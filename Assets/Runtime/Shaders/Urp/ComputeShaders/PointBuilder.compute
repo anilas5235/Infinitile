@@ -186,24 +186,49 @@ void RebuildPoints(uint3 id : SV_DispatchThreadID)
 // ─────────────────────────────────────────────────────────────────────────────
 // Copy Points Kernel - Copy points to final buffer for rendering
 // ─────────────────────────────────────────────────────────────────────────────
-StructuredBuffer<PointData> _PointsIn;
-RWStructuredBuffer<PointData> _PointsCopyOut;
-uint _PointCount;
-uint _PointOffset;
+StructuredBuffer<PointData> _SolidPointsIn;
+RWStructuredBuffer<PointData> _SolidPointsCopyOut;
 
-[numthreads(64, 1, 1)]
+StructuredBuffer<PointData> _TransparentPointsIn;
+RWStructuredBuffer<PointData> _TransparentPointsCopyOut;
+
+StructuredBuffer<PointData> _FoliagePointsIn;
+RWStructuredBuffer<PointData> _FoliagePointsCopyOut;
+
+StructuredBuffer<uint2> _PointsCountOffset; // x = count, y = transparent offset
+
+[numthreads(8, 3, 1)]
 void CopyPoints(uint3 id : SV_DispatchThreadID)
 {
-    uint baseIdx = id.x * 4u;
-    if (baseIdx >= _PointCount) return;
+    uint base = id.x * 32u;
+    uint max = _PointsCountOffset[id.y].x;
+    if (base >= max) return;
+    
+    uint offset = _PointsCountOffset[id.y].y;
 
-    [unroll]
-    for (uint i = 0u; i < 4u; i++)
+    for (uint i = 0u; i < 32u; i++)
     {
-        uint idx = baseIdx + i;
-        if (idx < _PointCount)
+        uint idx = base + i;
+        if (idx < max)
         {
-            _PointsCopyOut[_PointOffset + idx] = _PointsIn[idx];
+            switch (id.y)
+            {
+            case 0: // Solid
+                _SolidPointsCopyOut[offset + idx] = _SolidPointsIn[idx];
+                break;
+            case 1: // Transparent
+                _TransparentPointsCopyOut[offset + idx] = _TransparentPointsIn[idx];
+                break;
+            case 2: // Foliage
+                _FoliagePointsCopyOut[offset + idx] = _FoliagePointsIn[idx];
+                break;
+            default:
+                break;
+            }
+        }
+        else
+        {
+            break;
         }
     }
 }
