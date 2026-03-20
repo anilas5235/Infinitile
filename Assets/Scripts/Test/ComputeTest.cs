@@ -17,7 +17,9 @@ namespace Test
 {
     public class ComputeTest : MonoBehaviour
     {
-        private const int RenderBufferSize = 128 * 512;
+        private const int PointsPerPage = 128;
+        private const int PagesPerBuffer = 512;
+        private const int RenderBufferSize = PointsPerPage * PagesPerBuffer;
 
         
 
@@ -60,10 +62,13 @@ namespace Test
         private GraphicsBuffer _bigSolidVertexBuffer;
         private GraphicsBuffer _bigTransparentVertexBuffer;
         private GraphicsBuffer _bigFoliageVertexBuffer;
-        private GraphicsBuffer _solidIntervalsBuffer;
-        private GraphicsBuffer _transparentIntervalsBuffer;
-        private GraphicsBuffer _foliageIntervalsBuffer;
-        private GraphicsBuffer _pointsCountOffsetBuffer;
+        private GraphicsBuffer _solidPageStatesBuffer;
+        private GraphicsBuffer _transparentPageStatesBuffer;
+        private GraphicsBuffer _foliagePageStatesBuffer;
+        private GraphicsBuffer _solidPagesBuffer;
+        private GraphicsBuffer _transparentPagesBuffer;
+        private GraphicsBuffer _foliagePagesBuffer;
+        private GraphicsBuffer _pageCountsBuffer;
 
         private GraphicsBuffer _readBackCountBuffer;
 
@@ -123,15 +128,18 @@ namespace Test
             _bigFoliageVertexBuffer = new GraphicsBuffer(Target.Structured | Target.CopyDestination, RenderBufferSize,
                 Marshal.SizeOf<Vertex>());
 
-            _solidIntervalsBuffer = new GraphicsBuffer(Target.Structured, 1, Marshal.SizeOf<uint2>());
-            _transparentIntervalsBuffer = new GraphicsBuffer(Target.Structured, 1, Marshal.SizeOf<uint2>());
-            _foliageIntervalsBuffer = new GraphicsBuffer(Target.Structured, 1, Marshal.SizeOf<uint2>());
-            uint2[] emptyIntervals = { new uint2(0u, 0u) };
-            _solidIntervalsBuffer.SetData(emptyIntervals);
-            _transparentIntervalsBuffer.SetData(emptyIntervals);
-            _foliageIntervalsBuffer.SetData(emptyIntervals);
+            _solidPageStatesBuffer = new GraphicsBuffer(Target.Structured, PagesPerBuffer, sizeof(uint));
+            _transparentPageStatesBuffer = new GraphicsBuffer(Target.Structured, PagesPerBuffer, sizeof(uint));
+            _foliagePageStatesBuffer = new GraphicsBuffer(Target.Structured, PagesPerBuffer, sizeof(uint));
+            uint[] emptyPageStates = new uint[PagesPerBuffer];
+            _solidPageStatesBuffer.SetData(emptyPageStates);
+            _transparentPageStatesBuffer.SetData(emptyPageStates);
+            _foliagePageStatesBuffer.SetData(emptyPageStates);
 
-            _pointsCountOffsetBuffer = new GraphicsBuffer(Target.Structured, 3, Marshal.SizeOf<uint2>());
+            _solidPagesBuffer = new GraphicsBuffer(Target.Structured, PagesPerBuffer, Marshal.SizeOf<uint2>());
+            _transparentPagesBuffer = new GraphicsBuffer(Target.Structured, PagesPerBuffer, Marshal.SizeOf<uint2>());
+            _foliagePagesBuffer = new GraphicsBuffer(Target.Structured, PagesPerBuffer, Marshal.SizeOf<uint2>());
+            _pageCountsBuffer = new GraphicsBuffer(Target.Structured, 3, sizeof(uint));
 
             _solidArgBuffer = new GraphicsBuffer(Target.IndirectArguments, 5, sizeof(uint));
             _solidArgBuffer.SetData(_defaultArgs);
@@ -149,19 +157,19 @@ namespace Test
             {
                 VertexBuffer = _bigSolidVertexBuffer,
                 ArgsBuffer = _solidArgBuffer,
-                IntervalsBuffer = _solidIntervalsBuffer
+                PageStatesBuffer = _solidPageStatesBuffer
             });
             _drawCalls[1].AddDrawCall(new DrawCall
             {
                 VertexBuffer = _bigTransparentVertexBuffer,
                 ArgsBuffer = _transparentArgBuffer,
-                IntervalsBuffer = _transparentIntervalsBuffer,
+                PageStatesBuffer = _transparentPageStatesBuffer,
             });
             _drawCalls[2].AddDrawCall(new DrawCall
             {
                 VertexBuffer = _bigFoliageVertexBuffer,
                 ArgsBuffer = _foliageArgBuffer,
-                IntervalsBuffer = _foliageIntervalsBuffer,
+                PageStatesBuffer = _foliagePageStatesBuffer,
             });
         }
 
@@ -184,13 +192,18 @@ namespace Test
             _transparentPointsOut.Dispose();
             _foliagePointsOut.Dispose();
             _solidArgBuffer.Dispose();
+            _transparentArgBuffer.Dispose();
+            _foliageArgBuffer.Dispose();
             _bigSolidVertexBuffer.Dispose();
             _bigTransparentVertexBuffer.Dispose();
             _bigFoliageVertexBuffer.Dispose();
-            _solidIntervalsBuffer.Dispose();
-            _transparentIntervalsBuffer.Dispose();
-            _foliageIntervalsBuffer.Dispose();
-            _pointsCountOffsetBuffer.Dispose();
+            _solidPageStatesBuffer.Dispose();
+            _transparentPageStatesBuffer.Dispose();
+            _foliagePageStatesBuffer.Dispose();
+            _solidPagesBuffer.Dispose();
+            _transparentPagesBuffer.Dispose();
+            _foliagePagesBuffer.Dispose();
+            _pageCountsBuffer.Dispose();
             _materialPropertyBlock.Clear();
         }
 
@@ -228,17 +241,14 @@ namespace Test
             int solidCount = (int)counts[0];
             SetIndirectArgs(_solidArgBuffer, solidCount);
             _drawCalls[0].DrawCalls[0].VertexCount = solidCount;
-            UpdateSingleInterval(_solidIntervalsBuffer, solidCount, _drawCalls[0].DrawCalls[0]);
 
             int transparentCount = (int)counts[1];
             SetIndirectArgs(_transparentArgBuffer, transparentCount);
             _drawCalls[1].DrawCalls[0].VertexCount = transparentCount;
-            UpdateSingleInterval(_transparentIntervalsBuffer, transparentCount, _drawCalls[1].DrawCalls[0]);
 
             int foliageCount = (int)counts[2];
             SetIndirectArgs(_foliageArgBuffer, foliageCount);
             _drawCalls[2].DrawCalls[0].VertexCount = foliageCount;
-            UpdateSingleInterval(_foliageIntervalsBuffer, foliageCount, _drawCalls[2].DrawCalls[0]);
             double indicesSetFinished = Time.realtimeSinceStartupAsDouble;
 
             CopyJob(solidCount, transparentCount, foliageCount);
@@ -264,37 +274,70 @@ namespace Test
 
         private void CopyJob(int solidCount, int transparentCount, int foliageCount)
         {
-            uint2[] pointsCountOffsets =
-            {
-                new((uint)solidCount, 0u),
-                new((uint)transparentCount, 0u),
-                new((uint)foliageCount, 0u)
-            };
-            _pointsCountOffsetBuffer.SetData(pointsCountOffsets);
+            int solidPagesCount = BuildPagesForLayer(solidCount, _solidPagesBuffer, _solidPageStatesBuffer);
+            int transparentPagesCount = BuildPagesForLayer(transparentCount, _transparentPagesBuffer,
+                _transparentPageStatesBuffer);
+            int foliagePagesCount = BuildPagesForLayer(foliageCount, _foliagePagesBuffer, _foliagePageStatesBuffer);
+
+            uint[] pageCounts = { (uint)solidPagesCount, (uint)transparentPagesCount, (uint)foliagePagesCount };
+            _pageCountsBuffer.SetData(pageCounts);
 
             pointBuilder.SetBuffer(_copyPointsKernel, SolidPointsInNameID, _solidPointsOut);
             pointBuilder.SetBuffer(_copyPointsKernel, SolidPointsCopyOutNameID, _bigSolidVertexBuffer);
+            pointBuilder.SetBuffer(_copyPointsKernel, SolidPagesNameID, _solidPagesBuffer);
+            pointBuilder.SetInt(SolidPagesCountNameID, solidPagesCount);
             pointBuilder.SetBuffer(_copyPointsKernel, TransparentPointsInNameID, _transparentPointsOut);
             pointBuilder.SetBuffer(_copyPointsKernel, TransparentPointsCopyOutNameID, _bigTransparentVertexBuffer);
+            pointBuilder.SetBuffer(_copyPointsKernel, TransparentPagesNameID, _transparentPagesBuffer);
+            pointBuilder.SetInt(TransparentPagesCountNameID, transparentPagesCount);
             pointBuilder.SetBuffer(_copyPointsKernel, FoliagePointsInNameID, _foliagePointsOut);
             pointBuilder.SetBuffer(_copyPointsKernel, FoliagePointsCopyOutNameID, _bigFoliageVertexBuffer);
-            pointBuilder.SetBuffer(_copyPointsKernel, PointsCountOffsetNameID, _pointsCountOffsetBuffer);
+            pointBuilder.SetBuffer(_copyPointsKernel, FoliagePagesNameID, _foliagePagesBuffer);
+            pointBuilder.SetInt(FoliagePagesCountNameID, foliagePagesCount);
+            pointBuilder.SetBuffer(_copyPointsKernel, PageCountsNameID, _pageCountsBuffer);
+            pointBuilder.SetInt(PointsPerPageNameID, PointsPerPage);
 
-            int maxCount = math.max(solidCount, math.max(transparentCount, foliageCount));
-            if (maxCount <= 0) return;
+            int maxPageCount = math.max(solidPagesCount, math.max(transparentPagesCount, foliagePagesCount));
+            if (maxPageCount <= 0) return;
 
-            pointBuilder.Dispatch(_copyPointsKernel, Mathf.CeilToInt(maxCount / 256f), 1, 1);
+            pointBuilder.Dispatch(_copyPointsKernel, Mathf.CeilToInt(maxPageCount / 8f), 1, 1);
 
             _solidPointsOut.SetCounterValue(0);
             _transparentPointsOut.SetCounterValue(0);
             _foliagePointsOut.SetCounterValue(0);
         }
 
-        private static void UpdateSingleInterval(GraphicsBuffer intervalBuffer, int pointCount, DrawCall drawCall)
+        private static int BuildPagesForLayer(int pointCount, GraphicsBuffer pagesBuffer, GraphicsBuffer pageStatesBuffer)
         {
-            uint2[] data = { new uint2(0u, (uint)math.max(0, pointCount)) };
-            intervalBuffer.SetData(data);
-            drawCall.IntervalCount = pointCount > 0 ? 1 : 0;
+            if (pointCount < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(pointCount));
+            }
+
+            if (pointCount > RenderBufferSize)
+            {
+                throw new InvalidOperationException(
+                    $"Layer point count ({pointCount}) exceeds test render buffer capacity ({RenderBufferSize}).");
+            }
+
+            uint2[] pages = new uint2[PagesPerBuffer];
+            uint[] pageStates = new uint[PagesPerBuffer];
+
+            int pageIndex = 0;
+            int remaining = pointCount;
+            while (remaining > 0)
+            {
+                int inPageCount = math.min(PointsPerPage, remaining);
+                pages[pageIndex] = new uint2((uint)pageIndex, (uint)inPageCount);
+                pageStates[pageIndex] = (uint)inPageCount;
+
+                pageIndex++;
+                remaining -= inPageCount;
+            }
+
+            pagesBuffer.SetData(pages);
+            pageStatesBuffer.SetData(pageStates);
+            return pageIndex;
         }
 
         private void Draw(ScriptableRenderContext context, Camera cam)
@@ -328,7 +371,8 @@ namespace Test
                 {
                     if (!drawCall.CanDraw) continue;
                     PropertyBlock.SetBuffer(PointDataNameID, drawCall.VertexBuffer);
-                    PropertyBlock.SetBuffer(PageStatesNameID,drawCall.IntervalsBuffer);
+                    PropertyBlock.SetBuffer(PageStatesNameID, drawCall.PageStatesBuffer);
+                    PropertyBlock.SetInteger(PointsPerPageNameID, PointsPerPage);
                     Graphics.DrawProceduralIndirect(
                         Material,
                         new Bounds(Vector3.zero, Vector3.one * 100),
@@ -351,8 +395,7 @@ namespace Test
             public int VertexCount;
             public GraphicsBuffer VertexBuffer;
             public GraphicsBuffer ArgsBuffer;
-            public GraphicsBuffer IntervalsBuffer;
-            public int IntervalCount;
+            public GraphicsBuffer PageStatesBuffer;
         }
     }
 }

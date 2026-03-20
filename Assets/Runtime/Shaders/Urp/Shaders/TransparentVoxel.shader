@@ -29,8 +29,10 @@
 
         StructuredBuffer<PointData> _PointData;
         StructuredBuffer<uint> _VisiblePartitions;
-        StructuredBuffer<uint2> _PointIntervals;
-        uint _PointIntervalCount;
+        StructuredBuffer<uint> _PageStates;
+        uint _PointsPerPage;
+
+        static const uint MAX_PAGE_STATES = 512u;
 
         struct Varyings
         {
@@ -42,52 +44,34 @@
             float4 positionSS : TEXCOORD3;
         };
 
-        uint get_interval_prefix_count(uint exclusiveIndex)
-        {
-            uint prefix = 0u;
-            [loop]
-            for (uint i = 0u; i < exclusiveIndex; i++)
-            {
-                prefix += _PointIntervals[i].y;
-            }
-
-            return prefix;
-        }
-
         uint resolve_physical_point_id(uint logicalPointID)
         {
-            if (_PointIntervalCount == 0u)
+            if (_PointsPerPage == 0u)
             {
                 return 0u;
             }
 
-            uint low = 0u;
-            uint high = _PointIntervalCount;
-
-            while (low < high)
+            uint remaining = logicalPointID;
+            [loop]
+            for (uint pageIndex = 0u; pageIndex < MAX_PAGE_STATES; pageIndex++)
             {
-                uint mid = (low + high) >> 1;
-                uint prefixBefore = get_interval_prefix_count(mid);
-                uint midCount = _PointIntervals[mid].y;
-                uint prefixAfter = prefixBefore + midCount;
-
-                if (logicalPointID < prefixBefore)
+                uint pageCount = _PageStates[pageIndex];
+                if (pageCount == 0u)
                 {
-                    high = mid;
-                    continue;
+                    break;
                 }
 
-                if (logicalPointID >= prefixAfter)
+                if (remaining < pageCount)
                 {
-                    low = mid + 1u;
-                    continue;
+                    return pageIndex * _PointsPerPage + remaining;
                 }
 
-                return _PointIntervals[mid].x + (logicalPointID - prefixBefore);
+                remaining -= pageCount;
             }
 
-            return _PointIntervals[0].x;
+            return 0u;
         }
+
 
         // ── Vertex shader with expansion ─────────────────────────────
         Varyings vert(uint vertexID : SV_VertexID)

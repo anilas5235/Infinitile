@@ -208,44 +208,47 @@ uint _PointsPerPage;
 [numthreads(8, 3, 1)]
 void CopyPoints(uint3 id : SV_DispatchThreadID)
 {
-    if (id.x >= _PageCounts[id.y]) return; // No more pages to process in this layer
-    uint baseInInput = id.x * _PointsPerPage;
-    uint2 IndexAndCount = 0;
+    if (id.y >= 3u) return;
+
+    uint layerPageCount = _PageCounts[id.y];
+    if (id.x >= layerPageCount) return; // No more pages to process in this layer
+
+    uint2 indexAndCount = 0;
     switch (id.y)
     {
-        case 0: IndexAndCount = _SolidPages[id.x].y;
-        case 1: IndexAndCount =  _TransparentPages[id.x].y;
-        case 2: IndexAndCount =  _FoliagePages[id.x].y;
+    case 0: indexAndCount = _SolidPages[id.x];
+        break;
+    case 1: indexAndCount = _TransparentPages[id.x];
+        break;
+    case 2: indexAndCount = _FoliagePages[id.x];
+        break;
+    default:
+        return;
     }
-    
-    if (IndexAndCount.y == 0) return;
-    
-    uint endInInput = baseInInput + IndexAndCount.y;    
-    uint offset = IndexAndCount.x * _PointsPerPage;
 
-    for (uint i = 0u; i < _PointsPerPage; i++)
+    if (indexAndCount.y == 0u) return;
+
+    uint copyCount = min(indexAndCount.y, _PointsPerPage);
+    uint srcBase = id.x * _PointsPerPage;
+    uint dstBase = indexAndCount.x * _PointsPerPage;
+
+    for (uint i = 0u; i < copyCount; i++)
     {
-        uint idx = baseInInput + i;
-        if (idx < endInInput)
+        uint src = srcBase + i;
+        uint dst = dstBase + i;
+
+        switch (id.y)
         {
-            switch (id.y)
-            {
-            case 0: // Solid
-                _SolidPointsCopyOut[offset + idx] = _SolidPointsIn[idx];
-                break;
-            case 1: // Transparent
-                _TransparentPointsCopyOut[offset + idx] = _TransparentPointsIn[idx];
-                break;
-            case 2: // Foliage
-                _FoliagePointsCopyOut[offset + idx] = _FoliagePointsIn[idx];
-                break;
-            default:
-                break;
-            }
-        }
-        else
-        {
+        case 0: // Solid
+            _SolidPointsCopyOut[dst] = _SolidPointsIn[src];
             break;
+        case 1: // Transparent
+            _TransparentPointsCopyOut[dst] = _TransparentPointsIn[src];
+            break;
+        case 2: // Foliage
+            _FoliagePointsCopyOut[dst] = _FoliagePointsIn[src];
+            break;
+        default: break;
         }
     }
 }
