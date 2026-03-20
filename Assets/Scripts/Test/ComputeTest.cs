@@ -19,33 +19,7 @@ namespace Test
     {
         private const int RenderBufferSize = 128 * 512;
 
-        private static readonly int VoxelRenderDefNameID = Shader.PropertyToID("_VoxelRenderDefs");
-        private static readonly int VoxelRenderDefCountNameID = Shader.PropertyToID("_VoxelRenderDefsCount");
-
-        private static readonly int VoxelQuadTexPairNameID = Shader.PropertyToID("_VoxelQuadTexPairs");
-        private static readonly int VoxelQuadTexPairCountNameID = Shader.PropertyToID("_VoxelQuadTexPairsCount");
-
-        private static readonly int VoxelDataNameID = Shader.PropertyToID("_RawVoxels");
-        private static readonly int VoxelCompressedCountNameID = Shader.PropertyToID("_RawVoxelsCompressedCount");
-
-        private static readonly int MetadataNameID = Shader.PropertyToID("_Metadata");
-
-        private static readonly int SolidPointsOutNameID = Shader.PropertyToID("_SolidPointsOut");
-        private static readonly int TransparentPointsOutNameID = Shader.PropertyToID("_TransparentPointsOut");
-        private static readonly int FoliagePointsOutNameID = Shader.PropertyToID("_FoliagePointsOut");
-        private static readonly int PartitionIndexNameID = Shader.PropertyToID("_PartitionIndex");
-
-        private static readonly int SolidPointsInNameID = Shader.PropertyToID("_SolidPointsIn");
-        private static readonly int SolidPointsCopyOutNameID = Shader.PropertyToID("_SolidPointsCopyOut");
-        private static readonly int TransparentPointsInNameID = Shader.PropertyToID("_TransparentPointsIn");
-        private static readonly int TransparentPointsCopyOutNameID = Shader.PropertyToID("_TransparentPointsCopyOut");
-        private static readonly int FoliagePointsInNameID = Shader.PropertyToID("_FoliagePointsIn");
-        private static readonly int FoliagePointsCopyOutNameID = Shader.PropertyToID("_FoliagePointsCopyOut");
-        private static readonly int PointsCountOffsetNameID = Shader.PropertyToID("_PointsCountOffset");
-
-        private static readonly int PointDataNameID = Shader.PropertyToID("_PointData");
-        private static readonly int PointIntervalsNameID = Shader.PropertyToID("_PointIntervals");
-        private static readonly int PointIntervalCountNameID = Shader.PropertyToID("_PointIntervalCount");
+        
 
         struct PartitionMetadata
         {
@@ -354,8 +328,7 @@ namespace Test
                 {
                     if (!drawCall.CanDraw) continue;
                     PropertyBlock.SetBuffer(PointDataNameID, drawCall.VertexBuffer);
-                    PropertyBlock.SetBuffer(PointIntervalsNameID, drawCall.IntervalsBuffer);
-                    PropertyBlock.SetInt(PointIntervalCountNameID, drawCall.IntervalCount);
+                    PropertyBlock.SetBuffer(PageStatesNameID,drawCall.IntervalsBuffer);
                     Graphics.DrawProceduralIndirect(
                         Material,
                         new Bounds(Vector3.zero, Vector3.one * 100),

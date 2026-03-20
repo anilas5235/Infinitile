@@ -188,28 +188,45 @@ void RebuildPoints(uint3 id : SV_DispatchThreadID)
 // ─────────────────────────────────────────────────────────────────────────────
 StructuredBuffer<PointData> _SolidPointsIn;
 RWStructuredBuffer<PointData> _SolidPointsCopyOut;
+StructuredBuffer<uint2> _SolidPages; //Index & Count
+uint _SolidPagesCount;
 
 StructuredBuffer<PointData> _TransparentPointsIn;
 RWStructuredBuffer<PointData> _TransparentPointsCopyOut;
+StructuredBuffer<uint2> _TransparentPages;
+uint _TransparentPagesCount;
 
 StructuredBuffer<PointData> _FoliagePointsIn;
 RWStructuredBuffer<PointData> _FoliagePointsCopyOut;
+StructuredBuffer<uint2> _FoliagePages;
+uint _FoliagePagesCount;
 
-StructuredBuffer<uint2> _PointsCountOffset; // x = count, y = transparent offset
+StructuredBuffer<uint> _PageCounts;
+
+uint _PointsPerPage;
 
 [numthreads(8, 3, 1)]
 void CopyPoints(uint3 id : SV_DispatchThreadID)
 {
-    uint base = id.x * 32u;
-    uint max = _PointsCountOffset[id.y].x;
-    if (base >= max) return;
-    
-    uint offset = _PointsCountOffset[id.y].y;
-
-    for (uint i = 0u; i < 32u; i++)
+    if (id.x >= _PageCounts[id.y]) return; // No more pages to process in this layer
+    uint baseInInput = id.x * _PointsPerPage;
+    uint2 IndexAndCount = 0;
+    switch (id.y)
     {
-        uint idx = base + i;
-        if (idx < max)
+        case 0: IndexAndCount = _SolidPages[id.x].y;
+        case 1: IndexAndCount =  _TransparentPages[id.x].y;
+        case 2: IndexAndCount =  _FoliagePages[id.x].y;
+    }
+    
+    if (IndexAndCount.y == 0) return;
+    
+    uint endInInput = baseInInput + IndexAndCount.y;    
+    uint offset = IndexAndCount.x * _PointsPerPage;
+
+    for (uint i = 0u; i < _PointsPerPage; i++)
+    {
+        uint idx = baseInInput + i;
+        if (idx < endInInput)
         {
             switch (id.y)
             {
