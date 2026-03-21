@@ -31,17 +31,16 @@ namespace Runtime.Engine.Utils
         public static readonly int SolidPointsInNameID = Shader.PropertyToID("_SolidPointsIn");
         public static readonly int SolidPointsCopyOutNameID = Shader.PropertyToID("_SolidPointsCopyOut");
         public static readonly int SolidPagesNameID = Shader.PropertyToID("_SolidPages");
-        public static readonly int SolidPagesCountNameID = Shader.PropertyToID("_SolidPagesCount");
+        
         public static readonly int TransparentPointsInNameID = Shader.PropertyToID("_TransparentPointsIn");
         public static readonly int TransparentPointsCopyOutNameID = Shader.PropertyToID("_TransparentPointsCopyOut");
         public static readonly int TransparentPagesNameID = Shader.PropertyToID("_TransparentPages");
-        public static readonly int TransparentPagesCountNameID = Shader.PropertyToID("_TransparentPagesCount");
+        
         public static readonly int FoliagePointsInNameID = Shader.PropertyToID("_FoliagePointsIn");
         public static readonly int FoliagePointsCopyOutNameID = Shader.PropertyToID("_FoliagePointsCopyOut");
         public static readonly int FoliagePagesNameID = Shader.PropertyToID("_FoliagePages");
-        public static readonly int FoliagePagesCountNameID = Shader.PropertyToID("_FoliagePagesCount");
+        
         public static readonly int PageCountsNameID = Shader.PropertyToID("_PageCounts");
-        public static readonly int PointsCountOffsetNameID = Shader.PropertyToID("_PointsCountOffset");
 
         public static readonly int PointDataNameID = Shader.PropertyToID("_PointData");
         public static readonly int PageStatesNameID = Shader.PropertyToID("_PageStates");

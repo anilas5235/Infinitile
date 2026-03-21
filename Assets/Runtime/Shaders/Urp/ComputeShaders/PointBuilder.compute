@@ -189,17 +189,14 @@ void RebuildPoints(uint3 id : SV_DispatchThreadID)
 StructuredBuffer<PointData> _SolidPointsIn;
 RWStructuredBuffer<PointData> _SolidPointsCopyOut;
 StructuredBuffer<uint2> _SolidPages; //Index & Count
-uint _SolidPagesCount;
 
 StructuredBuffer<PointData> _TransparentPointsIn;
 RWStructuredBuffer<PointData> _TransparentPointsCopyOut;
 StructuredBuffer<uint2> _TransparentPages;
-uint _TransparentPagesCount;
 
 StructuredBuffer<PointData> _FoliagePointsIn;
 RWStructuredBuffer<PointData> _FoliagePointsCopyOut;
 StructuredBuffer<uint2> _FoliagePages;
-uint _FoliagePagesCount;
 
 StructuredBuffer<uint> _PageCounts;
 
@@ -213,7 +210,7 @@ void CopyPoints(uint3 id : SV_DispatchThreadID)
     uint layerPageCount = _PageCounts[id.y];
     if (id.x >= layerPageCount) return; // No more pages to process in this layer
 
-    uint2 indexAndCount = 0;
+    uint2 indexAndCount;
     switch (id.y)
     {
     case 0: indexAndCount = _SolidPages[id.x];

@@ -285,15 +285,12 @@ namespace Test
             pointBuilder.SetBuffer(_copyPointsKernel, SolidPointsInNameID, _solidPointsOut);
             pointBuilder.SetBuffer(_copyPointsKernel, SolidPointsCopyOutNameID, _bigSolidVertexBuffer);
             pointBuilder.SetBuffer(_copyPointsKernel, SolidPagesNameID, _solidPagesBuffer);
-            pointBuilder.SetInt(SolidPagesCountNameID, solidPagesCount);
             pointBuilder.SetBuffer(_copyPointsKernel, TransparentPointsInNameID, _transparentPointsOut);
             pointBuilder.SetBuffer(_copyPointsKernel, TransparentPointsCopyOutNameID, _bigTransparentVertexBuffer);
             pointBuilder.SetBuffer(_copyPointsKernel, TransparentPagesNameID, _transparentPagesBuffer);
-            pointBuilder.SetInt(TransparentPagesCountNameID, transparentPagesCount);
             pointBuilder.SetBuffer(_copyPointsKernel, FoliagePointsInNameID, _foliagePointsOut);
             pointBuilder.SetBuffer(_copyPointsKernel, FoliagePointsCopyOutNameID, _bigFoliageVertexBuffer);
             pointBuilder.SetBuffer(_copyPointsKernel, FoliagePagesNameID, _foliagePagesBuffer);
-            pointBuilder.SetInt(FoliagePagesCountNameID, foliagePagesCount);
             pointBuilder.SetBuffer(_copyPointsKernel, PageCountsNameID, _pageCountsBuffer);
             pointBuilder.SetInt(PointsPerPageNameID, PointsPerPage);
 
