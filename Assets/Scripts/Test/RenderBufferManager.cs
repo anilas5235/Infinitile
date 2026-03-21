@@ -2,18 +2,18 @@
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Runtime.Engine.Jobs.Meshing;
-using Runtime.Engine.Utils;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
+using static Runtime.Engine.Utils.VoxelRenderConstants;
 
 namespace Test
 {
     public class RenderBufferManager : IDisposable
     {
         private const int RenderBufferSize = PageSize * PagesPerBuffer;
-        private const int PageSize = 128;
-        private const int PagesPerBuffer = 512;
+        internal const int PageSize = 128;
+        internal const int PagesPerBuffer = 512;
 
         private class BufferPage
         {
@@ -38,12 +38,11 @@ namespace Test
             private readonly MaterialPropertyBlock _propertyBlock;
 
             private bool _stateBufferDirty;
-            
+
             public GraphicsBuffer Buffer => _buffer;
 
             public RenderBuffer()
             {
-                
                 _buffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, RenderBufferSize,
                     Marshal.SizeOf<Vertex>());
                 _argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 5, sizeof(uint));
@@ -52,7 +51,7 @@ namespace Test
                     Marshal.SizeOf<uint>());
 
                 _propertyBlock = new MaterialPropertyBlock();
-                _propertyBlock.SetInteger(VoxelRenderConstants.PointsPerPageNameID, PageSize);
+                _propertyBlock.SetInteger(PointsPerPageNameID, PageSize);
 
                 _pages = new BufferPage[PagesPerBuffer];
                 for (int i = 0; i < _pages.Length; i++) _pages[i] = new BufferPage();
@@ -88,11 +87,12 @@ namespace Test
             {
                 if (index < 0 || index >= _pages.Length) throw new ArgumentOutOfRangeException(nameof(index));
             }
-            
+
             public void Draw(Material mat, Camera cam)
             {
-                _propertyBlock.SetBuffer(VoxelRenderConstants.PointDataNameID, _buffer);
-                _propertyBlock.SetBuffer(VoxelRenderConstants.PageStatesNameID, _pageStateBuffer);
+                _propertyBlock.SetBuffer(PointDataNameID, _buffer);
+                _propertyBlock.SetBuffer(PageStatesNameID, _pageStateBuffer);
+                _propertyBlock.SetInteger(PointsPerPageNameID, PageSize);
                 Graphics.DrawProceduralIndirect(
                     mat,
                     new Bounds(Vector3.zero, Vector3.one * 100),
@@ -159,14 +159,10 @@ namespace Test
 
         public void Draw(Camera cam)
         {
-            foreach (RenderBuffer renderBuffer in _buffers)
-            {
-                renderBuffer.RebuildBuffers();
-                renderBuffer.Draw(_material, cam);
-            }
+            foreach (RenderBuffer renderBuffer in _buffers) renderBuffer.Draw(_material, cam);
         }
 
-        private readonly struct AllocInfo
+        public readonly struct AllocInfo
         {
             public readonly int BufferIndex;
             public readonly int PageIndex;
@@ -181,7 +177,7 @@ namespace Test
             }
         }
 
-        private List<AllocInfo> AllocBufferSpace(int3 partitionPos, int pointCount)
+        public List<AllocInfo> AllocBufferSpace(int3 partitionPos, int pointCount)
         {
             ThrowIfDisposed();
 
@@ -235,7 +231,7 @@ namespace Test
             return (newBufferIndex, firstPageIndex);
         }
 
-        private void ReleasePartition(int3 partitionPos)
+        public void ReleasePartition(int3 partitionPos)
         {
             if (!_partitionAllocations.TryGetValue(partitionPos, out List<int2> allocations))
             {
@@ -275,6 +271,23 @@ namespace Test
             _buffers.Clear();
             _partitionAllocations.Clear();
             _isDisposed = true;
+        }
+
+        public GraphicsBuffer GetBuffer(int bufferIndex)
+        {
+            ThrowIfDisposed();
+
+            if (bufferIndex < 0 || bufferIndex >= _buffers.Count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(bufferIndex), "Invalid buffer index.");
+            }
+
+            return _buffers[bufferIndex].Buffer;
+        }
+
+        public void RebuildBuffers()
+        {
+            foreach (RenderBuffer buffer in _buffers) buffer.RebuildBuffers();
         }
     }
 }

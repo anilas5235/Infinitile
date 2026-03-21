@@ -26,17 +26,8 @@ namespace Test
         struct PartitionMetadata
         {
             int3 partitionPos; // World partition coordinates
-            uint pointCount; // Actual points generated
             float3 boundsMin; // AABB min for frustum culling
             float3 boundsMax; // AABB max
-        };
-
-        struct ChunkMetadata
-        {
-            int2 chunkPos; // World chunk XZ coordinates
-            float3 boundsMin; // AABB min for coarse culling
-            float3 boundsMax; // AABB max
-            uint partitionMask; // Bitmask: which of 8 partitions are active (bit Y)
         };
 
         [SerializeField] private ComputeShader pointBuilder;

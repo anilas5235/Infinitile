@@ -1,6 +1,7 @@
 ﻿#pragma kernel RebuildPoints
 #pragma kernel CopyPoints
 
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "VoxelComputeCommon.hlsl"
 #include "../VoxelCommon.hlsl"
 
@@ -51,6 +52,7 @@ StructuredBuffer<uint> _VoxelQuadTexPairs;
 uint _VoxelQuadTexPairsCount;
 StructuredBuffer<uint2> _RawVoxels;
 uint _RawVoxelsCompressedCount;
+
 RWStructuredBuffer<PartitionMetadata> _Metadata;
 AppendStructuredBuffer<PointData> _SolidPointsOut;
 AppendStructuredBuffer<PointData> _TransparentPointsOut;
@@ -65,7 +67,7 @@ VoxelDef get_voxel_def(uint voxelId)
 
 uint get_voxel_array_index(in int3 pos)
 {
-    return pos.x * 1024u + pos.z * 32u + pos.y;
+    return ((uint)pos.x << 10) + ((uint)pos.z << 5) + (uint)pos.y;
 }
 
 uint get_voxel(in int3 pos)

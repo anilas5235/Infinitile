@@ -17,7 +17,6 @@
 struct PartitionMetadata
 {
     int3 partitionPos;   // World partition coordinates
-    uint pointCount;     // Actual points generated
     float3 boundsMin;    // AABB min for frustum culling
     float3 boundsMax;    // AABB max
 };
