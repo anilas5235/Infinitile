@@ -169,7 +169,7 @@ namespace Runtime.Engine.VoxelConfig.Data
             if (_voxelEngineRenderGenData.VoxelRenderDefs.IsCreated)
                 _voxelEngineRenderGenData.VoxelRenderDefs.Dispose();
             _voxelEngineRenderGenData.VoxelRenderDefs =
-                new NativeArray<VoxelRenderDef>(_idToVoxel.Count, Allocator.Persistent);
+                new NativeArray<VoxelRenderDef>(_idToVoxel.Count, Allocator.Domain);
 
             _voxelRenderDefBuffer?.Dispose();
             _voxelRenderDefBuffer = new GraphicsBuffer(Target.Structured, _idToVoxel.Count, Marshal.SizeOf<GPUVoxelDef>());

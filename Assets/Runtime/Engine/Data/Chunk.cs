@@ -50,7 +50,7 @@ namespace Runtime.Engine.Data
 
         public PartitionLightData(int initCapacity)
         {
-            _data = new UnsafeIntervalList<byte>(initCapacity, Allocator.Persistent);
+            _data = new UnsafeIntervalList<byte>(initCapacity, Allocator.Domain);
             _data.AddInterval(0, VoxelsPerPartition);
         }
 
@@ -100,7 +100,7 @@ namespace Runtime.Engine.Data
 
         public ChunkLightData(int initCapacity)
         {
-            _data = new UnsafeList<PartitionLightData>(PartitionsPerChunk, Allocator.Persistent);
+            _data = new UnsafeList<PartitionLightData>(PartitionsPerChunk, Allocator.Domain);
             for (int i = 0; i < PartitionsPerChunk; i++)
             {
                 _data.Add(new PartitionLightData(initCapacity));
@@ -141,7 +141,7 @@ namespace Runtime.Engine.Data
 
         public ChunkVoxelData(int initCapacity)
         {
-            _data = new UnsafeIntervalList<ushort>(initCapacity, Allocator.Persistent);
+            _data = new UnsafeIntervalList<ushort>(initCapacity, Allocator.Domain);
         }
 
         /// <summary>

@@ -42,10 +42,10 @@ namespace Runtime.Engine.Jobs.Chunk
             _chunkManager = chunkManager;
             _noiseProfile = noiseProfile;
             _config = config;
-            _jobs = new NativeList<int2>(Allocator.Persistent);
+            _jobs = new NativeList<int2>(Allocator.Domain);
             _results = new NativeParallelHashMap<int2, Data.ChunkVoxelData>(
                 settings.Chunk.LoadDistance.SquareSize(),
-                Allocator.Persistent
+                Allocator.Domain
             );
         }
 

@@ -53,11 +53,11 @@ namespace Runtime.Engine.Components
 
             _accessorMap = new NativeParallelHashMap<int2, ChunkVoxelData>(
                 settings.Scheduler.MeshingBatchSize * 6,
-                Allocator.Persistent
+                Allocator.Domain
             );
             _lightAccessorMap = new NativeParallelHashMap<int2, ChunkLightData>(
                 settings.Scheduler.MeshingBatchSize * 6,
-                Allocator.Persistent
+                Allocator.Domain
             );
         }
 

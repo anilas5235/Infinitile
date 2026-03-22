@@ -58,15 +58,15 @@ namespace Runtime.Engine.Jobs.Meshing
             _voxelRegistry = voxelRegistry;
 
             // Collider uses only Position and Normal from CVertex
-            _colliderVertexParams = new NativeArray<VertexAttributeDescriptor>(2, Allocator.Persistent)
+            _colliderVertexParams = new NativeArray<VertexAttributeDescriptor>(2, Allocator.Domain)
             {
                 [0] = new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float16, 4),
                 [1] = new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float16, 4)
             };
 
             _results = new NativeParallelHashMap<int3, MeshBuildJob.PartitionJobResult>(
-                settings.Chunk.DrawDistance.SquareSize(), Allocator.Persistent);
-            _jobs = new NativeList<int3>(Allocator.Persistent);
+                settings.Chunk.DrawDistance.SquareSize(), Allocator.Domain);
+            _jobs = new NativeList<int3>(Allocator.Domain);
         }
 
         /// <summary>
@@ -169,7 +169,7 @@ namespace Runtime.Engine.Jobs.Meshing
                     $"Total Mesh Build Time for {_jobs.Length} jobs: <color=red>{totalJobTime:0.000}</color>ms"
                 );
             }
-            
+
             // Trigger GPU rebuild after collider processing
             _chunkManager.OnGpuRebuildReady?.Invoke();
         }

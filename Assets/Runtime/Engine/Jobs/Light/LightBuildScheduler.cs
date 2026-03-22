@@ -50,11 +50,11 @@ namespace Runtime.Engine.Jobs.Light
             _chunkPool = chunkPool;
             _voxelRegistry = voxelRegistry;
 
-            _neighborOffsets = new NativeArray<int3>(VectorConstants.Int3Directions, Allocator.Persistent);
+            _neighborOffsets = new NativeArray<int3>(VectorConstants.Int3Directions, Allocator.Domain);
 
             _results = new NativeParallelHashMap<int3, PartitionLightData>(
-                settings.Chunk.DrawDistance.SquareSize(), Allocator.Persistent);
-            _jobs = new NativeList<int3>(Allocator.Persistent);
+                settings.Chunk.DrawDistance.SquareSize(), Allocator.Domain);
+            _jobs = new NativeList<int3>(Allocator.Domain);
         }
 
         /// <summary>
