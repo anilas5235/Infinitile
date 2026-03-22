@@ -175,6 +175,9 @@ namespace Test
                 PageIndex = pageIndex;
                 PointCount = pointCount;
             }
+
+            public uint2 ToIndexAndCount() => 
+                new((uint)PageIndex, (uint)PointCount);
         }
 
         public List<AllocInfo> AllocBufferSpace(int3 partitionPos, int pointCount)
