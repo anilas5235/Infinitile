@@ -1,4 +1,5 @@
-﻿using Unity.Mathematics;
+﻿using Runtime.Engine.Utils.Extensions;
+using Unity.Mathematics;
 using UnityEngine.Rendering;
 
 namespace Runtime.Engine.Utils
@@ -20,9 +21,9 @@ namespace Runtime.Engine.Utils
         internal const int VoxelsPerChunk = ChunkWidth * ChunkHeight * ChunkDepth;
 
 
-        internal const int PartitionWidth = ChunkWidth;
+        internal const int PartitionWidth = 32;
         internal const int PartitionHeight = 32;
-        internal const int PartitionDepth = ChunkDepth;
+        internal const int PartitionDepth = 32;
         
         internal const int MinPartitionPosXYZ = 0;
         internal const int MaxXPartitionPos = PartitionWidth - 1;
@@ -39,5 +40,11 @@ namespace Runtime.Engine.Utils
                                                    MeshUpdateFlags.DontResetBoneBounds;
         
         internal const byte MaxLightLevel = 15;
+        
+        public static int3 PartitionToWorldPos(int3 partition) => PartitionSize.MemberMultiply(partition);
+        
+        public static int3 WorldToPartitionPos(int3 worldPos) => PartitionSize.MemberDivide(worldPos);
+
+        public static int2 PartitionToChunkPos(int3 partition) => partition.xz;
     }
 }

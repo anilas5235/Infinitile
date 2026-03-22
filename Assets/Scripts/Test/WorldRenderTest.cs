@@ -24,9 +24,15 @@ namespace Test
                 _voxels.Set(index, (ushort)j);
             }
             vWRenderer.AddOrUpdateChunk(new int2(0, 0), _voxels);
+            vWRenderer.AddOrUpdateChunk(new int2(0, 1), _voxels);
+            vWRenderer.AddOrUpdateChunk(new int2(1, 1), _voxels);
+            vWRenderer.AddOrUpdateChunk(new int2(1, 0), _voxels);
             vWRenderer.UpdatePartitions(new List<int3>
             {
                 new(0,0,0),
+                new(1,0,0),
+                new(0,0,1),
+                new(1,0,1),
             });
         }
     }

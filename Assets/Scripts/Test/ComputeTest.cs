@@ -25,7 +25,8 @@ namespace Test
 
         struct PartitionMetadata
         {
-            int3 partitionPos; // World partition coordinates
+            int3 partitionPos; 
+            int3 partitionWorldPos; // World partition coordinates
             float3 boundsMin; // AABB min for frustum culling
             float3 boundsMax; // AABB max
         };

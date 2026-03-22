@@ -116,6 +116,8 @@ namespace Runtime.Engine.Utils.Extensions
         /// Komponentenweise Multiplikation mit Einzelwerten.
         /// </summary>
         public static int3 MemberMultiply(this int3 a, int x, int y, int z) => new(a.x * x, a.y * y, a.z * z);
+        
+        public static int3 MemberDivide(this int3 a, int3 b) => new(a.x / b.x, a.y / b.y, a.z / b.z);
 
 
         public static half Max(half a, half b) => a > b ? a : b;

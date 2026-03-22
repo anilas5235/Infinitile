@@ -101,8 +101,9 @@ namespace Test
                 intervalData[i++] = new uint2(n.Value, (uint)n.Count);
             }
 
-            VoxelEngineLogger.Info<VoxelWorldRender>($"Adding/updating chunk {chunk} with {voxelData.Length} voxels in {voxelData.Internal.Length} intervals.");
-            VoxelEngineLogger.Info<VoxelWorldRender>($"Intervals: {string.Join(", ",intervalData)}");
+            VoxelEngineLogger.Info<VoxelWorldRender>(
+                $"Adding/updating chunk {chunk} with {voxelData.Length} voxels in {voxelData.Internal.Length} intervals.");
+            VoxelEngineLogger.Info<VoxelWorldRender>($"Intervals: {string.Join(", ", intervalData)}");
             if (voxelData.Length != VoxelsPerPartition) throw new Exception("Voxel data length mismatch!");
             GraphicsBuffer dataBuffer = new(Target.Structured, voxelData.CompressedLength, Marshal.SizeOf<uint2>());
             dataBuffer.SetData(intervalData);
@@ -111,14 +112,16 @@ namespace Test
 
         public void UpdatePartitions(List<int3> partitions)
         {
-            VoxelEngineLogger.Info<VoxelWorldRender>($"Updating {partitions.Count} partitions: {string.Join(", ", partitions)}");
+            VoxelEngineLogger.Info<VoxelWorldRender>(
+                $"Updating {partitions.Count} partitions: {string.Join(", ", partitions)}");
             foreach (int3 partition in partitions)
             {
-                if (!_voxelDataBuffers.TryGetValue(partition.xz, out GraphicsBuffer dataBuffer))
+                if (!_voxelDataBuffers.TryGetValue(PartitionToChunkPos(partition), out GraphicsBuffer dataBuffer))
                     throw new Exception($"Voxel data buffer for partition {partition} not found.");
                 _pointBuilderHandler.BuildPoints(partition, dataBuffer);
                 int[] counts = _pointBuilderHandler.ReadBackCounters();
-                VoxelEngineLogger.Info<VoxelWorldRender>($"Partition {partition}: Solid={counts[0]}, Transparent={counts[1]}, Foliage={counts[2]}");
+                VoxelEngineLogger.Info<VoxelWorldRender>(
+                    $"Partition {partition}: Solid={counts[0]}, Transparent={counts[1]}, Foliage={counts[2]}");
                 _copyPointsHandler.CopyJob(_pointBuilderHandler, partition, counts);
             }
 
@@ -128,9 +131,11 @@ namespace Test
         }
     }
 
+    [StructLayout(LayoutKind.Sequential)]
     internal struct PartitionMetadata
     {
-        public int3 PartitionPos; // World partition coordinates
+        public int3 PartitionPos;
+        public int3 PartitionWorldPos; // World partition coordinates
         public float3 BoundsMin; // AABB min for frustum culling
         public float3 BoundsMax; // AABB max
     };
@@ -174,6 +179,7 @@ namespace Test
             PartitionMetadata meta = new()
             {
                 PartitionPos = partition,
+                PartitionWorldPos = PartitionToWorldPos(partition),
             };
             _metadata.SetData(new[] { meta });
 
@@ -264,7 +270,7 @@ namespace Test
 
             uint[] pageCounts = { (uint)solidPagesCount, (uint)transparentPagesCount, (uint)foliagePagesCount };
             _pageCountsBuffer.SetData(pageCounts);
-            
+
             uint2[] solidPageData = solidAlloc.Select(a => a.ToIndexAndCount()).ToArray();
             _solidPagesBuffer.SetData(solidPageData);
 
@@ -272,7 +278,7 @@ namespace Test
             _pointBuilder.SetBuffer(_copyKernelID, SolidPointsCopyOutNameID,
                 _solidBufferManager.GetBuffer(solidAlloc[0].BufferIndex));
             _pointBuilder.SetBuffer(_copyKernelID, SolidPagesNameID, _solidPagesBuffer);
-            
+
             uint2[] transparentPageData = transparentAlloc.Select(a => a.ToIndexAndCount()).ToArray();
             _transparentPagesBuffer.SetData(transparentPageData);
 
@@ -280,7 +286,7 @@ namespace Test
             _pointBuilder.SetBuffer(_copyKernelID, TransparentPointsCopyOutNameID,
                 _transparentBufferManager.GetBuffer(transparentAlloc[0].BufferIndex));
             _pointBuilder.SetBuffer(_copyKernelID, TransparentPagesNameID, _transparentPagesBuffer);
-            
+
             uint2[] foliagePageData = foliageAlloc.Select(a => a.ToIndexAndCount()).ToArray();
             _foliagePagesBuffer.SetData(foliagePageData);
 

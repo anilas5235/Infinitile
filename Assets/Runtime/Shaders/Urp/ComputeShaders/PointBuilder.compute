@@ -1,7 +1,6 @@
 ﻿#pragma kernel RebuildPoints
 #pragma kernel CopyPoints
 
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "VoxelComputeCommon.hlsl"
 #include "../VoxelCommon.hlsl"
 
@@ -162,13 +161,13 @@ void RebuildPoints(uint3 id : SV_DispatchThreadID)
     int3 pos = (int3)id;
     uint voxelId = get_voxel(pos);
     PartitionMetadata metadata = _Metadata[_PartitionIndex];
-    float3 partitionPos = metadata.partitionPos;
+    float3 partitionWS = metadata.partitionWS;
 
     if (voxelId == 0) return; // Skip air
 
     VoxelDef myDef = _VoxelRenderDefs[voxelId];
 
-    add_quads(pos, partitionPos, myDef, myDef.shape_quad_indices_alwaysRender);
+    add_quads(pos, partitionWS, myDef, myDef.shape_quad_indices_alwaysRender);
 
     // Check 6 neighbors for face exposure
     for (uint dir = 0; dir < 6; dir++)
@@ -180,7 +179,7 @@ void RebuildPoints(uint3 id : SV_DispatchThreadID)
         if (myDef.AlwaysRenderAllFaces == 0 && !should_render_face(myDef, otherDef)) continue;
 
         uint2 quadData = get_voxel_quad_indices(myDef, dir);
-        add_quads(pos, partitionPos, myDef, quadData);
+        add_quads(pos, partitionWS, myDef, quadData);
     }
 }
 
