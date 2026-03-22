@@ -66,13 +66,15 @@ VoxelDef get_voxel_def(uint voxelId)
 
 uint get_voxel_array_index(in int3 pos)
 {
-    return ((uint)pos.x << 10) + ((uint)pos.z << 5) + (uint)pos.y;
+    return ((uint)pos.x << 13) + ((uint)pos.z << 8) + (uint)pos.y; //x*32u*256u, z*256u
 }
 
-uint get_voxel(in int3 pos)
+uint get_voxel(in int3 partition_ws, in int3 pos)
 {
-    uint index = get_voxel_array_index(pos);
+    int3 in_chunk_pos = pos + int3(0, partition_ws.y, 0);
+    uint index = get_voxel_array_index(in_chunk_pos);
     if (index >= _RawVoxels[_RawVoxelsCompressedCount - 1].y) return 0;
+    if (_RawVoxelsCompressedCount == 1) return _RawVoxels[0].x;
 
     //binary search
     uint min = 0;
@@ -92,10 +94,10 @@ uint get_voxel(in int3 pos)
 }
 
 // Helper: Get voxel from flat buffer safely
-uint get_voxel_safe(in int3 pos)
+uint get_voxel_safe(in int3 partition_ws, in int3 pos)
 {
     if (any(pos < 0) || any(pos >= 32)) return 0; // Air outside bounds
-    return get_voxel(pos);
+    return get_voxel(partition_ws, pos);
 }
 
 // Helper: Get direction offset
@@ -158,10 +160,10 @@ void RebuildPoints(uint3 id : SV_DispatchThreadID)
 {
     if (any(id >= uint3(32, 32, 32))) return;
 
-    int3 pos = (int3)id;
-    uint voxelId = get_voxel(pos);
     PartitionMetadata metadata = _Metadata[_PartitionIndex];
+    int3 pos = (int3)id;
     float3 partitionWS = metadata.partitionWS;
+    uint voxelId = get_voxel(partitionWS,pos);
 
     if (voxelId == 0) return; // Skip air
 
@@ -173,7 +175,7 @@ void RebuildPoints(uint3 id : SV_DispatchThreadID)
     for (uint dir = 0; dir < 6; dir++)
     {
         int3 neighborPos = pos + get_direction_offset(dir);
-        uint neighborId = get_voxel_safe(neighborPos);
+        uint neighborId = get_voxel_safe(partitionWS,neighborPos);
         VoxelDef otherDef = _VoxelRenderDefs[neighborId];
 
         if (myDef.AlwaysRenderAllFaces == 0 && !should_render_face(myDef, otherDef)) continue;
