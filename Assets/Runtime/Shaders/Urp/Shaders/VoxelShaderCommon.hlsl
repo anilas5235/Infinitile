@@ -32,6 +32,13 @@ struct Attributes
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
+struct VoxelVertexData
+{
+    float3 positionOS;
+    float2 uv;
+    uint4 packed;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Vertex helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,15 +73,60 @@ uint resolve_logical_id(uint point_id)
 
 StructuredBuffer<PointData> _PointData;
 
-PointData fetch_point_data(uint vertexID)
+VoxelVertexData fetch_vertex_data(uint vertexID)
 {
     // Calculate point and corner indices
     uint pointID = vertexID / 6;
     uint index = resolve_logical_id(pointID);
+    uint cornerID = vertexID % 6;
 
     // Fetch point data directly
-    return _PointData[index];
+    PointData p = _PointData[index];
+    
+    VoxelVertexData v;
+    v.positionOS = p.position;
+    v.packed = p.packed;
+
+    uint quadIndex = get_quad_index(p.packed);
+    QuadData quad = quad_buffer[quadIndex];
+    
+
+    // Triangle strip corners: two triangles forming a quad
+    // Triangle 1: 00-01-02, Triangle 2: 02-01-03
+    switch (cornerID)
+    {
+    case 0: 
+        v.positionOS += quad.position00;
+        v.uv = quad.uv00;
+        break;
+    case 1: 
+        v.positionOS += quad.position01;
+        v.uv = quad.uv01;
+        break;
+    case 2:
+        v.positionOS += quad.position02;
+        v.uv = quad.uv02;
+        break;
+    case 3:
+        v.positionOS += quad.position02;
+        v.uv = quad.uv02;
+        break;
+    case 4:
+        v.positionOS += quad.position01;
+        v.uv = quad.uv01;
+        break;
+    case 5:
+        v.positionOS += quad.position03;
+        v.uv = quad.uv03;
+        break;        
+    default: 
+        v.uv = 0;
+        break;
+    }    
+
+    return v;
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Frag helpers

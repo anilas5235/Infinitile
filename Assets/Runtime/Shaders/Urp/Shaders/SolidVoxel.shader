@@ -25,7 +25,6 @@ Shader "Custom/VoxelShader"
         HLSLINCLUDE
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
         #include "VoxelShaderCommon.hlsl"
-        
         struct Varyings
         {
             float4 positionCS : SV_POSITION;
@@ -36,31 +35,12 @@ Shader "Custom/VoxelShader"
         // ── Vertex shader with expansion ─────────────────────────────
         Varyings vert(uint vertexID : SV_VertexID)
         {
-            uint cornerID = vertexID % 6;
-
-            // Fetch point data directly
-            PointData p = fetch_point_data(vertexID);
-
-            uint quadIndex = get_quad_index(p.packed);
-            QuadData quad = quad_buffer[quadIndex];
-
-            // Triangle strip corners: two triangles forming a quad
-            // Triangle 1: 00-01-02, Triangle 2: 02-01-03
-            float3 corners[6] = {
-                quad.position00, quad.position01, quad.position02,
-                quad.position02, quad.position01, quad.position03
-            };
-            float2 uvs[6] = {
-                quad.uv00, quad.uv01, quad.uv02,
-                quad.uv02, quad.uv01, quad.uv03
-            };
-
-            float3 objectPos = p.position + corners[cornerID];
+           VoxelVertexData v = fetch_vertex_data(vertexID);
 
             Varyings o;
-            o.positionCS = TransformObjectToHClip(objectPos);
-            o.uv = uvs[cornerID];
-            o.packed = p.packed;
+            o.positionCS = TransformObjectToHClip(v.positionOS);
+            o.uv = v.uv;
+            o.packed = v.packed;
             return o;
         }
         ENDHLSL

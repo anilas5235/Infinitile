@@ -30,10 +30,8 @@
         struct Varyings
         {
             float4 positionCS : SV_POSITION;
-            float2 uv : TEXCOORD0; // xy = tile UV
-            uint4 packed : TEXCOORD1; // x: (texArrayIndex u16, sunLightLevel u4, 4 bit unused, ao u8)
-            // y:half16 , 16 bit unused
-            // z and w unused
+            float2 uv : TEXCOORD0;
+            uint4 packed : TEXCOORD1; 
             float4 positionSS : TEXCOORD3;
         };
         
@@ -41,30 +39,12 @@
         // ── Vertex shader with expansion ─────────────────────────────
         Varyings vert(uint vertexID : SV_VertexID)
         {
-            uint cornerID = vertexID % 6;
-
-            // Fetch point data
-            PointData p = fetch_point_data(vertexID);
-
-            uint quadIndex = get_quad_index(p.packed);
-            QuadData quad = quad_buffer[quadIndex];
-
-            // Triangle strip corners: two triangles forming a quad
-            // Triangle 1: 00-01-02, Triangle 2: 02-01-03
-            float3 corners[6] = {
-                quad.position00, quad.position01, quad.position02,
-                quad.position02, quad.position01, quad.position03
-            };
-            float2 uvs[6] = {
-                quad.uv00, quad.uv01, quad.uv02,
-                quad.uv02, quad.uv01, quad.uv03
-            };
+            VoxelVertexData v = fetch_vertex_data(vertexID);
 
             Varyings o;
-            float4 worldPos = float4(p.position + corners[cornerID], 1.0);
-            o.positionCS = TransformObjectToHClip(worldPos.xyz);
-            o.uv = uvs[cornerID];
-            o.packed = p.packed;
+            o.positionCS = TransformObjectToHClip(v.positionOS);
+            o.uv = v.uv;
+            o.packed = v.packed;
             o.positionSS = ComputeScreenPos(o.positionCS);
             return o;
         }
