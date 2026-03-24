@@ -13,8 +13,8 @@ namespace Runtime.Engine.Components
 {
     public class RenderBufferManager : IDisposable
     {
-        private const int RenderBufferSize = PageSize * PagesPerBuffer;
-        internal const int PageSize = 128;
+        private const int RenderBufferSize = PointsPerPage * PagesPerBuffer;
+        internal const int PointsPerPage = 128;
         internal const int PagesPerBuffer = 2048;
 
         private class BufferPage
@@ -58,7 +58,7 @@ namespace Runtime.Engine.Components
                     Marshal.SizeOf<uint>());
 
                 _propertyBlock = new MaterialPropertyBlock();
-                _propertyBlock.SetInteger(PointsPerPageNameID, PageSize);
+                _propertyBlock.SetInteger(PointsPerPageNameID, PointsPerPage);
 
                 _pages = new BufferPage[PagesPerBuffer];
                 for (int i = 0; i < _pages.Length; i++) _pages[i] = new BufferPage();
@@ -107,7 +107,7 @@ namespace Runtime.Engine.Components
                 if (_usedPageCount == 0) return;
                 _propertyBlock.SetBuffer(PointDataNameID, _buffer);
                 _propertyBlock.SetBuffer(PageStatesNameID, _pageStateBuffer);
-                _propertyBlock.SetInteger(PointsPerPageNameID, PageSize);
+                _propertyBlock.SetInteger(PointsPerPageNameID, PointsPerPage);
                 _propertyBlock.SetInteger(PagesPerBufferNameID, PagesPerBuffer);
                 Graphics.DrawProceduralIndirect(
                     mat,
@@ -132,7 +132,8 @@ namespace Runtime.Engine.Components
                     _pageStateBuffer.SetData(pageCounts);
                     uint[] tempArgs = DefaultArgs;
                     tempArgs[0] = _totalValidPoints * 6u;
-                    VoxelEngineLogger.Info<RenderBuffer>($"Rebuilding RenderBuffer. Total Valid Points: {_totalValidPoints}, Total Pages Used: {_usedPageCount}");
+                    VoxelEngineLogger.Info<RenderBuffer>(
+                        $"Rebuilding RenderBuffer. Total Valid Points: {_totalValidPoints}, Total Pages Used: {_usedPageCount}");
                     VoxelEngineLogger.Info<RenderBuffer>($"Args: {string.Join(", ", tempArgs)}");
                     _argsBuffer.SetData(tempArgs);
                     _stateBufferDirty = false;
@@ -229,7 +230,7 @@ namespace Runtime.Engine.Components
 
         private List<AllocInfo> AllocPages(int3 partition, int pointCount)
         {
-            int numPages = (int)math.ceil(pointCount / (float)PageSize);
+            int numPages = (int)math.ceil(pointCount / (float)PointsPerPage);
             int bufferIndex = -1;
             for (int i = 0; i < _buffers.Count; i++)
             {
@@ -251,11 +252,11 @@ namespace Runtime.Engine.Components
                     throw new InvalidOperationException("Expected to find a free page but none were available.");
                 }
 
-                AllocInfo allocInfo = new(bufferIndex, pageIndex, math.min(PageSize, remainingPoints));
+                AllocInfo allocInfo = new(bufferIndex, pageIndex, math.min(PointsPerPage, remainingPoints));
 
                 buffer.SetPage(allocInfo, partition);
                 allocations.Add(allocInfo);
-                remainingPoints -= PageSize;
+                remainingPoints -= PointsPerPage;
             }
 
             return allocations;

@@ -5,7 +5,6 @@ using Runtime.Engine.Utils.Collections;
 using Runtime.Engine.Utils.Extensions;
 using Unity.Collections;
 using Unity.Mathematics;
-using Unity.VisualScripting;
 using UnityEngine;
 using static Runtime.Engine.Utils.VoxelConstants;
 
@@ -47,10 +46,11 @@ namespace Test
 
         private IEnumerator AddStoneChunks()
         {
-            yield return null;
-            ChunkAddAndUpdate(new int2(2, 0), _voxels2);
-            yield return null;
-            ChunkAddAndUpdate(new int2(4, 0), _voxels2);
+            for (int i = 0; i < 2; i++)
+            {
+                ChunkAddAndUpdate(new int2(2 + i, 0), _voxels2);
+                yield return null;
+            }
         }
 
         private void ChunkAddAndUpdate(int2 chunkPos, UnsafeIntervalList<ushort> voxels)

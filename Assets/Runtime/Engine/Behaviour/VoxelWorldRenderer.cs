@@ -7,7 +7,6 @@ using Runtime.Engine.Jobs.Meshing;
 using Runtime.Engine.Utils.Collections;
 using Runtime.Engine.Utils.Logger;
 using Runtime.Engine.VoxelConfig.Data;
-using Test;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -32,7 +31,7 @@ namespace Runtime.Engine.Behaviour
         private RenderBufferManager _transparentBufferManager;
         private RenderBufferManager _foliageBufferManager;
 
-        private Dictionary<int2, GraphicsBuffer> _voxelDataBuffers = new();
+        private readonly Dictionary<int2, GraphicsBuffer> _voxelDataBuffers = new();
 
         private PointBuilderHandler _pointBuilderHandler;
         private CopyPointsHandler _copyPointsHandler;
@@ -310,7 +309,7 @@ namespace Runtime.Engine.Behaviour
                 _pointBuilder.SetBuffer(_copyKernelID, FoliagePagesNameID, _foliagePagesBuffer);
 
                 _pointBuilder.SetBuffer(_copyKernelID, PageCountsNameID, _pageCountsBuffer);
-                _pointBuilder.SetInt(PointsPerPageNameID, PageSize);
+                _pointBuilder.SetInt(PointsPerPageNameID, PointsPerPage);
             }
 
             int maxPageCount = math.max(solidPagesCount, math.max(transparentPagesCount, foliagePagesCount));

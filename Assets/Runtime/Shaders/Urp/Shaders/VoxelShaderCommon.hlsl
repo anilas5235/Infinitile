@@ -48,10 +48,7 @@ uint _PagesPerBuffer;
 
 uint resolve_logical_id(uint point_id)
 {
-    if (_PointsPerPage == 0u)
-    {
-        return 0u;
-    }
+    if (_PointsPerPage == 0u) return 0u;
 
     uint remaining = point_id;
     [loop]
@@ -82,24 +79,24 @@ VoxelVertexData fetch_vertex_data(uint vertexID)
 
     // Fetch point data directly
     PointData p = _PointData[index];
-    
+
     VoxelVertexData v;
     v.positionOS = p.position;
     v.packed = p.packed;
 
     uint quadIndex = get_quad_index(p.packed);
     QuadData quad = quad_buffer[quadIndex];
-    
+
 
     // Triangle strip corners: two triangles forming a quad
     // Triangle 1: 00-01-02, Triangle 2: 02-01-03
     switch (cornerID)
     {
-    case 0: 
+    case 0:
         v.positionOS += quad.position00;
         v.uv = quad.uv00;
         break;
-    case 1: 
+    case 1:
         v.positionOS += quad.position01;
         v.uv = quad.uv01;
         break;
@@ -118,11 +115,11 @@ VoxelVertexData fetch_vertex_data(uint vertexID)
     case 5:
         v.positionOS += quad.position03;
         v.uv = quad.uv03;
-        break;        
-    default: 
+        break;
+    default:
         v.uv = 0;
         break;
-    }    
+    }
 
     return v;
 }
