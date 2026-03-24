@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Runtime.Engine.Jobs.Meshing;
 using Unity.Mathematics;
@@ -19,6 +20,7 @@ namespace Test
         {
             public int3 PartitionPos;
             public int PointCount;
+            public bool IsFree => PointCount == 0;
 
             public void Clear()
             {
@@ -38,8 +40,12 @@ namespace Test
             private readonly MaterialPropertyBlock _propertyBlock;
 
             private bool _stateBufferDirty;
+            private int _usedPageCount;
+
+            private int _lastFreePageIndex;
 
             public GraphicsBuffer Buffer => _buffer;
+            public int FreePages => PagesPerBuffer - _usedPageCount;
 
             public RenderBuffer()
             {
@@ -55,12 +61,16 @@ namespace Test
 
                 _pages = new BufferPage[PagesPerBuffer];
                 for (int i = 0; i < _pages.Length; i++) _pages[i] = new BufferPage();
+                _lastFreePageIndex = 0;
             }
 
-            public void SetPage(int index, int3 partition, int count)
+            internal void SetPage(in AllocInfo allocInfo, in int3 partition)
             {
+                int index = allocInfo.PageIndex;
+                int count = allocInfo.PointCount;
                 ValidOrThrow(index);
                 if (count < 0) throw new ArgumentOutOfRangeException(nameof(count));
+                if (_pages[index].IsFree) _usedPageCount++;
 
                 _totalValidPoints += (uint)count - (uint)_pages[index].PointCount;
 
@@ -78,8 +88,10 @@ namespace Test
             public void ClearPage(int index)
             {
                 ValidOrThrow(index);
-                _totalValidPoints -= (uint)_pages[index].PointCount;
-                _pages[index].Clear();
+                BufferPage page = _pages[index];
+                _totalValidPoints -= (uint)page.PointCount;
+                if (!page.IsFree) _usedPageCount--;
+                page.Clear();
                 _stateBufferDirty = true;
             }
 
@@ -95,7 +107,7 @@ namespace Test
                 _propertyBlock.SetInteger(PointsPerPageNameID, PageSize);
                 Graphics.DrawProceduralIndirect(
                     mat,
-                    new Bounds(Vector3.zero, Vector3.one * 100),
+                    new Bounds(Vector3.zero, Vector3.one * 100000),
                     MeshTopology.Triangles,
                     _argsBuffer,
                     0,
@@ -130,11 +142,13 @@ namespace Test
 
             public bool TryFindFreePage(out int pageIndex)
             {
-                for (int i = 0; i < _pages.Length; i++)
+                for (int i = _lastFreePageIndex; i < PagesPerBuffer; i++)
                 {
-                    if (_pages[i].PointCount != 0) continue;
+                    int index = i % PagesPerBuffer;
+                    if (_pages[index].PointCount != 0) continue;
 
-                    pageIndex = i;
+                    pageIndex = index;
+                    _lastFreePageIndex = index;
                     return true;
                 }
 
@@ -157,6 +171,8 @@ namespace Test
             }
         }
 
+        public int RemainingPages => _buffers.Sum(b => b.FreePages);
+
         public void Draw(Camera cam)
         {
             foreach (RenderBuffer renderBuffer in _buffers) renderBuffer.Draw(_material, cam);
@@ -167,8 +183,6 @@ namespace Test
             public readonly int BufferIndex;
             public readonly int PageIndex;
             public readonly int PointCount;
-            public int Offset => PageIndex * PageSize;
-
             public AllocInfo(int bufferIndex, int pageIndex, int pointCount)
             {
                 BufferIndex = bufferIndex;
@@ -176,8 +190,11 @@ namespace Test
                 PointCount = pointCount;
             }
 
-            public uint2 ToIndexAndCount() => 
+            public uint2 ToIndexAndCount() =>
                 new((uint)PageIndex, (uint)PointCount);
+            
+            public int2 ToBufferAndPageIndex() =>
+                new(BufferIndex, PageIndex);
         }
 
         public List<AllocInfo> AllocBufferSpace(int3 partitionPos, int pointCount)
@@ -195,43 +212,46 @@ namespace Test
                 return new List<AllocInfo>();
             }
 
-            List<AllocInfo> allocations = new();
-            List<int2> pageLocations = new();
 
-            int remaining = pointCount;
-
-            while (remaining > 0)
-            {
-                int count = math.min(PageSize, remaining);
-                (int bufferIndex, int pageIndex) = ReservePage();
-                _buffers[bufferIndex].SetPage(pageIndex, partitionPos, count);
-                pageLocations.Add(new int2(bufferIndex, pageIndex));
-                allocations.Add(new AllocInfo(bufferIndex, pageIndex, count));
-                remaining -= count;
-            }
+            List<AllocInfo> allocations = AllocPages(partitionPos, pointCount);
+            List<int2> pageLocations = allocations.Select(alloc => alloc.ToBufferAndPageIndex()).ToList();
 
             _partitionAllocations[partitionPos] = pageLocations;
             return allocations;
         }
 
-        private (int BufferIndex, int PageIndex) ReservePage()
+        private List<AllocInfo> AllocPages(int3 partition, int pointCount)
         {
+            int numPages = (int)math.ceil(pointCount / (float)PageSize);
+            int bufferIndex = -1;
             for (int i = 0; i < _buffers.Count; i++)
             {
-                if (_buffers[i].TryFindFreePage(out int pageIndex))
-                {
-                    return (i, pageIndex);
-                }
+                RenderBuffer rb = _buffers[i];
+                if (rb.FreePages < numPages) continue;
+                bufferIndex = i;
+                break;
             }
 
-            AddNewBuffer();
-            int newBufferIndex = _buffers.Count - 1;
-            if (!_buffers[newBufferIndex].TryFindFreePage(out int firstPageIndex))
+            if (bufferIndex < 0) bufferIndex = AddNewBuffer();
+
+            List<AllocInfo> allocations = new();
+            int remainingPoints = pointCount;
+            RenderBuffer buffer = _buffers[bufferIndex];
+            for (int i = 0; i < numPages; i++)
             {
-                throw new InvalidOperationException("Newly allocated render buffer has no free page.");
+                if (!buffer.TryFindFreePage(out int pageIndex))
+                {
+                    throw new InvalidOperationException("Expected to find a free page but none were available.");
+                }
+
+                AllocInfo allocInfo = new(bufferIndex, pageIndex, math.min(PageSize, remainingPoints));
+
+                buffer.SetPage(allocInfo, partition);
+                allocations.Add(allocInfo);
+                remainingPoints -= PageSize;
             }
 
-            return (newBufferIndex, firstPageIndex);
+            return allocations;
         }
 
         public void ReleasePartition(int3 partitionPos)
@@ -254,9 +274,10 @@ namespace Test
             }
         }
 
-        private void AddNewBuffer()
+        private int AddNewBuffer()
         {
             _buffers.Add(new RenderBuffer());
+            return _buffers.Count - 1;
         }
 
         public void Dispose()

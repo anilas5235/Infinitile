@@ -112,8 +112,6 @@ namespace Test
 
         public void UpdatePartitions(HashSet<int3> partitions)
         {
-            VoxelEngineLogger.Info<VoxelWorldRender>(
-                $"Updating {partitions.Count} partitions: {string.Join(", ", partitions)}");
             foreach (int3 partition in partitions)
             {
                 if (!_voxelDataBuffers.TryGetValue(PartitionToChunkPos(partition), out GraphicsBuffer dataBuffer))
@@ -263,6 +261,9 @@ namespace Test
             List<AllocInfo> solidAlloc = _solidBufferManager.AllocBufferSpace(partition, counts[0]);
             List<AllocInfo> transparentAlloc = _transparentBufferManager.AllocBufferSpace(partition, counts[1]);
             List<AllocInfo> foliageAlloc = _foliageBufferManager.AllocBufferSpace(partition, counts[2]);
+            
+            VoxelEngineLogger.Info<CopyPointsHandler>($"Copying points for partition {partition}. Solid pages: {solidAlloc.Count}, Transparent pages: {transparentAlloc.Count}, Foliage pages: {foliageAlloc.Count}");
+            VoxelEngineLogger.Info<CopyPointsHandler>($"Remaining Pages: Solid={_solidBufferManager.RemainingPages}, Transparent={_transparentBufferManager.RemainingPages}, Foliage={_foliageBufferManager.RemainingPages}");
 
             int solidPagesCount = solidAlloc.Count;
             int transparentPagesCount = transparentAlloc.Count;
