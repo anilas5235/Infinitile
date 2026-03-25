@@ -7,6 +7,7 @@ using Runtime.Engine.Jobs.Meshing;
 using Runtime.Engine.Utils.Collections;
 using Runtime.Engine.Utils.Logger;
 using Runtime.Engine.VoxelConfig.Data;
+using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -111,22 +112,33 @@ namespace Runtime.Engine.Behaviour
             _voxelDataBuffers.Add(chunk, dataBuffer);
         }
 
-        public void UpdatePartitions(HashSet<int3> partitions)
+        public async Awaitable<HashSet<int3>> UpdatePartitions(HashSet<int3> partitions)
         {
+            HashSet<int3> updatedPartitions = new();
             foreach (int3 partition in partitions)
             {
-                if (!_voxelDataBuffers.TryGetValue(PartitionToChunkPos(partition), out GraphicsBuffer dataBuffer))
-                    throw new Exception($"Voxel data buffer for partition {partition} not found.");
-                _pointBuilderHandler.BuildPoints(partition, dataBuffer);
-                int[] counts = _pointBuilderHandler.ReadBackCounters();
-                VoxelEngineLogger.Info<VoxelWorldRenderer>(
-                    $"Partition {partition}: Solid={counts[0]}, Transparent={counts[1]}, Foliage={counts[2]}");
-                _copyPointsHandler.CopyJob(_pointBuilderHandler, partition, counts);
+                try
+                {
+                    if (!_voxelDataBuffers.TryGetValue(PartitionToChunkPos(partition), out GraphicsBuffer dataBuffer))
+                        throw new Exception($"Voxel data buffer for partition {partition} not found.");
+                    _pointBuilderHandler.BuildPoints(partition, dataBuffer);
+                    int[] counts = await _pointBuilderHandler.ReadBackCounters();
+                    VoxelEngineLogger.Info<VoxelWorldRenderer>(
+                        $"Partition {partition}: Solid={counts[0]}, Transparent={counts[1]}, Foliage={counts[2]}");
+                    _copyPointsHandler.CopyJob(_pointBuilderHandler, partition, counts);
+                    updatedPartitions.Add(partition);
+                }
+                catch (Exception e)
+                {
+                    VoxelEngineLogger.Error<VoxelWorldRenderer>($"Error updating partition {partition}: {e}");
+                }
             }
 
             _solidBufferManager.RebuildBuffers();
             _transparentBufferManager.RebuildBuffers();
             _foliageBufferManager.RebuildBuffers();
+
+            return updatedPartitions;
         }
     }
 
@@ -149,6 +161,7 @@ namespace Runtime.Engine.Behaviour
         private readonly GraphicsBuffer _metadata;
 
         private readonly GraphicsBuffer _readBackCountBuffer;
+        private NativeArray<uint> _counts;
 
         public GraphicsBuffer SolidPointsOut { get; }
 
@@ -171,6 +184,7 @@ namespace Runtime.Engine.Behaviour
 
             _metadata = new GraphicsBuffer(Target.Structured, 1, Marshal.SizeOf<PartitionMetadata>());
             _readBackCountBuffer = new GraphicsBuffer(Target.Raw, 3, sizeof(uint));
+            _counts = new NativeArray<uint>(_readBackCountBuffer.count, Allocator.Domain);
         }
 
         public void BuildPoints(int3 partition, GraphicsBuffer voxelData)
@@ -201,15 +215,22 @@ namespace Runtime.Engine.Behaviour
             _pointBuilder.Dispatch(_pointBuilderKernelID, 4, 4, 4);
         }
 
-        public int[] ReadBackCounters()
+        public async Awaitable<int[]> ReadBackCounters()
         {
-            CopyCount(SolidPointsOut, _readBackCountBuffer, sizeof(uint) * 0);
-            CopyCount(TransparentPointsOut, _readBackCountBuffer, sizeof(uint) * 1);
-            CopyCount(FoliagePointsOut, _readBackCountBuffer, sizeof(uint) * 2);
+            try
+            {
+                CopyCount(SolidPointsOut, _readBackCountBuffer, sizeof(uint) * 0);
+                CopyCount(TransparentPointsOut, _readBackCountBuffer, sizeof(uint) * 1);
+                CopyCount(FoliagePointsOut, _readBackCountBuffer, sizeof(uint) * 2);
 
-            uint[] counts = new uint[_readBackCountBuffer.count];
-            _readBackCountBuffer.GetData(counts);
-            return counts.Select(c => (int)c).ToArray();
+                await AsyncGPUReadback.RequestIntoNativeArrayAsync(ref _counts, _readBackCountBuffer);
+                return _counts.Select(c => (int)c).ToArray();
+            }
+            catch (Exception e)
+            {
+                VoxelEngineLogger.Error<PointBuilderHandler>($"Error reading back point counts: {e}");
+                return Array.Empty<int>();
+            }
         }
 
         public void ResetCounters()
@@ -226,6 +247,7 @@ namespace Runtime.Engine.Behaviour
             FoliagePointsOut?.Dispose();
             _metadata?.Dispose();
             _readBackCountBuffer?.Dispose();
+            _counts.Dispose();
         }
     }
 

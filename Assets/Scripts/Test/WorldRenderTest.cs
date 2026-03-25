@@ -16,7 +16,7 @@ namespace Test
         private UnsafeIntervalList<ushort> _voxels;
         private UnsafeIntervalList<ushort> _voxels2;
 
-        private void Start()
+        private async void Start()
         {
             _voxels = new UnsafeIntervalList<ushort>(10, Allocator.Domain);
             _voxels.AddInterval(0, VoxelsPerChunk);
@@ -30,7 +30,7 @@ namespace Test
             vWRenderer.AddOrUpdateChunk(new int2(0, 1), _voxels);
             vWRenderer.AddOrUpdateChunk(new int2(1, 1), _voxels);
             vWRenderer.AddOrUpdateChunk(new int2(1, 0), _voxels);
-            vWRenderer.UpdatePartitions(new HashSet<int3>
+            await vWRenderer.UpdatePartitions(new HashSet<int3>
             {
                 new(0, 0, 0),
                 new(0, 0, 1),
@@ -49,12 +49,15 @@ namespace Test
             for (int z = 0; z < 16; z++)
             for (int x = 0; x < 16; x++)
             {
-                ChunkAddAndUpdate(new int2(2 + x, z), _voxels2);
-                yield return null;
+                Awaitable<bool> handle = ChunkAddAndUpdate(new int2(2 + x, z), _voxels2);
+                while (!handle.GetAwaiter().IsCompleted)
+                {
+                    yield return null;
+                }
             }
         }
 
-        private void ChunkAddAndUpdate(int2 chunkPos, UnsafeIntervalList<ushort> voxels)
+        private async Awaitable<bool> ChunkAddAndUpdate(int2 chunkPos, UnsafeIntervalList<ushort> voxels)
         {
             vWRenderer.AddOrUpdateChunk(chunkPos, voxels);
 
@@ -65,7 +68,8 @@ namespace Test
                 partitionsToUpdate.Add(new int3(chunkPos.x, y, chunkPos.y));
             }
 
-            vWRenderer.UpdatePartitions(partitionsToUpdate);
+            await vWRenderer.UpdatePartitions(partitionsToUpdate);
+            return true;
         }
 
         private void OnDestroy()
