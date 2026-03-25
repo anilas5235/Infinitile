@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Runtime.Engine.Jobs.Meshing;
 using Runtime.Engine.Utils.Logger;
+using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -17,28 +18,17 @@ namespace Runtime.Engine.Components
         internal const int PointsPerPage = 256;
         internal const int PagesPerBuffer = 2048;
 
-        private class BufferPage
-        {
-            public int3 PartitionPos;
-            public int PointCount;
-            public bool IsFree => PointCount == 0;
-
-            public void Clear()
-            {
-                PointCount = 0;
-                PartitionPos = default;
-            }
-        }
-
         private class RenderBuffer : IDisposable
         {
             private static readonly uint[] DefaultArgs = { 0u, 1u, 0u, 0u, 0u };
             private readonly GraphicsBuffer _buffer;
             private uint _totalValidPoints;
-            private readonly BufferPage[] _pages;
             private readonly GraphicsBuffer _argsBuffer;
             private readonly GraphicsBuffer _indexBuffer;
             private readonly MaterialPropertyBlock _propertyBlock;
+            
+            private NativeArray<uint> _indices;
+            private NativeArray<uint> _pagesPointCounts;
 
             private bool _stateBufferDirty;
             private int _usedPageCount;
@@ -56,49 +46,47 @@ namespace Runtime.Engine.Components
                 _argsBuffer.SetData(DefaultArgs);
                 _indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, RenderBufferSize,
                     Marshal.SizeOf<uint>());
+                _indices = new NativeArray<uint>(RenderBufferSize, Allocator.Domain);
 
                 _propertyBlock = new MaterialPropertyBlock();
 
-                _pages = new BufferPage[PagesPerBuffer];
-                for (int i = 0; i < _pages.Length; i++) _pages[i] = new BufferPage();
+                _pagesPointCounts = new NativeArray<uint>(PagesPerBuffer, Allocator.Domain);
                 _lastFreePageIndex = 0;
             }
+            
+            private bool IsPageFree(int index) => _pagesPointCounts[index] == 0;
+            private bool IsPageNotFree(int index) => _pagesPointCounts[index] != 0;
 
-            internal void SetPage(in AllocInfo allocInfo, in int3 partition)
+            private void SetPageCount(int index, uint count)
+            {
+                _totalValidPoints -= _pagesPointCounts[index];
+                _totalValidPoints += count;
+                _pagesPointCounts[index] = count;
+            }
+
+            internal void SetPage(in AllocInfo allocInfo)
             {
                 int index = allocInfo.PageIndex;
                 int count = allocInfo.PointCount;
                 ValidOrThrow(index);
                 if (count < 0) throw new ArgumentOutOfRangeException(nameof(count));
-                if (_pages[index].IsFree) _usedPageCount++;
+                if (IsPageFree(index)) _usedPageCount++;
 
-                _totalValidPoints -= (uint)_pages[index].PointCount;
-                _totalValidPoints += (uint)count;
-
-                _pages[index].PartitionPos = partition;
-                _pages[index].PointCount = count;
+                SetPageCount(index, (uint)count);
                 _stateBufferDirty = true;
-            }
-
-            public (int3 partition, int pointCount) GetPage(int index)
-            {
-                ValidOrThrow(index);
-                return (_pages[index].PartitionPos, _pages[index].PointCount);
             }
 
             public void ClearPage(int index)
             {
                 ValidOrThrow(index);
-                BufferPage page = _pages[index];
-                _totalValidPoints -= (uint)page.PointCount;
-                if (!page.IsFree) _usedPageCount--;
-                page.Clear();
+                if (IsPageNotFree(index)) _usedPageCount--;
+                SetPageCount(index, 0);
                 _stateBufferDirty = true;
             }
 
-            private void ValidOrThrow(int index)
+            private static void ValidOrThrow(int index)
             {
-                if (index < 0 || index >= _pages.Length) throw new ArgumentOutOfRangeException(nameof(index));
+                if (index is < 0 or >= PagesPerBuffer) throw new ArgumentOutOfRangeException(nameof(index));
             }
 
             public void Draw(Material mat, Camera cam)
@@ -121,31 +109,32 @@ namespace Runtime.Engine.Components
 
             public void RebuildBuffers()
             {
-                if (_stateBufferDirty)
+                double startTime = Time.realtimeSinceStartupAsDouble;
+                if (!_stateBufferDirty) return;
+                
+                uint offset = 0;
+                int writeIndex = 0;
+
+                for (int pageIndex = 0; pageIndex < PagesPerBuffer; pageIndex++)
                 {
-                    List<uint> pageCounts = new((int)_totalValidPoints);
-                    uint offset = 0;
-
-                    foreach (BufferPage page in _pages)
+                    uint count = _pagesPointCounts[pageIndex];
+                    for (int i = 0; i < count; i++)
                     {
-                        for (int i = 0; i < page.PointCount; i++)
-                        {
-                            offset++;
-                            pageCounts.Add(offset);
-                        }
-
-                        offset += (uint)(PointsPerPage - page.PointCount);
+                        _indices[writeIndex++] = ++offset;
                     }
 
-                    _indexBuffer.SetData(pageCounts);
-                    uint[] tempArgs = DefaultArgs;
-                    tempArgs[0] = _totalValidPoints * 6u;
-                    VoxelEngineLogger.Info<RenderBuffer>(
-                        $"Rebuilding RenderBuffer. Total Valid Points: {_totalValidPoints}, Total Pages Used: {_usedPageCount}");
-                    VoxelEngineLogger.Info<RenderBuffer>($"Args: {string.Join(", ", tempArgs)}");
-                    _argsBuffer.SetData(tempArgs);
-                    _stateBufferDirty = false;
+                    offset += PointsPerPage - count;
                 }
+
+                _indexBuffer.SetData(_indices);
+                VoxelEngineLogger.Info<RenderBuffer>($"RebuildBuffers: Updated index buffer with {_totalValidPoints} valid points in {(Time.realtimeSinceStartupAsDouble - startTime)*1000:F4} ms.");
+                uint[] tempArgs = DefaultArgs;
+                tempArgs[0] = _totalValidPoints * 6u;
+                VoxelEngineLogger.Info<RenderBuffer>(
+                    $"Rebuilding RenderBuffer. Total Valid Points: {_totalValidPoints}, Total Pages Used: {_usedPageCount}");
+                VoxelEngineLogger.Info<RenderBuffer>($"Args: {string.Join(", ", tempArgs)}");
+                _argsBuffer.SetData(tempArgs);
+                _stateBufferDirty = false;
             }
 
             public void Dispose()
@@ -153,6 +142,7 @@ namespace Runtime.Engine.Components
                 _buffer?.Dispose();
                 _argsBuffer?.Dispose();
                 _indexBuffer?.Dispose();
+                _indices.Dispose();
             }
 
             public bool TryFindFreePage(out int pageIndex)
@@ -160,7 +150,7 @@ namespace Runtime.Engine.Components
                 for (int i = _lastFreePageIndex; i < PagesPerBuffer; i++)
                 {
                     int index = i % PagesPerBuffer;
-                    if (_pages[index].PointCount != 0) continue;
+                    if (IsPageNotFree(index)) continue;
 
                     pageIndex = index;
                     _lastFreePageIndex = index;
@@ -229,14 +219,14 @@ namespace Runtime.Engine.Components
             }
 
 
-            List<AllocInfo> allocations = AllocPages(partitionPos, pointCount);
+            List<AllocInfo> allocations = AllocPages(pointCount);
             List<int2> pageLocations = allocations.Select(alloc => alloc.ToBufferAndPageIndex()).ToList();
 
             _partitionAllocations[partitionPos] = pageLocations;
             return allocations;
         }
 
-        private List<AllocInfo> AllocPages(int3 partition, int pointCount)
+        private List<AllocInfo> AllocPages(int pointCount)
         {
             int numPages = (int)math.ceil(pointCount / (float)PointsPerPage);
             int bufferIndex = -1;
@@ -262,7 +252,7 @@ namespace Runtime.Engine.Components
 
                 AllocInfo allocInfo = new(bufferIndex, pageIndex, math.min(PointsPerPage, remainingPoints));
 
-                buffer.SetPage(allocInfo, partition);
+                buffer.SetPage(allocInfo);
                 allocations.Add(allocInfo);
                 remainingPoints -= PointsPerPage;
             }

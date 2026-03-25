@@ -1,0 +1,70 @@
+﻿#pragma kernel CopyPoints
+
+#include "VoxelComputeCommon.hlsl"
+#include "../VoxelCommon.hlsl"
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Copy Points Kernel - Copy points to final buffer for rendering
+// ─────────────────────────────────────────────────────────────────────────────
+StructuredBuffer<PointData> _SolidPointsIn;
+RWStructuredBuffer<PointData> _SolidPointsCopyOut;
+StructuredBuffer<uint2> _SolidPages; //Index & Count
+
+StructuredBuffer<PointData> _TransparentPointsIn;
+RWStructuredBuffer<PointData> _TransparentPointsCopyOut;
+StructuredBuffer<uint2> _TransparentPages;
+
+StructuredBuffer<PointData> _FoliagePointsIn;
+RWStructuredBuffer<PointData> _FoliagePointsCopyOut;
+StructuredBuffer<uint2> _FoliagePages;
+
+StructuredBuffer<uint> _PageCounts;
+
+uint _PointsPerPage;
+
+[numthreads(8, 3, 1)]
+void CopyPoints(uint3 id : SV_DispatchThreadID)
+{
+    uint layer = id.y % 3u;
+    uint layerPageCount = _PageCounts[layer];
+    if (id.x >= layerPageCount) return; // No more pages to process in this layer
+
+    uint2 indexAndCount;
+    switch (layer)
+    {
+    case 0: indexAndCount = _SolidPages[id.x];
+        break;
+    case 1: indexAndCount = _TransparentPages[id.x];
+        break;
+    case 2: indexAndCount = _FoliagePages[id.x];
+        break;
+    default:
+        return;
+    }
+
+    if (indexAndCount.y == 0u) return;
+
+    uint copyCount = min(indexAndCount.y, _PointsPerPage);
+    uint srcBase = id.x * _PointsPerPage;
+    uint dstBase = indexAndCount.x * _PointsPerPage;
+
+    for (uint i = 0u; i < copyCount; i++)
+    {
+        uint src = srcBase + i;
+        uint dst = dstBase + i;
+
+        switch (layer)
+        {
+        case 0: // Solid
+            _SolidPointsCopyOut[dst] = _SolidPointsIn[src];
+            break;
+        case 1: // Transparent
+            _TransparentPointsCopyOut[dst] = _TransparentPointsIn[src];
+            break;
+        case 2: // Foliage
+            _FoliagePointsCopyOut[dst] = _FoliagePointsIn[src];
+            break;
+        default: break;
+        }
+    }
+}

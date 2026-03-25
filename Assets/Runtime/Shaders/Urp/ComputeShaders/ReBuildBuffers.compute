@@ -1,0 +1,77 @@
+﻿#pragma kernel ReBuildIndexAndArgs
+
+#include "VoxelComputeCommon.hlsl"
+#include "../VoxelCommon.hlsl"
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Copy Points Kernel - Copy points to final buffer for rendering
+// ─────────────────────────────────────────────────────────────────────────────
+AppendStructuredBuffer<uint> _SolidIndex;
+RWStructuredBuffer<uint> _SolidArgsBuffer;
+StructuredBuffer<uint> _SolidPages; //Count
+uint _SolidTotalPointCount;
+
+AppendStructuredBuffer<uint> _TransparentIndex;
+RWStructuredBuffer<uint> _TransparentArgsBuffer;
+StructuredBuffer<uint> _TransparentPages;
+uint _TransparentTotalPointCount;
+
+AppendStructuredBuffer<uint> _FoliageIndex;
+RWStructuredBuffer<uint> _FoliageArgsBuffer;
+StructuredBuffer<uint> _FoliagePages;
+uint _FoliageTotalPointCount;
+
+uint _PointsPerPage;
+
+[numthreads(128, 3, 1)]
+void ReBuildIndexAndArgs(uint3 id : SV_DispatchThreadID)
+{
+    uint layer = id.y % 3u;
+    uint pageIndex = id.x;
+
+    uint count = 0;
+    switch (layer)
+    {
+    case 0: count = _SolidPages[pageIndex];
+        break;
+    case 1: count = _TransparentPages[pageIndex];
+        break;
+    case 2: count = _FoliagePages[pageIndex];
+        break;
+    default: break;
+    }
+
+    uint offset = pageIndex * _PointsPerPage;
+
+    [loop]
+    for (int pInPage = 0; pInPage < count; ++pInPage)
+    {
+        switch (layer)
+        {
+        case 0: // Solid
+            _SolidIndex.Append(offset + pInPage);
+            break;
+        case 1: // Transparent
+            _TransparentIndex.Append(offset + pInPage);
+            break;
+        case 2: // Foliage
+            _FoliageIndex.Append(offset + pInPage);
+            break;
+        default: break;
+        }
+    }
+
+    if (pageIndex != 0) return;
+
+    //Set ArgsBuffer
+    switch (layer)
+    {
+    case 0: _SolidArgsBuffer[0] = _SolidTotalPointCount * 6u;
+        break;
+    case 1: _TransparentArgsBuffer[0] = _TransparentTotalPointCount * 6u;
+        break;
+    case 2: _FoliageArgsBuffer[0] = _FoliageTotalPointCount * 6u;
+        break;
+    default: break;
+    }
+}
