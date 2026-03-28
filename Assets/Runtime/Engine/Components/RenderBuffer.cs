@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using Runtime.Engine.Behaviour;
 using Runtime.Engine.Jobs.Meshing;
+using Runtime.Engine.Utils.Logger;
 using Unity.Collections;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using static Runtime.Engine.Utils.VoxelRenderConstants;
@@ -29,6 +32,7 @@ namespace Runtime.Engine.Components
         private int _usedPageCount;
 
         private int _lastFreePageIndex;
+        private int _highestUsedPageIndex;
 
         public GraphicsBuffer Buffer => _buffer;
         public int FreePages => PagesPerBuffer - _usedPageCount;
@@ -44,11 +48,13 @@ namespace Runtime.Engine.Components
                 Marshal.SizeOf<uint>());
             _indices = new NativeArray<uint>(RenderBufferSize, Allocator.Domain);
 
-            _propertyBlock = new MaterialPropertyBlock();
-
             _countsPerPage = new NativeArray<uint>(PagesPerBuffer, Allocator.Domain);
             _countsPerPageBuffer = new GraphicsBuffer(Target.Structured, PagesPerBuffer, sizeof(uint));
             _lastFreePageIndex = 0;
+            
+            _propertyBlock = new MaterialPropertyBlock();
+            _propertyBlock.SetBuffer(PointDataNameID, _buffer);
+            _propertyBlock.SetBuffer(IndexBufferNameID, _indexBuffer);
         }
 
         private bool IsPageFree(int index) => _countsPerPage[index] == 0;
@@ -67,7 +73,11 @@ namespace Runtime.Engine.Components
             int count = allocInfo.PointCount;
             ValidOrThrow(index);
             if (count < 0) throw new ArgumentOutOfRangeException(nameof(count));
-            if (IsPageFree(index)) _usedPageCount++;
+            if (IsPageFree(index))
+            {
+                _usedPageCount++;
+                if (index > _highestUsedPageIndex) _highestUsedPageIndex = index;
+            }
 
             SetPageCount(index, (uint)count);
             _stateBufferDirty = true;
@@ -76,9 +86,28 @@ namespace Runtime.Engine.Components
         public void ClearPage(int index)
         {
             ValidOrThrow(index);
-            if (IsPageNotFree(index)) _usedPageCount--;
+            if (IsPageNotFree(index))
+            {
+                _usedPageCount--;
+                if (index == _highestUsedPageIndex)
+                {
+                    _highestUsedPageIndex = FindUsedPageBefore(index);
+                }
+            }
+
             SetPageCount(index, 0);
             _stateBufferDirty = true;
+        }
+        
+        private int FindUsedPageBefore(int index)
+        {
+            ValidOrThrow(index);
+            for (int i = index - 1; i >= 0; i--)
+            {
+                if (IsPageFree(i)) continue;
+                return i;
+            }
+            return 0;
         }
 
         private static void ValidOrThrow(int index)
@@ -89,8 +118,6 @@ namespace Runtime.Engine.Components
         public void Draw(Material mat, Camera cam)
         {
             if (_usedPageCount == 0) return;
-            _propertyBlock.SetBuffer(PointDataNameID, _buffer);
-            _propertyBlock.SetBuffer(IndexBufferNameID, _indexBuffer);
             Graphics.DrawProceduralIndirect(
                 mat,
                 new Bounds(Vector3.zero, Vector3.one * 100000),
@@ -102,28 +129,30 @@ namespace Runtime.Engine.Components
                 ShadowCastingMode.Off,
                 false
             );
+            if(VoxelWorldRenderer.Logging)VoxelEngineLogger.Info<RenderBuffer>($"Drawing buffer with {_propertyBlock}");
         }
 
         public void RebuildBuffers()
         {
             if (!_stateBufferDirty) return;
-            
+
             _countsPerPageBuffer.SetData(_countsPerPage);
             _indexBuffer.SetCounterValue(0);
-            
+
             ComputeShader rebuild = _manager.RebuildBufferShader;
             int kernel = _manager.RebuildKernel;
-            const int groupX = PagesPerBuffer / 128;
-            
+
+            int groupX = (int)math.ceil(_highestUsedPageIndex / 128f);
+
             rebuild.SetBuffer(kernel, IndexBufferNameID, _indexBuffer);
             rebuild.SetBuffer(kernel, ArgsBufferNameID, _argsBuffer);
             rebuild.SetBuffer(kernel, CountsPerPageNameID, _countsPerPageBuffer);
-            
+
             rebuild.SetInt(TotalPointCountNameID, (int)_totalValidPoints);
             rebuild.SetInt(PointsPerPageNameID, PointsPerPage);
             rebuild.SetInt(PagesPerBufferNameID, PagesPerBuffer);
-            rebuild.Dispatch(kernel,groupX,1,1);
-            
+            rebuild.Dispatch(kernel, groupX, 1, 1);
+
             _stateBufferDirty = false;
         }
 

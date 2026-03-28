@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using Runtime.Engine.Behaviour;
 using Runtime.Engine.Utils.Logger;
 using Unity.Mathematics;
 using UnityEngine;
@@ -44,9 +45,9 @@ namespace Runtime.Engine.Components
             List<AllocInfo> transparentAlloc = _transparentBufferManager.AllocBufferSpace(partition, counts[1]);
             List<AllocInfo> foliageAlloc = _foliageBufferManager.AllocBufferSpace(partition, counts[2]);
 
-            VoxelEngineLogger.Info<CopyPointsHandler>(
+            if(VoxelWorldRenderer.Logging)VoxelEngineLogger.Info<CopyPointsHandler>(
                 $"Copying points for partition {partition}. Solid pages: {solidAlloc.Count}, Transparent pages: {transparentAlloc.Count}, Foliage pages: {foliageAlloc.Count}");
-            VoxelEngineLogger.Info<CopyPointsHandler>(
+            if(VoxelWorldRenderer.Logging)VoxelEngineLogger.Info<CopyPointsHandler>(
                 $"Remaining Pages: Solid={_solidBufferManager.RemainingPages}, Transparent={_transparentBufferManager.RemainingPages}, Foliage={_foliageBufferManager.RemainingPages}");
 
             int solidPagesCount = solidAlloc.Count;

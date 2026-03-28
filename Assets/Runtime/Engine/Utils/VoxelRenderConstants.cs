@@ -13,7 +13,7 @@ namespace Runtime.Engine.Utils
         
         public const int RenderBufferSize = PointsPerPage * PagesPerBuffer;
         public const int PointsPerPage = 256;
-        public const int PagesPerBuffer = 2048;
+        public const int PagesPerBuffer = 1024;
 
         public static readonly int VoxelRenderDefNameID = Shader.PropertyToID("_VoxelRenderDefs");
         public static readonly int VoxelRenderDefCountNameID = Shader.PropertyToID("_VoxelRenderDefsCount");

@@ -15,6 +15,7 @@ namespace Runtime.Engine.Behaviour
 {
     public class VoxelWorldRenderer : MonoBehaviour
     {
+        public const bool Logging = false;
         public Material solidMaterial;
         public Material transparentMaterial;
         public Material foliageMaterial;
@@ -101,9 +102,9 @@ namespace Runtime.Engine.Behaviour
                 intervalData[i++] = new uint2(n.Value, (uint)n.Count);
             }
 
-            VoxelEngineLogger.Info<VoxelWorldRenderer>(
+            if(Logging) VoxelEngineLogger.Info<VoxelWorldRenderer>(
                 $"Adding/updating chunk {chunk} with {voxelData.Length} voxels in {voxelData.Internal.Length} intervals.");
-            VoxelEngineLogger.Info<VoxelWorldRenderer>($"Intervals: {string.Join(", ", intervalData)}");
+            if(Logging) VoxelEngineLogger.Info<VoxelWorldRenderer>($"Intervals: {string.Join(", ", intervalData)}");
             if (voxelData.Length != VoxelsPerChunk) throw new Exception("Voxel data length mismatch!");
             GraphicsBuffer dataBuffer = new(Target.Structured, voxelData.CompressedLength, Marshal.SizeOf<uint2>());
             dataBuffer.SetData(intervalData);
@@ -119,16 +120,15 @@ namespace Runtime.Engine.Behaviour
                 {
                     if (!_voxelDataBuffers.TryGetValue(PartitionToChunkPos(partition), out GraphicsBuffer dataBuffer))
                         throw new Exception($"Voxel data buffer for partition {partition} not found.");
-                    _pointBuilderHandler.BuildPoints(partition, dataBuffer);
-                    int[] counts = await _pointBuilderHandler.ReadBackCounters();
-                    VoxelEngineLogger.Info<VoxelWorldRenderer>(
+                    int[] counts = await _pointBuilderHandler.BuildPoints(partition, dataBuffer);
+                    if(Logging)VoxelEngineLogger.Info<VoxelWorldRenderer>(
                         $"Partition {partition}: Solid={counts[0]}, Transparent={counts[1]}, Foliage={counts[2]}");
                     _copyPointsHandler.CopyJob(_pointBuilderHandler, partition, counts);
                     updatedPartitions.Add(partition);
                 }
                 catch (Exception e)
                 {
-                    VoxelEngineLogger.Error<VoxelWorldRenderer>($"Error updating partition {partition}: {e}");
+                    if(Logging)VoxelEngineLogger.Error<VoxelWorldRenderer>($"Error updating partition {partition}: {e}");
                 }
             }
 

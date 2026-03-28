@@ -33,12 +33,11 @@ namespace Test
             await vWRenderer.UpdatePartitions(new HashSet<int3>
             {
                 new(0, 0, 0),
-                /*new(0, 0, 1),
+                new(0, 0, 1),
                 new(1, 0, 1),
-                new(1, 0, 0),*/
+                new(1, 0, 0),
             });
 
-            return;
             _voxels2 = new UnsafeIntervalList<ushort>(1, Allocator.Domain);
             _voxels2.AddInterval(1, VoxelsPerChunk);
 

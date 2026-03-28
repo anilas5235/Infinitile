@@ -50,8 +50,9 @@ namespace Runtime.Engine.Components
             _counts = new NativeArray<uint>(_readBackCountBuffer.count, Allocator.Domain);
         }
 
-        public void BuildPoints(int3 partition, GraphicsBuffer voxelData)
+        public async Awaitable<int[]> BuildPoints(int3 partition, GraphicsBuffer voxelData)
         {
+            ResetCounters();
             PartitionMetadata meta = new()
             {
                 PartitionPos = partition,
@@ -76,10 +77,7 @@ namespace Runtime.Engine.Components
             _pointBuilder.SetInt(PartitionIndexNameID, 0);
 
             _pointBuilder.Dispatch(_pointBuilderKernelID, 4, 4, 4);
-        }
 
-        public async Awaitable<int[]> ReadBackCounters()
-        {
             try
             {
                 CopyCount(SolidPointsOut, _readBackCountBuffer, sizeof(uint) * 0);
@@ -88,13 +86,12 @@ namespace Runtime.Engine.Components
 
                 await AsyncGPUReadback.RequestIntoNativeArrayAsync(ref _counts, _readBackCountBuffer);
                 int[] results = _counts.Select(c => (int)c).ToArray();
-                ResetCounters();
                 return results;
             }
             catch (Exception e)
             {
-                VoxelEngineLogger.Error<PointBuilderHandler>($"Error reading back point counts: {e}");
-                return Array.Empty<int>();
+                if(VoxelWorldRenderer.Logging)VoxelEngineLogger.Error<PointBuilderHandler>($"Error reading back point counts: {e}");
+                return new[] { 0, 0, 0 };
             }
         }
 

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Runtime.Engine.Behaviour;
 using Runtime.Engine.Utils.Logger;
 using Unity.Mathematics;
 using UnityEngine;
@@ -113,7 +114,7 @@ namespace Runtime.Engine.Components
         private int AddNewBuffer()
         {
             _buffers.Add(new RenderBuffer(this));
-            VoxelEngineLogger.Info<RenderBufferManager>($"Added new RenderBuffer. Total buffers: {_buffers.Count}");
+            if(VoxelWorldRenderer.Logging) VoxelEngineLogger.Info<RenderBufferManager>($"Added new RenderBuffer. Total buffers: {_buffers.Count}");
             return _buffers.Count - 1;
         }
 
