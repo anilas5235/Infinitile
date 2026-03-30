@@ -8,6 +8,7 @@ using Runtime.Engine.VoxelConfig.Data;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
+using static Runtime.Engine.Utils.VoxelRenderConstants;
 using static Runtime.Engine.Utils.VoxelConstants;
 using static UnityEngine.GraphicsBuffer;
 
@@ -33,8 +34,23 @@ namespace Runtime.Engine.Behaviour
 
         private readonly Dictionary<int2, GraphicsBuffer> _voxelDataBuffers = new();
 
-        private PointBuilderHandler _pointBuilderHandler;
+        private PointBuilderHandler[] _pointBuilderHandlers;
         private CopyPointsHandler _copyPointsHandler;
+        private bool _isDestroyed;
+
+        private readonly struct InFlightBuild
+        {
+            public readonly int3 Partition;
+            public readonly int SlotIndex;
+            public readonly Awaitable<int[]> BuildAwaitable;
+
+            public InFlightBuild(int3 partition, int slotIndex, Awaitable<int[]> buildAwaitable)
+            {
+                Partition = partition;
+                SlotIndex = slotIndex;
+                BuildAwaitable = buildAwaitable;
+            }
+        }
 
         private void Awake()
         {
@@ -43,11 +59,17 @@ namespace Runtime.Engine.Behaviour
             _foliageBufferManager = new RenderBufferManager(foliageMaterial, rebuildBuffers);
 
             VoxelRegistry voxelRegistry = VoxelDataImporter.Instance.VoxelRegistry;
-            _pointBuilderHandler = new PointBuilderHandler(
-                pointBuilder,
-                voxelRegistry.VoxelRenderDefBuffer,
-                voxelRegistry.QuadTexPairBuffer
-            );
+            int maxInFlight = math.max(1, MaxDirtyUploadsPerFrame);
+            _pointBuilderHandlers = new PointBuilderHandler[maxInFlight];
+            for (int i = 0; i < _pointBuilderHandlers.Length; i++)
+            {
+                _pointBuilderHandlers[i] = new PointBuilderHandler(
+                    pointBuilder,
+                    voxelRegistry.VoxelRenderDefBuffer,
+                    voxelRegistry.QuadTexPairBuffer
+                );
+            }
+
             _copyPointsHandler = new CopyPointsHandler(
                 copyPoints,
                 _solidBufferManager,
@@ -68,6 +90,17 @@ namespace Runtime.Engine.Behaviour
 
         private void OnDestroy()
         {
+            _isDestroyed = true;
+            _copyPointsHandler?.Dispose();
+
+            if (_pointBuilderHandlers != null)
+            {
+                foreach (PointBuilderHandler handler in _pointBuilderHandlers)
+                {
+                    handler?.Dispose();
+                }
+            }
+
             _solidBufferManager.Dispose();
             _transparentBufferManager.Dispose();
             _foliageBufferManager.Dispose();
@@ -111,6 +144,16 @@ namespace Runtime.Engine.Behaviour
         public async Awaitable<HashSet<int3>> UpdatePartitions(HashSet<int3> partitions)
         {
             HashSet<int3> updatedPartitions = new();
+
+            if (_isDestroyed || _pointBuilderHandlers == null || _pointBuilderHandlers.Length == 0)
+            {
+                return updatedPartitions;
+            }
+
+            int maxInFlight = math.max(1, MaxDirtyUploadsPerFrame);
+            Queue<InFlightBuild> inFlight = new(maxInFlight);
+            int nextSlotIndex = 0;
+
             foreach (int3 partition in partitions)
             {
                 if (!_voxelDataBuffers.TryGetValue(PartitionToChunkPos(partition), out GraphicsBuffer dataBuffer))
@@ -119,18 +162,22 @@ namespace Runtime.Engine.Behaviour
                     continue;
                 }
 
-                try
+                int slotIndex = nextSlotIndex % _pointBuilderHandlers.Length;
+                nextSlotIndex++;
+                Awaitable<int[]> buildAwaitable = _pointBuilderHandlers[slotIndex].BuildPoints(partition, dataBuffer);
+                inFlight.Enqueue(new InFlightBuild(partition, slotIndex, buildAwaitable));
+
+                if (inFlight.Count >= maxInFlight)
                 {
-                    int[] counts = await _pointBuilderHandler.BuildPoints(partition, dataBuffer);
-                    if(Logging)VoxelEngineLogger.Info<VoxelWorldRenderer>(
-                        $"Partition {partition}: Solid={counts[0]}, Transparent={counts[1]}, Foliage={counts[2]}");
-                    _copyPointsHandler.CopyJob(_pointBuilderHandler, partition, counts);
-                    updatedPartitions.Add(partition);
+                    await CompleteBuild(inFlight.Dequeue(), updatedPartitions);
+                    if (_isDestroyed) return updatedPartitions;
                 }
-                catch (Exception e)
-                {
-                    if(Logging)VoxelEngineLogger.Error<VoxelWorldRenderer>($"Error updating partition {partition}: {e}");
-                }
+            }
+
+            while (inFlight.Count > 0)
+            {
+                await CompleteBuild(inFlight.Dequeue(), updatedPartitions);
+                if (_isDestroyed) return updatedPartitions;
             }
 
             if (updatedPartitions.Count > 0)
@@ -141,6 +188,25 @@ namespace Runtime.Engine.Behaviour
             }
 
             return updatedPartitions;
+        }
+
+        private async Awaitable CompleteBuild(InFlightBuild build, HashSet<int3> updatedPartitions)
+        {
+            try
+            {
+                int[] counts = await build.BuildAwaitable;
+                if (Logging) VoxelEngineLogger.Info<VoxelWorldRenderer>(
+                    $"Partition {build.Partition}: Solid={counts[0]}, Transparent={counts[1]}, Foliage={counts[2]}");
+
+                if (_isDestroyed) return;
+
+                _copyPointsHandler.CopyJob(_pointBuilderHandlers[build.SlotIndex], build.Partition, counts);
+                updatedPartitions.Add(build.Partition);
+            }
+            catch (Exception e)
+            {
+                if (Logging) VoxelEngineLogger.Error<VoxelWorldRenderer>($"Error updating partition {build.Partition}: {e}");
+            }
         }
     }
 
