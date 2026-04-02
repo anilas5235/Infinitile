@@ -128,10 +128,10 @@ float4 calc_ao_color(const float4 ao_color, const float4 albedo, const float4 ao
     int l = ao_data >> 6 & 1;
     int ul = ao_data >> 7 & 1;
 
-    float dlc = scale_ao(ao_color, compute_ao_corner(l, d, dl), ao_intensity, ao_power);
-    float ulc = scale_ao(ao_color, compute_ao_corner(l, u, ul), ao_intensity, ao_power);
-    float drc = scale_ao(ao_color, compute_ao_corner(r, d, dr), ao_intensity, ao_power);
-    float urc = scale_ao(ao_color, compute_ao_corner(r, u, ur), ao_intensity, ao_power);
+    float dlc = scale_ao(ao_curve, compute_ao_corner(l, d, dl), ao_intensity, ao_power);
+    float ulc = scale_ao(ao_curve, compute_ao_corner(l, u, ul), ao_intensity, ao_power);
+    float drc = scale_ao(ao_curve, compute_ao_corner(r, d, dr), ao_intensity, ao_power);
+    float urc = scale_ao(ao_curve, compute_ao_corner(r, u, ur), ao_intensity, ao_power);
 
     float t = lerp(lerp(dlc, drc, uv.x), lerp(ulc, urc, uv.x), uv.y);
     return lerp(ao_color, albedo, t);

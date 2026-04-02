@@ -210,10 +210,11 @@ void add_quads(int3 pos, in float3 partitionPos, in VoxelDef myDef, uint2 quadRa
         PointData p;
         p.position = (float3)pos + partitionPos;
 
-        p.packed.x = quad_tex_pair;
-        p.packed.y = 0xFFFFFFFF; // Full brightness for now
-        p.packed.z = 0; // No AO for now
-        p.packed.w = 0; // Unused
+        uint4 packed = uint4(quad_tex_pair,0,0,0);
+        set_sun_light(packed, uint4(15,15,15,15));
+        set_artificial_light(packed, uint4(0,0,0,0));
+        
+        p.packed = packed;
 
         switch (myDef.MeshLayer)
         {
