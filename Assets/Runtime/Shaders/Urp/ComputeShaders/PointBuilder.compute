@@ -1,4 +1,4 @@
-﻿#pragma kernel RebuildPoints
+﻿#pragma kernel BuildPoints
 
 #include "VoxelComputeCommon.hlsl"
 #include "../VoxelCommon.hlsl"
@@ -41,15 +41,23 @@ uint2 get_voxel_quad_indices(in VoxelDef def, uint dir)
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Rebuild Kernel - Generate solid point data per partition
+// Build Kernel - Generate solid point data per partition
 // ─────────────────────────────────────────────────────────────────────────────
 
 StructuredBuffer<VoxelDef> _VoxelRenderDefs;
 uint _VoxelRenderDefsCount;
 StructuredBuffer<uint> _VoxelQuadTexPairs;
 uint _VoxelQuadTexPairsCount;
-StructuredBuffer<uint2> _RawVoxels;
-uint _RawVoxelsCompressedCount;
+
+StructuredBuffer<uint2> _MainChunk; //First has compressedLength and highest uncompressed index
+StructuredBuffer<uint2> _NeighborChunk0; //(0,1)
+StructuredBuffer<uint2> _NeighborChunk1; //(1,1)
+StructuredBuffer<uint2> _NeighborChunk2; //(1,0)
+StructuredBuffer<uint2> _NeighborChunk3; //(1,-1)
+StructuredBuffer<uint2> _NeighborChunk4; //(0,-1)
+StructuredBuffer<uint2> _NeighborChunk5; //(-1,-1)
+StructuredBuffer<uint2> _NeighborChunk6; //(-1,0)
+StructuredBuffer<uint2> _NeighborChunk7; //(-1,1)
 
 RWStructuredBuffer<PartitionMetadata> _Metadata;
 AppendStructuredBuffer<PointData> _SolidPointsOut;
@@ -59,7 +67,12 @@ uint _PartitionIndex;
 
 VoxelDef get_voxel_def(uint voxelId)
 {
-    if (voxelId >= _VoxelRenderDefsCount) return (VoxelDef)0; // Invalid
+    if (voxelId >= _VoxelRenderDefsCount)
+    {
+        VoxelDef invalid = (VoxelDef)0;
+        invalid.MeshLayer = 255; // Treat invalid lookups as air
+        return invalid;
+    }
     return _VoxelRenderDefs[voxelId];
 }
 
@@ -68,35 +81,97 @@ uint get_voxel_array_index(in int3 pos)
     return ((uint)pos.x << 13) + ((uint)pos.z << 8) + (uint)pos.y; //x*32u*256u, z*256u
 }
 
-uint get_voxel(in int3 partition_ws, in int3 pos)
+uint get_voxel(StructuredBuffer<uint2> target, in int3 in_chunk_pos);
+
+uint get_voxel_from_chunk_offset(in int2 chunk_offset, in int3 in_chunk_pos)
 {
-    int3 in_chunk_pos = pos + int3(0, partition_ws.y, 0);
+    if (abs(chunk_offset.x) > 1 || abs(chunk_offset.y) > 1) return 0;
+
+    int ox = clamp(chunk_offset.x, -1, 1);
+    int oy = clamp(chunk_offset.y, -1, 1);
+
+    switch (ox)
+    {
+    case 1:
+        switch (oy)
+        {
+        case 1: return get_voxel(_NeighborChunk1, in_chunk_pos);
+        case 0: return get_voxel(_NeighborChunk2, in_chunk_pos);
+        case -1: return get_voxel(_NeighborChunk3, in_chunk_pos);
+        default: return get_voxel(_MainChunk, in_chunk_pos);
+        }
+    case 0:
+        switch (oy)
+        {
+        case 1: return get_voxel(_NeighborChunk0, in_chunk_pos);
+        case -1: return get_voxel(_NeighborChunk4, in_chunk_pos);
+        default: return get_voxel(_MainChunk, in_chunk_pos);
+        }
+    case -1:
+        switch (oy)
+        {
+        case 1: return get_voxel(_NeighborChunk7, in_chunk_pos);
+        case 0: return get_voxel(_NeighborChunk6, in_chunk_pos);
+        case -1: return get_voxel(_NeighborChunk5, in_chunk_pos);
+        default: return get_voxel(_MainChunk, in_chunk_pos);
+        }
+    default:
+        return get_voxel(_MainChunk, in_chunk_pos);
+    }
+}
+
+uint get_voxel(StructuredBuffer<uint2> target, in int3 in_chunk_pos)
+{
     uint index = get_voxel_array_index(in_chunk_pos);
-    if (index >= _RawVoxels[_RawVoxelsCompressedCount - 1].y) return 0;
-    if (_RawVoxelsCompressedCount == 1) return _RawVoxels[0].x;
+    uint comp_count = target[0].x;
+    uint highest_index = target[0].y;
+    if (index >= highest_index) return 0;
+    if (comp_count == 2) return target[1].x;
 
     //binary search
-    uint min = 0;
-    uint max = _RawVoxelsCompressedCount - 1;
+    uint min = 1;
+    uint max = comp_count - 1;
 
     while (min <= max)
     {
         uint mid = (max + min) >> 1;
-        uint count = _RawVoxels[mid].y;
+        uint count = target[mid].y;
 
-        if (index == count) return _RawVoxels[mid + 1].x;
+        if (index == count) return target[mid + 1].x;
 
         if (index < count) max = mid - 1;
         else min = mid + 1;
     }
-    return _RawVoxels[min].x;
+    return target[min].x;
 }
 
+#define PARTITION_SIZE 32
+#define CHUNK_HEIGHT 256
 // Helper: Get voxel from flat buffer safely
-uint get_voxel_safe(in int3 partition_ws, in int3 pos)
+uint get_voxel_safe(in StructuredBuffer<uint2> target, int partition_ps_y, in int3 pos)
 {
-    if (any(pos < 0) || any(pos >= 32)) return 0; // Air outside bounds
-    return get_voxel(partition_ws, pos);
+    int in_chunk_y = partition_ps_y * PARTITION_SIZE + pos.y;
+    if (in_chunk_y < 0 || in_chunk_y >= CHUNK_HEIGHT) return 0;
+
+    if (pos.x < 0 || pos.x >= PARTITION_SIZE || pos.z < 0 || pos.z >= PARTITION_SIZE)
+    {
+        if (pos.x < -PARTITION_SIZE || pos.x >= 2 * PARTITION_SIZE || pos.z < -PARTITION_SIZE || pos.z >= 2 * PARTITION_SIZE) return 0;
+
+        int2 chunk_offset = int2(
+            floor((float)pos.x / PARTITION_SIZE),
+            floor((float)pos.z / PARTITION_SIZE)
+        );
+
+        int3 in_chunk_pos = int3(
+            pos.x - chunk_offset.x * PARTITION_SIZE,
+            in_chunk_y,
+            pos.z - chunk_offset.y * PARTITION_SIZE
+        );
+
+        return get_voxel_from_chunk_offset(chunk_offset, in_chunk_pos);
+    }
+
+    return get_voxel(target, int3(pos.x, in_chunk_y, pos.z));
 }
 
 // Helper: Get direction offset
@@ -155,18 +230,19 @@ void add_quads(int3 pos, in float3 partitionPos, in VoxelDef myDef, uint2 quadRa
 }
 
 [numthreads(8, 8, 8)]
-void RebuildPoints(uint3 id : SV_DispatchThreadID)
+void BuildPoints(uint3 id : SV_DispatchThreadID)
 {
     if (any(id >= uint3(32, 32, 32))) return;
 
     PartitionMetadata metadata = _Metadata[_PartitionIndex];
     int3 pos = (int3)id;
-    float3 partitionWS = metadata.partitionWS;
-    uint voxelId = get_voxel(partitionWS,pos);
+    int partitionY = metadata.partitionPS.y;
+    float3 partitionWS = (float3)metadata.partitionWS;
+    uint voxelId = get_voxel(_MainChunk, pos + int3(0, partitionY * PARTITION_SIZE, 0));
 
     if (voxelId == 0) return; // Skip air
 
-    VoxelDef myDef = _VoxelRenderDefs[voxelId];
+    VoxelDef myDef = get_voxel_def(voxelId);
 
     add_quads(pos, partitionWS, myDef, myDef.shape_quad_indices_alwaysRender);
 
@@ -174,8 +250,8 @@ void RebuildPoints(uint3 id : SV_DispatchThreadID)
     for (uint dir = 0; dir < 6; dir++)
     {
         int3 neighborPos = pos + get_direction_offset(dir);
-        uint neighborId = get_voxel_safe(partitionWS,neighborPos);
-        VoxelDef otherDef = _VoxelRenderDefs[neighborId];
+        uint neighborId = get_voxel_safe(_MainChunk, partitionY, neighborPos);
+        VoxelDef otherDef = get_voxel_def(neighborId);
 
         if (myDef.AlwaysRenderAllFaces == 0 && !should_render_face(myDef, otherDef)) continue;
 

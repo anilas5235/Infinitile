@@ -21,6 +21,13 @@ namespace Test
         {
             _voxels = new UnsafeIntervalList<ushort>(10, Allocator.Domain);
             _voxels.AddInterval(0, VoxelsPerChunk);
+
+            for (int z = -32; z < 32; z++)
+            for (int x = -32; x < 32; x++)
+            {
+                vWRenderer.AddOrUpdateChunk(new int2(x, z), _voxels);
+            }
+
             for (int j = 0; j < 64; j++)
             {
                 int index = ChunkSize.Flatten(new int3((j % 16) * 2, 0, 2 * (int)math.floor(j / 16.0f)));
@@ -47,30 +54,26 @@ namespace Test
 
         private IEnumerator AddStoneChunks()
         {
-            for (int z = 0; z < 16; z++)
-            for (int x = 0; x < 16; x++)
-            {
-                Awaitable<bool> handle = ChunkAddAndUpdate(new int2(2 + x, z), _voxels2);
-                while (!handle.GetAwaiter().IsCompleted)
-                {
-                    yield return null;
-                }
-            }
-        }
-
-        private async Awaitable<bool> ChunkAddAndUpdate(int2 chunkPos, UnsafeIntervalList<ushort> voxels)
-        {
-            vWRenderer.AddOrUpdateChunk(chunkPos, voxels);
-
             HashSet<int3> partitionsToUpdate = new();
-
-            for (int y = 0; y < PartitionsPerChunk; y++)
+            int gridSize = 3;
+            for (int z = 0; z < gridSize; z++)
+            for (int x = 0; x < gridSize; x++)
             {
-                partitionsToUpdate.Add(new int3(chunkPos.x, y, chunkPos.y));
+                int2 chunkPos = new int2(2 + x, z);
+                vWRenderer.AddOrUpdateChunk(chunkPos, _voxels2);
+
+                for (int y = 0; y < PartitionsPerChunk; y++)
+                {
+                    partitionsToUpdate.Add(new int3(chunkPos.x, y, chunkPos.y));
+                }
+
             }
 
-            await vWRenderer.UpdatePartitions(partitionsToUpdate);
-            return true;
+            Awaitable<HashSet<int3>> handle = vWRenderer.UpdatePartitions(partitionsToUpdate);
+            while (!handle.GetAwaiter().IsCompleted)
+            {
+                yield return null;
+            }
         }
 
         private void OnDestroy()

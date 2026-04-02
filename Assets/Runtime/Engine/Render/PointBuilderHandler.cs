@@ -37,7 +37,7 @@ namespace Runtime.Engine.Render
             _pointBuilder = pointBuilder;
             _voxelRenderDefBuffer = voxelRenderDef;
             _voxelQuadTexPairBuffer = voxelQuadTexPair;
-            _pointBuilderKernelID = pointBuilder.FindKernel("RebuildPoints");
+            _pointBuilderKernelID = pointBuilder.FindKernel("BuildPoints");
 
             int vSize = Marshal.SizeOf<Vertex>();
             SolidPointsOut = new GraphicsBuffer(Target.Append, MaxPointsPerPartition, vSize);
@@ -49,7 +49,7 @@ namespace Runtime.Engine.Render
             _counts = new NativeArray<uint>(_readBackCountBuffer.count, Allocator.Domain);
         }
 
-        public async Awaitable<int[]> BuildPoints(int3 partition, GraphicsBuffer voxelData)
+        public async Awaitable<int[]> BuildPoints(int3 partition, GraphicsBuffer voxelData, GraphicsBuffer[] neighbors8)
         {
             ResetCounters();
             PartitionMetadata meta = new()
@@ -65,8 +65,15 @@ namespace Runtime.Engine.Render
             _pointBuilder.SetBuffer(_pointBuilderKernelID, VoxelQuadTexPairNameID, _voxelQuadTexPairBuffer);
             _pointBuilder.SetInt(VoxelQuadTexPairCountNameID, _voxelQuadTexPairBuffer.count);
 
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, VoxelDataNameID, voxelData);
-            _pointBuilder.SetInt(VoxelCompressedCountNameID, voxelData.count);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, MainChunkNameID, voxelData);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkUpNameID, neighbors8[0]);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkUpRightNameID, neighbors8[1]);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkRightNameID, neighbors8[2]);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkDownRightNameID, neighbors8[3]);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkDownNameID, neighbors8[4]);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkDownLeftNameID, neighbors8[5]);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkLeftNameID, neighbors8[6]);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkUpLeftNameID, neighbors8[7]);
 
             _pointBuilder.SetBuffer(_pointBuilderKernelID, MetadataNameID, _metadata);
             _pointBuilder.SetBuffer(_pointBuilderKernelID, SolidPointsOutNameID, SolidPointsOut);

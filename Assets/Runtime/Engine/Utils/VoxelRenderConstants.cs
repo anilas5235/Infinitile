@@ -21,8 +21,15 @@ namespace Runtime.Engine.Utils
         public static readonly int VoxelQuadTexPairNameID = Shader.PropertyToID("_VoxelQuadTexPairs");
         public static readonly int VoxelQuadTexPairCountNameID = Shader.PropertyToID("_VoxelQuadTexPairsCount");
 
-        public static readonly int VoxelDataNameID = Shader.PropertyToID("_RawVoxels");
-        public static readonly int VoxelCompressedCountNameID = Shader.PropertyToID("_RawVoxelsCompressedCount");
+        public static readonly int MainChunkNameID = Shader.PropertyToID("_MainChunk");
+        public static readonly int NeighborChunkUpNameID = Shader.PropertyToID("_NeighborChunk0");
+        public static readonly int NeighborChunkUpRightNameID = Shader.PropertyToID("_NeighborChunk1");
+        public static readonly int NeighborChunkRightNameID = Shader.PropertyToID("_NeighborChunk2");
+        public static readonly int NeighborChunkDownRightNameID = Shader.PropertyToID("_NeighborChunk3");
+        public static readonly int NeighborChunkDownNameID = Shader.PropertyToID("_NeighborChunk4");
+        public static readonly int NeighborChunkDownLeftNameID = Shader.PropertyToID("_NeighborChunk5");
+        public static readonly int NeighborChunkLeftNameID = Shader.PropertyToID("_NeighborChunk6");
+        public static readonly int NeighborChunkUpLeftNameID = Shader.PropertyToID("_NeighborChunk7");
 
         public static readonly int MetadataNameID = Shader.PropertyToID("_Metadata");
 

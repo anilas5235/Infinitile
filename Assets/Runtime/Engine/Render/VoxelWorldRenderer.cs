@@ -16,7 +16,7 @@ namespace Runtime.Engine.Render
 {
     public class VoxelWorldRenderer : Singleton<VoxelWorldRenderer>
     {
-        public static bool Logging = false;
+        public static bool Logging = true;
         public Material solidMaterial;
         public Material transparentMaterial;
         public Material foliageMaterial;
@@ -127,18 +127,22 @@ namespace Runtime.Engine.Render
                 existingBuffer.Dispose();
             }
 
-            uint2[] intervalData = new uint2[voxelData.CompressedLength];
-            int i = 0;
+            int compLength = voxelData.CompressedLength;
+            uint2[] intervalData = new uint2[compLength + 1];
+            int i = 1;
             foreach (UnsafeIntervalList<ushort>.Node n in voxelData.Internal)
             {
                 intervalData[i++] = new uint2(n.Value, (uint)n.Count);
             }
 
-            if(Logging) VoxelEngineLogger.Info<VoxelWorldRenderer>(
-                $"Adding/updating chunk {chunk} with {voxelData.Length} voxels in {voxelData.Internal.Length} intervals.");
-            if(Logging) VoxelEngineLogger.Info<VoxelWorldRenderer>($"Intervals: {string.Join(", ", intervalData)}");
+            intervalData[0] = new uint2((uint)compLength, intervalData[compLength].y);
+
+            if (Logging)
+                VoxelEngineLogger.Info<VoxelWorldRenderer>(
+                    $"Adding/updating chunk {chunk} with {voxelData.Length} voxels in {voxelData.Internal.Length} intervals.");
+            if (Logging) VoxelEngineLogger.Info<VoxelWorldRenderer>($"Intervals: {string.Join(", ", intervalData)}");
             if (voxelData.Length != VoxelsPerChunk) throw new Exception("Voxel data length mismatch!");
-            GraphicsBuffer dataBuffer = new(Target.Structured, voxelData.CompressedLength, Marshal.SizeOf<uint2>());
+            GraphicsBuffer dataBuffer = new(Target.Structured, intervalData.Length, Marshal.SizeOf<uint2>());
             dataBuffer.SetData(intervalData);
             _voxelDataBuffers[chunk] = dataBuffer;
         }
@@ -160,13 +164,43 @@ namespace Runtime.Engine.Render
             {
                 if (!_voxelDataBuffers.TryGetValue(PartitionToChunkPos(partition), out GraphicsBuffer dataBuffer))
                 {
-                    if (Logging) VoxelEngineLogger.Error<VoxelWorldRenderer>($"Voxel data buffer for partition {partition} not found.");
+                    if (Logging)
+                        VoxelEngineLogger.Error<VoxelWorldRenderer>(
+                            $"Voxel data buffer for partition {partition} not found.");
+                    continue;
+                }
+
+                GraphicsBuffer[] neighbors = new GraphicsBuffer[8];
+                int2[] neighborsOffsets =
+                    { new(0, 1), new(1, 1), new(1, 0), new(1, -1), new(0, -1), new(-1, -1), new(-1, 0), new(-1, 1) };
+                bool vaild = true;
+                for (int i = 0; i < neighborsOffsets.Length; i++)
+                {
+                    int2 neighborChunkPos = PartitionToChunkPos(partition) + neighborsOffsets[i];
+                    if (!_voxelDataBuffers.TryGetValue(neighborChunkPos, out GraphicsBuffer neighborBuffer))
+                    {
+                        if (Logging)
+                            VoxelEngineLogger.Error<VoxelWorldRenderer>(
+                                $"Neighbor voxel data buffer for partition {partition} not found at offset {neighborsOffsets[i]}.");
+                        vaild = false;
+                        break;
+                    }
+
+                    neighbors[i] = neighborBuffer;
+                }
+
+                if (!vaild)
+                {
+                    if (Logging)
+                        VoxelEngineLogger.Error<VoxelWorldRenderer>(
+                            $"Skipping partition {partition} due to missing neighbor data.");
                     continue;
                 }
 
                 int slotIndex = nextSlotIndex % _pointBuilderHandlers.Length;
                 nextSlotIndex++;
-                Awaitable<int[]> buildAwaitable = _pointBuilderHandlers[slotIndex].BuildPoints(partition, dataBuffer);
+                Awaitable<int[]> buildAwaitable =
+                    _pointBuilderHandlers[slotIndex].BuildPoints(partition, dataBuffer, neighbors);
                 inFlight.Enqueue(new InFlightBuild(partition, slotIndex, buildAwaitable));
 
                 if (inFlight.Count >= maxInFlight)
@@ -197,8 +231,9 @@ namespace Runtime.Engine.Render
             try
             {
                 int[] counts = await build.BuildAwaitable;
-                if (Logging) VoxelEngineLogger.Info<VoxelWorldRenderer>(
-                    $"Partition {build.Partition}: Solid={counts[0]}, Transparent={counts[1]}, Foliage={counts[2]}");
+                if (Logging)
+                    VoxelEngineLogger.Info<VoxelWorldRenderer>(
+                        $"Partition {build.Partition}: Solid={counts[0]}, Transparent={counts[1]}, Foliage={counts[2]}");
 
                 if (_isDestroyed) return;
 
@@ -207,7 +242,8 @@ namespace Runtime.Engine.Render
             }
             catch (Exception e)
             {
-                if (Logging) VoxelEngineLogger.Error<VoxelWorldRenderer>($"Error updating partition {build.Partition}: {e}");
+                if (Logging)
+                    VoxelEngineLogger.Error<VoxelWorldRenderer>($"Error updating partition {build.Partition}: {e}");
             }
         }
     }
