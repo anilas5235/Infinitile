@@ -147,31 +147,30 @@ uint get_voxel(StructuredBuffer<uint2> target, in int3 in_chunk_pos)
 
 #define PARTITION_SIZE 32
 #define CHUNK_HEIGHT 256
-// Helper: Get voxel from flat buffer safely
-uint get_voxel_safe(in StructuredBuffer<uint2> target, int partition_ps_y, in int3 pos)
+// Helper: Get voxel from chunk-space position safely
+uint get_voxel_safe(in StructuredBuffer<uint2> target, in int3 in_chunk_pos)
 {
-    int in_chunk_y = partition_ps_y * PARTITION_SIZE + pos.y;
-    if (in_chunk_y < 0 || in_chunk_y >= CHUNK_HEIGHT) return 0;
+    if (in_chunk_pos.y < 0 || in_chunk_pos.y >= CHUNK_HEIGHT) return 0;
 
-    if (pos.x < 0 || pos.x >= PARTITION_SIZE || pos.z < 0 || pos.z >= PARTITION_SIZE)
+    if (in_chunk_pos.x < 0 || in_chunk_pos.x >= PARTITION_SIZE || in_chunk_pos.z < 0 || in_chunk_pos.z >= PARTITION_SIZE)
     {
-        if (pos.x < -PARTITION_SIZE || pos.x >= 2 * PARTITION_SIZE || pos.z < -PARTITION_SIZE || pos.z >= 2 * PARTITION_SIZE) return 0;
+        if (in_chunk_pos.x < -PARTITION_SIZE || in_chunk_pos.x >= 2 * PARTITION_SIZE || in_chunk_pos.z < -PARTITION_SIZE || in_chunk_pos.z >= 2 * PARTITION_SIZE) return 0;
 
         int2 chunk_offset = int2(
-            floor((float)pos.x / PARTITION_SIZE),
-            floor((float)pos.z / PARTITION_SIZE)
+            floor((float)in_chunk_pos.x / PARTITION_SIZE),
+            floor((float)in_chunk_pos.z / PARTITION_SIZE)
         );
 
-        int3 in_chunk_pos = int3(
-            pos.x - chunk_offset.x * PARTITION_SIZE,
-            in_chunk_y,
-            pos.z - chunk_offset.y * PARTITION_SIZE
+        int3 neighbor_chunk_pos = int3(
+            in_chunk_pos.x - chunk_offset.x * PARTITION_SIZE,
+            in_chunk_pos.y,
+            in_chunk_pos.z - chunk_offset.y * PARTITION_SIZE
         );
 
-        return get_voxel_from_chunk_offset(chunk_offset, in_chunk_pos);
+        return get_voxel_from_chunk_offset(chunk_offset, neighbor_chunk_pos);
     }
 
-    return get_voxel(target, int3(pos.x, in_chunk_y, pos.z));
+    return get_voxel(target, in_chunk_pos);
 }
 
 // Helper: Get direction offset
@@ -232,13 +231,13 @@ void add_quads(int3 pos, in float3 partitionPos, in VoxelDef myDef, uint2 quadRa
 [numthreads(8, 8, 8)]
 void BuildPoints(uint3 id : SV_DispatchThreadID)
 {
-    if (any(id >= uint3(32, 32, 32))) return;
+    if (any(id >= uint3(PARTITION_SIZE, PARTITION_SIZE, PARTITION_SIZE))) return;
 
     PartitionMetadata metadata = _Metadata[_PartitionIndex];
     int3 pos = (int3)id;
-    int partitionY = metadata.partitionPS.y;
     float3 partitionWS = (float3)metadata.partitionWS;
-    uint voxelId = get_voxel(_MainChunk, pos + int3(0, partitionY * PARTITION_SIZE, 0));
+    int3 in_chunk_pos = pos + int3(0, partitionWS.y, 0);
+    uint voxelId = get_voxel(_MainChunk, in_chunk_pos);
 
     if (voxelId == 0) return; // Skip air
 
@@ -249,8 +248,8 @@ void BuildPoints(uint3 id : SV_DispatchThreadID)
     // Check 6 neighbors for face exposure
     for (uint dir = 0; dir < 6; dir++)
     {
-        int3 neighborPos = pos + get_direction_offset(dir);
-        uint neighborId = get_voxel_safe(_MainChunk, partitionY, neighborPos);
+        int3 neighbor_chunk_pos = in_chunk_pos + get_direction_offset(dir);
+        uint neighborId = get_voxel_safe(_MainChunk, neighbor_chunk_pos);
         VoxelDef otherDef = get_voxel_def(neighborId);
 
         if (myDef.AlwaysRenderAllFaces == 0 && !should_render_face(myDef, otherDef)) continue;

@@ -16,7 +16,7 @@ namespace Runtime.Engine.Render
 {
     public class VoxelWorldRenderer : Singleton<VoxelWorldRenderer>
     {
-        public static bool Logging = true;
+        public static bool Logging = false;
         public Material solidMaterial;
         public Material transparentMaterial;
         public Material foliageMaterial;
