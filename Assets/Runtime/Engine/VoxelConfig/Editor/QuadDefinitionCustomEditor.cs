@@ -188,6 +188,8 @@ namespace Runtime.Engine.VoxelConfig.Editor
             using (new EditorGUI.DisabledGroupScope(true))
             {
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("normal"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("up"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("right"));
             }
 
             EditorGUILayout.PropertyField(serializedObject.FindProperty("uv00"));
