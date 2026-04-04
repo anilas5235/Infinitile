@@ -84,7 +84,7 @@ namespace Runtime.Engine.Render
 
             _pointBuilder.SetInt(PartitionIndexNameID, 0);
 
-            _pointBuilder.Dispatch(_pointBuilderKernelID, 4, 4, 4);
+            _pointBuilder.Dispatch(_pointBuilderKernelID, 8, 8, 8);
 
             try
             {

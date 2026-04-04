@@ -252,7 +252,7 @@ void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uin
     }
 }
 
-[numthreads(8, 8, 8)]
+[numthreads(4, 4, 4)]
 void BuildPoints(uint3 id : SV_DispatchThreadID)
 {
     if (any(id >= uint3(PARTITION_SIZE, PARTITION_SIZE, PARTITION_SIZE))) return;
