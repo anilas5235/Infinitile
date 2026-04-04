@@ -12,6 +12,24 @@ struct PointData
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Quad buffer
+// ─────────────────────────────────────────────────────────────────────────────
+
+struct QuadData
+{
+    float3 position00; // vertex offset from voxel origin
+    float3 position01;
+    float3 position02;
+    float3 position03;
+    float2 uv00;
+    float2 uv01;
+    float2 uv02;
+    float2 uv03;
+};
+
+StructuredBuffer<QuadData> _Quad_buffer;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Packed data accessors
 // ─────────────────────────────────────────────────────────────────────────────
 

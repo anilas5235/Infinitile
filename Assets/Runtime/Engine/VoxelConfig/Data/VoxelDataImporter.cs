@@ -5,6 +5,7 @@ using Runtime.Engine.Utils;
 using Runtime.Engine.Utils.Extensions;
 using Unity.Mathematics;
 using UnityEngine;
+using static Runtime.Engine.Utils.VoxelRenderConstants;
 
 namespace Runtime.Engine.VoxelConfig.Data
 {
@@ -16,8 +17,6 @@ namespace Runtime.Engine.VoxelConfig.Data
     [DefaultExecutionOrder(-1000)]
     public class VoxelDataImporter : Singleton<VoxelDataImporter>
     {
-        private static readonly int QuadBufferID = Shader.PropertyToID("quad_buffer");
-
         /// <summary>
         /// Material used for opaque voxel rendering (solid mesh layer).
         /// </summary>

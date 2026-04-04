@@ -5,24 +5,6 @@
 #include "../VoxelCommon.hlsl"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Quad buffer
-// ─────────────────────────────────────────────────────────────────────────────
-
-struct QuadData
-{
-    float3 position00; // vertex offset from voxel origin
-    float3 position01;
-    float3 position02;
-    float3 position03;
-    float2 uv00;
-    float2 uv01;
-    float2 uv02;
-    float2 uv03;
-};
-
-StructuredBuffer<QuadData> quad_buffer;
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Vertex input structs (for GPU rendering - kept for compatibility)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -60,7 +42,7 @@ VoxelVertexData fetch_vertex_data(uint vertexID)
     v.packed = p.packed;
 
     uint quadIndex = get_quad_index(p.packed);
-    QuadData quad = quad_buffer[quadIndex];
+    QuadData quad = _Quad_buffer[quadIndex];
 
 
     // Triangle strip corners: two triangles forming a quad
