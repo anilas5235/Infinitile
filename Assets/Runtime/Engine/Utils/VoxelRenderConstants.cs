@@ -15,7 +15,7 @@ namespace Runtime.Engine.Utils
         public const int PointsPerPage = 256;
         public const int PagesPerBuffer = 1024;
         
-        public static readonly int QuadBufferID = Shader.PropertyToID("_Quad_buffer");
+        public static readonly int QuadBufferNameID = Shader.PropertyToID("_Quad_buffer");
 
         public static readonly int VoxelRenderDefNameID = Shader.PropertyToID("_VoxelRenderDefs");
         public static readonly int VoxelRenderDefCountNameID = Shader.PropertyToID("_VoxelRenderDefsCount");

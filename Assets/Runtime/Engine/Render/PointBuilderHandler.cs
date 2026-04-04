@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Runtime.Engine.Jobs.Meshing;
 using Runtime.Engine.Utils;
 using Runtime.Engine.Utils.Logger;
+using Runtime.Engine.VoxelConfig.Data;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
@@ -47,6 +48,7 @@ namespace Runtime.Engine.Render
             _metadata = new GraphicsBuffer(Target.Structured, 1, Marshal.SizeOf<PartitionMetadata>());
             _readBackCountBuffer = new GraphicsBuffer(Target.Raw, 3, sizeof(uint));
             _counts = new NativeArray<uint>(_readBackCountBuffer.count, Allocator.Domain);
+            pointBuilder.SetBuffer(_pointBuilderKernelID, QuadBufferNameID, VoxelDataImporter.Instance.VoxelRegistry.QuadBuffer);
         }
 
         public async Awaitable<int[]> BuildPoints(int3 partition, GraphicsBuffer voxelData, GraphicsBuffer[] neighbors8)

@@ -52,9 +52,9 @@ namespace Runtime.Engine.VoxelConfig.Data
 
             UpdateMaterials();
 
-            voxelSolidMaterial.SetBuffer(QuadBufferID, VoxelRegistry.QuadBuffer);
-            voxelTransparentMaterial.SetBuffer(QuadBufferID, VoxelRegistry.QuadBuffer);
-            voxelFoliageMaterial.SetBuffer(QuadBufferID, VoxelRegistry.QuadBuffer);
+            voxelSolidMaterial.SetBuffer(QuadBufferNameID, VoxelRegistry.QuadBuffer);
+            voxelTransparentMaterial.SetBuffer(QuadBufferNameID, VoxelRegistry.QuadBuffer);
+            voxelFoliageMaterial.SetBuffer(QuadBufferNameID, VoxelRegistry.QuadBuffer);
         }
 
         /// <summary>

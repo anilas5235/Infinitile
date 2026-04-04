@@ -148,13 +148,16 @@ uint get_voxel(StructuredBuffer<uint2> target, in int3 in_chunk_pos)
 #define PARTITION_SIZE 32
 #define CHUNK_HEIGHT 256
 // Helper: Get voxel from chunk-space position safely
-uint get_voxel_safe(in StructuredBuffer<uint2> target, in int3 in_chunk_pos)
+uint get_voxel_safe(in int3 in_chunk_pos)
 {
     if (in_chunk_pos.y < 0 || in_chunk_pos.y >= CHUNK_HEIGHT) return 0;
 
-    if (in_chunk_pos.x < 0 || in_chunk_pos.x >= PARTITION_SIZE || in_chunk_pos.z < 0 || in_chunk_pos.z >= PARTITION_SIZE)
+    if (in_chunk_pos.x < 0 || in_chunk_pos.x >= PARTITION_SIZE || in_chunk_pos.z < 0 || in_chunk_pos.z >=
+        PARTITION_SIZE)
     {
-        if (in_chunk_pos.x < -PARTITION_SIZE || in_chunk_pos.x >= 2 * PARTITION_SIZE || in_chunk_pos.z < -PARTITION_SIZE || in_chunk_pos.z >= 2 * PARTITION_SIZE) return 0;
+        if (in_chunk_pos.x < -PARTITION_SIZE || in_chunk_pos.x >= 2 * PARTITION_SIZE || in_chunk_pos.z < -PARTITION_SIZE
+            || in_chunk_pos.z >= 2 * PARTITION_SIZE)
+            return 0;
 
         int2 chunk_offset = int2(
             floor((float)in_chunk_pos.x / PARTITION_SIZE),
@@ -170,7 +173,7 @@ uint get_voxel_safe(in StructuredBuffer<uint2> target, in int3 in_chunk_pos)
         return get_voxel_from_chunk_offset(chunk_offset, neighbor_chunk_pos);
     }
 
-    return get_voxel(target, in_chunk_pos);
+    return get_voxel(_MainChunk, in_chunk_pos);
 }
 
 // Helper: Get direction offset
@@ -201,23 +204,39 @@ uint get_quad_tex_pair(uint index)
     return _VoxelQuadTexPairs[index];
 }
 
-void add_quads(int3 pos, in float3 partitionPos, in VoxelDef myDef, uint2 quadRange)
+bool is_solid(int3 in_chunk_pos)
+{
+    return _VoxelRenderDefs[get_voxel_safe(in_chunk_pos)].MeshLayer == MESH_LAYER_SOLID;
+}
+
+void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uint2 quadRange)
 {
     for (uint i = 0u; i < quadRange.y; i++)
     {
         uint quad_tex_pair = get_quad_tex_pair(quadRange.x + i);
         // Generate point in world voxel space.
         PointData p;
-        p.position = (float3)pos + partitionPos;
+        p.position = (float3)in_chunk_pos + float3(partitionPos.x,0,partitionPos.z);
 
-        uint4 packed = uint4(quad_tex_pair,0,0,0);
-        set_sun_light(packed, uint4(15,15,15,15));
-        set_artificial_light(packed, uint4(0,0,0,0));
-        set_ao(packed, p.position.y);
-        
+        uint4 packed = uint4(quad_tex_pair, 0, 0, 0);
+        set_sun_light(packed, uint4(15, 15, 15, 15));
+        set_artificial_light(packed, uint4(0, 0, 0, 0));
+
         uint quadIndex = get_quad_index(packed);
         QuadData quad = _Quad_buffer[quadIndex];
+        uint ao_mask = 0;
+        int3 front_in_chunk = in_chunk_pos + quad.normal;
+        if (is_solid(front_in_chunk + quad.up)) ao_mask |= 1 << 0; // Up
+        if (is_solid(front_in_chunk + quad.up + quad.right)) ao_mask |= 1 << 1; // UpRight
+        if (is_solid(front_in_chunk + quad.right)) ao_mask |= 1 << 2; // Right
+        if (is_solid(front_in_chunk + quad.right - quad.up)) ao_mask |= 1 << 3; // DownRight
+        if (is_solid(front_in_chunk - quad.up)) ao_mask |= 1 << 4; // Down
+        if (is_solid(front_in_chunk - quad.up - quad.right)) ao_mask |= 1 << 5; // DownLeft
+        if (is_solid(front_in_chunk - quad.right)) ao_mask |= 1 << 6; // Left
+        if (is_solid(front_in_chunk + quad.up - quad.right)) ao_mask |= 1 << 7; // UpLeft
         
+        set_ao(packed, ao_mask);
+
         p.packed = packed;
 
         switch (myDef.MeshLayer)
@@ -248,18 +267,18 @@ void BuildPoints(uint3 id : SV_DispatchThreadID)
 
     VoxelDef myDef = get_voxel_def(voxelId);
 
-    add_quads(pos, partitionWS, myDef, myDef.shape_quad_indices_alwaysRender);
+    add_quads(in_chunk_pos, partitionWS, myDef, myDef.shape_quad_indices_alwaysRender);
 
     // Check 6 neighbors for face exposure
     for (uint dir = 0; dir < 6; dir++)
     {
         int3 neighbor_chunk_pos = in_chunk_pos + get_direction_offset(dir);
-        uint neighborId = get_voxel_safe(_MainChunk, neighbor_chunk_pos);
+        uint neighborId = get_voxel_safe(neighbor_chunk_pos);
         VoxelDef otherDef = get_voxel_def(neighborId);
 
         if (myDef.AlwaysRenderAllFaces == 0 && !should_render_face(myDef, otherDef)) continue;
 
         uint2 quadData = get_voxel_quad_indices(myDef, dir);
-        add_quads(pos, partitionWS, myDef, quadData);
+        add_quads(in_chunk_pos, partitionWS, myDef, quadData);
     }
 }
