@@ -21,6 +21,7 @@ struct QuadData
     float3 position01;
     float3 position02;
     float3 position03;
+    float3 normal;
     float2 uv00;
     float2 uv01;
     float2 uv02;
