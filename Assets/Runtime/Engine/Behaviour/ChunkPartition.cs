@@ -1,4 +1,4 @@
-﻿using Runtime.Engine.Settings;
+﻿using System.Threading.Tasks;
 using Runtime.Engine.Utils.Extensions;
 using UnityEditor;
 using UnityEngine;
@@ -12,7 +12,9 @@ namespace Runtime.Engine.Behaviour
         public static bool ShowPartitionGizmos = false;
 #endif
         [SerializeField] private MeshCollider _Collider;
-        
+
+        private Task _handel;
+
         /// <summary>
         /// Dedicated mesh for collider (not shared with render mesh).
         /// </summary>

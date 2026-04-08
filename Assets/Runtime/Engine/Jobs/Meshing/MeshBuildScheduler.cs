@@ -19,7 +19,7 @@ using UnityEngine.Rendering;
 namespace Runtime.Engine.Jobs.Meshing
 {
     /// <summary>
-    /// Schedules and executes mesh build jobs for chunks, generating both render and collider meshes
+    /// Schedules and executes mesh build jobs for Partitions, creates collider meshes
     /// using a greedy meshing algorithm and applying the results to chunk behaviors.
     /// </summary>
     internal sealed class MeshBuildScheduler : JobScheduler
@@ -80,11 +80,9 @@ namespace Runtime.Engine.Jobs.Meshing
         /// <summary>
         /// Gets a value indicating whether the currently scheduled mesh build jobs have completed.
         /// </summary>
-        internal bool IsComplete => CheckComplete();
-        
-        internal bool CheckComplete() => _handle.IsCompleted && _awaiter.IsCompleted;
+        internal bool IsComplete => _handle.IsCompleted && _awaiter.IsCompleted;
 
-        internal Awaitable<HashSet<int3>>.Awaiter _awaiter;
+        private Awaitable<HashSet<int3>>.Awaiter _awaiter;
 
         /// <summary>
         /// Starts a mesh build job for the given list of chunk positions.
@@ -134,7 +132,7 @@ namespace Runtime.Engine.Jobs.Meshing
             if (gpuPipelineResult.Count != _jobs.Length)
             {
                 VoxelEngineLogger.Warn<MeshBuildScheduler>(
-                    $"GPU pipeline returned {gpuPipelineResult.Count} results, expected {_jobs.Count()}. This may indicate a synchronization issue or a problem in the GPU processing stage."
+                    $"GPU pipeline returned {gpuPipelineResult.Count} results, expected {_jobs.Length}. This may indicate a synchronization issue or a problem in the GPU processing stage."
                 );
             }
 

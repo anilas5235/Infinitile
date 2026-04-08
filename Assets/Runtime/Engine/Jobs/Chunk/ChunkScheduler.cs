@@ -25,7 +25,7 @@ namespace Runtime.Engine.Jobs.Chunk
         private readonly NoiseProfile _noiseProfile;
         private JobHandle _handle;
         private NativeList<int2> _jobs;
-        private NativeParallelHashMap<int2, Data.ChunkVoxelData> _results;
+        private NativeParallelHashMap<int2, ChunkVoxelData> _results;
         private readonly GeneratorConfig _config;
 
         /// <summary>
@@ -95,12 +95,6 @@ namespace Runtime.Engine.Jobs.Chunk
             _handle.Complete();
             _chunkManager.AddChunks(_results);
 
-            VoxelWorldRenderer worldRenderer = VoxelWorldRenderer.Instance;
-            if (worldRenderer)
-            {
-                foreach (KeyValue<int2, ChunkVoxelData> r in _results) worldRenderer.AddOrUpdateChunk(r.Key, r.Value.Data);
-            }
-
             double totalTime = (Time.realtimeSinceStartupAsDouble - start) * 1000;
             if (totalTime >= 1)
             {
@@ -109,10 +103,19 @@ namespace Runtime.Engine.Jobs.Chunk
                 );
             }
 
+            UploadChunks();
+            
             _jobs.Clear();
             _results.Clear();
             IsReady = true;
             StopRecord();
+        }
+
+        private void UploadChunks()
+        {
+            VoxelWorldRenderer worldRenderer = VoxelWorldRenderer.Instance;
+            if (!worldRenderer) return;
+            foreach (KeyValue<int2, ChunkVoxelData> r in _results) worldRenderer.AddOrUpdateChunk(r.Key, r.Value.Data);
         }
 
         /// <summary>

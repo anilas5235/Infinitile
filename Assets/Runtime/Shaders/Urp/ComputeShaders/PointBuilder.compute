@@ -70,7 +70,7 @@ VoxelDef get_voxel_def(uint voxelId)
     if (voxelId >= _VoxelRenderDefsCount)
     {
         VoxelDef invalid = (VoxelDef)0;
-        invalid.MeshLayer = 255; // Treat invalid lookups as air
+        invalid.MeshLayer = MESH_LAYER_AIR; // Treat invalid lookups as air
         return invalid;
     }
     return _VoxelRenderDefs[voxelId];
@@ -193,8 +193,8 @@ int3 get_direction_offset(uint dir)
 // Helper: Check if face should be rendered
 bool should_render_face(in VoxelDef currentVoxel, in VoxelDef neighborVoxel)
 {
-    if (currentVoxel.MeshLayer == 255) return false; // Current is air, don't render
-    if (neighborVoxel.MeshLayer == 255) return true; // Neighbor is air, render face
+    if (currentVoxel.AlwaysRenderAllFaces == (uint)true) return true;
+    if (currentVoxel.MeshLayer < neighborVoxel.MeshLayer) return true;
     return false;
 }
 
@@ -216,7 +216,7 @@ void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uin
         uint quad_tex_pair = get_quad_tex_pair(quadRange.x + i);
         // Generate point in world voxel space.
         PointData p;
-        p.position = (float3)in_chunk_pos + float3(partitionPos.x,0,partitionPos.z);
+        p.position = (float3)in_chunk_pos + float3(partitionPos.x, 0, partitionPos.z);
 
         uint4 packed = uint4(quad_tex_pair, 0, 0, 0);
         set_sun_light(packed, uint4(15, 15, 15, 15));
@@ -234,7 +234,7 @@ void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uin
         if (is_solid(front_in_chunk - quad.up - quad.right)) ao_mask |= 1 << 5; // DownLeft
         if (is_solid(front_in_chunk - quad.right)) ao_mask |= 1 << 6; // Left
         if (is_solid(front_in_chunk + quad.up - quad.right)) ao_mask |= 1 << 7; // UpLeft
-        
+
         set_ao(packed, ao_mask);
 
         p.packed = packed;
