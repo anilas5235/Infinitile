@@ -1,5 +1,6 @@
 ﻿using Runtime.Engine.Components;
 using Runtime.Engine.Jobs.Chunk;
+using Runtime.Engine.Jobs.ColliderBake;
 using Runtime.Engine.Jobs.Meshing;
 using Runtime.Engine.Settings;
 using Unity.Mathematics;
@@ -10,9 +11,10 @@ namespace Runtime.Engine.Jobs
     /// Zentraler Scheduler der Daten-, Mesh- und Collider-Jobs als Round-Robin State Machine orchestriert.
     /// Verwaltet separate Prioritäts-Queues und wählt Batches nach Konfiguration (<see cref="SchedulerSettings"/>).
     /// </summary>
-    public partial class VoxelEngineScheduler
+    public class VoxelEngineScheduler
     {
         private readonly ChunkScheduler _chunkScheduler;
+        private readonly ColliderBakeScheduler _colliderBakeScheduler;
         private readonly MeshBuildScheduler _meshBuildScheduler;
 
         private readonly ChunkManager _chunkManager;
@@ -27,20 +29,20 @@ namespace Runtime.Engine.Jobs
         /// <summary>
         /// Erstellt neuen Scheduler und initialisiert alle Queues / Sets.
         /// </summary>
-        internal VoxelEngineScheduler(
-            VoxelEngineSettings settings,
+        internal VoxelEngineScheduler(VoxelEngineSettings settings,
             MeshBuildScheduler meshBuildScheduler,
             ChunkScheduler chunkScheduler,
             ChunkManager chunkManager,
-            ChunkPool chunkPool
-        )
+            ColliderBakeScheduler colliderBakeScheduler,
+            ChunkPool chunkPool)
         {
             _meshBuildScheduler = meshBuildScheduler;
             _chunkScheduler = chunkScheduler;
+            _colliderBakeScheduler = colliderBakeScheduler;
             _chunkManager = chunkManager;
             _chunkPool = chunkPool;
 
-            _colliderJobHandler = new ColliderJobStateHandler(settings, chunkManager, chunkPool);
+            _colliderJobHandler = new ColliderJobStateHandler(settings, chunkManager, chunkPool, colliderBakeScheduler);
             _meshJobHandler = new MeshJobStateHandler(settings, chunkManager, chunkPool, meshBuildScheduler,
                 _colliderJobHandler);
             _dataJobHandler =
@@ -104,6 +106,7 @@ namespace Runtime.Engine.Jobs
         {
             _chunkScheduler.Dispose();
             _meshBuildScheduler.Dispose();
+            _colliderBakeScheduler.Dispose();
 
             if (_chunkManager != null) _chunkManager.OnChunkRemeshRequested -= OnRemesh;
         }

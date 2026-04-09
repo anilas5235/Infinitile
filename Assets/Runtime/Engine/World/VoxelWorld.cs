@@ -1,6 +1,7 @@
 ﻿using Runtime.Engine.Components;
 using Runtime.Engine.Jobs;
 using Runtime.Engine.Jobs.Chunk;
+using Runtime.Engine.Jobs.ColliderBake;
 using Runtime.Engine.Jobs.Meshing;
 using Runtime.Engine.Noise;
 using Runtime.Engine.Settings;
@@ -49,8 +50,9 @@ namespace Runtime.Engine.World
         #endregion
 
         private ChunkPool _chunkPool;
-        private MeshBuildScheduler _meshBuildScheduler;
         private ChunkScheduler _chunkScheduler;
+        private ColliderBakeScheduler _colliderBakeScheduler;
+        private MeshBuildScheduler _meshBuildScheduler;
 
         private bool _isFocused;
 
@@ -166,6 +168,11 @@ namespace Runtime.Engine.World
                 VoxelDataImporter.Instance.VoxelRegistry
             );
 
+            _colliderBakeScheduler = VoxelEngineProvider.Current.ColliderBakeScheduler(
+                ChunkManager,
+                _chunkPool
+            );
+
             _chunkScheduler = VoxelEngineProvider.Current.ChunkDataScheduler(
                 ChunkManager,
                 NoiseProfile,
@@ -175,6 +182,7 @@ namespace Runtime.Engine.World
             Scheduler = VoxelEngineProvider.Current.VoxelEngineScheduler(
                 _meshBuildScheduler,
                 _chunkScheduler,
+                _colliderBakeScheduler,
                 ChunkManager,
                 _chunkPool
             );

@@ -12,7 +12,7 @@ namespace Runtime.Engine.Behaviour
         public static bool ShowPartitionGizmos = false;
 #endif
         [SerializeField] private MeshCollider _Collider;
-        
+
         /// <summary>
         /// Dedicated mesh for collider (not shared with render mesh).
         /// </summary>
@@ -36,7 +36,6 @@ namespace Runtime.Engine.Behaviour
             transform.localPosition = new Vector3(0, PartitionHeight * pId, 0);
         }
 
-
         public void ApplyColliderMesh()
         {
             Collider.sharedMesh = ColliderMesh;
@@ -49,12 +48,6 @@ namespace Runtime.Engine.Behaviour
         }
 
 #if UNITY_EDITOR
-        private static readonly Color[] FaceColors =
-            { Color.red, Color.blue, Color.green, Color.yellow, Color.cyan, Color.magenta };
-
-        private static readonly Vector3[] FaceNormals =
-            { Vector3.right, Vector3.left, Vector3.up, Vector3.down, Vector3.forward, Vector3.back };
-
         private void OnDrawGizmosSelected()
         {
             if (!ShowPartitionGizmos) return;
@@ -65,18 +58,6 @@ namespace Runtime.Engine.Behaviour
             Gizmos.DrawWireCube(
                 transform.position + PartitionSize.GetVector3() * 0.5f,
                 PartitionSize.GetVector3() * 0.95f
-            );
-
-            // Draw partition ID
-            Gizmos.color = Color.white;
-            Handles.Label(
-                transform.position + PartitionSize.GetVector3() * 0.5f,
-                $"Id:{PartitionId}",
-                new GUIStyle()
-                {
-                    fontSize = 20,
-                    normal = new GUIStyleState() { textColor = Color.white }
-                }
             );
         }
 #endif

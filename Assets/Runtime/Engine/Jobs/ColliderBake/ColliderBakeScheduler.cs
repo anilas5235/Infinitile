@@ -13,7 +13,7 @@ namespace Runtime.Engine.Jobs.ColliderBake
     /// <summary>
     /// Schedules and manages jobs that build or update physics colliders for active chunk meshes.
     /// </summary>
-    public class ColliderBuildScheduler : JobScheduler
+    public class ColliderBakeScheduler : JobScheduler
     {
         private readonly ChunkManager _chunkManager;
         private readonly ChunkPool _chunkPool;
@@ -24,14 +24,15 @@ namespace Runtime.Engine.Jobs.ColliderBake
         private JobHandle _handle;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ColliderBuildScheduler"/> class.
+        /// Initializes a new instance of the <see cref="ColliderBakeScheduler"/> class.
         /// </summary>
         /// <param name="chunkManager">The chunk manager responsible for tracking chunk state and events.</param>
         /// <param name="chunkPool">The chunk pool providing access to active chunk meshes.</param>
-        internal ColliderBuildScheduler(ChunkManager chunkManager, ChunkPool chunkPool)
+        internal ColliderBakeScheduler(ChunkManager chunkManager, ChunkPool chunkPool)
         {
             _chunkManager = chunkManager;
             _chunkPool = chunkPool;
+            _meshes = new Dictionary<int3, ChunkPartition>();
 
             _jobs = new NativeList<int>(Allocator.Persistent);
         }
@@ -89,20 +90,20 @@ namespace Runtime.Engine.Jobs.ColliderBake
                 _chunkManager.ReCollidedPartition(position);
 
                 if (behaviour.ColliderMesh.vertexCount <= 0) continue;
-                behaviour.Collider.sharedMesh = behaviour.ColliderMesh;
+                behaviour.ApplyColliderMesh();
             }
 
             double totalTime = (Time.realtimeSinceStartupAsDouble - start) * 1000;
 
             if (totalTime >= 0.8)
             {
-                VoxelEngineLogger.Info<ColliderBuildScheduler>(
+                VoxelEngineLogger.Info<ColliderBakeScheduler>(
                     $"Built {_jobs.Length} colliders, Collected Results in <color=red>{totalTime:0.000}</color>ms"
                 );
             }
 
             _jobs.Clear();
-            _meshes = null;
+            _meshes.Clear();
 
             IsReady = true;
 
