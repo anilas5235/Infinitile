@@ -1,6 +1,7 @@
 ﻿# Mesh & Render Pipeline (Overview)
 
 # Version 1.0 (Chunks)
+
 ## Mesh Pipeline
 
 ```mermaid
@@ -15,27 +16,53 @@ H --> I[Bake Collider
 CPU Job]
 I --> J[Collider Applied]
 ```
+
 ### Description
 
-In version 1.0, the mesh pipeline is built around the concept of "chunks".
-Each chunk represents a portion of the world and is responsible for generating its own render and collider meshes.
-The process starts with a request for a chunk, which triggers the mesh queue to build both the render and collider
-meshes using CPU jobs.
-Once the render mesh is applied, the collider mesh is baked in a separate queue before being applied to the chunk.
+In version 1.0, the mesh pipeline is built around whole chunks.
+Each chunk generates its own render mesh and collider mesh on the CPU, and the pipeline applies them in sequence.
 
-The main advantage of this approach is its simplicity and low Draw Calls, as each chunk can be rendered with a single
-mesh.
-However it leaded to performance issues as the hole Chunk mesh needs to be rebuilt even if only a small portion of it is
-changed. This resulted in slow updates and a less responsive experience for players.
+Advantages:
 
-## Render Pipeline (Texture Array)
+- Very simple data flow and easy to reason about.
+- Low draw call count because each chunk uses a single render mesh.
+
+Trade-offs:
+
+- Any small change can force a full chunk rebuild.
+- Updates become slower and less responsive as the world grows.
+
+## Render Pipeline (Texture Array, ShaderGraph)
 
 ```mermaid
 flowchart LR
-    
+    A[Voxel Registry 
+    Data] --> B[Build Texture2D
+Array]
+B --> C[Bind Array +
+Material Properties]
+
+T[Vertex] --> U[Extract Texture
+Index & Sample 
+Texture Array]
+U --> V[Apply AO
+...]
+V --> W[Output Color]
 ```
+
 ### Description
 
+In version 1.0, rendering uses classic mesh rendering per chunk with a Texture2D Array bound to a ShaderGraph material.
+Each voxel face stores texture indices, and the shader samples the correct layer from the texture array.
+
+Advantages:
+
+- Simple authoring workflow in ShaderGraph.
+- Good visual flexibility without changing mesh topology.
+
+Trade-offs:
+
+- Rendering is still tied to fully buildt meshes.
 
 # Version 1.1 (Partitions)
 
@@ -51,28 +78,69 @@ H --> I[Bake Collider
 CPU Job]
 I --> J[Collider Applied]
 ```
+
 ### Description
 
-In version 1.1, the mesh pipeline was updated to use "partitions" instead of chunks.
-Partitions are smaller sections of a chunk that can be updated independently, allowing for more efficient mesh
-generation.
-The process is similar to version 1.0, but instead of building a mesh for an entire chunk, the mesh queue builds meshes
-for individual partitions.
+In version 1.1, the pipeline switches from chunks to partitions.
+This solves the main v1.0 problem: small edits no longer force a full chunk rebuild, because only the affected
+partitions need new mesh data.
 
-The main advantage of this approach is improved performance and responsiveness of the Mesh Pipeline, as only the
-affected partitions need tobe rebuilt when changes occur.
-However, it leads to increased Draw Calls, as each partition requires its own mesh (or SubMesh),
-which impacts rendering performance if there are many partitions in view.
-For example, if a chunk is divided into 16 partitions and we have 3 materials per Mesh,
-even with culling we get 6000+ Draw Calls very quickly, which caused significant performance degradation.
+Advantages:
 
-## Render Pipeline (Vertex Pulling with Geom)
+- Faster and more responsive updates after edits.
+- Less CPU work per change because only local partitions are rebuilt.
+
+Trade-offs:
+
+- Each partition adds render overhead and more draw calls.
+- Many visible partitions can quickly become expensive, especially with multiple materials.
+
+## Render Pipeline (Vertex Pulling, Point Mesh)
 
 ```mermaid
 flowchart LR
-    
+    A[Voxel Registry 
+    Data] --> B[Build Texture2D
+Array]
+B --> C[Bind Array +
+Material Properties]
+
+A--> D[Build Quad 
+Buffer]
+D --> E[Bind Buffer +
+Material Properties]
+
+L[Point] --> M[Extract Quad
+Index & Sample 
+Quad Buffer]
+M --> O[Expand to Quads
+Geometry Shader]
+O -->U[Extract Texture
+Index & Sample
+Texture Array]
+U --> V[Apply AO 
+& Lighting
+...]
+V --> W[Output Color]
 ```
+
 ### Description
+
+In version 1.1, rendering shifts toward vertex pulling, where shaders fetch packed vertex data from buffers instead of
+relying only on classic mesh attributes.
+The geometry stage expands primitives for rendering and keeps CPU-side mesh binding lighter.
+
+Advantages:
+
+- Lower CPU mesh management overhead compared to fully traditional mesh binding.
+- Smaller Meshes
+- Better control over data layout in GPU buffers.
+
+Trade-offs:
+
+- Geometry stage overhead can limit scalability.
+- Geometry Stage is not supported on all platforms.
+- Draw call pressure remains high with many visible partitions. (Fixed by Unity's SRP batcher)
 
 # Version 1.2 (Compute Shaders)
 
@@ -99,28 +167,49 @@ Shader]
 
 ### Description
 
-In version 1.2, the mesh pipeline was further optimized by introducing compute shaders for mesh generation.
-The process starts similarly to version 1.1, with a request for a partition triggering the mesh queue to build the
-collider mesh using CPU jobs.
-However, instead of building the render mesh on the CPU, a compute shader is used to build the vertex buffer for the
-render mesh.
-This allows for much faster mesh generation, as the GPU can handle the parallel processing of vertices more efficiently
-than the CPU.
-After the vertex buffer is built, a global buffer space is reserved on the CPU, and the vertex data is copied to the
-global buffer while the indices are rebuilt using another shader.
+In version 1.2, compute shaders take over the render-data generation path.
+This solves the main v1.1 problem: the partition approach still caused too many draw calls and too much CPU-side mesh
+overhead, so the pipeline moves the heavy work to the GPU and global buffers.
 
-This approach significantly reduces the time required to update meshes and improves
-the overall performance of the mesh pipeline. However, it also introduces additional complexity in terms of shader
-programming and buffer management.
+Advantages:
 
-The main improvement in this version is the significant reduction in mesh generation time and Draw Calls, as the Global
-Buffers allow for more efficient rendering of multiple partitions with fewer Draw Calls, even when many partitions are in view.
-So now we can easily render 16x16x16 partitions of 32x32x32 Voxels with 3 materials each and draw millions of vertices.
+- Much lower CPU cost for generating render data.
+- Better scalability when many partitions are visible at once.
+- Fewer draw calls thanks to global buffers and indirect-style rendering.
 
-## Render Pipeline (Mesh less Draw, Global Buffers, Index Vertex Pulling)
+Trade-offs:
+
+- More complex shader, buffer, and synchronization logic.
+- Debugging becomes harder than with a classic mesh pipeline.
+
+## Render Pipeline (Meshless Draw, Global Buffers, Index Vertex Pulling)
 
 ```mermaid
 flowchart LR
-    
+    A[Partition Render Request] --> B[PointBuilder Compute]
+    B --> C[Reserve/Compact Global Buffer Range]
+    C --> D[CopyPoints Compute]
+    D --> E[ReBuildIndexAndArgs Compute]
+    E --> F[Global Vertex + Index + Args Buffers]
+    F --> G[DrawProceduralIndirect]
+    G --> H[Vertex Pulling Shader]
+    H --> I[Frame Output]
 ```
+
 ### Description
+
+In version 1.2, rendering becomes meshless for the visual path.
+Compute shaders build and pack point/vertex data into global GPU buffers, then indirect draw arguments are rebuilt
+before issuing `DrawProceduralIndirect`.
+
+Advantages:
+
+- Strong reduction of CPU render setup work.
+- Much better scaling for large numbers of visible partitions.
+- Lower draw call overhead through batched indirect rendering.
+
+Trade-offs:
+
+- Higher implementation complexity (compute pipeline, synchronization, buffer lifetime).
+- Harder debugging and profiling compared to classic mesh rendering.
+
