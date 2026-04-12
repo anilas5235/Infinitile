@@ -207,7 +207,8 @@ Global Buffers]
 I--> J[Issue Indirect Draw]
 
 K[IndexID
-6 per Point] --> L[Get Point 
+6 per Point
+-Vertex Pulling] --> L[Get Point 
 from Buffer over
 IndexBuffer]
 L --> M[Extract Quad
@@ -238,6 +239,7 @@ Advantages:
 - Much better scaling for large numbers of visible partitions through global buffer management.
 - Lower draw call overhead through batched indirect rendering instead of per-partition draws.
 - Unified GPU-driven path simplifies CPU-side rendering logic.
+- No Geometry Shader needed.
 
 Trade-offs:
 
