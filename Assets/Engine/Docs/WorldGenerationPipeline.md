@@ -1,4 +1,4 @@
-﻿# Chunk & World Generation (Overview)
+﻿# World Generation (Overview)
 
 # Version 1.0 (Chunk Jobs)
 
@@ -6,16 +6,14 @@
 
 ```mermaid
 flowchart
-    B[Generation Request Queue] --> C[Chunk Scheduler
+    C[Chunk Scheduler
     Chunk Data Jobs\nCPU]
     C --> E1[Prepare Chunk Inputs\nSeed, Bounds, Neighbor Context]
     E1 --> E2[Sample Noise Fields\nHeight, Density, Biome Weights]
-    E2 --> E3[Classify Base Materials\nAir, Soil, Stone, Water]
+    E2 --> E3[Base Terrain\nAir, Soil, Stone, Water]
     E3 --> E4[Apply Feature Passes\nOres, Caves, Structures, Vegetation]
     E4 --> E6[Pack Chunk Data\nVoxel Map + Metadata]
     E6 --> F[Chunk Data Ready]
-    F --> G[Register in Chunk Manager]
-    G --> H[Request Mesh Pipeline]
 ```
 
 ### Description
