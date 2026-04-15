@@ -1,4 +1,5 @@
-﻿#pragma kernel BuildPoints
+﻿#pragma kernel BuildPrep
+#pragma kernel BuildPoints
 
 #include "VoxelComputeCommon.hlsl"
 #include "../VoxelCommon.hlsl"
@@ -10,13 +11,13 @@ struct VoxelDef
     half DepthFadeDistance;
     uint Glow;
     uint Collision;
-    uint2 shape_quad_indices_alwaysRender;
-    uint2 shape_quad_indices_right;
-    uint2 shape_quad_indices_left;
-    uint2 shape_quad_indices_up;
-    uint2 shape_quad_indices_down;
-    uint2 shape_quad_indices_front;
-    uint2 shape_quad_indices_back;
+    uint2 ShapeQuadIndicesAlwaysRender;
+    uint2 ShapeQuadIndicesRight;
+    uint2 ShapeQuadIndicesLeft;
+    uint2 ShapeQuadIndicesUp;
+    uint2 ShapeQuadIndicesDown;
+    uint2 ShapeQuadIndicesFront;
+    uint2 ShapeQuadIndicesBack;
 };
 
 struct VoxelQuad
@@ -29,45 +30,137 @@ uint2 get_voxel_quad_indices(in VoxelDef def, uint dir)
 {
     switch (dir)
     {
-    case 0: return def.shape_quad_indices_right;
-    case 1: return def.shape_quad_indices_left;
-    case 2: return def.shape_quad_indices_up;
-    case 3: return def.shape_quad_indices_down;
-    case 4: return def.shape_quad_indices_front;
-    case 5: return def.shape_quad_indices_back;
+    case 0: return def.ShapeQuadIndicesRight;
+    case 1: return def.ShapeQuadIndicesLeft;
+    case 2: return def.ShapeQuadIndicesUp;
+    case 3: return def.ShapeQuadIndicesDown;
+    case 4: return def.ShapeQuadIndicesFront;
+    case 5: return def.ShapeQuadIndicesBack;
     default: return 0;
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// BuildPrep Kernel - Expand compressed chunk data into flat arrays
+// ─────────────────────────────────────────────────────────────────────────────
+
+StructuredBuffer<uint2> _CompMainChunk; //First has compressedLength and highest uncompressed index
+StructuredBuffer<uint2> _CompNeighborChunk0; //(0,1)
+StructuredBuffer<uint2> _CompNeighborChunk1; //(1,1)
+StructuredBuffer<uint2> _CompNeighborChunk2; //(1,0)
+StructuredBuffer<uint2> _CompNeighborChunk3; //(1,-1)
+StructuredBuffer<uint2> _CompNeighborChunk4; //(0,-1)
+StructuredBuffer<uint2> _CompNeighborChunk5; //(-1,-1)
+StructuredBuffer<uint2> _CompNeighborChunk6; //(-1,0)
+StructuredBuffer<uint2> _CompNeighborChunk7; //(-1,1)
+
+RWStructuredBuffer<uint> _UnCompMainChunk;
+RWStructuredBuffer<uint> _UnCompNeighborChunk0; //(0,1)
+RWStructuredBuffer<uint> _UnCompNeighborChunk1; //(1,1)
+RWStructuredBuffer<uint> _UnCompNeighborChunk2; //(1,0)
+RWStructuredBuffer<uint> _UnCompNeighborChunk3; //(1,-1)
+RWStructuredBuffer<uint> _UnCompNeighborChunk4; //(0,-1)
+RWStructuredBuffer<uint> _UnCompNeighborChunk5; //(-1,-1)
+RWStructuredBuffer<uint> _UnCompNeighborChunk6; //(-1,0)
+RWStructuredBuffer<uint> _UnCompNeighborChunk7; //(-1,1)
+
+#define INTERVALS_PER_THREAD 8
+
+[numthreads(10, 9, 1)]
+void BuildPrep(uint3 id : SV_DispatchThreadID)
+{
+    uint start_interval = 1 + id.x * INTERVALS_PER_THREAD; //+1 because interval 0 is metadata
+    StructuredBuffer<uint2> source;
+    RWStructuredBuffer<uint> target;
+
+    switch (id.y)
+    {
+    case 0: source = _CompMainChunk;
+        target = _UnCompMainChunk;
+        break;
+    case 1: source = _CompNeighborChunk0;
+        target = _UnCompNeighborChunk0;
+        break;
+    case 2: source = _CompNeighborChunk1;
+        target = _UnCompNeighborChunk1;
+        break;
+    case 3: source = _CompNeighborChunk2;
+        target = _UnCompNeighborChunk2;
+        break;
+    case 4: source = _CompNeighborChunk3;
+        target = _UnCompNeighborChunk3;
+        break;
+    case 5: source = _CompNeighborChunk4;
+        target = _UnCompNeighborChunk4;
+        break;
+    case 6: source = _CompNeighborChunk5;
+        target = _UnCompNeighborChunk5;
+        break;
+    case 7: source = _CompNeighborChunk6;
+        target = _UnCompNeighborChunk6;
+        break;
+    case 8: source = _CompNeighborChunk7;
+        target = _UnCompNeighborChunk7;
+        break;
+    default: return;
+    }
+    
+    uint total_intervals = source[0].x;
+
+    for (int i = 0; i < INTERVALS_PER_THREAD; ++i)
+    {
+        uint target_interval = start_interval + i;
+        if (target_interval > total_intervals) break;
+
+        uint start_index = 0;
+        if (target_interval > 1) start_index = source[target_interval - 1].y; // Previous page's end index
+
+        uint2 page_data = source[target_interval];
+        for (uint t_index = start_index; t_index < page_data.y; ++t_index)
+        {
+            target[t_index] = page_data.x;
+        }
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Build Kernel - Generate solid point data per partition
 // ─────────────────────────────────────────────────────────────────────────────
+struct BuildParameters
+{
+    uint VoxelsPerChunk;
+    int3 ChunkSize;
+    int3 PartitionSize;
+
+    uint VoxelRenderDefsCount;
+    uint VoxelQuadTexPairsCount;
+
+    uint PartitionIndex;
+};
+
+BuildParameters _BuildParameters;
 
 StructuredBuffer<VoxelDef> _VoxelRenderDefs;
-uint _VoxelRenderDefsCount;
 StructuredBuffer<uint> _VoxelQuadTexPairs;
-uint _VoxelQuadTexPairsCount;
 
-StructuredBuffer<uint2> _MainChunk; //First has compressedLength and highest uncompressed index
-StructuredBuffer<uint2> _NeighborChunk0; //(0,1)
-StructuredBuffer<uint2> _NeighborChunk1; //(1,1)
-StructuredBuffer<uint2> _NeighborChunk2; //(1,0)
-StructuredBuffer<uint2> _NeighborChunk3; //(1,-1)
-StructuredBuffer<uint2> _NeighborChunk4; //(0,-1)
-StructuredBuffer<uint2> _NeighborChunk5; //(-1,-1)
-StructuredBuffer<uint2> _NeighborChunk6; //(-1,0)
-StructuredBuffer<uint2> _NeighborChunk7; //(-1,1)
+StructuredBuffer<uint> _MainChunk;
+StructuredBuffer<uint> _NeighborChunk0; //(0,1)
+StructuredBuffer<uint> _NeighborChunk1; //(1,1)
+StructuredBuffer<uint> _NeighborChunk2; //(1,0)
+StructuredBuffer<uint> _NeighborChunk3; //(1,-1)
+StructuredBuffer<uint> _NeighborChunk4; //(0,-1)
+StructuredBuffer<uint> _NeighborChunk5; //(-1,-1)
+StructuredBuffer<uint> _NeighborChunk6; //(-1,0)
+StructuredBuffer<uint> _NeighborChunk7; //(-1,1)
 
 RWStructuredBuffer<PartitionMetadata> _Metadata;
 AppendStructuredBuffer<PointData> _SolidPointsOut;
 AppendStructuredBuffer<PointData> _TransparentPointsOut;
 AppendStructuredBuffer<PointData> _FoliagePointsOut;
-uint _PartitionIndex;
 
 VoxelDef get_voxel_def(uint voxelId)
 {
-    if (voxelId >= _VoxelRenderDefsCount)
+    if (voxelId >= _BuildParameters.VoxelRenderDefsCount)
     {
         VoxelDef invalid = (VoxelDef)0;
         invalid.MeshLayer = MESH_LAYER_AIR; // Treat invalid lookups as air
@@ -81,7 +174,12 @@ uint get_voxel_array_index(in int3 pos)
     return ((uint)pos.x << 13) + ((uint)pos.z << 8) + (uint)pos.y; //x*32u*256u, z*256u
 }
 
-uint get_voxel(StructuredBuffer<uint2> target, in int3 in_chunk_pos);
+uint get_voxel(StructuredBuffer<uint> target, in int3 in_chunk_pos)
+{
+    uint index = get_voxel_array_index(in_chunk_pos);
+    if (index >= _BuildParameters.VoxelsPerChunk) return 0; // Out of bounds, treat as air
+    return target[index];
+}
 
 uint get_voxel_from_chunk_offset(in int2 chunk_offset, in int3 in_chunk_pos)
 {
@@ -120,54 +218,29 @@ uint get_voxel_from_chunk_offset(in int2 chunk_offset, in int3 in_chunk_pos)
     }
 }
 
-uint get_voxel(StructuredBuffer<uint2> target, in int3 in_chunk_pos)
-{
-    uint index = get_voxel_array_index(in_chunk_pos);
-    uint comp_count = target[0].x;
-    uint highest_index = target[0].y;
-    if (index >= highest_index) return 0;
-    if (comp_count == 2) return target[1].x;
-
-    //binary search
-    uint min = 1;
-    uint max = comp_count - 1;
-
-    while (min <= max)
-    {
-        uint mid = (max + min) >> 1;
-        uint count = target[mid].y;
-
-        if (index == count) return target[mid + 1].x;
-
-        if (index < count) max = mid - 1;
-        else min = mid + 1;
-    }
-    return target[min].x;
-}
-
-#define PARTITION_SIZE 32
-#define CHUNK_HEIGHT 256
 // Helper: Get voxel from chunk-space position safely
 uint get_voxel_safe(in int3 in_chunk_pos)
 {
-    if (in_chunk_pos.y < 0 || in_chunk_pos.y >= CHUNK_HEIGHT) return 0;
+    int3 chunk_size = _BuildParameters.ChunkSize;
+    int3 part_size = _BuildParameters.PartitionSize;
+    if (in_chunk_pos.y < 0 || in_chunk_pos.y >= chunk_size.y) return 0;
 
-    if (in_chunk_pos.x < 0 || in_chunk_pos.x >= PARTITION_SIZE || in_chunk_pos.z < 0 || in_chunk_pos.z >=
-        PARTITION_SIZE)
+    if (in_chunk_pos.x < 0 || in_chunk_pos.x >= part_size.x || in_chunk_pos.z < 0 || in_chunk_pos.z >=
+        part_size.z)
     {
-        if (in_chunk_pos.x < -PARTITION_SIZE || in_chunk_pos.x >= 2 * PARTITION_SIZE || in_chunk_pos.z < -PARTITION_SIZE
-            || in_chunk_pos.z >= 2 * PARTITION_SIZE)
+        if (in_chunk_pos.x < -part_size.x || in_chunk_pos.x >= 2 * part_size.x || in_chunk_pos.z < -part_size.z
+            || in_chunk_pos.z >= 2 * part_size.z)
             return 0;
 
         int2 chunk_offset = int2(
-            floor((float)in_chunk_pos.x / PARTITION_SIZE),
-            floor((float)in_chunk_pos.z / PARTITION_SIZE)
+            floor((float)in_chunk_pos.x / part_size.x),
+            floor((float)in_chunk_pos.z / part_size.z)
         );
 
         int3 neighbor_chunk_pos = int3(
-            in_chunk_pos.x - chunk_offset.x * PARTITION_SIZE,
+            in_chunk_pos.x - chunk_offset.x * part_size.x,
             in_chunk_pos.y,
-            in_chunk_pos.z - chunk_offset.y * PARTITION_SIZE
+            in_chunk_pos.z - chunk_offset.y * part_size.z
         );
 
         return get_voxel_from_chunk_offset(chunk_offset, neighbor_chunk_pos);
@@ -200,7 +273,7 @@ bool should_render_face(in VoxelDef currentVoxel, in VoxelDef neighborVoxel)
 
 uint get_quad_tex_pair(uint index)
 {
-    if (index >= _VoxelQuadTexPairsCount) return 0; // Invalid
+    if (index >= _BuildParameters.VoxelQuadTexPairsCount) return 0; // Invalid
     return _VoxelQuadTexPairs[index];
 }
 
@@ -255,9 +328,9 @@ void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uin
 [numthreads(4, 4, 4)]
 void BuildPoints(uint3 id : SV_DispatchThreadID)
 {
-    if (any(id >= uint3(PARTITION_SIZE, PARTITION_SIZE, PARTITION_SIZE))) return;
+    if (any(id >= _BuildParameters.PartitionSize)) return;
 
-    PartitionMetadata metadata = _Metadata[_PartitionIndex];
+    PartitionMetadata metadata = _Metadata[_BuildParameters.PartitionIndex];
     int3 pos = (int3)id;
     float3 partitionWS = (float3)metadata.partitionWS;
     int3 in_chunk_pos = pos + int3(0, partitionWS.y, 0);
@@ -267,7 +340,7 @@ void BuildPoints(uint3 id : SV_DispatchThreadID)
 
     VoxelDef myDef = get_voxel_def(voxelId);
 
-    add_quads(in_chunk_pos, partitionWS, myDef, myDef.shape_quad_indices_alwaysRender);
+    add_quads(in_chunk_pos, partitionWS, myDef, myDef.ShapeQuadIndicesAlwaysRender);
 
     // Check 6 neighbors for face exposure
     for (uint dir = 0; dir < 6; dir++)
@@ -276,7 +349,7 @@ void BuildPoints(uint3 id : SV_DispatchThreadID)
         uint neighborId = get_voxel_safe(neighbor_chunk_pos);
         VoxelDef otherDef = get_voxel_def(neighborId);
 
-        if (myDef.AlwaysRenderAllFaces == 0 && !should_render_face(myDef, otherDef)) continue;
+        if (!should_render_face(myDef, otherDef)) continue;
 
         uint2 quadData = get_voxel_quad_indices(myDef, dir);
         add_quads(in_chunk_pos, partitionWS, myDef, quadData);
