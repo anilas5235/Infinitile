@@ -64,48 +64,58 @@ RWStructuredBuffer<uint> _UnCompNeighborChunk5; //(-1,-1)
 RWStructuredBuffer<uint> _UnCompNeighborChunk6; //(-1,0)
 RWStructuredBuffer<uint> _UnCompNeighborChunk7; //(-1,1)
 
+uint2 get_interval(uint chunk_index, uint interval_index)
+{
+    switch (chunk_index)
+    {
+    case 0: return _CompMainChunk[interval_index];
+    case 1: return _CompNeighborChunk0[interval_index];
+    case 2: return _CompNeighborChunk1[interval_index];
+    case 3: return _CompNeighborChunk2[interval_index];
+    case 4: return _CompNeighborChunk3[interval_index];
+    case 5: return _CompNeighborChunk4[interval_index];
+    case 6: return _CompNeighborChunk5[interval_index];
+    case 7: return _CompNeighborChunk6[interval_index];
+    case 8: return _CompNeighborChunk7[interval_index];
+    default: return 0;
+    }
+}
+
+void set_unComp(uint chunk_index, uint index, uint value)
+{
+    switch (chunk_index)
+    {
+    case 0: _UnCompMainChunk[index] = value;
+        break;
+    case 1: _UnCompNeighborChunk0[index] = value;
+        break;
+    case 2: _UnCompNeighborChunk1[index] = value;
+        break;
+    case 3: _UnCompNeighborChunk2[index] = value;
+        break;
+    case 4: _UnCompNeighborChunk3[index] = value;
+        break;
+    case 5: _UnCompNeighborChunk4[index] = value;
+        break;
+    case 6: _UnCompNeighborChunk5[index] = value;
+        break;
+    case 7: _UnCompNeighborChunk6[index] = value;
+        break;
+    case 8: _UnCompNeighborChunk7[index] = value;
+        break;
+    default: break;
+    }
+}
+
 #define INTERVALS_PER_THREAD 8
 
 [numthreads(10, 9, 1)]
+
 void BuildPrep(uint3 id : SV_DispatchThreadID)
 {
-    uint start_interval = 1 + id.x * INTERVALS_PER_THREAD; //+1 because interval 0 is metadata
-    StructuredBuffer<uint2> source;
-    RWStructuredBuffer<uint> target;
+    uint start_interval = 1 + id.x * INTERVALS_PER_THREAD; //+1 because interval 0 is metadata   
 
-    switch (id.y)
-    {
-    case 0: source = _CompMainChunk;
-        target = _UnCompMainChunk;
-        break;
-    case 1: source = _CompNeighborChunk0;
-        target = _UnCompNeighborChunk0;
-        break;
-    case 2: source = _CompNeighborChunk1;
-        target = _UnCompNeighborChunk1;
-        break;
-    case 3: source = _CompNeighborChunk2;
-        target = _UnCompNeighborChunk2;
-        break;
-    case 4: source = _CompNeighborChunk3;
-        target = _UnCompNeighborChunk3;
-        break;
-    case 5: source = _CompNeighborChunk4;
-        target = _UnCompNeighborChunk4;
-        break;
-    case 6: source = _CompNeighborChunk5;
-        target = _UnCompNeighborChunk5;
-        break;
-    case 7: source = _CompNeighborChunk6;
-        target = _UnCompNeighborChunk6;
-        break;
-    case 8: source = _CompNeighborChunk7;
-        target = _UnCompNeighborChunk7;
-        break;
-    default: return;
-    }
-    
-    uint total_intervals = source[0].x;
+    uint total_intervals = get_interval(id.y, 0).x;
 
     for (int i = 0; i < INTERVALS_PER_THREAD; ++i)
     {
@@ -113,12 +123,12 @@ void BuildPrep(uint3 id : SV_DispatchThreadID)
         if (target_interval > total_intervals) break;
 
         uint start_index = 0;
-        if (target_interval > 1) start_index = source[target_interval - 1].y; // Previous page's end index
+        if (target_interval > 1) start_index = get_interval(id.y, target_interval - 1).y; // Previous page's end index
 
-        uint2 page_data = source[target_interval];
+        uint2 page_data = get_interval(id.y, target_interval);
         for (uint t_index = start_index; t_index < page_data.y; ++t_index)
         {
-            target[t_index] = page_data.x;
+            set_unComp(id.y, t_index, page_data.x);
         }
     }
 }
@@ -126,22 +136,17 @@ void BuildPrep(uint3 id : SV_DispatchThreadID)
 // ─────────────────────────────────────────────────────────────────────────────
 // Build Kernel - Generate solid point data per partition
 // ─────────────────────────────────────────────────────────────────────────────
-struct BuildParameters
-{
-    uint VoxelsPerChunk;
-    int3 ChunkSize;
-    int3 PartitionSize;
 
-    uint VoxelRenderDefsCount;
-    uint VoxelQuadTexPairsCount;
 
-    uint PartitionIndex;
-};
-
-BuildParameters _BuildParameters;
+uint _VoxelsPerChunk;
+int3 _ChunkSize;
+int3 _PartitionSize;
+uint _PartitionIndex;
 
 StructuredBuffer<VoxelDef> _VoxelRenderDefs;
+uint _VoxelRenderDefsCount;
 StructuredBuffer<uint> _VoxelQuadTexPairs;
+uint _VoxelQuadTexPairsCount;
 
 StructuredBuffer<uint> _MainChunk;
 StructuredBuffer<uint> _NeighborChunk0; //(0,1)
@@ -160,12 +165,7 @@ AppendStructuredBuffer<PointData> _FoliagePointsOut;
 
 VoxelDef get_voxel_def(uint voxelId)
 {
-    if (voxelId >= _BuildParameters.VoxelRenderDefsCount)
-    {
-        VoxelDef invalid = (VoxelDef)0;
-        invalid.MeshLayer = MESH_LAYER_AIR; // Treat invalid lookups as air
-        return invalid;
-    }
+    if (voxelId >= _VoxelRenderDefsCount) return (VoxelDef)0;
     return _VoxelRenderDefs[voxelId];
 }
 
@@ -177,7 +177,7 @@ uint get_voxel_array_index(in int3 pos)
 uint get_voxel(StructuredBuffer<uint> target, in int3 in_chunk_pos)
 {
     uint index = get_voxel_array_index(in_chunk_pos);
-    if (index >= _BuildParameters.VoxelsPerChunk) return 0; // Out of bounds, treat as air
+    if (index >= _VoxelsPerChunk) return 0; // Out of bounds, treat as air
     return target[index];
 }
 
@@ -221,8 +221,8 @@ uint get_voxel_from_chunk_offset(in int2 chunk_offset, in int3 in_chunk_pos)
 // Helper: Get voxel from chunk-space position safely
 uint get_voxel_safe(in int3 in_chunk_pos)
 {
-    int3 chunk_size = _BuildParameters.ChunkSize;
-    int3 part_size = _BuildParameters.PartitionSize;
+    int3 chunk_size = _ChunkSize;
+    int3 part_size = _PartitionSize;
     if (in_chunk_pos.y < 0 || in_chunk_pos.y >= chunk_size.y) return 0;
 
     if (in_chunk_pos.x < 0 || in_chunk_pos.x >= part_size.x || in_chunk_pos.z < 0 || in_chunk_pos.z >=
@@ -273,7 +273,7 @@ bool should_render_face(in VoxelDef currentVoxel, in VoxelDef neighborVoxel)
 
 uint get_quad_tex_pair(uint index)
 {
-    if (index >= _BuildParameters.VoxelQuadTexPairsCount) return 0; // Invalid
+    if (index >= _VoxelQuadTexPairsCount) return 0; // Invalid
     return _VoxelQuadTexPairs[index];
 }
 
@@ -328,9 +328,9 @@ void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uin
 [numthreads(4, 4, 4)]
 void BuildPoints(uint3 id : SV_DispatchThreadID)
 {
-    if (any(id >= _BuildParameters.PartitionSize)) return;
+    if (any(id >= uint3(_PartitionSize))) return;
 
-    PartitionMetadata metadata = _Metadata[_BuildParameters.PartitionIndex];
+    PartitionMetadata metadata = _Metadata[_PartitionIndex];
     int3 pos = (int3)id;
     float3 partitionWS = (float3)metadata.partitionWS;
     int3 in_chunk_pos = pos + int3(0, partitionWS.y, 0);
