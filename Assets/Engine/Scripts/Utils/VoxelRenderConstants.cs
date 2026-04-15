@@ -35,6 +35,14 @@ namespace Engine.Scripts.Utils
 
         public static readonly int MetadataNameID = Shader.PropertyToID("_Metadata");
 
+        public static readonly int CompChunkNameID = Shader.PropertyToID("_CompChunk");
+        public static readonly int UnCompChunkNameID = Shader.PropertyToID("_UnCompChunk");
+        public static readonly int PrepChunkIndexNameID = Shader.PropertyToID("_PrepChunkIndex");
+
+        public static readonly int VoxelsPerChunkNameID = Shader.PropertyToID("_VoxelsPerChunk");
+        public static readonly int ChunkSizeNameID = Shader.PropertyToID("_ChunkSize");
+        public static readonly int PartitionSizeNameID = Shader.PropertyToID("_PartitionSize");
+
         public static readonly int SolidPointsOutNameID = Shader.PropertyToID("_SolidPointsOut");
         public static readonly int TransparentPointsOutNameID = Shader.PropertyToID("_TransparentPointsOut");
         public static readonly int FoliagePointsOutNameID = Shader.PropertyToID("_FoliagePointsOut");

@@ -10,15 +10,22 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
+using static Engine.Scripts.Utils.VoxelConstants;
 using static UnityEngine.GraphicsBuffer;
 
 namespace Engine.Scripts.Render
 {
     public class PointBuilderHandler : IDisposable
     {
+        private const int PrepChunkCount = 9;
+        private const int PrepIntervalsPerThread = 8;
+        private const int PrepThreadsX = 64;
+
         private readonly GraphicsBuffer _metadata;
         private readonly ComputeShader _pointBuilder;
+        private readonly int _buildPrepKernelID;
         private readonly int _pointBuilderKernelID;
+        private readonly GraphicsBuffer[] _preparedChunks;
 
         private readonly GraphicsBuffer _readBackCountBuffer;
         private readonly GraphicsBuffer _voxelQuadTexPairBuffer;
@@ -32,7 +39,11 @@ namespace Engine.Scripts.Render
             _pointBuilder = pointBuilder;
             _voxelRenderDefBuffer = voxelRenderDef;
             _voxelQuadTexPairBuffer = voxelQuadTexPair;
+            _buildPrepKernelID = pointBuilder.FindKernel("BuildPrep");
             _pointBuilderKernelID = pointBuilder.FindKernel("BuildPoints");
+            _preparedChunks = new GraphicsBuffer[PrepChunkCount];
+            for (int i = 0; i < _preparedChunks.Length; i++)
+                _preparedChunks[i] = new GraphicsBuffer(Target.Structured, VoxelsPerChunk, sizeof(uint));
 
             int vSize = Marshal.SizeOf<Vertex>();
             SolidPointsOut = new GraphicsBuffer(Target.Append, MaxPointsPerPartition, vSize);
@@ -59,11 +70,15 @@ namespace Engine.Scripts.Render
             FoliagePointsOut?.Dispose();
             _metadata?.Dispose();
             _readBackCountBuffer?.Dispose();
+            foreach (GraphicsBuffer chunkBuffer in _preparedChunks) chunkBuffer?.Dispose();
             _counts.Dispose();
         }
 
         public async Awaitable<int[]> BuildPoints(int3 partition, GraphicsBuffer voxelData, GraphicsBuffer[] neighbors8)
         {
+            if (neighbors8 == null || neighbors8.Length != 8)
+                throw new ArgumentException("neighbors8 must contain exactly 8 chunk buffers.", nameof(neighbors8));
+
             ResetCounters();
             PartitionMetadata meta = new()
             {
@@ -72,21 +87,27 @@ namespace Engine.Scripts.Render
             };
             _metadata.SetData(new[] { meta });
 
+            PrepareChunks(voxelData, neighbors8);
+
             _pointBuilder.SetBuffer(_pointBuilderKernelID, VoxelRenderDefNameID, _voxelRenderDefBuffer);
             _pointBuilder.SetInt(VoxelRenderDefCountNameID, _voxelRenderDefBuffer.count);
 
             _pointBuilder.SetBuffer(_pointBuilderKernelID, VoxelQuadTexPairNameID, _voxelQuadTexPairBuffer);
             _pointBuilder.SetInt(VoxelQuadTexPairCountNameID, _voxelQuadTexPairBuffer.count);
 
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, MainChunkNameID, voxelData);
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkUpNameID, neighbors8[0]);
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkUpRightNameID, neighbors8[1]);
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkRightNameID, neighbors8[2]);
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkDownRightNameID, neighbors8[3]);
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkDownNameID, neighbors8[4]);
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkDownLeftNameID, neighbors8[5]);
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkLeftNameID, neighbors8[6]);
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkUpLeftNameID, neighbors8[7]);
+            _pointBuilder.SetInt(VoxelsPerChunkNameID, VoxelsPerChunk);
+            _pointBuilder.SetInts(ChunkSizeNameID, ChunkSize.x, ChunkSize.y, ChunkSize.z);
+            _pointBuilder.SetInts(PartitionSizeNameID, PartitionSize.x, PartitionSize.y, PartitionSize.z);
+
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, MainChunkNameID, _preparedChunks[0]);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkUpNameID, _preparedChunks[1]);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkUpRightNameID, _preparedChunks[2]);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkRightNameID, _preparedChunks[3]);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkDownRightNameID, _preparedChunks[4]);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkDownNameID, _preparedChunks[5]);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkDownLeftNameID, _preparedChunks[6]);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkLeftNameID, _preparedChunks[7]);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkUpLeftNameID, _preparedChunks[8]);
 
             _pointBuilder.SetBuffer(_pointBuilderKernelID, MetadataNameID, _metadata);
             _pointBuilder.SetBuffer(_pointBuilderKernelID, SolidPointsOutNameID, SolidPointsOut);
@@ -120,6 +141,25 @@ namespace Engine.Scripts.Render
             SolidPointsOut.SetCounterValue(0);
             TransparentPointsOut.SetCounterValue(0);
             FoliagePointsOut.SetCounterValue(0);
+        }
+
+        private void PrepareChunks(GraphicsBuffer mainChunkCompressed, GraphicsBuffer[] neighbors8Compressed)
+        {
+            DispatchPrepChunk(0, mainChunkCompressed);
+            for (int i = 0; i < neighbors8Compressed.Length; i++) DispatchPrepChunk(i + 1, neighbors8Compressed[i]);
+        }
+
+        private void DispatchPrepChunk(int chunkIndex, GraphicsBuffer compressedChunk)
+        {
+            _pointBuilder.SetInt(VoxelsPerChunkNameID, VoxelsPerChunk);
+            _pointBuilder.SetInt(PrepChunkIndexNameID, chunkIndex);
+            _pointBuilder.SetBuffer(_buildPrepKernelID, CompChunkNameID, compressedChunk);
+            _pointBuilder.SetBuffer(_buildPrepKernelID, UnCompChunkNameID, _preparedChunks[chunkIndex]);
+
+            int intervalCount = math.max(0, compressedChunk.count - 1);
+            int intervalsPerGroup = PrepThreadsX * PrepIntervalsPerThread;
+            int groupsX = math.max(1, (intervalCount + intervalsPerGroup - 1) / intervalsPerGroup);
+            _pointBuilder.Dispatch(_buildPrepKernelID, groupsX, 1, 1);
         }
     }
 }

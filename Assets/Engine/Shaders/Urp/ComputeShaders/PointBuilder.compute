@@ -44,78 +44,24 @@ uint2 get_voxel_quad_indices(in VoxelDef def, uint dir)
 // BuildPrep Kernel - Expand compressed chunk data into flat arrays
 // ─────────────────────────────────────────────────────────────────────────────
 
-StructuredBuffer<uint2> _CompMainChunk; //First has compressedLength and highest uncompressed index
-StructuredBuffer<uint2> _CompNeighborChunk0; //(0,1)
-StructuredBuffer<uint2> _CompNeighborChunk1; //(1,1)
-StructuredBuffer<uint2> _CompNeighborChunk2; //(1,0)
-StructuredBuffer<uint2> _CompNeighborChunk3; //(1,-1)
-StructuredBuffer<uint2> _CompNeighborChunk4; //(0,-1)
-StructuredBuffer<uint2> _CompNeighborChunk5; //(-1,-1)
-StructuredBuffer<uint2> _CompNeighborChunk6; //(-1,0)
-StructuredBuffer<uint2> _CompNeighborChunk7; //(-1,1)
+StructuredBuffer<uint2> _CompChunk; // interval 0: (intervalCount, lastUncompressedIndex)
+RWStructuredBuffer<uint> _UnCompChunk;
 
-RWStructuredBuffer<uint> _UnCompMainChunk;
-RWStructuredBuffer<uint> _UnCompNeighborChunk0; //(0,1)
-RWStructuredBuffer<uint> _UnCompNeighborChunk1; //(1,1)
-RWStructuredBuffer<uint> _UnCompNeighborChunk2; //(1,0)
-RWStructuredBuffer<uint> _UnCompNeighborChunk3; //(1,-1)
-RWStructuredBuffer<uint> _UnCompNeighborChunk4; //(0,-1)
-RWStructuredBuffer<uint> _UnCompNeighborChunk5; //(-1,-1)
-RWStructuredBuffer<uint> _UnCompNeighborChunk6; //(-1,0)
-RWStructuredBuffer<uint> _UnCompNeighborChunk7; //(-1,1)
-
-uint2 get_interval(uint chunk_index, uint interval_index)
-{
-    switch (chunk_index)
-    {
-    case 0: return _CompMainChunk[interval_index];
-    case 1: return _CompNeighborChunk0[interval_index];
-    case 2: return _CompNeighborChunk1[interval_index];
-    case 3: return _CompNeighborChunk2[interval_index];
-    case 4: return _CompNeighborChunk3[interval_index];
-    case 5: return _CompNeighborChunk4[interval_index];
-    case 6: return _CompNeighborChunk5[interval_index];
-    case 7: return _CompNeighborChunk6[interval_index];
-    case 8: return _CompNeighborChunk7[interval_index];
-    default: return 0;
-    }
-}
-
-void set_unComp(uint chunk_index, uint index, uint value)
-{
-    switch (chunk_index)
-    {
-    case 0: _UnCompMainChunk[index] = value;
-        break;
-    case 1: _UnCompNeighborChunk0[index] = value;
-        break;
-    case 2: _UnCompNeighborChunk1[index] = value;
-        break;
-    case 3: _UnCompNeighborChunk2[index] = value;
-        break;
-    case 4: _UnCompNeighborChunk3[index] = value;
-        break;
-    case 5: _UnCompNeighborChunk4[index] = value;
-        break;
-    case 6: _UnCompNeighborChunk5[index] = value;
-        break;
-    case 7: _UnCompNeighborChunk6[index] = value;
-        break;
-    case 8: _UnCompNeighborChunk7[index] = value;
-        break;
-    default: break;
-    }
-}
+uint _PrepChunkIndex;
+uint _VoxelsPerChunk;
 
 #define INTERVALS_PER_THREAD 8
 
-[numthreads(10, 9, 1)]
+[numthreads(64, 1, 1)]
 
 void BuildPrep(uint3 id : SV_DispatchThreadID)
 {
+    if (_PrepChunkIndex > 8) return;
+
     uint start_interval = 1 + id.x * INTERVALS_PER_THREAD; //+1 because interval 0 is metadata   
 
-    uint total_intervals = get_interval(id.y, 0).x;
+    uint total_intervals = _CompChunk[0].x;
+    if (start_interval > total_intervals) return;
 
     for (int i = 0; i < INTERVALS_PER_THREAD; ++i)
     {
@@ -123,12 +69,13 @@ void BuildPrep(uint3 id : SV_DispatchThreadID)
         if (target_interval > total_intervals) break;
 
         uint start_index = 0;
-        if (target_interval > 1) start_index = get_interval(id.y, target_interval - 1).y; // Previous page's end index
+        if (target_interval > 1) start_index = _CompChunk[target_interval - 1].y; // Previous page's end index
 
-        uint2 page_data = get_interval(id.y, target_interval);
-        for (uint t_index = start_index; t_index < page_data.y; ++t_index)
+        uint2 page_data = _CompChunk[target_interval];
+        uint end_index = min(page_data.y, _VoxelsPerChunk);
+        for (uint t_index = start_index; t_index < end_index; ++t_index)
         {
-            set_unComp(id.y, t_index, page_data.x);
+            _UnCompChunk[t_index] = page_data.x;
         }
     }
 }
@@ -137,8 +84,6 @@ void BuildPrep(uint3 id : SV_DispatchThreadID)
 // Build Kernel - Generate solid point data per partition
 // ─────────────────────────────────────────────────────────────────────────────
 
-
-uint _VoxelsPerChunk;
 int3 _ChunkSize;
 int3 _PartitionSize;
 uint _PartitionIndex;
