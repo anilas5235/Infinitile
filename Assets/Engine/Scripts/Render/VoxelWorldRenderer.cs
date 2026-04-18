@@ -16,7 +16,6 @@ namespace Engine.Scripts.Render
 {
     public class VoxelWorldRenderer : Singleton<VoxelWorldRenderer>
     {
-        public static bool Logging = false;
         public Material solidMaterial;
         public Material transparentMaterial;
         public Material foliageMaterial;
@@ -112,10 +111,6 @@ namespace Engine.Scripts.Render
 
             intervalData[0] = new uint2((uint)compLength, intervalData[compLength].y);
 
-            if (Logging)
-                VoxelEngineLogger.Info<VoxelWorldRenderer>(
-                    $"Adding/updating chunk {chunk} with {voxelData.Length} voxels in {voxelData.Internal.Length} intervals.");
-            if (Logging) VoxelEngineLogger.Info<VoxelWorldRenderer>($"Intervals: {string.Join(", ", intervalData)}");
             if (voxelData.Length != VoxelsPerChunk) throw new Exception("Voxel data length mismatch!");
             GraphicsBuffer dataBuffer = new(Target.Structured, intervalData.Length, Marshal.SizeOf<uint2>());
             dataBuffer.SetData(intervalData);
@@ -135,45 +130,19 @@ namespace Engine.Scripts.Render
 
             foreach (int3 partition in partitions)
             {
-                if (!_voxelDataBuffers.TryGetValue(PartitionToChunkPos(partition), out GraphicsBuffer dataBuffer))
-                {
-                    if (Logging)
-                        VoxelEngineLogger.Error<VoxelWorldRenderer>(
-                            $"Voxel data buffer for partition {partition} not found.");
-                    continue;
-                }
+                PartitionBuildRequest request = new(partition);
+                request.CollectBuffers(_voxelDataBuffers);
 
-                GraphicsBuffer[] neighbors = new GraphicsBuffer[8];
-                int2[] neighborsOffsets =
-                    { new(0, 1), new(1, 1), new(1, 0), new(1, -1), new(0, -1), new(-1, -1), new(-1, 0), new(-1, 1) };
-                bool vaild = true;
-                for (int i = 0; i < neighborsOffsets.Length; i++)
+                if (!request.IsValid)
                 {
-                    int2 neighborChunkPos = PartitionToChunkPos(partition) + neighborsOffsets[i];
-                    if (!_voxelDataBuffers.TryGetValue(neighborChunkPos, out GraphicsBuffer neighborBuffer))
-                    {
-                        if (Logging)
-                            VoxelEngineLogger.Error<VoxelWorldRenderer>(
-                                $"Neighbor voxel data buffer for partition {partition} not found at offset {neighborsOffsets[i]}.");
-                        vaild = false;
-                        break;
-                    }
-
-                    neighbors[i] = neighborBuffer;
-                }
-
-                if (!vaild)
-                {
-                    if (Logging)
-                        VoxelEngineLogger.Error<VoxelWorldRenderer>(
-                            $"Skipping partition {partition} due to missing neighbor data.");
+                    VoxelEngineLogger.Error<VoxelWorldRenderer>(
+                        $"Skipping partition {partition} due to missing neighbor data.");
                     continue;
                 }
 
                 int slotIndex = nextSlotIndex % _pointBuilderHandlers.Length;
                 nextSlotIndex++;
-                Awaitable<int[]> buildAwaitable =
-                    _pointBuilderHandlers[slotIndex].BuildPoints(partition, dataBuffer, neighbors);
+                Awaitable<int[]> buildAwaitable = _pointBuilderHandlers[slotIndex].BuildPoints(request);
                 inFlight.Enqueue(new InFlightBuild(partition, slotIndex, buildAwaitable));
 
                 if (inFlight.Count >= maxInFlight)
@@ -204,10 +173,6 @@ namespace Engine.Scripts.Render
             try
             {
                 int[] counts = await build.BuildAwaitable;
-                if (Logging)
-                    VoxelEngineLogger.Info<VoxelWorldRenderer>(
-                        $"Partition {build.Partition}: Solid={counts[0]}, Transparent={counts[1]}, Foliage={counts[2]}");
-
                 if (_isDestroyed) return;
 
                 _copyPointsHandler.CopyJob(_pointBuilderHandlers[build.SlotIndex], build.Partition, counts);
@@ -215,8 +180,7 @@ namespace Engine.Scripts.Render
             }
             catch (Exception e)
             {
-                if (Logging)
-                    VoxelEngineLogger.Error<VoxelWorldRenderer>($"Error updating partition {build.Partition}: {e}");
+                VoxelEngineLogger.Error<VoxelWorldRenderer>($"Error updating partition {build.Partition}: {e}");
             }
         }
 

@@ -51,14 +51,7 @@ namespace Engine.Scripts.Render
             List<AllocInfo> solidAlloc = _solidBufferManager.AllocBufferSpace(partition, counts[0]);
             List<AllocInfo> transparentAlloc = _transparentBufferManager.AllocBufferSpace(partition, counts[1]);
             List<AllocInfo> foliageAlloc = _foliageBufferManager.AllocBufferSpace(partition, counts[2]);
-
-            if (VoxelWorldRenderer.Logging)
-                VoxelEngineLogger.Info<CopyPointsHandler>(
-                    $"Copying points for partition {partition}. Solid pages: {solidAlloc.Count}, Transparent pages: {transparentAlloc.Count}, Foliage pages: {foliageAlloc.Count}");
-            if (VoxelWorldRenderer.Logging)
-                VoxelEngineLogger.Info<CopyPointsHandler>(
-                    $"Remaining Pages: Solid={_solidBufferManager.RemainingPages}, Transparent={_transparentBufferManager.RemainingPages}, Foliage={_foliageBufferManager.RemainingPages}");
-
+            
             int solidPagesCount = solidAlloc.Count;
             int transparentPagesCount = transparentAlloc.Count;
             int foliagePagesCount = foliageAlloc.Count;

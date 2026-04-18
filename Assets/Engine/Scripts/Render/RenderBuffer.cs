@@ -143,8 +143,8 @@ namespace Engine.Scripts.Render
                 ShadowCastingMode.Off,
                 false
             );
-            if (VoxelWorldRenderer.Logging)
-                VoxelEngineLogger.Info<RenderBuffer>($"Drawing buffer with {_propertyBlock}");
+
+            VoxelEngineLogger.Info<RenderBuffer>($"Drawing buffer with {_propertyBlock}");
         }
 
         public void RebuildBuffers()

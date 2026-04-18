@@ -74,20 +74,13 @@ namespace Engine.Scripts.Render
             _counts.Dispose();
         }
 
-        public async Awaitable<int[]> BuildPoints(int3 partition, GraphicsBuffer voxelData, GraphicsBuffer[] neighbors8)
+        internal async Awaitable<int[]> BuildPoints(PartitionBuildRequest data)
         {
-            if (neighbors8 == null || neighbors8.Length != 8)
-                throw new ArgumentException("neighbors8 must contain exactly 8 chunk buffers.", nameof(neighbors8));
-
             ResetCounters();
-            PartitionMetadata meta = new()
-            {
-                PartitionPos = partition,
-                PartitionWorldPos = VoxelConstants.PartitionToWorldPos(partition)
-            };
+            PartitionMetadata meta = data.GetMetadata();
             _metadata.SetData(new[] { meta });
 
-            PrepareChunks(voxelData, neighbors8);
+            PrepareChunks(data);
 
             _pointBuilder.SetBuffer(_pointBuilderKernelID, VoxelRenderDefNameID, _voxelRenderDefBuffer);
             _pointBuilder.SetInt(VoxelRenderDefCountNameID, _voxelRenderDefBuffer.count);
@@ -130,8 +123,7 @@ namespace Engine.Scripts.Render
             }
             catch (Exception e)
             {
-                if (VoxelWorldRenderer.Logging)
-                    VoxelEngineLogger.Error<PointBuilderHandler>($"Error reading back point counts: {e}");
+                VoxelEngineLogger.Error<PointBuilderHandler>($"Error reading back point counts: {e}");
                 return new[] { 0, 0, 0 };
             }
         }
@@ -143,10 +135,10 @@ namespace Engine.Scripts.Render
             FoliagePointsOut.SetCounterValue(0);
         }
 
-        private void PrepareChunks(GraphicsBuffer mainChunkCompressed, GraphicsBuffer[] neighbors8Compressed)
+        private void PrepareChunks(PartitionBuildRequest data)
         {
-            DispatchPrepChunk(0, mainChunkCompressed);
-            for (int i = 0; i < neighbors8Compressed.Length; i++) DispatchPrepChunk(i + 1, neighbors8Compressed[i]);
+            GraphicsBuffer[] buffers = data.Buffers;
+            for (int i = 0; i < buffers.Length; i++) DispatchPrepChunk(i, buffers[i]);
         }
 
         private void DispatchPrepChunk(int chunkIndex, GraphicsBuffer compressedChunk)

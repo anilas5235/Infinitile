@@ -26,8 +26,6 @@ namespace Engine.Scripts.Render
         internal ComputeShader RebuildBufferShader { get; private set; }
         internal int RebuildKernel { get; private set; }
 
-        public int RemainingPages => _buffers.Sum(b => b.FreePages);
-
         public void Dispose()
         {
             if (_isDisposed) return;
@@ -110,8 +108,7 @@ namespace Engine.Scripts.Render
         private int AddNewBuffer()
         {
             _buffers.Add(new RenderBuffer(this));
-            if (VoxelWorldRenderer.Logging)
-                VoxelEngineLogger.Info<RenderBufferManager>($"Added new RenderBuffer. Total buffers: {_buffers.Count}");
+            VoxelEngineLogger.Info<RenderBufferManager>($"Added new RenderBuffer for {_material.name}. Total buffers: {_buffers.Count}");
             return _buffers.Count - 1;
         }
 
