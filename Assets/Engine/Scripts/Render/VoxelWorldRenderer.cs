@@ -5,6 +5,7 @@ using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Collections;
 using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.World;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -16,6 +17,8 @@ namespace Engine.Scripts.Render
 {
     public class VoxelWorldRenderer : Singleton<VoxelWorldRenderer>
     {
+        public VoxelWorld World;
+
         public Material solidMaterial;
         public Material transparentMaterial;
         public Material foliageMaterial;
@@ -64,7 +67,9 @@ namespace Engine.Scripts.Render
 
         private void OnEnable()
         {
+            if (World == null) World = VoxelWorld.Instance;
             RenderPipelineManager.beginCameraRendering += Draw;
+            World.ChunkManager.OnChunkChange += chunk => AddOrUpdateChunk(chunk.Position, chunk.VoxelData.GetData());
         }
 
         private void OnDisable()

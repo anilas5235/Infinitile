@@ -49,7 +49,7 @@ namespace Engine.Scripts.Jobs
 
             _currentUpdate = SchedulerUpdate.Data;
 
-            _chunkManager.OnChunkRemeshRequested += OnRemesh;
+            _chunkManager.OnRemeshRequested += OnRemesh;
         }
 
         /// <summary>
@@ -101,7 +101,7 @@ namespace Engine.Scripts.Jobs
             _meshBuildScheduler.Dispose();
             _colliderBakeScheduler.Dispose();
 
-            if (_chunkManager != null) _chunkManager.OnChunkRemeshRequested -= OnRemesh;
+            if (_chunkManager != null) _chunkManager.OnRemeshRequested -= OnRemesh;
         }
 
         private enum SchedulerUpdate : byte

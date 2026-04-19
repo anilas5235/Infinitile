@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs;
+using Engine.Scripts.Render;
 using Engine.Scripts.Settings;
 using Engine.Scripts.ThirdParty.Priority_Queue;
 using Engine.Scripts.Utils;
@@ -25,7 +26,6 @@ namespace Engine.Scripts.Components
     {
         private readonly Dictionary<int2, Chunk> _chunks;
         private readonly int _chunkStoreSize;
-        private readonly HashSet<int3> _gpuDirtyPartitions;
         private readonly SimpleFastPriorityQueue<int2, int> _queue;
         private readonly HashSet<int3> _reCollidePartitions;
 
@@ -35,8 +35,9 @@ namespace Engine.Scripts.Components
         private int3 _focus;
         private NativeParallelHashMap<int2, ChunkLightData> _lightAccessorMap;
 
-        internal Action OnChunkRemeshRequested;
-
+        internal Action OnRemeshRequested;
+        internal Action<Chunk> OnChunkChange;
+        
         /// <summary>
         ///     Creates a new manager with capacities from <paramref name="settings" />.
         /// </summary>
@@ -46,7 +47,6 @@ namespace Engine.Scripts.Components
 
             _reMeshPartitions = new HashSet<int3>();
             _reCollidePartitions = new HashSet<int3>();
-            _gpuDirtyPartitions = new HashSet<int3>();
 
             _chunks = new Dictionary<int2, Chunk>(_chunkStoreSize);
             _queue = new SimpleFastPriorityQueue<int2, int>();
@@ -64,18 +64,12 @@ namespace Engine.Scripts.Components
         /// <summary>
         ///     Whether a chunk is flagged for remeshing.
         /// </summary>
-        internal bool ShouldReMesh(int3 position)
-        {
-            return _reMeshPartitions.Contains(position);
-        }
+        internal bool ShouldReMesh(int3 position) => _reMeshPartitions.Contains(position);
 
         /// <summary>
         ///     Whether a chunk needs collider rebuild.
         /// </summary>
-        internal bool ShouldReCollide(int3 position)
-        {
-            return _reCollidePartitions.Contains(position);
-        }
+        internal bool ShouldReCollide(int3 position) => _reCollidePartitions.Contains(position);
 
         /// <summary>
         ///     Disposes native resources and all chunk data.
@@ -117,10 +111,7 @@ namespace Engine.Scripts.Components
         /// <summary>
         ///     Removes the chunk data (eviction). Persistence hook could be added here.
         /// </summary>
-        private void RemoveChunkData(int2 position)
-        {
-            _chunks.Remove(position);
-        }
+        private void RemoveChunkData(int2 position) => _chunks.Remove(position);
 
         /// <summary>
         ///     Builds a <see cref="ChunkAccessor" /> that includes a 3x3 neighborhood for given positions.
@@ -163,32 +154,6 @@ namespace Engine.Scripts.Components
         }
 
         /// <summary>
-        ///     Flushes GPU dirty partitions for rebuild (max batch size).
-        /// </summary>
-        /// <param name="maxCount">Maximum partitions to return per flush.</param>
-        /// <returns>List of dirty partition positions.</returns>
-        internal List<int3> FlushGpuDirtyPartitions(int maxCount = VoxelRenderConstants.MaxDirtyUploadsPerFrame)
-        {
-            List<int3> batch = new(math.min(maxCount, _gpuDirtyPartitions.Count));
-            foreach (int3 pos in _gpuDirtyPartitions)
-            {
-                batch.Add(pos);
-                if (batch.Count >= maxCount) break;
-            }
-
-            foreach (int3 pos in batch) _gpuDirtyPartitions.Remove(pos);
-            return batch;
-        }
-
-        /// <summary>
-        ///     Manually marks a partition as dirty for GPU rebuild (for testing).
-        /// </summary>
-        public void MarkPartitionDirty(int3 partitionPos)
-        {
-            _gpuDirtyPartitions.Add(partitionPos);
-        }
-
-        /// <summary>
         ///     Flags all neighbor partitions (including own) for remeshing.
         /// </summary>
         /// <param name="blockPosition">World block position that changed.</param>
@@ -196,17 +161,14 @@ namespace Engine.Scripts.Components
         {
             int3 pCoords = GetPartitionCoords(blockPosition);
             _reMeshPartitions.Add(pCoords);
-            _gpuDirtyPartitions.Add(pCoords);
             int3 localPos = GetPartitionLocalVoxelCoords(pCoords, blockPosition);
             switch (localPos.x % PartitionWidth)
             {
                 case MinPartitionPosXYZ:
                     _reMeshPartitions.Add(pCoords + Int3Left);
-                    _gpuDirtyPartitions.Add(pCoords + Int3Left);
                     break;
                 case MaxXPartitionPos:
                     _reMeshPartitions.Add(pCoords + Int3Right);
-                    _gpuDirtyPartitions.Add(pCoords + Int3Right);
                     break;
             }
 
@@ -214,11 +176,9 @@ namespace Engine.Scripts.Components
             {
                 case MinPartitionPosXYZ:
                     _reMeshPartitions.Add(pCoords + Int3Backward);
-                    _gpuDirtyPartitions.Add(pCoords + Int3Backward);
                     break;
                 case MaxZPartitionPos:
                     _reMeshPartitions.Add(pCoords + Int3Forward);
-                    _gpuDirtyPartitions.Add(pCoords + Int3Forward);
                     break;
             }
 
@@ -226,15 +186,13 @@ namespace Engine.Scripts.Components
             {
                 case MinPartitionPosXYZ:
                     _reMeshPartitions.Add(pCoords + Int3Down);
-                    _gpuDirtyPartitions.Add(pCoords + Int3Down);
                     break;
                 case MaxYPartitionPos:
                     _reMeshPartitions.Add(pCoords + Int3Up);
-                    _gpuDirtyPartitions.Add(pCoords + Int3Up);
                     break;
             }
 
-            OnChunkRemeshRequested?.Invoke();
+            OnRemeshRequested?.Invoke();
         }
 
         #region API
@@ -275,7 +233,11 @@ namespace Engine.Scripts.Components
 
             bool result = chunk.VoxelData.SetVoxel(blockPos, voxelId);
             _chunks[chunkPos] = chunk;
-            if (remesh && result) ReMeshPartitions(position.Int3());
+            if (remesh && result)
+            {
+                ReMeshPartitions(position.Int3());
+                OnChunkChange?.Invoke(chunk);
+            }
             return result;
         }
 

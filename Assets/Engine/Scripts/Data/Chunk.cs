@@ -144,6 +144,8 @@ namespace Engine.Scripts.Data
     public struct ChunkVoxelData : IDisposable
     {
         internal UnsafeIntervalList<ushort> Data;
+        
+        public UnsafeIntervalList<ushort> GetData() => Data;
 
         public ChunkVoxelData(int initCapacity)
         {
