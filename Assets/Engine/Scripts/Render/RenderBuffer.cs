@@ -66,15 +66,9 @@ namespace Engine.Scripts.Render
             _countsPerPage.Dispose();
         }
 
-        private bool IsPageFree(int index)
-        {
-            return _countsPerPage[index] == 0;
-        }
+        private bool IsPageFree(int index) => _countsPerPage[index] == 0;
 
-        private bool IsPageNotFree(int index)
-        {
-            return _countsPerPage[index] != 0;
-        }
+        private bool IsPageNotFree(int index) => _countsPerPage[index] != 0;
 
         private void SetPageCount(int index, uint count)
         {
