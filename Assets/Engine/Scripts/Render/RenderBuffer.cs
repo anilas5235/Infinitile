@@ -1,7 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Engine.Scripts.Jobs.Meshing;
-using Engine.Scripts.Utils.Logger;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
@@ -17,58 +18,75 @@ namespace Engine.Scripts.Render
         private readonly GraphicsBuffer _argsBuffer;
         private readonly GraphicsBuffer _countsPerPageBuffer;
         private readonly GraphicsBuffer _indexBuffer;
+        public GraphicsBuffer PointBuffer { get; }
 
         private readonly RenderBufferManager _manager;
         private readonly MaterialPropertyBlock _propertyBlock;
         private NativeArray<uint> _countsPerPage;
-        private int _highestUsedPageIndex;
-
-
-        private NativeArray<uint> _indices;
-
-        private int _lastFreePageIndex;
+        private NativeQueue<int> _freePages;
 
         private bool _stateBufferDirty;
+        private bool _shouldDraw;
         private uint _totalValidPoints;
-        private int _usedPageCount;
+        public int FreePages => _freePages.Count;
+        public int BufferIndex { get; }
 
-        public RenderBuffer(RenderBufferManager manager)
+        public RenderBuffer(RenderBufferManager manager, int bufferIndex)
         {
             _manager = manager;
-            Buffer = new GraphicsBuffer(Target.Structured, RenderBufferSize,
+            BufferIndex = bufferIndex;
+            PointBuffer = new GraphicsBuffer(Target.Structured, RenderBufferSize,
                 Marshal.SizeOf<Vertex>());
             _argsBuffer = new GraphicsBuffer(Target.IndirectArguments, 5, sizeof(uint));
             _argsBuffer.SetData(DefaultArgs);
             _indexBuffer = new GraphicsBuffer(Target.Append, RenderBufferSize,
                 Marshal.SizeOf<uint>());
-            _indices = new NativeArray<uint>(RenderBufferSize, Allocator.Domain);
 
             _countsPerPage = new NativeArray<uint>(PagesPerBuffer, Allocator.Domain);
+            _freePages = new NativeQueue<int>(Allocator.Domain);
+            for (int i = 0; i < PagesPerBuffer; i++) _freePages.Enqueue(i);
+
             _countsPerPageBuffer = new GraphicsBuffer(Target.Structured, PagesPerBuffer, sizeof(uint));
-            _lastFreePageIndex = 0;
 
             _propertyBlock = new MaterialPropertyBlock();
-            _propertyBlock.SetBuffer(PointDataNameID, Buffer);
+            _propertyBlock.SetBuffer(PointDataNameID, PointBuffer);
             _propertyBlock.SetBuffer(IndexBufferNameID, _indexBuffer);
         }
 
-        public GraphicsBuffer Buffer { get; }
-
-        public int FreePages => PagesPerBuffer - _usedPageCount;
-
         public void Dispose()
         {
-            Buffer?.Dispose();
+            PointBuffer?.Dispose();
             _argsBuffer?.Dispose();
             _indexBuffer?.Dispose();
-            _indices.Dispose();
             _countsPerPageBuffer?.Dispose();
             _countsPerPage.Dispose();
+            _freePages.Dispose();
+        }
+
+        public bool TryAllocPages(int pointCount, int numPages, out AllocInfo allocation)
+        {
+            allocation = new AllocInfo(BufferIndex);
+            if (numPages <= 0)
+                throw new ArgumentOutOfRangeException(nameof(numPages), "Must allocate at least one page.");
+            if (numPages > FreePages) return false;
+
+            int remainingPoints = pointCount;
+            for (int i = 0; i < numPages; i++)
+            {
+                int pageIndex = _freePages.Dequeue();
+                int pointsForPage = math.min(PointsPerPage, remainingPoints);
+                allocation.AddPage(new AllocInfo.AllocPage(pageIndex, pointsForPage));
+                SetPageCount(pageIndex, (uint)pointsForPage);
+
+                remainingPoints -= PointsPerPage;
+            }
+
+            _stateBufferDirty = true;
+            if (!_shouldDraw) _shouldDraw = true;
+            return true;
         }
 
         private bool IsPageFree(int index) => _countsPerPage[index] == 0;
-
-        private bool IsPageNotFree(int index) => _countsPerPage[index] != 0;
 
         private void SetPageCount(int index, uint count)
         {
@@ -77,55 +95,26 @@ namespace Engine.Scripts.Render
             _countsPerPage[index] = count;
         }
 
-        internal void SetPage(in AllocInfo allocInfo)
+        public void ClearPage(in AllocInfo allocInfo)
         {
-            int index = allocInfo.PageIndex;
-            int count = allocInfo.PointCount;
-            ValidOrThrow(index);
-            if (count < 0) throw new ArgumentOutOfRangeException(nameof(count));
-            if (IsPageFree(index))
+            if(allocInfo.Count == 0) return;
+            
+            foreach (int index in allocInfo.GetPageIndices())
             {
-                _usedPageCount++;
-                if (index > _highestUsedPageIndex) _highestUsedPageIndex = index;
+                ValidOrThrow(index);
+                if (IsPageFree(index)) continue;
+
+                SetPageCount(index, 0);
+                _freePages.Enqueue(index);
             }
 
-            SetPageCount(index, (uint)count);
             _stateBufferDirty = true;
-        }
-
-        public void ClearPage(int index)
-        {
-            ValidOrThrow(index);
-            if (IsPageNotFree(index))
-            {
-                _usedPageCount--;
-                if (index == _highestUsedPageIndex) _highestUsedPageIndex = FindUsedPageBefore(index);
-            }
-
-            SetPageCount(index, 0);
-            _stateBufferDirty = true;
-        }
-
-        private int FindUsedPageBefore(int index)
-        {
-            ValidOrThrow(index);
-            for (int i = index - 1; i >= 0; i--)
-            {
-                if (IsPageFree(i)) continue;
-                return i;
-            }
-
-            return 0;
-        }
-
-        private static void ValidOrThrow(int index)
-        {
-            if (index is < 0 or >= PagesPerBuffer) throw new ArgumentOutOfRangeException(nameof(index));
+            if (_shouldDraw && _freePages.Count == PagesPerBuffer) _shouldDraw = false;
         }
 
         public void Draw(Material mat, Camera cam)
         {
-            if (_usedPageCount == 0) return;
+            if (!_shouldDraw) return;
             Graphics.DrawProceduralIndirect(
                 mat,
                 new Bounds(Vector3.zero, Vector3.one * 100000),
@@ -137,8 +126,6 @@ namespace Engine.Scripts.Render
                 ShadowCastingMode.Off,
                 false
             );
-
-            VoxelEngineLogger.Info<RenderBuffer>($"Drawing buffer with {_propertyBlock}");
         }
 
         public void RebuildBuffers()
@@ -151,7 +138,7 @@ namespace Engine.Scripts.Render
             ComputeShader rebuild = _manager.RebuildBufferShader;
             int kernel = _manager.RebuildKernel;
 
-            int groupX = (int)math.ceil(_highestUsedPageIndex / 128f);
+            int groupX = (int)math.ceil(PagesPerBuffer / 128f);
 
             rebuild.SetBuffer(kernel, IndexBufferNameID, _indexBuffer);
             rebuild.SetBuffer(kernel, ArgsBufferNameID, _argsBuffer);
@@ -165,20 +152,9 @@ namespace Engine.Scripts.Render
             _stateBufferDirty = false;
         }
 
-        public bool TryFindFreePage(out int pageIndex)
+        private static void ValidOrThrow(int index)
         {
-            for (int i = _lastFreePageIndex; i < PagesPerBuffer; i++)
-            {
-                int index = i % PagesPerBuffer;
-                if (IsPageNotFree(index)) continue;
-
-                pageIndex = index;
-                _lastFreePageIndex = index;
-                return true;
-            }
-
-            pageIndex = -1;
-            return false;
+            if (index is < 0 or >= PagesPerBuffer) throw new ArgumentOutOfRangeException(nameof(index));
         }
     }
 }
