@@ -1,4 +1,5 @@
 ﻿using System;
+using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace Engine.Scripts.Settings
@@ -9,9 +10,24 @@ namespace Engine.Scripts.Settings
     [Serializable]
     public class RendererSettings
     {
+        [Header("Material Settings")]
+        public Material solidMaterial;
+        
+        public Material transparentMaterial;
+        
+        public Material foliageMaterial;
+        
+        [Header("ComputeShader Settings")]
+        public ComputeShader pointBuilder;
+        
+        public ComputeShader copyPoints;
+        
+        public ComputeShader rebuildBuffers;
+        
         /// <summary>
         ///     Whether chunk meshes cast shadows.
         /// </summary>
-        public ShadowCastingMode shadows;
+        [HideInInspector]
+        public ShadowCastingMode shadows = ShadowCastingMode.Off;
     }
 }

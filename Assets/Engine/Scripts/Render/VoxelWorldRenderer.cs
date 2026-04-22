@@ -10,7 +10,6 @@ using Engine.Scripts.World;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
-using static Engine.Scripts.Utils.VoxelRenderConstants;
 using static Engine.Scripts.Utils.VoxelConstants;
 using static UnityEngine.GraphicsBuffer;
 
@@ -19,16 +18,8 @@ namespace Engine.Scripts.Render
     [RequireComponent(typeof(VoxelWorld))]
     public class VoxelWorldRenderer : Singleton<VoxelWorldRenderer>
     {
-        public VoxelWorld World;
+        public VoxelWorld world;
         private VoxelEngineSettings _settings;
-
-        public Material solidMaterial;
-        public Material transparentMaterial;
-        public Material foliageMaterial;
-
-        public ComputeShader pointBuilder;
-        public ComputeShader copyPoints;
-        public ComputeShader rebuildBuffers;
 
         private readonly Dictionary<int2, GraphicsBuffer> _voxelDataBuffers = new();
         private int _copyKernelID;
@@ -48,36 +39,40 @@ namespace Engine.Scripts.Render
         {
             base.Awake();
 
-            _settings = World.Settings;
+            _settings = world.Settings;
             _maxInFlight = math.max(1, _settings.Scheduler.partitionBuildBatchSize);
 
+            var rSettings = _settings.Renderer;
+
             _solidBufferManager = new RenderBufferManager(
-                solidMaterial,
-                rebuildBuffers,
-                _settings.Renderer
+                rSettings.solidMaterial,
+                rSettings.rebuildBuffers,
+                rSettings
             );
             _transparentBufferManager = new RenderBufferManager(
-                transparentMaterial,
-                rebuildBuffers,
-                _settings.Renderer
+                rSettings.transparentMaterial,
+                rSettings.rebuildBuffers,
+                rSettings
             );
             _foliageBufferManager = new RenderBufferManager(
-                foliageMaterial,
-                rebuildBuffers,
-                _settings.Renderer
+                rSettings.foliageMaterial,
+                rSettings.rebuildBuffers,
+                rSettings
             );
 
             VoxelRegistry voxelRegistry = VoxelDataImporter.Instance.VoxelRegistry;
             _pointBuilderHandlers = new PointBuilderHandler[_maxInFlight];
             for (int i = 0; i < _pointBuilderHandlers.Length; i++)
+            {
                 _pointBuilderHandlers[i] = new PointBuilderHandler(
-                    pointBuilder,
+                    rSettings.pointBuilder,
                     voxelRegistry.VoxelRenderDefBuffer,
                     voxelRegistry.QuadTexPairBuffer
                 );
+            }
 
             _copyPointsHandler = new CopyPointsHandler(
-                copyPoints,
+                rSettings.copyPoints,
                 _solidBufferManager,
                 _transparentBufferManager,
                 _foliageBufferManager
@@ -86,9 +81,9 @@ namespace Engine.Scripts.Render
 
         private void OnEnable()
         {
-            if (World == null) World = VoxelWorld.Instance;
+            if (world == null) world = VoxelWorld.Instance;
             RenderPipelineManager.beginCameraRendering += Draw;
-            World.ChunkManager.OnChunkChange += chunk => AddOrUpdateChunk(chunk.Position, chunk.VoxelData.GetData());
+            world.ChunkManager.OnChunkChange += chunk => AddOrUpdateChunk(chunk.Position, chunk.VoxelData.GetData());
         }
 
         private void OnDisable()
