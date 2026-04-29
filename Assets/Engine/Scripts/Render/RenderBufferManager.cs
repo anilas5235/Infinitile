@@ -61,8 +61,6 @@ namespace Engine.Scripts.Render
 
             int numPages = (int)math.ceil(pointCount / (float)PointsPerPage);
 
-            if (hasAlloc && numPages == allocInfo.Count) return allocInfo;
-
             if (hasAlloc) Release(allocInfo, partitionPos);
             AllocInfo allocation = AllocPages(pointCount, numPages);
             _partitionAllocations[partitionPos] = allocation;

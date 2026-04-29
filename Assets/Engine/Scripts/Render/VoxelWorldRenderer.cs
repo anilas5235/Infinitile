@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Engine.Scripts.Data;
 using Engine.Scripts.Settings;
@@ -23,14 +24,12 @@ namespace Engine.Scripts.Render
         private VoxelEngineSettings _settings;
 
         private readonly Dictionary<int2, GraphicsBuffer> _voxelDataBuffers = new();
-        private readonly Queue<int3> _pendingPartitionBuilds = new();
-        private readonly HashSet<int3> _pendingPartitionSet = new();
-        private readonly HashSet<int3> _inFlightPartitionSet = new();
-        private readonly List<InFlightBuild> _inFlightPartitionBuilds = new();
-        private readonly Dictionary<int3, int> _partitionRequestVersions = new();
+        private readonly List<int3> _pendingBuilds = new();
+
+        private InFlightBuild[] _inFlightBuilds;
+
         private int _copyKernelID;
         private CopyPointsHandler _copyPointsHandler;
-        private RenderBufferManager _foliageBufferManager;
         private bool _isDestroyed;
 
         private PointBuilderHandler[] _pointBuilderHandlers;
@@ -40,6 +39,7 @@ namespace Engine.Scripts.Render
 
         private RenderBufferManager _solidBufferManager;
         private RenderBufferManager _transparentBufferManager;
+        private RenderBufferManager _foliageBufferManager;
         private bool _buffersRebuildPending;
 
         protected override void Awake()
@@ -48,6 +48,8 @@ namespace Engine.Scripts.Render
 
             _settings = world.Settings;
             _maxInFlight = math.max(1, _settings.Scheduler.partitionBuildBatchSize);
+
+            _inFlightBuilds = new InFlightBuild[_maxInFlight];
 
             RendererSettings rSettings = _settings.Renderer;
 
@@ -143,11 +145,7 @@ namespace Engine.Scripts.Render
 
             foreach (GraphicsBuffer buffer in _voxelDataBuffers.Values) buffer.Dispose();
 
-            _pendingPartitionBuilds.Clear();
-            _pendingPartitionSet.Clear();
-            _inFlightPartitionSet.Clear();
-            _inFlightPartitionBuilds.Clear();
-            _partitionRequestVersions.Clear();
+            _pendingBuilds.Clear();
 
             _voxelDataBuffers.Clear();
         }
@@ -182,35 +180,30 @@ namespace Engine.Scripts.Render
             foreach (int3 partition in partitions) EnqueuePartitionBuild(partition);
         }
 
-        private void EnqueuePartitionBuild(int3 partition, bool incrementVersion = true)
+        private void EnqueuePartitionBuild(int3 partition)
         {
             if (_isDestroyed) return;
+            if (_pendingBuilds.Contains(partition)) return;
 
-            if (incrementVersion)
-            {
-                _partitionRequestVersions[partition] =
-                    _partitionRequestVersions.TryGetValue(partition, out int version)
-                        ? version + 1
-                        : 1;
-            }
-
-            if (_pendingPartitionSet.Contains(partition) || _inFlightPartitionSet.Contains(partition)) return;
-
-            _pendingPartitionBuilds.Enqueue(partition);
-            _pendingPartitionSet.Add(partition);
+            _pendingBuilds.Add(partition);
         }
 
         private void StartPendingPartitionBuilds()
         {
             if (_pointBuilderHandlers == null || _pointBuilderHandlers.Length == 0) return;
 
-            while (_inFlightPartitionSet.Count < _maxInFlight && _pendingPartitionBuilds.Count > 0)
+            for (int i = 0; i < _maxInFlight; i++)
             {
-                int3 partition = _pendingPartitionBuilds.Dequeue();
-                _pendingPartitionSet.Remove(partition);
+                if (_pendingBuilds.Count < 1) break;
+                if (_inFlightBuilds[i] != null) continue;
 
-                if (!_partitionRequestVersions.TryGetValue(partition, out int requestVersion)) continue;
-                if (_inFlightPartitionSet.Contains(partition)) continue;
+                int3 partition = _pendingBuilds.First();
+                _pendingBuilds.Remove(partition);
+                if (_inFlightBuilds.Any(build => build != null && build.Partition.Equals(partition)))
+                {
+                    EnqueuePartitionBuild(partition);
+                    continue;
+                }
 
                 PartitionBuildRequest request = new(partition);
                 request.CollectBuffers(_voxelDataBuffers);
@@ -222,59 +215,33 @@ namespace Engine.Scripts.Render
                     continue;
                 }
 
-                int slotIndex = GetFreePointBuilderSlotIndex();
-                if (slotIndex < 0)
-                {
-                    _pendingPartitionBuilds.Enqueue(partition);
-                    _pendingPartitionSet.Add(partition);
-                    break;
-                }
-
-                Awaitable<int[]> buildAwaitable = _pointBuilderHandlers[slotIndex].BuildPoints(request);
-                _inFlightPartitionSet.Add(partition);
-                _inFlightPartitionBuilds.Add(new InFlightBuild(partition, slotIndex, requestVersion,
-                    buildAwaitable.GetAwaiter()));
+                PointBuilderHandler handler = _pointBuilderHandlers[i];
+                Awaitable<int[]> buildAwaitable = handler.BuildPoints(request);
+                _inFlightBuilds[i] = new InFlightBuild(partition, handler, buildAwaitable.GetAwaiter());
             }
-        }
-
-        private int GetFreePointBuilderSlotIndex()
-        {
-            for (int i = 0; i < _pointBuilderHandlers.Length; i++)
-            {
-                if (!_inFlightPartitionBuilds.Exists(build => build.SlotIndex == i)) return i;
-            }
-
-            return -1;
         }
 
         private void CompleteFinishedPartitionBuilds()
         {
             bool updatedPartitions = false;
 
-            for (int i = _inFlightPartitionBuilds.Count - 1; i >= 0; i--)
+            for (int i = 0; i < _maxInFlight; i++)
             {
-                InFlightBuild build = _inFlightPartitionBuilds[i];
+                InFlightBuild build = _inFlightBuilds[i];
+                if(build == null) continue;
                 if (!build.BuildAwaiter.IsCompleted) continue;
 
-                _inFlightPartitionBuilds.RemoveAt(i);
-                _inFlightPartitionSet.Remove(build.Partition);
+                _inFlightBuilds[i] = null;
 
                 try
                 {
-                    if (!_partitionRequestVersions.TryGetValue(build.Partition, out int currentVersion))
-                        continue;
-
                     Awaitable<int[]>.Awaiter buildAwaiter = build.BuildAwaiter;
                     int[] pointCounts = buildAwaiter.GetResult();
                     if (_isDestroyed) return;
 
-                    if (build.RequestVersion != currentVersion)
-                    {
-                        EnqueuePartitionBuild(build.Partition, false);
-                        continue;
-                    }
+                    if (_pendingBuilds.Contains(build.Partition)) continue;
 
-                    _copyPointsHandler.CopyJob(_pointBuilderHandlers[build.SlotIndex], build.Partition, pointCounts);
+                    _copyPointsHandler.CopyJob(build.Handler, build.Partition, pointCounts);
                     updatedPartitions = true;
                 }
                 catch (Exception e)
@@ -317,7 +284,7 @@ namespace Engine.Scripts.Render
         {
             if (_isDestroyed) return;
 
-            _partitionRequestVersions.Remove(partition);
+            _pendingBuilds.Remove(partition);
 
             bool changed = false;
             changed |= _solidBufferManager.ReleasePartition(partition);
@@ -329,19 +296,16 @@ namespace Engine.Scripts.Render
             RequestBuffersRebuild();
         }
 
-        private struct InFlightBuild
+        private class InFlightBuild
         {
             public readonly int3 Partition;
-            public readonly int SlotIndex;
-            public readonly int RequestVersion;
+            public readonly PointBuilderHandler Handler;
             public readonly Awaitable<int[]>.Awaiter BuildAwaiter;
 
-            public InFlightBuild(int3 partition, int slotIndex, int requestVersion,
-                Awaitable<int[]>.Awaiter buildAwaiter)
+            public InFlightBuild(int3 partition, PointBuilderHandler handler, Awaitable<int[]>.Awaiter buildAwaiter)
             {
                 Partition = partition;
-                SlotIndex = slotIndex;
-                RequestVersion = requestVersion;
+                Handler = handler;
                 BuildAwaiter = buildAwaiter;
             }
         }
