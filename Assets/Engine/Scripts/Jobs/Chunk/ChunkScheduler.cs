@@ -115,7 +115,10 @@ namespace Engine.Scripts.Jobs.Chunk
         private void UploadChunks()
         {
             foreach (KeyValue<int2, ChunkVoxelData> r in _results)
-                _world.RaiseChunkDataReady(r.Key, r.Value.Data);
+            {
+                if (_chunkManager.TryGetChunk(r.Key, out Data.Chunk chunk))
+                    _world.RaiseChunkDataReady(chunk);
+            }
         }
 
         /// <summary>

@@ -14,7 +14,7 @@ namespace Engine.Scripts.Data
     ///     Tracks a dirty flag for mesh rebuild decisions and provides simple read/write API.
     /// </summary>
     [BurstCompile]
-    public struct Chunk : IDisposable
+    public class Chunk : IDisposable
     {
         /// <summary>
         ///     World-space position (chunk origin coordinate).

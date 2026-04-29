@@ -278,6 +278,14 @@ namespace Engine.Scripts.Components
             return _chunks.ContainsKey(position);
         }
 
+        /// <summary>
+        ///     Attempts to get a chunk by its position.
+        /// </summary>
+        internal bool TryGetChunk(int2 position, out Chunk chunk)
+        {
+            return _chunks.TryGetValue(position, out chunk);
+        }
+
         #endregion
     }
 }

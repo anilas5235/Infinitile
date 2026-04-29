@@ -41,15 +41,15 @@ namespace Engine.Scripts.World
         private MeshBuildScheduler _meshBuildScheduler;
 
         internal event Action<Chunk> ChunkChanged;
-        internal event Action<int2, UnsafeIntervalList<ushort>> ChunkDataReady;
+        internal event Action<Chunk> ChunkDataReady;
         internal event Action<int2> ChunkEvicted;
         internal event Action<int3> PartitionEvicted;
         internal event Func<HashSet<int3>, Awaitable<HashSet<int3>>> PartitionBuildRequested;
 
         internal void RaiseChunkChanged(Chunk chunk) => ChunkChanged?.Invoke(chunk);
 
-        internal void RaiseChunkDataReady(int2 chunk, UnsafeIntervalList<ushort> voxelData)
-            => ChunkDataReady?.Invoke(chunk, voxelData);
+        internal void RaiseChunkDataReady(Chunk chunk)
+            => ChunkDataReady?.Invoke(chunk);
 
         internal void RaiseChunkEvicted(int2 chunkPos) => ChunkEvicted?.Invoke(chunkPos);
 

@@ -109,9 +109,9 @@ namespace Engine.Scripts.Render
             AddOrUpdateChunk(chunk.Position, chunk.VoxelData.GetData());
         }
 
-        private void HandleChunkDataReady(int2 chunk, UnsafeIntervalList<ushort> voxelData)
+        private void HandleChunkDataReady(Chunk chunk)
         {
-            AddOrUpdateChunk(chunk, voxelData);
+            AddOrUpdateChunk(chunk.Position, chunk.VoxelData.GetData());
         }
 
         protected override void OnDestroy()
