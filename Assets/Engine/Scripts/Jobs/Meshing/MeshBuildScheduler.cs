@@ -32,7 +32,6 @@ namespace Engine.Scripts.Jobs.Meshing
         private readonly VoxelRegistry _voxelRegistry;
         private readonly VoxelWorld _world;
 
-        private Awaitable<HashSet<int3>>.Awaiter _awaiter;
         private ChunkAccessor _chunkAccessor;
 
         private Mesh.MeshDataArray _colliderMeshDataArray;
@@ -85,7 +84,7 @@ namespace Engine.Scripts.Jobs.Meshing
         /// <summary>
         ///     Gets a value indicating whether the currently scheduled mesh build jobs have completed.
         /// </summary>
-        internal bool IsComplete => _handle.IsCompleted && _awaiter.IsCompleted;
+        internal bool IsComplete => _handle.IsCompleted;
 
         /// <summary>
         ///     Starts a mesh build job for the given list of chunk positions.
@@ -115,7 +114,7 @@ namespace Engine.Scripts.Jobs.Meshing
             };
 
             _handle = job.Schedule(_jobs.Length, 1);
-            _awaiter = _world.RequestPartitionBuild(jobs).GetAwaiter();
+            _world.RequestPartitionBuild(jobs);
         }
 
         /// <summary>
@@ -126,23 +125,14 @@ namespace Engine.Scripts.Jobs.Meshing
         {
             double start = Time.realtimeSinceStartupAsDouble;
             _handle.Complete();
-            HashSet<int3> gpuPipelineResult = _awaiter.GetResult();
-
-            if (gpuPipelineResult.Count != _jobs.Length)
-                VoxelEngineLogger.Warn<MeshBuildScheduler>(
-                    $"GPU pipeline returned {gpuPipelineResult.Count} results, expected {_jobs.Length}. This may indicate a synchronization issue or a problem in the GPU processing stage."
-                );
 
             Mesh[] colliderMeshes = new Mesh[_jobs.Length];
-
-            List<ChunkPartition> changedPartitions = new();
 
             for (int index = 0; index < _jobs.Length; index++)
             {
                 int3 pos = _jobs[index];
                 ChunkPartition partition = _chunkPool.GetOrClaimPartition(pos);
                 _chunkManager.ReMeshedPartition(pos);
-                changedPartitions.Add(partition);
 
                 MeshBuildJob.PartitionJobResult result = _results[pos];
 

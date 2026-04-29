@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using Engine.Scripts.Data;
 using System.Runtime.InteropServices;
+using Engine.Scripts.Data;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Collections;
@@ -23,6 +23,11 @@ namespace Engine.Scripts.Render
         private VoxelEngineSettings _settings;
 
         private readonly Dictionary<int2, GraphicsBuffer> _voxelDataBuffers = new();
+        private readonly Queue<int3> _pendingPartitionBuilds = new();
+        private readonly HashSet<int3> _pendingPartitionSet = new();
+        private readonly HashSet<int3> _inFlightPartitionSet = new();
+        private readonly List<InFlightBuild> _inFlightPartitionBuilds = new();
+        private readonly Dictionary<int3, int> _partitionRequestVersions = new();
         private int _copyKernelID;
         private CopyPointsHandler _copyPointsHandler;
         private RenderBufferManager _foliageBufferManager;
@@ -44,7 +49,7 @@ namespace Engine.Scripts.Render
             _settings = world.Settings;
             _maxInFlight = math.max(1, _settings.Scheduler.partitionBuildBatchSize);
 
-            var rSettings = _settings.Renderer;
+            RendererSettings rSettings = _settings.Renderer;
 
             _solidBufferManager = new RenderBufferManager(
                 rSettings.solidMaterial,
@@ -79,6 +84,14 @@ namespace Engine.Scripts.Render
                 _transparentBufferManager,
                 _foliageBufferManager
             );
+        }
+
+        private void Update()
+        {
+            if (_isDestroyed) return;
+
+            CompleteFinishedPartitionBuilds();
+            StartPendingPartitionBuilds();
         }
 
         private void OnEnable()
@@ -130,6 +143,12 @@ namespace Engine.Scripts.Render
 
             foreach (GraphicsBuffer buffer in _voxelDataBuffers.Values) buffer.Dispose();
 
+            _pendingPartitionBuilds.Clear();
+            _pendingPartitionSet.Clear();
+            _inFlightPartitionSet.Clear();
+            _inFlightPartitionBuilds.Clear();
+            _partitionRequestVersions.Clear();
+
             _voxelDataBuffers.Clear();
         }
 
@@ -156,8 +175,119 @@ namespace Engine.Scripts.Render
             _buffersRebuildPending = true;
         }
 
+        private void UpdatePartitions(HashSet<int3> partitions)
+        {
+            if (_isDestroyed || partitions == null) return;
 
-        public void AddOrUpdateChunk(int2 chunk, UnsafeIntervalList<ushort> voxelData)
+            foreach (int3 partition in partitions) EnqueuePartitionBuild(partition);
+        }
+
+        private void EnqueuePartitionBuild(int3 partition, bool incrementVersion = true)
+        {
+            if (_isDestroyed) return;
+
+            if (incrementVersion)
+            {
+                _partitionRequestVersions[partition] =
+                    _partitionRequestVersions.TryGetValue(partition, out int version)
+                        ? version + 1
+                        : 1;
+            }
+
+            if (_pendingPartitionSet.Contains(partition) || _inFlightPartitionSet.Contains(partition)) return;
+
+            _pendingPartitionBuilds.Enqueue(partition);
+            _pendingPartitionSet.Add(partition);
+        }
+
+        private void StartPendingPartitionBuilds()
+        {
+            if (_pointBuilderHandlers == null || _pointBuilderHandlers.Length == 0) return;
+
+            while (_inFlightPartitionSet.Count < _maxInFlight && _pendingPartitionBuilds.Count > 0)
+            {
+                int3 partition = _pendingPartitionBuilds.Dequeue();
+                _pendingPartitionSet.Remove(partition);
+
+                if (!_partitionRequestVersions.TryGetValue(partition, out int requestVersion)) continue;
+                if (_inFlightPartitionSet.Contains(partition)) continue;
+
+                PartitionBuildRequest request = new(partition);
+                request.CollectBuffers(_voxelDataBuffers);
+
+                if (!request.IsValid)
+                {
+                    VoxelEngineLogger.Error<VoxelWorldRenderer>(
+                        $"Skipping partition {partition} due to missing neighbor data.");
+                    continue;
+                }
+
+                int slotIndex = GetFreePointBuilderSlotIndex();
+                if (slotIndex < 0)
+                {
+                    _pendingPartitionBuilds.Enqueue(partition);
+                    _pendingPartitionSet.Add(partition);
+                    break;
+                }
+
+                Awaitable<int[]> buildAwaitable = _pointBuilderHandlers[slotIndex].BuildPoints(request);
+                _inFlightPartitionSet.Add(partition);
+                _inFlightPartitionBuilds.Add(new InFlightBuild(partition, slotIndex, requestVersion,
+                    buildAwaitable.GetAwaiter()));
+            }
+        }
+
+        private int GetFreePointBuilderSlotIndex()
+        {
+            for (int i = 0; i < _pointBuilderHandlers.Length; i++)
+            {
+                if (!_inFlightPartitionBuilds.Exists(build => build.SlotIndex == i)) return i;
+            }
+
+            return -1;
+        }
+
+        private void CompleteFinishedPartitionBuilds()
+        {
+            bool updatedPartitions = false;
+
+            for (int i = _inFlightPartitionBuilds.Count - 1; i >= 0; i--)
+            {
+                InFlightBuild build = _inFlightPartitionBuilds[i];
+                if (!build.BuildAwaiter.IsCompleted) continue;
+
+                _inFlightPartitionBuilds.RemoveAt(i);
+                _inFlightPartitionSet.Remove(build.Partition);
+
+                try
+                {
+                    if (!_partitionRequestVersions.TryGetValue(build.Partition, out int currentVersion))
+                        continue;
+
+                    Awaitable<int[]>.Awaiter buildAwaiter = build.BuildAwaiter;
+                    int[] pointCounts = buildAwaiter.GetResult();
+                    if (_isDestroyed) return;
+
+                    if (build.RequestVersion != currentVersion)
+                    {
+                        EnqueuePartitionBuild(build.Partition, false);
+                        continue;
+                    }
+
+                    _copyPointsHandler.CopyJob(_pointBuilderHandlers[build.SlotIndex], build.Partition, pointCounts);
+                    updatedPartitions = true;
+                }
+                catch (Exception e)
+                {
+                    VoxelEngineLogger.Error<VoxelWorldRenderer>($"Error updating partition {build.Partition}: {e}");
+                }
+            }
+
+            if (updatedPartitions) RequestBuffersRebuild();
+        }
+
+
+        private void AddOrUpdateChunk(int2 chunk, UnsafeIntervalList<ushort> voxelData)
         {
             if (_voxelDataBuffers.TryGetValue(chunk, out GraphicsBuffer existingBuffer)) existingBuffer.Dispose();
 
@@ -175,7 +305,7 @@ namespace Engine.Scripts.Render
             _voxelDataBuffers[chunk] = dataBuffer;
         }
 
-        public void RemoveChunkData(int2 chunk)
+        private void RemoveChunkData(int2 chunk)
         {
             if (!_voxelDataBuffers.TryGetValue(chunk, out GraphicsBuffer existingBuffer)) return;
 
@@ -183,9 +313,11 @@ namespace Engine.Scripts.Render
             _voxelDataBuffers.Remove(chunk);
         }
 
-        public void RemovePartitionRenderData(int3 partition)
+        private void RemovePartitionRenderData(int3 partition)
         {
             if (_isDestroyed) return;
+
+            _partitionRequestVersions.Remove(partition);
 
             bool changed = false;
             changed |= _solidBufferManager.ReleasePartition(partition);
@@ -197,84 +329,20 @@ namespace Engine.Scripts.Render
             RequestBuffersRebuild();
         }
 
-        public async Awaitable<HashSet<int3>> UpdatePartitions(HashSet<int3> partitions)
-        {
-            HashSet<int3> updatedPartitions = new();
-
-            if (_isDestroyed || _pointBuilderHandlers == null || _pointBuilderHandlers.Length == 0)
-                return updatedPartitions;
-
-            Queue<InFlightBuild> inFlight = new(_maxInFlight);
-            int nextSlotIndex = 0;
-
-            foreach (int3 partition in partitions)
-            {
-                PartitionBuildRequest request = new(partition);
-                request.CollectBuffers(_voxelDataBuffers);
-
-                if (!request.IsValid)
-                {
-                    VoxelEngineLogger.Error<VoxelWorldRenderer>(
-                        $"Skipping partition {partition} due to missing neighbor data.");
-                    continue;
-                }
-
-                int slotIndex = nextSlotIndex % _pointBuilderHandlers.Length;
-                nextSlotIndex++;
-                Awaitable<int[]> buildAwaitable = _pointBuilderHandlers[slotIndex].BuildPoints(request);
-                inFlight.Enqueue(new InFlightBuild(partition, slotIndex, buildAwaitable));
-
-
-                if (inFlight.Count >= _maxInFlight)
-                {
-                    VoxelEngineLogger.Info<VoxelWorldRenderer>(" Max in-flight builds reached, awaiting completion...");
-                    await Awaitable.NextFrameAsync();
-                    await CompleteBuild(inFlight.Dequeue(), updatedPartitions);
-                    if (_isDestroyed) return updatedPartitions;
-                }
-            }
-
-            while (inFlight.Count > 0)
-            {
-                await CompleteBuild(inFlight.Dequeue(), updatedPartitions);
-                if (_isDestroyed) return updatedPartitions;
-            }
-
-            if (updatedPartitions.Count > 0)
-            {
-                RequestBuffersRebuild();
-            }
-
-            return updatedPartitions;
-        }
-
-        private async Awaitable CompleteBuild(InFlightBuild build, HashSet<int3> updatedPartitions)
-        {
-            try
-            {
-                int[] counts = await build.BuildAwaitable;
-                if (_isDestroyed) return;
-
-                _copyPointsHandler.CopyJob(_pointBuilderHandlers[build.SlotIndex], build.Partition, counts);
-                updatedPartitions.Add(build.Partition);
-            }
-            catch (Exception e)
-            {
-                VoxelEngineLogger.Error<VoxelWorldRenderer>($"Error updating partition {build.Partition}: {e}");
-            }
-        }
-
-        private readonly struct InFlightBuild
+        private struct InFlightBuild
         {
             public readonly int3 Partition;
             public readonly int SlotIndex;
-            public readonly Awaitable<int[]> BuildAwaitable;
+            public readonly int RequestVersion;
+            public readonly Awaitable<int[]>.Awaiter BuildAwaiter;
 
-            public InFlightBuild(int3 partition, int slotIndex, Awaitable<int[]> buildAwaitable)
+            public InFlightBuild(int3 partition, int slotIndex, int requestVersion,
+                Awaitable<int[]>.Awaiter buildAwaiter)
             {
                 Partition = partition;
                 SlotIndex = slotIndex;
-                BuildAwaitable = buildAwaitable;
+                RequestVersion = requestVersion;
+                BuildAwaiter = buildAwaiter;
             }
         }
     }

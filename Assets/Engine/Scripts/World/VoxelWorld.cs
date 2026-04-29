@@ -7,11 +7,9 @@ using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.Meshing;
 using Engine.Scripts.Noise;
-using Engine.Scripts.Render;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
-using Engine.Scripts.Utils.Collections;
 using Engine.Scripts.VoxelConfig.Data;
 using Unity.Mathematics;
 using UnityEngine;
@@ -44,7 +42,7 @@ namespace Engine.Scripts.World
         internal event Action<Chunk> ChunkDataReady;
         internal event Action<int2> ChunkEvicted;
         internal event Action<int3> PartitionEvicted;
-        internal event Func<HashSet<int3>, Awaitable<HashSet<int3>>> PartitionBuildRequested;
+        internal event Action<HashSet<int3>> PartitionBuildRequested;
 
         internal void RaiseChunkChanged(Chunk chunk) => ChunkChanged?.Invoke(chunk);
 
@@ -55,11 +53,9 @@ namespace Engine.Scripts.World
 
         internal void RaisePartitionEvicted(int3 partitionPos) => PartitionEvicted?.Invoke(partitionPos);
 
-        internal async Awaitable<HashSet<int3>> RequestPartitionBuild(HashSet<int3> partitions)
+        internal void RequestPartitionBuild(HashSet<int3> partitions)
         {
-            if (PartitionBuildRequested == null) return new HashSet<int3>();
-
-            return await PartitionBuildRequested.Invoke(partitions);
+            PartitionBuildRequested?.Invoke(partitions);
         }
 
         /// <summary>
