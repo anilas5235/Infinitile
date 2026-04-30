@@ -25,6 +25,7 @@ namespace Engine.Scripts.Render
 
         private readonly Dictionary<int2, GraphicsBuffer> _voxelDataBuffers = new();
         private readonly List<int3> _pendingBuilds = new();
+        private readonly HashSet<int3> _requestedPartitions = new();
 
         private InFlightBuild[] _inFlightBuilds;
 
@@ -146,6 +147,7 @@ namespace Engine.Scripts.Render
             foreach (GraphicsBuffer buffer in _voxelDataBuffers.Values) buffer.Dispose();
 
             _pendingBuilds.Clear();
+            _requestedPartitions.Clear();
 
             _voxelDataBuffers.Clear();
         }
@@ -177,7 +179,11 @@ namespace Engine.Scripts.Render
         {
             if (_isDestroyed || partitions == null) return;
 
-            foreach (int3 partition in partitions) EnqueuePartitionBuild(partition);
+            foreach (int3 partition in partitions)
+            {
+                _requestedPartitions.Add(partition);
+                EnqueuePartitionBuild(partition);
+            }
         }
 
         private void EnqueuePartitionBuild(int3 partition)
@@ -239,7 +245,8 @@ namespace Engine.Scripts.Render
                     int[] pointCounts = buildAwaiter.GetResult();
                     if (_isDestroyed) return;
 
-                    if (_pendingBuilds.Contains(build.Partition)) continue;
+                    if (!_requestedPartitions.Contains(build.Partition) || _pendingBuilds.Contains(build.Partition))
+                        continue;
 
                     _copyPointsHandler.CopyJob(build.Handler, build.Partition, pointCounts);
                     updatedPartitions = true;
@@ -284,6 +291,7 @@ namespace Engine.Scripts.Render
         {
             if (_isDestroyed) return;
 
+            _requestedPartitions.Remove(partition);
             _pendingBuilds.Remove(partition);
 
             bool changed = false;

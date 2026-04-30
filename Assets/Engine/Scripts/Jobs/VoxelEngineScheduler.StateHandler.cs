@@ -45,7 +45,8 @@ namespace Engine.Scripts.Jobs
                     else Sleeping = true;
                     break;
                 case SchedulerStep.JobUpdate:
-                    if (JobUpdateStep(focus)) CurrentStep = SchedulerStep.CollectResults;
+                    if (JobUpdateStep(focus))
+                        CurrentStep = Set.Count > 0 ? SchedulerStep.CollectResults : SchedulerStep.UpdateQueues;
                     break;
                 case SchedulerStep.CollectResults:
                     if (CollectResultsStep()) CurrentStep = SchedulerStep.UpdateQueues;
@@ -113,11 +114,24 @@ namespace Engine.Scripts.Jobs
 
         protected override bool JobUpdateStep(int3 focus)
         {
-            if (!_chunkScheduler.IsReady) return true;
+            if (!_chunkScheduler.IsReady) return false;
 
             int count = math.min(Settings.Scheduler.chunkGenBatchSize, Queue.Count);
+            int accepted = 0;
 
-            for (int i = 0; i < count; i++) Set.Add(Queue.Dequeue());
+            while (accepted < count && Queue.Count > 0)
+            {
+                int2 pos = Queue.Dequeue();
+                if (!IsChunkStillRelevant(pos, focus)) continue;
+                if (ShouldScheduleForGenerating(pos))
+                {
+                    Set.Add(pos);
+                    accepted++;
+                }
+            }
+
+            if (accepted == 0) return true;
+
             _chunkScheduler.Start(Set.ToList());
 
             return true;
@@ -136,6 +150,13 @@ namespace Engine.Scripts.Jobs
         private bool ShouldScheduleForGenerating(int2 position)
         {
             return !ChunkManager.IsChunkLoaded(position) && !Set.Contains(position);
+        }
+
+        private bool IsChunkStillRelevant(int2 position, int3 focus)
+        {
+            int loadDistance = Settings.Chunk.LoadDistance;
+            return math.abs(position.x - focus.x) <= loadDistance &&
+                   math.abs(position.y - focus.z) <= loadDistance;
         }
     }
 
@@ -183,15 +204,23 @@ namespace Engine.Scripts.Jobs
 
         protected override bool JobUpdateStep(int3 focus)
         {
-            if (!_meshBuildScheduler.IsReady) return true;
+            if (!_meshBuildScheduler.IsReady) return false;
 
             int count = math.min(Settings.Scheduler.meshingBatchSize, Queue.Count);
+            int accepted = 0;
 
-            for (int i = 0; i < count; i++)
+            while (accepted < count && Queue.Count > 0)
             {
                 int3 chunk = Queue.Dequeue();
-                if (CanGenerateMeshForChunk(chunk)) Set.Add(chunk);
+                if (!IsPartitionStillRelevant(chunk, focus)) continue;
+                if (CanGenerateMeshForChunk(chunk) && ShouldScheduleForMeshing(chunk))
+                {
+                    Set.Add(chunk);
+                    accepted++;
+                }
             }
+
+            if (accepted == 0) return true;
 
             _meshBuildScheduler.Start(Set);
 
@@ -227,6 +256,13 @@ namespace Engine.Scripts.Jobs
             return ChunkManager.IsChunkLoaded(position.xz) &&
                    (!ChunkPool.IsPartitionActive(position) || ChunkManager.ShouldReMesh(position)) &&
                    !Set.Contains(position);
+        }
+
+        private bool IsPartitionStillRelevant(int3 position, int3 focus)
+        {
+            int drawDistance = Settings.Chunk.DrawDistance;
+            return math.abs(position.x - focus.x) <= drawDistance &&
+                   math.abs(position.z - focus.z) <= drawDistance;
         }
     }
 
@@ -265,13 +301,23 @@ namespace Engine.Scripts.Jobs
 
         protected override bool JobUpdateStep(int3 focus)
         {
-            int count = math.min(Settings.Scheduler.colliderBatchSize, Queue.Count);
+            if (!_colliderBakeScheduler.IsReady) return false;
 
-            for (int i = 0; i < count; i++)
+            int count = math.min(Settings.Scheduler.colliderBatchSize, Queue.Count);
+            int accepted = 0;
+
+            while (accepted < count && Queue.Count > 0)
             {
                 int3 pos = Queue.Dequeue();
-                if (CanBakeColliderForChunk(pos)) Set.Add(pos);
+                if (!IsPartitionStillRelevant(pos, focus)) continue;
+                if (CanBakeColliderForChunk(pos) && ShouldScheduleForBaking(pos))
+                {
+                    Set.Add(pos);
+                    accepted++;
+                }
             }
+
+            if (accepted == 0) return true;
 
             _colliderBakeScheduler.Start(Set.ToList());
 
@@ -297,6 +343,13 @@ namespace Engine.Scripts.Jobs
         private bool CanBakeColliderForChunk(int3 position)
         {
             return ChunkPool.IsPartitionActive(position);
+        }
+
+        private bool IsPartitionStillRelevant(int3 position, int3 focus)
+        {
+            int updateDistance = Settings.Chunk.UpdateDistance;
+            return math.abs(position.x - focus.x) <= updateDistance &&
+                   math.abs(position.z - focus.z) <= updateDistance;
         }
     }
 
