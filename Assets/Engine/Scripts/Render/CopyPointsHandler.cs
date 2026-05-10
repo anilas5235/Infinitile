@@ -10,6 +10,10 @@ using static UnityEngine.GraphicsBuffer;
 
 namespace Engine.Scripts.Render
 {
+    /// <summary>
+    /// Handles copying of point data from point builders into render buffers using compute shaders.
+    /// Manages point distribution across solid, transparent, and foliage buffer managers.
+    /// </summary>
     public class CopyPointsHandler : IDisposable
     {
         private readonly int _copyKernelID;
@@ -23,6 +27,13 @@ namespace Engine.Scripts.Render
         private readonly RenderBufferManager _transparentBufferManager;
         private readonly GraphicsBuffer _transparentPagesBuffer;
 
+        /// <summary>
+        /// Initializes a new instance of the CopyPointsHandler class.
+        /// </summary>
+        /// <param name="copyPoints">The compute shader used for copying points.</param>
+        /// <param name="solidBufferManager">The render buffer manager for solid points.</param>
+        /// <param name="transparentBufferManager">The render buffer manager for transparent points.</param>
+        /// <param name="foliageBufferManager">The render buffer manager for foliage points.</param>
         public CopyPointsHandler(ComputeShader copyPoints, RenderBufferManager solidBufferManager,
             RenderBufferManager transparentBufferManager, RenderBufferManager foliageBufferManager)
         {
@@ -38,6 +49,9 @@ namespace Engine.Scripts.Render
             _foliagePagesBuffer = new GraphicsBuffer(Target.Structured, PagesPerBuffer, Marshal.SizeOf<uint2>());
         }
 
+        /// <summary>
+        /// Releases all GPU resources held by this handler.
+        /// </summary>
         public void Dispose()
         {
             _pageCountsBuffer?.Dispose();
@@ -46,6 +60,12 @@ namespace Engine.Scripts.Render
             _foliagePagesBuffer?.Dispose();
         }
 
+        /// <summary>
+        /// Copies point data from the point builder into the respective render buffers.
+        /// </summary>
+        /// <param name="pointBuilderHandler">The point builder handler containing built points.</param>
+        /// <param name="partition">The partition coordinates for the data.</param>
+        /// <param name="counts">Array of point counts for solid, transparent, and foliage types.</param>
         internal void CopyJob(PointBuilderHandler pointBuilderHandler, int3 partition, int[] counts)
         {
             AllocInfo solidAlloc = _solidBufferManager.AllocBufferSpace(partition, counts[0]);

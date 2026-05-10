@@ -7,7 +7,7 @@ using Engine.Scripts.Utils.Extensions;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Pool;
-using static Engine.Scripts.Jobs.PriorityUtil;
+using static Engine.Scripts.Jobs.Core.PriorityUtil;
 using static Engine.Scripts.Utils.VoxelConstants;
 using Object = UnityEngine.Object;
 

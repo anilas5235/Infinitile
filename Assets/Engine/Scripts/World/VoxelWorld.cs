@@ -5,6 +5,7 @@ using Engine.Scripts.Components;
 using Engine.Scripts.Jobs;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
+using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Jobs.Meshing;
 using Engine.Scripts.Noise;
 using Engine.Scripts.Settings;

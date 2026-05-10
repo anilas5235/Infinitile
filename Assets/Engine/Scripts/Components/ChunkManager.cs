@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs;
+using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Render;
 using Engine.Scripts.Settings;
 using Engine.Scripts.ThirdParty.Priority_Queue;

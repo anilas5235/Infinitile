@@ -15,6 +15,10 @@ using static UnityEngine.GraphicsBuffer;
 
 namespace Engine.Scripts.Render
 {
+    /// <summary>
+    /// Handles the building of point geometry from voxel data using compute shaders.
+    /// Manages point preparation, building, and provides GPU buffers for solid, transparent, and foliage points.
+    /// </summary>
     public class PointBuilderHandler : IDisposable
     {
         private const int PrepChunkCount = 9;
@@ -33,6 +37,12 @@ namespace Engine.Scripts.Render
         private readonly GraphicsBuffer _voxelRenderDefBuffer;
         private NativeArray<uint> _counts;
 
+        /// <summary>
+        /// Initializes a new instance of the PointBuilderHandler class.
+        /// </summary>
+        /// <param name="pointBuilder">The compute shader for building points.</param>
+        /// <param name="voxelRenderDef">The GPU buffer containing voxel render definitions.</param>
+        /// <param name="voxelQuadTexPair">The GPU buffer containing voxel quad texture pairs.</param>
         public PointBuilderHandler(ComputeShader pointBuilder, GraphicsBuffer voxelRenderDef,
             GraphicsBuffer voxelQuadTexPair)
         {
@@ -57,12 +67,24 @@ namespace Engine.Scripts.Render
                 VoxelDataImporter.Instance.VoxelRegistry.QuadBuffer);
         }
 
+        /// <summary>
+        /// Gets the GPU buffer containing solid (opaque) points.
+        /// </summary>
         public GraphicsBuffer SolidPointsOut { get; }
 
+        /// <summary>
+        /// Gets the GPU buffer containing transparent points.
+        /// </summary>
         public GraphicsBuffer TransparentPointsOut { get; }
 
+        /// <summary>
+        /// Gets the GPU buffer containing foliage points.
+        /// </summary>
         public GraphicsBuffer FoliagePointsOut { get; }
 
+        /// <summary>
+        /// Releases all GPU resources held by this handler.
+        /// </summary>
         public void Dispose()
         {
             SolidPointsOut?.Dispose();
@@ -74,6 +96,11 @@ namespace Engine.Scripts.Render
             _counts.Dispose();
         }
 
+        /// <summary>
+        /// Asynchronously builds points for the given partition from its voxel data.
+        /// </summary>
+        /// <param name="data">The partition build request containing chunk data.</param>
+        /// <returns>An awaitable that returns an array with solid, transparent, and foliage point counts.</returns>
         internal async Awaitable<int[]> BuildPoints(PartitionBuildRequest data)
         {
             ResetCounters();
@@ -128,6 +155,9 @@ namespace Engine.Scripts.Render
             }
         }
 
+        /// <summary>
+        /// Resets the counters for all output point buffers.
+        /// </summary>
         private void ResetCounters()
         {
             SolidPointsOut.SetCounterValue(0);
@@ -135,12 +165,21 @@ namespace Engine.Scripts.Render
             FoliagePointsOut.SetCounterValue(0);
         }
 
+        /// <summary>
+        /// Prepares all chunks for point building by decompressing them.
+        /// </summary>
+        /// <param name="data">The partition build request containing chunk buffers.</param>
         private void PrepareChunks(PartitionBuildRequest data)
         {
             GraphicsBuffer[] buffers = data.Buffers;
             for (int i = 0; i < buffers.Length; i++) DispatchPrepChunk(i, buffers[i]);
         }
 
+        /// <summary>
+        /// Dispatches a compute shader job to decompress a single chunk.
+        /// </summary>
+        /// <param name="chunkIndex">The index of the chunk to prepare.</param>
+        /// <param name="compressedChunk">The compressed chunk data buffer.</param>
         private void DispatchPrepChunk(int chunkIndex, GraphicsBuffer compressedChunk)
         {
             _pointBuilder.SetInt(VoxelsPerChunkNameID, VoxelsPerChunk);
