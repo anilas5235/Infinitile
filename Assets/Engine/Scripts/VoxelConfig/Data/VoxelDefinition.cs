@@ -6,8 +6,7 @@ using UnityEngine;
 namespace Engine.Scripts.VoxelConfig.Data
 {
     /// <summary>
-    ///     ScriptableObject that describes a single voxel type, including textures, mesh layer,
-    ///     voxel type, collision and optional post-processing data.
+    /// ScriptableObject that describes a single voxel type, including textures, mesh layer, collision, and optional post-processing data.
     /// </summary>
     [CreateAssetMenu(fileName = "VoxelDefinition", menuName = "Voxel/Voxel Data")]
     public class VoxelDefinition : ScriptableObject
@@ -18,22 +17,22 @@ namespace Engine.Scripts.VoxelConfig.Data
         public enum VoxelTexMode
         {
             /// <summary>
-            ///     One texture is used for all faces.
+            /// One texture is used for all faces.
             /// </summary>
             AllSame,
 
             /// <summary>
-            ///     Separate textures for top and bottom, and one shared texture for all side faces.
+            /// Separate textures for top and bottom, and one shared texture for all side faces.
             /// </summary>
             TopBottomSides,
 
             /// <summary>
-            ///     All six directions can have unique textures.
+            /// All six directions can have unique textures.
             /// </summary>
             SixSidesUnique,
 
             /// <summary>
-            ///     All Quads have Unique Textures, allowing for more complex shapes with different textures on each face.
+            /// All quads can have unique textures, allowing complex shapes with different textures on each face.
             /// </summary>
             AllUnique
         }
@@ -99,7 +98,7 @@ namespace Engine.Scripts.VoxelConfig.Data
 
 
         /// <summary>
-        ///     Gets or sets the texture mapping mode for this voxel.
+        /// Gets or sets the texture mapping mode for this voxel.
         /// </summary>
         public VoxelTexMode TextureMode
         {
@@ -108,6 +107,11 @@ namespace Engine.Scripts.VoxelConfig.Data
         }
 
 
+        /// <summary>
+        /// Gets the quads and textures that match the given draw condition.
+        /// </summary>
+        /// <param name="condition">The quad draw condition to filter by.</param>
+        /// <returns>A list of quad-definition and texture pairs.</returns>
         public List<(QuadDefinition, Texture2D)> GetQuadsAndTextures(QuadDrawCondition condition)
         {
             List<(QuadDefinition, Texture2D)> result = new();
@@ -122,6 +126,11 @@ namespace Engine.Scripts.VoxelConfig.Data
             return result;
         }
 
+        /// <summary>
+        /// Gets a representative texture for display purposes based on the current texture mode.
+        /// </summary>
+        /// <param name="condition">The draw condition used to select a texture.</param>
+        /// <returns>The texture used for display, or null if no texture is available.</returns>
         public Texture2D GetDisplayTexture(QuadDrawCondition condition)
         {
             return textureMode switch
@@ -131,6 +140,12 @@ namespace Engine.Scripts.VoxelConfig.Data
             };
         }
 
+        /// <summary>
+        /// Resolves the texture for a quad and draw condition based on the current texture mode.
+        /// </summary>
+        /// <param name="quad">The quad to resolve, or null when the mode does not require a quad.</param>
+        /// <param name="condition">The draw condition.</param>
+        /// <returns>The resolved texture, or null if no texture is assigned.</returns>
         private Texture2D FindTex(VoxelQuad quad, QuadDrawCondition condition)
         {
             return textureMode switch
@@ -161,33 +176,33 @@ namespace Engine.Scripts.VoxelConfig.Data
     }
 
     /// <summary>
-    ///     Optional per-voxel post processing parameters such as color grading and fog.
+    /// Optional per-voxel post-processing parameters such as color grading and fog.
     /// </summary>
     [Serializable]
     public class VoxelPostProcessData
     {
         /// <summary>
-        ///     Color tint applied during post processing.
+        /// Color tint applied during post processing.
         /// </summary>
         public Color postProcessColor;
 
         /// <summary>
-        ///     Contrast adjustment factor.
+        /// Contrast adjustment factor.
         /// </summary>
         public float contrast;
 
         /// <summary>
-        ///     Saturation adjustment factor.
+        /// Saturation adjustment factor.
         /// </summary>
         public float saturation;
 
         /// <summary>
-        ///     Enables additional fog for this voxel type.
+        /// Enables additional fog for this voxel type.
         /// </summary>
         public bool enableFog;
 
         /// <summary>
-        ///     Fog density value used when <see cref="enableFog" /> is true.
+        /// Fog density value used when <see cref="enableFog" /> is true.
         /// </summary>
         public float fogDensity = .01f;
     }

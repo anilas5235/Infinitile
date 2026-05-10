@@ -1,18 +1,28 @@
 ﻿using System;
 using System.Collections.Generic;
 using Engine.Scripts.Utils.Logger;
-using UnityEngine;
 
 namespace Engine.Scripts.VoxelConfig.Data
 {
+    /// <summary>
+    /// Registers quad definitions and builds the runtime quad array used by voxel rendering.
+    /// </summary>
     public class QuadRegistry
     {
         private readonly Dictionary<QuadDefinition, ushort> _quadToId = new();
 
 
+        /// <summary>
+        /// Gets the registered quad data array after preparation.
+        /// </summary>
         public QuadDefinition.QuadData[] QuadArray { get; private set; }
 
 
+        /// <summary>
+        /// Registers a quad definition and returns its assigned ID.
+        /// </summary>
+        /// <param name="quad">The quad definition to register.</param>
+        /// <returns>The assigned quad ID, or 0 if registration failed.</returns>
         public ushort Register(QuadDefinition quad)
         {
             ushort quadId = 0;
@@ -32,7 +42,7 @@ namespace Engine.Scripts.VoxelConfig.Data
         }
 
         /// <summary>
-        ///     Builds a <see cref="Texture2DArray" /> from all registered textures using point filtering and repeat wrapping.
+        /// Builds the runtime quad array from all registered quad definitions.
         /// </summary>
         internal void PrepareArray()
         {

@@ -6,14 +6,14 @@ using UnityEngine;
 namespace Engine.Scripts.Utils.Extensions
 {
     /// <summary>
-    ///     Burst-kompatible mathematische Erweiterungen für int / int2 / int3 sowie bool3 und Vektor-Konvertierungen.
-    ///     Fokus auf Flatten/Größenoperationen für Chunk- und Voxel-Berechnung.
+    /// Burst-compatible math extensions for int, int2, int3, bool3, and vector conversions.
+    /// Focuses on flattening and size operations for chunk and voxel calculations.
     /// </summary>
     [GenerateTestsForBurstCompatibility]
     public static class BurstMathExtensions
     {
         /// <summary>
-        ///     Liefert (2·r+1)^3 – Anzahl Zellen in einem kubischen Bereich mit Radius r.
+        /// Returns (2r + 1)^3, the number of cells in a cubic area with radius r.
         /// </summary>
         [BurstCompile]
         public static int CubedSize(this int r)
@@ -22,7 +22,7 @@ namespace Engine.Scripts.Utils.Extensions
         }
 
         /// <summary>
-        ///     Liefert (2·r+1)^2 – Anzahl Zellen in einem quadratischen Bereich mit Radius r.
+        /// Returns (2r + 1)^2, the number of cells in a square area with radius r.
         /// </summary>
         [BurstCompile]
         public static int SquareSize(this int r)
@@ -31,7 +31,7 @@ namespace Engine.Scripts.Utils.Extensions
         }
 
         /// <summary>
-        ///     Liefert (2·r.x+1)·(2·r.y+1)·(2·r.z+1) für anisotropen Radius.
+        /// Returns (2r.x + 1) * (2r.y + 1) * (2r.z + 1) for an anisotropic radius.
         /// </summary>
         [BurstCompile]
         public static int CubedSize(this int3 r)
@@ -40,7 +40,7 @@ namespace Engine.Scripts.Utils.Extensions
         }
 
         /// <summary>
-        ///     Flacht 2D Koordinaten (x, y) auf eindimensionalen Index basierend auf Größe (vec.x, vec.y) ab.
+        /// Flattens 2D coordinates (x, y) into a one-dimensional index using the dimensions in <paramref name="vec" />.
         /// </summary>
         [BurstCompile]
         public static int Flatten(this int2 vec, int x, int y)
@@ -50,7 +50,7 @@ namespace Engine.Scripts.Utils.Extensions
         }
 
         /// <summary>
-        ///     Flacht 3D Koordinaten (x, y, z) auf eindimensionalen Index ab (x·Y·Z + z·Y + y).
+        /// Flattens 3D coordinates (x, y, z) into a one-dimensional index (x * Y * Z + z * Y + y).
         /// </summary>
         [BurstCompile]
         public static int Flatten(this int3 vec, int x, int y, int z)
@@ -61,7 +61,7 @@ namespace Engine.Scripts.Utils.Extensions
         }
 
         /// <summary>
-        ///     Flacht 3D Position ab unter Verwendung eines int3 Position-Structs.
+        /// Flattens a 3D position using an <see cref="int3" /> position struct.
         /// </summary>
         [BurstCompile]
         public static int Flatten(this int3 vec, in int3 pos)
@@ -70,7 +70,7 @@ namespace Engine.Scripts.Utils.Extensions
         }
 
         /// <summary>
-        ///     Reduziert bool3 mit OR Verknüpfung.
+        /// Reduces a <see cref="bool3" /> using logical OR.
         /// </summary>
         [BurstCompile]
         public static bool OrReduce(this bool3 val)
@@ -79,7 +79,7 @@ namespace Engine.Scripts.Utils.Extensions
         }
 
         /// <summary>
-        ///     Reduziert bool3 mit AND Verknüpfung.
+        /// Reduces a <see cref="bool3" /> using logical AND.
         /// </summary>
         [BurstCompile]
         public static bool AndReduce(this bool3 val)
@@ -88,7 +88,7 @@ namespace Engine.Scripts.Utils.Extensions
         }
 
         /// <summary>
-        ///     Volumen eines int3 (x·y·z).
+        /// Returns the volume of an <see cref="int3" /> vector (x * y * z).
         /// </summary>
         [BurstCompile]
         public static int Size(this int3 vec)
@@ -97,7 +97,7 @@ namespace Engine.Scripts.Utils.Extensions
         }
 
         /// <summary>
-        ///     Konvertiert int3 nach Vector3Int.
+        /// Converts <see cref="int3" /> to <see cref="Vector3Int" />.
         /// </summary>
         [BurstCompile]
         public static Vector3Int GetVector3Int(this int3 vec)
@@ -106,7 +106,7 @@ namespace Engine.Scripts.Utils.Extensions
         }
 
         /// <summary>
-        ///     Konvertiert int3 nach Vector3.
+        /// Converts <see cref="int3" /> to <see cref="Vector3" />.
         /// </summary>
         [BurstCompile]
         public static Vector3 GetVector3(this int3 vec)
@@ -115,7 +115,7 @@ namespace Engine.Scripts.Utils.Extensions
         }
 
         /// <summary>
-        ///     Konvertiert int2 nach Vector2.
+        /// Converts <see cref="int2" /> to <see cref="Vector2" />.
         /// </summary>
         [BurstCompile]
         public static Vector3 GetVector2(this int2 vec)
@@ -125,12 +125,12 @@ namespace Engine.Scripts.Utils.Extensions
     }
 
     /// <summary>
-    ///     Nicht-Burst spezifische mathematische Erweiterungen für Distanz und komponentenweises Multiplizieren.
+    /// Non-Burst math extensions for distance and component-wise multiplication/division.
     /// </summary>
     public static class MathExtension
     {
         /// <summary>
-        ///     Quadratische Länge eines int3 Vektors.
+        /// Returns the squared magnitude of an <see cref="int3" /> vector.
         /// </summary>
         public static int SqrMagnitude(this int3 vec)
         {
@@ -138,7 +138,7 @@ namespace Engine.Scripts.Utils.Extensions
         }
 
         /// <summary>
-        ///     Quadratische Länge eines int3 Vektors.
+        /// Returns the squared magnitude of an <see cref="int2" /> vector.
         /// </summary>
         public static int SqrMagnitude(this int2 vec)
         {
@@ -146,7 +146,7 @@ namespace Engine.Scripts.Utils.Extensions
         }
 
         /// <summary>
-        ///     Komponentenweise Multiplikation zweier int3.
+        /// Multiplies two <see cref="int3" /> values component-wise.
         /// </summary>
         public static int3 MemberMultiply(this int3 a, int3 b)
         {
@@ -154,49 +154,58 @@ namespace Engine.Scripts.Utils.Extensions
         }
 
         /// <summary>
-        ///     Komponentenweise Multiplikation mit Einzelwerten.
+        /// Multiplies an <see cref="int3" /> by individual component values.
         /// </summary>
         public static int3 MemberMultiply(this int3 a, int x, int y, int z)
         {
             return new int3(a.x * x, a.y * y, a.z * z);
         }
 
+        /// <summary>
+        /// Divides two <see cref="int3" /> values component-wise.
+        /// </summary>
         public static int3 MemberDivide(this int3 a, int3 b)
         {
             return new int3(a.x / b.x, a.y / b.y, a.z / b.z);
         }
 
 
+        /// <summary>
+        /// Returns the larger of two <see cref="half" /> values.
+        /// </summary>
         public static half Max(half a, half b)
         {
             return a > b ? a : b;
         }
     }
 
+    /// <summary>
+    /// Common integer and floating-point vector constants used throughout the engine.
+    /// </summary>
     public static class VectorConstants
     {
-        /// <summary> (0,0,0) Vektor. </summary>
+        /// <summary>Represents the zero vector (0, 0, 0).</summary>
         public static readonly int3 Int3Zero = new(0, 0, 0);
 
-        /// <summary> (1,1,1) Vektor. </summary>
+        /// <summary>Represents the one vector (1, 1, 1).</summary>
         public static readonly int3 Int3One = new(1, 1, 1);
 
-        /// <summary> (0,1,0) Vektor. </summary>
+        /// <summary>Represents the up vector (0, 1, 0).</summary>
         public static readonly int3 Int3Up = new(0, 1, 0);
 
-        /// <summary> (0,-1,0) Vektor. </summary>
+        /// <summary>Represents the down vector (0, -1, 0).</summary>
         public static readonly int3 Int3Down = new(0, -1, 0);
 
-        /// <summary> (1,0,0) Vektor. </summary>
+        /// <summary>Represents the right vector (1, 0, 0).</summary>
         public static readonly int3 Int3Right = new(1, 0, 0);
 
-        /// <summary> (-1,0,0) Vektor. </summary>
+        /// <summary>Represents the left vector (-1, 0, 0).</summary>
         public static readonly int3 Int3Left = new(-1, 0, 0);
 
-        /// <summary> (0,0,1) Vektor. </summary>
+        /// <summary>Represents the forward vector (0, 0, 1).</summary>
         public static readonly int3 Int3Forward = new(0, 0, 1);
 
-        /// <summary> (0,0,-1) Vektor. </summary>
+        /// <summary>Represents the backward vector (0, 0, -1).</summary>
         public static readonly int3 Int3Backward = new(0, 0, -1);
 
         public static readonly int3[] Int3Directions =
@@ -209,38 +218,38 @@ namespace Engine.Scripts.Utils.Extensions
             Int3Down
         };
 
-        /// <summary> (0,0,0) Vektor. </summary>
+        /// <summary>Represents the zero vector (0, 0, 0).</summary>
         public static readonly float3 Float3Zero = new(0, 0, 0);
 
-        /// <summary> (1,1,1) Vektor. </summary>
+        /// <summary>Represents the one vector (1, 1, 1).</summary>
         public static readonly float3 Float3One = new(1, 1, 1);
 
-        /// <summary> (0,1,0) Vektor. </summary>
+        /// <summary>Represents the up vector (0, 1, 0).</summary>
         public static readonly float3 Float3Up = new(0, 1, 0);
 
-        /// <summary> (0,-1,0) Vektor. </summary>
+        /// <summary>Represents the down vector (0, -1, 0).</summary>
         public static readonly float3 Float3Down = new(0, -1, 0);
 
-        /// <summary> (1,0,0) Vektor. </summary>
+        /// <summary>Represents the right vector (1, 0, 0).</summary>
         public static readonly float3 Float3Right = new(1, 0, 0);
 
-        /// <summary> (-1,0,0) Vektor. </summary>
+        /// <summary>Represents the left vector (-1, 0, 0).</summary>
         public static readonly float3 Float3Left = new(-1, 0, 0);
 
-        /// <summary> (0,0,1) Vektor. </summary>
+        /// <summary>Represents the forward vector (0, 0, 1).</summary>
         public static readonly float3 Float3Forward = new(0, 0, 1);
 
-        /// <summary> (0,0,-1) Vektor. </summary>
+        /// <summary>Represents the backward vector (0, 0, -1).</summary>
         public static readonly float3 Float3Backward = new(0, 0, -1);
     }
 
     /// <summary>
-    ///     Erweiterungen für Vektor Konvertierung, Normalisierung und Richtungsermittlung.
+    /// Vector conversion, normalization, and direction helper extensions.
     /// </summary>
     public static class VectorExtension
     {
         /// <summary>
-        ///     Konvertiert Vector3Int zu int3.
+        /// Converts <see cref="Vector3Int" /> to <see cref="int3" />.
         /// </summary>
         public static int3 Int3(this Vector3Int vec)
         {
@@ -248,20 +257,23 @@ namespace Engine.Scripts.Utils.Extensions
         }
 
         /// <summary>
-        ///     Konvertiert Vector3 (floored) zu int3.
+        /// Converts a <see cref="Vector3" /> to <see cref="int3" /> using floor rounding.
         /// </summary>
         public static int3 Int3(this Vector3 vec)
         {
             return Vector3Int.FloorToInt(vec).Int3();
         }
 
+        /// <summary>
+        /// Converts <see cref="Vector3" /> to <see cref="float3" />.
+        /// </summary>
         public static float3 Float3(this Vector3 vec)
         {
             return new float3(vec.x, vec.y, vec.z);
         }
 
         /// <summary>
-        ///     Konvertiert Vector3 (floored) zu Vector3Int.
+        /// Converts a <see cref="Vector3" /> to <see cref="Vector3Int" /> using floor rounding.
         /// </summary>
         public static Vector3Int V3Int(this Vector3 vec)
         {
@@ -269,20 +281,23 @@ namespace Engine.Scripts.Utils.Extensions
         }
 
         /// <summary>
-        ///     Konvertiert int2 zu float2.
+        /// Converts <see cref="int2" /> to <see cref="float2" />.
         /// </summary>
         public static float2 Float2(this int2 vec)
         {
             return new float2(vec.x, vec.y);
         }
 
+        /// <summary>
+        /// Converts <see cref="Vector2" /> to <see cref="float2" />.
+        /// </summary>
         public static float2 Float2(this Vector2 vec)
         {
             return new float2(vec.x, vec.y);
         }
 
         /// <summary>
-        ///     Normalisiert einen float3.
+        /// Normalizes a <see cref="float3" />.
         /// </summary>
         public static float3 Normalized(this float3 vec)
         {

@@ -15,7 +15,7 @@ namespace Engine.Scripts.Utils.Collections
     public struct UnsafeIntervalList<T> where T : unmanaged, IEquatable<T>
     {
         /// <summary>
-        ///     Internal node representing an interval until inclusive end position (Count viewed as cumulative length).
+        /// Internal node representing an interval with an inclusive cumulative end position.
         /// </summary>
         internal struct Node
         {
@@ -32,18 +32,20 @@ namespace Engine.Scripts.Utils.Collections
         private UnsafeList<Node> _internal;
 
         /// <summary>
-        ///     Total decompressed length (sum of interval lengths).
+        /// Total decompressed length (sum of all interval lengths).
         /// </summary>
         public int Length;
 
         /// <summary>
-        ///     Current number of compressed nodes.
+        /// Current number of compressed nodes.
         /// </summary>
         public int CompressedLength => _internal.Length;
 
         /// <summary>
-        ///     Creates a new compressed list with initial capacity.
+        /// Creates a new compressed list with the specified initial capacity.
         /// </summary>
+        /// <param name="capacity">Initial number of nodes to allocate.</param>
+        /// <param name="allocator">Allocator used for native memory.</param>
         public UnsafeIntervalList(int capacity, Allocator allocator)
         {
             _internal = new UnsafeList<Node>(capacity, allocator);
@@ -51,7 +53,7 @@ namespace Engine.Scripts.Utils.Collections
         }
 
         /// <summary>
-        ///     Disposes internal native memory.
+        /// Disposes internal native memory.
         /// </summary>
         public void Dispose()
         {
@@ -59,16 +61,20 @@ namespace Engine.Scripts.Utils.Collections
         }
 
         /// <summary>
-        ///     Finds node index for a decompressed index via binary search.
+        /// Finds the node index for a decompressed index via binary search.
         /// </summary>
+        /// <param name="index">The decompressed index to look up.</param>
+        /// <returns>The internal node index containing the given value.</returns>
         public int NodeIndex(int index)
         {
             return BinarySearch(index);
         }
 
         /// <summary>
-        ///     Adds a new interval (value repeated <paramref name="count" /> times).
+        /// Adds a new interval where the same value is repeated <paramref name="count" /> times.
         /// </summary>
+        /// <param name="value">The value to store.</param>
+        /// <param name="count">The number of repetitions.</param>
         public void AddInterval(T value, int count)
         {
             Length += count;
@@ -76,9 +82,11 @@ namespace Engine.Scripts.Utils.Collections
         }
 
         /// <summary>
-        ///     Gets value at decompressed position. Complexity: O(log n).
+        /// Gets the value at a decompressed position. Complexity: O(log n).
         /// </summary>
-        /// <exception cref="IndexOutOfRangeException">Wenn Index außerhalb (Editor/Development Builds).</exception>
+        /// <param name="index">The decompressed index.</param>
+        /// <returns>The value stored at the given index.</returns>
+        /// <exception cref="IndexOutOfRangeException">Thrown when the index is out of range in Editor or Development builds.</exception>
         public T Get(int index)
         {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -89,11 +97,13 @@ namespace Engine.Scripts.Utils.Collections
         }
 
         /// <summary>
-        ///     Sets value at decompressed position with coalescing logic. Complexity typically O(log n).
-        ///     Returns true if value changed.
+        /// Sets the value at a decompressed position with coalescing logic. Complexity is typically O(log n).
+        /// Returns true if the value changed.
         /// </summary>
-        /// <returns>True falls Änderung auftrat.</returns>
-        /// <exception cref="IndexOutOfRangeException">Wenn Index außerhalb (Editor/Development Builds).</exception>
+        /// <param name="index">The decompressed index.</param>
+        /// <param name="value">The new value.</param>
+        /// <returns>True if a change occurred.</returns>
+        /// <exception cref="IndexOutOfRangeException">Thrown when the index is out of range in Editor or Development builds.</exception>
         public bool Set(int index, T value)
         {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -210,8 +220,11 @@ namespace Engine.Scripts.Utils.Collections
         }
 
         /// <summary>
-        ///     Returns left neighbor item (Value) relative to index.
+        /// Returns the left neighbor value relative to the specified index.
         /// </summary>
+        /// <param name="index">The decompressed index.</param>
+        /// <param name="value">The value to receive the left neighbor.</param>
+        /// <returns>True if a left neighbor exists.</returns>
         public bool TryLeftOf(int index, out T value)
         {
             (bool has, T v, _) = LeftOf(index, NodeIndex(index));
@@ -220,8 +233,11 @@ namespace Engine.Scripts.Utils.Collections
         }
 
         /// <summary>
-        ///     Returns right neighbor item (Value) relative to index.
+        /// Returns the right neighbor value relative to the specified index.
         /// </summary>
+        /// <param name="index">The decompressed index.</param>
+        /// <param name="value">The value to receive the right neighbor.</param>
+        /// <returns>True if a right neighbor exists.</returns>
         public bool TryRightOf(int index, out T value)
         {
             (bool has, T v, _) = RightOf(index, NodeIndex(index));
@@ -232,7 +248,7 @@ namespace Engine.Scripts.Utils.Collections
         private (bool hasValue, T value, int nodeIndex) LeftOf(int index, int nodeIndex)
         {
             if (nodeIndex == 0)
-                // First Node
+                // First node
                 return index == 0 ? (false, default, -1) : (true, _internal[nodeIndex].Value, nodeIndex);
 
             Node left = _internal[nodeIndex - 1];
@@ -244,7 +260,7 @@ namespace Engine.Scripts.Utils.Collections
         private (bool hasValue, T value, int nodeIndex) RightOf(int index, int nodeIndex)
         {
             if (nodeIndex == CompressedLength - 1)
-                // Last Node
+                // Last node
                 return index == Length - 1 ? (false, default, -1) : (true, _internal[nodeIndex].Value, nodeIndex);
 
             Node right = _internal[nodeIndex + 1];
@@ -254,8 +270,10 @@ namespace Engine.Scripts.Utils.Collections
         }
 
         /// <summary>
-        ///     Binary search for node containing decompressed index.
+        /// Binary search for the node containing a decompressed index.
         /// </summary>
+        /// <param name="index">The decompressed index to search for.</param>
+        /// <returns>The internal node index containing the given index.</returns>
         private int BinarySearch(int index)
         {
             int min = 0;
@@ -287,12 +305,18 @@ namespace Engine.Scripts.Utils.Collections
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Clears all stored intervals and resets the decompressed length.
+        /// </summary>
         public void Clear()
         {
             _internal.Clear();
             Length = 0;
         }
 
+        /// <summary>
+        /// Gets a read-only view of the internal compressed nodes.
+        /// </summary>
         internal UnsafeList<Node>.ReadOnly Internal => _internal.AsReadOnly();
     }
 }

@@ -4,6 +4,9 @@ using UnityEngine.Rendering;
 
 namespace Engine.Scripts.Utils
 {
+    /// <summary>
+    /// Defines the core voxel and partition dimensions used throughout the engine.
+    /// </summary>
     public static class VoxelConstants
     {
         internal const int ChunkWidth = 32;
@@ -41,16 +44,31 @@ namespace Engine.Scripts.Utils
 
         internal static readonly int3 PartitionSize = new(PartitionWidth, PartitionHeight, PartitionDepth);
 
+        /// <summary>
+        /// Converts a partition position to its corresponding world-space origin.
+        /// </summary>
+        /// <param name="partition">The partition position in partition coordinates.</param>
+        /// <returns>The world-space origin of the partition.</returns>
         public static int3 PartitionToWorldPos(int3 partition)
         {
             return PartitionSize.MemberMultiply(partition);
         }
 
+        /// <summary>
+        /// Converts a world-space position to its containing partition coordinates.
+        /// </summary>
+        /// <param name="worldPos">The world-space position.</param>
+        /// <returns>The partition coordinates containing the world position.</returns>
         public static int3 WorldToPartitionPos(int3 worldPos)
         {
             return PartitionSize.MemberDivide(worldPos);
         }
 
+        /// <summary>
+        /// Converts a partition position to its corresponding chunk coordinates in XZ space.
+        /// </summary>
+        /// <param name="partition">The partition position.</param>
+        /// <returns>The chunk coordinates for the partition.</returns>
         public static int2 PartitionToChunkPos(int3 partition)
         {
             return partition.xz;

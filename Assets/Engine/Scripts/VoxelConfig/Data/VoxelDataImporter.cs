@@ -23,6 +23,9 @@ namespace Engine.Scripts.VoxelConfig.Data
         /// </summary>
         public Material voxelTransparentMaterial;
 
+        /// <summary>
+        /// Material used for foliage voxel rendering (foliage mesh layer).
+        /// </summary>
         public Material voxelFoliageMaterial;
 
         /// <summary>

@@ -4,6 +4,9 @@ using UnityEngine;
 
 namespace Engine.Scripts.VoxelConfig.Data
 {
+    /// <summary>
+    /// Describes a single quad face used by voxel shapes, including vertex positions, basis vectors, and UVs.
+    /// </summary>
     [CreateAssetMenu(menuName = "Voxel/Shape/Quad Definition", fileName = "QuadDefinition")]
     public class QuadDefinition : ScriptableObject
     {
@@ -20,17 +23,27 @@ namespace Engine.Scripts.VoxelConfig.Data
         public Vector2 uv03;
 
 #if UNITY_EDITOR
+        /// <summary>
+        /// Recalculates the quad basis when edited in the Unity editor.
+        /// </summary>
         private void OnValidate()
         {
             RecalculateNormal();
         }
 #endif
 
+        /// <summary>
+        /// Recalculates the normal, up, and right vectors from the current vertex positions.
+        /// </summary>
         public void RecalculateNormal()
         {
             CalculateBasis(out normal, out up, out right);
         }
 
+        /// <summary>
+        /// Converts this quad definition into its Burst-friendly data representation.
+        /// </summary>
+        /// <returns>A <see cref="QuadData" /> struct containing the quad data.</returns>
         public QuadData ToStruct()
         {
             CalculateBasis(out Vector3 calculatedNormal, out Vector3 calculatedUp, out Vector3 calculatedRight);
@@ -51,6 +64,12 @@ namespace Engine.Scripts.VoxelConfig.Data
             };
         }
 
+        /// <summary>
+        /// Calculates the local basis vectors for the quad from its vertex positions.
+        /// </summary>
+        /// <param name="calculatedNormal">The calculated normal vector.</param>
+        /// <param name="calculatedUp">The calculated up vector.</param>
+        /// <param name="calculatedRight">The calculated right vector.</param>
         private void CalculateBasis(out Vector3 calculatedNormal, out Vector3 calculatedUp, out Vector3 calculatedRight)
         {
             const float epsilon = 1e-6f;
@@ -74,18 +93,64 @@ namespace Engine.Scripts.VoxelConfig.Data
             calculatedRight *= -1;
         }
 
+        /// <summary>
+        /// Burst-friendly quad data used by runtime rendering systems.
+        /// </summary>
         public struct QuadData
         {
-            public float3 position00; // vertex offset from voxel origin
+            /// <summary>
+            /// Vertex position 00 relative to the voxel origin.
+            /// </summary>
+            public float3 position00;
+
+            /// <summary>
+            /// Vertex position 01 relative to the voxel origin.
+            /// </summary>
             public float3 position01;
+
+            /// <summary>
+            /// Vertex position 02 relative to the voxel origin.
+            /// </summary>
             public float3 position02;
+
+            /// <summary>
+            /// Vertex position 03 relative to the voxel origin.
+            /// </summary>
             public float3 position03;
+
+            /// <summary>
+            /// Quad normal vector.
+            /// </summary>
             public float3 normal;
+
+            /// <summary>
+            /// Quad up vector.
+            /// </summary>
             public float3 up;
+
+            /// <summary>
+            /// Quad right vector.
+            /// </summary>
             public float3 right;
+
+            /// <summary>
+            /// UV coordinate for vertex 00.
+            /// </summary>
             public float2 uv00;
+
+            /// <summary>
+            /// UV coordinate for vertex 01.
+            /// </summary>
             public float2 uv01;
+
+            /// <summary>
+            /// UV coordinate for vertex 02.
+            /// </summary>
             public float2 uv02;
+
+            /// <summary>
+            /// UV coordinate for vertex 03.
+            /// </summary>
             public float2 uv03;
         }
     }

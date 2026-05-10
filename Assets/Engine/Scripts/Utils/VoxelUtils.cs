@@ -6,8 +6,7 @@ using static Engine.Scripts.Utils.VoxelConstants;
 namespace Engine.Scripts.Utils
 {
     /// <summary>
-    ///     Utility methods for converting between world, chunk and voxel coordinates,
-    ///     and common direction vectors used for neighbor queries.
+    /// Utility methods for converting between world, chunk, partition, and voxel coordinates.
     /// </summary>
     public static class VoxelUtils
     {
@@ -36,11 +35,21 @@ namespace Engine.Scripts.Utils
             return cCoords;
         }
 
+        /// <summary>
+        /// Gets the partition coordinates for a world position specified as <see cref="Vector3" />.
+        /// </summary>
+        /// <param name="position">World position in floating-point voxel coordinates.</param>
+        /// <returns>Partition coordinates containing the given position.</returns>
         public static int3 GetPartitionCoords(Vector3 position)
         {
             return GetPartitionCoords(position.Int3());
         }
 
+        /// <summary>
+        /// Gets the partition coordinates for a world position specified as <see cref="int3" />.
+        /// </summary>
+        /// <param name="position">World position in integer voxel coordinates.</param>
+        /// <returns>Partition coordinates containing the given position.</returns>
         public static int3 GetPartitionCoords(int3 position)
         {
             int2 cCoords = GetChunkCoords(position);
@@ -51,6 +60,12 @@ namespace Engine.Scripts.Utils
             );
         }
 
+        /// <summary>
+        /// Converts a world position to voxel coordinates local to a partition.
+        /// </summary>
+        /// <param name="partitionPosition">The partition position in partition coordinates.</param>
+        /// <param name="worldPosition">The world position in integer voxel coordinates.</param>
+        /// <returns>Local voxel coordinates inside the partition.</returns>
         public static int3 GetPartitionLocalVoxelCoords(int3 partitionPosition, int3 worldPosition)
         {
             int3 localVoxelPos = worldPosition - new int3(
@@ -63,7 +78,7 @@ namespace Engine.Scripts.Utils
 
 
         /// <summary>
-        ///     Gets the local voxel coordinates within its chunk for a world position/>.
+        /// Gets the local voxel coordinates within its chunk for a world position.
         /// </summary>
         /// <param name="position">World position in integer voxel coordinates.</param>
         /// <returns>Local voxel coordinates within the chunk.</returns>

@@ -6,10 +6,16 @@ using UnityEngine;
 
 namespace Engine.Scripts.VoxelConfig.Editor
 {
+    /// <summary>
+    /// Custom inspector for <see cref="VoxelDefinition" /> that shows texture fields based on the selected texture mode.
+    /// </summary>
     [CustomEditor(typeof(VoxelDefinition))]
     [CanEditMultipleObjects]
     public class VoxelDefinitionCustomEditor : UnityEditor.Editor
     {
+        /// <summary>
+        /// Draws the custom inspector UI for voxel definitions.
+        /// </summary>
         public override void OnInspectorGUI()
         {
             VoxelDefinition voxelDef = (VoxelDefinition)target;

@@ -24,8 +24,10 @@ namespace Engine.Scripts.VoxelConfig.Data
     public static class DirectionUtils
     {
         /// <summary>
-        ///     Ermittelt Richtung für Normal-Vektor int3 basierend auf dominanter Komponente.
+        /// Determines a direction from an <see cref="int3" /> normal vector based on its dominant component.
         /// </summary>
+        /// <param name="vec">The vector to convert.</param>
+        /// <returns>The matching cardinal direction.</returns>
         public static Direction ToDirection(this int3 vec)
         {
             if (vec.x < vec.y && vec.z < vec.y) return Direction.Up;
@@ -38,6 +40,11 @@ namespace Engine.Scripts.VoxelConfig.Data
             throw new Exception("Invalid direction vector");
         }
 
+        /// <summary>
+        /// Converts a direction to its corresponding <see cref="int3" /> unit vector.
+        /// </summary>
+        /// <param name="direction">The direction to convert.</param>
+        /// <returns>The matching unit vector.</returns>
         public static int3 ToInt3(this Direction direction)
         {
             return direction switch
@@ -52,6 +59,11 @@ namespace Engine.Scripts.VoxelConfig.Data
             };
         }
 
+        /// <summary>
+        /// Gets a relative up vector for the given direction.
+        /// </summary>
+        /// <param name="direction">The reference direction.</param>
+        /// <returns>A vector representing the relative up direction.</returns>
         public static int3 RelativeUp(this Direction direction)
         {
             return direction switch
@@ -62,11 +74,21 @@ namespace Engine.Scripts.VoxelConfig.Data
             };
         }
 
+        /// <summary>
+        /// Gets a relative down vector for the given direction.
+        /// </summary>
+        /// <param name="direction">The reference direction.</param>
+        /// <returns>A vector representing the relative down direction.</returns>
         public static int3 RelativeDown(this Direction direction)
         {
             return -direction.RelativeUp();
         }
 
+        /// <summary>
+        /// Gets a relative right vector for the given direction.
+        /// </summary>
+        /// <param name="direction">The reference direction.</param>
+        /// <returns>A vector representing the relative right direction.</returns>
         public static int3 RelativeRight(this Direction direction)
         {
             return direction switch
@@ -81,6 +103,11 @@ namespace Engine.Scripts.VoxelConfig.Data
             };
         }
 
+        /// <summary>
+        /// Gets a relative left vector for the given direction.
+        /// </summary>
+        /// <param name="direction">The reference direction.</param>
+        /// <returns>A vector representing the relative left direction.</returns>
         public static int3 RelativeLeft(this Direction direction)
         {
             return -direction.RelativeRight();

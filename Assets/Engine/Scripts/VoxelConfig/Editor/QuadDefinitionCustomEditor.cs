@@ -4,6 +4,9 @@ using UnityEngine;
 
 namespace Engine.Scripts.VoxelConfig.Editor
 {
+    /// <summary>
+    /// Custom inspector for <see cref="QuadDefinition" /> that provides live preview rendering and basis visualization.
+    /// </summary>
     [CustomEditor(typeof(QuadDefinition))]
     [CanEditMultipleObjects]
     public class QuadDefinitionCustomEditor : UnityEditor.Editor
@@ -23,6 +26,9 @@ namespace Engine.Scripts.VoxelConfig.Editor
         private Mesh _previewWireCubeMesh;
         private Material _previewWireMat;
 
+        /// <summary>
+        /// Creates preview resources when the editor becomes active.
+        /// </summary>
         private void OnEnable()
         {
             _previewUtility = new PreviewRenderUtility
@@ -93,6 +99,9 @@ namespace Engine.Scripts.VoxelConfig.Editor
             EnsureAxisLineMesh();
         }
 
+        /// <summary>
+        /// Releases preview resources when the editor is disabled.
+        /// </summary>
         private void OnDisable()
         {
             if (_previewMesh != null)
@@ -162,6 +171,9 @@ namespace Engine.Scripts.VoxelConfig.Editor
             }
         }
 
+        /// <summary>
+        /// Draws the custom inspector UI and updates the preview when vertices change.
+        /// </summary>
         public override void OnInspectorGUI()
         {
             QuadDefinition quadDef = (QuadDefinition)target;
@@ -204,6 +216,10 @@ namespace Engine.Scripts.VoxelConfig.Editor
             }
         }
 
+        /// <summary>
+        /// Draws the quad preview section in the inspector.
+        /// </summary>
+        /// <param name="quadDef">The quad definition being edited.</param>
         private void DrawMeshPreviewSection(QuadDefinition quadDef)
         {
             EditorGUILayout.Space(8f);
@@ -211,20 +227,20 @@ namespace Engine.Scripts.VoxelConfig.Editor
 
             if (targets.Length > 1)
             {
-                EditorGUILayout.HelpBox("Preview ist bei Multi-Selection deaktiviert.", MessageType.Info);
+                EditorGUILayout.HelpBox("Preview is disabled for multi-selection.", MessageType.Info);
                 return;
             }
 
             if (_previewUtility == null || _previewMaterial == null)
             {
-                EditorGUILayout.HelpBox("PreviewRenderUtility ist nicht verfugbar.", MessageType.Warning);
+                EditorGUILayout.HelpBox("PreviewRenderUtility is not available.", MessageType.Warning);
                 return;
             }
 
             EnsurePreviewMesh(quadDef);
             if (_previewMesh == null)
             {
-                EditorGUILayout.HelpBox("Mesh-Preview konnte nicht erstellt werden.", MessageType.Warning);
+                EditorGUILayout.HelpBox("Mesh preview could not be created.", MessageType.Warning);
                 return;
             }
 
@@ -233,6 +249,10 @@ namespace Engine.Scripts.VoxelConfig.Editor
             RenderPreview(previewRect, quadDef);
         }
 
+        /// <summary>
+        /// Handles mouse drag and scroll input for the preview camera.
+        /// </summary>
+        /// <param name="previewRect">The preview rectangle.</param>
         private void HandlePreviewInput(Rect previewRect)
         {
             Event evt = Event.current;
@@ -256,6 +276,11 @@ namespace Engine.Scripts.VoxelConfig.Editor
             }
         }
 
+        /// <summary>
+        /// Renders the quad preview into the inspector preview rectangle.
+        /// </summary>
+        /// <param name="previewRect">The preview rectangle.</param>
+        /// <param name="quadDef">The quad definition to render.</param>
         private void RenderPreview(Rect previewRect, QuadDefinition quadDef)
         {
             _previewUtility.BeginPreview(previewRect, GUIStyle.none);
@@ -287,6 +312,9 @@ namespace Engine.Scripts.VoxelConfig.Editor
             GUI.DrawTexture(previewRect, result, ScaleMode.StretchToFill, false);
         }
 
+        /// <summary>
+        /// Creates the shared axis line mesh used in the preview.
+        /// </summary>
         private void EnsureAxisLineMesh()
         {
             if (_previewAxisLineMesh != null) return;
@@ -306,6 +334,10 @@ namespace Engine.Scripts.VoxelConfig.Editor
             _previewAxisLineMesh.RecalculateBounds();
         }
 
+        /// <summary>
+        /// Draws axis and normal helper lines in the preview.
+        /// </summary>
+        /// <param name="quadDef">The quad definition being previewed.</param>
         private void DrawLines(QuadDefinition quadDef)
         {
             if (!_previewAxisLineMesh || !_previewAxisXMat || !_previewAxisYMat ||
@@ -335,6 +367,10 @@ namespace Engine.Scripts.VoxelConfig.Editor
             _previewUtility.DrawMesh(_previewAxisLineMesh, normalMatrix, _previewNormalMat, 0);
         }
 
+        /// <summary>
+        /// Creates or updates the preview mesh for the current quad definition.
+        /// </summary>
+        /// <param name="quadDef">The quad definition being previewed.</param>
         private void EnsurePreviewMesh(QuadDefinition quadDef)
         {
             if (!_previewMesh)
@@ -372,6 +408,9 @@ namespace Engine.Scripts.VoxelConfig.Editor
             _previewMesh.RecalculateBounds();
         }
 
+        /// <summary>
+        /// Creates the unit wireframe cube mesh used as a preview reference.
+        /// </summary>
         private void EnsureWireCubeMesh()
         {
             if (_previewWireCubeMesh) return;
@@ -402,6 +441,10 @@ namespace Engine.Scripts.VoxelConfig.Editor
             _previewWireCubeMesh.RecalculateBounds();
         }
 
+        /// <summary>
+        /// Calculates a preview bounds volume that fits the quad and helper geometry.
+        /// </summary>
+        /// <returns>The bounds used to position the preview camera.</returns>
         private Bounds GetPreviewBounds()
         {
             Bounds bounds = _previewMesh.bounds;
