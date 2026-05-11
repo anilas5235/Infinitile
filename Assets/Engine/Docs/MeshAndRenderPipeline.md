@@ -71,7 +71,7 @@ Trade-offs:
 - Rendering is still tied to fully buildt meshes.
 
 # Version 1.1 (Partitions)
-
+## Mesh Pipeline
 ```mermaid
 flowchart LR
     D[Request Partition] --> E[Mesh Queue]
@@ -155,7 +155,7 @@ Trade-offs:
 - Draw call pressure remains high with many visible partitions. (Fixed by Unity's SRP batcher)
 
 # Version 1.2 (Compute Shaders)
-
+## Mesh Pipeline
 ```mermaid
 flowchart LR
 subgraph CPU["CPU"]
