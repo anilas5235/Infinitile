@@ -1,0 +1,33 @@
+﻿#pragma kernel ReBuildIndexAndArgs
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rebuild Index and Args Kernel - Generate index buffer and indirect draw args for rendering
+// ─────────────────────────────────────────────────────────────────────────────
+AppendStructuredBuffer<uint> _IndexBuffer;
+RWStructuredBuffer<uint> _ArgsBuffer;
+StructuredBuffer<uint> _CountsPerPage; //Count
+
+uint _TotalPointCount;
+uint _PointsPerPage;
+uint _PagesPerBuffer;
+
+[numthreads(128, 1, 1)]
+void ReBuildIndexAndArgs(uint3 id : SV_DispatchThreadID)
+{
+    uint pageIndex = id.x;
+    if (pageIndex >= _PagesPerBuffer) return;
+
+    uint count = _CountsPerPage[pageIndex];
+
+    uint offset = pageIndex * _PointsPerPage;
+
+    [loop]
+    for (uint pInPage = 0; pInPage < count; ++pInPage)
+    {
+        _IndexBuffer.Append(offset + pInPage);
+    }
+
+    if (pageIndex != 0) return;
+    //Set ArgsBuffer
+    _ArgsBuffer[0] = _TotalPointCount * 6u;
+}

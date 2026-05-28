@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 33d8813f542849ba9f913f9b873fda02, type: 3}
+  m_Name: Half
+  m_EditorClassIdentifier: Assembly-CSharp::Runtime.Engine.VoxelConfig.Data.VoxelShape
+  quads:
+  - quadDef: {fileID: 11400000, guid: 0af98131d802b784188e80f2ac024985, type: 2}
+    drawCondition: 6
+  - quadDef: {fileID: 11400000, guid: 8a213f108bd718044ac1cf8a4d0a9bb6, type: 2}
+    drawCondition: 5
+  - quadDef: {fileID: 11400000, guid: 00fa5fc96c1d08442a2e6692dbfdb6a1, type: 2}
+    drawCondition: 0
+  - quadDef: {fileID: 11400000, guid: 1ead402594c9901478d11e50a9a627fd, type: 2}
+    drawCondition: 2
+  - quadDef: {fileID: 11400000, guid: e9425d5ab86bf7e48a90bab8aba0887c, type: 2}
+    drawCondition: 3
+  - quadDef: {fileID: 11400000, guid: c82363c70b522304c848062b1e004298, type: 2}
+    drawCondition: 4

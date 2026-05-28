@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de6253de127543aeb23d6596fc20fad2, type: 3}
+  m_Name: VoxelEngineSettings
+  m_EditorClassIdentifier: 
+  Seed: 1337
+  Noise: {fileID: 11400000, guid: 0d29f4d418efd7d42a007b66f6e5a547, type: 2}
+  Chunk:
+    ChunkPrefab: {fileID: 972016758114520785, guid: c64e56d0bf3b95d4786aca3e51faf0ed, type: 3}
+    DrawDistance: 6
+    LoadDistance: 8
+    UpdateDistance: 4
+  Renderer:
+    solidMaterial: {fileID: 2100000, guid: b6215133664aff74dad83d56615f47d0, type: 2}
+    transparentMaterial: {fileID: 2100000, guid: e8e8dbf7c2062df49bf757b4e9d3a636, type: 2}
+    foliageMaterial: {fileID: 2100000, guid: daf19eb8c4aeb474ebe2bb4b7e1f87a6, type: 2}
+    pointBuilder: {fileID: 7200000, guid: b253108f447042e389630ea3cd8affd1, type: 3}
+    copyPoints: {fileID: 7200000, guid: d6821e19a578d8a468410694549d56e8, type: 3}
+    rebuildBuffers: {fileID: 7200000, guid: 2cded031692db1345b8b6cceb7abce13, type: 3}
+    shadows: 0
+  Scheduler:
+    chunkGenBatchSize: 8
+    meshingBatchSize: 8
+    partitionBuildBatchSize: 4
+    colliderBatchSize: 6

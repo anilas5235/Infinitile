@@ -1,0 +1,108 @@
+﻿#pragma kernel CullChunks
+#pragma kernel CullPartitions
+#pragma kernel BuildIndirectArgs
+
+#include "VoxelComputeCommon.hlsl"
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Chunk Culling - Coarse frustum culling per chunk
+// ─────────────────────────────────────────────────────────────────────────────
+StructuredBuffer<PartitionMetadata> _Metadata;
+StructuredBuffer<ChunkMetadata> _ChunkMetadata;
+AppendStructuredBuffer<uint> _VisibleChunks;
+float4 _VoxelFrustumPlanes[6];
+uint _ActiveChunkCount;
+
+// AABB-Frustum intersection test
+bool IsFrustumVisible(float3 bmin, float3 bmax, float4 planes[6])
+{
+    for (int i = 0; i < 6; i++)
+    {
+        float3 normal = planes[i].xyz;
+        float dist = planes[i].w;
+
+        // Get positive vertex (farthest along plane normal)
+        float3 pVertex = bmax;
+        if (normal.x < 0) pVertex.x = bmin.x;
+        if (normal.y < 0) pVertex.y = bmin.y;
+        if (normal.z < 0) pVertex.z = bmin.z;
+
+        // Test if positive vertex is outside
+        if (dot(normal, pVertex) + dist < 0)
+            return false;
+    }
+    return true;
+}
+
+[numthreads(64, 1, 1)]
+void CullChunks(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _ActiveChunkCount) return;
+
+    ChunkMetadata chunk = _ChunkMetadata[id.x];
+
+    if (IsFrustumVisible(chunk.boundsMin, chunk.boundsMax, _VoxelFrustumPlanes))
+    {
+        _VisibleChunks.Append(id.x);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Partition Culling - Fine frustum culling per partition
+// ─────────────────────────────────────────────────────────────────────────────
+
+ConsumeStructuredBuffer<uint> _VisibleChunksIn;
+AppendStructuredBuffer<uint> _VisiblePartitions;
+
+[numthreads(8, 1, 1)]
+void CullPartitions(uint3 tid : SV_GroupThreadID)
+{
+    uint chunkIdx = _VisibleChunksIn.Consume();
+    ChunkMetadata chunk = _ChunkMetadata[chunkIdx];
+
+    uint partY = tid.x; // 0..7
+    if ((chunk.partitionMask & (1u << partY)) == 0) return; // Partition inactive
+
+    uint partIdx = chunkIdx * 8 + partY;
+    PartitionMetadata part = _Metadata[partIdx];
+
+    if (part.pointCount == 0) return; // Empty partition
+
+    // Fine frustum test
+    if (IsFrustumVisible(part.boundsMin, part.boundsMax, _VoxelFrustumPlanes))
+    {
+        _VisiblePartitions.Append(partIdx);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Indirect Args Builder - Build DrawProceduralIndirect arguments
+// ─────────────────────────────────────────────────────────────────────────────
+
+StructuredBuffer<uint> _VisiblePartitionsIn;
+RWStructuredBuffer<uint> _IndirectArgs;
+uint _VisiblePartitionCount;
+
+[numthreads(1, 1, 1)]
+void BuildIndirectArgs(uint3 id : SV_DispatchThreadID)
+{
+    uint totalPoints = 0;
+
+    // Sum points from all visible partitions
+    for (uint i = 0; i < _VisiblePartitionCount; i++)
+    {
+        uint partIdx = _VisiblePartitionsIn[i];
+        totalPoints += _Metadata[partIdx].pointCount;
+    }
+
+    // args[0] = vertexCountPerInstance (6 vertices per point for 2 triangles)
+    _IndirectArgs[0] = totalPoints * 6;
+    // args[1] = instanceCount
+    _IndirectArgs[1] = 1;
+    // args[2] = startVertexLocation
+    _IndirectArgs[2] = 0;
+    // args[3] = startInstanceLocation
+    _IndirectArgs[3] = 0;
+    // args[4] = baseVertexLocation (not used for non-indexed draws)
+    _IndirectArgs[4] = 0;
+}

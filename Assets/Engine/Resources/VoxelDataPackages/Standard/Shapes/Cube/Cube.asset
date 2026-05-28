@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 33d8813f542849ba9f913f9b873fda02, type: 3}
+  m_Name: Cube
+  m_EditorClassIdentifier: Assembly-CSharp::Runtime.Engine.VoxelConfig.Data.VoxelShape
+  quads:
+  - quadDef: {fileID: 11400000, guid: 3376535f5c81ad042bb72fd6a649c32c, type: 2}
+    drawCondition: 6
+  - quadDef: {fileID: 11400000, guid: 52650719fcd69ef41b8423a2de1cb85e, type: 2}
+    drawCondition: 5
+  - quadDef: {fileID: 11400000, guid: f93a2b6eaee97ed44ae54b13c624f218, type: 2}
+    drawCondition: 1
+  - quadDef: {fileID: 11400000, guid: 1ead402594c9901478d11e50a9a627fd, type: 2}
+    drawCondition: 2
+  - quadDef: {fileID: 11400000, guid: ebc41a6b149de174aa605f897d40674f, type: 2}
+    drawCondition: 3
+  - quadDef: {fileID: 11400000, guid: ff3ae8e89e554184db2a0ba3729f4605, type: 2}
+    drawCondition: 4
