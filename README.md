@@ -50,26 +50,28 @@ Assets/
 ├── Engine/                    # Core engine code (production)
 │   ├── Docs/                  # Pipeline documentation (see below)
 │   ├── Scripts/
-│   │   ├── World/             # Chunk management and world state
+│   │   ├── Behaviour/         # MonoBehaviour-based system components
+│   │   ├── Components/        # Unity-facing MonoBehaviour components
+│   │   ├── Data/              # Data structures and serializable types
 │   │   ├── Jobs/              # Schedulers and job definitions
-│   │   ├── Render/            # GPU rendering pipeline
-│   │   ├── VoxelConfig/       # Voxel definitions and registries
-│   │   ├── Settings/          # Engine settings and configuration
-│   │   ├── Utils/             # Math, logging, and shared helpers
 │   │   ├── Noise/             # Procedural generation utilities
-│   │   └── Components/        # Unity-facing MonoBehaviour components
+│   │   ├── Render/            # GPU rendering pipeline
+│   │   ├── Settings/          # Engine settings and configuration
+│   │   ├── ThirdParty/        # Third-party libraries and utilities
+│   │   ├── Utils/             # Math, logging, and shared helpers
+│   │   ├── VoxelConfig/       # Voxel definitions and registries
+│   │   └── World/             # Chunk management and world state
 │   ├── Prefabs/               # Engine prefabs (world manager, renderer, etc.)
 │   ├── Resources/             # Voxel data packages and runtime assets
 │   └── Shaders/               # Compute shaders and render shaders
 ├── EngineSettings/            # Configurable engine settings (world size, generation params)
+├── Scenes/                    # Game scenes
 ├── Scripts/                   # Game-specific scripts (not part of the engine)
 │   ├── Player/                # Player controller and voxel editor
-│   ├── UI/                    # HUD and in-game UI
-│   ├── NoiseTest/             # Noise generation test utilities
-│   └── Test/                  # Test scenes and helpers
-├── Scenes/                    # Game scenes
+│   └── UI/                    # HUD and in-game UI
 ├── Settings/                  # Project settings
-└── InputSystem_Actions        # Input bindings
+├── TextMesh Pro/              # TextMesh Pro assets and resources
+└── InputSystem_Actions.inputactions  # Input bindings
 
 ProjectSettings/              # Unity project configuration
 Packages/                     # Unity package dependencies
