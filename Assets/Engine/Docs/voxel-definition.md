@@ -254,7 +254,3 @@ graph
   VR -.->|stores| VD
 ```
 
-Wenn dir dieses Format passt, kann ich noch weitere konkrete Code‑Snippets (z. B. `FindTex`, `TexRegistry.Register` oder `QuadRegistry.Register`) in gleicher Weise einfügen. Sag mir welche Methode du noch als Ausschnitt möchtest.
-
-
-
