@@ -10,17 +10,14 @@ Dieses Kapitel trennt bewusst zwei Schritte:
 Wichtig: Die Compute Shader bereiten nur die Daten vor. **Das eigentliche Färben der Pixel passiert erst im Fragment Shader**.
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph Build["Renderdaten bauen"]
+        direction TB
         A["VoxelDefinition / Shape / QuadDefinition"] --> B["VoxelRegistry"]
         B --> C["QuadBuffer"]
         B --> D["QuadTexPairBuffer"]
         B --> E["VoxelRenderDefBuffer"]
         B --> F["Texture2DArray(s)"]
-
-        G["Culling.compute"] --> H["sichtbare Chunks und Partitionen"]
-        H --> I["ReBuildBuffers.compute"]
-        I --> J["IndexBuffer + IndirectArgs"]
 
         K["PointBuilder.compute"] --> L["PointData pro sichtbarem Voxel"]
         L --> M["CopyPoints.compute"]
@@ -28,6 +25,7 @@ flowchart LR
     end
 
     subgraph Render["Eigentliches Rendern"]
+        direction LR
         O["SolidVoxel.shader / TransparentVoxel.shader"] --> P["Vertex Stage: fetch_vertex_data"]
         P --> Q["Fragment Stage: Sample, AO, Licht, Glow"]
         Q --> R["Framebuffer / Bild"]
@@ -37,7 +35,6 @@ flowchart LR
     D --> K
     E --> K
     F --> Q
-    J --> P
     N --> P
 ```
 
@@ -161,12 +158,11 @@ Erklärung: `texIndex` wird als Slice verwendet. UVs kommen aus `QuadData.uvXX`.
 
 Die eigentliche Vorarbeit passiert in den Compute Shadern:
 
-- `Culling.compute` reduziert zuerst die Arbeit auf sichtbare Chunks und Partitionen.
 - `PointBuilder.compute` baut daraus die `PointData`‑Einträge pro Layer.
 - `ReBuildBuffers.compute` erzeugt daraus `IndexBuffer` und indirekte Draw-Argumente.
 - `CopyPoints.compute` kopiert die vorbereiteten Punkte in die finalen Render-Buffers.
 
-Im echten Kernel wird dabei zusätzlich geprüft, welche Faces sichtbar sind: `BuildPoints` läuft pro Voxelfeld, schaut auf Nachbarn und ruft dann `add_quads` nur für die benötigten Faces auf.
+Im echten Kernel wird dabei direkt pro Voxelfeld geprüft, welche Faces sichtbar sind: `BuildPoints` schaut auf Nachbarn und ruft dann `add_quads` nur für die benötigten Faces auf.
 
 `PointBuilder.compute` als Kernstück der Build-Phase:
 ```hlsl
@@ -269,18 +265,6 @@ Sag kurz, was du bevorzugst.
 
 10) Vertex Shader Stage — aus PointData werden echte Vertices
 ```hlsl
-struct Attributes
-{
-    uint vertexID : SV_VertexID;
-};
-
-struct VoxelVertexData
-{
-    float3 positionOS;
-    float2 uv;
-    uint4 packed;
-};
-
 StructuredBuffer<PointData> _PointData;
 StructuredBuffer<uint> _IndexBuffer;
 
@@ -306,37 +290,14 @@ VoxelVertexData fetch_vertex_data(uint vertexID)
     // Triangle 1: 00-01-02, Triangle 2: 02-01-03
     switch (cornerID)
     {
-    case 0:
-        v.positionOS += quad.position00;
-        v.uv = quad.uv00;
-        break;
-    case 1:
-        v.positionOS += quad.position01;
-        v.uv = quad.uv01;
-        break;
-    case 2:
-        v.positionOS += quad.position02;
-        v.uv = quad.uv02;
-        break;
-    case 3:
-        v.positionOS += quad.position02;
-        v.uv = quad.uv02;
-        break;
-    case 4:
-        v.positionOS += quad.position01;
-        v.uv = quad.uv01;
-        break;
-    case 5:
-        v.positionOS += quad.position03;
-        v.uv = quad.uv03;
-        break;
+       // Nimm die passende Position und UV je nach cornerID
     }
 
     return v;
 }
 ```
 
-Erklärung: Jetzt beginnt die **Render-Phase**. Jeder `PointData`-Eintrag wird zu 6 Vertices erweitert. Der Vertex Shader holt sich die `QuadData` per `quadIndex` und setzt daraus die tatsächliche Geometrie auf. Wichtig: Der Vertex Shader malt noch nichts — er erzeugt nur die Vertices, die später rasterisiert werden.
+Erklärung: Jetzt beginnt die **Render-Phase**. Aus einem `PointData` werden 6 Vertices gebaut. Der Shader nimmt dafür die passende `QuadData` und wählt je nach Corner die richtige Position und UV aus. Die Farbe entsteht erst später im Fragment Shader.
 
 10.1) Varyings — Daten zum Fragment Shader
 ```hlsl
@@ -365,24 +326,6 @@ Erklärung: Die Daten aus `VoxelVertexData` werden in die `Varyings` Struktur ko
 
 Struktur des Fragment Shaders (SolidVoxel):
 ```hlsl
-struct FragExtraData
-{
-    uint texture_index;
-    uint4 sun_light;
-    uint4 artificial_light;
-    uint ao;
-};
-
-FragExtraData unpack_frag_extra_data(uint4 packed)
-{
-    FragExtraData data;
-    data.texture_index = get_tex_index(packed);
-    data.sun_light = get_sun_light(packed);
-    data.artificial_light = get_artificial_light(packed);
-    data.ao = get_ao(packed);
-    return data;
-}
-
 half4 frag(Varyings IN) : SV_Target
 {
     // 1) Unpack Daten aus dem gepackten uint4
