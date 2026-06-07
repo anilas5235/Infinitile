@@ -2,9 +2,46 @@
 
 Kurzüberblick
 -------------
-Dieses Kapitel erklärt, wie die vom Editor/Registry erzeugten Daten (VoxelRenderDef, QuadData, QuadTexPairs, Texture2DArray) auf der GPU genutzt werden: Layouts, Packing, Shader‑Zugriffe und kurze Code‑Beispiele (HLSL + C#). Ziel ist: zeigen, wie Daten vom C#-Runtime‑Format in GPU‑Buffers überführt werden und wie Shader daraus die finalen Vertex‑/Fragment‑Informationen gewinnen.
+Dieses Kapitel trennt bewusst zwei Schritte:
 
-1) Laufzeit → GPU: C# GPU‑Layout (Kurz)
+1. **Renderdaten bauen**: Registry, Shape-/Quad-Definitionen und Compute Shader erzeugen die GPU-Buffers.
+2. **Eigentliches Rendern**: Vertex- und Fragment-Shader lesen diese Buffers und malen das Bild.
+
+Wichtig: Die Compute Shader bereiten nur die Daten vor. **Das eigentliche Färben der Pixel passiert erst im Fragment Shader**.
+
+```mermaid
+flowchart LR
+    subgraph Build["Renderdaten bauen"]
+        A["VoxelDefinition / Shape / QuadDefinition"] --> B["VoxelRegistry"]
+        B --> C["QuadBuffer"]
+        B --> D["QuadTexPairBuffer"]
+        B --> E["VoxelRenderDefBuffer"]
+        B --> F["Texture2DArray(s)"]
+
+        G["Culling.compute"] --> H["sichtbare Chunks und Partitionen"]
+        H --> I["ReBuildBuffers.compute"]
+        I --> J["IndexBuffer + IndirectArgs"]
+
+        K["PointBuilder.compute"] --> L["PointData pro sichtbarem Voxel"]
+        L --> M["CopyPoints.compute"]
+        M --> N["finale Render-Point-Buffers"]
+    end
+
+    subgraph Render["Eigentliches Rendern"]
+        O["SolidVoxel.shader / TransparentVoxel.shader"] --> P["Vertex Stage: fetch_vertex_data"]
+        P --> Q["Fragment Stage: Sample, AO, Licht, Glow"]
+        Q --> R["Framebuffer / Bild"]
+    end
+
+    C --> K
+    D --> K
+    E --> K
+    F --> Q
+    J --> P
+    N --> P
+```
+
+1) Renderdaten bauen — C# GPU‑Layout (Kurz)
 ```csharp
 // Interne GPU‑repräsentation (C#) — wird in einen GraphicsBuffer geschrieben
 private struct GPUVoxelDef
@@ -40,7 +77,7 @@ private struct GPUVoxelDef
 }
 ```
 
-Erklärung: Dieses struct wird zeilenweise in einen Structured GraphicsBuffer geschrieben. Der GPU‑Code benötigt eine exakt passende HLSL‑Struktur (gleiche Feldtypen/Reihenfolge), damit das Memory‑Layout stimmt.
+Erklärung: Dieses Struct gehört noch zur **Build-Phase**. Es wird zeilenweise in einen Structured GraphicsBuffer geschrieben. Der GPU‑Code benötigt eine exakt passende HLSL‑Struktur (gleiche Feldtypen/Reihenfolge), damit das Memory‑Layout stimmt.
 
 2) HLSL‑Seite: VoxelDef und QuadData
 ```hlsl
@@ -81,7 +118,7 @@ StructuredBuffer<uint> _VoxelQuadTexPairs; // gepackte 32-bit Werte
 uint _VoxelQuadTexPairsCount;
 ```
 
-Erklärung: Der GPU‑Code liest `VoxelDef` per Index (VoxelID) und bekommt per Face‑Range (uint2 start,count) die Indices in `_VoxelQuadTexPairs`. Das erlaubt variable Anzahl an Quad‑Einträgen pro Voxel‑Face ohne kompliziertes Pointer‑System.
+Erklärung: Auch das ist noch **Vorbereitung**. Der GPU‑Code liest `VoxelDef` per Index (VoxelID) und bekommt per Face‑Range (`uint2 start,count`) die Indices in `_VoxelQuadTexPairs`. Das erlaubt variable Anzahl an Quad‑Einträgen pro Voxel‑Face ohne kompliziertes Pointer‑System.
 
 3) Packing: Quad/Tex Paar — C# ↔ HLSL
 ```csharp
@@ -120,29 +157,69 @@ float4 sample_texture_array(Texture2DArray texArr, float2 uv, uint slice)
 
 Erklärung: `texIndex` wird als Slice verwendet. UVs kommen aus `QuadData.uvXX`.
 
-5) Beispiel‑Ablauf im Shader (Vertex/PointBuilder)
+5) Compute Shader‑Pipeline — Sichtbarkeit, Build und Kopie
 
-- Compute/Vertex shader liest VoxelDef für eine Voxel‑ID.
-- Für jede Face‑Range (uint2) iteriert der Shader über `_VoxelQuadTexPairs[start + i]`.
-- Für jedes Paar: unpack → quadIndex / texIndex.
-- `QuadData q = _Quad_buffer[quadIndex];` → Vertex‑Offsets und UVs.
-- PointData wird mit `packed` Feldern befüllt (z. B. Light/ao/depthFade/glow) und an AppendStructuredBuffer geschickt.
+Die eigentliche Vorarbeit passiert in den Compute Shadern:
 
-HLSL‑Pseudoablauf:
+- `Culling.compute` reduziert zuerst die Arbeit auf sichtbare Chunks und Partitionen.
+- `PointBuilder.compute` baut daraus die `PointData`‑Einträge pro Layer.
+- `ReBuildBuffers.compute` erzeugt daraus `IndexBuffer` und indirekte Draw-Argumente.
+- `CopyPoints.compute` kopiert die vorbereiteten Punkte in die finalen Render-Buffers.
+
+Im echten Kernel wird dabei zusätzlich geprüft, welche Faces sichtbar sind: `BuildPoints` läuft pro Voxelfeld, schaut auf Nachbarn und ruft dann `add_quads` nur für die benötigten Faces auf.
+
+`PointBuilder.compute` als Kernstück der Build-Phase:
 ```hlsl
-uint2 quadRange = def.ShapeQuadIndicesRight; // (start, count)
-for (uint i = 0; i < quadRange.y; ++i)
+void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uint2 quadRange)
 {
-    uint packedPair = _VoxelQuadTexPairs[quadRange.x + i];
-    uint quadIndex = get_quad_index(uint4(packedPair,0,0,0));
-    uint texIndex = get_tex_index(uint4(packedPair,0,0,0));
+    for (uint i = 0u; i < quadRange.y; i++)
+    {
+        uint quad_tex_pair = get_quad_tex_pair(quadRange.x + i);
 
-    QuadData quad = _Quad_buffer[quadIndex];
-    float2 uv = quad.uv00; // je nach Corner
-    float4 color = _Textures.Sample(sampler_Point, float3(uv, (float)texIndex));
-    // ... assemble PointData and Append
+        PointData p;
+        p.position = (float3)in_chunk_pos + float3(partitionPos.x, 0, partitionPos.z);
+
+        uint4 packed = uint4(quad_tex_pair, 0, 0, 0);
+        set_sun_light(packed, uint4(15, 15, 15, 15));
+        set_artificial_light(packed, uint4(0, 0, 0, 0));
+
+        uint quadIndex = get_quad_index(packed);
+        QuadData quad = _Quad_buffer[quadIndex];
+        uint ao_mask = 0;
+
+        // AO und Zusatzdaten werden hier nur vorbereitet, nicht gerendert
+        set_ao(packed, ao_mask);
+        p.packed = packed;
+
+        switch (myDef.MeshLayer)
+        {
+        case 0: _SolidPointsOut.Append(p); break;
+        case 1: _TransparentPointsOut.Append(p); break;
+        case 2: _FoliagePointsOut.Append(p); break;
+        default: break;
+        }
+    }
+}
+
+[numthreads(4, 4, 4)]
+void BuildPoints(uint3 id : SV_DispatchThreadID)
+{
+    if (any(id >= uint3(_PartitionSize))) return;
+
+    PartitionMetadata metadata = _Metadata[_PartitionIndex];
+    int3 pos = (int3)id;
+    float3 partitionWS = (float3)metadata.partitionWS;
+    int3 in_chunk_pos = pos + int3(0, partitionWS.y, 0);
+    uint voxelId = get_voxel(_MainChunk, in_chunk_pos);
+
+    if (voxelId == 0) return;
+
+    VoxelDef myDef = get_voxel_def(voxelId);
+    add_quads(in_chunk_pos, partitionWS, myDef, myDef.ShapeQuadIndicesAlwaysRender);
 }
 ```
+
+Erklärung: Hier werden noch keine Pixel gerendert. Der Compute Shader baut nur die Renderdaten auf: er wählt Quads, Texturen und Zusatzdaten wie Licht, AO oder Glow aus und schreibt daraus `PointData` in Append-Buffers.
 
 6) PointData.packed — zusätzlicher per‑Point Zustand
 
@@ -190,7 +267,7 @@ Wenn du möchtest, füge ich noch:
 - ein kurzes Debug‑ComputeKernel‑Snippet (C# + ComputeShader Dispatch) zum Testen der Buffer‑Inhalte.
 Sag kurz, was du bevorzugst.
 
-10) Vertex Shader Stage — fetch_vertex_data und Quad‑Expansion
+10) Vertex Shader Stage — aus PointData werden echte Vertices
 ```hlsl
 struct Attributes
 {
@@ -259,7 +336,7 @@ VoxelVertexData fetch_vertex_data(uint vertexID)
 }
 ```
 
-Erklärung: Jeder PointData (von der Compute Shader generiert) wird zu 6 Vertices expandiert (Triangle Strip). Der Vertex Shader holt sich die `QuadData` per `quadIndex` und addiert die 4 Eckpunkte `position00/01/02/03` zu `positionOS`. Die UVs werden aus dem Quad ebenfalls pro Corner extrahiert. Das `packed` Feld wird unverändert an die Fragment‑Stufe weitergegeben.
+Erklärung: Jetzt beginnt die **Render-Phase**. Jeder `PointData`-Eintrag wird zu 6 Vertices erweitert. Der Vertex Shader holt sich die `QuadData` per `quadIndex` und setzt daraus die tatsächliche Geometrie auf. Wichtig: Der Vertex Shader malt noch nichts — er erzeugt nur die Vertices, die später rasterisiert werden.
 
 10.1) Varyings — Daten zum Fragment Shader
 ```hlsl
@@ -282,7 +359,7 @@ Varyings vert(uint vertexID : SV_VertexID)
 }
 ```
 
-Erklärung: Die Daten aus `VoxelVertexData` werden in die `Varyings` Struktur kopiert. `positionCS` wird berechnet, damit GPU die Pixel‑Position kennt. `packed` bleibt unverändert und wird per Hardware‑Interpolation auf die Fragment‑Shader‑Invokationen verteilt.
+Erklärung: Die Daten aus `VoxelVertexData` werden in die `Varyings` Struktur kopiert. `positionCS` wird berechnet, damit die GPU die Position im Clip Space kennt. `packed` bleibt unverändert und wird an die Fragment‑Stufe weitergereicht. Die eigentliche Farbentscheidung passiert erst danach.
 
 11) Fragment Shader Stage — Texture Sampling und Beleuchtung
 
@@ -326,7 +403,7 @@ half4 frag(Varyings IN) : SV_Target
 }
 ```
 
-Erklärung: Der Fragment Shader hat folgende Schritte:
+Erklärung: **Hier wird das Bild wirklich gemalt.** Der Fragment Shader hat folgende Schritte:
 1. Unpacking: `uint4 packed` wird dekodiert in texture_index, sun_light (je Corner u4), AO‑Mask (u8).
 2. Texture Sampling: Die Texture2DArray wird mit UV und texIndex gesampelt.
 3. AO‑Berechnung: `calc_ao_color` mischt _AOColor mit dem sampled albedo basierend auf AO‑Mask und UV.
@@ -360,7 +437,7 @@ half4 frag(Varyings IN) : SV_Target
 }
 ```
 
-Erklärung: Der TransparentVoxel‑Shader hat zusätzlich:
+Erklärung: Auch hier gilt: Die Geometrie kommt aus der Compute-/Vertex-Pipeline, aber **die sichtbare Farbe entsteht im Fragment Shader**. Der TransparentVoxel-Shader hat zusätzlich:
 - `depth_fade`: Samples Scene Depth und interpoliert Alpha je nach Distanz zum nächsten Objekt. Verhindert floating‑glass‑Look.
 - `glow`: Multipliziert Glow‑Faktor (aus VoxelDefinition).
 - `clip`: Verwerft sehr transparente Pixel für Performance.
