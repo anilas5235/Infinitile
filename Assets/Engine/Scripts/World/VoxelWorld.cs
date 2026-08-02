@@ -104,7 +104,7 @@ namespace Engine.Scripts.World
             _cMeshBuildScheduler = VoxelEngineProvider.Current.MeshBuildScheduler(
                 ChunkManager,
                 _chunkPool,
-                VoxelDataImporter.Instance.VoxelRegistry,
+                DataImporter.Instance.VoxelRegistry,
                 this
             );
 
@@ -116,7 +116,7 @@ namespace Engine.Scripts.World
             _chunkScheduler = VoxelEngineProvider.Current.ChunkDataScheduler(
                 ChunkManager,
                 _noiseProfile,
-                VoxelDataImporter.Instance.CreateConfig(),
+                DataImporter.Instance.CreateConfig(),
                 this
             );
 

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
 using Engine.Scripts.VoxelConfig.Data;
 using Unity.Collections;
@@ -18,7 +17,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
     {
         internal const int TextureSize = 128; // Texture resolution (square)
         private static readonly int TexturesNameID = Shader.PropertyToID("_Textures");
-        
+
         private readonly Registry<VoxelRenderDef> _voxelRenderDefRegistry = new(100);
         private readonly Registry<VoxelDefinition> _voxelDefinitionRegistry = new(100);
         private readonly Registry<string> _nameRegistry = new(100);
@@ -27,7 +26,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         private readonly TexRegistry _transparentTexRegistry = new(100);
         private readonly TexRegistry _foliageTexRegistry = new(50);
         private readonly List<uint> _quadTexPairs = new();
-        
+
         private bool _initialized;
         private VoxelEngineRenderGenData _voxelEngineRenderGenData;
 
@@ -97,12 +96,12 @@ namespace Engine.Scripts.VoxelConfig.Registry
         private ushort Register(string name, VoxelRenderDef renderDef)
         {
             Initialize();
-            if(_nameRegistry.TryGetId(name, out ushort existingId))
+            if (_nameRegistry.TryGetId(name, out ushort existingId))
             {
                 Debug.LogWarning($"Voxel with name {name} is already registered with ID {existingId}.");
                 return existingId;
             }
-            
+
             ushort id = _nameRegistry.Register(name);
             _voxelRenderDefRegistry.Register(renderDef);
             return id;
@@ -152,7 +151,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         /// <returns>Voxel ID associated with the name.</returns>
         public ushort GetIdOrThrow(string name)
         {
-            if(TryGetId(name, out ushort id)) return id;
+            if (TryGetId(name, out ushort id)) return id;
             throw new KeyNotFoundException($"No voxel found with name {name}");
         }
 
@@ -202,7 +201,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
 
             for (int i = 0; i < voxelCount; i++)
             {
-                _voxelRenderDefRegistry.TryGet((ushort)i,out VoxelRenderDef def);
+                _voxelRenderDefRegistry.TryGet((ushort)i, out VoxelRenderDef def);
                 _voxelEngineRenderGenData.VoxelRenderDefs[i] = def;
                 gpuVoxelDefData[i] = new GPUVoxelDef(def);
             }

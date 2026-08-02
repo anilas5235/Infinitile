@@ -45,7 +45,7 @@ namespace UI
         private void OnVoxelIdChanged(ushort newVoxelId)
         {
             voxelId = newVoxelId;
-            if (VoxelDataImporter.Instance.VoxelRegistry.TryGetVoxelDefinition(voxelId, out VoxelDefinition definition))
+            if (DataImporter.Instance.VoxelRegistry.TryGetVoxelDefinition(voxelId, out VoxelDefinition definition))
             {
                 Texture2D tex = definition.GetDisplayTexture(QuadDrawCondition.Forward);
                 voxelImage.texture = tex;

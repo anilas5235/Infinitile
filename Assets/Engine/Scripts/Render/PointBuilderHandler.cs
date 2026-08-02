@@ -65,7 +65,7 @@ namespace Engine.Scripts.Render
             _readBackCountBuffer = new GraphicsBuffer(Target.Raw, 3, sizeof(uint));
             _counts = new NativeArray<uint>(_readBackCountBuffer.count, Allocator.Domain);
             pointBuilder.SetBuffer(_pointBuilderKernelID, QuadBufferNameID,
-                VoxelDataImporter.Instance.VoxelRegistry.QuadBuffer);
+                DataImporter.Instance.VoxelRegistry.QuadBuffer);
         }
 
         /// <summary>

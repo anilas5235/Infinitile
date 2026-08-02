@@ -79,7 +79,7 @@ namespace Engine.Scripts.Render
                 rSettings
             );
 
-            VoxelRegistry voxelRegistry = VoxelDataImporter.Instance.VoxelRegistry;
+            VoxelRegistry voxelRegistry = DataImporter.Instance.VoxelRegistry;
             _pointBuilderHandlers = new PointBuilderHandler[_maxInFlight];
             for (int i = 0; i < _pointBuilderHandlers.Length; i++)
             {

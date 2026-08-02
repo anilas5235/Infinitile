@@ -1,11 +1,6 @@
-using Engine.Scripts.VoxelConfig.Data;
-
 namespace Engine.Scripts.VoxelConfig.Registry
 {
-    public class BiomeRegistry : Registry<BiomeDefinition>
+    public class BiomeRegistry
     {
-        public BiomeRegistry(int initCapacity) : base(initCapacity)
-        {
-        }
     }
 }

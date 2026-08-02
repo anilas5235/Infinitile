@@ -13,7 +13,7 @@ namespace Engine.Scripts.VoxelConfig
     ///     The singleton lifecycle controls the registry lifetime.
     /// </summary>
     [DefaultExecutionOrder(-1000)]
-    public class VoxelDataImporter : Singleton<VoxelDataImporter>
+    public class DataImporter : Singleton<DataImporter>
     {
         /// <summary>
         ///     Material used for opaque voxel rendering (solid mesh layer).
@@ -35,12 +35,24 @@ namespace Engine.Scripts.VoxelConfig
         /// </summary>
         public VoxelRegistry VoxelRegistry { get; } = new();
 
+        public BiomeRegistry BiomeRegistry { get; } = new();
+
         /// <summary>
         ///     Loads packages, registers voxels and updates materials when the importer is created.
         /// </summary>
         protected override void Awake()
         {
             base.Awake();
+            LoadVoxels();
+            LoadBioms();
+        }
+
+        private void LoadBioms()
+        {
+        }
+
+        private void LoadVoxels()
+        {
             VoxelRegistry.Initialize();
             VoxelDataPackage[] voxelDataPackages = Resources.LoadAll<VoxelDataPackage>("VoxelDataPackages");
             if (voxelDataPackages == null || voxelDataPackages.Length == 0)

@@ -45,7 +45,7 @@ namespace Engine.Shaders
 
         private void OnEnable()
         {
-            _voxelRegistry = VoxelDataImporter.Instance.VoxelRegistry;
+            _voxelRegistry = DataImporter.Instance.VoxelRegistry;
             _postProcessManager = PostProcessManager.Instance;
         }
 
