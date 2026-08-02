@@ -2,12 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using Engine.Scripts.VoxelConfig.Data;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
 
-namespace Engine.Scripts.VoxelConfig.Data
+namespace Engine.Scripts.VoxelConfig.Registry
 {
     /// <summary>
     ///     Registry that manages voxel render definitions, texture arrays and name-to-ID mappings.

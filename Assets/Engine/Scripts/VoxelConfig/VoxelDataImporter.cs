@@ -1,9 +1,11 @@
 ﻿using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Utils;
+using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.VoxelConfig.Registry;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
 
-namespace Engine.Scripts.VoxelConfig.Data
+namespace Engine.Scripts.VoxelConfig
 {
     /// <summary>
     ///     Loads all <see cref="VoxelDataPackage" /> assets from Resources, registers their definitions in the

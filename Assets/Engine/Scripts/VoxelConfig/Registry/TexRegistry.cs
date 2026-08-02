@@ -3,7 +3,7 @@ using System.Linq;
 using Engine.Scripts.Utils.Logger;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Data
+namespace Engine.Scripts.VoxelConfig.Registry
 {
     /// <summary>
     ///     Registers textures for voxel definitions and builds a shared <see cref="Texture2DArray" /> atlas.

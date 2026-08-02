@@ -11,6 +11,7 @@ using Engine.Scripts.Noise;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
+using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Data;
 using Unity.Mathematics;
 using UnityEngine;

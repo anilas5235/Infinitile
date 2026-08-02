@@ -1,4 +1,5 @@
-﻿using Engine.Scripts.VoxelConfig.Data;
+﻿using Engine.Scripts.VoxelConfig;
+using Engine.Scripts.VoxelConfig.Data;
 using Player;
 using UnityEngine;
 using UnityEngine.UI;

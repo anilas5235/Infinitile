@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Logger;
+using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Data;
 using Unity.Collections;
 using Unity.Mathematics;
