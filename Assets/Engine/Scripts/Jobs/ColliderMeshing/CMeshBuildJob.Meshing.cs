@@ -3,13 +3,13 @@ using Unity.Collections;
 using Unity.Mathematics;
 using static Engine.Scripts.Utils.VoxelConstants;
 
-namespace Engine.Scripts.Jobs.Meshing
+namespace Engine.Scripts.Jobs.ColliderMeshing
 {
     /// <summary>
     ///     Burst-optimized greedy mesher for voxel chunks. Merges contiguous faces into maximal rectangles
     ///     to reduce vertex/index count. Produces render and collider data plus foliage (billboard) quads.
     /// </summary>
-    internal partial struct MeshBuildJob
+    internal partial struct CMeshBuildJob
     {
         private void MeshCollision(ref PartitionJobData jobData)
         {

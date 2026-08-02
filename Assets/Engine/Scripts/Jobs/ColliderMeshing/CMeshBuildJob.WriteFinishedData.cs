@@ -5,9 +5,9 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using static Engine.Scripts.Utils.VoxelConstants;
 
-namespace Engine.Scripts.Jobs.Meshing
+namespace Engine.Scripts.Jobs.ColliderMeshing
 {
-    internal partial struct MeshBuildJob
+    internal partial struct CMeshBuildJob
     {
         private static readonly Bounds Bounds = new((PartitionSize / (int3)2).GetVector3(), PartitionSize.GetVector3());
 
@@ -28,18 +28,18 @@ namespace Engine.Scripts.Jobs.Meshing
 
         private void FillColliderMeshData(in PartitionJobData jobData)
         {
-            MeshBuffer meshBuffer = jobData.MeshBuffer;
+            CMeshBuffer cMeshBuffer = jobData.CMeshBuffer;
             Mesh.MeshData colliderMesh = jobData.ColliderMesh;
 
-            int cVertexCount = meshBuffer.CVertexBuffer.Length;
+            int cVertexCount = cMeshBuffer.CVertexBuffer.Length;
             colliderMesh.SetVertexBufferParams(cVertexCount, ColliderVertexParams);
-            colliderMesh.GetVertexData<CVertex>().CopyFrom(meshBuffer.CVertexBuffer.AsArray());
+            colliderMesh.GetVertexData<CVertex>().CopyFrom(cMeshBuffer.CVertexBuffer.AsArray());
 
-            int cIndexCount = meshBuffer.CIndexBuffer.Length;
+            int cIndexCount = cMeshBuffer.CIndexBuffer.Length;
             colliderMesh.SetIndexBufferParams(cIndexCount, IndexFormat.UInt16);
             NativeArray<ushort> cIndexBuffer = colliderMesh.GetIndexData<ushort>();
             if (cIndexCount > 0)
-                NativeArray<ushort>.Copy(meshBuffer.CIndexBuffer.AsArray(), 0, cIndexBuffer, 0, cIndexCount);
+                NativeArray<ushort>.Copy(cMeshBuffer.CIndexBuffer.AsArray(), 0, cIndexBuffer, 0, cIndexCount);
 
             colliderMesh.subMeshCount = 1;
             SubMeshDescriptor cDesc = new(0, cIndexCount);

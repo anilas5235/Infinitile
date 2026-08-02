@@ -2,8 +2,8 @@
 using Engine.Scripts.Jobs;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
+using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Jobs.Core;
-using Engine.Scripts.Jobs.Meshing;
 using Engine.Scripts.Noise;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils.Provider;
@@ -62,14 +62,14 @@ namespace Engine.Scripts.Utils
         ///     Creates the top-level <see cref="VoxelEngineScheduler" /> coordinating all sub-schedulers.
         /// </summary>
         internal VoxelEngineScheduler VoxelEngineScheduler(
-            MeshBuildScheduler meshBuildScheduler,
+            CMeshBuildScheduler cMeshBuildScheduler,
             ChunkScheduler chunkScheduler,
             ColliderBakeScheduler colliderBakeScheduler,
             ChunkManager chunkManager,
             ChunkPool chunkPool
         )
         {
-            return new VoxelEngineScheduler(Settings, meshBuildScheduler, chunkScheduler, chunkManager,
+            return new VoxelEngineScheduler(Settings, cMeshBuildScheduler, chunkScheduler, chunkManager,
                 colliderBakeScheduler, chunkPool);
         }
 
@@ -92,14 +92,14 @@ namespace Engine.Scripts.Utils
         /// <summary>
         ///     Creates the <see cref="MeshBuildScheduler" /> for building chunk meshes.
         /// </summary>
-        internal MeshBuildScheduler MeshBuildScheduler(
+        internal CMeshBuildScheduler MeshBuildScheduler(
             ChunkManager chunkManager,
             ChunkPool chunkPool,
             VoxelRegistry voxelRegistry,
             VoxelWorld world
         )
         {
-            return new MeshBuildScheduler(Settings, chunkManager, chunkPool, voxelRegistry, world);
+            return new CMeshBuildScheduler(Settings, chunkManager, chunkPool, voxelRegistry, world);
         }
 
         internal ColliderBakeScheduler ColliderBakeScheduler(ChunkManager chunkManager, ChunkPool chunkPool)

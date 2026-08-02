@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
-using Engine.Scripts.Jobs.Meshing;
+using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Settings;
 using Unity.Collections;
 using Unity.Mathematics;

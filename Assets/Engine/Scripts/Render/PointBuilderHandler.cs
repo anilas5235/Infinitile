@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Runtime.InteropServices;
-using Engine.Scripts.Jobs.Meshing;
+using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig.Data;

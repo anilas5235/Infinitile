@@ -1,5 +1,5 @@
 ﻿using Engine.Scripts.Components;
-using Engine.Scripts.Jobs.Meshing;
+using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Unity.Mathematics;
@@ -13,7 +13,7 @@ namespace Engine.Scripts.Jobs.Core
     internal class MeshJobStateHandler : JobStateHandler<int3>
     {
         private readonly ColliderJobStateHandler _colliderJobHandler;
-        private readonly MeshBuildScheduler _meshBuildScheduler;
+        private readonly CMeshBuildScheduler _cMeshBuildScheduler;
 
         /// <summary>
         /// Initializes a new instance of the MeshJobStateHandler class.
@@ -21,13 +21,13 @@ namespace Engine.Scripts.Jobs.Core
         /// <param name="settings">The voxel engine settings.</param>
         /// <param name="chunkManager">The chunk manager reference.</param>
         /// <param name="chunkPool">The chunk pool reference.</param>
-        /// <param name="meshBuildScheduler">The mesh build scheduler for dispatching mesh building jobs.</param>
+        /// <param name="cMeshBuildScheduler">The mesh build scheduler for dispatching mesh building jobs.</param>
         /// <param name="colliderJobHandler">The collider job handler to wake up when meshing completes.</param>
         public MeshJobStateHandler(VoxelEngineSettings settings, ChunkManager chunkManager, ChunkPool chunkPool,
-            MeshBuildScheduler meshBuildScheduler, ColliderJobStateHandler colliderJobHandler) :
+            CMeshBuildScheduler cMeshBuildScheduler, ColliderJobStateHandler colliderJobHandler) :
             base(settings, chunkManager, chunkPool)
         {
-            _meshBuildScheduler = meshBuildScheduler;
+            _cMeshBuildScheduler = cMeshBuildScheduler;
             _colliderJobHandler = colliderJobHandler;
         }
 
@@ -77,7 +77,7 @@ namespace Engine.Scripts.Jobs.Core
         /// <returns>True if jobs were dispatched or batch is full, false if scheduler is busy.</returns>
         protected override bool JobUpdateStep(int3 focus)
         {
-            if (!_meshBuildScheduler.IsReady) return false;
+            if (!_cMeshBuildScheduler.IsReady) return false;
 
             int count = math.min(Settings.Scheduler.meshingBatchSize, Queue.Count);
             int prioThreshold = ChunkPool.GetPartitionPrioThreshold();
@@ -94,7 +94,7 @@ namespace Engine.Scripts.Jobs.Core
 
             if (accepted == 0) return true;
 
-            _meshBuildScheduler.Start(Set);
+            _cMeshBuildScheduler.Start(Set);
 
             return true;
         }
@@ -105,9 +105,9 @@ namespace Engine.Scripts.Jobs.Core
         /// <returns>True if collection completed, false if scheduler is still working.</returns>
         protected override bool CollectResultsStep()
         {
-            if (!_meshBuildScheduler.IsComplete || _meshBuildScheduler.IsReady) return false;
+            if (!_cMeshBuildScheduler.IsComplete || _cMeshBuildScheduler.IsReady) return false;
 
-            _meshBuildScheduler.Complete();
+            _cMeshBuildScheduler.Complete();
             Set.Clear();
             _colliderJobHandler.WakeUp();
             return true;

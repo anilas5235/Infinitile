@@ -1,7 +1,7 @@
 ﻿using Engine.Scripts.Components;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
-using Engine.Scripts.Jobs.Meshing;
+using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Settings;
 using Unity.Mathematics;
 
@@ -20,7 +20,7 @@ namespace Engine.Scripts.Jobs.Core
         private readonly ColliderJobStateHandler _colliderJobHandler;
 
         private readonly DataJobStateHandler _dataJobHandler;
-        private readonly MeshBuildScheduler _meshBuildScheduler;
+        private readonly CMeshBuildScheduler _cMeshBuildScheduler;
         private readonly MeshJobStateHandler _meshJobHandler;
 
         private SchedulerUpdate _currentUpdate;
@@ -29,26 +29,26 @@ namespace Engine.Scripts.Jobs.Core
         /// Creates a new scheduler and initializes all job queues and state handlers.
         /// </summary>
         /// <param name="settings">The voxel engine settings.</param>
-        /// <param name="meshBuildScheduler">The mesh build scheduler.</param>
+        /// <param name="cMeshBuildScheduler">The mesh build scheduler.</param>
         /// <param name="chunkScheduler">The chunk data generation scheduler.</param>
         /// <param name="chunkManager">The chunk manager.</param>
         /// <param name="colliderBakeScheduler">The collider bake scheduler.</param>
         /// <param name="chunkPool">The chunk pool.</param>
         internal VoxelEngineScheduler(VoxelEngineSettings settings,
-            MeshBuildScheduler meshBuildScheduler,
+            CMeshBuildScheduler cMeshBuildScheduler,
             ChunkScheduler chunkScheduler,
             ChunkManager chunkManager,
             ColliderBakeScheduler colliderBakeScheduler,
             ChunkPool chunkPool)
         {
-            _meshBuildScheduler = meshBuildScheduler;
+            _cMeshBuildScheduler = cMeshBuildScheduler;
             _chunkScheduler = chunkScheduler;
             _colliderBakeScheduler = colliderBakeScheduler;
             _chunkManager = chunkManager;
             _chunkPool = chunkPool;
 
             _colliderJobHandler = new ColliderJobStateHandler(settings, chunkManager, chunkPool, colliderBakeScheduler);
-            _meshJobHandler = new MeshJobStateHandler(settings, chunkManager, chunkPool, meshBuildScheduler,
+            _meshJobHandler = new MeshJobStateHandler(settings, chunkManager, chunkPool, cMeshBuildScheduler,
                 _colliderJobHandler);
             _dataJobHandler =
                 new DataJobStateHandler(settings, chunkManager, chunkPool, chunkScheduler, _meshJobHandler);
@@ -108,7 +108,7 @@ namespace Engine.Scripts.Jobs.Core
         internal void Dispose()
         {
             _chunkScheduler.Dispose();
-            _meshBuildScheduler.Dispose();
+            _cMeshBuildScheduler.Dispose();
             _colliderBakeScheduler.Dispose();
 
             if (_chunkManager != null) _chunkManager.OnRemeshRequested -= OnRemesh;
@@ -137,7 +137,7 @@ namespace Engine.Scripts.Jobs.Core
         /// <summary>
         /// Gets the average execution time of mesh building jobs.
         /// </summary>
-        public float MeshAvgTiming => _meshBuildScheduler.AvgTime;
+        public float MeshAvgTiming => _cMeshBuildScheduler.AvgTime;
 
         /// <summary>
         /// Gets the number of chunks in the data generation queue.

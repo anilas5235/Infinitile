@@ -6,9 +6,9 @@ using Unity.Mathematics;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelConstants;
 
-namespace Engine.Scripts.Jobs.Meshing
+namespace Engine.Scripts.Jobs.ColliderMeshing
 {
-    internal partial struct MeshBuildJob
+    internal partial struct CMeshBuildJob
     {
         #region Constants
 
@@ -34,7 +34,7 @@ namespace Engine.Scripts.Jobs.Meshing
             public readonly int2 ChunkPos;
             public readonly int3 PartitionPos;
 
-            public MeshBuffer MeshBuffer;
+            public CMeshBuffer CMeshBuffer;
 
             public NativeHashSet<int3> CollisionVoxels;
 
@@ -49,7 +49,7 @@ namespace Engine.Scripts.Jobs.Meshing
                 PartitionPos = partitionPos;
                 ChunkVoxelData = chunkVoxelData;
                 ChunkPos = partitionPos.xz;
-                MeshBuffer = new MeshBuffer
+                CMeshBuffer = new CMeshBuffer
                 {
                     CVertexBuffer = new NativeList<CVertex>(VoxelCount4, Allocator.Temp),
                     CIndexBuffer = new NativeList<ushort>(VoxelCount6, Allocator.Temp)
@@ -62,7 +62,7 @@ namespace Engine.Scripts.Jobs.Meshing
 
             public void Dispose()
             {
-                MeshBuffer.Dispose();
+                CMeshBuffer.Dispose();
                 CollisionVoxels.Dispose();
             }
         }
@@ -113,14 +113,40 @@ namespace Engine.Scripts.Jobs.Meshing
                 ? jobData.ChunkVoxelData.GetVoxel(chunkLocalPos)
                 : Accessor.GetVoxelInPartition(jobData.PartitionPos, voxelPos);
         }
+        
+        [BurstCompile]
+        private void CreateColliderQuad(ref PartitionJobData jobData, CMask mask, int3 directionMask, in VQuad verts)
+        {
+            float3 normal = directionMask * mask.Normal;
 
+            AddColliderVertices(ref jobData.CMeshBuffer, in verts, normal);
+
+            int baseVertexIndex = jobData.CollisionVertexCount;
+            ref CMeshBuffer cMeshBuffer = ref jobData.CMeshBuffer;
+
+            cMeshBuffer.AddCIndex(baseVertexIndex + 1);
+            cMeshBuffer.AddCIndex(baseVertexIndex + 1 + mask.Normal);
+            cMeshBuffer.AddCIndex(baseVertexIndex + 1 - mask.Normal);
+
+            cMeshBuffer.AddCIndex(baseVertexIndex + 2);
+            cMeshBuffer.AddCIndex(baseVertexIndex + 2 - mask.Normal);
+            cMeshBuffer.AddCIndex(baseVertexIndex + 2 + mask.Normal);
+
+            jobData.CollisionVertexCount += 4;
+        }
 
         [BurstCompile]
-        private void ClearColMaskRegion(NativeArray<CMask> normalMask, int n, int width, int height, int axis1Limit)
+        private void AddColliderVertices(ref CMeshBuffer cMesh, in VQuad verts, float3 normal)
         {
-            for (int l = 0; l < height; ++l)
-            for (int k = 0; k < width; ++k)
-                normalMask[n + k + l * axis1Limit] = default;
+            CVertex vertex1 = new(verts.V1, normal);
+            CVertex vertex2 = new(verts.V2, normal);
+            CVertex vertex3 = new(verts.V3, normal);
+            CVertex vertex4 = new(verts.V4, normal);
+
+            cMesh.AddCVertex(vertex1);
+            cMesh.AddCVertex(vertex2);
+            cMesh.AddCVertex(vertex3);
+            cMesh.AddCVertex(vertex4);
         }
 
         #endregion

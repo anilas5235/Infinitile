@@ -3,16 +3,8 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;
 
-namespace Engine.Scripts.Jobs.Meshing
+namespace Engine.Scripts.Jobs.ColliderMeshing
 {
-    [BurstCompile]
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public struct Vertex
-    {
-        public float3 Position;
-        private uint4 PackedData;
-    }
-
     /// <summary>
     ///     Compact vertex structure for collider mesh (position + normal).
     /// </summary>
@@ -37,7 +29,7 @@ namespace Engine.Scripts.Jobs.Meshing
     ///     Buffer collection for mesh & collider building (native lists). Internal data container for mesher.
     /// </summary>
     [BurstCompile]
-    internal struct MeshBuffer
+    internal struct CMeshBuffer
     {
         public NativeList<CVertex> CVertexBuffer;
         public NativeList<ushort> CIndexBuffer;
@@ -70,13 +62,5 @@ namespace Engine.Scripts.Jobs.Meshing
             int newCap = math.max(list.Capacity * 2, need);
             list.Capacity = newCap;
         }
-    }
-
-    internal enum SubMeshType : byte
-    {
-        Solid = 0,
-        Transparent = 1,
-        Foliage = 2,
-        Collider = 3
     }
 }

@@ -3,13 +3,11 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;
 
-namespace Engine.Scripts.Jobs.Meshing
+namespace Engine.Scripts.Jobs.ColliderMeshing
 {
-    internal partial struct MeshBuildJob
+    internal partial struct CMeshBuildJob
     {
-        #region Mask Helpers
-
-        [BurstCompile(FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Low, CompileSynchronously = true)]
+        [BurstCompile]
         private bool BuildColliderMasks(ref PartitionJobData jobData, int3 posItr, int3 dirMask, AxisInfo axInfo,
             ref NativeArray<CMask> posNormalMask, ref NativeArray<CMask> negNormalMask)
         {
@@ -36,6 +34,7 @@ namespace Engine.Scripts.Jobs.Meshing
             return hasCollision;
         }
 
+        [BurstCompile]
         private bool TryAddCollisionMask(PartitionJobData jobData, int3 dirMask, int3 pos, int n,
             NativeArray<CMask> cMask, bool posNormal)
         {
@@ -56,7 +55,7 @@ namespace Engine.Scripts.Jobs.Meshing
         }
 
 
-        [BurstCompile(FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Low, CompileSynchronously = true)]
+        [BurstCompile]
         private int FindColQuadWidth(NativeArray<CMask> cMasks, int n, CMask currentMask, int start, int max)
         {
             int width;
@@ -67,7 +66,7 @@ namespace Engine.Scripts.Jobs.Meshing
             return width;
         }
 
-        [BurstCompile(FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Low, CompileSynchronously = true)]
+        [BurstCompile]
         private int FindColQuadHeight(NativeArray<CMask> cMasks, int n, CMask currentMask, int axis1Limit,
             int axis2Limit, int width, int j)
         {
@@ -87,7 +86,13 @@ namespace Engine.Scripts.Jobs.Meshing
 
             return height;
         }
-
-        #endregion
+        
+        [BurstCompile]
+        private void ClearColMaskRegion(NativeArray<CMask> normalMask, int n, int width, int height, int axis1Limit)
+        {
+            for (int l = 0; l < height; ++l)
+            for (int k = 0; k < width; ++k)
+                normalMask[n + k + l * axis1Limit] = default;
+        }
     }
 }

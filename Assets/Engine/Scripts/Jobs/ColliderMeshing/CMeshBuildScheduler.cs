@@ -15,13 +15,13 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Engine.Scripts.Jobs.Meshing
+namespace Engine.Scripts.Jobs.ColliderMeshing
 {
     /// <summary>
     ///     Schedules and executes mesh build jobs for Partitions, creates collider meshes
     ///     using a greedy meshing algorithm and applying the results to chunk behaviors.
     /// </summary>
-    internal sealed class MeshBuildScheduler : JobScheduler
+    internal sealed class CMeshBuildScheduler : JobScheduler
     {
         private const MeshUpdateFlags MeshFlags = MeshUpdateFlags.DontRecalculateBounds |
                                                   MeshUpdateFlags.DontValidateIndices |
@@ -41,7 +41,7 @@ namespace Engine.Scripts.Jobs.Meshing
         private JobHandle _handle;
 
         private NativeList<int3> _jobs;
-        private NativeParallelHashMap<int3, MeshBuildJob.PartitionJobResult> _results;
+        private NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult> _results;
 
         /// <summary>
         ///     Indicates whether the scheduler is ready to accept a new list of mesh build jobs.
@@ -49,14 +49,14 @@ namespace Engine.Scripts.Jobs.Meshing
         internal bool IsReady = true;
 
         /// <summary>
-        ///     Initializes a new instance of the <see cref="MeshBuildScheduler" /> class.
+        ///     Initializes a new instance of the <see cref="CMeshBuildScheduler" /> class.
         /// </summary>
         /// <param name="settings">Voxel engine settings providing chunk size and draw distance.</param>
         /// <param name="chunkManager">Chunk manager used to access chunk data and state.</param>
         /// <param name="chunkPool">Pool providing reusable chunk behaviours and meshes.</param>
         /// <param name="voxelRegistry">Voxel registry providing render generation data for blocks.</param>
         /// <param name="world">World event hub used to trigger GPU mesh generation and receive completion callbacks.</param>
-        internal MeshBuildScheduler(
+        internal CMeshBuildScheduler(
             VoxelEngineSettings settings,
             ChunkManager chunkManager,
             ChunkPool chunkPool,
@@ -76,7 +76,7 @@ namespace Engine.Scripts.Jobs.Meshing
                 [1] = new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float16, 4)
             };
 
-            _results = new NativeParallelHashMap<int3, MeshBuildJob.PartitionJobResult>(
+            _results = new NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult>(
                 settings.Chunk.DrawDistance.SquareSize(), Allocator.Domain);
             _jobs = new NativeList<int3>(Allocator.Domain);
         }
@@ -103,7 +103,7 @@ namespace Engine.Scripts.Jobs.Meshing
 
             _colliderMeshDataArray = Mesh.AllocateWritableMeshData(_jobs.Length);
 
-            MeshBuildJob job = new()
+            CMeshBuildJob job = new()
             {
                 Accessor = _chunkAccessor,
                 Jobs = _jobs,
@@ -134,7 +134,7 @@ namespace Engine.Scripts.Jobs.Meshing
                 ChunkPartition partition = _chunkPool.GetOrClaimPartition(pos);
                 _chunkManager.ReMeshedPartition(pos);
 
-                MeshBuildJob.PartitionJobResult result = _results[pos];
+                CMeshBuildJob.PartitionJobResult result = _results[pos];
 
                 colliderMeshes[result.Index] = partition.ColliderMesh;
                 partition.ColliderMesh.bounds = result.ColliderBounds;
@@ -148,7 +148,7 @@ namespace Engine.Scripts.Jobs.Meshing
 
             double totalTime = (Time.realtimeSinceStartupAsDouble - start) * 1000;
             if (totalTime >= 4)
-                VoxelEngineLogger.Warn<MeshBuildScheduler>(
+                VoxelEngineLogger.Warn<CMeshBuildScheduler>(
                     $"Built {_jobs.Length} meshes, Collected Results in <color=red>{totalTime:0.000}</color>ms"
                 );
 
@@ -158,7 +158,7 @@ namespace Engine.Scripts.Jobs.Meshing
             IsReady = true;
             long totalJobTime = StopRecord();
             if (totalJobTime > 100)
-                VoxelEngineLogger.Warn<MeshBuildScheduler>(
+                VoxelEngineLogger.Warn<CMeshBuildScheduler>(
                     $"Total Mesh Build Time for {_jobs.Length} jobs: <color=red>{totalJobTime:0.000}</color>ms"
                 );
         }

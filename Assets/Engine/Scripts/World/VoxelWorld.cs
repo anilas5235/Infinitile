@@ -5,8 +5,8 @@ using Engine.Scripts.Components;
 using Engine.Scripts.Jobs;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
+using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Jobs.Core;
-using Engine.Scripts.Jobs.Meshing;
 using Engine.Scripts.Noise;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
@@ -37,7 +37,7 @@ namespace Engine.Scripts.World
 
         private bool _isFocused;
         private bool _isShuttingDown;
-        private MeshBuildScheduler _meshBuildScheduler;
+        private CMeshBuildScheduler _cMeshBuildScheduler;
 
         internal event Action<Chunk> ChunkChanged;
         internal event Action<Chunk> ChunkDataReady;
@@ -100,7 +100,7 @@ namespace Engine.Scripts.World
             _chunkPool.OnChunkEvicted += HandleChunkEvicted;
             _chunkPool.OnPartitionEvicted += HandlePartitionEvicted;
 
-            _meshBuildScheduler = VoxelEngineProvider.Current.MeshBuildScheduler(
+            _cMeshBuildScheduler = VoxelEngineProvider.Current.MeshBuildScheduler(
                 ChunkManager,
                 _chunkPool,
                 VoxelDataImporter.Instance.VoxelRegistry,
@@ -120,7 +120,7 @@ namespace Engine.Scripts.World
             );
 
             _scheduler = VoxelEngineProvider.Current.VoxelEngineScheduler(
-                _meshBuildScheduler,
+                _cMeshBuildScheduler,
                 _chunkScheduler,
                 _colliderBakeScheduler,
                 ChunkManager,
