@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Engine.Scripts.Utils.Logger;
 using UnityEngine;
@@ -8,9 +9,8 @@ namespace Engine.Scripts.VoxelConfig.Registry
     /// <summary>
     ///     Registers textures for voxel definitions and builds a shared <see cref="Texture2DArray" /> atlas.
     /// </summary>
-    internal class TexRegistry
+    internal class TexRegistry : Registry<Texture2D>
     {
-        private readonly Dictionary<Texture2D, ushort> _textureToId = new();
         private static int TextureSize => VoxelRegistry.TextureSize;
 
         /// <summary>
@@ -18,43 +18,44 @@ namespace Engine.Scripts.VoxelConfig.Registry
         /// </summary>
         public Texture2DArray TextureArray { get; private set; }
 
+        private TextureFormat _texFormat;
+
         /// <summary>
         ///     Registers a texture and assigns an index ID if its size matches the expected atlas size.
         ///     Returns the index or -1 on failure.
         /// </summary>
         /// <param name="tex">Texture to register.</param>
-        /// <returns>Assigned texture index, or -1 if registration failed.</returns>
-        public ushort Register(Texture2D tex)
+        /// <returns>Assigned texture index.</returns>
+        public override ushort Register(Texture2D tex)
         {
-            ushort textureId = 0;
-            if (!tex) return textureId;
+            if (!tex) throw new ArgumentNullException(nameof(tex), "Cannot register a null texture.");
+
             if (tex.width != TextureSize || tex.height != TextureSize)
-            {
-                VoxelEngineLogger.Warn<VoxelRegistry>(
-                    $"Texture {tex.name} size is {tex.width}x{tex.height}, expected {TextureSize}x{TextureSize}. It will be ignored.");
-                return textureId;
-            }
+                throw new ArgumentException(
+                    $"Texture size does not match the expected atlas size, expected {TextureSize}x{TextureSize}.",
+                    nameof(tex));
 
-            if (_textureToId.TryGetValue(tex, out textureId)) return textureId;
+            if (Count == 0) _texFormat = tex.format;
+            else if (tex.format != _texFormat)
+                throw new ArgumentException(
+                    $"Texture format does not match the expected format, expected {_texFormat}.",
+                    nameof(tex));
 
-            textureId = (ushort)_textureToId.Count;
-            _textureToId[tex] = textureId;
-
-            return textureId;
+            return base.Register(tex);
         }
 
         /// <summary>
         ///     Builds a <see cref="Texture2DArray" /> from all registered textures using point filtering and repeat wrapping.
         /// </summary>
-        internal void PrepareArray()
+        public override void PrepareArray()
         {
-            if (_textureToId.Count == 0) return;
+            if (Count == 0) return;
 
             Texture2DArray textureArray = new(
                 TextureSize,
                 TextureSize,
-                _textureToId.Count,
-                _textureToId.First().Key.format,
+                Count,
+                ForwardMap.First().Key.format,
                 false
             )
             {
@@ -63,7 +64,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
             };
             // Copy each texture into the texture array
             int index = 0;
-            foreach (KeyValuePair<Texture2D, ushort> kvp in _textureToId)
+            foreach (KeyValuePair<Texture2D, ushort> kvp in ForwardMap)
             {
                 VoxelEngineLogger.Info<TexRegistry>($"copy texture {kvp.Key.name} to texture array");
                 Graphics.CopyTexture(kvp.Key, 0, 0, textureArray, index, 0);
