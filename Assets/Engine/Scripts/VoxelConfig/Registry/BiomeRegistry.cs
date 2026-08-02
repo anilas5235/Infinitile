@@ -4,9 +4,8 @@ namespace Engine.Scripts.VoxelConfig.Registry
 {
     public class BiomeRegistry : Registry<BiomeDefinition>
     {
-        public override void PrepareArray()
+        public BiomeRegistry(int initCapacity) : base(initCapacity)
         {
-            throw new System.NotImplementedException();
         }
     }
 }

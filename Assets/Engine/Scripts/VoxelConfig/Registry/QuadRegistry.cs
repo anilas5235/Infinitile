@@ -8,8 +8,12 @@ namespace Engine.Scripts.VoxelConfig.Registry
     /// <summary>
     /// Registers quad definitions and builds the runtime quad array used by voxel rendering.
     /// </summary>
-    public class QuadRegistry :  Registry<QuadDefinition>
+    public class QuadRegistry :  Registry<QuadDefinition>, IResourceRegistry<QuadDefinition>
     {
+        public QuadRegistry(int initCapacity) : base(initCapacity)
+        {
+        }
+
         /// <summary>
         /// Gets the registered quad data array after preparation.
         /// </summary>
@@ -29,7 +33,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         /// <summary>
         /// Builds the runtime quad array from all registered quad definitions.
         /// </summary>
-        public override void PrepareArray()
+        public void PrepareArray()
         {
             if (Count == 0)
             {

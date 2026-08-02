@@ -60,7 +60,7 @@ namespace Engine.Shaders
             _postProcessManager.ResetColorAdjustments();
             RenderSettings.fog = false;
 
-            if (!_voxelRegistry.GetVoxelDefinition(voxelId, out VoxelDefinition info)) return;
+            if (!_voxelRegistry.TryGetVoxelDefinition(voxelId, out VoxelDefinition info)) return;
 
             if (info.meshLayer != MeshLayer.Transparent) return;
             if (!info.usePostProcess) return;

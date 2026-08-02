@@ -9,8 +9,12 @@ namespace Engine.Scripts.VoxelConfig.Registry
     /// <summary>
     ///     Registers textures for voxel definitions and builds a shared <see cref="Texture2DArray" /> atlas.
     /// </summary>
-    internal class TexRegistry : Registry<Texture2D>
+    internal class TexRegistry : Registry<Texture2D>, IResourceRegistry<Texture2D>
     {
+        public TexRegistry(int initCapacity) : base(initCapacity)
+        {
+        }
+
         private static int TextureSize => VoxelRegistry.TextureSize;
 
         /// <summary>
@@ -47,7 +51,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         /// <summary>
         ///     Builds a <see cref="Texture2DArray" /> from all registered textures using point filtering and repeat wrapping.
         /// </summary>
-        public override void PrepareArray()
+        public void PrepareArray()
         {
             if (Count == 0) return;
 

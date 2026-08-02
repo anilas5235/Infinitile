@@ -1,13 +1,20 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace Engine.Scripts.VoxelConfig.Registry
 {
-    public abstract class Registry<T> : IRegistry<T>
+    public class Registry<T> : IRegistry<T>
     {
-        protected readonly Dictionary<T, ushort> ForwardMap = new();
-        private readonly Dictionary<ushort, T> _backwardMap = new();
+        protected readonly Dictionary<T, ushort> ForwardMap;
+        private readonly Dictionary<ushort, T> _backwardMap;
         private bool _isFull;
         public int Count => ForwardMap.Count;
+        
+        public Registry(int initCapacity)
+        {
+            ForwardMap = new Dictionary<T, ushort>(initCapacity);
+            _backwardMap = new Dictionary<ushort, T>(initCapacity);
+        }
 
         public virtual ushort Register(T item)
         {
@@ -27,7 +34,10 @@ namespace Engine.Scripts.VoxelConfig.Registry
 
         public bool TryGet(ushort id, out T item) => _backwardMap.TryGetValue(id, out item);
 
-        public abstract void PrepareArray();
+        public List<KeyValuePair<ushort, T>> GetAllEntries()
+        {
+            return _backwardMap.ToList();
+        }
     }
 
     public interface IRegistry<T>
@@ -35,6 +45,10 @@ namespace Engine.Scripts.VoxelConfig.Registry
         ushort Register(T item);
         bool TryGetId(T item, out ushort id);
         bool TryGet(ushort id, out T item);
+    }
+    
+    public interface IResourceRegistry<T> : IRegistry<T>
+    {
         void PrepareArray();
     }
 }
