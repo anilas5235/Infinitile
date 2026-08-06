@@ -1,7 +1,8 @@
-﻿using Unity.Burst;
+﻿using Engine.Scripts.VoxelConfig.Data.Mesh;
+using Unity.Burst;
 using Unity.Mathematics;
 
-namespace Engine.Scripts.VoxelConfig.Data
+namespace Engine.Scripts.VoxelConfig.Data.Internal
 {
     /// <summary>
     ///     Render definition for a voxel, including texture slots for all faces, mesh layer,

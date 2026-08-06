@@ -1,13 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
+using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.VoxelConfig.Data.Internal;
+using Engine.Scripts.VoxelConfig.Data.Mesh;
+using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
 
-namespace Engine.Scripts.VoxelConfig.Data
+namespace Engine.Scripts.VoxelConfig.Registry
 {
     /// <summary>
     ///     Registry that manages voxel render definitions, texture arrays and name-to-ID mappings.
@@ -17,15 +20,16 @@ namespace Engine.Scripts.VoxelConfig.Data
     {
         internal const int TextureSize = 128; // Texture resolution (square)
         private static readonly int TexturesNameID = Shader.PropertyToID("_Textures");
-        private readonly TexRegistry _foliageTexRegistry = new();
-        private readonly Dictionary<ushort, string> _idToName = new();
-        private readonly Dictionary<ushort, VoxelRenderDef> _idToVoxel = new(100);
-        private readonly Dictionary<ushort, VoxelDefinition> _idToVoxelDefinition = new(100);
-        private readonly Dictionary<string, ushort> _nameToId = new();
-        private readonly QuadRegistry _quadRegistry = new();
+
+        private readonly Registry<VoxelRenderDef> _voxelRenderDefRegistry = new(100);
+        private readonly Registry<VoxelDefinition> _voxelDefinitionRegistry = new(100);
+        private readonly Registry<string> _nameRegistry = new(100);
+        private readonly QuadRegistry _quadRegistry = new(40);
+        private readonly TexRegistry _solidTexRegistry = new(200);
+        private readonly TexRegistry _transparentTexRegistry = new(100);
+        private readonly TexRegistry _foliageTexRegistry = new(50);
         private readonly List<uint> _quadTexPairs = new();
-        private readonly TexRegistry _solidTexRegistry = new();
-        private readonly TexRegistry _transparentTexRegistry = new();
+
         private bool _initialized;
         private VoxelEngineRenderGenData _voxelEngineRenderGenData;
 
@@ -89,22 +93,20 @@ namespace Engine.Scripts.VoxelConfig.Data
 
             ushort id = Register(packagePrefix + ":" + definition.name, type);
             if (id == 0) return;
-            _idToVoxelDefinition.Add(id, definition);
+            _voxelDefinitionRegistry.Register(definition);
         }
 
         private ushort Register(string name, VoxelRenderDef renderDef)
         {
             Initialize();
-            if (_nameToId.ContainsKey(name))
+            if (_nameRegistry.TryGetId(name, out ushort existingId))
             {
-                Debug.LogWarning($"Voxel with name {name} is already registered.");
-                return 0;
+                Debug.LogWarning($"Voxel with name {name} is already registered with ID {existingId}.");
+                return existingId;
             }
 
-            ushort id = (ushort)_idToVoxel.Count;
-            _idToVoxel.Add(id, renderDef);
-            _nameToId.Add(name, id);
-            _idToName.Add(id, name);
+            ushort id = _nameRegistry.Register(name);
+            _voxelRenderDefRegistry.Register(renderDef);
             return id;
         }
 
@@ -140,9 +142,9 @@ namespace Engine.Scripts.VoxelConfig.Data
         /// <param name="name">Registered voxel name.</param>
         /// <param name="id">Resulting voxel ID if found.</param>
         /// <returns><c>true</c> if the name exists; otherwise, <c>false</c>.</returns>
-        public bool GetId(string name, out ushort id)
+        public bool TryGetId(string name, out ushort id)
         {
-            return _nameToId.TryGetValue(name, out id);
+            return _nameRegistry.TryGetId(name, out id);
         }
 
         /// <summary>
@@ -152,7 +154,8 @@ namespace Engine.Scripts.VoxelConfig.Data
         /// <returns>Voxel ID associated with the name.</returns>
         public ushort GetIdOrThrow(string name)
         {
-            return _nameToId[name];
+            if (TryGetId(name, out ushort id)) return id;
+            throw new KeyNotFoundException($"No voxel found with name {name}");
         }
 
         /// <summary>
@@ -161,9 +164,9 @@ namespace Engine.Scripts.VoxelConfig.Data
         /// <param name="id">Voxel ID.</param>
         /// <param name="name">Output name if found.</param>
         /// <returns><c>true</c> if the ID exists; otherwise, <c>false</c>.</returns>
-        public bool GetName(ushort id, out string name)
+        public bool TryGetName(ushort id, out string name)
         {
-            return _idToName.TryGetValue(id, out name);
+            return _nameRegistry.TryGet(id, out name);
         }
 
         /// <summary>
@@ -172,13 +175,13 @@ namespace Engine.Scripts.VoxelConfig.Data
         /// <param name="id">Voxel ID.</param>
         /// <param name="def">Output voxel definition if found.</param>
         /// <returns><c>true</c> if the ID has an associated definition; otherwise, <c>false</c>.</returns>
-        public bool GetVoxelDefinition(ushort id, out VoxelDefinition def)
+        public bool TryGetVoxelDefinition(ushort id, out VoxelDefinition def)
         {
-            return _idToVoxelDefinition.TryGetValue(id, out def);
+            return _voxelDefinitionRegistry.TryGet(id, out def);
         }
 
         /// <summary>
-        ///     Finalizes registration: builds texture arrays and a native array for render definitions.
+        ///     Finalizes the registry by preparing texture arrays and GPU buffers for rendering.
         /// </summary>
         public void FinalizeRegistry()
         {
@@ -188,19 +191,20 @@ namespace Engine.Scripts.VoxelConfig.Data
 
         private void PrepareVoxelGenData()
         {
+            int voxelCount = _voxelRenderDefRegistry.Count;
             if (_voxelEngineRenderGenData.VoxelRenderDefs.IsCreated)
                 _voxelEngineRenderGenData.VoxelRenderDefs.Dispose();
             _voxelEngineRenderGenData.VoxelRenderDefs =
-                new NativeArray<VoxelRenderDef>(_idToVoxel.Count, Allocator.Domain);
+                new NativeArray<VoxelRenderDef>(voxelCount, Allocator.Domain);
 
             VoxelRenderDefBuffer?.Dispose();
             VoxelRenderDefBuffer =
-                new GraphicsBuffer(Target.Structured, _idToVoxel.Count, Marshal.SizeOf<GPUVoxelDef>());
-            GPUVoxelDef[] gpuVoxelDefData = new GPUVoxelDef[_idToVoxel.Count];
+                new GraphicsBuffer(Target.Structured, voxelCount, Marshal.SizeOf<GPUVoxelDef>());
+            GPUVoxelDef[] gpuVoxelDefData = new GPUVoxelDef[voxelCount];
 
-            for (int i = 0; i < _idToVoxel.Count; i++)
+            for (int i = 0; i < voxelCount; i++)
             {
-                VoxelRenderDef def = _idToVoxel[(ushort)i];
+                _voxelRenderDefRegistry.TryGet((ushort)i, out VoxelRenderDef def);
                 _voxelEngineRenderGenData.VoxelRenderDefs[i] = def;
                 gpuVoxelDefData[i] = new GPUVoxelDef(def);
             }
@@ -272,7 +276,7 @@ namespace Engine.Scripts.VoxelConfig.Data
         /// <returns>List of ID/name pairs.</returns>
         public List<KeyValuePair<ushort, string>> GetAllEntries()
         {
-            return _idToName.ToList();
+            return _nameRegistry.GetAllEntries();
         }
 
         private struct GPUVoxelDef

@@ -1,4 +1,7 @@
-﻿using Engine.Scripts.VoxelConfig.Data;
+﻿using Engine.Scripts.VoxelConfig;
+using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.VoxelConfig.Data.Mesh;
+using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Player;
 using UnityEngine;
 using UnityEngine.UI;
@@ -44,7 +47,7 @@ namespace UI
         private void OnVoxelIdChanged(ushort newVoxelId)
         {
             voxelId = newVoxelId;
-            if (VoxelDataImporter.Instance.VoxelRegistry.GetVoxelDefinition(voxelId, out VoxelDefinition definition))
+            if (DataImporter.Instance.VoxelRegistry.TryGetVoxelDefinition(voxelId, out VoxelDefinition definition))
             {
                 Texture2D tex = definition.GetDisplayTexture(QuadDrawCondition.Forward);
                 voxelImage.texture = tex;

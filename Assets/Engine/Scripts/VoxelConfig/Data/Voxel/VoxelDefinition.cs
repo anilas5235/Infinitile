@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Engine.Scripts.VoxelConfig.Data.Mesh;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Data
+namespace Engine.Scripts.VoxelConfig.Data.Voxel
 {
     /// <summary>
     /// ScriptableObject that describes a single voxel type, including textures, mesh layer, collision, and optional post-processing data.
     /// </summary>
-    [CreateAssetMenu(fileName = "VoxelDefinition", menuName = "Voxel/Voxel Data")]
+    [CreateAssetMenu(fileName = "Voxel", menuName = "Infinitile/Voxel/VoxelDefinition")]
     public class VoxelDefinition : ScriptableObject
     {
         /// <summary>

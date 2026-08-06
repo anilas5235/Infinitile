@@ -1,9 +1,13 @@
 ﻿using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Utils;
+using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.VoxelConfig.Data.Mesh;
+using Engine.Scripts.VoxelConfig.Data.Voxel;
+using Engine.Scripts.VoxelConfig.Registry;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
 
-namespace Engine.Scripts.VoxelConfig.Data
+namespace Engine.Scripts.VoxelConfig
 {
     /// <summary>
     ///     Loads all <see cref="VoxelDataPackage" /> assets from Resources, registers their definitions in the
@@ -11,7 +15,7 @@ namespace Engine.Scripts.VoxelConfig.Data
     ///     The singleton lifecycle controls the registry lifetime.
     /// </summary>
     [DefaultExecutionOrder(-1000)]
-    public class VoxelDataImporter : Singleton<VoxelDataImporter>
+    public class DataImporter : Singleton<DataImporter>
     {
         /// <summary>
         ///     Material used for opaque voxel rendering (solid mesh layer).
@@ -33,12 +37,24 @@ namespace Engine.Scripts.VoxelConfig.Data
         /// </summary>
         public VoxelRegistry VoxelRegistry { get; } = new();
 
+        public BiomeRegistry BiomeRegistry { get; } = new();
+
         /// <summary>
         ///     Loads packages, registers voxels and updates materials when the importer is created.
         /// </summary>
         protected override void Awake()
         {
             base.Awake();
+            LoadVoxels();
+            LoadBioms();
+        }
+
+        private void LoadBioms()
+        {
+        }
+
+        private void LoadVoxels()
+        {
             VoxelRegistry.Initialize();
             VoxelDataPackage[] voxelDataPackages = Resources.LoadAll<VoxelDataPackage>("VoxelDataPackages");
             if (voxelDataPackages == null || voxelDataPackages.Length == 0)

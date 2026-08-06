@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.VoxelConfig.Data.Mesh;
+using Engine.Scripts.VoxelConfig.Data.Voxel;
 using UnityEditor;
 using UnityEngine;
 

@@ -1,12 +1,12 @@
 ﻿using System;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Data
+namespace Engine.Scripts.VoxelConfig.Data.Mesh
 {
     /// <summary>
     /// Describes a voxel shape as a list of quads and their draw conditions.
     /// </summary>
-    [CreateAssetMenu(menuName = "Voxel/Shape/Voxel Shape", fileName = "VoxelShape")]
+    [CreateAssetMenu(fileName = "Shape", menuName = "Infinitile/Mesh/Shape")]
     public class VoxelShape : ScriptableObject
     {
         /// <summary>

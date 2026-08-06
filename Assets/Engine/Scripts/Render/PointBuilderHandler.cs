@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Logger;
+using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Data;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -64,7 +65,7 @@ namespace Engine.Scripts.Render
             _readBackCountBuffer = new GraphicsBuffer(Target.Raw, 3, sizeof(uint));
             _counts = new NativeArray<uint>(_readBackCountBuffer.count, Allocator.Domain);
             pointBuilder.SetBuffer(_pointBuilderKernelID, QuadBufferNameID,
-                VoxelDataImporter.Instance.VoxelRegistry.QuadBuffer);
+                DataImporter.Instance.VoxelRegistry.QuadBuffer);
         }
 
         /// <summary>

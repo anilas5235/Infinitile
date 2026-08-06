@@ -7,7 +7,9 @@ using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Collections;
 using Engine.Scripts.Utils.Logger;
+using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using Unity.Mathematics;
 using UnityEngine;
@@ -77,7 +79,7 @@ namespace Engine.Scripts.Render
                 rSettings
             );
 
-            VoxelRegistry voxelRegistry = VoxelDataImporter.Instance.VoxelRegistry;
+            VoxelRegistry voxelRegistry = DataImporter.Instance.VoxelRegistry;
             _pointBuilderHandlers = new PointBuilderHandler[_maxInFlight];
             for (int i = 0; i < _pointBuilderHandlers.Length; i++)
             {

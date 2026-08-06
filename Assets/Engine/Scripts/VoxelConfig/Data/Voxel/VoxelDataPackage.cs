@@ -1,13 +1,13 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Data
+namespace Engine.Scripts.VoxelConfig.Data.Voxel
 {
     /// <summary>
     ///     ScriptableObject asset that groups multiple <see cref="VoxelDefinition" /> instances
     ///     under a common package prefix for registration.
     /// </summary>
-    [CreateAssetMenu(fileName = "VoxelDataPackage", menuName = "Voxel/Voxel Data Package")]
+    [CreateAssetMenu(fileName = "VoxelDataPackage", menuName = "Infinitile/Voxel/VoxelDataPackage")]
     public class VoxelDataPackage : ScriptableObject
     {
         /// <summary>

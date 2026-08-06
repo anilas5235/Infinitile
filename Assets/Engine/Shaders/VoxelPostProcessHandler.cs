@@ -1,4 +1,8 @@
-﻿using Engine.Scripts.VoxelConfig.Data;
+﻿using Engine.Scripts.VoxelConfig;
+using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.VoxelConfig.Data.Mesh;
+using Engine.Scripts.VoxelConfig.Data.Voxel;
+using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using UnityEngine;
 
@@ -43,7 +47,7 @@ namespace Engine.Shaders
 
         private void OnEnable()
         {
-            _voxelRegistry = VoxelDataImporter.Instance.VoxelRegistry;
+            _voxelRegistry = DataImporter.Instance.VoxelRegistry;
             _postProcessManager = PostProcessManager.Instance;
         }
 
@@ -58,7 +62,7 @@ namespace Engine.Shaders
             _postProcessManager.ResetColorAdjustments();
             RenderSettings.fog = false;
 
-            if (!_voxelRegistry.GetVoxelDefinition(voxelId, out VoxelDefinition info)) return;
+            if (!_voxelRegistry.TryGetVoxelDefinition(voxelId, out VoxelDefinition info)) return;
 
             if (info.meshLayer != MeshLayer.Transparent) return;
             if (!info.usePostProcess) return;

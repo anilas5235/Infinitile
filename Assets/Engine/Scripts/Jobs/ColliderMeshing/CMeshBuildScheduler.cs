@@ -8,6 +8,7 @@ using Engine.Scripts.Settings;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using Unity.Collections;
 using Unity.Jobs;

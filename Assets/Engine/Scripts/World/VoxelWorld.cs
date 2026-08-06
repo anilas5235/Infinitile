@@ -11,6 +11,7 @@ using Engine.Scripts.Noise;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
+using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Data;
 using Unity.Mathematics;
 using UnityEngine;
@@ -103,7 +104,7 @@ namespace Engine.Scripts.World
             _cMeshBuildScheduler = VoxelEngineProvider.Current.MeshBuildScheduler(
                 ChunkManager,
                 _chunkPool,
-                VoxelDataImporter.Instance.VoxelRegistry,
+                DataImporter.Instance.VoxelRegistry,
                 this
             );
 
@@ -115,7 +116,7 @@ namespace Engine.Scripts.World
             _chunkScheduler = VoxelEngineProvider.Current.ChunkDataScheduler(
                 ChunkManager,
                 _noiseProfile,
-                VoxelDataImporter.Instance.CreateConfig(),
+                DataImporter.Instance.CreateConfig(),
                 this
             );
 
