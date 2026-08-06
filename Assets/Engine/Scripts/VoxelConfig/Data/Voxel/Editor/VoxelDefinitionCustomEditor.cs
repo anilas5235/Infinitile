@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using Engine.Scripts.VoxelConfig.Data;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
-using Engine.Scripts.VoxelConfig.Data.Voxel;
 using UnityEditor;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Editor
+namespace Engine.Scripts.VoxelConfig.Data.Voxel.Editor
 {
     /// <summary>
     /// Custom inspector for <see cref="VoxelDefinition" /> that shows texture fields based on the selected texture mode.

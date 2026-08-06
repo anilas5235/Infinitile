@@ -1,9 +1,7 @@
-﻿using Engine.Scripts.VoxelConfig.Data;
-using Engine.Scripts.VoxelConfig.Data.Mesh;
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Editor
+namespace Engine.Scripts.VoxelConfig.Data.Mesh.Editor
 {
     /// <summary>
     /// Custom inspector for <see cref="QuadDefinition" /> that provides live preview rendering and basis visualization.
@@ -14,17 +12,17 @@ namespace Engine.Scripts.VoxelConfig.Editor
     {
         private const float PreviewHeight = 220f;
         private float _camDistanceFactor = 4f;
-        private Mesh _previewAxisLineMesh;
+        private UnityEngine.Mesh _previewAxisLineMesh;
         private Material _previewAxisXMat;
         private Material _previewAxisYMat;
         private Material _previewAxisZMat;
         private Material _previewBackMat;
         private Vector2 _previewDir = new(120f, -20f);
         private Material _previewMaterial;
-        private Mesh _previewMesh;
+        private UnityEngine.Mesh _previewMesh;
         private Material _previewNormalMat;
         private PreviewRenderUtility _previewUtility;
-        private Mesh _previewWireCubeMesh;
+        private UnityEngine.Mesh _previewWireCubeMesh;
         private Material _previewWireMat;
 
         /// <summary>
@@ -320,7 +318,7 @@ namespace Engine.Scripts.VoxelConfig.Editor
         {
             if (_previewAxisLineMesh != null) return;
 
-            _previewAxisLineMesh = new Mesh
+            _previewAxisLineMesh = new UnityEngine.Mesh
             {
                 name = "AxisLinePreviewMesh",
                 hideFlags = HideFlags.HideAndDontSave,
@@ -375,7 +373,7 @@ namespace Engine.Scripts.VoxelConfig.Editor
         private void EnsurePreviewMesh(QuadDefinition quadDef)
         {
             if (!_previewMesh)
-                _previewMesh = new Mesh
+                _previewMesh = new UnityEngine.Mesh
                 {
                     name = "QuadPreviewMesh",
                     hideFlags = HideFlags.HideAndDontSave,
@@ -416,7 +414,7 @@ namespace Engine.Scripts.VoxelConfig.Editor
         {
             if (_previewWireCubeMesh) return;
 
-            _previewWireCubeMesh = new Mesh
+            _previewWireCubeMesh = new UnityEngine.Mesh
             {
                 name = "UnitWireCubePreviewMesh",
                 hideFlags = HideFlags.HideAndDontSave,
