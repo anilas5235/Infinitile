@@ -1,8 +1,9 @@
 ﻿using System;
+using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Unity.Burst;
 using Unity.Collections;
 
-namespace Engine.Scripts.VoxelConfig.Data
+namespace Engine.Scripts.VoxelConfig.Data.Internal
 {
     /// <summary>
     ///     Burst-compatible container that exposes voxel render definitions to meshing jobs.

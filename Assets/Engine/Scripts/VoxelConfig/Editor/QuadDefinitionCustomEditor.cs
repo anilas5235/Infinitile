@@ -1,4 +1,5 @@
 ﻿using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.VoxelConfig.Data.Mesh;
 using UnityEditor;
 using UnityEngine;
 

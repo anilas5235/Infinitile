@@ -2,6 +2,9 @@
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.VoxelConfig.Data.Internal;
+using Engine.Scripts.VoxelConfig.Data.Mesh;
+using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;

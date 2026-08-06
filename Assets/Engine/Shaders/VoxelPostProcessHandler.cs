@@ -1,5 +1,7 @@
 ﻿using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.VoxelConfig.Data.Mesh;
+using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using UnityEngine;

@@ -1,6 +1,8 @@
 ﻿using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Utils;
 using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.VoxelConfig.Data.Mesh;
+using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelRenderConstants;

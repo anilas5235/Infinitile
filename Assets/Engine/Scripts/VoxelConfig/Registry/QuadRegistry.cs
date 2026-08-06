@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.VoxelConfig.Data.Mesh;
 
 namespace Engine.Scripts.VoxelConfig.Registry
 {

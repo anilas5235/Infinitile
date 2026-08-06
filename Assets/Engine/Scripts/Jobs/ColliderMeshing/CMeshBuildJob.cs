@@ -1,6 +1,7 @@
 ﻿using Engine.Scripts.Data;
 using Engine.Scripts.Utils;
 using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.VoxelConfig.Data.Internal;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;

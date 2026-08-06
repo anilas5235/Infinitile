@@ -2,12 +2,13 @@
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Data
+namespace Engine.Scripts.VoxelConfig.Data.Mesh
 {
     /// <summary>
     /// Describes a single quad face used by voxel shapes, including vertex positions, basis vectors, and UVs.
     /// </summary>
-    [CreateAssetMenu(menuName = "Voxel/Shape/Quad Definition", fileName = "QuadDefinition")]
+    ///
+    [CreateAssetMenu(fileName = "Quad", menuName = "Infinitile/Mesh/Quad")]
     public class QuadDefinition : ScriptableObject
     {
         public Vector3 position00;
