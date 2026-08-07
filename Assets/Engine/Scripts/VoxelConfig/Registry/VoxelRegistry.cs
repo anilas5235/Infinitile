@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig.Data.Internal;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
@@ -21,9 +21,9 @@ namespace Engine.Scripts.VoxelConfig.Registry
         internal const int TextureSize = 128; // Texture resolution (square)
         private static readonly int TexturesNameID = Shader.PropertyToID("_Textures");
 
-        private readonly Registry<VoxelRenderDef> _voxelRenderDefRegistry = new(100);
-        private readonly Registry<VoxelDefinition> _voxelDefinitionRegistry = new(100);
-        private readonly Registry<string> _nameRegistry = new(100);
+        private readonly Registry<Voxel.VoxelDef> _voxelRenderDefRegistry = new(100);
+        private readonly Registry<Voxel> _voxelDefinitionRegistry = new(100);
+        private readonly Registry<FixedString32Bytes> _nameRegistry = new(100);
         private readonly QuadRegistry _quadRegistry = new(40);
         private readonly TexRegistry _solidTexRegistry = new(200);
         private readonly TexRegistry _transparentTexRegistry = new(100);
@@ -55,7 +55,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         {
             if (_initialized) return;
             _initialized = true;
-            Register("std:air", new VoxelRenderDef
+            Register("std:air", new Voxel.VoxelDef
             {
                 MeshLayer = MeshLayer.Air,
                 Collision = false
@@ -68,14 +68,14 @@ namespace Engine.Scripts.VoxelConfig.Registry
         }
 
         /// <summary>
-        ///     Registers a voxel definition, builds its texture-based <see cref="VoxelRenderDef" />,
+        ///     Registers a voxel definition, builds its texture-based <see cref="Voxel.VoxelDef" />,
         ///     and assigns a new voxel ID.
         /// </summary>
         /// <param name="packagePrefix">Prefix of the package this definition belongs to.</param>
         /// <param name="definition">Voxel definition asset to register.</param>
-        public void Register(string packagePrefix, VoxelDefinition definition)
+        public void Register(FixedString32Bytes packagePrefix, Voxel definition)
         {
-            VoxelRenderDef type = new()
+            Voxel.VoxelDef type = new()
             {
                 MeshLayer = definition.meshLayer,
                 AlwaysRenderAllFaces = definition.alwaysRenderAllFaces,
@@ -91,12 +91,23 @@ namespace Engine.Scripts.VoxelConfig.Registry
                 Back = RegisterFaces(definition, QuadDrawCondition.Backward)
             };
 
-            ushort id = Register(packagePrefix + ":" + definition.name, type);
+            FixedString32Bytes voxelPrefix = new(packagePrefix + ":");
+            FixedString32Bytes voxelName = new(definition.name);
+
+            if (voxelPrefix.Length + voxelName.Length > FixedString32Bytes.UTF8MaxLengthInBytes)
+            {
+                VoxelEngineLogger.Error<VoxelRegistry>(
+                    $"Voxel name '{voxelPrefix}:{voxelName}' exceeds the maximum length of {FixedString32Bytes.UTF8MaxLengthInBytes} bytes. Registration skipped.");
+                return;
+            }
+
+            FixedString32Bytes fullName = new(packagePrefix + ":" + definition.name);
+            ushort id = Register(fullName, type);
             if (id == 0) return;
             _voxelDefinitionRegistry.Register(definition);
         }
 
-        private ushort Register(string name, VoxelRenderDef renderDef)
+        private ushort Register(FixedString32Bytes name, Voxel.VoxelDef def)
         {
             Initialize();
             if (_nameRegistry.TryGetId(name, out ushort existingId))
@@ -106,11 +117,11 @@ namespace Engine.Scripts.VoxelConfig.Registry
             }
 
             ushort id = _nameRegistry.Register(name);
-            _voxelRenderDefRegistry.Register(renderDef);
+            _voxelRenderDefRegistry.Register(def);
             return id;
         }
 
-        private uint2 RegisterFaces(VoxelDefinition definition, QuadDrawCondition condition)
+        private uint2 RegisterFaces(Voxel definition, QuadDrawCondition condition)
         {
             int baseIndex = _quadTexPairs.Count;
             int texPairsAdded = 0;
@@ -142,7 +153,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         /// <param name="name">Registered voxel name.</param>
         /// <param name="id">Resulting voxel ID if found.</param>
         /// <returns><c>true</c> if the name exists; otherwise, <c>false</c>.</returns>
-        public bool TryGetId(string name, out ushort id)
+        public bool TryGetId(FixedString32Bytes name, out ushort id)
         {
             return _nameRegistry.TryGetId(name, out id);
         }
@@ -152,7 +163,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         /// </summary>
         /// <param name="name">Registered voxel name.</param>
         /// <returns>Voxel ID associated with the name.</returns>
-        public ushort GetIdOrThrow(string name)
+        public ushort GetIdOrThrow(FixedString32Bytes name)
         {
             if (TryGetId(name, out ushort id)) return id;
             throw new KeyNotFoundException($"No voxel found with name {name}");
@@ -164,18 +175,18 @@ namespace Engine.Scripts.VoxelConfig.Registry
         /// <param name="id">Voxel ID.</param>
         /// <param name="name">Output name if found.</param>
         /// <returns><c>true</c> if the ID exists; otherwise, <c>false</c>.</returns>
-        public bool TryGetName(ushort id, out string name)
+        public bool TryGetName(ushort id, out FixedString32Bytes name)
         {
             return _nameRegistry.TryGet(id, out name);
         }
 
         /// <summary>
-        ///     Tries to get the <see cref="VoxelDefinition" /> associated with the given ID.
+        ///     Tries to get the <see cref="Voxel" /> associated with the given ID.
         /// </summary>
         /// <param name="id">Voxel ID.</param>
         /// <param name="def">Output voxel definition if found.</param>
         /// <returns><c>true</c> if the ID has an associated definition; otherwise, <c>false</c>.</returns>
-        public bool TryGetVoxelDefinition(ushort id, out VoxelDefinition def)
+        public bool TryGetVoxelDefinition(ushort id, out Voxel def)
         {
             return _voxelDefinitionRegistry.TryGet(id, out def);
         }
@@ -195,7 +206,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
             if (_voxelEngineRenderGenData.VoxelRenderDefs.IsCreated)
                 _voxelEngineRenderGenData.VoxelRenderDefs.Dispose();
             _voxelEngineRenderGenData.VoxelRenderDefs =
-                new NativeArray<VoxelRenderDef>(voxelCount, Allocator.Domain);
+                new NativeArray<Voxel.VoxelDef>(voxelCount, Allocator.Domain);
 
             VoxelRenderDefBuffer?.Dispose();
             VoxelRenderDefBuffer =
@@ -204,7 +215,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
 
             for (int i = 0; i < voxelCount; i++)
             {
-                _voxelRenderDefRegistry.TryGet((ushort)i, out VoxelRenderDef def);
+                _voxelRenderDefRegistry.TryGet((ushort)i, out Voxel.VoxelDef def);
                 _voxelEngineRenderGenData.VoxelRenderDefs[i] = def;
                 gpuVoxelDefData[i] = new GPUVoxelDef(def);
             }
@@ -213,7 +224,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
 
             QuadBuffer?.Dispose();
             QuadBuffer = new GraphicsBuffer(Target.Structured, _quadRegistry.QuadArray.Length,
-                Marshal.SizeOf<QuadDefinition.QuadData>());
+                Marshal.SizeOf<QuadDefinition.QuadDef>());
             QuadBuffer.SetData(_quadRegistry.QuadArray);
 
             QuadTexPairBuffer?.Dispose();
@@ -274,7 +285,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         ///     Returns a list of all registered IDs and their corresponding names.
         /// </summary>
         /// <returns>List of ID/name pairs.</returns>
-        public List<KeyValuePair<ushort, string>> GetAllEntries()
+        public List<KeyValuePair<ushort, FixedString32Bytes>> GetAllEntries()
         {
             return _nameRegistry.GetAllEntries();
         }
@@ -294,7 +305,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
             private uint2 shape_quad_indices_front;
             private uint2 shape_quad_indices_back;
 
-            public GPUVoxelDef(VoxelRenderDef def)
+            public GPUVoxelDef(Voxel.VoxelDef def)
             {
                 MeshLayer = (uint)def.MeshLayer;
                 AlwaysRenderAllFaces = def.AlwaysRenderAllFaces ? 1u : 0u;

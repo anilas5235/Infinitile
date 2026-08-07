@@ -2,6 +2,7 @@
 using Engine.Scripts.Utils;
 using Engine.Scripts.VoxelConfig.Data;
 using Engine.Scripts.VoxelConfig.Data.Internal;
+using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
@@ -57,9 +58,9 @@ namespace Engine.Scripts.Jobs.ColliderMeshing
             {
                 int3 localPos = new(x, y, z);
                 ushort voxelId = GetVoxel(ref jobData, localPos);
-                VoxelRenderDef renderDef = RenderGenData.GetRenderDef(voxelId);
+                Voxel.VoxelDef def = RenderGenData.GetRenderDef(voxelId);
 
-                if (renderDef.Collision) jobData.CollisionVoxels.Add(localPos);
+                if (def.Collision) jobData.CollisionVoxels.Add(localPos);
             }
         }
     }

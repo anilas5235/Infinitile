@@ -7,18 +7,18 @@ using UnityEngine;
 namespace Engine.Scripts.VoxelConfig.Data.Voxel.Editor
 {
     /// <summary>
-    /// Custom inspector for <see cref="VoxelDefinition" /> that shows texture fields based on the selected texture mode.
+    /// Custom inspector for <see cref="Voxel" /> that shows texture fields based on the selected texture mode.
     /// </summary>
-    [CustomEditor(typeof(VoxelDefinition))]
+    [CustomEditor(typeof(Voxel))]
     [CanEditMultipleObjects]
-    public class VoxelDefinitionCustomEditor : UnityEditor.Editor
+    public class VoxelCustomEditor : UnityEditor.Editor
     {
         /// <summary>
         /// Draws the custom inspector UI for voxel definitions.
         /// </summary>
         public override void OnInspectorGUI()
         {
-            VoxelDefinition voxelDef = (VoxelDefinition)target;
+            Voxel voxelDef = (Voxel)target;
 
             serializedObject.Update();
 
@@ -40,17 +40,17 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel.Editor
             EditorGUILayout.PropertyField(serializedObject.FindProperty("textureMode"));
             switch (voxelDef.TextureMode)
             {
-                case VoxelDefinition.VoxelTexMode.AllSame:
+                case Voxel.VoxelTexMode.AllSame:
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("all"));
                     break;
 
-                case VoxelDefinition.VoxelTexMode.TopBottomSides:
+                case Voxel.VoxelTexMode.TopBottomSides:
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("top"));
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("bottom"));
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("side"));
                     break;
 
-                case VoxelDefinition.VoxelTexMode.SixSidesUnique:
+                case Voxel.VoxelTexMode.SixSidesUnique:
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("top"));
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("bottom"));
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("front"));
@@ -58,7 +58,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel.Editor
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("left"));
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("right"));
                     break;
-                case VoxelDefinition.VoxelTexMode.AllUnique:
+                case Voxel.VoxelTexMode.AllUnique:
                     int quadCount = voxelDef.shape.quads.Length;
                     if (voxelDef.allUnique.Count != quadCount)
                     {

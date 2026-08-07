@@ -44,12 +44,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Mesh
         /// <summary>
         /// Converts this quad definition into its Burst-friendly data representation.
         /// </summary>
-        /// <returns>A <see cref="QuadData" /> struct containing the quad data.</returns>
-        public QuadData ToStruct()
+        /// <returns>A <see cref="QuadDef" /> struct containing the quad data.</returns>
+        public QuadDef ToStruct()
         {
             CalculateBasis(out Vector3 calculatedNormal, out Vector3 calculatedUp, out Vector3 calculatedRight);
 
-            return new QuadData
+            return new QuadDef
             {
                 position00 = position00.Float3(),
                 position01 = position01.Float3(),
@@ -97,7 +97,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Mesh
         /// <summary>
         /// Burst-friendly quad data used by runtime rendering systems.
         /// </summary>
-        public struct QuadData
+        public struct QuadDef
         {
             /// <summary>
             /// Vertex position 00 relative to the voxel origin.

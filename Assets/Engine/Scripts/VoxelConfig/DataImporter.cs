@@ -1,9 +1,11 @@
 ﻿using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Utils;
+using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig.Data;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
+using Unity.Collections;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
 
@@ -33,7 +35,7 @@ namespace Engine.Scripts.VoxelConfig
         public Material voxelFoliageMaterial;
 
         /// <summary>
-        ///     Registry containing all registered <see cref="VoxelDefinition" /> instances.
+        ///     Registry containing all registered <see cref="Voxel" /> instances.
         /// </summary>
         public VoxelRegistry VoxelRegistry { get; } = new();
 
@@ -97,18 +99,18 @@ namespace Engine.Scripts.VoxelConfig
         /// <param name="package">Voxel data package whose definitions should be registered.</param>
         private void RegisterPackage(VoxelDataPackage package)
         {
-            string prefix = package.packagePrefix;
-            if (string.IsNullOrEmpty(prefix))
+            FixedString32Bytes prefix = package.packagePrefix;
+            if (prefix.IsEmpty)
             {
-                Debug.LogWarning("VoxelDataPackage prefix is empty. Using default 'UserPackage'.");
-                prefix = "UserPackage";
+                VoxelEngineLogger.Warn<DataImporter>("VoxelDataPackage prefix is empty. Package will be ignored.");
+                return;
             }
 
-            foreach (VoxelDefinition definition in package.voxelTextures)
+            foreach (Voxel definition in package.voxelTextures)
             {
                 if (!definition)
                 {
-                    Debug.LogWarning("Found null VoxelDefinition in package: " + package.name);
+                    VoxelEngineLogger.Warn<DataImporter>("Found null VoxelDefinition in package: " + package.name);
                     continue;
                 }
 

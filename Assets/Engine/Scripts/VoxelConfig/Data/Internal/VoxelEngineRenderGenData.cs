@@ -14,7 +14,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Internal
         /// <summary>
         ///     Backing array of render definitions, indexed by voxel ID.
         /// </summary>
-        [NativeDisableParallelForRestriction] internal NativeArray<VoxelRenderDef> VoxelRenderDefs;
+        [NativeDisableParallelForRestriction] internal NativeArray<Voxel.Voxel.VoxelDef> VoxelRenderDefs;
 
         /// <summary>
         ///     Disposes the underlying native array holding voxel render definitions.
@@ -39,7 +39,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Internal
         /// </summary>
         /// <param name="voxelId">Voxel ID used to index into the render definition array.</param>
         /// <returns>Render definition for the voxel.</returns>
-        public readonly VoxelRenderDef GetRenderDef(ushort voxelId)
+        public readonly Voxel.Voxel.VoxelDef GetRenderDef(ushort voxelId)
         {
             return VoxelRenderDefs[voxelId];
         }

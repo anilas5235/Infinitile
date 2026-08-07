@@ -1,5 +1,6 @@
 ﻿using Engine.Scripts.VoxelConfig.Data;
 using Engine.Scripts.VoxelConfig.Data.Internal;
+using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -43,7 +44,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing
 
             ushort neighborVoxel = GetVoxel(ref jobData, neighborCoord);
 
-            VoxelRenderDef neighborDef = RenderGenData.GetRenderDef(neighborVoxel);
+            Voxel.VoxelDef neighborDef = RenderGenData.GetRenderDef(neighborVoxel);
 
             if (neighborDef.Collision)
             {

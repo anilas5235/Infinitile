@@ -9,8 +9,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation
     [CreateAssetMenu(fileName = "BiomeDefinition", menuName = "Infinitile/Generation/Biome")]
     public class BiomeDefinition : ScriptableObject
     {
-        [SerializeField] public VoxelDefinition SurfaceMaterial;
+        [SerializeField] public Voxel.Voxel SurfaceMaterial;
 
-        [SerializeField] public VoxelDefinition SubsurfaceMaterial;
+        [SerializeField] public Voxel.Voxel SubsurfaceMaterial;
     }
 }
