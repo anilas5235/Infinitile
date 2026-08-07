@@ -75,6 +75,9 @@ namespace Engine.Scripts.VoxelConfig.Registry
         /// <param name="definition">Voxel definition asset to register.</param>
         public void Register(FixedString32Bytes packagePrefix, Voxel definition)
         {
+            if (!_initialized) throw new InvalidOperationException("VoxelRegistry is not initialized.");
+            if (!definition) throw new InvalidOperationException("Voxel definition is not defined.");
+
             Voxel.VoxelDef type = new()
             {
                 MeshLayer = definition.meshLayer,
@@ -91,19 +94,22 @@ namespace Engine.Scripts.VoxelConfig.Registry
                 Back = RegisterFaces(definition, QuadDrawCondition.Backward)
             };
 
-            FixedString32Bytes voxelPrefix = new(packagePrefix + ":");
-            FixedString32Bytes voxelName = new(definition.name);
+            FixedString32Bytes fullName;
 
-            if (voxelPrefix.Length + voxelName.Length > FixedString32Bytes.UTF8MaxLengthInBytes)
+            try
+            {
+                fullName = new FixedString32Bytes(packagePrefix + ":" + definition.name);
+            }
+            catch (ArgumentException e)
             {
                 VoxelEngineLogger.Error<VoxelRegistry>(
-                    $"Voxel name '{voxelPrefix}:{voxelName}' exceeds the maximum length of {FixedString32Bytes.UTF8MaxLengthInBytes} bytes. Registration skipped.");
+                    $"Voxel name '{packagePrefix}:{definition.name}' exceeds the maximum length of {FixedString32Bytes.UTF8MaxLengthInBytes} bytes. Registration skipped.");
                 return;
             }
-
-            FixedString32Bytes fullName = new(packagePrefix + ":" + definition.name);
+            
             ushort id = Register(fullName, type);
             if (id == 0) return;
+
             _voxelDefinitionRegistry.Register(definition);
         }
 

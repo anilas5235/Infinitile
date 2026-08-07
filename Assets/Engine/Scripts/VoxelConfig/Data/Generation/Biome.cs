@@ -7,7 +7,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation
     ///     Defines a biome with its associated structures and configurations.
     /// </summary>
     [CreateAssetMenu(fileName = "BiomeDefinition", menuName = "Infinitile/Generation/Biome")]
-    public class BiomeDefinition : ScriptableObject
+    public class Biome : ScriptableObject
     {
         [SerializeField] public Voxel.Voxel SurfaceMaterial;
 

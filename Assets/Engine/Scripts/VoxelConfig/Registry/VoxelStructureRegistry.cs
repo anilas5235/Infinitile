@@ -2,41 +2,58 @@
 using System.Collections.Generic;
 using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig.Data.Generation;
+using Unity.Collections;
 
 namespace Engine.Scripts.VoxelConfig.Registry
 {
-    public class VoxelStructureRegistry : Registry<VoxelStructure>, IResourceRegistry<VoxelStructure>
+    public class VoxelStructureRegistry : IDisposable
     {
-        public VoxelStructureRegistry(int initCapacity) : base(initCapacity)
-        {
-        }
-
+        private readonly Registry<FixedString32Bytes> _nameRegistry = new(16);
+        private readonly Registry<VoxelStructure> _structureRegistry = new(16);
 
         public VoxelStructure.VoxelStructureDef[] StructureArray { get; private set; }
 
-
-        public override ushort Register(VoxelStructure structure)
+        public void Register(VoxelStructure structure)
         {
-            if (structure) return base.Register(structure);
-            throw new ArgumentNullException(nameof(structure), "Cannot register a null structure definition.");
+            if (!structure)
+                throw new ArgumentNullException(nameof(structure), "Cannot register a null structure definition.");
+            FixedString32Bytes structureName;
+
+            try
+            {
+                structureName = new FixedString32Bytes(structure.name);
+            }
+            catch (ArgumentException e)
+            {
+                VoxelEngineLogger.Error<VoxelRegistry>(
+                    $"Voxel name '{structure.name}' exceeds the maximum length of {FixedString32Bytes.UTF8MaxLengthInBytes} bytes. Registration skipped.");
+                return;
+            }
+
+            _nameRegistry.Register(structureName);
+            _structureRegistry.Register(structure);
         }
 
         public void PrepareArray()
         {
-            if (Count == 0)
+            if (_nameRegistry.Count == 0)
             {
                 StructureArray = Array.Empty<VoxelStructure.VoxelStructureDef>();
                 return;
             }
 
-            StructureArray = new VoxelStructure.VoxelStructureDef[Count];
+            StructureArray = new VoxelStructure.VoxelStructureDef[_nameRegistry.Count];
             int index = 0;
-            foreach (KeyValuePair<VoxelStructure, ushort> kvp in ForwardMap)
+            foreach (KeyValuePair<ushort, VoxelStructure> kvp in _structureRegistry.GetAllEntries())
             {
-                VoxelEngineLogger.Info<VoxelStructureRegistry>($"copy structure {kvp.Key.name} to Structure array");
-                StructureArray[index] = kvp.Key.ToStruct();
+                VoxelEngineLogger.Info<VoxelStructureRegistry>($"copy structure {kvp.Value.name} to Structure array");
+                StructureArray[index] = kvp.Value.ToStruct();
                 index++;
             }
+        }
+
+        public void Dispose()
+        {
         }
     }
 }
