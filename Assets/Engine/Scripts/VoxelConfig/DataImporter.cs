@@ -89,7 +89,10 @@ namespace Engine.Scripts.VoxelConfig
 
         private void LoadVoxels()
         {
-            VoxelRegistry.Initialize();
+            Texture2D texError = Resources.Load<Texture2D>("Artwork/TexError");
+            Texture2D texErrorT = Resources.Load<Texture2D>("Artwork/TexErrorT");
+            VoxelRegistry.Initialize(texError, texErrorT, texErrorT);
+            
             foreach ((FixedString32Bytes prefix, VoxelDataPackage package) in _voxelPackages)
             {
                 foreach (Voxel definition in package.voxel)

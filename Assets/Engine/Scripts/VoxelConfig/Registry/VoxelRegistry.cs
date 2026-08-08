@@ -52,7 +52,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
             QuadTexPairBuffer.Dispose();
         }
 
-        public void Initialize()
+        public void Initialize(Texture2D errorTexSolid, Texture2D errorTexTransparent, Texture2D errorTexFoliage)
         {
             if (_initialized) return;
             _initialized = true;
@@ -61,11 +61,12 @@ namespace Engine.Scripts.VoxelConfig.Registry
                 MeshLayer = MeshLayer.Air,
                 Collision = false
             });
+
             _voxelEngineRenderGenData = new VoxelEngineRenderGenData();
-            Texture2D texError = Resources.Load<Texture2D>("Artwork/TexError");
-            RegisterTexture(texError, MeshLayer.Solid);
-            Texture2D texErrorT = Resources.Load<Texture2D>("Artwork/TexErrorT");
-            RegisterTexture(texErrorT, MeshLayer.Transparent);
+
+            RegisterTexture(errorTexSolid, MeshLayer.Solid);
+            RegisterTexture(errorTexTransparent, MeshLayer.Transparent);
+            RegisterTexture(errorTexFoliage, MeshLayer.Foliage);
         }
 
         /// <summary>
@@ -77,6 +78,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         public void Register(FixedString32Bytes packagePrefix, Voxel definition)
         {
             if (!_initialized) throw new InvalidOperationException("VoxelRegistry is not initialized.");
+            if (_finalized) throw new InvalidOperationException("VoxelRegistry has been finalized.");
             if (!definition) throw new InvalidOperationException("Voxel definition is not defined.");
 
             Voxel.VoxelDef type = new()
@@ -116,7 +118,6 @@ namespace Engine.Scripts.VoxelConfig.Registry
 
         private ushort Register(FixedString32Bytes name, Voxel.VoxelDef def)
         {
-            Initialize();
             if (_nameRegistry.TryGetId(name, out ushort existingId))
             {
                 Debug.LogWarning($"Voxel with name {name} is already registered with ID {existingId}.");
@@ -276,7 +277,8 @@ namespace Engine.Scripts.VoxelConfig.Registry
         /// <param name="solid">Mesh layer whose texture array should be used.</param>
         public void ApplyToMaterial(Material material, MeshLayer solid)
         {
-            if(!_finalized) throw new InvalidOperationException("VoxelRegistry must be finalized before applying to materials.");
+            if (!_finalized)
+                throw new InvalidOperationException("VoxelRegistry must be finalized before applying to materials.");
             if (material)
             {
                 Texture2DArray texArray = GetTextureArray(solid);
