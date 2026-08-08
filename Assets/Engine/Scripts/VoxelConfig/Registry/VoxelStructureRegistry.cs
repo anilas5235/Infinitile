@@ -11,7 +11,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         private readonly Registry<FixedString32Bytes> _nameRegistry = new(16);
         private readonly Registry<VoxelStructure> _structureRegistry = new(16);
 
-        public VoxelStructure.VoxelStructureDef[] StructureArray { get; private set; }
+        public NativeArray<VoxelStructure.VoxelStructureDef> StructureArray { get; private set; }
 
         public void Register(VoxelStructure structure)
         {
@@ -34,26 +34,30 @@ namespace Engine.Scripts.VoxelConfig.Registry
             _structureRegistry.Register(structure);
         }
 
-        public void PrepareArray()
+        public void PrepareArray(VoxelRegistry voxelRegistry)
         {
             if (_nameRegistry.Count == 0)
             {
-                StructureArray = Array.Empty<VoxelStructure.VoxelStructureDef>();
+                StructureArray = new NativeArray<VoxelStructure.VoxelStructureDef>(0, Allocator.Domain);
                 return;
             }
 
-            StructureArray = new VoxelStructure.VoxelStructureDef[_nameRegistry.Count];
+            VoxelStructure.VoxelStructureDef[] tempArray = new VoxelStructure.VoxelStructureDef[_nameRegistry.Count];
             int index = 0;
             foreach (KeyValuePair<ushort, VoxelStructure> kvp in _structureRegistry.GetAllEntries())
             {
                 VoxelEngineLogger.Info<VoxelStructureRegistry>($"copy structure {kvp.Value.name} to Structure array");
-                StructureArray[index] = kvp.Value.ToStruct();
+                tempArray[index] = kvp.Value.ToStruct(voxelRegistry);
                 index++;
             }
+
+            StructureArray = new NativeArray<VoxelStructure.VoxelStructureDef>(tempArray, Allocator.Domain);
         }
 
         public void Dispose()
         {
+            foreach (VoxelStructure.VoxelStructureDef def in StructureArray) def.Dispose();
+            StructureArray.Dispose();
         }
     }
 }

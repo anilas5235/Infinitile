@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Engine.Scripts.VoxelConfig.Registry;
 using Unity.Burst;
 using Unity.Collections;
 using UnityEngine;
@@ -19,29 +20,35 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation
             return uniqueNames.ToList();
         }
 
-        public VoxelStructureDef ToStruct()
+        public VoxelStructureDef ToStruct(VoxelRegistry voxelRegistry)
         {
             VoxelStructureDef def = new()
             {
                 PlacementData =
-                    new NativeHashMap<FixedString32Bytes, NativeArray<VoxelPlacement>>(parts.Length, Allocator.Domain)
+                    new NativeHashMap<ushort, NativeArray<VoxelPlacement>>(parts.Length, Allocator.Domain)
             };
 
             foreach (StructurePart part in parts)
             {
                 NativeArray<VoxelPlacement> placements = new(part.placements.Length, Allocator.Domain);
                 placements.CopyFrom(part.placements);
-                def.PlacementData.TryAdd(part.voxelName, placements);
+                def.PlacementData.TryAdd(voxelRegistry.GetIdOrThrow(part.voxelName), placements);
             }
 
             return def;
         }
 
         [BurstCompile]
-        public struct VoxelStructureDef
+        public struct VoxelStructureDef : IDisposable
         {
             [NativeDisableParallelForRestriction]
-            public NativeHashMap<FixedString32Bytes, NativeArray<VoxelPlacement>> PlacementData;
+            public NativeHashMap<ushort, NativeArray<VoxelPlacement>> PlacementData;
+
+            public void Dispose()
+            {
+                foreach (KVPair<ushort, NativeArray<VoxelPlacement>> item in PlacementData) item.Value.Dispose();
+                PlacementData.Dispose();
+            }
         }
     }
 

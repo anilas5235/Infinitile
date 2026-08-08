@@ -9,6 +9,7 @@ using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
+using static Engine.Scripts.Utils.VoxelRenderConstants;
 
 namespace Engine.Scripts.VoxelConfig.Registry
 {
@@ -19,7 +20,6 @@ namespace Engine.Scripts.VoxelConfig.Registry
     public class VoxelRegistry : IDisposable
     {
         internal const int TextureSize = 128; // Texture resolution (square)
-        private static readonly int TexturesNameID = Shader.PropertyToID("_Textures");
 
         private readonly Registry<Voxel.VoxelDef> _voxelRenderDefRegistry = new(100);
         private readonly Registry<Voxel> _voxelDefinitionRegistry = new(100);
@@ -31,6 +31,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         private readonly List<uint> _quadTexPairs = new();
 
         private bool _initialized;
+        private bool _finalized;
         private VoxelEngineRenderGenData _voxelEngineRenderGenData;
 
         public GraphicsBuffer VoxelRenderDefBuffer { get; private set; }
@@ -106,7 +107,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
                     $"Voxel name '{packagePrefix}:{definition.name}' exceeds the maximum length of {FixedString32Bytes.UTF8MaxLengthInBytes} bytes. Registration skipped.");
                 return;
             }
-            
+
             ushort id = Register(fullName, type);
             if (id == 0) return;
 
@@ -202,8 +203,18 @@ namespace Engine.Scripts.VoxelConfig.Registry
         /// </summary>
         public void FinalizeRegistry()
         {
+            if (_finalized) throw new InvalidOperationException("VoxelRegistry has already been finalized.");
+            _finalized = true;
             PrepareArrays();
             PrepareVoxelGenData();
+        }
+
+        private void PrepareArrays()
+        {
+            _solidTexRegistry.PrepareArray();
+            _transparentTexRegistry.PrepareArray();
+            _foliageTexRegistry.PrepareArray();
+            _quadRegistry.PrepareArray();
         }
 
         private void PrepareVoxelGenData()
@@ -247,14 +258,6 @@ namespace Engine.Scripts.VoxelConfig.Registry
             return _voxelEngineRenderGenData;
         }
 
-        private void PrepareArrays()
-        {
-            _solidTexRegistry.PrepareArray();
-            _transparentTexRegistry.PrepareArray();
-            _foliageTexRegistry.PrepareArray();
-            _quadRegistry.PrepareArray();
-        }
-
         private Texture2DArray GetTextureArray(MeshLayer meshLayer)
         {
             return meshLayer switch
@@ -273,17 +276,20 @@ namespace Engine.Scripts.VoxelConfig.Registry
         /// <param name="solid">Mesh layer whose texture array should be used.</param>
         public void ApplyToMaterial(Material material, MeshLayer solid)
         {
+            if(!_finalized) throw new InvalidOperationException("VoxelRegistry must be finalized before applying to materials.");
             if (material)
             {
                 Texture2DArray texArray = GetTextureArray(solid);
                 if (texArray)
                     material.SetTexture(TexturesNameID, texArray);
                 else
-                    Debug.LogWarning("Texture array is null, cannot assign to material.");
+                    VoxelEngineLogger.Error<VoxelRegistry>("Texture array is null, cannot assign to material.");
+
+                material.SetBuffer(QuadBufferNameID, QuadBuffer);
             }
             else
             {
-                Debug.LogWarning("Voxel material is null, cannot assign texture array.");
+                VoxelEngineLogger.Error<VoxelRegistry>("Voxel material is null, cannot assign texture array.");
             }
         }
 
