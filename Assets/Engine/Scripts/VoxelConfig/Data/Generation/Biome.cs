@@ -1,4 +1,5 @@
-using Engine.Scripts.VoxelConfig.Data.Voxel;
+using System;
+using Engine.Scripts.VoxelConfig.Registry;
 using UnityEngine;
 
 namespace Engine.Scripts.VoxelConfig.Data.Generation
@@ -12,5 +13,24 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation
         [SerializeField] public Voxel.Voxel SurfaceMaterial;
 
         [SerializeField] public Voxel.Voxel SubsurfaceMaterial;
+
+        public BiomeDef ToStruct(VoxelRegistry voxelRegistry)
+        {
+            return new BiomeDef
+            {
+                surfaceMaterial = voxelRegistry.GetIdOrThrow(SurfaceMaterial.name),
+                subsurfaceMaterial = voxelRegistry.GetIdOrThrow(SubsurfaceMaterial.name)
+            };
+        }
+
+        public struct BiomeDef: IDisposable
+        {
+            public ushort surfaceMaterial;
+            public ushort subsurfaceMaterial;
+
+            public void Dispose()
+            {
+            }
+        }
     }
 }
