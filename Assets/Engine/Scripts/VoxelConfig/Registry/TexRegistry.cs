@@ -48,6 +48,11 @@ namespace Engine.Scripts.VoxelConfig.Registry
             return base.Register(tex);
         }
 
+        protected override void PostRegister(ushort id, Texture2D item)
+        {
+            VoxelEngineLogger.Info<TexRegistry>($"Registered texture '{item.name}' with ID {id}");
+        }
+
         /// <summary>
         ///     Builds a <see cref="Texture2DArray" /> from all registered textures using point filtering and repeat wrapping.
         /// </summary>
@@ -70,7 +75,6 @@ namespace Engine.Scripts.VoxelConfig.Registry
             int index = 0;
             foreach (KeyValuePair<Texture2D, ushort> kvp in ForwardMap)
             {
-                VoxelEngineLogger.Info<TexRegistry>($"copy texture {kvp.Key.name} to texture array");
                 Graphics.CopyTexture(kvp.Key, 0, 0, textureArray, index, 0);
                 index++;
             }

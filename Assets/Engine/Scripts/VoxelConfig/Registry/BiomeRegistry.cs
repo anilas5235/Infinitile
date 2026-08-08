@@ -6,44 +6,28 @@ using Unity.Collections;
 
 namespace Engine.Scripts.VoxelConfig.Registry
 {
-    public class BiomeRegistry : IDisposable
+    public class BiomeRegistry : TopLevelRegistry<Biome>
     {
-        private readonly Registry<FixedString32Bytes> _nameRegistry = new(16);
-        private readonly Registry<Biome> _biomeRegistry = new(16);
-        
         public NativeArray<Biome.BiomeDef> BiomeArray { get; private set; }
 
-        public void Register(FixedString32Bytes packagePrefix, Biome biome)
+        public void Initialize()
         {
-            if (!biome) throw new ArgumentNullException(nameof(biome), "Cannot register a null biome definition.");
-            FixedString32Bytes biomeName;
-
-            try
-            {
-                biomeName = new FixedString32Bytes(packagePrefix + ":" + biome.name);
-            }
-            catch (ArgumentException e)
-            {
-                VoxelEngineLogger.Error<VoxelRegistry>(
-                    $"Voxel name '{biome.name}' exceeds the maximum length of {FixedString32Bytes.UTF8MaxLengthInBytes} bytes. Registration skipped.");
-                return;
-            }
-
-            _nameRegistry.Register(biomeName);
-            _biomeRegistry.Register(biome);
+            InternalInitialize();
         }
 
-        public void PrepareArray(VoxelRegistry voxelRegistry)
+        public void FinalizeRegistry(VoxelRegistry voxelRegistry)
         {
-            if (_nameRegistry.Count == 0)
+            InternalFinalize();
+
+            if (NameRegistry.Count == 0)
             {
                 BiomeArray = new NativeArray<Biome.BiomeDef>(0, Allocator.Domain);
                 return;
             }
 
-            Biome.BiomeDef[] tempArray = new Biome.BiomeDef[_nameRegistry.Count];
+            Biome.BiomeDef[] tempArray = new Biome.BiomeDef[NameRegistry.Count];
             int index = 0;
-            foreach (KeyValuePair<ushort, Biome> kvp in _biomeRegistry.GetAllEntries())
+            foreach (KeyValuePair<ushort, Biome> kvp in SoRegistry.GetAllEntries())
             {
                 VoxelEngineLogger.Info<BiomeRegistry>($"copy biome {kvp.Value.name} to Biome array");
                 Biome.BiomeDef def;
@@ -66,7 +50,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         }
 
 
-        public void Dispose()
+        public override void Dispose()
         {
             foreach (Biome.BiomeDef def in BiomeArray) def.Dispose();
             BiomeArray.Dispose();

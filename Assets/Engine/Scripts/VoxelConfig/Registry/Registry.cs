@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using Engine.Scripts.Utils.Logger;
 
 namespace Engine.Scripts.VoxelConfig.Registry
 {
@@ -9,7 +10,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         private readonly Dictionary<ushort, T> _backwardMap;
         private bool _isFull;
         public int Count => ForwardMap.Count;
-        
+
         public Registry(int initCapacity)
         {
             ForwardMap = new Dictionary<T, ushort>(initCapacity);
@@ -27,7 +28,25 @@ namespace Engine.Scripts.VoxelConfig.Registry
             ForwardMap.Add(item, id);
             _backwardMap.Add(id, item);
             if (id == ushort.MaxValue) _isFull = true;
+            PostRegister(id, item);
             return id;
+        }
+
+        protected virtual void PostRegister(ushort id, T item)
+        {
+        }
+
+        public bool Register(ushort id, T item)
+        {
+            if (ForwardMap.TryGetValue(item, out ushort existingId))
+            {
+                VoxelEngineLogger.Warn<Registry<T>>($"Register: ID {id} already exists. Ignoring.");
+                return false;
+            }
+
+            ForwardMap.Add(item, id);
+            _backwardMap.Add(id, item);
+            return true;
         }
 
         public bool TryGetId(T item, out ushort id) => ForwardMap.TryGetValue(item, out id);
@@ -46,7 +65,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         bool TryGetId(T item, out ushort id);
         bool TryGet(ushort id, out T item);
     }
-    
+
     public interface IResourceRegistry<T> : IRegistry<T>
     {
         void PrepareArray();

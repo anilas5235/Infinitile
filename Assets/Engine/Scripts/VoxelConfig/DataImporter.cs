@@ -112,6 +112,8 @@ namespace Engine.Scripts.VoxelConfig
 
         private void LoadBioms()
         {
+            BiomeRegistry.Initialize();
+
             foreach ((FixedString32Bytes prefix, VoxelDataPackage package) in _voxelPackages)
             {
                 foreach (Biome biome in package.biomes)
@@ -129,13 +131,16 @@ namespace Engine.Scripts.VoxelConfig
 
         private void LoadVoxelStructures()
         {
+            VoxelStructureRegistry.Initialize();
+
             foreach ((FixedString32Bytes prefix, VoxelDataPackage package) in _voxelPackages)
             {
                 foreach (VoxelStructure structure in package.structures)
                 {
                     if (!structure)
                     {
-                        VoxelEngineLogger.Warn<DataImporter>("Found null VoxelStructureDefinition in package: " + prefix);
+                        VoxelEngineLogger.Warn<DataImporter>(
+                            "Found null VoxelStructureDefinition in package: " + prefix);
                         continue;
                     }
 
@@ -152,9 +157,11 @@ namespace Engine.Scripts.VoxelConfig
             VoxelRegistry.ApplyToMaterial(voxelTransparentMaterial, MeshLayer.Transparent);
             VoxelRegistry.ApplyToMaterial(voxelFoliageMaterial, MeshLayer.Foliage);
         }
-        
+
         private void SetUpGenerationData()
         {
+            BiomeRegistry.FinalizeRegistry(VoxelRegistry);
+            VoxelStructureRegistry.FinalizeRegistry(VoxelRegistry);
         }
 
         /// <summary>

@@ -1,5 +1,4 @@
 ﻿using Engine.Scripts.VoxelConfig;
-using Engine.Scripts.VoxelConfig.Data;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
@@ -62,7 +61,7 @@ namespace Engine.Shaders
             _postProcessManager.ResetColorAdjustments();
             RenderSettings.fog = false;
 
-            if (!_voxelRegistry.TryGetVoxelDefinition(voxelId, out Voxel info)) return;
+            if (!_voxelRegistry.TryGet(voxelId, out Voxel info)) return;
 
             if (info.meshLayer != MeshLayer.Transparent) return;
             if (!info.usePostProcess) return;
