@@ -13,7 +13,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
 
         public NativeArray<VoxelStructure.VoxelStructureDef> StructureArray { get; private set; }
 
-        public void Register(VoxelStructure structure)
+        public void Register(FixedString32Bytes packagePrefix, VoxelStructure structure)
         {
             if (!structure)
                 throw new ArgumentNullException(nameof(structure), "Cannot register a null structure definition.");
@@ -21,7 +21,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
 
             try
             {
-                structureName = new FixedString32Bytes(structure.name);
+                structureName = new FixedString32Bytes(packagePrefix + ":" + structure.name);
             }
             catch (ArgumentException e)
             {
@@ -47,7 +47,18 @@ namespace Engine.Scripts.VoxelConfig.Registry
             foreach (KeyValuePair<ushort, VoxelStructure> kvp in _structureRegistry.GetAllEntries())
             {
                 VoxelEngineLogger.Info<VoxelStructureRegistry>($"copy structure {kvp.Value.name} to Structure array");
-                tempArray[index] = kvp.Value.ToStruct(voxelRegistry);
+                VoxelStructure.VoxelStructureDef def;
+                try
+                {
+                    def = kvp.Value.ToStruct(voxelRegistry);
+                }
+                catch (Exception e)
+                {
+                    VoxelEngineLogger.Error<VoxelStructureRegistry>(
+                        $"Failed to convert structure {kvp.Value.name} to struct: {e.Message}. Skipping this structure.");
+                    continue;
+                }
+                tempArray[index] = def;
                 index++;
             }
 

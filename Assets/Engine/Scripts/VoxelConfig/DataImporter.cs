@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Logger;
+using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
-using Unity.Collections;
 using UnityEngine;
-using static Engine.Scripts.Utils.VoxelRenderConstants;
+using Biome = Engine.Scripts.VoxelConfig.Data.Generation.Biome;
+using FixedString32Bytes = Unity.Collections.FixedString32Bytes;
 
 namespace Engine.Scripts.VoxelConfig
 {
@@ -55,9 +56,10 @@ namespace Engine.Scripts.VoxelConfig
             _voxelPackages = FindPackages();
             LoadVoxels();
             LoadBioms();
+            LoadVoxelStructures();
             SetUpRenderData();
+            SetUpGenerationData();
         }
-
 
         private Dictionary<FixedString32Bytes, VoxelDataPackage> FindPackages()
         {
@@ -92,7 +94,7 @@ namespace Engine.Scripts.VoxelConfig
             Texture2D texError = Resources.Load<Texture2D>("Artwork/TexError");
             Texture2D texErrorT = Resources.Load<Texture2D>("Artwork/TexErrorT");
             VoxelRegistry.Initialize(texError, texErrorT, texErrorT);
-            
+
             foreach ((FixedString32Bytes prefix, VoxelDataPackage package) in _voxelPackages)
             {
                 foreach (Voxel definition in package.voxel)
@@ -110,6 +112,36 @@ namespace Engine.Scripts.VoxelConfig
 
         private void LoadBioms()
         {
+            foreach ((FixedString32Bytes prefix, VoxelDataPackage package) in _voxelPackages)
+            {
+                foreach (Biome biome in package.biomes)
+                {
+                    if (!biome)
+                    {
+                        VoxelEngineLogger.Warn<DataImporter>("Found null BiomeDefinition in package: " + prefix);
+                        continue;
+                    }
+
+                    BiomeRegistry.Register(prefix, biome);
+                }
+            }
+        }
+
+        private void LoadVoxelStructures()
+        {
+            foreach ((FixedString32Bytes prefix, VoxelDataPackage package) in _voxelPackages)
+            {
+                foreach (VoxelStructure structure in package.structures)
+                {
+                    if (!structure)
+                    {
+                        VoxelEngineLogger.Warn<DataImporter>("Found null VoxelStructureDefinition in package: " + prefix);
+                        continue;
+                    }
+
+                    VoxelStructureRegistry.Register(prefix, structure);
+                }
+            }
         }
 
         private void SetUpRenderData()
@@ -119,6 +151,10 @@ namespace Engine.Scripts.VoxelConfig
             VoxelRegistry.ApplyToMaterial(voxelSolidMaterial, MeshLayer.Solid);
             VoxelRegistry.ApplyToMaterial(voxelTransparentMaterial, MeshLayer.Transparent);
             VoxelRegistry.ApplyToMaterial(voxelFoliageMaterial, MeshLayer.Foliage);
+        }
+        
+        private void SetUpGenerationData()
+        {
         }
 
         /// <summary>
