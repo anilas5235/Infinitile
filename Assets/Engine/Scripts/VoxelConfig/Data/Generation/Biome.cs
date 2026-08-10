@@ -10,23 +10,29 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation
     [CreateAssetMenu(fileName = "BiomeDefinition", menuName = "Infinitile/Generation/Biome")]
     public class Biome : ScriptableObject
     {
-        [SerializeField] public Voxel.Voxel SurfaceMaterial;
+        [SerializeField] public Voxel.Voxel TopBlock;
 
-        [SerializeField] public Voxel.Voxel SubsurfaceMaterial;
+        [SerializeField] public Voxel.Voxel UnderBlock;
+        
+        [SerializeField] public Voxel.Voxel StoneBlock;
+        
+        
 
         public BiomeDef ToStruct(VoxelRegistry voxelRegistry)
         {
             return new BiomeDef
             {
-                surfaceMaterial = voxelRegistry.GetIdOrThrow(SurfaceMaterial.name),
-                subsurfaceMaterial = voxelRegistry.GetIdOrThrow(SubsurfaceMaterial.name)
+                topBlock = voxelRegistry.GetIdOrThrow(TopBlock.GetFullName()),
+                underBlock = voxelRegistry.GetIdOrThrow(UnderBlock.GetFullName()),
+                stoneBlock = voxelRegistry.GetIdOrThrow(StoneBlock.GetFullName()),
             };
         }
 
         public struct BiomeDef: IDisposable
         {
-            public ushort surfaceMaterial;
-            public ushort subsurfaceMaterial;
+            public ushort topBlock;
+            public ushort underBlock;
+            public ushort stoneBlock;
 
             public void Dispose()
             {

@@ -22,6 +22,11 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel.Editor
 
             serializedObject.Update();
 
+            EditorGUI.BeginDisabledGroup(true);
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("package"));
+            EditorGUILayout.TextField("Full Name", voxelDef.GetFullName().ToString());
+            EditorGUI.EndDisabledGroup();
+            
             EditorGUILayout.PropertyField(serializedObject.FindProperty("meshLayer"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("collision"));
 

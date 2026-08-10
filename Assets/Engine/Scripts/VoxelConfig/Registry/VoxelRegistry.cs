@@ -35,6 +35,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         public GraphicsBuffer QuadBuffer { get; private set; }
 
         public GraphicsBuffer QuadTexPairBuffer { get; private set; }
+        public NativeHashMap<FixedString32Bytes, Voxel.VoxelDef> VoxelMap { get; private set; }
 
         public void Initialize(Texture2D errorTexSolid, Texture2D errorTexTransparent, Texture2D errorTexFoliage)
         {
@@ -54,6 +55,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
             if (id != 0) throw new Exception("RegisterAir: ID " + id + " already exists");
             _voxelRenderDefRegistry.Register(id, new Voxel.VoxelDef
             {
+                Id = id,
                 MeshLayer = MeshLayer.Air,
                 Collision = false
             });
@@ -64,6 +66,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         {
             Voxel.VoxelDef type = new()
             {
+                Id = id,
                 MeshLayer = so.meshLayer,
                 AlwaysRenderAllFaces = so.alwaysRenderAllFaces,
                 DepthFadeDistance = (half)so.depthFadeDistance,
@@ -114,7 +117,8 @@ namespace Engine.Scripts.VoxelConfig.Registry
         {
             InternalFinalize();
             PrepareArrays();
-            PrepareVoxelGenData();
+            PrepareRenderData();
+            PrepareGeneratiionData();
         }
 
         private void PrepareArrays()
@@ -125,7 +129,31 @@ namespace Engine.Scripts.VoxelConfig.Registry
             _quadRegistry.PrepareArray();
         }
 
-        private void PrepareVoxelGenData()
+        private void PrepareGeneratiionData()
+        {
+            if (VoxelMap.IsCreated) VoxelMap.Clear();
+            else
+                VoxelMap = new NativeHashMap<FixedString32Bytes, Voxel.VoxelDef>(_voxelRenderDefRegistry.Count,
+                    Allocator.Domain);
+
+            for (ushort i = 0; i < _voxelRenderDefRegistry.Count; i++)
+            {
+                if (_voxelRenderDefRegistry.TryGet(i, out Voxel.VoxelDef def) &&
+                    NameRegistry.TryGet(i, out FixedString32Bytes name))
+                {
+                    if (!VoxelMap.TryAdd(name, def))
+                    {
+                        VoxelEngineLogger.Warn<VoxelRegistry>($"Failed to add voxel ID {def.Id} to VoxelMap.");
+                    }
+                }
+                else
+                {
+                    VoxelEngineLogger.Warn<VoxelRegistry>($"Voxel ID {i} not found in _voxelRenderDefRegistry.");
+                }
+            }
+        }
+
+        private void PrepareRenderData()
         {
             int voxelCount = _voxelRenderDefRegistry.Count;
             if (_voxelEngineRenderGenData.VoxelRenderDefs.IsCreated)
@@ -186,7 +214,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
         {
             if (!Finalized)
                 throw new InvalidOperationException("VoxelRegistry must be finalized before applying to materials.");
-            
+
             if (material)
             {
                 Texture2DArray texArray = GetTextureArray(solid);
@@ -219,6 +247,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
             VoxelRenderDefBuffer.Dispose();
             QuadBuffer.Dispose();
             QuadTexPairBuffer.Dispose();
+            VoxelMap.Dispose();
         }
 
         //TODO: Compacting?

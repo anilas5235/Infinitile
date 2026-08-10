@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Tree
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.VoxelConfig.Data.Generation.MultiVoxelBlueprint
   parts:
-  - voxelName: std:LogOak
+  - voxel: {fileID: 11400000, guid: 717e752d88b00d64eb6f6f5e6622a136, type: 2}
     placements:
     - shape: 1
       origin: {x: 0, y: 0, z: 0}
@@ -22,7 +22,7 @@ MonoBehaviour:
       height: 0
       radius: 0
       filled: 0
-  - voxelName: std:Leaves
+  - voxel: {fileID: 11400000, guid: f40ca8ec657e32349900f989d0ebd529, type: 2}
     placements:
     - shape: 3
       origin: {x: 0, y: 6, z: 0}

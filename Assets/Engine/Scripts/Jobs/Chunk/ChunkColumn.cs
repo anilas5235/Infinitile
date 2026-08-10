@@ -9,7 +9,7 @@
         public int Height;
 
         /// <summary>Biome classification for the column.</summary>
-        public Biome Biome;
+        public ushort Biome;
 
         /// <summary>Surface block voxel ID.</summary>
         public ushort TopBlock;

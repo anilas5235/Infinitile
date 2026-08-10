@@ -13,10 +13,21 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel
         /// </summary>
         public string packagePrefix = "Custom";
 
-        [FormerlySerializedAs("voxelTextures")] public List<Voxel> voxel;
-        
+        [FormerlySerializedAs("voxelTextures")]
+        public List<Voxel> voxel;
+
         public List<Biome> biomes;
-        
+
         public List<VoxelStructure> structures;
+
+        private void OnValidate()
+        {
+            MarkAllVoxels();
+        }
+
+        private void MarkAllVoxels()
+        {
+            foreach (Voxel v in voxel) v.package = this;
+        }
     }
 }

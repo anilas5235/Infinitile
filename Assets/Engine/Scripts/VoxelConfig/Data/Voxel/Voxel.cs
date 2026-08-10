@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
+using Engine.Scripts.VoxelConfig.Registry;
 using Unity.Burst;
+using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -14,6 +17,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel
     [CreateAssetMenu(fileName = "Voxel", menuName = "Infinitile/Voxel/VoxelDefinition")]
     public class Voxel : ScriptableObject
     {
+        public VoxelDataPackage package;
         /// <summary>
         ///     Defines how textures are assigned to voxel faces.
         /// </summary>
@@ -143,6 +147,22 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel
             };
         }
 
+        public FixedString32Bytes GetFullName()
+        {
+            FixedString32Bytes fullName;
+            try
+            {
+                fullName = new FixedString32Bytes(package.packagePrefix + ":" + name);
+            }
+            catch (ArgumentException e)
+            {
+                VoxelEngineLogger.Error<Voxel>(
+                    $"Name '{name}' exceeds the maximum length of {FixedString32Bytes.UTF8MaxLengthInBytes} bytes. Registration skipped.({e.Message})");
+                return "Error";
+            }
+            return fullName;
+        }
+
         /// <summary>
         /// Resolves the texture for a quad and draw condition based on the current texture mode.
         /// </summary>
@@ -184,6 +204,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel
         [BurstCompile]
         public struct VoxelDef
         {
+            public ushort Id;
             /// <summary>Mesh layer (solid, transparent or air).</summary>
             public MeshLayer MeshLayer;
 

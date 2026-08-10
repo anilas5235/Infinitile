@@ -1,5 +1,6 @@
 ﻿using Engine.Scripts.Noise;
 using Engine.Scripts.Utils.Extensions;
+using Engine.Scripts.VoxelConfig.Data.Generation;
 using Unity.Collections;
 using Unity.Mathematics;
 using static Engine.Scripts.Utils.VoxelConstants;
@@ -106,7 +107,7 @@ namespace Engine.Scripts.Jobs.Chunk
                         height,
                         config.WaterLevel,
                         continentality,
-                        mountainMask),
+                        ref config),
                     Temperature = temperature,
                     Humidity = humidity
                 };
@@ -129,9 +130,8 @@ namespace Engine.Scripts.Jobs.Chunk
             int waterLevel, NativeArray<ChunkColumn> chunkColumns, ref GeneratorConfig config)
         {
             const ushort air = 0;
-            ushort waterBlock = config.Water;
-            ushort stone = config.Stone;
-            ushort dirt = config.Dirt;
+            ushort waterBlock = config.Voxels["std:Water"].Id;
+            ushort ice = config.Voxels["std:Ice"].Id;
 
             for (int x = 0; x < ChunkWidth; x++)
             for (int z = 0; z < ChunkDepth; z++)
@@ -144,9 +144,6 @@ namespace Engine.Scripts.Jobs.Chunk
                 ushort under = col.UnderBlock;
                 ushort top = col.TopBlock;
 
-                if (st == 0) st = stone;
-                if (under == 0) under = dirt;
-                if (top == 0) top = dirt;
 
                 int gy = col.Height;
 
@@ -158,7 +155,7 @@ namespace Engine.Scripts.Jobs.Chunk
                     else if (y == gy) v = gy < waterLevel ? waterBlock : top;
                     else v = y < waterLevel ? waterBlock : air;
 
-                    if (y == waterLevel && v == waterBlock && col.Temperature < .2f) v = config.Ice;
+                    if (y == waterLevel && v == waterBlock && col.Temperature < .2f) v = ice;
 
                     vox[ChunkSize.Flatten(x, y, z)] = v;
                 }
@@ -167,66 +164,11 @@ namespace Engine.Scripts.Jobs.Chunk
 
         private static void SelectSurfaceMaterials(ref GeneratorConfig config, ref ChunkColumn col, ref Random rng)
         {
-            ushort stone = config.Stone;
-            ushort dirt = config.Dirt;
-
-            ushort topBlock = config.Grass;
-            ushort underBlock = dirt;
-
-            switch (col.Biome)
-            {
-                case Biome.Desert:
-                    topBlock = config.Sand;
-                    underBlock = config.SandStoneRed;
-                    break;
-                case Biome.RedDesert:
-                    topBlock = config.SandRed;
-                    underBlock = config.SandStoneRed;
-                    break;
-                case Biome.Beach:
-                    topBlock = config.Sand;
-                    underBlock = config.SandStoneRedSandy;
-                    break;
-                case Biome.Ice:
-                    topBlock = config.DirtSnowy;
-                    underBlock = dirt;
-                    break;
-                case Biome.Snow:
-                    topBlock = config.DirtSnowy;
-                    underBlock = dirt;
-                    break;
-                case Biome.Swamp:
-                    topBlock = dirt;
-                    underBlock = dirt;
-                    break;
-                case Biome.Mountain:
-                    topBlock = col.Height >= MountainSnowline
-                        ? config.StoneSnowy
-                        : stone;
-                    underBlock = stone;
-                    break;
-                case Biome.HighStone:
-                    topBlock = col.Height >= MountainSnowline
-                        ? config.Snow
-                        : config.StoneGrey;
-                    underBlock = stone;
-                    break;
-                case Biome.GreyMountain:
-                    topBlock = col.Height >= MountainSnowline
-                        ? config.Snow
-                        : config.StoneGrey;
-                    underBlock = stone;
-                    break;
-                case Biome.Tundra:
-                    topBlock = rng.NextFloat() < .1f ? config.Dirt :
-                        config.DirtSnowy != 0 ? config.DirtSnowy : topBlock;
-                    underBlock = dirt;
-                    break;
-            }
-
-            col.TopBlock = topBlock;
-            col.UnderBlock = underBlock;
-            col.StoneBlock = stone;
+            Biome.BiomeDef biomDef = config.BiomeDefs[col.Biome];
+            
+            col.TopBlock = biomDef.topBlock;
+            col.UnderBlock = biomDef.underBlock;
+            col.StoneBlock = biomDef.stoneBlock;
         }
     }
 }

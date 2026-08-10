@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using System;
 using System.Runtime.InteropServices;
-using Engine.Scripts.Utils.Logger;
 using Unity.Mathematics;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
@@ -71,55 +68,70 @@ namespace Engine.Scripts.Render
             AllocInfo solidAlloc = _solidBufferManager.AllocBufferSpace(partition, counts[0]);
             AllocInfo transparentAlloc = _transparentBufferManager.AllocBufferSpace(partition, counts[1]);
             AllocInfo foliageAlloc = _foliageBufferManager.AllocBufferSpace(partition, counts[2]);
-            
+
             int solidPagesCount = solidAlloc.Count;
             int transparentPagesCount = transparentAlloc.Count;
             int foliagePagesCount = foliageAlloc.Count;
 
             uint[] pageCounts = { (uint)solidPagesCount, (uint)transparentPagesCount, (uint)foliagePagesCount };
             _pageCountsBuffer.SetData(pageCounts);
+            _copyPoints.SetBuffer(_copyKernelID, PageCountsNameID, _pageCountsBuffer);
+            _copyPoints.SetInt(PointsPerPageNameID, PointsPerPage);
 
-            if (solidPagesCount > 0)
-            {
-                uint2[] solidPageData = solidAlloc.ToIndexAndCount();
-                _solidPagesBuffer.SetData(solidPageData);
-
-                _copyPoints.SetBuffer(_copyKernelID, SolidPointsInNameID, pointBuilderHandler.SolidPointsOut);
-                _copyPoints.SetBuffer(_copyKernelID, SolidPointsCopyOutNameID,
-                    _solidBufferManager.GetBuffer(solidAlloc.BufferIndex));
-                _copyPoints.SetBuffer(_copyKernelID, SolidPagesNameID, _solidPagesBuffer);
-            }
-
-            if (transparentPagesCount > 0)
-            {
-                uint2[] transparentPageData = transparentAlloc.ToIndexAndCount();
-                _transparentPagesBuffer.SetData(transparentPageData);
-
-                _copyPoints.SetBuffer(_copyKernelID, TransparentPointsInNameID,
-                    pointBuilderHandler.TransparentPointsOut);
-                _copyPoints.SetBuffer(_copyKernelID, TransparentPointsCopyOutNameID,
-                    _transparentBufferManager.GetBuffer(transparentAlloc.BufferIndex));
-                _copyPoints.SetBuffer(_copyKernelID, TransparentPagesNameID, _transparentPagesBuffer);
-            }
-
-            if (foliagePagesCount > 0)
-            {
-                uint2[] foliagePageData = foliageAlloc.ToIndexAndCount();
-                _foliagePagesBuffer.SetData(foliagePageData);
-
-                _copyPoints.SetBuffer(_copyKernelID, FoliagePointsInNameID, pointBuilderHandler.FoliagePointsOut);
-                _copyPoints.SetBuffer(_copyKernelID, FoliagePointsCopyOutNameID,
-                    _foliageBufferManager.GetBuffer(foliageAlloc.BufferIndex));
-                _copyPoints.SetBuffer(_copyKernelID, FoliagePagesNameID, _foliagePagesBuffer);
-
-                _copyPoints.SetBuffer(_copyKernelID, PageCountsNameID, _pageCountsBuffer);
-                _copyPoints.SetInt(PointsPerPageNameID, PointsPerPage);
-            }
+            SetSolidBuffers(pointBuilderHandler, solidAlloc);
+            SetTransparentBuffers(pointBuilderHandler, transparentAlloc);
+            SetFoliageBuffers(pointBuilderHandler, foliageAlloc);
 
             int maxPageCount = math.max(solidPagesCount, math.max(transparentPagesCount, foliagePagesCount));
             if (maxPageCount <= 0) return;
 
             _copyPoints.Dispatch(_copyKernelID, Mathf.CeilToInt(maxPageCount / 8f), 1, 1);
+        }
+
+        private void SetSolidBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo solidAlloc)
+        {
+            _copyPoints.SetBuffer(_copyKernelID, SolidPointsInNameID, pointBuilderHandler.SolidPointsOut);
+            _copyPoints.SetBuffer(_copyKernelID, SolidPointsCopyOutNameID,
+                GetTargetBuffer(_solidBufferManager, solidAlloc));
+            _copyPoints.SetBuffer(_copyKernelID, SolidPagesNameID, _solidPagesBuffer);
+
+            if (solidAlloc.Count <= 0) return;
+
+            uint2[] solidPageData = solidAlloc.ToIndexAndCount();
+            _solidPagesBuffer.SetData(solidPageData);
+        }
+
+        private void SetTransparentBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo transparentAlloc)
+        {
+            _copyPoints.SetBuffer(_copyKernelID, TransparentPointsInNameID,
+                pointBuilderHandler.TransparentPointsOut);
+            _copyPoints.SetBuffer(_copyKernelID, TransparentPointsCopyOutNameID,
+                GetTargetBuffer(_transparentBufferManager, transparentAlloc));
+            _copyPoints.SetBuffer(_copyKernelID, TransparentPagesNameID, _transparentPagesBuffer);
+
+            if (transparentAlloc.Count <= 0) return;
+
+            uint2[] transparentPageData = transparentAlloc.ToIndexAndCount();
+            _transparentPagesBuffer.SetData(transparentPageData);
+        }
+
+        private void SetFoliageBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo foliageAlloc)
+        {
+            _copyPoints.SetBuffer(_copyKernelID, FoliagePointsInNameID, pointBuilderHandler.FoliagePointsOut);
+            _copyPoints.SetBuffer(_copyKernelID, FoliagePointsCopyOutNameID,
+                GetTargetBuffer(_foliageBufferManager, foliageAlloc));
+            _copyPoints.SetBuffer(_copyKernelID, FoliagePagesNameID, _foliagePagesBuffer);
+
+            if (foliageAlloc.Count <= 0) return;
+
+            uint2[] foliagePageData = foliageAlloc.ToIndexAndCount();
+            _foliagePagesBuffer.SetData(foliagePageData);
+        }
+
+        private GraphicsBuffer GetTargetBuffer(RenderBufferManager bufferManager, AllocInfo allocInfo)
+        {
+            int bufferIndex = allocInfo.Count > 0 ? allocInfo.BufferIndex : 0;
+            return bufferManager.GetBuffer(bufferIndex);
         }
     }
 }

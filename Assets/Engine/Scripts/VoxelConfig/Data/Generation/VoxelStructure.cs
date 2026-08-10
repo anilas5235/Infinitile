@@ -16,7 +16,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation
         public List<FixedString32Bytes> GetRequiredVoxels()
         {
             HashSet<FixedString32Bytes> uniqueNames = new();
-            foreach (StructurePart part in parts) uniqueNames.Add(part.voxelName);
+            foreach (StructurePart part in parts) uniqueNames.Add(part.voxel.GetFullName());
             return uniqueNames.ToList();
         }
 
@@ -32,7 +32,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation
             {
                 NativeArray<VoxelPlacement> placements = new(part.placements.Length, Allocator.Domain);
                 placements.CopyFrom(part.placements);
-                def.PlacementData.TryAdd(voxelRegistry.GetIdOrThrow(part.voxelName), placements);
+                def.PlacementData.TryAdd(voxelRegistry.GetIdOrThrow(part.voxel.GetFullName()), placements);
             }
 
             return def;
@@ -55,7 +55,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation
     [Serializable]
     public class StructurePart
     {
-        public FixedString32Bytes voxelName;
+        public Voxel.Voxel voxel;
         public VoxelPlacement[] placements;
     }
 

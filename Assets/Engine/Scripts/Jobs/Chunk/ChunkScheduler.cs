@@ -41,6 +41,7 @@ namespace Engine.Scripts.Jobs.Chunk
         /// <param name="chunkManager">Chunk manager that receives finished chunk data.</param>
         /// <param name="noiseProfile">Noise profile used for terrain height generation.</param>
         /// <param name="config">Generator configuration used by chunk jobs.</param>
+        /// <param name="world">Voxel world that raises events when chunk data is ready.</param>
         internal ChunkScheduler(
             VoxelEngineSettings settings,
             ChunkManager chunkManager,

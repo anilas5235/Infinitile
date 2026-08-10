@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Standart
   m_EditorClassIdentifier: 
   packagePrefix: std
-  voxelTextures:
+  voxel:
   - {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   - {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
   - {fileID: 11400000, guid: 2e8eca1efe0447d4b845f277ce2ada8f, type: 2}
@@ -73,3 +73,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 2859aedcdbe37214c8b06ac736ce4d1f, type: 2}
   - {fileID: 11400000, guid: 718e517cfa2f0b945a8f3566abd28090, type: 2}
   - {fileID: 11400000, guid: d9bb7a57046120b4aaf5da083bf77700, type: 2}
+  biomes:
+  - {fileID: 11400000, guid: c81cc6b7ac616da47b2c83f5b1cb1f75, type: 2}
+  structures:
+  - {fileID: 11400000, guid: c5009c6c5ae901e4ca7dc81efb418f22, type: 2}
