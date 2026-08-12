@@ -3,6 +3,7 @@ using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Unity.Collections;
 using Unity.Mathematics;
+using static Engine.Scripts.Jobs.Chunk.NoiseCalculator;
 using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.Jobs.Chunk
@@ -14,8 +15,6 @@ namespace Engine.Scripts.Jobs.Chunk
     internal partial struct ChunkJob
     {
         private const float BiomeScale = 0.0012f;
-
-        private const int MountainSnowline = 215;
 
         /// <summary>
         ///     Computes climate values, terrain height and biome information for every column of a chunk.
@@ -34,62 +33,12 @@ namespace Engine.Scripts.Jobs.Chunk
                 int i = GetColumnIdx(x, z, ChunkDepth);
                 float2 worldPos = new(chunkWordPos.x + x, chunkWordPos.z + z);
 
-                float2 noiseSamplePos = worldPos + new float2(-randomSeed, randomSeed);
-
-                // Klima-Noise sauber normalisieren (0..1)
-                float humidityRaw = noise.cnoise((noiseSamplePos - 789f) * BiomeScale);
-                float temperatureRaw = noise.cnoise((noiseSamplePos + 543f) * BiomeScale);
-                float humidity = humidityRaw * 0.5f + 0.5f;
-                float temperature = temperatureRaw * 0.5f + 0.5f;
-
-                // Basis-Höhen-Noise
-                float rawHeight = noiseProfile.GetNoise(worldPos);
-                float rawHeight01 = math.saturate(rawHeight); // kein zusätzliches Remap nach oben
-
-                // Optionaler Gebirgs-Noise (einfacher Mask-Wert 0..1)
-                const float mountainScale = 0.0012f; // etwas höher → kleinere, seltenere Berge
-                const float mountainThreshold = 0.90f; // seltener über Schwelle
-                const float mountainHeightMultiplier = 1.25f; // schwächerer Anhebe-Faktor
-
-                float mountainRaw = noise.cnoise(worldPos * mountainScale);
-                float mountainMask = math.saturate(mountainRaw * 0.5f + 0.5f);
-                float mountainFactor = math.smoothstep(mountainThreshold, 1f, mountainMask);
-
-                // Optionaler Kontinental-Noise (sehr grob skaliert)
-                const float continentalScale = 0.0004f;
-                const float continentalAmplitude = 0.06f; // geringerer Einfluss
-                float continentalRaw = noise.cnoise(worldPos * continentalScale);
-                float continentality = math.saturate(continentalRaw * 0.5f + 0.5f);
+                WorldNoiseOutput worldNoise = WorldNoise(worldPos, ref config.NoiseParams, ref noiseProfile);
 
                 // Basis-Höhenanteil (klima-unabhängig)
                 const float minHeightFrac = 0.36f;
                 const float maxHeightFrac = 0.86f;
-                float baseHeightFrac = math.lerp(minHeightFrac, maxHeightFrac, rawHeight01);
-
-                // Kontinentaler Bias: hebt/senkt Landmassen leicht
-                float continentalBias = math.lerp(-continentalAmplitude, continentalAmplitude, continentality);
-                baseHeightFrac = math.saturate(baseHeightFrac + continentalBias);
-
-                // Gebirge verstärken die Höhe
-                baseHeightFrac *= math.lerp(1f, mountainHeightMultiplier, mountainFactor);
-
-                // Leichter Klima-Einfluss auf die Höhe (Option B)
-                const float climateHeightInfluence = 0.1f; // etwas geringer
-                const float temperatureHeightBias = 0.5f; // kälter -> etwas höher
-                const float humidityHeightBias = -0.4f; // trockener -> etwas höher
-
-                float tempDeviation = temperature - 0.5f; // -0.5 .. 0.5
-                float humDeviation = humidity - 0.5f; // -0.5 .. 0.5
-
-                float climateMod = 1f + climateHeightInfluence *
-                    (temperatureHeightBias * tempDeviation + humidityHeightBias * humDeviation);
-
-                // Clamp Klima-Modifikator in sinnvollen Bereich
-                const float minClimateMod = 1f - climateHeightInfluence;
-                const float maxClimateMod = 1f + climateHeightInfluence;
-                climateMod = math.clamp(climateMod, minClimateMod, maxClimateMod);
-
-                baseHeightFrac = math.saturate(baseHeightFrac * climateMod);
+                float baseHeightFrac = math.lerp(minHeightFrac, maxHeightFrac, worldNoise.Height);
 
                 // Mappe finale Höhe mit Sicherheitsabstand zur Weltobergrenze (Top-Margin)
                 const int topMarginY = 8; // verhindert Abschneiden an WorldHeight
@@ -100,18 +49,11 @@ namespace Engine.Scripts.Jobs.Chunk
                 ChunkColumn col = new()
                 {
                     Height = height,
-                    Biome = SelectBiome(
-                        temperature,
-                        humidity,
-                        (float)height / maxY,
-                        height,
-                        config.WaterLevel,
-                        continentality,
-                        ref config),
-                    Temperature = temperature,
-                    Humidity = humidity
+                    Biome = BiomeCalculator.SelectBiome(ref worldNoise, ref config),
+                    Temperature = worldNoise.Temperature,
+                    Humidity = worldNoise.Humidity
                 };
-                uint seed = (uint)((chunkWordPos.x + x) ^ (chunkWordPos.y + z) ^ randomSeed ^ 0x85ebca6b);
+                uint seed = (uint)((chunkWordPos.x + x) ^ (chunkWordPos.z + z) ^ randomSeed ^ 0x85ebca6b);
                 Random rng = new(seed == 0 ? 1u : seed);
                 SelectSurfaceMaterials(ref config, ref col, ref rng);
                 chunkColumns[i] = col;
@@ -126,12 +68,13 @@ namespace Engine.Scripts.Jobs.Chunk
         /// <param name="waterLevel">Global water level used to place water or surface blocks.</param>
         /// <param name="chunkColumns">Per-column terrain metadata produced by <see cref="PrepareChunkMaps" />.</param>
         /// <param name="config">Generator configuration providing voxel IDs for stone, dirt, grass, etc.</param>
-        public static void FillTerrain(NativeArray<ushort> vox,
-            int waterLevel, NativeArray<ChunkColumn> chunkColumns, ref GeneratorConfig config)
+        public static void FillTerrain(NativeArray<ushort> vox, NativeArray<ChunkColumn> chunkColumns,
+            ref GeneratorConfig config)
         {
             const ushort air = 0;
             ushort waterBlock = config.Voxels["std:Water"].Id;
             ushort ice = config.Voxels["std:Ice"].Id;
+            int waterLevel = config.WaterLevel;
 
             for (int x = 0; x < ChunkWidth; x++)
             for (int z = 0; z < ChunkDepth; z++)
@@ -165,7 +108,7 @@ namespace Engine.Scripts.Jobs.Chunk
         private static void SelectSurfaceMaterials(ref GeneratorConfig config, ref ChunkColumn col, ref Random rng)
         {
             Biome.BiomeDef biomDef = config.BiomeDefs[col.Biome];
-            
+
             col.TopBlock = biomDef.topBlock;
             col.UnderBlock = biomDef.underBlock;
             col.StoneBlock = biomDef.stoneBlock;

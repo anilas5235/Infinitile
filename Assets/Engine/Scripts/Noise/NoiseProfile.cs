@@ -38,7 +38,7 @@ namespace Engine.Scripts.Noise
         /// <returns>Noise value in the range [0,1].</returns>
         public float GetNoise(float2 position)
         {
-            return ComputeNoise(position) * 0.5f + 0.5f;
+            return math.saturate(ComputeNoise(position) * 0.5f + 0.5f);
         }
 
         /// <summary>
@@ -52,7 +52,6 @@ namespace Engine.Scripts.Noise
             float frequency = 1f;
             float noiseSum = 0f;
 
-            // Seed als Float hinzufügen
             float2 samplePos = (position + _settings.Seed) / _settings.Scale;
 
             for (int i = 0; i < _settings.Octaves; i++)
@@ -98,22 +97,5 @@ namespace Engine.Scripts.Noise
             /// </summary>
             public int Octaves;
         }
-    }
-
-    /// <summary>
-    ///     Packed noise sample containing humidity, temperature and height components.
-    /// </summary>
-    [BurstCompile]
-    [StructLayout(LayoutKind.Sequential)]
-    public struct NoiseValue
-    {
-        /// <summary>Humidity value (typically 0..1).</summary>
-        public float Humidity;
-
-        /// <summary>Temperature value (typically 0..1).</summary>
-        public float Temperature;
-
-        /// <summary>Height component used for terrain shaping.</summary>
-        public float Height;
     }
 }

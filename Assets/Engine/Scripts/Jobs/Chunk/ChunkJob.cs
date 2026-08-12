@@ -42,26 +42,27 @@ namespace Engine.Scripts.Jobs.Chunk
         private void GenerateChunkData(int2 chunkPos, out ChunkVoxelData voxelData)
         {
             int surfaceArea = ChunkSize.x * ChunkSize.z;
-            int waterLevel = Config.WaterLevel;
 
             int3 chunkWorldPos = ChunkSize.MemberMultiply(chunkPos.x, 0, chunkPos.y);
 
-            NativeArray<ushort> vox = new(VoxelsPerChunk, Allocator.Temp);
+            NativeArray<ushort> chunkVoxels = new(VoxelsPerChunk, Allocator.Temp);
             NativeArray<ChunkColumn> chunkColumns = new(surfaceArea, Allocator.Temp);
 
-            PrepareChunkMaps(ref NoiseProfile, RandomSeed, ref Config, ref chunkWorldPos,
-                chunkColumns);
-            FillTerrain(vox, waterLevel, chunkColumns, ref Config);
-            PlaceOres(vox, Config, RandomSeed);
-            CarveCaves(vox, chunkWorldPos, chunkColumns, Config, RandomSeed,
-                CaveScale, LavaLevel);
-            PlaceStructures(ref vox, ref chunkColumns, ref chunkWorldPos,
-                RandomSeed, ref Config);
-            PlaceVegetation(ref vox, ref chunkColumns, ref chunkWorldPos,
-                RandomSeed, ref Config);
+            PrepareChunkMaps(ref NoiseProfile, RandomSeed, ref Config, ref chunkWorldPos, chunkColumns);
 
-            WriteToChunkData(vox, out voxelData);
-            vox.Dispose();
+            FillTerrain(chunkVoxels, chunkColumns, ref Config);
+
+            //PlaceOres(vox, Config, RandomSeed);
+
+            //CarveCaves(vox, chunkWorldPos, chunkColumns, Config, RandomSeed, CaveScale, LavaLevel);
+
+            //PlaceStructures(ref vox, ref chunkColumns, ref chunkWorldPos, RandomSeed, ref Config);
+
+            //PlaceVegetation(ref vox, ref chunkColumns, ref chunkWorldPos, RandomSeed, ref Config);
+
+            WriteToChunkData(chunkVoxels, out voxelData);
+            
+            chunkVoxels.Dispose();
             chunkColumns.Dispose();
         }
 

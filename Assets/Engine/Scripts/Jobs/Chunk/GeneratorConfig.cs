@@ -25,5 +25,7 @@ namespace Engine.Scripts.Jobs.Chunk
         
         [NativeDisableParallelForRestriction]
         public NativeHashMap<FixedString32Bytes, Voxel.VoxelDef> Voxels;
+        
+        public NoiseCalculator.NoiseParameters NoiseParams;
     }
 }
