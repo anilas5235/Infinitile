@@ -87,6 +87,13 @@ namespace Engine.Scripts.Utils
             GeneratorConfig cfg = generatorConfig;
             cfg.WaterLevel = Settings.Noise.WaterLevel;
             cfg.GlobalSeed = Settings.Seed;
+            cfg.NoiseParams = new NoiseCalculator.NoiseParameters
+            {
+                Seed = Settings.Seed,
+                HumidityScale = Settings.Noise.HumidityScale,
+                TemperatureScale = Settings.Noise.TemperatureScale,
+                ContinentalScale = Settings.Noise.ContinentalScale
+            };
             return new ChunkScheduler(Settings, chunkManager, noiseProfile, cfg, world);
         }
 

@@ -15,8 +15,14 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation
         [SerializeField] public Voxel.Voxel UnderBlock;
         
         [SerializeField] public Voxel.Voxel StoneBlock;
-        
-        
+
+        [Range(0f, 1f)] [SerializeField] public float TargetHumidity = 0.5f;
+
+        [Range(0f, 1f)] [SerializeField] public float TargetTemperature = 0.5f;
+
+        [Range(0f, 1f)] [SerializeField] public float TargetContinental = 0.5f;
+
+        [SerializeField] public Color RepresentativeColor = Color.magenta;
 
         public BiomeDef ToStruct(VoxelRegistry voxelRegistry)
         {
@@ -25,6 +31,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation
                 topBlock = voxelRegistry.GetIdOrThrow(TopBlock.GetFullName()),
                 underBlock = voxelRegistry.GetIdOrThrow(UnderBlock.GetFullName()),
                 stoneBlock = voxelRegistry.GetIdOrThrow(StoneBlock.GetFullName()),
+                targetHumidity = TargetHumidity,
+                targetTemperature = TargetTemperature,
+                targetContinental = TargetContinental
             };
         }
 
@@ -33,6 +42,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation
             public ushort topBlock;
             public ushort underBlock;
             public ushort stoneBlock;
+            public float targetHumidity;
+            public float targetTemperature;
+            public float targetContinental;
 
             public void Dispose()
             {

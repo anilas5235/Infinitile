@@ -1,0 +1,777 @@
+using System.Collections.Generic;
+using Engine.Scripts.Jobs.Chunk;
+using Engine.Scripts.Noise;
+using Engine.Scripts.Settings;
+using Engine.Scripts.VoxelConfig.Data.Voxel;
+using Unity.Burst;
+using Unity.Collections;
+using Unity.Jobs;
+using Unity.Mathematics;
+using UnityEditor;
+using UnityEngine;
+
+namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
+{
+    public class WorldGenerationPreviewWindow : EditorWindow
+    {
+        private const int HumidityTemperaturePhaseResolution = 100;
+        private static readonly int[] ResolutionOptions = { 128, 256, 512, 1024 };
+
+        private readonly List<VoxelDataPackage> _packages = new();
+        private readonly List<Biome> _biomes = new();
+
+        private VoxelEngineSettings _settings;
+        private UnityEditor.Editor _biomeEditor;
+
+        private Texture2D _biomeTexture;
+        private Texture2D _heightTexture;
+        private Texture2D _climateTexture;
+        private Texture2D _humidityTemperatureTexture;
+
+        private int _selectedBiomeIndex;
+        private int _resolutionIndex;
+        private Vector2Int _worldOffset;
+        private bool _showHumidity = true;
+        private bool _showTemperature = true;
+        private bool _showContinental = true;
+        private float _phaseContinental = 0.5f;
+        private bool _autoRebuild = true;
+        private bool _needsRebuild = true;
+        private bool _isDragging;
+        private Vector2 _dragStartMouse;
+        private Vector2Int _dragStartOffset;
+        private bool _buildInProgress;
+        private JobHandle _buildHandle;
+
+        private NativeArray<float3> _jobBiomeTargets;
+        private NativeArray<Color32> _jobBiomeColors;
+        private NativeArray<Color32> _jobBiomePixels;
+        private NativeArray<Color32> _jobHeightPixels;
+        private NativeArray<Color32> _jobClimatePixels;
+        private NativeArray<Color32> _jobHumidityTemperaturePixels;
+        private int _jobResolution;
+
+        [MenuItem("Infinitile/World Generation Preview")]
+        private static void OpenWindow()
+        {
+            WorldGenerationPreviewWindow window = GetWindow<WorldGenerationPreviewWindow>();
+            window.titleContent = new GUIContent("World Gen Preview");
+            window.minSize = new Vector2(920f, 620f);
+            window.Show();
+        }
+
+        private void OnEnable()
+        {
+            EditorApplication.update += OnEditorUpdate;
+            ReloadAssets();
+            _needsRebuild = true;
+        }
+
+        private void OnDisable()
+        {
+            EditorApplication.update -= OnEditorUpdate;
+
+            if (_biomeEditor != null)
+            {
+                DestroyImmediate(_biomeEditor);
+                _biomeEditor = null;
+            }
+
+            FinalizeScheduledBuild(false);
+
+            DestroyTexture(ref _biomeTexture);
+            DestroyTexture(ref _heightTexture);
+            DestroyTexture(ref _climateTexture);
+            DestroyTexture(ref _humidityTemperatureTexture);
+        }
+
+        private void OnEditorUpdate()
+        {
+            if (_buildInProgress && _buildHandle.IsCompleted)
+            {
+                FinalizeScheduledBuild(true);
+                Repaint();
+            }
+
+            if (_autoRebuild && _needsRebuild && !_buildInProgress)
+            {
+                ScheduleBuild();
+            }
+        }
+
+        private void OnGUI()
+        {
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.BeginHorizontal();
+
+            EditorGUILayout.BeginVertical();
+            DrawToolbar();
+            DrawBiomeDistributionView();
+            EditorGUILayout.EndVertical();
+
+            DrawViews();
+            DrawBiomeEditorPanel();
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                RequestRebuild();
+            }
+
+            EditorGUILayout.EndHorizontal();
+        }
+
+        private void DrawToolbar()
+        {
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.LabelField("Data Source", EditorStyles.boldLabel);
+            _settings = (VoxelEngineSettings)EditorGUILayout.ObjectField("VoxelEngineSettings", _settings,
+                typeof(VoxelEngineSettings), false);
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Reload SOs", GUILayout.Width(120f)))
+            {
+                ReloadAssets();
+            }
+
+            using (new EditorGUI.DisabledScope(_buildInProgress))
+            {
+                if (GUILayout.Button("Rebuild", GUILayout.Width(120f)))
+                {
+                    _needsRebuild = true;
+                    ScheduleBuild();
+                }
+            }
+
+            _autoRebuild = EditorGUILayout.ToggleLeft("Auto Rebuild", _autoRebuild, GUILayout.Width(120f));
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.EndVertical();
+        }
+
+        private void DrawBiomeDistributionView()
+        {
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.LabelField("BiomeDistribution", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Humidity/Temperature Phase View", EditorStyles.boldLabel);
+            _phaseContinental = EditorGUILayout.Slider("Continental", _phaseContinental, 0f, 1f);
+            DrawView("Biome Distribution (X=Hum, Y=Temp)", EditorStyles.helpBox, _humidityTemperatureTexture, false);
+            EditorGUILayout.EndVertical();
+        }
+
+        private void DrawBiomeEditorPanel()
+        {
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.LabelField("Biome Editing", EditorStyles.boldLabel);
+
+            if (_biomes.Count == 0)
+            {
+                EditorGUILayout.HelpBox("Keine Biome in den geladenen VoxelDataPackages gefunden.",
+                    MessageType.Warning);
+                EditorGUILayout.EndVertical();
+                return;
+            }
+
+            string[] biomeNames = new string[_biomes.Count];
+            for (int i = 0; i < _biomes.Count; i++)
+            {
+                biomeNames[i] = _biomes[i] ? _biomes[i].name : "<null>";
+            }
+
+            int newIndex = EditorGUILayout.Popup("Active Biome", _selectedBiomeIndex, biomeNames);
+            if (newIndex != _selectedBiomeIndex)
+            {
+                _selectedBiomeIndex = newIndex;
+                CreateBiomeEditor();
+            }
+
+            if (_biomeEditor != null)
+            {
+                _biomeEditor.OnInspectorGUI();
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        private void DrawViews()
+        {
+            if (!_settings)
+            {
+                EditorGUILayout.HelpBox("Bitte ein VoxelEngineSettings-Asset auswählen.", MessageType.Info);
+                return;
+            }
+
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            {
+                _worldOffset = EditorGUILayout.Vector2IntField("World Offset (X/Z)", _worldOffset);
+                _resolutionIndex = EditorGUILayout.Popup("Resolution", _resolutionIndex, new[]
+                {
+                    $"{ResolutionOptions[0]}x{ResolutionOptions[0]}",
+                    $"{ResolutionOptions[1]}x{ResolutionOptions[1]}",
+                    $"{ResolutionOptions[2]}x{ResolutionOptions[2]}",
+                    $"{ResolutionOptions[3]}x{ResolutionOptions[3]}",
+                });
+
+                EditorGUILayout.Space();
+                EditorGUILayout.Separator();
+
+                EditorGUILayout.BeginHorizontal();
+                {
+                    EditorGUILayout.BeginVertical();
+                    {
+                        EditorGUILayout.LabelField("Climate RGB Channels", EditorStyles.boldLabel);
+                        _showHumidity = EditorGUILayout.ToggleLeft("Humidity (R)", _showHumidity);
+                        _showTemperature = EditorGUILayout.ToggleLeft("Temperature (G)", _showTemperature);
+                        _showContinental = EditorGUILayout.ToggleLeft("Continental (B)", _showContinental);
+
+                        DrawView("Climate", EditorStyles.helpBox, _climateTexture, true);
+                    }
+                    EditorGUILayout.EndVertical();
+                    EditorGUILayout.BeginVertical();
+                    {
+                        DrawView("Biome View", EditorStyles.label, _biomeTexture, true);
+                        DrawView("HeightMap", EditorStyles.helpBox, _heightTexture, true);
+                    }
+                    EditorGUILayout.EndVertical();
+                }
+                EditorGUILayout.EndHorizontal();
+            }
+            EditorGUILayout.EndVertical();
+        }
+
+        private void DrawView(string viewTitle, GUIStyle style, Texture2D texture, bool allowPan)
+        {
+            EditorGUILayout.BeginVertical(style, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+            EditorGUILayout.LabelField(viewTitle, EditorStyles.boldLabel);
+
+            Rect rect = GUILayoutUtility.GetRect(200f, 280f, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+            EditorGUI.DrawRect(rect, new Color(0.1f, 0.1f, 0.1f, 1f));
+            if (texture)
+            {
+                GUI.DrawTexture(rect, texture, ScaleMode.ScaleToFit, false);
+            }
+
+            if (allowPan)
+            {
+                HandlePanInput(rect);
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        private void HandlePanInput(Rect viewRect)
+        {
+            Event e = Event.current;
+            if (e == null)
+            {
+                return;
+            }
+
+            if (e.type == EventType.MouseDown && e.button == 0 && viewRect.Contains(e.mousePosition))
+            {
+                _isDragging = true;
+                _dragStartMouse = e.mousePosition;
+                _dragStartOffset = _worldOffset;
+                e.Use();
+                return;
+            }
+
+            if (e.type == EventType.MouseDrag && _isDragging)
+            {
+                Vector2 delta = e.mousePosition - _dragStartMouse;
+                _worldOffset = _dragStartOffset - new Vector2Int(Mathf.RoundToInt(delta.x), Mathf.RoundToInt(delta.y));
+                RequestRebuild();
+                Repaint();
+                e.Use();
+                return;
+            }
+
+            if (e.type == EventType.MouseUp && _isDragging)
+            {
+                _isDragging = false;
+                e.Use();
+            }
+        }
+
+        private void ReloadAssets()
+        {
+            if (!_settings)
+            {
+                string[] settingsGuids = AssetDatabase.FindAssets("t:VoxelEngineSettings");
+                if (settingsGuids.Length > 0)
+                {
+                    string settingsPath = AssetDatabase.GUIDToAssetPath(settingsGuids[0]);
+                    _settings = AssetDatabase.LoadAssetAtPath<VoxelEngineSettings>(settingsPath);
+                }
+            }
+
+            _packages.Clear();
+            _biomes.Clear();
+
+            string[] packageGuids = AssetDatabase.FindAssets("t:VoxelDataPackage");
+            HashSet<Biome> uniqueBiomes = new();
+            foreach (string guid in packageGuids)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                VoxelDataPackage package = AssetDatabase.LoadAssetAtPath<VoxelDataPackage>(path);
+                if (package == null)
+                {
+                    continue;
+                }
+
+                _packages.Add(package);
+                if (package.biomes == null)
+                {
+                    continue;
+                }
+
+                foreach (Biome biome in package.biomes)
+                {
+                    if (biome == null || !uniqueBiomes.Add(biome))
+                    {
+                        continue;
+                    }
+
+                    _biomes.Add(biome);
+                }
+            }
+
+            _selectedBiomeIndex = Mathf.Clamp(_selectedBiomeIndex, 0, Mathf.Max(0, _biomes.Count - 1));
+            CreateBiomeEditor();
+            RequestRebuild();
+            Repaint();
+        }
+
+        private void CreateBiomeEditor()
+        {
+            if (_biomeEditor)
+            {
+                DestroyImmediate(_biomeEditor);
+                _biomeEditor = null;
+            }
+
+            if (_selectedBiomeIndex < 0 || _selectedBiomeIndex >= _biomes.Count)
+            {
+                return;
+            }
+
+            Biome biome = _biomes[_selectedBiomeIndex];
+            if (biome)
+            {
+                UnityEditor.Editor.CreateCachedEditor(biome, null, ref _biomeEditor);
+            }
+        }
+
+        private void RequestRebuild()
+        {
+            _needsRebuild = true;
+            if (_autoRebuild && !_buildInProgress)
+            {
+                ScheduleBuild();
+            }
+        }
+
+        private void ScheduleBuild()
+        {
+            if (_buildInProgress || !_needsRebuild)
+            {
+                return;
+            }
+
+            if (!_settings || !_settings.Noise)
+            {
+                return;
+            }
+
+            int biomeCount = _biomes.Count;
+            int resolution = ResolutionOptions[Mathf.Clamp(_resolutionIndex, 0, ResolutionOptions.Length - 1)];
+            int pixelCount = resolution * resolution;
+            int phasePixelCount = HumidityTemperaturePhaseResolution * HumidityTemperaturePhaseResolution;
+
+            if (biomeCount == 0)
+            {
+                EnsureTexture(ref _biomeTexture, resolution);
+                EnsureTexture(ref _heightTexture, resolution);
+                EnsureTexture(ref _climateTexture, resolution);
+                EnsureTexture(ref _humidityTemperatureTexture, HumidityTemperaturePhaseResolution);
+                FillTexture(_biomeTexture, Color.black);
+                FillTexture(_heightTexture, Color.black);
+                FillTexture(_climateTexture, Color.black);
+                FillTexture(_humidityTemperatureTexture, Color.black);
+                _needsRebuild = false;
+                return;
+            }
+
+            DisposeJobData();
+
+            _jobResolution = resolution;
+            _jobBiomeTargets = new NativeArray<float3>(biomeCount, Allocator.TempJob);
+            _jobBiomeColors = new NativeArray<Color32>(biomeCount, Allocator.TempJob);
+            _jobBiomePixels = new NativeArray<Color32>(pixelCount, Allocator.TempJob);
+            _jobHeightPixels = new NativeArray<Color32>(pixelCount, Allocator.TempJob);
+            _jobClimatePixels = new NativeArray<Color32>(pixelCount, Allocator.TempJob);
+            _jobHumidityTemperaturePixels = new NativeArray<Color32>(phasePixelCount, Allocator.TempJob);
+
+            for (int i = 0; i < biomeCount; i++)
+            {
+                Biome biome = _biomes[i];
+                if (!biome)
+                {
+                    _jobBiomeTargets[i] = new float3(0.5f, 0.5f, 0.5f);
+                    _jobBiomeColors[i] = new Color32(0, 0, 0, 255);
+                    continue;
+                }
+
+                _jobBiomeTargets[i] =
+                    new float3(biome.TargetHumidity, biome.TargetTemperature, biome.TargetContinental);
+                _jobBiomeColors[i] = biome.RepresentativeColor;
+            }
+
+            NoiseProfile noiseProfile = new(new NoiseProfile.Settings
+            {
+                Seed = _settings.Seed,
+                Scale = _settings.Noise.Scale,
+                Persistance = _settings.Noise.Persistance,
+                Lacunarity = _settings.Noise.Lacunarity,
+                Octaves = _settings.Noise.Octaves
+            });
+
+            NoiseCalculator.NoiseParameters noiseParams = new()
+            {
+                Seed = _settings.Seed,
+                HumidityScale = _settings.Noise.HumidityScale,
+                TemperatureScale = _settings.Noise.TemperatureScale,
+                ContinentalScale = _settings.Noise.ContinentalScale
+            };
+
+            BiomeWorldViewJob biomeJob = new()
+            {
+                Resolution = resolution,
+                WorldOffsetX = _worldOffset.x,
+                WorldOffsetZ = _worldOffset.y,
+                NoiseProfile = noiseProfile,
+                NoiseParams = noiseParams,
+                BiomeTargets = _jobBiomeTargets,
+                BiomeColors = _jobBiomeColors,
+                Output = _jobBiomePixels
+            };
+
+            HeightWorldViewJob heightJob = new()
+            {
+                Resolution = resolution,
+                WorldOffsetX = _worldOffset.x,
+                WorldOffsetZ = _worldOffset.y,
+                NoiseProfile = noiseProfile,
+                NoiseParams = noiseParams,
+                Output = _jobHeightPixels
+            };
+
+            ClimateWorldViewJob climateJob = new()
+            {
+                Resolution = resolution,
+                WorldOffsetX = _worldOffset.x,
+                WorldOffsetZ = _worldOffset.y,
+                NoiseProfile = noiseProfile,
+                NoiseParams = noiseParams,
+                ShowHumidity = _showHumidity ? (byte)1 : (byte)0,
+                ShowTemperature = _showTemperature ? (byte)1 : (byte)0,
+                ShowContinental = _showContinental ? (byte)1 : (byte)0,
+                Output = _jobClimatePixels
+            };
+
+            HumidityTemperatureBiomePhaseJob phaseJob = new()
+            {
+                Resolution = HumidityTemperaturePhaseResolution,
+                Continental = _phaseContinental,
+                BiomeTargets = _jobBiomeTargets,
+                BiomeColors = _jobBiomeColors,
+                Output = _jobHumidityTemperaturePixels
+            };
+
+            JobHandle biomeHandle = biomeJob.Schedule(pixelCount, 64);
+            JobHandle heightHandle = heightJob.Schedule(pixelCount, 64);
+            JobHandle climateHandle = climateJob.Schedule(pixelCount, 64);
+            JobHandle phaseHandle = phaseJob.Schedule(phasePixelCount, 64);
+
+            JobHandle combined = JobHandle.CombineDependencies(biomeHandle, heightHandle);
+            combined = JobHandle.CombineDependencies(combined, climateHandle);
+            combined = JobHandle.CombineDependencies(combined, phaseHandle);
+
+            _buildHandle = combined;
+            _buildInProgress = true;
+            _needsRebuild = false;
+        }
+
+        private void FinalizeScheduledBuild(bool applyResult)
+        {
+            if (!_buildInProgress)
+            {
+                DisposeJobData();
+                return;
+            }
+
+            _buildHandle.Complete();
+
+            if (applyResult)
+            {
+                EnsureTexture(ref _biomeTexture, _jobResolution);
+                EnsureTexture(ref _heightTexture, _jobResolution);
+                EnsureTexture(ref _climateTexture, _jobResolution);
+                EnsureTexture(ref _humidityTemperatureTexture, HumidityTemperaturePhaseResolution);
+
+                _biomeTexture.SetPixelData(_jobBiomePixels, 0);
+                _heightTexture.SetPixelData(_jobHeightPixels, 0);
+                _climateTexture.SetPixelData(_jobClimatePixels, 0);
+                _humidityTemperatureTexture.SetPixelData(_jobHumidityTemperaturePixels, 0);
+                _biomeTexture.Apply(false);
+                _heightTexture.Apply(false);
+                _climateTexture.Apply(false);
+                _humidityTemperatureTexture.Apply(false);
+            }
+
+            DisposeJobData();
+            _buildInProgress = false;
+        }
+
+        private void DisposeJobData()
+        {
+            if (_jobBiomeTargets.IsCreated)
+            {
+                _jobBiomeTargets.Dispose();
+            }
+
+            if (_jobBiomeColors.IsCreated)
+            {
+                _jobBiomeColors.Dispose();
+            }
+
+            if (_jobBiomePixels.IsCreated)
+            {
+                _jobBiomePixels.Dispose();
+            }
+
+            if (_jobHeightPixels.IsCreated)
+            {
+                _jobHeightPixels.Dispose();
+            }
+
+            if (_jobClimatePixels.IsCreated)
+            {
+                _jobClimatePixels.Dispose();
+            }
+
+            if (_jobHumidityTemperaturePixels.IsCreated)
+            {
+                _jobHumidityTemperaturePixels.Dispose();
+            }
+        }
+
+        private static void EnsureTexture(ref Texture2D texture, int size)
+        {
+            if (texture && texture.width == size && texture.height == size)
+            {
+                return;
+            }
+
+            DestroyTexture(ref texture);
+            texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "WorldGenPreviewTexture",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+        }
+
+        private static void FillTexture(Texture2D texture, Color color)
+        {
+            if (!texture)
+            {
+                return;
+            }
+
+            Color[] colors = new Color[texture.width * texture.height];
+            for (int i = 0; i < colors.Length; i++)
+            {
+                colors[i] = color;
+            }
+
+            texture.SetPixels(colors);
+            texture.Apply(false);
+        }
+
+        private static void DestroyTexture(ref Texture2D texture)
+        {
+            if (!texture)
+            {
+                return;
+            }
+
+            DestroyImmediate(texture);
+            texture = null;
+        }
+
+        [BurstCompile]
+        private struct BiomeWorldViewJob : IJobParallelFor
+        {
+            public int Resolution;
+            public int WorldOffsetX;
+            public int WorldOffsetZ;
+            public NoiseProfile NoiseProfile;
+            public NoiseCalculator.NoiseParameters NoiseParams;
+
+            [ReadOnly] public NativeArray<float3> BiomeTargets;
+            [ReadOnly] public NativeArray<Color32> BiomeColors;
+            [WriteOnly] public NativeArray<Color32> Output;
+
+            public void Execute(int index)
+            {
+                int x = index % Resolution;
+                int z = index / Resolution;
+                float2 worldPos = new(WorldOffsetX + x, WorldOffsetZ + z);
+                NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref NoiseParams,
+                    ref NoiseProfile);
+                int biomeIndex = SelectBestBiomeIndex(noise.Humidity, noise.Temperature, noise.Continental);
+                Output[index] = biomeIndex >= 0 ? BiomeColors[biomeIndex] : new Color32(0, 0, 0, 255);
+            }
+
+            private int SelectBestBiomeIndex(float humidity, float temperature, float continental)
+            {
+                if (BiomeTargets.Length == 0)
+                {
+                    return -1;
+                }
+
+                int bestIndex = 0;
+                float bestDistance = float.MaxValue;
+                for (int i = 0; i < BiomeTargets.Length; i++)
+                {
+                    float3 target = BiomeTargets[i];
+                    float distance = BiomeCalculator.ClimateDistanceSq(
+                        humidity,
+                        temperature,
+                        continental,
+                        target.x,
+                        target.y,
+                        target.z);
+                    if (distance >= bestDistance)
+                    {
+                        continue;
+                    }
+
+                    bestDistance = distance;
+                    bestIndex = i;
+                }
+
+                return bestIndex;
+            }
+        }
+
+        [BurstCompile]
+        private struct HeightWorldViewJob : IJobParallelFor
+        {
+            public int Resolution;
+            public int WorldOffsetX;
+            public int WorldOffsetZ;
+            public NoiseProfile NoiseProfile;
+            public NoiseCalculator.NoiseParameters NoiseParams;
+
+            [WriteOnly] public NativeArray<Color32> Output;
+
+            public void Execute(int index)
+            {
+                int x = index % Resolution;
+                int z = index / Resolution;
+                float2 worldPos = new(WorldOffsetX + x, WorldOffsetZ + z);
+                NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref NoiseParams,
+                    ref NoiseProfile);
+                byte value = (byte)math.round(math.saturate(noise.Height) * 255f);
+                Output[index] = new Color32(value, value, value, 255);
+            }
+        }
+
+        [BurstCompile]
+        private struct ClimateWorldViewJob : IJobParallelFor
+        {
+            public int Resolution;
+            public int WorldOffsetX;
+            public int WorldOffsetZ;
+            public NoiseProfile NoiseProfile;
+            public NoiseCalculator.NoiseParameters NoiseParams;
+            public byte ShowHumidity;
+            public byte ShowTemperature;
+            public byte ShowContinental;
+
+            [WriteOnly] public NativeArray<Color32> Output;
+
+            public void Execute(int index)
+            {
+                int x = index % Resolution;
+                int z = index / Resolution;
+                float2 worldPos = new(WorldOffsetX + x, WorldOffsetZ + z);
+                NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref NoiseParams,
+                    ref NoiseProfile);
+
+                byte humidity = ShowHumidity == 1 ? (byte)math.round(math.saturate(noise.Humidity) * 255f) : (byte)0;
+                byte temperature =
+                    ShowTemperature == 1 ? (byte)math.round(math.saturate(noise.Temperature) * 255f) : (byte)0;
+                byte continental =
+                    ShowContinental == 1 ? (byte)math.round(math.saturate(noise.Continental) * 255f) : (byte)0;
+
+                Output[index] = new Color32(humidity, temperature, continental, 255);
+            }
+        }
+
+        [BurstCompile]
+        private struct HumidityTemperatureBiomePhaseJob : IJobParallelFor
+        {
+            public int Resolution;
+            public float Continental;
+
+            [ReadOnly] public NativeArray<float3> BiomeTargets;
+            [ReadOnly] public NativeArray<Color32> BiomeColors;
+            [WriteOnly] public NativeArray<Color32> Output;
+
+            public void Execute(int index)
+            {
+                int x = index % Resolution;
+                int y = index / Resolution;
+                float humidity = x * 0.01f + 0.005f;
+                float temperature = y * 0.01f + 0.005f;
+                int biomeIndex = SelectBestBiomeIndex(humidity, temperature, Continental);
+                Output[index] = biomeIndex >= 0 && biomeIndex < BiomeColors.Length
+                    ? BiomeColors[biomeIndex]
+                    : new Color32(0, 0, 0, 255);
+            }
+
+            private int SelectBestBiomeIndex(float humidity, float temperature, float continental)
+            {
+                if (BiomeTargets.Length == 0)
+                {
+                    return -1;
+                }
+
+                int bestIndex = 0;
+                float bestDistance = float.MaxValue;
+                for (int i = 0; i < BiomeTargets.Length; i++)
+                {
+                    float3 target = BiomeTargets[i];
+                    float distance = BiomeCalculator.ClimateDistanceSq(
+                        humidity,
+                        temperature,
+                        continental,
+                        target.x,
+                        target.y,
+                        target.z);
+                    if (distance >= bestDistance)
+                    {
+                        continue;
+                    }
+
+                    bestDistance = distance;
+                    bestIndex = i;
+                }
+
+                return bestIndex;
+            }
+        }
+    }
+}

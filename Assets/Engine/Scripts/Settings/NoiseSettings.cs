@@ -37,5 +37,14 @@ namespace Engine.Scripts.Settings
         /// </summary>
         [Tooltip("Number of octaves.")]
         public int Octaves = 4;
+
+        [Tooltip("Scale factor for humidity climate noise sampling.")]
+        public float HumidityScale = 0.0012f;
+
+        [Tooltip("Scale factor for temperature climate noise sampling.")]
+        public float TemperatureScale = 0.0012f;
+
+        [Tooltip("Scale factor for continental climate noise sampling.")]
+        public float ContinentalScale = 0.0012f;
     }
 }
