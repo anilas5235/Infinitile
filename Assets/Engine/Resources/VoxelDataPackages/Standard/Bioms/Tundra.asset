@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 73ce5c2ac5ec3364a915ef3d1b97af22, type: 3}
-  m_Name: Plains
+  m_Name: Tundra
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.VoxelConfig.Data.Generation.Biome
-  TopBlock: {fileID: 11400000, guid: 2e8eca1efe0447d4b845f277ce2ada8f, type: 2}
+  TopBlock: {fileID: 11400000, guid: bbd609c54f9fb07488a90c8376ce0fa2, type: 2}
   UnderBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
-  TargetHumidity: 0.45
-  TargetTemperature: 0.55
-  TargetContinental: 0.4
-  TargetHeight: 0.3
-  RepresentativeColor: {r: 0.67952645, g: 0.83396226, b: 0.27536482, a: 1}
+  TargetHumidity: 0.25
+  TargetTemperature: 0.1
+  TargetContinental: 0.45
+  TargetHeight: 0.35
+  RepresentativeColor: {r: 0.8867924, g: 0.8395356, b: 0.62075466, a: 1}

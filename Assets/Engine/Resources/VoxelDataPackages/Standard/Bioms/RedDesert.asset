@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 73ce5c2ac5ec3364a915ef3d1b97af22, type: 3}
-  m_Name: Plains
+  m_Name: RedDesert
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.VoxelConfig.Data.Generation.Biome
-  TopBlock: {fileID: 11400000, guid: 2e8eca1efe0447d4b845f277ce2ada8f, type: 2}
-  UnderBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
+  TopBlock: {fileID: 11400000, guid: 9cf114b1c56383b448012d6a5b9d8b72, type: 2}
+  UnderBlock: {fileID: 11400000, guid: eeed6c09b1b96c04faeab22d816e1b62, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
-  TargetHumidity: 0.45
-  TargetTemperature: 0.55
-  TargetContinental: 0.4
-  TargetHeight: 0.3
-  RepresentativeColor: {r: 0.67952645, g: 0.83396226, b: 0.27536482, a: 1}
+  TargetHumidity: 0.05
+  TargetTemperature: 0.85
+  TargetContinental: 0.55
+  TargetHeight: 0.4
+  RepresentativeColor: {r: 0.86415094, g: 0.28081894, b: 0, a: 1}

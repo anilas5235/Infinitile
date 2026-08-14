@@ -13,16 +13,13 @@ namespace Engine.Scripts.Jobs.Chunk
             public float Humidity;
             public float Temperature;
             public float Continental;
-            public float Height;
+            public float Elevation;
         }
 
         public static ushort SelectBiome(ref BiomSectionInput input, ref GeneratorConfig config)
         {
             NativeArray<Biome.BiomeDef> bioms = config.BiomeDefs;
-            if (bioms.Length == 0)
-            {
-                return 0;
-            }
+            if (bioms.Length == 0) return 0;
 
             ushort bestIndex = 0;
             float bestDistance = float.MaxValue;
@@ -33,13 +30,10 @@ namespace Engine.Scripts.Jobs.Chunk
                 float dh = input.Humidity - biome.targetHumidity;
                 float dt = input.Temperature - biome.targetTemperature;
                 float dc = input.Continental - biome.targetContinental;
-                float dHeight = input.Height - biome.targetHeight;
-                float distance = math.lengthsq(new float4(dh, dt, dc, dHeight));
+                float de = input.Elevation - biome.targetHeight;
+                float distance = math.lengthsq(new float4(dh, dt, dc, de));
 
-                if (distance >= bestDistance)
-                {
-                    continue;
-                }
+                if (distance >= bestDistance) continue;
 
                 bestDistance = distance;
                 bestIndex = i;

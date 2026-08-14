@@ -463,7 +463,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             {
                 Resolution = ViewResolution,
                 Continental = _phaseContinental,
-                Height = _phaseHeight,
+                Elevation = _phaseHeight,
                 Config = _generatorConfig,
                 BiomeColors = _jobBiomeColors,
                 Output = _jobHumidityTemperaturePixels
@@ -597,7 +597,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 BiomeWorldView[index] = BiomeColors[biomeIndex];
 
                 //HeightWorldView
-                byte value = (byte)math.round(math.saturate(noise.Height) * 255f);
+                byte value = (byte)math.round(math.saturate(noise.Elevation) * 255f);
                 HeightWorldView[index] = new Color32(value, value, value, 255);
 
                 //ClimateWorldView
@@ -616,7 +616,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         {
             public int Resolution;
             public float Continental;
-            public float Height;
+            public float Elevation;
 
             [ReadOnly] public GeneratorConfig Config;
             [ReadOnly] public NativeArray<Color32> BiomeColors;
@@ -634,7 +634,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                     Humidity = humidity,
                     Temperature = temperature,
                     Continental = Continental,
-                    Height = Height
+                    Elevation = Elevation
                 };
                 ushort biomeIndex = BiomeCalculator.SelectBiome(ref input, ref Config);
                 Output[index] = BiomeColors[biomeIndex];

@@ -38,7 +38,7 @@ namespace Engine.Scripts.Jobs.Chunk
                 // Basis-Höhenanteil (klima-unabhängig)
                 const float minHeightFrac = 0.36f;
                 const float maxHeightFrac = 0.86f;
-                float baseHeightFrac = math.lerp(minHeightFrac, maxHeightFrac, worldNoise.Height);
+                float baseHeightFrac = math.lerp(minHeightFrac, maxHeightFrac, worldNoise.Elevation);
 
                 // Mappe finale Höhe mit Sicherheitsabstand zur Weltobergrenze (Top-Margin)
                 const int topMarginY = 8; // verhindert Abschneiden an WorldHeight

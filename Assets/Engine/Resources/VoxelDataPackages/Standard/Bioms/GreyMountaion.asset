@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 73ce5c2ac5ec3364a915ef3d1b97af22, type: 3}
-  m_Name: Plains
+  m_Name: GreyMountaion
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.VoxelConfig.Data.Generation.Biome
-  TopBlock: {fileID: 11400000, guid: 2e8eca1efe0447d4b845f277ce2ada8f, type: 2}
-  UnderBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
+  TopBlock: {fileID: 11400000, guid: 2a1844411e45fba40a1da565a805687e, type: 2}
+  UnderBlock: {fileID: 11400000, guid: 10218f21e1d9ac948ac6846e1469b188, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
-  TargetHumidity: 0.45
-  TargetTemperature: 0.55
-  TargetContinental: 0.4
-  TargetHeight: 0.3
-  RepresentativeColor: {r: 0.67952645, g: 0.83396226, b: 0.27536482, a: 1}
+  TargetHumidity: 0.15
+  TargetTemperature: 0.1
+  TargetContinental: 0.9
+  TargetHeight: 0.95
+  RepresentativeColor: {r: 0.2679245, g: 0.2679245, b: 0.2679245, a: 1}
