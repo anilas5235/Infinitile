@@ -93,7 +93,6 @@ namespace Engine.Scripts.World
         /// </summary>
         private void ConstructEngineComponents()
         {
-            _noiseProfile = VoxelEngineProvider.Current.NoiseProfile();
             ChunkManager = VoxelEngineProvider.Current.ChunkManager();
             ChunkManager.OnChunkChange += RaiseChunkChanged;
 
@@ -115,7 +114,6 @@ namespace Engine.Scripts.World
 
             _chunkScheduler = VoxelEngineProvider.Current.ChunkDataScheduler(
                 ChunkManager,
-                _noiseProfile,
                 DataImporter.Instance.CreateConfig(),
                 this
             );

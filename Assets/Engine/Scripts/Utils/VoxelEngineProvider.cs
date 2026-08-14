@@ -1,5 +1,4 @@
 ﻿using Engine.Scripts.Components;
-using Engine.Scripts.Jobs;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.ColliderMeshing;
@@ -7,7 +6,6 @@ using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Noise;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils.Provider;
-using Engine.Scripts.VoxelConfig.Data;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using UnityEngine;
@@ -28,7 +26,7 @@ namespace Engine.Scripts.Utils
         /// <summary>
         ///     Creates a new noise profile from current <see cref="Settings" />.
         /// </summary>
-        internal NoiseProfile NoiseProfile()
+        private NoiseProfile NoiseProfile()
         {
             return new NoiseProfile(
                 new NoiseProfile.Settings
@@ -40,6 +38,17 @@ namespace Engine.Scripts.Utils
                     Octaves = Settings.Noise.Octaves
                 }
             );
+        }
+        
+        private NoiseCalculator.NoiseParameters NoiseParameters()
+        {
+            return new NoiseCalculator.NoiseParameters
+            {
+                Seed = Settings.Seed,
+                HumidityScale = Settings.Noise.HumidityScale,
+                TemperatureScale = Settings.Noise.TemperatureScale,
+                ContinentalScale = Settings.Noise.ContinentalScale
+            };
         }
 
         /// <summary>
@@ -79,7 +88,6 @@ namespace Engine.Scripts.Utils
         /// </summary>
         internal ChunkScheduler ChunkDataScheduler(
             ChunkManager chunkManager,
-            NoiseProfile noiseProfile,
             GeneratorConfig generatorConfig,
             VoxelWorld world
         )
@@ -87,14 +95,9 @@ namespace Engine.Scripts.Utils
             GeneratorConfig cfg = generatorConfig;
             cfg.WaterLevel = Settings.Noise.WaterLevel;
             cfg.GlobalSeed = Settings.Seed;
-            cfg.NoiseParams = new NoiseCalculator.NoiseParameters
-            {
-                Seed = Settings.Seed,
-                HumidityScale = Settings.Noise.HumidityScale,
-                TemperatureScale = Settings.Noise.TemperatureScale,
-                ContinentalScale = Settings.Noise.ContinentalScale
-            };
-            return new ChunkScheduler(Settings, chunkManager, noiseProfile, cfg, world);
+            cfg.NoiseParams = NoiseParameters();
+            cfg.NoiseProfile = Current.NoiseProfile();
+            return new ChunkScheduler(Settings, chunkManager, cfg, world);
         }
 
         /// <summary>

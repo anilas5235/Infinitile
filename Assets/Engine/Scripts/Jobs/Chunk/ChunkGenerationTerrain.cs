@@ -24,8 +24,8 @@ namespace Engine.Scripts.Jobs.Chunk
         /// <param name="config">Generator configuration providing water level and voxel IDs.</param>
         /// <param name="chunkWordPos">World-space origin (in voxels) of the chunk.</param>
         /// <param name="chunkColumns">Output array that will receive per-column height, biome and climate data.</param>
-        public static void PrepareChunkMaps(ref NoiseProfile noiseProfile, int randomSeed,
-            ref GeneratorConfig config, ref int3 chunkWordPos, NativeArray<ChunkColumn> chunkColumns)
+        public static void PrepareChunkMaps(int randomSeed, ref GeneratorConfig config, ref int3 chunkWordPos,
+            NativeArray<ChunkColumn> chunkColumns)
         {
             for (int x = 0; x < ChunkWidth; x++)
             for (int z = 0; z < ChunkDepth; z++)
@@ -33,7 +33,7 @@ namespace Engine.Scripts.Jobs.Chunk
                 int i = GetColumnIdx(x, z, ChunkDepth);
                 float2 worldPos = new(chunkWordPos.x + x, chunkWordPos.z + z);
 
-                WorldNoiseOutput worldNoise = WorldNoise(worldPos, ref config.NoiseParams, ref noiseProfile);
+                WorldNoiseOutput worldNoise = WorldNoise(worldPos, ref config.NoiseParams, ref config.NoiseProfile);
 
                 // Basis-Höhenanteil (klima-unabhängig)
                 const float minHeightFrac = 0.36f;
@@ -46,10 +46,11 @@ namespace Engine.Scripts.Jobs.Chunk
                 int maxY = math.max(minY + 1, ChunkHeight - topMarginY);
                 int height = math.clamp(minY + (int)(baseHeightFrac * (maxY - minY)), minY, maxY);
 
+                BiomeCalculator.BiomSectionInput input = worldNoise.BiomSectionInput();
                 ChunkColumn col = new()
                 {
                     Height = height,
-                    Biome = BiomeCalculator.SelectBiome(ref worldNoise, ref config),
+                    Biome = BiomeCalculator.SelectBiome(ref input, ref config),
                     Temperature = worldNoise.Temperature,
                     Humidity = worldNoise.Humidity
                 };

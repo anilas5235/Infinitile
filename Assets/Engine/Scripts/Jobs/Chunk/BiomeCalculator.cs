@@ -9,7 +9,14 @@ namespace Engine.Scripts.Jobs.Chunk
     [BurstCompile]
     public static class BiomeCalculator
     {
-        public static ushort SelectBiome(ref WorldNoiseOutput worldNoise, ref GeneratorConfig config)
+        public struct BiomSectionInput
+        {
+            public float Humidity;
+            public float Temperature;
+            public float Continental;
+            public float Height;
+        }
+        public static ushort SelectBiome(ref BiomSectionInput input, ref GeneratorConfig config)
         {
             NativeArray<Biome.BiomeDef> bioms = config.BiomeDefs;
             if (bioms.Length == 0)
@@ -24,9 +31,9 @@ namespace Engine.Scripts.Jobs.Chunk
             {
                 Biome.BiomeDef biome = bioms[i];
                 float distance = ClimateDistanceSq(
-                    worldNoise.Humidity,
-                    worldNoise.Temperature,
-                    worldNoise.Continental,
+                    input.Humidity,
+                    input.Temperature,
+                    input.Continental,
                     biome.targetHumidity,
                     biome.targetTemperature,
                     biome.targetContinental);

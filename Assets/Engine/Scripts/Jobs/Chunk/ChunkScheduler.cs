@@ -2,11 +2,10 @@ using System.Collections.Generic;
 using Engine.Scripts.Components;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Core;
-using Engine.Scripts.Noise;
-using Engine.Scripts.World;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.Utils.Logger;
+using Engine.Scripts.World;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
@@ -23,7 +22,6 @@ namespace Engine.Scripts.Jobs.Chunk
     {
         private readonly ChunkManager _chunkManager;
         private readonly GeneratorConfig _config;
-        private readonly NoiseProfile _noiseProfile;
         private readonly VoxelWorld _world;
         private JobHandle _handle;
         private NativeList<int2> _jobs;
@@ -39,19 +37,16 @@ namespace Engine.Scripts.Jobs.Chunk
         /// </summary>
         /// <param name="settings">Voxel engine settings providing chunk dimensions and load distance.</param>
         /// <param name="chunkManager">Chunk manager that receives finished chunk data.</param>
-        /// <param name="noiseProfile">Noise profile used for terrain height generation.</param>
         /// <param name="config">Generator configuration used by chunk jobs.</param>
         /// <param name="world">Voxel world that raises events when chunk data is ready.</param>
         internal ChunkScheduler(
             VoxelEngineSettings settings,
             ChunkManager chunkManager,
-            NoiseProfile noiseProfile,
             GeneratorConfig config,
             VoxelWorld world
         )
         {
             _chunkManager = chunkManager;
-            _noiseProfile = noiseProfile;
             _config = config;
             _world = world;
             _jobs = new NativeList<int2>(Allocator.Domain);
@@ -80,7 +75,6 @@ namespace Engine.Scripts.Jobs.Chunk
             ChunkJob job = new()
             {
                 Jobs = _jobs,
-                NoiseProfile = _noiseProfile,
                 Results = _results.AsParallelWriter(),
                 RandomSeed = _config.GlobalSeed,
                 Config = _config

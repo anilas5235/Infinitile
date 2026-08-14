@@ -44,7 +44,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         private bool _buildInProgress;
         private JobHandle _buildHandle;
 
-        private NativeArray<float3> _jobBiomeTargets;
+        private GeneratorConfig _generatorConfig;
         private NativeArray<Color32> _jobBiomeColors;
         private NativeArray<Color32> _jobBiomePixels;
         private NativeArray<Color32> _jobHeightPixels;
@@ -120,6 +120,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 }
             }
             EditorGUILayout.EndHorizontal();
+        }
+
+        private void OnDestroy()
+        {
+            _generatorConfig.Dispose();
+            DisposeJobData();
         }
 
         private void DrawToolbar()
@@ -320,6 +326,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
             _packages.Clear();
             _biomes.Clear();
+            _generatorConfig.Dispose();
 
             string[] packageGuids = AssetDatabase.FindAssets("t:VoxelDataPackage");
             HashSet<Biome> uniqueBiomes = new();
@@ -327,29 +334,38 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 VoxelDataPackage package = AssetDatabase.LoadAssetAtPath<VoxelDataPackage>(path);
-                if (!package)
-                {
-                    continue;
-                }
+                if (!package) continue;
 
                 _packages.Add(package);
-                if (package.biomes == null)
-                {
-                    continue;
-                }
+                if (package.biomes == null) continue;
 
                 foreach (Biome biome in package.biomes)
                 {
-                    if (!biome || !uniqueBiomes.Add(biome))
-                    {
-                        continue;
-                    }
+                    if (!biome || !uniqueBiomes.Add(biome)) continue;
 
                     _biomes.Add(biome);
                 }
             }
 
             _selectedBiomeIndex = Mathf.Clamp(_selectedBiomeIndex, 0, Mathf.Max(0, _biomes.Count - 1));
+            _generatorConfig = new GeneratorConfig
+            {
+                WaterLevel = _settings.Noise.WaterLevel,
+                GlobalSeed = _settings.Seed,
+                BiomeDefs = new NativeArray<Biome.BiomeDef>(_biomes.Count, Allocator.Domain),
+                Voxels = new NativeHashMap<FixedString32Bytes, Voxel.Voxel.VoxelDef>(0, Allocator.Domain),
+            };
+            for (int i = 0; i < _biomes.Count; i++)
+            {
+                Biome biome = _biomes[i];
+                _generatorConfig.BiomeDefs[i] = new Biome.BiomeDef()
+                {
+                    targetHumidity = biome.TargetHumidity,
+                    targetTemperature = biome.TargetTemperature,
+                    targetContinental = biome.TargetContinental,
+                };
+            }
+
             CreateBiomeEditor();
             RequestRebuild();
             Repaint();
@@ -386,15 +402,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
         private void ScheduleBuild()
         {
-            if (_buildInProgress || !_needsRebuild)
-            {
-                return;
-            }
-
-            if (!_settings || !_settings.Noise)
-            {
-                return;
-            }
+            if (_buildInProgress || !_needsRebuild) return;
+            if (!_settings || !_settings.Noise) return;
 
             int biomeCount = _biomes.Count;
             int resolution = ResolutionOptions[Mathf.Clamp(_resolutionIndex, 0, ResolutionOptions.Length - 1)];
@@ -402,10 +411,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
             if (biomeCount == 0)
             {
-                EnsureTexture(ref _biomeTexture,ViewResolution);
-                EnsureTexture(ref _heightTexture,ViewResolution);
-                EnsureTexture(ref _climateTexture,ViewResolution);
-                EnsureTexture(ref _humidityTemperatureTexture,ViewResolution);
+                EnsureTexture(ref _biomeTexture, ViewResolution);
+                EnsureTexture(ref _heightTexture, ViewResolution);
+                EnsureTexture(ref _climateTexture, ViewResolution);
+                EnsureTexture(ref _humidityTemperatureTexture, ViewResolution);
                 FillTexture(_biomeTexture, Color.black);
                 FillTexture(_heightTexture, Color.black);
                 FillTexture(_climateTexture, Color.black);
@@ -416,7 +425,6 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
             DisposeJobData();
 
-            _jobBiomeTargets = new NativeArray<float3>(biomeCount, Allocator.TempJob);
             _jobBiomeColors = new NativeArray<Color32>(biomeCount, Allocator.TempJob);
             _jobBiomePixels = new NativeArray<Color32>(pixelCount, Allocator.TempJob);
             _jobHeightPixels = new NativeArray<Color32>(pixelCount, Allocator.TempJob);
@@ -428,17 +436,14 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 Biome biome = _biomes[i];
                 if (!biome)
                 {
-                    _jobBiomeTargets[i] = new float3(0.5f, 0.5f, 0.5f);
                     _jobBiomeColors[i] = new Color32(0, 0, 0, 255);
                     continue;
                 }
 
-                _jobBiomeTargets[i] =
-                    new float3(biome.TargetHumidity, biome.TargetTemperature, biome.TargetContinental);
                 _jobBiomeColors[i] = biome.RepresentativeColor;
             }
 
-            NoiseProfile noiseProfile = new(new NoiseProfile.Settings
+            _generatorConfig.NoiseProfile = new NoiseProfile(new NoiseProfile.Settings
             {
                 Seed = _settings.Seed,
                 Scale = _settings.Noise.Scale,
@@ -447,7 +452,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 Octaves = _settings.Noise.Octaves
             });
 
-            NoiseCalculator.NoiseParameters noiseParams = new()
+            _generatorConfig.NoiseParams = new NoiseCalculator.NoiseParameters
             {
                 Seed = _settings.Seed,
                 HumidityScale = _settings.Noise.HumidityScale,
@@ -459,9 +464,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             {
                 Resolution = resolution,
                 WorldOffset = _worldOffset.Int2(),
-                NoiseProfile = noiseProfile,
-                NoiseParams = noiseParams,
-                BiomeTargets = _jobBiomeTargets,
+                Config = _generatorConfig,
                 BiomeColors = _jobBiomeColors,
                 Output = _jobBiomePixels
             };
@@ -470,8 +473,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             {
                 Resolution = resolution,
                 WorldOffset = _worldOffset.Int2(),
-                NoiseProfile = noiseProfile,
-                NoiseParams = noiseParams,
+                Config = _generatorConfig,
                 Output = _jobHeightPixels
             };
 
@@ -479,19 +481,18 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             {
                 Resolution = resolution,
                 WorldOffset = _worldOffset.Int2(),
-                NoiseProfile = noiseProfile,
-                NoiseParams = noiseParams,
+                Config = _generatorConfig,
                 ShowHumidity = _showHumidity ? (byte)1 : (byte)0,
                 ShowTemperature = _showTemperature ? (byte)1 : (byte)0,
                 ShowContinental = _showContinental ? (byte)1 : (byte)0,
                 Output = _jobClimatePixels
             };
 
-            HumidityTemperatureBiomePhaseJob phaseJob = new()
+            BiomeDistributionJob distributionJob = new()
             {
                 Resolution = ViewResolution,
                 Continental = _phaseContinental,
-                BiomeTargets = _jobBiomeTargets,
+                Config = _generatorConfig,
                 BiomeColors = _jobBiomeColors,
                 Output = _jobHumidityTemperaturePixels
             };
@@ -499,7 +500,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             JobHandle biomeHandle = biomeJob.Schedule(pixelCount, 64);
             JobHandle heightHandle = heightJob.Schedule(pixelCount, 64);
             JobHandle climateHandle = climateJob.Schedule(pixelCount, 64);
-            JobHandle phaseHandle = phaseJob.Schedule(pixelCount, 64);
+            JobHandle phaseHandle = distributionJob.Schedule(pixelCount, 64);
 
             JobHandle combined = JobHandle.CombineDependencies(biomeHandle, heightHandle);
             combined = JobHandle.CombineDependencies(combined, climateHandle);
@@ -543,35 +544,15 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
         private void DisposeJobData()
         {
-            if (_jobBiomeTargets.IsCreated)
-            {
-                _jobBiomeTargets.Dispose();
-            }
+            if (_jobBiomeColors.IsCreated) _jobBiomeColors.Dispose();
 
-            if (_jobBiomeColors.IsCreated)
-            {
-                _jobBiomeColors.Dispose();
-            }
+            if (_jobBiomePixels.IsCreated) _jobBiomePixels.Dispose();
 
-            if (_jobBiomePixels.IsCreated)
-            {
-                _jobBiomePixels.Dispose();
-            }
+            if (_jobHeightPixels.IsCreated) _jobHeightPixels.Dispose();
 
-            if (_jobHeightPixels.IsCreated)
-            {
-                _jobHeightPixels.Dispose();
-            }
+            if (_jobClimatePixels.IsCreated) _jobClimatePixels.Dispose();
 
-            if (_jobClimatePixels.IsCreated)
-            {
-                _jobClimatePixels.Dispose();
-            }
-
-            if (_jobHumidityTemperaturePixels.IsCreated)
-            {
-                _jobHumidityTemperaturePixels.Dispose();
-            }
+            if (_jobHumidityTemperaturePixels.IsCreated) _jobHumidityTemperaturePixels.Dispose();
         }
 
         private static void EnsureTexture(ref Texture2D texture, int size)
@@ -633,51 +614,19 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         {
             public int Resolution;
             public int2 WorldOffset;
-            public NoiseProfile NoiseProfile;
-            public NoiseCalculator.NoiseParameters NoiseParams;
 
-            [ReadOnly] public NativeArray<float3> BiomeTargets;
+            [ReadOnly] public GeneratorConfig Config;
             [ReadOnly] public NativeArray<Color32> BiomeColors;
             [WriteOnly] public NativeArray<Color32> Output;
 
             public void Execute(int index)
             {
                 float2 worldPos = CalcWorldPos(index, Resolution, WorldOffset);
-                NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref NoiseParams,
-                    ref NoiseProfile);
-                int biomeIndex = SelectBestBiomeIndex(noise.Humidity, noise.Temperature, noise.Continental);
-                Output[index] = biomeIndex >= 0 ? BiomeColors[biomeIndex] : new Color32(0, 0, 0, 255);
-            }
-
-            private int SelectBestBiomeIndex(float humidity, float temperature, float continental)
-            {
-                if (BiomeTargets.Length == 0)
-                {
-                    return -1;
-                }
-
-                int bestIndex = 0;
-                float bestDistance = float.MaxValue;
-                for (int i = 0; i < BiomeTargets.Length; i++)
-                {
-                    float3 target = BiomeTargets[i];
-                    float distance = BiomeCalculator.ClimateDistanceSq(
-                        humidity,
-                        temperature,
-                        continental,
-                        target.x,
-                        target.y,
-                        target.z);
-                    if (distance >= bestDistance)
-                    {
-                        continue;
-                    }
-
-                    bestDistance = distance;
-                    bestIndex = i;
-                }
-
-                return bestIndex;
+                NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref Config.NoiseParams,
+                    ref Config.NoiseProfile);
+                BiomeCalculator.BiomSectionInput input = noise.BiomSectionInput();
+                ushort biomeIndex = BiomeCalculator.SelectBiome(ref input, ref Config);
+                Output[index] = BiomeColors[biomeIndex];
             }
         }
 
@@ -686,16 +635,15 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         {
             public int Resolution;
             public int2 WorldOffset;
-            public NoiseProfile NoiseProfile;
-            public NoiseCalculator.NoiseParameters NoiseParams;
 
+            [ReadOnly] public GeneratorConfig Config;
             [WriteOnly] public NativeArray<Color32> Output;
 
             public void Execute(int index)
             {
                 float2 worldPos = CalcWorldPos(index, Resolution, WorldOffset);
-                NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref NoiseParams,
-                    ref NoiseProfile);
+                NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref Config.NoiseParams,
+                    ref Config.NoiseProfile);
                 byte value = (byte)math.round(math.saturate(noise.Height) * 255f);
                 Output[index] = new Color32(value, value, value, 255);
             }
@@ -706,19 +654,18 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         {
             public int Resolution;
             public int2 WorldOffset;
-            public NoiseProfile NoiseProfile;
-            public NoiseCalculator.NoiseParameters NoiseParams;
             public byte ShowHumidity;
             public byte ShowTemperature;
             public byte ShowContinental;
 
+            [ReadOnly] public GeneratorConfig Config;
             [WriteOnly] public NativeArray<Color32> Output;
 
             public void Execute(int index)
             {
                 float2 worldPos = CalcWorldPos(index, Resolution, WorldOffset);
-                NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref NoiseParams,
-                    ref NoiseProfile);
+                NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref Config.NoiseParams,
+                    ref Config.NoiseProfile);
 
                 byte humidity = ShowHumidity == 1 ? (byte)math.round(math.saturate(noise.Humidity) * 255f) : (byte)0;
                 byte temperature =
@@ -731,12 +678,13 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         }
 
         [BurstCompile]
-        private struct HumidityTemperatureBiomePhaseJob : IJobParallelFor
+        private struct BiomeDistributionJob : IJobParallelFor
         {
             public int Resolution;
             public float Continental;
+            public float Height;
 
-            [ReadOnly] public NativeArray<float3> BiomeTargets;
+            [ReadOnly] public GeneratorConfig Config;
             [ReadOnly] public NativeArray<Color32> BiomeColors;
             [WriteOnly] public NativeArray<Color32> Output;
 
@@ -747,41 +695,15 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 float step = 1f / Resolution;
                 float humidity = (x + 0.5f) * step;
                 float temperature = (y + 0.5f) * step;
-                int biomeIndex = SelectBestBiomeIndex(humidity, temperature, Continental);
-                Output[index] = biomeIndex >= 0 && biomeIndex < BiomeColors.Length
-                    ? BiomeColors[biomeIndex]
-                    : new Color32(0, 0, 0, 255);
-            }
-
-            private int SelectBestBiomeIndex(float humidity, float temperature, float continental)
-            {
-                if (BiomeTargets.Length == 0)
+                BiomeCalculator.BiomSectionInput input = new()
                 {
-                    return -1;
-                }
-
-                int bestIndex = 0;
-                float bestDistance = float.MaxValue;
-                for (int i = 0; i < BiomeTargets.Length; i++)
-                {
-                    float3 target = BiomeTargets[i];
-                    float distance = BiomeCalculator.ClimateDistanceSq(
-                        humidity,
-                        temperature,
-                        continental,
-                        target.x,
-                        target.y,
-                        target.z);
-                    if (distance >= bestDistance)
-                    {
-                        continue;
-                    }
-
-                    bestDistance = distance;
-                    bestIndex = i;
-                }
-
-                return bestIndex;
+                    Humidity = humidity,
+                    Temperature = temperature,
+                    Continental = Continental,
+                    Height = Height
+                };
+                ushort biomeIndex = BiomeCalculator.SelectBiome(ref input, ref Config);
+                Output[index] = BiomeColors[biomeIndex];
             }
         }
     }

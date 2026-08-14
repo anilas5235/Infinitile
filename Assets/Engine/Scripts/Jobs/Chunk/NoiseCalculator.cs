@@ -47,6 +47,17 @@ namespace Engine.Scripts.Jobs.Chunk
             public float Continental;
             public float Height;
         }
+        
+        public static BiomeCalculator.BiomSectionInput BiomSectionInput(this WorldNoiseOutput worldNoise)
+        {
+            return new BiomeCalculator.BiomSectionInput
+            {
+                Humidity = worldNoise.Humidity,
+                Temperature = worldNoise.Temperature,
+                Continental = worldNoise.Continental,
+                Height = worldNoise.Height
+            };
+        }
 
         public static float GetNormalizedCNoise(float2 position, float2 seed, float scale)
         {

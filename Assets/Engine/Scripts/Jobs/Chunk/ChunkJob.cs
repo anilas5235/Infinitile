@@ -16,7 +16,6 @@ namespace Engine.Scripts.Jobs.Chunk
     [BurstCompile]
     internal partial struct ChunkJob : IJobParallelFor
     {
-        [ReadOnly] public NoiseProfile NoiseProfile;
         [ReadOnly] public NativeList<int2> Jobs; // Chunk world positions
         [WriteOnly] public NativeParallelHashMap<int2, ChunkVoxelData>.ParallelWriter Results; // Result mapping
         [ReadOnly] public int RandomSeed;
@@ -48,7 +47,7 @@ namespace Engine.Scripts.Jobs.Chunk
             NativeArray<ushort> chunkVoxels = new(VoxelsPerChunk, Allocator.Temp);
             NativeArray<ChunkColumn> chunkColumns = new(surfaceArea, Allocator.Temp);
 
-            PrepareChunkMaps(ref NoiseProfile, RandomSeed, ref Config, ref chunkWorldPos, chunkColumns);
+            PrepareChunkMaps(RandomSeed, ref Config, ref chunkWorldPos, chunkColumns);
 
             FillTerrain(chunkVoxels, chunkColumns, ref Config);
 

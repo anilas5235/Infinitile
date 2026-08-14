@@ -1,4 +1,6 @@
-﻿using Engine.Scripts.VoxelConfig.Data.Generation;
+﻿using System;
+using Engine.Scripts.Noise;
+using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Unity.Collections;
 
@@ -8,7 +10,7 @@ namespace Engine.Scripts.Jobs.Chunk
     ///     Holds voxel IDs and global parameters used by chunk generation jobs to create terrain,
     ///     caves, ores, vegetation and structures.
     /// </summary>
-    public struct GeneratorConfig
+    public struct GeneratorConfig : IDisposable
     {
         /// <summary>
         ///     Vertical world Y level that represents the global water surface used for oceans, lakes and rivers.
@@ -27,5 +29,13 @@ namespace Engine.Scripts.Jobs.Chunk
         public NativeHashMap<FixedString32Bytes, Voxel.VoxelDef> Voxels;
         
         public NoiseCalculator.NoiseParameters NoiseParams;
+        
+        public NoiseProfile NoiseProfile;
+
+        public void Dispose()
+        {
+            if (BiomeDefs.IsCreated) BiomeDefs.Dispose();
+            if (Voxels.IsCreated) Voxels.Dispose();
+        }
     }
 }
