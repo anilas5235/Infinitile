@@ -73,9 +73,11 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 2859aedcdbe37214c8b06ac736ce4d1f, type: 2}
   - {fileID: 11400000, guid: 718e517cfa2f0b945a8f3566abd28090, type: 2}
   - {fileID: 11400000, guid: d9bb7a57046120b4aaf5da083bf77700, type: 2}
+  - {fileID: 11400000, guid: 67d30e0404ac0924293a8ce43f6beafc, type: 2}
   biomes:
   - {fileID: 11400000, guid: c81cc6b7ac616da47b2c83f5b1cb1f75, type: 2}
   - {fileID: 11400000, guid: b56e988584e3a2a45bd91098ebd3fdc7, type: 2}
   - {fileID: 11400000, guid: 886a98ad0b541f948b98f13c79588a3f, type: 2}
+  - {fileID: 11400000, guid: 6c8775e42a6a84d48832716106bcda37, type: 2}
   structures:
   - {fileID: 11400000, guid: c5009c6c5ae901e4ca7dc81efb418f22, type: 2}
