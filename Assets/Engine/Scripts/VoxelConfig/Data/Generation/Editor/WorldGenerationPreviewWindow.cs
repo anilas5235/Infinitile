@@ -93,11 +93,16 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 Repaint();
             }
 
-            if (_autoRebuild && _needsRebuild && !_buildInProgress)
-            {
-                ScheduleBuild();
-            }
+            if (_autoRebuild && _needsRebuild && !_buildInProgress) ScheduleBuild();
         }
+
+        private void OnDestroy()
+        {
+            _generatorConfig.Dispose();
+            DisposeJobData();
+        }
+
+        #region Draw
 
         private void OnGUI()
         {
@@ -120,12 +125,6 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 }
             }
             EditorGUILayout.EndHorizontal();
-        }
-
-        private void OnDestroy()
-        {
-            _generatorConfig.Dispose();
-            DisposeJobData();
         }
 
         private void DrawToolbar()
@@ -186,10 +185,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             }
 
             string[] biomeNames = new string[_biomes.Count];
-            for (int i = 0; i < _biomes.Count; i++)
-            {
-                biomeNames[i] = _biomes[i] ? _biomes[i].name : "<null>";
-            }
+            for (int i = 0; i < _biomes.Count; i++) biomeNames[i] = _biomes[i] ? _biomes[i].name : "<null>";
 
             int newIndex = EditorGUILayout.Popup("Active Biome", _selectedBiomeIndex, biomeNames);
             if (newIndex != _selectedBiomeIndex)
@@ -198,10 +194,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 CreateBiomeEditor();
             }
 
-            if (_biomeEditor)
-            {
-                _biomeEditor.OnInspectorGUI();
-            }
+            if (_biomeEditor) _biomeEditor.OnInspectorGUI();
 
             EditorGUILayout.EndVertical();
         }
@@ -265,15 +258,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 Rect rect = GUILayoutUtility.GetRect(200f, 280f, GUILayout.ExpandWidth(true),
                     GUILayout.ExpandHeight(true));
                 EditorGUI.DrawRect(rect, new Color(0.1f, 0.1f, 0.1f, 1f));
-                if (texture)
-                {
-                    GUI.DrawTexture(rect, texture, ScaleMode.ScaleToFit, false);
-                }
+                if (texture) GUI.DrawTexture(rect, texture, ScaleMode.ScaleToFit, false);
 
-                if (allowPan)
-                {
-                    HandlePanInput(rect);
-                }
+                if (allowPan) HandlePanInput(rect);
             }
             EditorGUILayout.EndVertical();
         }
@@ -281,10 +268,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         private void HandlePanInput(Rect viewRect)
         {
             Event e = Event.current;
-            if (e == null)
-            {
-                return;
-            }
+            if (e == null) return;
 
             switch (e.type)
             {
@@ -297,8 +281,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 case EventType.MouseDrag when _isDragging:
                 {
                     Vector2 delta = e.mousePosition - _dragStartMouse;
-                    delta *= ResolutionOptions[_resolutionIndex]/(float)ViewResolution;
-                    _worldOffset = _dragStartOffset - new Vector2Int(Mathf.RoundToInt(delta.x), Mathf.RoundToInt(-delta.y));
+                    delta *= ResolutionOptions[_resolutionIndex] / (float)ViewResolution;
+                    _worldOffset = _dragStartOffset -
+                                   new Vector2Int(Mathf.RoundToInt(delta.x), Mathf.RoundToInt(-delta.y));
                     RequestRebuild();
                     Repaint();
                     e.Use();
@@ -354,6 +339,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 BiomeDefs = new NativeArray<Biome.BiomeDef>(_biomes.Count, Allocator.Domain),
                 Voxels = new NativeHashMap<FixedString32Bytes, Voxel.Voxel.VoxelDef>(0, Allocator.Domain),
             };
+
             for (int i = 0; i < _biomes.Count; i++)
             {
                 Biome biome = _biomes[i];
@@ -378,17 +364,15 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 _biomeEditor = null;
             }
 
-            if (_selectedBiomeIndex < 0 || _selectedBiomeIndex >= _biomes.Count)
-            {
-                return;
-            }
+            if (_selectedBiomeIndex < 0 || _selectedBiomeIndex >= _biomes.Count) return;
 
             Biome biome = _biomes[_selectedBiomeIndex];
-            if (biome)
-            {
-                UnityEditor.Editor.CreateCachedEditor(biome, null, ref _biomeEditor);
-            }
+            if (biome) UnityEditor.Editor.CreateCachedEditor(biome, null, ref _biomeEditor);
         }
+
+        #endregion
+
+        #region JobScheduling
 
         private void RequestRebuild()
         {
@@ -536,12 +520,13 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             if (_jobHumidityTemperaturePixels.IsCreated) _jobHumidityTemperaturePixels.Dispose();
         }
 
+        #endregion
+
+        #region TextureHelpers
+
         private static void EnsureTexture(ref Texture2D texture, int size)
         {
-            if (texture && texture.width == size && texture.height == size)
-            {
-                return;
-            }
+            if (texture && texture.width == size && texture.height == size) return;
 
             DestroyTexture(ref texture);
             texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
@@ -555,16 +540,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
         private static void FillTexture(Texture2D texture, Color color)
         {
-            if (!texture)
-            {
-                return;
-            }
+            if (!texture) return;
 
             Color[] colors = new Color[texture.width * texture.height];
-            for (int i = 0; i < colors.Length; i++)
-            {
-                colors[i] = color;
-            }
+            for (int i = 0; i < colors.Length; i++) colors[i] = color;
 
             texture.SetPixels(colors);
             texture.Apply(false);
@@ -572,23 +551,15 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
         private static void DestroyTexture(ref Texture2D texture)
         {
-            if (!texture)
-            {
-                return;
-            }
+            if (!texture) return;
 
             DestroyImmediate(texture);
             texture = null;
         }
 
-        private static float2 CalcWorldPos(int index, int resolution, int2 worldOffset)
-        {
-            int x = index % ViewResolution;
-            int z = index / ViewResolution;
-            float step = resolution / (float)ViewResolution;
-            float2 worldPos = new(worldOffset.x + x * step, worldOffset.y + z * step);
-            return worldPos;
-        }
+        #endregion
+
+        #region Jobs
 
         [BurstCompile]
         private struct WorldViewJob : IJobParallelFor
@@ -607,7 +578,11 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
             public void Execute(int index)
             {
-                float2 worldPos = CalcWorldPos(index, Resolution, WorldOffset);
+                int x = index % ViewResolution;
+                int z = index / ViewResolution;
+                float step = Resolution / (float)ViewResolution;
+                float2 worldPos = new(WorldOffset.x + x * step, WorldOffset.y + z * step);
+
                 NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref Config.NoiseParams,
                     ref Config.NoiseProfile);
 
@@ -662,5 +637,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 Output[index] = BiomeColors[biomeIndex];
             }
         }
+
+        #endregion
     }
 }
