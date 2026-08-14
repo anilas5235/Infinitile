@@ -279,6 +279,11 @@ namespace Engine.Scripts.Utils.Extensions
         {
             return Vector3Int.FloorToInt(vec);
         }
+        
+        public static int2 Int2(this Vector2Int vec) 
+        {
+            return new int2(vec.x, vec.y);
+        }
 
         /// <summary>
         /// Converts <see cref="int2" /> to <see cref="float2" />.
@@ -287,7 +292,7 @@ namespace Engine.Scripts.Utils.Extensions
         {
             return new float2(vec.x, vec.y);
         }
-
+        
         /// <summary>
         /// Converts <see cref="Vector2" /> to <see cref="float2" />.
         /// </summary>

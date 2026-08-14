@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Noise;
 using Engine.Scripts.Settings;
+using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Unity.Burst;
 using Unity.Collections;
@@ -14,8 +15,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 {
     public class WorldGenerationPreviewWindow : EditorWindow
     {
-        private const int HumidityTemperaturePhaseResolution = 100;
-        private static readonly int[] ResolutionOptions = { 128, 256, 512, 1024 };
+        private const int ViewResolution = 512;
+        private static readonly int[] ResolutionOptions = { 128, 256, 512, 1024, 2048, 4096, 8192, 16384 };
 
         private readonly List<VoxelDataPackage> _packages = new();
         private readonly List<Biome> _biomes = new();
@@ -49,7 +50,6 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         private NativeArray<Color32> _jobHeightPixels;
         private NativeArray<Color32> _jobClimatePixels;
         private NativeArray<Color32> _jobHumidityTemperaturePixels;
-        private int _jobResolution;
 
         [MenuItem("Infinitile/World Generation Preview")]
         private static void OpenWindow()
@@ -71,7 +71,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         {
             EditorApplication.update -= OnEditorUpdate;
 
-            if (_biomeEditor != null)
+            if (_biomeEditor)
             {
                 DestroyImmediate(_biomeEditor);
                 _biomeEditor = null;
@@ -103,57 +103,66 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         {
             EditorGUI.BeginChangeCheck();
             EditorGUILayout.BeginHorizontal();
-
-            EditorGUILayout.BeginVertical();
-            DrawToolbar();
-            DrawBiomeDistributionView();
-            EditorGUILayout.EndVertical();
-
-            DrawViews();
-            DrawBiomeEditorPanel();
-
-            if (EditorGUI.EndChangeCheck())
             {
-                RequestRebuild();
-            }
+                EditorGUILayout.BeginVertical();
+                {
+                    DrawToolbar();
+                    DrawBiomeDistributionView();
+                }
+                EditorGUILayout.EndVertical();
 
+                DrawViews();
+                DrawBiomeEditorPanel();
+
+                if (EditorGUI.EndChangeCheck())
+                {
+                    RequestRebuild();
+                }
+            }
             EditorGUILayout.EndHorizontal();
         }
 
         private void DrawToolbar()
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.LabelField("Data Source", EditorStyles.boldLabel);
-            _settings = (VoxelEngineSettings)EditorGUILayout.ObjectField("VoxelEngineSettings", _settings,
-                typeof(VoxelEngineSettings), false);
-
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Reload SOs", GUILayout.Width(120f)))
             {
-                ReloadAssets();
-            }
+                EditorGUILayout.LabelField("Data Source", EditorStyles.boldLabel);
+                _settings = (VoxelEngineSettings)EditorGUILayout.ObjectField("VoxelEngineSettings", _settings,
+                    typeof(VoxelEngineSettings), false);
 
-            using (new EditorGUI.DisabledScope(_buildInProgress))
-            {
-                if (GUILayout.Button("Rebuild", GUILayout.Width(120f)))
+                EditorGUILayout.BeginHorizontal();
                 {
-                    _needsRebuild = true;
-                    ScheduleBuild();
-                }
-            }
+                    if (GUILayout.Button("Reload SOs", GUILayout.Width(120f)))
+                    {
+                        ReloadAssets();
+                    }
 
-            _autoRebuild = EditorGUILayout.ToggleLeft("Auto Rebuild", _autoRebuild, GUILayout.Width(120f));
-            EditorGUILayout.EndHorizontal();
+                    using (new EditorGUI.DisabledScope(_buildInProgress))
+                    {
+                        if (GUILayout.Button("Rebuild", GUILayout.Width(120f)))
+                        {
+                            _needsRebuild = true;
+                            ScheduleBuild();
+                        }
+                    }
+
+                    _autoRebuild = EditorGUILayout.ToggleLeft("Auto Rebuild", _autoRebuild, GUILayout.Width(120f));
+                }
+                EditorGUILayout.EndHorizontal();
+            }
             EditorGUILayout.EndVertical();
         }
 
         private void DrawBiomeDistributionView()
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.LabelField("BiomeDistribution", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField("Humidity/Temperature Phase View", EditorStyles.boldLabel);
-            _phaseContinental = EditorGUILayout.Slider("Continental", _phaseContinental, 0f, 1f);
-            DrawView("Biome Distribution (X=Hum, Y=Temp)", EditorStyles.helpBox, _humidityTemperatureTexture, false);
+            {
+                EditorGUILayout.LabelField("BiomeDistribution", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Humidity/Temperature Phase View", EditorStyles.boldLabel);
+                _phaseContinental = EditorGUILayout.Slider("Continental", _phaseContinental, 0f, 1f);
+                DrawView("Biome Distribution (X=Hum, Y=Temp)", EditorStyles.helpBox, _humidityTemperatureTexture,
+                    false);
+            }
             EditorGUILayout.EndVertical();
         }
 
@@ -183,7 +192,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 CreateBiomeEditor();
             }
 
-            if (_biomeEditor != null)
+            if (_biomeEditor)
             {
                 _biomeEditor.OnInspectorGUI();
             }
@@ -208,6 +217,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                     $"{ResolutionOptions[1]}x{ResolutionOptions[1]}",
                     $"{ResolutionOptions[2]}x{ResolutionOptions[2]}",
                     $"{ResolutionOptions[3]}x{ResolutionOptions[3]}",
+                    $"{ResolutionOptions[4]}x{ResolutionOptions[4]}",
+                    $"{ResolutionOptions[5]}x{ResolutionOptions[5]}",
+                    $"{ResolutionOptions[6]}x{ResolutionOptions[6]}",
+                    $"{ResolutionOptions[7]}x{ResolutionOptions[7]}",
                 });
 
                 EditorGUILayout.Space();
@@ -240,20 +253,22 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         private void DrawView(string viewTitle, GUIStyle style, Texture2D texture, bool allowPan)
         {
             EditorGUILayout.BeginVertical(style, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
-            EditorGUILayout.LabelField(viewTitle, EditorStyles.boldLabel);
-
-            Rect rect = GUILayoutUtility.GetRect(200f, 280f, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
-            EditorGUI.DrawRect(rect, new Color(0.1f, 0.1f, 0.1f, 1f));
-            if (texture)
             {
-                GUI.DrawTexture(rect, texture, ScaleMode.ScaleToFit, false);
-            }
+                EditorGUILayout.LabelField(viewTitle, EditorStyles.boldLabel);
 
-            if (allowPan)
-            {
-                HandlePanInput(rect);
-            }
+                Rect rect = GUILayoutUtility.GetRect(200f, 280f, GUILayout.ExpandWidth(true),
+                    GUILayout.ExpandHeight(true));
+                EditorGUI.DrawRect(rect, new Color(0.1f, 0.1f, 0.1f, 1f));
+                if (texture)
+                {
+                    GUI.DrawTexture(rect, texture, ScaleMode.ScaleToFit, false);
+                }
 
+                if (allowPan)
+                {
+                    HandlePanInput(rect);
+                }
+            }
             EditorGUILayout.EndVertical();
         }
 
@@ -277,7 +292,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             if (e.type == EventType.MouseDrag && _isDragging)
             {
                 Vector2 delta = e.mousePosition - _dragStartMouse;
-                _worldOffset = _dragStartOffset - new Vector2Int(Mathf.RoundToInt(delta.x), Mathf.RoundToInt(delta.y));
+                _worldOffset = _dragStartOffset - new Vector2Int(Mathf.RoundToInt(delta.x), Mathf.RoundToInt(-delta.y));
                 RequestRebuild();
                 Repaint();
                 e.Use();
@@ -312,7 +327,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 VoxelDataPackage package = AssetDatabase.LoadAssetAtPath<VoxelDataPackage>(path);
-                if (package == null)
+                if (!package)
                 {
                     continue;
                 }
@@ -325,7 +340,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
                 foreach (Biome biome in package.biomes)
                 {
-                    if (biome == null || !uniqueBiomes.Add(biome))
+                    if (!biome || !uniqueBiomes.Add(biome))
                     {
                         continue;
                     }
@@ -383,15 +398,14 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
             int biomeCount = _biomes.Count;
             int resolution = ResolutionOptions[Mathf.Clamp(_resolutionIndex, 0, ResolutionOptions.Length - 1)];
-            int pixelCount = resolution * resolution;
-            int phasePixelCount = HumidityTemperaturePhaseResolution * HumidityTemperaturePhaseResolution;
+            const int pixelCount = ViewResolution * ViewResolution;
 
             if (biomeCount == 0)
             {
-                EnsureTexture(ref _biomeTexture, resolution);
-                EnsureTexture(ref _heightTexture, resolution);
-                EnsureTexture(ref _climateTexture, resolution);
-                EnsureTexture(ref _humidityTemperatureTexture, HumidityTemperaturePhaseResolution);
+                EnsureTexture(ref _biomeTexture,ViewResolution);
+                EnsureTexture(ref _heightTexture,ViewResolution);
+                EnsureTexture(ref _climateTexture,ViewResolution);
+                EnsureTexture(ref _humidityTemperatureTexture,ViewResolution);
                 FillTexture(_biomeTexture, Color.black);
                 FillTexture(_heightTexture, Color.black);
                 FillTexture(_climateTexture, Color.black);
@@ -402,13 +416,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
             DisposeJobData();
 
-            _jobResolution = resolution;
             _jobBiomeTargets = new NativeArray<float3>(biomeCount, Allocator.TempJob);
             _jobBiomeColors = new NativeArray<Color32>(biomeCount, Allocator.TempJob);
             _jobBiomePixels = new NativeArray<Color32>(pixelCount, Allocator.TempJob);
             _jobHeightPixels = new NativeArray<Color32>(pixelCount, Allocator.TempJob);
             _jobClimatePixels = new NativeArray<Color32>(pixelCount, Allocator.TempJob);
-            _jobHumidityTemperaturePixels = new NativeArray<Color32>(phasePixelCount, Allocator.TempJob);
+            _jobHumidityTemperaturePixels = new NativeArray<Color32>(pixelCount, Allocator.TempJob);
 
             for (int i = 0; i < biomeCount; i++)
             {
@@ -445,8 +458,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             BiomeWorldViewJob biomeJob = new()
             {
                 Resolution = resolution,
-                WorldOffsetX = _worldOffset.x,
-                WorldOffsetZ = _worldOffset.y,
+                WorldOffset = _worldOffset.Int2(),
                 NoiseProfile = noiseProfile,
                 NoiseParams = noiseParams,
                 BiomeTargets = _jobBiomeTargets,
@@ -457,8 +469,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             HeightWorldViewJob heightJob = new()
             {
                 Resolution = resolution,
-                WorldOffsetX = _worldOffset.x,
-                WorldOffsetZ = _worldOffset.y,
+                WorldOffset = _worldOffset.Int2(),
                 NoiseProfile = noiseProfile,
                 NoiseParams = noiseParams,
                 Output = _jobHeightPixels
@@ -467,8 +478,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             ClimateWorldViewJob climateJob = new()
             {
                 Resolution = resolution,
-                WorldOffsetX = _worldOffset.x,
-                WorldOffsetZ = _worldOffset.y,
+                WorldOffset = _worldOffset.Int2(),
                 NoiseProfile = noiseProfile,
                 NoiseParams = noiseParams,
                 ShowHumidity = _showHumidity ? (byte)1 : (byte)0,
@@ -479,7 +489,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
             HumidityTemperatureBiomePhaseJob phaseJob = new()
             {
-                Resolution = HumidityTemperaturePhaseResolution,
+                Resolution = ViewResolution,
                 Continental = _phaseContinental,
                 BiomeTargets = _jobBiomeTargets,
                 BiomeColors = _jobBiomeColors,
@@ -489,7 +499,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             JobHandle biomeHandle = biomeJob.Schedule(pixelCount, 64);
             JobHandle heightHandle = heightJob.Schedule(pixelCount, 64);
             JobHandle climateHandle = climateJob.Schedule(pixelCount, 64);
-            JobHandle phaseHandle = phaseJob.Schedule(phasePixelCount, 64);
+            JobHandle phaseHandle = phaseJob.Schedule(pixelCount, 64);
 
             JobHandle combined = JobHandle.CombineDependencies(biomeHandle, heightHandle);
             combined = JobHandle.CombineDependencies(combined, climateHandle);
@@ -512,10 +522,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
             if (applyResult)
             {
-                EnsureTexture(ref _biomeTexture, _jobResolution);
-                EnsureTexture(ref _heightTexture, _jobResolution);
-                EnsureTexture(ref _climateTexture, _jobResolution);
-                EnsureTexture(ref _humidityTemperatureTexture, HumidityTemperaturePhaseResolution);
+                EnsureTexture(ref _biomeTexture, ViewResolution);
+                EnsureTexture(ref _heightTexture, ViewResolution);
+                EnsureTexture(ref _climateTexture, ViewResolution);
+                EnsureTexture(ref _humidityTemperatureTexture, ViewResolution);
 
                 _biomeTexture.SetPixelData(_jobBiomePixels, 0);
                 _heightTexture.SetPixelData(_jobHeightPixels, 0);
@@ -609,12 +619,20 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             texture = null;
         }
 
+        private static float2 CalcWorldPos(int index, int resolution, int2 worldOffset)
+        {
+            int x = index % ViewResolution;
+            int z = index / ViewResolution;
+            float step = resolution / (float)ViewResolution;
+            float2 worldPos = new(worldOffset.x + x * step, worldOffset.y + z * step);
+            return worldPos;
+        }
+
         [BurstCompile]
         private struct BiomeWorldViewJob : IJobParallelFor
         {
             public int Resolution;
-            public int WorldOffsetX;
-            public int WorldOffsetZ;
+            public int2 WorldOffset;
             public NoiseProfile NoiseProfile;
             public NoiseCalculator.NoiseParameters NoiseParams;
 
@@ -624,9 +642,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
             public void Execute(int index)
             {
-                int x = index % Resolution;
-                int z = index / Resolution;
-                float2 worldPos = new(WorldOffsetX + x, WorldOffsetZ + z);
+                float2 worldPos = CalcWorldPos(index, Resolution, WorldOffset);
                 NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref NoiseParams,
                     ref NoiseProfile);
                 int biomeIndex = SelectBestBiomeIndex(noise.Humidity, noise.Temperature, noise.Continental);
@@ -669,8 +685,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         private struct HeightWorldViewJob : IJobParallelFor
         {
             public int Resolution;
-            public int WorldOffsetX;
-            public int WorldOffsetZ;
+            public int2 WorldOffset;
             public NoiseProfile NoiseProfile;
             public NoiseCalculator.NoiseParameters NoiseParams;
 
@@ -678,9 +693,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
             public void Execute(int index)
             {
-                int x = index % Resolution;
-                int z = index / Resolution;
-                float2 worldPos = new(WorldOffsetX + x, WorldOffsetZ + z);
+                float2 worldPos = CalcWorldPos(index, Resolution, WorldOffset);
                 NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref NoiseParams,
                     ref NoiseProfile);
                 byte value = (byte)math.round(math.saturate(noise.Height) * 255f);
@@ -692,8 +705,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         private struct ClimateWorldViewJob : IJobParallelFor
         {
             public int Resolution;
-            public int WorldOffsetX;
-            public int WorldOffsetZ;
+            public int2 WorldOffset;
             public NoiseProfile NoiseProfile;
             public NoiseCalculator.NoiseParameters NoiseParams;
             public byte ShowHumidity;
@@ -704,9 +716,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
             public void Execute(int index)
             {
-                int x = index % Resolution;
-                int z = index / Resolution;
-                float2 worldPos = new(WorldOffsetX + x, WorldOffsetZ + z);
+                float2 worldPos = CalcWorldPos(index, Resolution, WorldOffset);
                 NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref NoiseParams,
                     ref NoiseProfile);
 
@@ -734,8 +744,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             {
                 int x = index % Resolution;
                 int y = index / Resolution;
-                float humidity = x * 0.01f + 0.005f;
-                float temperature = y * 0.01f + 0.005f;
+                float step = 1f / Resolution;
+                float humidity = (x + 0.5f) * step;
+                float temperature = (y + 0.5f) * step;
                 int biomeIndex = SelectBestBiomeIndex(humidity, temperature, Continental);
                 Output[index] = biomeIndex >= 0 && biomeIndex < BiomeColors.Length
                     ? BiomeColors[biomeIndex]
