@@ -36,6 +36,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         private bool _showTemperature = true;
         private bool _showContinental = true;
         private float _phaseContinental = 0.5f;
+        private float _phaseHeight = 0.5f;
         private bool _autoRebuild = true;
         private bool _needsRebuild = true;
         private bool _isDragging;
@@ -163,8 +164,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             {
                 EditorGUILayout.LabelField("BiomeDistribution", EditorStyles.boldLabel);
-                EditorGUILayout.LabelField("Humidity/Temperature Phase View", EditorStyles.boldLabel);
                 _phaseContinental = EditorGUILayout.Slider("Continental", _phaseContinental, 0f, 1f);
+                _phaseHeight = EditorGUILayout.Slider("Height", _phaseHeight, 0f, 1f);
+                
                 DrawView("Biome Distribution (X=Hum, Y=Temp)", EditorStyles.helpBox, _humidityTemperatureTexture,
                     false);
             }
@@ -461,6 +463,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             {
                 Resolution = ViewResolution,
                 Continental = _phaseContinental,
+                Height = _phaseHeight,
                 Config = _generatorConfig,
                 BiomeColors = _jobBiomeColors,
                 Output = _jobHumidityTemperaturePixels

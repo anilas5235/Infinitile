@@ -2,7 +2,6 @@
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;
-using static Engine.Scripts.Jobs.Chunk.NoiseCalculator;
 
 namespace Engine.Scripts.Jobs.Chunk
 {
@@ -16,6 +15,7 @@ namespace Engine.Scripts.Jobs.Chunk
             public float Continental;
             public float Height;
         }
+
         public static ushort SelectBiome(ref BiomSectionInput input, ref GeneratorConfig config)
         {
             NativeArray<Biome.BiomeDef> bioms = config.BiomeDefs;
@@ -30,13 +30,11 @@ namespace Engine.Scripts.Jobs.Chunk
             for (ushort i = 0; i < bioms.Length; i++)
             {
                 Biome.BiomeDef biome = bioms[i];
-                float distance = ClimateDistanceSq(
-                    input.Humidity,
-                    input.Temperature,
-                    input.Continental,
-                    biome.targetHumidity,
-                    biome.targetTemperature,
-                    biome.targetContinental);
+                float dh = input.Humidity - biome.targetHumidity;
+                float dt = input.Temperature - biome.targetTemperature;
+                float dc = input.Continental - biome.targetContinental;
+                float dHeight = input.Height - biome.targetHeight;
+                float distance = math.lengthsq(new float4(dh, dt, dc, dHeight));
 
                 if (distance >= bestDistance)
                 {
@@ -48,20 +46,6 @@ namespace Engine.Scripts.Jobs.Chunk
             }
 
             return bestIndex;
-        }
-
-        public static float ClimateDistanceSq(
-            float humidity,
-            float temperature,
-            float continental,
-            float targetHumidity,
-            float targetTemperature,
-            float targetContinental)
-        {
-            float dh = humidity - targetHumidity;
-            float dt = temperature - targetTemperature;
-            float dc = continental - targetContinental;
-            return math.lengthsq(new float3(dh, dt, dc));
         }
     }
 }
