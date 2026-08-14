@@ -286,29 +286,28 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 return;
             }
 
-            if (e.type == EventType.MouseDown && e.button == 0 && viewRect.Contains(e.mousePosition))
+            switch (e.type)
             {
-                _isDragging = true;
-                _dragStartMouse = e.mousePosition;
-                _dragStartOffset = _worldOffset;
-                e.Use();
-                return;
-            }
-
-            if (e.type == EventType.MouseDrag && _isDragging)
-            {
-                Vector2 delta = e.mousePosition - _dragStartMouse;
-                _worldOffset = _dragStartOffset - new Vector2Int(Mathf.RoundToInt(delta.x), Mathf.RoundToInt(-delta.y));
-                RequestRebuild();
-                Repaint();
-                e.Use();
-                return;
-            }
-
-            if (e.type == EventType.MouseUp && _isDragging)
-            {
-                _isDragging = false;
-                e.Use();
+                case EventType.MouseDown when e.button == 0 && viewRect.Contains(e.mousePosition):
+                    _isDragging = true;
+                    _dragStartMouse = e.mousePosition;
+                    _dragStartOffset = _worldOffset;
+                    e.Use();
+                    return;
+                case EventType.MouseDrag when _isDragging:
+                {
+                    Vector2 delta = e.mousePosition - _dragStartMouse;
+                    delta *= ResolutionOptions[_resolutionIndex]/(float)ViewResolution;
+                    _worldOffset = _dragStartOffset - new Vector2Int(Mathf.RoundToInt(delta.x), Mathf.RoundToInt(-delta.y));
+                    RequestRebuild();
+                    Repaint();
+                    e.Use();
+                    return;
+                }
+                case EventType.MouseUp when _isDragging:
+                    _isDragging = false;
+                    e.Use();
+                    break;
             }
         }
 
@@ -460,32 +459,18 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 ContinentalScale = _settings.Noise.ContinentalScale
             };
 
-            BiomeWorldViewJob biomeJob = new()
+            WorldViewJob job = new()
             {
                 Resolution = resolution,
                 WorldOffset = _worldOffset.Int2(),
-                Config = _generatorConfig,
-                BiomeColors = _jobBiomeColors,
-                Output = _jobBiomePixels
-            };
-
-            HeightWorldViewJob heightJob = new()
-            {
-                Resolution = resolution,
-                WorldOffset = _worldOffset.Int2(),
-                Config = _generatorConfig,
-                Output = _jobHeightPixels
-            };
-
-            ClimateWorldViewJob climateJob = new()
-            {
-                Resolution = resolution,
-                WorldOffset = _worldOffset.Int2(),
-                Config = _generatorConfig,
                 ShowHumidity = _showHumidity ? (byte)1 : (byte)0,
                 ShowTemperature = _showTemperature ? (byte)1 : (byte)0,
                 ShowContinental = _showContinental ? (byte)1 : (byte)0,
-                Output = _jobClimatePixels
+                Config = _generatorConfig,
+                BiomeColors = _jobBiomeColors,
+                BiomeWorldView = _jobBiomePixels,
+                HeightWorldView = _jobHeightPixels,
+                ClimateWorldView = _jobClimatePixels,
             };
 
             BiomeDistributionJob distributionJob = new()
@@ -497,14 +482,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 Output = _jobHumidityTemperaturePixels
             };
 
-            JobHandle biomeHandle = biomeJob.Schedule(pixelCount, 64);
-            JobHandle heightHandle = heightJob.Schedule(pixelCount, 64);
-            JobHandle climateHandle = climateJob.Schedule(pixelCount, 64);
-            JobHandle phaseHandle = distributionJob.Schedule(pixelCount, 64);
+            JobHandle biomeHandle = job.Schedule(pixelCount, 64);
+            JobHandle distributionHandle = distributionJob.Schedule(pixelCount, 64);
 
-            JobHandle combined = JobHandle.CombineDependencies(biomeHandle, heightHandle);
-            combined = JobHandle.CombineDependencies(combined, climateHandle);
-            combined = JobHandle.CombineDependencies(combined, phaseHandle);
+            JobHandle combined = JobHandle.CombineDependencies(biomeHandle, distributionHandle);
 
             _buildHandle = combined;
             _buildInProgress = true;
@@ -610,47 +591,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         }
 
         [BurstCompile]
-        private struct BiomeWorldViewJob : IJobParallelFor
-        {
-            public int Resolution;
-            public int2 WorldOffset;
-
-            [ReadOnly] public GeneratorConfig Config;
-            [ReadOnly] public NativeArray<Color32> BiomeColors;
-            [WriteOnly] public NativeArray<Color32> Output;
-
-            public void Execute(int index)
-            {
-                float2 worldPos = CalcWorldPos(index, Resolution, WorldOffset);
-                NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref Config.NoiseParams,
-                    ref Config.NoiseProfile);
-                BiomeCalculator.BiomSectionInput input = noise.BiomSectionInput();
-                ushort biomeIndex = BiomeCalculator.SelectBiome(ref input, ref Config);
-                Output[index] = BiomeColors[biomeIndex];
-            }
-        }
-
-        [BurstCompile]
-        private struct HeightWorldViewJob : IJobParallelFor
-        {
-            public int Resolution;
-            public int2 WorldOffset;
-
-            [ReadOnly] public GeneratorConfig Config;
-            [WriteOnly] public NativeArray<Color32> Output;
-
-            public void Execute(int index)
-            {
-                float2 worldPos = CalcWorldPos(index, Resolution, WorldOffset);
-                NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref Config.NoiseParams,
-                    ref Config.NoiseProfile);
-                byte value = (byte)math.round(math.saturate(noise.Height) * 255f);
-                Output[index] = new Color32(value, value, value, 255);
-            }
-        }
-
-        [BurstCompile]
-        private struct ClimateWorldViewJob : IJobParallelFor
+        private struct WorldViewJob : IJobParallelFor
         {
             public int Resolution;
             public int2 WorldOffset;
@@ -659,7 +600,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             public byte ShowContinental;
 
             [ReadOnly] public GeneratorConfig Config;
-            [WriteOnly] public NativeArray<Color32> Output;
+            [ReadOnly] public NativeArray<Color32> BiomeColors;
+            [WriteOnly] public NativeArray<Color32> BiomeWorldView;
+            [WriteOnly] public NativeArray<Color32> HeightWorldView;
+            [WriteOnly] public NativeArray<Color32> ClimateWorldView;
 
             public void Execute(int index)
             {
@@ -667,13 +611,25 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref Config.NoiseParams,
                     ref Config.NoiseProfile);
 
+                BiomeCalculator.BiomSectionInput input = noise.BiomSectionInput();
+
+                ushort biomeIndex = BiomeCalculator.SelectBiome(ref input, ref Config);
+
+                //BiomeWorldView
+                BiomeWorldView[index] = BiomeColors[biomeIndex];
+
+                //HeightWorldView
+                byte value = (byte)math.round(math.saturate(noise.Height) * 255f);
+                HeightWorldView[index] = new Color32(value, value, value, 255);
+
+                //ClimateWorldView
                 byte humidity = ShowHumidity == 1 ? (byte)math.round(math.saturate(noise.Humidity) * 255f) : (byte)0;
                 byte temperature =
                     ShowTemperature == 1 ? (byte)math.round(math.saturate(noise.Temperature) * 255f) : (byte)0;
                 byte continental =
                     ShowContinental == 1 ? (byte)math.round(math.saturate(noise.Continental) * 255f) : (byte)0;
 
-                Output[index] = new Color32(humidity, temperature, continental, 255);
+                ClimateWorldView[index] = new Color32(humidity, temperature, continental, 255);
             }
         }
 
