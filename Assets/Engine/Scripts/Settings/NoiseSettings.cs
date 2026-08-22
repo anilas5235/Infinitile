@@ -15,17 +15,50 @@ namespace Engine.Scripts.Settings
         ///     Water surface level in world Y coordinates.
         /// </summary>
         [Tooltip("Water surface level in world Y coordinates.")]
-        public int WaterLevel = 96;
+        public int WaterLevel = 124;
 
         [Tooltip("Scale factor for humidity climate noise sampling.")]
-        public float HumidityScale = 0.0012f;
+        public float HumidityScale = 0.001f;
 
         [Tooltip("Scale factor for temperature climate noise sampling.")]
-        public float TemperatureScale = 0.0012f;
+        public float TemperatureScale = 0.0009f;
 
-        public NoiseProfileSettings elevationProfile;
+        public NoiseProfileSettings elevationProfile = new()
+        {
+            scale = 180f,
+            persistance = 0.5f,
+            lacunarity = 2f,
+            octaves = 4
+        };
 
-        public WarpedNoiseLayerSettings continentalLayer;
+        public WarpedNoiseLayerSettings continentalLayer = new()
+        {
+            baseNoise = new NoiseProfileSettings
+            {
+                scale = 2500f,
+                persistance = 0.5f,
+                lacunarity = 2f,
+                octaves = 5
+            },
+            warpNoise = new NoiseProfileSettings
+            {
+                scale = 1800f,
+                persistance = 0.5f,
+                lacunarity = 2f,
+                octaves = 2
+            },
+            warpStrength = 400f,
+            warpSeedOffsetY = 1000,
+            redistributionCurve = new AnimationCurve(
+                new Keyframe(0f, 0.02f),
+                new Keyframe(0.3f, 0.12f),
+                new Keyframe(0.4f, 0.28f),
+                new Keyframe(0.5f, 0.42f),
+                new Keyframe(0.6f, 0.55f),
+                new Keyframe(0.8f, 0.78f),
+                new Keyframe(1f, 1f)
+            ),
+        };
 
         private void OnValidate()
         {
@@ -74,7 +107,7 @@ namespace Engine.Scripts.Settings
         /// <summary>Seed offset applied to the Y warp channel so X/Y don't correlate.</summary>
         public int warpSeedOffsetY = 1000;
 
-        public AnimationCurve warpCurve = new(
+        public AnimationCurve redistributionCurve = new(
             new Keyframe(0f, 0f),
             new Keyframe(0.3f, 0.3f),
             new Keyframe(0.4f, 0.4f),
@@ -86,10 +119,10 @@ namespace Engine.Scripts.Settings
 
         public WarpedNoiseLayer.Settings ToStruct(int seed)
         {
-            float2[] points = new float2[warpCurve.length];
-            for (int i = 0; i < warpCurve.length; i++)
+            float2[] points = new float2[redistributionCurve.length];
+            for (int i = 0; i < redistributionCurve.length; i++)
             {
-                Keyframe key = warpCurve.keys[i];
+                Keyframe key = redistributionCurve.keys[i];
                 points[i] = new float2(key.time, key.value);
             }
 
@@ -106,27 +139,27 @@ namespace Engine.Scripts.Settings
         {
             const int count = 7;
 
-            if (warpCurve.keys.Length != count)
+            if (redistributionCurve.keys.Length != count)
             {
                 Keyframe[] keys = new Keyframe[count];
 
                 for (int i = 0; i < count; i++)
                 {
                     float t = i / (float)(count - 1);
-                    float v = warpCurve.Evaluate(t);
+                    float v = redistributionCurve.Evaluate(t);
 
                     Keyframe k = new(t, v);
                     keys[i] = k;
                 }
 
-                warpCurve = new AnimationCurve(keys);
+                redistributionCurve = new AnimationCurve(keys);
             }
             else
             {
-                Keyframe[] keys = warpCurve.keys;
+                Keyframe[] keys = redistributionCurve.keys;
                 keys[0].time = 0f;
                 keys[6].time = 1f;
-                warpCurve = new AnimationCurve(keys);
+                redistributionCurve = new AnimationCurve(keys);
             }
         }
     }

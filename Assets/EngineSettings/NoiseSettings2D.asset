@@ -11,10 +11,10 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c3b2e488ee8f4f838bfbe8664412fa7b, type: 3}
   m_Name: NoiseSettings2D
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.Settings.NoiseSettings
   WaterLevel: 124
-  HumidityScale: 0.0012
-  TemperatureScale: 0.0012
+  HumidityScale: 0.001
+  TemperatureScale: 0.0009
   elevationProfile:
     scale: 256
     persistance: 0.5
@@ -22,80 +22,80 @@ MonoBehaviour:
     octaves: 4
   continentalLayer:
     baseNoise:
-      scale: 4096
+      scale: 1024
       persistance: 0.5
       lacunarity: 2
-      octaves: 4
+      octaves: 8
     warpNoise:
-      scale: 256
+      scale: 768
       persistance: 0.5
       lacunarity: 2
-      octaves: 4
-    warpStrength: 1
+      octaves: 2
+    warpStrength: 400
     warpSeedOffsetY: 1000
-    warpCurve:
+    redistributionCurve:
       serializedVersion: 2
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 0
+        value: 0.02
         inSlope: 0
-        outSlope: 0.3333333
-        tangentMode: 69
+        outSlope: 0
+        tangentMode: 0
         weightedMode: 0
         inWeight: 0
         outWeight: 0
       - serializedVersion: 3
         time: 0.3
-        value: 0.1
-        inSlope: 0.3333333
-        outSlope: 1.5000001
-        tangentMode: 69
+        value: 0.12
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
         weightedMode: 0
         inWeight: 0
         outWeight: 0
       - serializedVersion: 3
         time: 0.4
-        value: 0.25
-        inSlope: 1.5000001
-        outSlope: 3.0000012
-        tangentMode: 69
+        value: 0.28
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
         weightedMode: 0
         inWeight: 0
         outWeight: 0
       - serializedVersion: 3
-        time: 0.45
-        value: 0.4
-        inSlope: 3.0000012
-        outSlope: 0.9999998
-        tangentMode: 69
+        time: 0.5
+        value: 0.42
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
         weightedMode: 0
         inWeight: 0
         outWeight: 0
       - serializedVersion: 3
         time: 0.6
         value: 0.55
-        inSlope: 0.9999998
-        outSlope: 1.2500001
-        tangentMode: 69
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
         weightedMode: 0
         inWeight: 0
         outWeight: 0
       - serializedVersion: 3
         time: 0.8
-        value: 0.8
-        inSlope: 1.2500001
-        outSlope: 1
-        tangentMode: 69
+        value: 0.78
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
         weightedMode: 0
         inWeight: 0
         outWeight: 0
       - serializedVersion: 3
         time: 1
         value: 1
-        inSlope: 1
+        inSlope: 0
         outSlope: 0
-        tangentMode: 69
+        tangentMode: 0
         weightedMode: 0
         inWeight: 0
         outWeight: 0

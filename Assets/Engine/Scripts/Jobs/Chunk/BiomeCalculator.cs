@@ -31,8 +31,8 @@ namespace Engine.Scripts.Jobs.Chunk
                 float dc = input.Continental - biome.targetContinental;
                 float de = input.Elevation - biome.targetElevation;
 
-                dc *= 1.3f;
-                de *= 1.5f;
+                dc *= 4f;
+                de *= 2f;
 
                 float distance = dh * dh + dt * dt + dc * dc + de * de;
 

@@ -25,7 +25,7 @@ namespace Engine.Scripts.Jobs.Chunk
 
             float rawElevation = noiseParams.ElevationProfile.GetNoise(noiseSamplePos);
 
-            float elevation = math.saturate(continental * 0.7f + rawElevation * 0.3f);
+            float elevation = math.saturate((continental + rawElevation) * 0.5f);
 
             return new WorldNoiseOutput
             {
