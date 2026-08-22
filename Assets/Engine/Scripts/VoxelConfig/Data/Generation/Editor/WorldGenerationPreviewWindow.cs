@@ -52,6 +52,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         private NativeArray<Color32> _jobClimatePixels;
         private NativeArray<Color32> _jobHumidityTemperaturePixels;
 
+        private Vector2 windowSize;
+
         [MenuItem("Infinitile/World Generation Preview")]
         private static void OpenWindow()
         {
@@ -107,18 +109,19 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
         private void OnGUI()
         {
+            windowSize = position.size;
             EditorGUI.BeginChangeCheck();
             EditorGUILayout.BeginHorizontal();
             {
-                EditorGUILayout.BeginVertical();
+                EditorGUILayout.BeginVertical(GUILayout.Width(windowSize.x * .25f));
                 {
                     DrawToolbar();
                     DrawBiomeDistributionView();
+                    DrawBiomeEditorPanel();
                 }
                 EditorGUILayout.EndVertical();
 
                 DrawViews();
-                DrawBiomeEditorPanel();
 
                 if (EditorGUI.EndChangeCheck())
                 {
@@ -161,12 +164,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
         private void DrawBiomeDistributionView()
         {
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox, GUILayout.Height(windowSize.y * .55f));
             {
                 EditorGUILayout.LabelField("BiomeDistribution", EditorStyles.boldLabel);
                 _phaseContinental = EditorGUILayout.Slider("Continental", _phaseContinental, 0f, 1f);
                 _phaseElevation = EditorGUILayout.Slider("Elevation", _phaseElevation, 0f, 1f);
-                
+
                 DrawView("Biome Distribution (X=Hum, Y=Temp)", EditorStyles.helpBox, _humidityTemperatureTexture,
                     false);
             }
@@ -209,57 +212,56 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 return;
             }
 
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.BeginHorizontal(EditorStyles.helpBox);
             {
-                _worldOffset = EditorGUILayout.Vector2IntField("World Offset (X/Z)", _worldOffset);
-                _resolutionIndex = EditorGUILayout.Popup("Resolution", _resolutionIndex, new[]
+                EditorGUILayout.BeginVertical();
                 {
-                    $"{ResolutionOptions[0]}x{ResolutionOptions[0]}",
-                    $"{ResolutionOptions[1]}x{ResolutionOptions[1]}",
-                    $"{ResolutionOptions[2]}x{ResolutionOptions[2]}",
-                    $"{ResolutionOptions[3]}x{ResolutionOptions[3]}",
-                    $"{ResolutionOptions[4]}x{ResolutionOptions[4]}",
-                    $"{ResolutionOptions[5]}x{ResolutionOptions[5]}",
-                    $"{ResolutionOptions[6]}x{ResolutionOptions[6]}",
-                    $"{ResolutionOptions[7]}x{ResolutionOptions[7]}",
-                });
-
-                EditorGUILayout.Space();
-                EditorGUILayout.Separator();
-
-                EditorGUILayout.BeginHorizontal();
-                {
-                    EditorGUILayout.BeginVertical();
+                    _worldOffset = EditorGUILayout.Vector2IntField("World Offset (X/Z)", _worldOffset);
+                    _resolutionIndex = EditorGUILayout.Popup("Resolution", _resolutionIndex, new[]
                     {
-                        EditorGUILayout.LabelField("Climate RGB Channels", EditorStyles.boldLabel);
-                        _showHumidity = EditorGUILayout.ToggleLeft("Humidity (R)", _showHumidity);
-                        _showTemperature = EditorGUILayout.ToggleLeft("Temperature (G)", _showTemperature);
-                        _showContinental = EditorGUILayout.ToggleLeft("Continental (B)", _showContinental);
-
-                        DrawView("Climate", EditorStyles.helpBox, _climateTexture, true);
-                    }
-                    EditorGUILayout.EndVertical();
-                    EditorGUILayout.BeginVertical();
-                    {
-                        DrawView("Biome View", EditorStyles.label, _biomeTexture, true);
-                        DrawView("HeightMap", EditorStyles.helpBox, _heightTexture, true);
-                    }
-                    EditorGUILayout.EndVertical();
+                        $"{ResolutionOptions[0]}x{ResolutionOptions[0]}",
+                        $"{ResolutionOptions[1]}x{ResolutionOptions[1]}",
+                        $"{ResolutionOptions[2]}x{ResolutionOptions[2]}",
+                        $"{ResolutionOptions[3]}x{ResolutionOptions[3]}",
+                        $"{ResolutionOptions[4]}x{ResolutionOptions[4]}",
+                        $"{ResolutionOptions[5]}x{ResolutionOptions[5]}",
+                        $"{ResolutionOptions[6]}x{ResolutionOptions[6]}",
+                        $"{ResolutionOptions[7]}x{ResolutionOptions[7]}",
+                    });
+                    EditorGUILayout.LabelField("Climate RGB Channels", EditorStyles.boldLabel);
+                    _showHumidity = EditorGUILayout.ToggleLeft("Humidity (R)", _showHumidity);
+                    _showTemperature = EditorGUILayout.ToggleLeft("Temperature (G)", _showTemperature);
+                    _showContinental = EditorGUILayout.ToggleLeft("Continental (B)", _showContinental);
+                    EditorGUILayout.Separator();
+                    DrawView("Biome View", EditorStyles.label, _biomeTexture, true);
                 }
-                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.EndVertical();
+                EditorGUILayout.BeginVertical();
+                {
+                    DrawView("Climate", EditorStyles.label, _climateTexture, true);
+
+                    DrawView("HeightMap", EditorStyles.label, _heightTexture, true);
+                }
+                EditorGUILayout.EndVertical();
             }
-            EditorGUILayout.EndVertical();
+            EditorGUILayout.EndHorizontal();
         }
 
         private void DrawView(string viewTitle, GUIStyle style, Texture2D texture, bool allowPan)
         {
-            EditorGUILayout.BeginVertical(style, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+            EditorGUILayout.BeginVertical(style);
             {
                 EditorGUILayout.LabelField(viewTitle, EditorStyles.boldLabel);
 
-                Rect rect = GUILayoutUtility.GetRect(200f, 280f, GUILayout.ExpandWidth(true),
+                Rect rect = GUILayoutUtility.GetRect(200f, 200f, GUILayout.ExpandWidth(true),
                     GUILayout.ExpandHeight(true));
+
+                float size = Mathf.Min(rect.width, rect.height);
+                rect.width = size;
+                rect.height = size;
+
                 EditorGUI.DrawRect(rect, new Color(0.1f, 0.1f, 0.1f, 1f));
+
                 if (texture) GUI.DrawTexture(rect, texture, ScaleMode.ScaleToFit, false);
 
                 if (allowPan) HandlePanInput(rect);
