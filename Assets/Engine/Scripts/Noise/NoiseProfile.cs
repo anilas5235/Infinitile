@@ -1,8 +1,6 @@
-﻿// csharp
-
-using System;
-using System.Runtime.InteropServices;
+﻿using System;
 using Unity.Burst;
+using Unity.Collections;
 using Unity.Mathematics;
 using static Unity.Mathematics.noise;
 
@@ -13,9 +11,12 @@ namespace Engine.Scripts.Noise
     ///     used in terrain generation.
     /// </summary>
     [BurstCompile]
-    public readonly struct NoiseProfile
+    public struct NoiseProfile : IDisposable
     {
-        private readonly Settings _settings;
+        [ReadOnly] private NativeArray<float2> _octaveData; // (frequency, amplitude)
+        private readonly float _maxAmplitude;
+        private readonly float2 _seedOffset;
+        private readonly float _scale;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="NoiseProfile" /> struct with the given settings,
@@ -24,46 +25,43 @@ namespace Engine.Scripts.Noise
         /// <param name="settings">Noise parameters such as seed, scale, persistence, lacunarity and octaves.</param>
         public NoiseProfile(Settings settings)
         {
-            // Kopiere settings, bevor Felder verändert werden (vermeidet Mutation eines readonly-Felds)
             Settings s = settings;
-            if (s.Scale <= 0f) s.Scale = 0.0001f;
+            _scale = s.Scale <= 0f ? 0.0001f : s.Scale;
 
-            _settings = s;
+            // Precompute octave data for efficient noise evaluation
+            _seedOffset = new float2(s.Seed);
+
+            _octaveData = new NativeArray<float2>(s.Octaves, Allocator.Domain);
+
+            float amplitude = 1f;
+            float frequency = 1f;
+            float maxAmp = 0f;
+
+            for (int i = 0; i < s.Octaves; i++)
+            {
+                _octaveData[i] = new float2(frequency, amplitude);
+                maxAmp += amplitude;
+
+                amplitude *= s.Persistance;
+                frequency *= s.Lacunarity;
+            }
+
+            _maxAmplitude = maxAmp;
         }
 
         /// <summary>
         ///     Evaluates normalized noise (0..1) at the given 2D position using the configured profile.
         /// </summary>
-        /// <param name="position">Position in world space used as input for the noise function.</param>
+        /// <param name="pos">Position in world space used as input for the noise function.</param>
         /// <returns>Noise value in the range [0,1].</returns>
-        public float GetNoise(float2 position)
+        public float GetNoise(float2 pos)
         {
-            return math.saturate(ComputeNoise(position) * 0.5f + 0.5f);
-        }
+            float2 samplePos = (pos + _seedOffset) / _scale;
 
-        /// <summary>
-        ///     Computes the raw (unnormalized) multi-octave noise value for the given position.
-        /// </summary>
-        /// <param name="position">Position in world space used as input for the noise function.</param>
-        /// <returns>Noise value that can be outside the [0,1] range.</returns>
-        private float ComputeNoise(float2 position)
-        {
-            float amplitude = 1f;
-            float frequency = 1f;
-            float noiseSum = 0f;
+            float sum = 0f;
+            foreach (float2 af in _octaveData) sum += cnoise(samplePos * af.x) * af.y;
 
-            float2 samplePos = (position + _settings.Seed) / _settings.Scale;
-
-            for (int i = 0; i < _settings.Octaves; i++)
-            {
-                float n = cnoise(samplePos * frequency);
-                noiseSum += n * amplitude;
-
-                amplitude *= _settings.Persistance;
-                frequency *= _settings.Lacunarity;
-            }
-
-            return noiseSum;
+            return math.remap(-_maxAmplitude, _maxAmplitude, 0f, 1f, sum);
         }
 
         /// <summary>
@@ -96,6 +94,11 @@ namespace Engine.Scripts.Noise
             ///     Number of octaves to accumulate when sampling the noise.
             /// </summary>
             public int Octaves;
+        }
+
+        public void Dispose()
+        {
+            _octaveData.Dispose();
         }
     }
 }

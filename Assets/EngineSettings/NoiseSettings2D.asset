@@ -13,7 +13,92 @@ MonoBehaviour:
   m_Name: NoiseSettings2D
   m_EditorClassIdentifier: 
   WaterLevel: 124
-  Scale: 256
-  Persistance: 0.5
-  Lacunarity: 2
-  Octaves: 6
+  HumidityScale: 0.0012
+  TemperatureScale: 0.0012
+  elevationProfile:
+    scale: 256
+    persistance: 0.5
+    lacunarity: 2
+    octaves: 4
+  continentalLayer:
+    baseNoise:
+      scale: 4096
+      persistance: 0.5
+      lacunarity: 2
+      octaves: 4
+    warpNoise:
+      scale: 256
+      persistance: 0.5
+      lacunarity: 2
+      octaves: 4
+    warpStrength: 1
+    warpSeedOffsetY: 1000
+    warpCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 0.3333333
+        tangentMode: 69
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.3
+        value: 0.1
+        inSlope: 0.3333333
+        outSlope: 1.5000001
+        tangentMode: 69
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.4
+        value: 0.25
+        inSlope: 1.5000001
+        outSlope: 3.0000012
+        tangentMode: 69
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.45
+        value: 0.4
+        inSlope: 3.0000012
+        outSlope: 0.9999998
+        tangentMode: 69
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.6
+        value: 0.55
+        inSlope: 0.9999998
+        outSlope: 1.2500001
+        tangentMode: 69
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.8
+        value: 0.8
+        inSlope: 1.2500001
+        outSlope: 1
+        tangentMode: 69
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 69
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4

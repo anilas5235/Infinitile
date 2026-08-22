@@ -1,5 +1,7 @@
-﻿using Engine.Scripts.Noise;
+﻿using System;
+using Engine.Scripts.Noise;
 using Unity.Burst;
+using Unity.Collections;
 using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Chunk
@@ -11,17 +13,17 @@ namespace Engine.Scripts.Jobs.Chunk
         private static readonly float2 TemperatureOffset = new(867f, -543f);
         private static readonly float2 ContinentalOffset = new(-916f, 823f);
 
-        public static WorldNoiseOutput WorldNoise(float2 worldPos, ref NoiseParameters noiseParams,
-            ref NoiseProfile noiseProfile)
+        public static WorldNoiseOutput WorldNoise(float2 worldPos, ref NoiseParameters noiseParams)
         {
             float2 seed2D = new(-noiseParams.Seed, noiseParams.Seed);
             float2 noiseSamplePos = worldPos + seed2D;
 
             float humidity = GetNormalizedCNoise(noiseSamplePos, HumidityOffset, noiseParams.HumidityScale);
             float temperature = GetNormalizedCNoise(noiseSamplePos, TemperatureOffset, noiseParams.TemperatureScale);
-            float continental = GetNormalizedCNoise(noiseSamplePos, ContinentalOffset, noiseParams.ContinentalScale);
 
-            float rawElevation = noiseProfile.GetNoise(noiseSamplePos);
+            float continental = noiseParams.ContinentalLayer.GetNoise(worldPos + seed2D + ContinentalOffset);
+
+            float rawElevation = noiseParams.ElevationProfile.GetNoise(noiseSamplePos);
 
             float elevation = math.saturate(continental * 0.7f + rawElevation * 0.3f);
 
@@ -34,12 +36,21 @@ namespace Engine.Scripts.Jobs.Chunk
             };
         }
 
-        public struct NoiseParameters
+        public struct NoiseParameters : IDisposable
         {
             public int Seed;
             public float HumidityScale;
             public float TemperatureScale;
-            public float ContinentalScale;
+
+            [ReadOnly] public NoiseProfile ElevationProfile;
+
+            [ReadOnly] public WarpedNoiseLayer ContinentalLayer;
+
+            public void Dispose()
+            {
+                ElevationProfile.Dispose();
+                ContinentalLayer.Dispose();
+            }
         }
 
         public struct WorldNoiseOutput
@@ -65,6 +76,25 @@ namespace Engine.Scripts.Jobs.Chunk
         {
             float2 samplePos = (position + seed) * scale;
             return math.remap(-1f, 1f, 0f, 1f, noise.cnoise(samplePos));
+        }
+
+        [BurstCompile]
+        public static float ApplyCurve(float raw, in NativeArray<float2> points)
+        {
+            if (raw <= points[0].x) return points[0].y;
+            int last = points.Length - 1;
+            if (raw >= points[last].x) return points[last].y;
+
+            for (int i = 1; i < points.Length; i++)
+            {
+                if (raw > points[i].x) continue;
+                float2 a = points[i - 1];
+                float2 b = points[i];
+                float t = math.unlerp(a.x, b.x, raw);
+                return math.lerp(a.y, b.y, t);
+            }
+
+            return raw;
         }
     }
 }

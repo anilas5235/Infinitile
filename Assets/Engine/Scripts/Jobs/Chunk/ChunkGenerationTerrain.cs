@@ -33,7 +33,7 @@ namespace Engine.Scripts.Jobs.Chunk
                 int i = GetColumnIdx(x, z, ChunkDepth);
                 float2 worldPos = new(chunkWordPos.x + x, chunkWordPos.z + z);
 
-                WorldNoiseOutput worldNoise = WorldNoise(worldPos, ref config.NoiseParams, ref config.NoiseProfile);
+                WorldNoiseOutput worldNoise = WorldNoise(worldPos, ref config.NoiseParams);
 
                 // Basis-Höhenanteil (klima-unabhängig)
                 const float minHeightFrac = 0.36f;

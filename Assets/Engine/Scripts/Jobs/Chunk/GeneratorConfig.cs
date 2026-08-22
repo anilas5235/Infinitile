@@ -29,13 +29,12 @@ namespace Engine.Scripts.Jobs.Chunk
         public NativeHashMap<FixedString32Bytes, Voxel.VoxelDef> Voxels;
         
         public NoiseCalculator.NoiseParameters NoiseParams;
-        
-        public NoiseProfile NoiseProfile;
 
         public void Dispose()
         {
             if (BiomeDefs.IsCreated) BiomeDefs.Dispose();
             if (Voxels.IsCreated) Voxels.Dispose();
+            NoiseParams.Dispose();
         }
     }
 }

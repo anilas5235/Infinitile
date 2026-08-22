@@ -23,22 +23,6 @@ namespace Engine.Scripts.Utils
         /// </summary>
         public VoxelEngineSettings Settings { get; set; }
 
-        /// <summary>
-        ///     Creates a new noise profile from current <see cref="Settings" />.
-        /// </summary>
-        private NoiseProfile NoiseProfile()
-        {
-            return new NoiseProfile(
-                new NoiseProfile.Settings
-                {
-                    Seed = Settings.Seed,
-                    Scale = Settings.Noise.Scale,
-                    Lacunarity = Settings.Noise.Lacunarity,
-                    Persistance = Settings.Noise.Persistance,
-                    Octaves = Settings.Noise.Octaves
-                }
-            );
-        }
         
         private NoiseCalculator.NoiseParameters NoiseParameters()
         {
@@ -47,7 +31,8 @@ namespace Engine.Scripts.Utils
                 Seed = Settings.Seed,
                 HumidityScale = Settings.Noise.HumidityScale,
                 TemperatureScale = Settings.Noise.TemperatureScale,
-                ContinentalScale = Settings.Noise.ContinentalScale
+                ElevationProfile = new NoiseProfile(Settings.Noise.elevationProfile.ToStruct(Settings.Seed)),
+                ContinentalLayer = new WarpedNoiseLayer(Settings.Noise.continentalLayer.ToStruct(Settings.Seed))
             };
         }
 
@@ -96,7 +81,6 @@ namespace Engine.Scripts.Utils
             cfg.WaterLevel = Settings.Noise.WaterLevel;
             cfg.GlobalSeed = Settings.Seed;
             cfg.NoiseParams = NoiseParameters();
-            cfg.NoiseProfile = Current.NoiseProfile();
             return new ChunkScheduler(Settings, chunkManager, cfg, world);
         }
 

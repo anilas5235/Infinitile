@@ -421,21 +421,13 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 _jobBiomeColors[i] = biome.RepresentativeColor;
             }
 
-            _generatorConfig.NoiseProfile = new NoiseProfile(new NoiseProfile.Settings
-            {
-                Seed = _settings.Seed,
-                Scale = _settings.Noise.Scale,
-                Persistance = _settings.Noise.Persistance,
-                Lacunarity = _settings.Noise.Lacunarity,
-                Octaves = _settings.Noise.Octaves
-            });
-
             _generatorConfig.NoiseParams = new NoiseCalculator.NoiseParameters
             {
                 Seed = _settings.Seed,
                 HumidityScale = _settings.Noise.HumidityScale,
                 TemperatureScale = _settings.Noise.TemperatureScale,
-                ContinentalScale = _settings.Noise.ContinentalScale
+                ElevationProfile = new NoiseProfile(_settings.Noise.elevationProfile.ToStruct(_settings.Seed)),
+                ContinentalLayer = new WarpedNoiseLayer(_settings.Noise.continentalLayer.ToStruct(_settings.Seed))
             };
 
             WorldViewJob job = new()
@@ -580,8 +572,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 float step = Resolution / (float)ViewResolution;
                 float2 worldPos = new(WorldOffset.x + x * step, WorldOffset.y + z * step);
 
-                NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref Config.NoiseParams,
-                    ref Config.NoiseProfile);
+                NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref Config.NoiseParams);
 
                 BiomeCalculator.BiomSectionInput input = noise.BiomSectionInput();
 
