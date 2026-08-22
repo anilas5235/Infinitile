@@ -1,7 +1,6 @@
 ﻿using Engine.Scripts.VoxelConfig.Data.Generation;
 using Unity.Burst;
 using Unity.Collections;
-using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Chunk
 {
@@ -30,8 +29,12 @@ namespace Engine.Scripts.Jobs.Chunk
                 float dh = input.Humidity - biome.targetHumidity;
                 float dt = input.Temperature - biome.targetTemperature;
                 float dc = input.Continental - biome.targetContinental;
-                float de = input.Elevation - biome.targetHeight;
-                float distance = math.lengthsq(new float4(dh, dt, dc, de));
+                float de = input.Elevation - biome.targetElevation;
+
+                dc *= 1.3f;
+                de *= 1.5f;
+
+                float distance = dh * dh + dt * dt + dc * dc + de * de;
 
                 if (distance >= bestDistance) continue;
 

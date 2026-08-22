@@ -22,13 +22,15 @@ namespace Engine.Scripts.Jobs.Chunk
             float continental = GetNormalizedCNoise(noiseSamplePos, ContinentalOffset, noiseParams.ContinentalScale);
 
             float rawElevation = noiseProfile.GetNoise(noiseSamplePos);
-            
-            return  new WorldNoiseOutput
+
+            float elevation = math.saturate(continental * 0.7f + rawElevation * 0.3f);
+
+            return new WorldNoiseOutput
             {
                 Humidity = humidity,
                 Temperature = temperature,
                 Continental = continental,
-                Elevation = rawElevation
+                Elevation = elevation
             };
         }
 
@@ -39,7 +41,7 @@ namespace Engine.Scripts.Jobs.Chunk
             public float TemperatureScale;
             public float ContinentalScale;
         }
-        
+
         public struct WorldNoiseOutput
         {
             public float Humidity;
@@ -47,7 +49,7 @@ namespace Engine.Scripts.Jobs.Chunk
             public float Continental;
             public float Elevation;
         }
-        
+
         public static BiomeCalculator.BiomSectionInput BiomSectionInput(this WorldNoiseOutput worldNoise)
         {
             return new BiomeCalculator.BiomSectionInput

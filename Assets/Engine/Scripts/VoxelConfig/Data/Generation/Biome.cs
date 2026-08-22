@@ -36,7 +36,18 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation
                 targetHumidity = TargetHumidity,
                 targetTemperature = TargetTemperature,
                 targetContinental = TargetContinental,
-                targetHeight = TargetHeight
+                targetElevation = TargetHeight
+            };
+        }
+        
+        public BiomeDef ToStruct()
+        {
+            return new BiomeDef
+            {
+                targetHumidity = TargetHumidity,
+                targetTemperature = TargetTemperature,
+                targetContinental = TargetContinental,
+                targetElevation = TargetHeight
             };
         }
 
@@ -48,7 +59,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation
             public float targetHumidity;
             public float targetTemperature;
             public float targetContinental;
-            public float targetHeight;
+            public float targetElevation;
 
             public void Dispose()
             {
