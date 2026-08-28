@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Engine.Scripts.Behaviour;
+using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
 using Engine.Scripts.ThirdParty.Priority_Queue;
 using Engine.Scripts.Utils.Extensions;
@@ -24,17 +25,17 @@ namespace Engine.Scripts.Components
 
         private readonly Dictionary<int2, ChunkBehaviour> _chunkMap;
         private readonly int _chunkPoolSize;
-        private readonly SimpleFastPriorityQueue<int2, int> _chunkQueue;
+        private readonly SimpleFastPriorityQueue<int2, float> _chunkQueue;
         private readonly int _colliderPoolSize;
-        private readonly SimpleFastPriorityQueue<int3, int> _colliderQueue;
+        private readonly SimpleFastPriorityQueue<int3, float> _colliderQueue;
         private readonly HashSet<int3> _colliderSet;
         private readonly Dictionary<int3, ChunkPartition> _meshMap;
         private readonly int _partitionPoolSize;
-        private readonly SimpleFastPriorityQueue<int3, int> _partitionQueue;
+        private readonly SimpleFastPriorityQueue<int3, float> _partitionQueue;
         private readonly ObjectPool<ChunkBehaviour> _pool;
         private bool _emitEvictionEvents = true;
 
-        private int3 _focus;
+        private Focus _focus;
 
         /// <summary>
         ///     Constructs a pool based on draw/update distances.
@@ -50,9 +51,9 @@ namespace Engine.Scripts.Components
             _colliderPoolSize = settings.Chunk.UpdateDistance.SquareSize() * PartitionsPerChunk;
             _colliderSet = new HashSet<int3>(_colliderPoolSize);
 
-            _chunkQueue = new SimpleFastPriorityQueue<int2, int>();
-            _partitionQueue = new SimpleFastPriorityQueue<int3, int>();
-            _colliderQueue = new SimpleFastPriorityQueue<int3, int>();
+            _chunkQueue = new SimpleFastPriorityQueue<int2, float>();
+            _partitionQueue = new SimpleFastPriorityQueue<int3, float>();
+            _colliderQueue = new SimpleFastPriorityQueue<int3, float>();
 
             _pool = new ObjectPool<ChunkBehaviour>(
                 () =>
@@ -85,7 +86,7 @@ namespace Engine.Scripts.Components
         /// <summary>
         ///     Updates focus and queue priorities.
         /// </summary>
-        internal void FocusUpdate(int3 focus)
+        internal void FocusUpdate(PriorityUtil.Focus focus)
         {
             _focus = focus;
             _chunkQueue.UpdateAllPriorities(PriorityCalc);
@@ -94,12 +95,13 @@ namespace Engine.Scripts.Components
         }
 
 
-        private int PriorityCalc(int2 position)
+
+        private float PriorityCalc(int2 position)
         {
             return -DistPriority(ref position, ref _focus);
         }
 
-        private int PriorityCalc(int3 position)
+        private float PriorityCalc(int3 position)
         {
             return -DistPriority(ref position, ref _focus);
         }
@@ -141,7 +143,7 @@ namespace Engine.Scripts.Components
             return behaviour;
         }
 
-        internal int GetPartitionPrioThreshold()
+        internal float GetPartitionPrioThreshold()
         {
             return _partitionQueue.Count < _partitionPoolSize
                 ? int.MinValue

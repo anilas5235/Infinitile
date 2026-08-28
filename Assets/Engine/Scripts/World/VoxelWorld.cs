@@ -1,8 +1,8 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
-using Engine.Scripts.Data;
 using Engine.Scripts.Components;
-using Engine.Scripts.Jobs;
+using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.ColliderMeshing;
@@ -12,7 +12,6 @@ using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.VoxelConfig;
-using Engine.Scripts.VoxelConfig.Data;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -34,7 +33,8 @@ namespace Engine.Scripts.World
         private ChunkScheduler _chunkScheduler;
         private ColliderBakeScheduler _colliderBakeScheduler;
         private NoiseProfile _noiseProfile;
-
+        
+        private Coroutine _focusUpdateRoutine;
 
         private bool _isFocused;
         private bool _isShuttingDown;
@@ -55,10 +55,7 @@ namespace Engine.Scripts.World
 
         internal void RaisePartitionEvicted(int3 partitionPos) => PartitionEvicted?.Invoke(partitionPos);
 
-        internal void RequestPartitionBuild(HashSet<int3> partitions)
-        {
-            PartitionBuildRequested?.Invoke(partitions);
-        }
+        internal void RequestPartitionBuild(HashSet<int3> partitions) => PartitionBuildRequested?.Invoke(partitions);
 
         /// <summary>
         ///     Gets the voxel ID at the given world voxel position.
@@ -127,7 +124,6 @@ namespace Engine.Scripts.World
                 ChunkManager,
                 _chunkPool
             );
-
         }
 
         private void HandleChunkEvicted(int2 chunkPos)
@@ -150,9 +146,7 @@ namespace Engine.Scripts.World
         /// <summary>
         ///     The partition coordinates of the current focus position.
         /// </summary>
-        public int3 FocusPartitionCoords { get; private set; }
-
-        public int3 FocusPosition { get; private set; }
+        public PriorityUtil.Focus Focus { get; private set; }
 
         /// <summary>
         ///     Gets the chunk manager that stores and accesses chunk data.
@@ -180,7 +174,19 @@ namespace Engine.Scripts.World
 
             ConstructEngineComponents();
 
-            FocusPartitionCoords = new int3(1, 1, 1) * int.MinValue;
+            Focus = new PriorityUtil.Focus(new int3(1, 1, 1) * int.MinValue, new float3(0, 0, 1));
+        }
+
+        private void OnEnable()
+        {
+            if(_focusUpdateRoutine != null) StopCoroutine(_focusUpdateRoutine);
+            _focusUpdateRoutine = StartCoroutine(FocusUpdateRoutine());
+        }
+
+        private void OnDisable()
+        {
+            if(_focusUpdateRoutine != null) StopCoroutine(_focusUpdateRoutine);
+            _focusUpdateRoutine = null;
         }
 
         /// <summary>
@@ -191,29 +197,9 @@ namespace Engine.Scripts.World
             _isFocused = focus;
         }
 
-        /// <summary>
-        ///     Updates the focus chunk coordinate and lets the scheduler perform focus and
-        ///     regular scheduling logic every frame.
-        /// </summary>
         private void Update()
         {
-            int3 newFocusCoords = _isFocused ? VoxelUtils.GetPartitionCoords(focus.position) : int3.zero;
-
-            if (!(newFocusCoords == FocusPartitionCoords).AndReduce())
-            {
-                FocusPartitionCoords = newFocusCoords;
-                _scheduler.FocusUpdate(FocusPartitionCoords);
-            }
-
-            _scheduler.ScheduleUpdate(FocusPartitionCoords);
-        }
-
-        private void FixedUpdate()
-        {
-            if (!_isFocused) return;
-
-            FocusPosition = focus.position.Int3();
-            //_occlusionCuller.OccUpdate(FocusPartitionCoords, FocusPosition,focus.forward.Float3());
+            _scheduler.ScheduleUpdate(Focus);
         }
 
         /// <summary>
@@ -232,7 +218,27 @@ namespace Engine.Scripts.World
 
             base.OnDestroy();
             _scheduler.Dispose();
-            ChunkManager.Dispose();
+            ChunkManager?.Dispose();
+        }
+
+        private IEnumerator FocusUpdateRoutine()
+        {
+            while (true)
+            {
+                if (_isFocused)
+                {
+                    PriorityUtil.Focus newFocus = new(VoxelConstants.WorldToPartitionPos(focus.position.Int3()),
+                        focus.forward.Float3());
+
+                    if (!newFocus.Equals(Focus))
+                    {
+                        Focus = newFocus;
+                        _scheduler.FocusUpdate(Focus);
+                    }
+                }
+
+                yield return new WaitForSeconds(1f);
+            }
         }
 
         #endregion

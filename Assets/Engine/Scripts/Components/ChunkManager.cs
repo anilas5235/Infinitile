@@ -27,13 +27,13 @@ namespace Engine.Scripts.Components
     {
         private readonly Dictionary<int2, Chunk> _chunks;
         private readonly int _chunkStoreSize;
-        private readonly SimpleFastPriorityQueue<int2, int> _queue;
+        private readonly SimpleFastPriorityQueue<int2, float> _queue;
         private readonly HashSet<int3> _reCollidePartitions;
 
         private readonly HashSet<int3> _reMeshPartitions;
         private NativeParallelHashMap<int2, ChunkVoxelData> _accessorMap;
 
-        private int3 _focus;
+        private PriorityUtil.Focus _focus;
         private NativeParallelHashMap<int2, ChunkLightData> _lightAccessorMap;
 
         internal Action OnRemeshRequested;
@@ -50,7 +50,7 @@ namespace Engine.Scripts.Components
             _reCollidePartitions = new HashSet<int3>();
 
             _chunks = new Dictionary<int2, Chunk>(_chunkStoreSize);
-            _queue = new SimpleFastPriorityQueue<int2, int>();
+            _queue = new SimpleFastPriorityQueue<int2, float>();
 
             _accessorMap = new NativeParallelHashMap<int2, ChunkVoxelData>(
                 settings.Scheduler.meshingBatchSize * 6,
@@ -85,7 +85,7 @@ namespace Engine.Scripts.Components
         /// <summary>
         ///     Updates focus (player) and priorities in eviction queue.
         /// </summary>
-        internal void FocusUpdate(int3 focus)
+        internal void FocusUpdate(PriorityUtil.Focus focus)
         {
             _focus = focus;
             _queue.UpdateAllPriorities(pos => -PriorityUtil.DistPriority(ref pos, ref focus));
@@ -107,7 +107,7 @@ namespace Engine.Scripts.Components
 
                 Chunk chunk = new(position) { VoxelData = pair.Value };
                 _chunks.Add(position, chunk);
-                _queue.Enqueue(position, -(position - _focus.xz).SqrMagnitude());
+                _queue.Enqueue(position, -(position - _focus.Pos.xz).SqrMagnitude());
             }
         }
 

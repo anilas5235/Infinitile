@@ -33,7 +33,7 @@ namespace Engine.Scripts.Jobs.Core
         /// Updates focus and reprioritizes all queued partitions based on distance from focus.
         /// </summary>
         /// <param name="focus">The new focus position.</param>
-        public override void FocusUpdate(int3 focus)
+        public override void FocusUpdate(PriorityUtil.Focus focus)
         {
             WakeUp();
             Queue.UpdateAllPriorities(pos => PriorityUtil.DistPriority(ref pos, ref focus));
@@ -44,7 +44,7 @@ namespace Engine.Scripts.Jobs.Core
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if any partitions were enqueued, false if queue is empty.</returns>
-        protected override bool EnqueueStep(int3 focus)
+        protected override bool EnqueueStep(PriorityUtil.Focus focus)
         {
             int update = Settings.Chunk.UpdateDistance;
 
@@ -52,7 +52,7 @@ namespace Engine.Scripts.Jobs.Core
             for (int z = -update; z <= update; z++)
             for (int y = 0; y < VoxelConstants.PartitionsPerChunk; y++)
             {
-                int3 pos = new(x + focus.x, y, z + focus.z);
+                int3 pos = new(x + focus.Pos.x, y, z + focus.Pos.z);
                 if (!Queue.Contains(pos) && ShouldScheduleForBaking(pos))
                     Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
             }
@@ -65,7 +65,7 @@ namespace Engine.Scripts.Jobs.Core
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if jobs were dispatched or batch is full, false if scheduler is busy.</returns>
-        protected override bool JobUpdateStep(int3 focus)
+        protected override bool JobUpdateStep(PriorityUtil.Focus focus)
         {
             if (!_colliderBakeScheduler.IsReady) return false;
 
@@ -130,11 +130,11 @@ namespace Engine.Scripts.Jobs.Core
         /// <param name="position">The partition position to check.</param>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if partition is within update distance.</returns>
-        private bool IsPartitionStillRelevant(int3 position, int3 focus)
+        private bool IsPartitionStillRelevant(int3 position, PriorityUtil.Focus focus)
         {
             int updateDistance = Settings.Chunk.UpdateDistance;
-            return math.abs(position.x - focus.x) <= updateDistance &&
-                   math.abs(position.z - focus.z) <= updateDistance;
+            return math.abs(position.x - focus.Pos.x) <= updateDistance &&
+                   math.abs(position.z - focus.Pos.z) <= updateDistance;
         }
     }
 }
