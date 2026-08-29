@@ -2,6 +2,7 @@
 using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
+using Engine.Scripts.Utils.Logger;
 using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Core
@@ -61,7 +62,7 @@ namespace Engine.Scripts.Jobs.Core
                     int3 pos = new(x + focus.Pos.x, y, z + focus.Pos.z);
                     if (Queue.Contains(pos) || !ShouldScheduleForMeshing(pos)) continue;
 
-                    if (-PriorityUtil.DistPriority(ref pos, ref focus) <= prioThreshold) continue;
+                    if (PriorityUtil.ReVerseDistPriority(ref pos, ref focus) <= prioThreshold) continue;
 
                     Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
                 }
@@ -85,10 +86,12 @@ namespace Engine.Scripts.Jobs.Core
 
             while (accepted < count && Queue.Count > 0)
             {
-                int3 chunk = Queue.Dequeue();
-                if (!IsPartitionStillRelevant(chunk, focus, prioThreshold)) continue;
-                if (!CanGenerateMeshForChunk(chunk) || !ShouldScheduleForMeshing(chunk)) continue;
-                Set.Add(chunk);
+                int3 partition = Queue.Dequeue();
+                if (!IsPartitionStillRelevant(partition, focus, prioThreshold)) continue;
+                if (!CanGenerateMeshForChunk(partition)) continue;
+                if (!ShouldScheduleForMeshing(partition)) continue;
+                
+                Set.Add(partition);
                 accepted++;
             }
 
@@ -158,7 +161,7 @@ namespace Engine.Scripts.Jobs.Core
             return math.abs(position.x - focus.Pos.x) <= drawDistance &&
                    math.abs(position.z - focus.Pos.z) <= drawDistance &&
                    math.abs(position.y - focus.Pos.y) <= drawDistance &&
-                   -PriorityUtil.DistPriority(ref position, ref focus) > prioThreshold;
+                   PriorityUtil.ReVerseDistPriority(ref position, ref focus) > prioThreshold;
         }
     }
 }

@@ -969,7 +969,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   focus: {fileID: 330585546}
   settings: {fileID: 11400000, guid: 455fa891937aa3143ab4d3735c5e538d, type: 2}
-  worldRenderer: {fileID: 1592505031}
 --- !u!114 &1592505031
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -983,12 +982,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Runtime.Engine.Render.VoxelWorldRenderer
   world: {fileID: 1592505030}
-  solidMaterial: {fileID: 2100000, guid: b6215133664aff74dad83d56615f47d0, type: 2}
-  transparentMaterial: {fileID: 2100000, guid: e8e8dbf7c2062df49bf757b4e9d3a636, type: 2}
-  foliageMaterial: {fileID: 2100000, guid: daf19eb8c4aeb474ebe2bb4b7e1f87a6, type: 2}
-  pointBuilder: {fileID: 7200000, guid: b253108f447042e389630ea3cd8affd1, type: 3}
-  copyPoints: {fileID: 7200000, guid: d6821e19a578d8a468410694549d56e8, type: 3}
-  rebuildBuffers: {fileID: 7200000, guid: 2cded031692db1345b8b6cceb7abce13, type: 3}
 --- !u!1 &1610362568
 GameObject:
   m_ObjectHideFlags: 0

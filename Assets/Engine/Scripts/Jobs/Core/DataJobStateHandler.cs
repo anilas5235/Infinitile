@@ -2,6 +2,7 @@
 using Engine.Scripts.Components;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Settings;
+using Engine.Scripts.Utils.Logger;
 using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Core
@@ -53,8 +54,9 @@ namespace Engine.Scripts.Jobs.Core
             for (int z = -load; z <= load; z++)
             {
                 int2 pos = focus.Pos.xz + new int2(x, z);
-                if (!Queue.Contains(pos) && ShouldScheduleForGenerating(pos))
-                    Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
+                if (Queue.Contains(pos) || !ShouldScheduleForGenerating(pos)) continue;
+
+                Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
             }
 
             return Queue.Count > 0;

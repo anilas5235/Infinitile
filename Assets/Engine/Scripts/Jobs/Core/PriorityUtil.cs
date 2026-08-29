@@ -20,7 +20,7 @@ namespace Engine.Scripts.Jobs.Core
             public Focus(int3 pos, float3 forward)
             {
                 Pos = pos;
-                Forward = forward;
+                Forward = Quantize45(ref forward);
             }
 
             public bool Equals(Focus other)
@@ -41,6 +41,34 @@ namespace Engine.Scripts.Jobs.Core
                 }
             }
         }
+        
+        private static float3 Quantize45(ref float3 v)
+        {
+            v = math.normalize(v);
+
+            // 45° Schritte
+            const float s = 0.70710678f;
+
+            float3 q;
+
+            q.x = QuantizeAxis(v.x, s);
+            q.y = QuantizeAxis(v.y, s);
+            q.z = QuantizeAxis(v.z, s);
+
+            return math.normalize(q);
+        }
+
+        private static float QuantizeAxis(float a, float step)
+        {
+            return a switch
+            {
+                > 0.923f => 1f,
+                > 0.383f => step,
+                > -0.383f => 0f,
+                > -0.923f => -step,
+                _ => -1f
+            };
+        }
 
         /// <summary>
         /// Calculates priority based on squared distance from focus position for 3D coordinates.
@@ -53,16 +81,18 @@ namespace Engine.Scripts.Jobs.Core
         public static float DistPriority(ref int3 position, ref Focus focus)
         {
             int dist = (position - focus.Pos).SqrMagnitude();
-
+            if(dist == 0) return 0f;
             float3 dir = math.normalize(position - (float3)focus.Pos);
 
-            return DistPriority(dist, ref dir, ref focus);
+            float dot = math.dot(focus.Forward, dir);
+
+            return dist * (3f - 2f * dot);
         }
 
         [BurstCompile]
-        public static float DistPriority(float dist, ref float3 dir, ref Focus focus)
+        public static float ReVerseDistPriority(ref int3 position, ref Focus focus)
         {
-            return dist * (3f - 2f *math.dot(focus.Forward, dir));
+            return -DistPriority(ref position, ref focus);
         }
 
         /// <summary>
@@ -76,10 +106,20 @@ namespace Engine.Scripts.Jobs.Core
         public static float DistPriority(ref int2 position, ref Focus focus)
         {
             int dist = (position - focus.Pos.xz).SqrMagnitude();
+            if(dist == 0) return 0f;
+            
+            float2 dir = math.normalize(position - focus.Pos.xz);
+            float2 forward = math.normalize(focus.Forward.xz);
+            
+            float dot = math.dot(forward, dir);
+            
+            return dist * (3f - 2f * dot);
+        }
 
-            float3 dir = math.normalize(new float3(position.x, 0f, position.y) - new float3(focus.Pos.x, 0f, focus.Pos.z));
-
-            return DistPriority(dist, ref dir, ref focus);
+        [BurstCompile]
+        public static float ReVerseDistPriority(ref int2 position, ref Focus focus)
+        {
+            return -DistPriority(ref position, ref focus);
         }
     }
 }

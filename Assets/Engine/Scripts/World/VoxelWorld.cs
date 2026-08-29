@@ -11,6 +11,7 @@ using Engine.Scripts.Noise;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
+using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig;
 using Unity.Mathematics;
 using UnityEngine;
@@ -140,6 +141,18 @@ namespace Engine.Scripts.World
 
             RaisePartitionEvicted(partitionPos);
         }
+        
+        private void TryFocusUpdate()
+        {
+            if (!_isFocused) return;
+            PriorityUtil.Focus newFocus = new(VoxelConstants.WorldToPartitionPos(focus.position.Int3()),
+                focus.forward.Float3());
+
+            if (newFocus.Equals(Focus)) return;
+            VoxelEngineLogger.Info<VoxelWorld>($"Focus updated to {newFocus.Pos} with forward {newFocus.Forward}");
+            Focus = newFocus;
+            _scheduler.FocusUpdate(Focus);
+        }
 
         #region API
 
@@ -195,6 +208,7 @@ namespace Engine.Scripts.World
         private void Start()
         {
             _isFocused = focus;
+            TryFocusUpdate();
         }
 
         private void Update()
@@ -225,22 +239,11 @@ namespace Engine.Scripts.World
         {
             while (true)
             {
-                if (_isFocused)
-                {
-                    PriorityUtil.Focus newFocus = new(VoxelConstants.WorldToPartitionPos(focus.position.Int3()),
-                        focus.forward.Float3());
-
-                    if (!newFocus.Equals(Focus))
-                    {
-                        Focus = newFocus;
-                        _scheduler.FocusUpdate(Focus);
-                    }
-                }
-
-                yield return new WaitForSeconds(1f);
+                yield return new WaitForSeconds(.5f);
+                TryFocusUpdate();
             }
         }
-
+        
         #endregion
     }
 }

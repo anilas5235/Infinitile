@@ -27,7 +27,7 @@ namespace Engine.Scripts.Components
     {
         private readonly Dictionary<int2, Chunk> _chunks;
         private readonly int _chunkStoreSize;
-        private readonly SimpleFastPriorityQueue<int2, float> _queue;
+        private readonly SimpleFastPriorityQueue<int2, float> _unloadingQueue;
         private readonly HashSet<int3> _reCollidePartitions;
 
         private readonly HashSet<int3> _reMeshPartitions;
@@ -50,7 +50,7 @@ namespace Engine.Scripts.Components
             _reCollidePartitions = new HashSet<int3>();
 
             _chunks = new Dictionary<int2, Chunk>(_chunkStoreSize);
-            _queue = new SimpleFastPriorityQueue<int2, float>();
+            _unloadingQueue = new SimpleFastPriorityQueue<int2, float>();
 
             _accessorMap = new NativeParallelHashMap<int2, ChunkVoxelData>(
                 settings.Scheduler.meshingBatchSize * 6,
@@ -88,7 +88,7 @@ namespace Engine.Scripts.Components
         internal void FocusUpdate(PriorityUtil.Focus focus)
         {
             _focus = focus;
-            _queue.UpdateAllPriorities(pos => -PriorityUtil.DistPriority(ref pos, ref focus));
+            _unloadingQueue.UpdateAllPriorities(pos => PriorityUtil.ReVerseDistPriority(ref pos, ref focus));
         }
 
         /// <summary>
@@ -103,11 +103,11 @@ namespace Engine.Scripts.Components
                 if (_chunks.ContainsKey(position))
                     throw new InvalidOperationException($"Chunk {position} already exists");
 
-                if (_queue.Count >= _chunkStoreSize) RemoveChunkData(_queue.Dequeue());
+                if (_unloadingQueue.Count >= _chunkStoreSize) RemoveChunkData(_unloadingQueue.Dequeue());
 
                 Chunk chunk = new(position) { VoxelData = pair.Value };
                 _chunks.Add(position, chunk);
-                _queue.Enqueue(position, -(position - _focus.Pos.xz).SqrMagnitude());
+                _unloadingQueue.Enqueue(position, PriorityUtil.ReVerseDistPriority(ref position, ref _focus));
             }
         }
 
@@ -121,7 +121,7 @@ namespace Engine.Scripts.Components
 
         internal void UnloadChunk(int2 position)
         {
-            if (_queue.Contains(position)) _queue.Remove(position);
+            if (_unloadingQueue.Contains(position)) _unloadingQueue.Remove(position);
             if (!_chunks.TryGetValue(position, out Chunk chunk)) return;
 
             chunk.Dispose();
