@@ -149,7 +149,6 @@ namespace Engine.Scripts.World
                 focus.forward.Float3());
 
             if (newFocus.Equals(Focus)) return;
-            VoxelEngineLogger.Info<VoxelWorld>($"Focus updated to {newFocus.Pos} with forward {newFocus.Forward}");
             Focus = newFocus;
             _scheduler.FocusUpdate(Focus);
         }

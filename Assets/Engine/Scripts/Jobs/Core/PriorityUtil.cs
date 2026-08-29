@@ -46,26 +46,24 @@ namespace Engine.Scripts.Jobs.Core
         {
             v = math.normalize(v);
 
-            // 45° Schritte
-            const float s = 0.70710678f;
-
-            float3 q;
-
-            q.x = QuantizeAxis(v.x, s);
-            q.y = QuantizeAxis(v.y, s);
-            q.z = QuantizeAxis(v.z, s);
-
+            float3 q = new(
+                QuantizeAxis(v.x),
+                QuantizeAxis(v.y),
+                QuantizeAxis(v.z)
+            );
+            
             return math.normalize(q);
         }
 
-        private static float QuantizeAxis(float a, float step)
+        private static float QuantizeAxis(float a)
         {
+            const float s = 0.70710678f;
             return a switch
             {
                 > 0.923f => 1f,
-                > 0.383f => step,
+                > 0.383f => s,
                 > -0.383f => 0f,
-                > -0.923f => -step,
+                > -0.923f => -s,
                 _ => -1f
             };
         }
