@@ -56,7 +56,7 @@ namespace Engine.Scripts.Jobs.Core
             for (int x = -draw; x <= draw; x++)
             for (int z = -draw; z <= draw; z++)
             {
-                if (!CanGenerateMeshForChunk(focus.Pos + new int3(x, 0, z))) continue;
+                if (!CanGenerateMeshForChunk(focus.Pos.xz + new int2(x, z))) continue;
                 for (int y = 0; y < VoxelConstants.PartitionsPerChunk; y++)
                 {
                     int3 pos = new(x + focus.Pos.x, y, z + focus.Pos.z);
@@ -88,7 +88,7 @@ namespace Engine.Scripts.Jobs.Core
             {
                 int3 partition = Queue.Dequeue();
                 if (!IsPartitionStillRelevant(partition, focus, prioThreshold)) continue;
-                if (!CanGenerateMeshForChunk(partition)) continue;
+                if (!CanGenerateMeshForChunk(partition.xz)) continue;
                 if (!ShouldScheduleForMeshing(partition)) continue;
                 
                 Set.Add(partition);
@@ -122,14 +122,14 @@ namespace Engine.Scripts.Jobs.Core
         /// </summary>
         /// <param name="position">The chunk position to check.</param>
         /// <returns>True if the chunk and all neighbors are loaded.</returns>
-        private bool CanGenerateMeshForChunk(int3 position)
+        private bool CanGenerateMeshForChunk(int2 position)
         {
             bool result = true;
 
             for (int x = -1; x <= 1; x++)
             for (int z = -1; z <= 1; z++)
             {
-                int2 pos = position.xz + new int2(x, z);
+                int2 pos = position + new int2(x, z);
                 result &= ChunkManager.IsChunkLoaded(pos);
             }
 

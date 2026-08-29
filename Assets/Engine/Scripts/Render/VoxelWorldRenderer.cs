@@ -8,7 +8,6 @@ using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Collections;
 using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig;
-using Engine.Scripts.VoxelConfig.Data;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using Unity.Mathematics;
@@ -19,17 +18,18 @@ using static UnityEngine.GraphicsBuffer;
 
 namespace Engine.Scripts.Render
 {
-    [RequireComponent(typeof(VoxelWorld))]
     /// <summary>
     /// Main renderer component for the voxel world, managing partition building and rendering.
     /// Handles async GPU work for geometry generation and updates render buffers.
     /// </summary>
+    [RequireComponent(typeof(VoxelWorld))]
     public class VoxelWorldRenderer : Singleton<VoxelWorldRenderer>
     {
         /// <summary>
         /// Reference to the VoxelWorld instance.
         /// </summary>
         public VoxelWorld world;
+
         private VoxelEngineSettings _settings;
 
         private readonly Dictionary<int2, GraphicsBuffer> _voxelDataBuffers = new();
@@ -288,7 +288,7 @@ namespace Engine.Scripts.Render
             for (int i = 0; i < _maxInFlight; i++)
             {
                 InFlightBuild build = _inFlightBuilds[i];
-                if(build == null) continue;
+                if (build == null) continue;
                 if (!build.BuildAwaiter.IsCompleted) continue;
 
                 _inFlightBuilds[i] = null;
@@ -380,12 +380,12 @@ namespace Engine.Scripts.Render
             /// The partition coordinates being built.
             /// </summary>
             public readonly int3 Partition;
-            
+
             /// <summary>
             /// The point builder handler responsible for this build.
             /// </summary>
             public readonly PointBuilderHandler Handler;
-            
+
             /// <summary>
             /// The awaiter for the build operation's result.
             /// </summary>
@@ -416,17 +416,17 @@ namespace Engine.Scripts.Render
         /// The partition grid coordinates.
         /// </summary>
         public int3 PartitionPos;
-        
+
         /// <summary>
         /// The world space position of the partition.
         /// </summary>
         public int3 PartitionWorldPos;
-        
+
         /// <summary>
         /// The minimum corner of the partition's axis-aligned bounding box.
         /// </summary>
         public float3 BoundsMin;
-        
+
         /// <summary>
         /// The maximum corner of the partition's axis-aligned bounding box.
         /// </summary>
