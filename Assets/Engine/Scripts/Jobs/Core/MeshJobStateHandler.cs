@@ -2,6 +2,7 @@
 using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
+using Engine.Scripts.Utils.Logger;
 using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Core
@@ -35,7 +36,7 @@ namespace Engine.Scripts.Jobs.Core
         /// Updates focus and reprioritizes all queued partitions based on distance from focus.
         /// </summary>
         /// <param name="focus">The new focus position.</param>
-        public override void FocusUpdate(int3 focus)
+        public override void FocusUpdate(PriorityUtil.Focus focus)
         {
             WakeUp();
             Queue.UpdateAllPriorities(pos => PriorityUtil.DistPriority(ref pos, ref focus));
@@ -47,21 +48,21 @@ namespace Engine.Scripts.Jobs.Core
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if any partitions were enqueued, false if queue is empty.</returns>
-        protected override bool EnqueueStep(int3 focus)
+        protected override bool EnqueueStep(PriorityUtil.Focus focus)
         {
             int draw = Settings.Chunk.DrawDistance;
-            int prioThreshold = ChunkPool.GetPartitionPrioThreshold();
+            float prioThreshold = ChunkPool.GetPartitionPrioThreshold();
 
             for (int x = -draw; x <= draw; x++)
             for (int z = -draw; z <= draw; z++)
             {
-                if (!CanGenerateMeshForChunk(focus + new int3(x, 0, z))) continue;
+                if (!CanGenerateMeshForChunk(focus.Pos.xz + new int2(x, z))) continue;
                 for (int y = 0; y < VoxelConstants.PartitionsPerChunk; y++)
                 {
-                    int3 pos = new(x + focus.x, y, z + focus.z);
+                    int3 pos = new(x + focus.Pos.x, y, z + focus.Pos.z);
                     if (Queue.Contains(pos) || !ShouldScheduleForMeshing(pos)) continue;
 
-                    if (-PriorityUtil.DistPriority(ref pos, ref focus) <= prioThreshold) continue;
+                    if (PriorityUtil.ReVerseDistPriority(ref pos, ref focus) <= prioThreshold) continue;
 
                     Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
                 }
@@ -75,20 +76,22 @@ namespace Engine.Scripts.Jobs.Core
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if jobs were dispatched or batch is full, false if scheduler is busy.</returns>
-        protected override bool JobUpdateStep(int3 focus)
+        protected override bool JobUpdateStep(PriorityUtil.Focus focus)
         {
             if (!_cMeshBuildScheduler.IsReady) return false;
 
             int count = math.min(Settings.Scheduler.meshingBatchSize, Queue.Count);
-            int prioThreshold = ChunkPool.GetPartitionPrioThreshold();
+            float prioThreshold = ChunkPool.GetPartitionPrioThreshold();
             int accepted = 0;
 
             while (accepted < count && Queue.Count > 0)
             {
-                int3 chunk = Queue.Dequeue();
-                if (!IsPartitionStillRelevant(chunk, focus, prioThreshold)) continue;
-                if (!CanGenerateMeshForChunk(chunk) || !ShouldScheduleForMeshing(chunk)) continue;
-                Set.Add(chunk);
+                int3 partition = Queue.Dequeue();
+                if (!IsPartitionStillRelevant(partition, focus, prioThreshold)) continue;
+                if (!CanGenerateMeshForChunk(partition.xz)) continue;
+                if (!ShouldScheduleForMeshing(partition)) continue;
+                
+                Set.Add(partition);
                 accepted++;
             }
 
@@ -119,14 +122,14 @@ namespace Engine.Scripts.Jobs.Core
         /// </summary>
         /// <param name="position">The chunk position to check.</param>
         /// <returns>True if the chunk and all neighbors are loaded.</returns>
-        private bool CanGenerateMeshForChunk(int3 position)
+        private bool CanGenerateMeshForChunk(int2 position)
         {
             bool result = true;
 
             for (int x = -1; x <= 1; x++)
             for (int z = -1; z <= 1; z++)
             {
-                int2 pos = position.xz + new int2(x, z);
+                int2 pos = position + new int2(x, z);
                 result &= ChunkManager.IsChunkLoaded(pos);
             }
 
@@ -152,12 +155,13 @@ namespace Engine.Scripts.Jobs.Core
         /// <param name="focus">The current focus position.</param>
         /// <param name="prioThreshold">The priority threshold for relevance.</param>
         /// <returns>True if partition is still relevant.</returns>
-        private bool IsPartitionStillRelevant(int3 position, int3 focus, int prioThreshold)
+        private bool IsPartitionStillRelevant(int3 position, PriorityUtil.Focus focus, float prioThreshold)
         {
             int drawDistance = Settings.Chunk.DrawDistance;
-            return math.abs(position.x - focus.x) <= drawDistance &&
-                   math.abs(position.z - focus.z) <= drawDistance &&
-                   -PriorityUtil.DistPriority(ref position, ref focus) > prioThreshold;
+            return math.abs(position.x - focus.Pos.x) <= drawDistance &&
+                   math.abs(position.z - focus.Pos.z) <= drawDistance &&
+                   math.abs(position.y - focus.Pos.y) <= drawDistance &&
+                   PriorityUtil.ReVerseDistPriority(ref position, ref focus) > prioThreshold;
         }
     }
 }

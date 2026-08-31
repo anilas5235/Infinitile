@@ -2,6 +2,7 @@
 using Engine.Scripts.Components;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Settings;
+using Engine.Scripts.Utils.Logger;
 using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Core
@@ -35,7 +36,7 @@ namespace Engine.Scripts.Jobs.Core
         /// Updates focus and reprioritizes all queued chunks based on distance from focus.
         /// </summary>
         /// <param name="focus">The new focus position.</param>
-        public override void FocusUpdate(int3 focus)
+        public override void FocusUpdate(PriorityUtil.Focus focus)
         {
             WakeUp();
             Queue.UpdateAllPriorities(pos => PriorityUtil.DistPriority(ref pos, ref focus));
@@ -46,15 +47,16 @@ namespace Engine.Scripts.Jobs.Core
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if any chunks were enqueued, false if queue is empty.</returns>
-        protected override bool EnqueueStep(int3 focus)
+        protected override bool EnqueueStep(PriorityUtil.Focus focus)
         {
             int load = Settings.Chunk.LoadDistance;
             for (int x = -load; x <= load; x++)
             for (int z = -load; z <= load; z++)
             {
-                int2 pos = focus.xz + new int2(x, z);
-                if (!Queue.Contains(pos) && ShouldScheduleForGenerating(pos))
-                    Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
+                int2 pos = focus.Pos.xz + new int2(x, z);
+                if (Queue.Contains(pos) || !ShouldScheduleForGenerating(pos)) continue;
+
+                Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
             }
 
             return Queue.Count > 0;
@@ -65,7 +67,7 @@ namespace Engine.Scripts.Jobs.Core
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if jobs were dispatched or batch is full, false if scheduler is busy.</returns>
-        protected override bool JobUpdateStep(int3 focus)
+        protected override bool JobUpdateStep(PriorityUtil.Focus focus)
         {
             if (!_chunkScheduler.IsReady) return false;
 
@@ -118,11 +120,11 @@ namespace Engine.Scripts.Jobs.Core
         /// <param name="position">The chunk position to check.</param>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if chunk is within load distance.</returns>
-        private bool IsChunkStillRelevant(int2 position, int3 focus)
+        private bool IsChunkStillRelevant(int2 position, PriorityUtil.Focus focus)
         {
             int loadDistance = Settings.Chunk.LoadDistance;
-            return math.abs(position.x - focus.x) <= loadDistance &&
-                   math.abs(position.y - focus.z) <= loadDistance;
+            return math.abs(position.x - focus.Pos.x) <= loadDistance &&
+                   math.abs(position.y - focus.Pos.z) <= loadDistance;
         }
     }
 }

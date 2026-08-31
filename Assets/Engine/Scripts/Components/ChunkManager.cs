@@ -27,13 +27,13 @@ namespace Engine.Scripts.Components
     {
         private readonly Dictionary<int2, Chunk> _chunks;
         private readonly int _chunkStoreSize;
-        private readonly SimpleFastPriorityQueue<int2, int> _queue;
+        private readonly SimpleFastPriorityQueue<int2, float> _unloadingQueue;
         private readonly HashSet<int3> _reCollidePartitions;
 
         private readonly HashSet<int3> _reMeshPartitions;
         private NativeParallelHashMap<int2, ChunkVoxelData> _accessorMap;
 
-        private int3 _focus;
+        private PriorityUtil.Focus _focus;
         private NativeParallelHashMap<int2, ChunkLightData> _lightAccessorMap;
 
         internal Action OnRemeshRequested;
@@ -50,7 +50,7 @@ namespace Engine.Scripts.Components
             _reCollidePartitions = new HashSet<int3>();
 
             _chunks = new Dictionary<int2, Chunk>(_chunkStoreSize);
-            _queue = new SimpleFastPriorityQueue<int2, int>();
+            _unloadingQueue = new SimpleFastPriorityQueue<int2, float>();
 
             _accessorMap = new NativeParallelHashMap<int2, ChunkVoxelData>(
                 settings.Scheduler.meshingBatchSize * 6,
@@ -85,10 +85,10 @@ namespace Engine.Scripts.Components
         /// <summary>
         ///     Updates focus (player) and priorities in eviction queue.
         /// </summary>
-        internal void FocusUpdate(int3 focus)
+        internal void FocusUpdate(PriorityUtil.Focus focus)
         {
             _focus = focus;
-            _queue.UpdateAllPriorities(pos => -PriorityUtil.DistPriority(ref pos, ref focus));
+            _unloadingQueue.UpdateAllPriorities(pos => PriorityUtil.ReVerseDistPriority(ref pos, ref focus));
         }
 
         /// <summary>
@@ -103,11 +103,11 @@ namespace Engine.Scripts.Components
                 if (_chunks.ContainsKey(position))
                     throw new InvalidOperationException($"Chunk {position} already exists");
 
-                if (_queue.Count >= _chunkStoreSize) RemoveChunkData(_queue.Dequeue());
+                if (_unloadingQueue.Count >= _chunkStoreSize) RemoveChunkData(_unloadingQueue.Dequeue());
 
                 Chunk chunk = new(position) { VoxelData = pair.Value };
                 _chunks.Add(position, chunk);
-                _queue.Enqueue(position, -(position - _focus.xz).SqrMagnitude());
+                _unloadingQueue.Enqueue(position, PriorityUtil.ReVerseDistPriority(ref position, ref _focus));
             }
         }
 
@@ -121,7 +121,7 @@ namespace Engine.Scripts.Components
 
         internal void UnloadChunk(int2 position)
         {
-            if (_queue.Contains(position)) _queue.Remove(position);
+            if (_unloadingQueue.Contains(position)) _unloadingQueue.Remove(position);
             if (!_chunks.TryGetValue(position, out Chunk chunk)) return;
 
             chunk.Dispose();
@@ -222,7 +222,7 @@ namespace Engine.Scripts.Components
         /// <summary>
         ///     Reads a voxel at world position. Returns 0 if chunk or Y out of range.
         /// </summary>
-        internal ushort GetVoxel(Vector3Int position)
+        internal ushort GetVoxel(int3 position)
         {
             int2 chunkPos = GetChunkCoords(position);
             int3 blockPos = GetLocalVoxelCoords(position);
@@ -239,7 +239,7 @@ namespace Engine.Scripts.Components
         /// <param name="position">World position.</param>
         /// <param name="remesh">Whether to flag for remeshing.</param>
         /// <returns>True if voxel actually changed.</returns>
-        internal bool SetVoxel(ushort voxelId, Vector3Int position, bool remesh = true)
+        internal bool SetVoxel(ushort voxelId, int3 position, bool remesh = true)
         {
             int2 chunkPos = GetChunkCoords(position);
             int3 blockPos = GetLocalVoxelCoords(position);
@@ -257,7 +257,7 @@ namespace Engine.Scripts.Components
             _chunks[chunkPos] = chunk;
             if (remesh && result)
             {
-                ReMeshPartitions(position.Int3());
+                ReMeshPartitions(position);
                 OnChunkChange?.Invoke(chunk);
             }
             return result;

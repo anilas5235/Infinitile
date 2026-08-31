@@ -476,6 +476,7 @@ GameObject:
   - component: {fileID: 455605773}
   - component: {fileID: 455605774}
   - component: {fileID: 455605775}
+  - component: {fileID: 455605776}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -647,6 +648,18 @@ MonoBehaviour:
   voxelLayerMask:
     serializedVersion: 2
     m_Bits: 8
+--- !u!114 &455605776
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 455605763}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c63618488e9d4530a963440fb2dfebd4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Player.PlayerManager
 --- !u!1 &746607514
 GameObject:
   m_ObjectHideFlags: 0
@@ -867,6 +880,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8ea334ed0f9e41aaaeb72f0194c790cb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  world: {fileID: 1592505030}
   voxelSolidMaterial: {fileID: 2100000, guid: b6215133664aff74dad83d56615f47d0, type: 2}
   voxelTransparentMaterial: {fileID: 2100000, guid: e8e8dbf7c2062df49bf757b4e9d3a636, type: 2}
   voxelFoliageMaterial: {fileID: 2100000, guid: daf19eb8c4aeb474ebe2bb4b7e1f87a6, type: 2}
@@ -939,7 +953,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1592505029
 Transform:
   m_ObjectHideFlags: 0
@@ -969,7 +983,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   focus: {fileID: 330585546}
   settings: {fileID: 11400000, guid: 455fa891937aa3143ab4d3735c5e538d, type: 2}
-  worldRenderer: {fileID: 1592505031}
+  ShowGizmos: 0
 --- !u!114 &1592505031
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -983,12 +997,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Runtime.Engine.Render.VoxelWorldRenderer
   world: {fileID: 1592505030}
-  solidMaterial: {fileID: 2100000, guid: b6215133664aff74dad83d56615f47d0, type: 2}
-  transparentMaterial: {fileID: 2100000, guid: e8e8dbf7c2062df49bf757b4e9d3a636, type: 2}
-  foliageMaterial: {fileID: 2100000, guid: daf19eb8c4aeb474ebe2bb4b7e1f87a6, type: 2}
-  pointBuilder: {fileID: 7200000, guid: b253108f447042e389630ea3cd8affd1, type: 3}
-  copyPoints: {fileID: 7200000, guid: d6821e19a578d8a468410694549d56e8, type: 3}
-  rebuildBuffers: {fileID: 7200000, guid: 2cded031692db1345b8b6cceb7abce13, type: 3}
 --- !u!1 &1610362568
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,6 +1,5 @@
-﻿using UnityEditor;
-using UnityEngine;
-using static Engine.Scripts.Behaviour.ChunkPartition;
+﻿using Engine.Scripts.Behaviour;
+using UnityEditor;
 
 namespace Engine.Scripts.World.Editor
 {
@@ -10,10 +9,9 @@ namespace Engine.Scripts.World.Editor
         public override void OnInspectorGUI()
         {
             base.OnInspectorGUI();
-            GUILayout.Space(10);
 
-            ShowPartitionGizmos =
-                GUILayout.Toggle(ShowPartitionGizmos, "Show Partition Gizmos");
+            VoxelWorld voxelWorld = (VoxelWorld)target;
+            ChunkPartition.ShowPartitionGizmos = voxelWorld.ShowGizmos;
         }
     }
 }

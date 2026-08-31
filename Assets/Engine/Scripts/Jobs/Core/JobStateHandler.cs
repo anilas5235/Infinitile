@@ -27,7 +27,7 @@ namespace Engine.Scripts.Jobs.Core
         /// <summary>
         /// Priority queue for managing work items.
         /// </summary>
-        protected readonly SimpleFastPriorityQueue<T, int> Queue = new();
+        protected readonly SimpleFastPriorityQueue<T, float> Queue = new();
         
         /// <summary>
         /// Set of items currently being processed.
@@ -72,7 +72,7 @@ namespace Engine.Scripts.Jobs.Core
         /// Processes one step of the three-step cycle based on current state.
         /// </summary>
         /// <param name="focus">The focus position (e.g., player chunk position).</param>
-        public void Update(int3 focus)
+        public void Update(PriorityUtil.Focus focus)
         {
             if (Sleeping) return;
             switch (CurrentStep)
@@ -98,7 +98,7 @@ namespace Engine.Scripts.Jobs.Core
         /// Must be implemented by derived classes.
         /// </summary>
         /// <param name="focus">The new focus position.</param>
-        public abstract void FocusUpdate(int3 focus);
+        public abstract void FocusUpdate(PriorityUtil.Focus focus);
 
         /// <summary>
         /// Wakes up the handler from sleeping state so it resumes processing.
@@ -114,7 +114,7 @@ namespace Engine.Scripts.Jobs.Core
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if items were enqueued, false if queue is empty.</returns>
-        protected virtual bool EnqueueStep(int3 focus)
+        protected virtual bool EnqueueStep(PriorityUtil.Focus focus)
         {
             return true;
         }
@@ -125,7 +125,7 @@ namespace Engine.Scripts.Jobs.Core
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if processing completed, false if still working.</returns>
-        protected virtual bool JobUpdateStep(int3 focus)
+        protected virtual bool JobUpdateStep(PriorityUtil.Focus focus)
         {
             return true;
         }

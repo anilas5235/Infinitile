@@ -63,7 +63,7 @@ namespace Engine.Scripts.Jobs.Core
         /// depending on the current step in the round-robin cycle.
         /// </summary>
         /// <param name="focus">The focus position (e.g., player chunk root).</param>
-        internal void ScheduleUpdate(int3 focus)
+        internal void ScheduleUpdate(PriorityUtil.Focus focus)
         {
             switch (_currentUpdate)
             {
@@ -85,7 +85,7 @@ namespace Engine.Scripts.Jobs.Core
         /// Updates priorities of all queues and delegates focus update to managers/pool.
         /// </summary>
         /// <param name="focus">The new focus position.</param>
-        internal void FocusUpdate(int3 focus)
+        internal void FocusUpdate(PriorityUtil.Focus focus)
         {
             _dataJobHandler.FocusUpdate(focus);
             _meshJobHandler.FocusUpdate(focus);

@@ -1,9 +1,9 @@
 ﻿using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Utils;
-using Engine.Scripts.VoxelConfig.Data;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
+using Engine.Scripts.World;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
 
@@ -17,6 +17,8 @@ namespace Engine.Scripts.VoxelConfig
     [DefaultExecutionOrder(-1000)]
     public class DataImporter : Singleton<DataImporter>
     {
+        public VoxelWorld world;
+
         /// <summary>
         ///     Material used for opaque voxel rendering (solid mesh layer).
         /// </summary>
@@ -47,6 +49,8 @@ namespace Engine.Scripts.VoxelConfig
             base.Awake();
             LoadVoxels();
             LoadBioms();
+
+            world.gameObject.SetActive(true);
         }
 
         private void LoadBioms()
