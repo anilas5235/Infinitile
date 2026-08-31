@@ -26,6 +26,8 @@ namespace Engine.Scripts.Render
         private readonly GraphicsBuffer _solidPagesBuffer;
         private readonly RenderBufferManager _transparentBufferManager;
         private readonly GraphicsBuffer _transparentPagesBuffer;
+        
+        private bool _firstDispatch = true;
 
         /// <summary>
         /// Initializes a new instance of the CopyPointsHandler class.
@@ -79,7 +81,7 @@ namespace Engine.Scripts.Render
             uint[] pageCounts = { (uint)solidPagesCount, (uint)transparentPagesCount, (uint)foliagePagesCount };
             _pageCountsBuffer.SetData(pageCounts);
 
-            if (solidPagesCount > 0)
+            if (solidPagesCount > 0 || _firstDispatch)
             {
                 uint2[] solidPageData = solidAlloc.ToIndexAndCount();
                 _solidPagesBuffer.SetData(solidPageData);
@@ -90,7 +92,7 @@ namespace Engine.Scripts.Render
                 _copyPoints.SetBuffer(_copyKernelID, SolidPagesNameID, _solidPagesBuffer);
             }
 
-            if (transparentPagesCount > 0)
+            if (transparentPagesCount > 0 || _firstDispatch)
             {
                 uint2[] transparentPageData = transparentAlloc.ToIndexAndCount();
                 _transparentPagesBuffer.SetData(transparentPageData);
@@ -102,7 +104,7 @@ namespace Engine.Scripts.Render
                 _copyPoints.SetBuffer(_copyKernelID, TransparentPagesNameID, _transparentPagesBuffer);
             }
 
-            if (foliagePagesCount > 0)
+            if (foliagePagesCount > 0 || _firstDispatch)
             {
                 uint2[] foliagePageData = foliageAlloc.ToIndexAndCount();
                 _foliagePagesBuffer.SetData(foliagePageData);
@@ -120,6 +122,7 @@ namespace Engine.Scripts.Render
             if (maxPageCount <= 0) return;
 
             _copyPoints.Dispatch(_copyKernelID, Mathf.CeilToInt(maxPageCount / 8f), 1, 1);
+            _firstDispatch = false;
         }
     }
 }

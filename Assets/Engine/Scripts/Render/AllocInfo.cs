@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Unity.Mathematics;
 
@@ -13,24 +14,28 @@ namespace Engine.Scripts.Render
         /// The index of the render buffer this allocation belongs to.
         /// </summary>
         public readonly int BufferIndex;
+
         private readonly List<AllocPage> _pages;
-        
+
         /// <summary>
         /// Gets the number of pages allocated in this allocation.
         /// </summary>
         public int Count => _pages?.Count ?? 0;
-        
+
+        public bool IsEmpty => _pages == null || _pages.Count == 0;
+
         /// <summary>
         /// Adds a page to this allocation.
         /// </summary>
         /// <param name="page">The page to add.</param>
-        /// <exception cref="System.InvalidOperationException">Thrown when trying to add a page to an uninitialized allocation.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when trying to add a page to an uninitialized allocation.</exception>
         public void AddPage(AllocPage page)
         {
-            if (_pages == null) throw new System.InvalidOperationException("Cannot add pages to an AllocInfo with no page list.");
+            if (_pages == null)
+                throw new InvalidOperationException("Cannot add pages to an AllocInfo with no page list.");
             _pages.Add(page);
         }
-        
+
         /// <summary>
         /// Gets the indices of all allocated pages.
         /// </summary>
@@ -46,7 +51,7 @@ namespace Engine.Scripts.Render
             /// The index of the page within the buffer.
             /// </summary>
             public readonly int PageIndex;
-            
+
             /// <summary>
             /// The number of points stored in this page.
             /// </summary>
@@ -80,7 +85,7 @@ namespace Engine.Scripts.Render
         /// <returns>An array of uint2 values where x is the page index and y is the point count.</returns>
         public uint2[] ToIndexAndCount()
         {
-            return _pages.Select(p => new uint2((uint)p.PageIndex, (uint)p.PointCount)).ToArray();
+            return IsEmpty ? Array.Empty<uint2>() : _pages.Select(p => new uint2((uint)p.PageIndex, (uint)p.PointCount)).ToArray();
         }
     }
 }
