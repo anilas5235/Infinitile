@@ -11,7 +11,6 @@ using Engine.Scripts.Noise;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
-using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig;
 using Unity.Mathematics;
 using UnityEngine;
@@ -25,16 +24,19 @@ namespace Engine.Scripts.World
     [DefaultExecutionOrder(-101)]
     public class VoxelWorld : Singleton<VoxelWorld>
     {
+        
         [SerializeField] private Transform focus;
 
         [SerializeField] private VoxelEngineSettings settings;
+        
+        [SerializeField] public bool ShowGizmos;
 
         private VoxelEngineScheduler _scheduler;
         private ChunkPool _chunkPool;
         private ChunkScheduler _chunkScheduler;
         private ColliderBakeScheduler _colliderBakeScheduler;
         private NoiseProfile _noiseProfile;
-        
+
         private Coroutine _focusUpdateRoutine;
 
         private bool _isFocused;
@@ -141,7 +143,7 @@ namespace Engine.Scripts.World
 
             RaisePartitionEvicted(partitionPos);
         }
-        
+
         private void TryFocusUpdate()
         {
             if (!_isFocused) return;
@@ -191,13 +193,13 @@ namespace Engine.Scripts.World
 
         private void OnEnable()
         {
-            if(_focusUpdateRoutine != null) StopCoroutine(_focusUpdateRoutine);
+            if (_focusUpdateRoutine != null) StopCoroutine(_focusUpdateRoutine);
             _focusUpdateRoutine = StartCoroutine(FocusUpdateRoutine());
         }
 
         private void OnDisable()
         {
-            if(_focusUpdateRoutine != null) StopCoroutine(_focusUpdateRoutine);
+            if (_focusUpdateRoutine != null) StopCoroutine(_focusUpdateRoutine);
             _focusUpdateRoutine = null;
         }
 
@@ -242,7 +244,7 @@ namespace Engine.Scripts.World
                 TryFocusUpdate();
             }
         }
-        
+
         #endregion
     }
 }
