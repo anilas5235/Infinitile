@@ -73,5 +73,10 @@ namespace Engine.Scripts.Utils
         {
             return partition.xz;
         }
+        
+        public static int2 WorldToChunkPos(int3 worldPos)
+        {
+            return PartitionToChunkPos(WorldToPartitionPos(worldPos));
+        }
     }
 }

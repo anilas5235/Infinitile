@@ -59,31 +59,13 @@ namespace Engine.Scripts.World
         internal void RaisePartitionEvicted(int3 partitionPos) => PartitionEvicted?.Invoke(partitionPos);
 
         internal void RequestPartitionBuild(HashSet<int3> partitions) => PartitionBuildRequested?.Invoke(partitions);
-
-        public bool ReadyForPlayer()
-        {
-            if(!_isFocused) return false;
-            if(!ChunkManager.IsChunkLoaded(Focus.Pos.xz)) return false;
-            
-            bool oneCollidablePartition = false;
-            for(int y = 0; y < VoxelConstants.PartitionsPerChunk; y++)
-            {
-                int3 partitionPos = new(Focus.Pos.x, y, Focus.Pos.z);
-                if (!_chunkPool.IsCollidable(partitionPos)) continue;
-                
-                oneCollidablePartition = true;
-                break;
-            }
-
-            return oneCollidablePartition;
-        }
-
+       
         /// <summary>
         ///     Gets the voxel ID at the given world voxel position.
         /// </summary>
         /// <param name="position">World voxel position.</param>
         /// <returns>Voxel ID at the given position.</returns>
-        public ushort GetVoxel(Vector3Int position) => ChunkManager.GetVoxel(position);
+        public ushort GetVoxel(int3 position) => ChunkManager.GetVoxel(position);
 
         /// <summary>
         ///     Sets the voxel ID at a given world voxel position and optionally triggers a remesh.
@@ -93,7 +75,9 @@ namespace Engine.Scripts.World
         /// <param name="remesh">If true, the affected chunks will be re-meshed.</param>
         /// <returns><c>true</c> if the voxel could be set; otherwise, <c>false</c>.</returns>
         public bool SetVoxel(ushort voxelId, Vector3Int position, bool remesh = true) =>
-            ChunkManager.SetVoxel(voxelId, position, remesh);
+            ChunkManager.SetVoxel(voxelId, position.Int3(), remesh);
+        
+        public bool IsCollidable(int3 pos) => _chunkPool.IsPartitionActive(pos) && _chunkPool.IsCollidable(pos);
 
         /// <summary>
         ///     Adjusts derived chunk settings such as load and update distance based on the

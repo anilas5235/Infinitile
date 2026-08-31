@@ -1,4 +1,5 @@
 ﻿using System;
+using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.World;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -57,7 +58,7 @@ namespace Player
         {
             if (!value.isPressed) return;
             if (!GetLookAtVoxelPos(out Vector3Int voxelWorldPos)) return;
-            ushort voxId = VoxelWorld.Instance.GetVoxel(voxelWorldPos);
+            ushort voxId = VoxelWorld.Instance.GetVoxel(voxelWorldPos.Int3());
             if (voxId > 0 && voxId != voxelId)
             {
                 voxelId = voxId;

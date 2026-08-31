@@ -222,7 +222,7 @@ namespace Engine.Scripts.Components
         /// <summary>
         ///     Reads a voxel at world position. Returns 0 if chunk or Y out of range.
         /// </summary>
-        internal ushort GetVoxel(Vector3Int position)
+        internal ushort GetVoxel(int3 position)
         {
             int2 chunkPos = GetChunkCoords(position);
             int3 blockPos = GetLocalVoxelCoords(position);
@@ -239,7 +239,7 @@ namespace Engine.Scripts.Components
         /// <param name="position">World position.</param>
         /// <param name="remesh">Whether to flag for remeshing.</param>
         /// <returns>True if voxel actually changed.</returns>
-        internal bool SetVoxel(ushort voxelId, Vector3Int position, bool remesh = true)
+        internal bool SetVoxel(ushort voxelId, int3 position, bool remesh = true)
         {
             int2 chunkPos = GetChunkCoords(position);
             int3 blockPos = GetLocalVoxelCoords(position);
@@ -257,7 +257,7 @@ namespace Engine.Scripts.Components
             _chunks[chunkPos] = chunk;
             if (remesh && result)
             {
-                ReMeshPartitions(position.Int3());
+                ReMeshPartitions(position);
                 OnChunkChange?.Invoke(chunk);
             }
             return result;
