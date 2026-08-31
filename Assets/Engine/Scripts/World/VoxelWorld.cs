@@ -60,6 +60,24 @@ namespace Engine.Scripts.World
 
         internal void RequestPartitionBuild(HashSet<int3> partitions) => PartitionBuildRequested?.Invoke(partitions);
 
+        public bool ReadyForPlayer()
+        {
+            if(!_isFocused) return false;
+            if(!ChunkManager.IsChunkLoaded(Focus.Pos.xz)) return false;
+            
+            bool oneCollidablePartition = false;
+            for(int y = 0; y < VoxelConstants.PartitionsPerChunk; y++)
+            {
+                int3 partitionPos = new(Focus.Pos.x, y, Focus.Pos.z);
+                if (!_chunkPool.IsCollidable(partitionPos)) continue;
+                
+                oneCollidablePartition = true;
+                break;
+            }
+
+            return oneCollidablePartition;
+        }
+
         /// <summary>
         ///     Gets the voxel ID at the given world voxel position.
         /// </summary>

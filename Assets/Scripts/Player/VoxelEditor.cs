@@ -110,6 +110,7 @@ namespace Player
 #if UNITY_EDITOR
         private void OnDrawGizmos()
         {
+            if(!enabled) return;
             if (Application.isPlaying && GetLookAtVoxelPos(out Vector3Int voxelWorldPos))
             {
                 Gizmos.color = Color.yellow;
