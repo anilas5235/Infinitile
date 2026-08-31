@@ -76,7 +76,7 @@ namespace Player
                 firstCollidableVoxel.y--;
                 if (voxelId == 0) continue;
 
-                if (_voxelRegistry.TryGetVoxelDefinition(voxelId, out VoxelDefinition voxelDef) &&
+                if (_voxelRegistry.TryGet(voxelId, out Voxel voxelDef) &&
                     !voxelDef.collision) continue;
 
                 collidableVoxelFound = true;
