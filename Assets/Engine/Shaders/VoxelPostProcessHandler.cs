@@ -1,4 +1,5 @@
-﻿using Engine.Scripts.VoxelConfig;
+using Engine.Scripts.Utils.Extensions;
+using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
@@ -37,7 +38,7 @@ namespace Engine.Shaders
 
             Vector3 camPos = target.transform.position;
 
-            ushort voxelId = VoxelWorld.Instance.GetVoxel(Vector3Int.FloorToInt(camPos));
+            ushort voxelId = VoxelWorld.Instance.GetVoxel(Vector3Int.FloorToInt(camPos).Int3());
             if (voxelId == currentVoxelId) return;
 
             currentVoxelId = voxelId;

@@ -82,10 +82,10 @@ namespace Engine.Scripts.Utils
         /// </summary>
         /// <param name="position">World position in integer voxel coordinates.</param>
         /// <returns>Local voxel coordinates within the chunk.</returns>
-        public static int3 GetLocalVoxelCoords(Vector3Int position)
+        public static int3 GetLocalVoxelCoords(int3 position)
         {
             int2 chunkCoords = GetChunkCoords(position);
-            return position.Int3() - ChunkSize.MemberMultiply(chunkCoords.x, 0, chunkCoords.y);
+            return position - ChunkSize.MemberMultiply(chunkCoords.x, 0, chunkCoords.y);
         }
 
         private static int FloorDivide(int value, int divisor)

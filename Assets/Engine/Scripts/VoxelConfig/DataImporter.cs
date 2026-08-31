@@ -7,6 +7,7 @@ using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
+using Engine.Scripts.World;
 using UnityEngine;
 using Biome = Engine.Scripts.VoxelConfig.Data.Generation.Biome;
 using FixedString32Bytes = Unity.Collections.FixedString32Bytes;
@@ -21,6 +22,8 @@ namespace Engine.Scripts.VoxelConfig
     [DefaultExecutionOrder(-1000)]
     public class DataImporter : Singleton<DataImporter>
     {
+        public VoxelWorld world;
+
         /// <summary>
         ///     Material used for opaque voxel rendering (solid mesh layer).
         /// </summary>
@@ -59,6 +62,7 @@ namespace Engine.Scripts.VoxelConfig
             LoadVoxelStructures();
             SetUpRenderData();
             SetUpGenerationData();
+            world.gameObject.SetActive(true);
         }
 
         private Dictionary<FixedString32Bytes, VoxelDataPackage> FindPackages()

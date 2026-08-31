@@ -51,7 +51,7 @@ namespace Engine.Scripts.Utils
         /// <returns>The world-space origin of the partition.</returns>
         public static int3 PartitionToWorldPos(int3 partition)
         {
-            return PartitionSize.MemberMultiply(partition);
+            return partition.MemberMultiply(PartitionSize);
         }
 
         /// <summary>
@@ -61,7 +61,7 @@ namespace Engine.Scripts.Utils
         /// <returns>The partition coordinates containing the world position.</returns>
         public static int3 WorldToPartitionPos(int3 worldPos)
         {
-            return PartitionSize.MemberDivide(worldPos);
+            return worldPos.MemberDivide(PartitionSize);
         }
 
         /// <summary>
@@ -72,6 +72,11 @@ namespace Engine.Scripts.Utils
         public static int2 PartitionToChunkPos(int3 partition)
         {
             return partition.xz;
+        }
+        
+        public static int2 WorldToChunkPos(int3 worldPos)
+        {
+            return PartitionToChunkPos(WorldToPartitionPos(worldPos));
         }
     }
 }

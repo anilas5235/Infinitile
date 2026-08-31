@@ -1,8 +1,8 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
-using Engine.Scripts.Data;
 using Engine.Scripts.Components;
-using Engine.Scripts.Jobs;
+using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.ColliderMeshing;
@@ -12,7 +12,6 @@ using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.VoxelConfig;
-using Engine.Scripts.VoxelConfig.Data;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -25,9 +24,12 @@ namespace Engine.Scripts.World
     [DefaultExecutionOrder(-101)]
     public class VoxelWorld : Singleton<VoxelWorld>
     {
+        
         [SerializeField] private Transform focus;
 
         [SerializeField] private VoxelEngineSettings settings;
+        
+        [SerializeField] public bool ShowGizmos;
 
         private VoxelEngineScheduler _scheduler;
         private ChunkPool _chunkPool;
@@ -35,6 +37,7 @@ namespace Engine.Scripts.World
         private ColliderBakeScheduler _colliderBakeScheduler;
         private NoiseProfile _noiseProfile;
 
+        private Coroutine _focusUpdateRoutine;
 
         private bool _isFocused;
         private bool _isShuttingDown;
@@ -55,17 +58,14 @@ namespace Engine.Scripts.World
 
         internal void RaisePartitionEvicted(int3 partitionPos) => PartitionEvicted?.Invoke(partitionPos);
 
-        internal void RequestPartitionBuild(HashSet<int3> partitions)
-        {
-            PartitionBuildRequested?.Invoke(partitions);
-        }
-
+        internal void RequestPartitionBuild(HashSet<int3> partitions) => PartitionBuildRequested?.Invoke(partitions);
+       
         /// <summary>
         ///     Gets the voxel ID at the given world voxel position.
         /// </summary>
         /// <param name="position">World voxel position.</param>
         /// <returns>Voxel ID at the given position.</returns>
-        public ushort GetVoxel(Vector3Int position) => ChunkManager.GetVoxel(position);
+        public ushort GetVoxel(int3 position) => ChunkManager.GetVoxel(position);
 
         /// <summary>
         ///     Sets the voxel ID at a given world voxel position and optionally triggers a remesh.
@@ -75,7 +75,9 @@ namespace Engine.Scripts.World
         /// <param name="remesh">If true, the affected chunks will be re-meshed.</param>
         /// <returns><c>true</c> if the voxel could be set; otherwise, <c>false</c>.</returns>
         public bool SetVoxel(ushort voxelId, Vector3Int position, bool remesh = true) =>
-            ChunkManager.SetVoxel(voxelId, position, remesh);
+            ChunkManager.SetVoxel(voxelId, position.Int3(), remesh);
+        
+        public bool IsCollidable(int3 pos) => _chunkPool.IsPartitionActive(pos) && _chunkPool.IsCollidable(pos);
 
         /// <summary>
         ///     Adjusts derived chunk settings such as load and update distance based on the
@@ -125,7 +127,6 @@ namespace Engine.Scripts.World
                 ChunkManager,
                 _chunkPool
             );
-
         }
 
         private void HandleChunkEvicted(int2 chunkPos)
@@ -143,14 +144,23 @@ namespace Engine.Scripts.World
             RaisePartitionEvicted(partitionPos);
         }
 
+        private void TryFocusUpdate()
+        {
+            if (!_isFocused) return;
+            PriorityUtil.Focus newFocus = new(VoxelConstants.WorldToPartitionPos(focus.position.Int3()),
+                focus.forward.Float3());
+
+            if (newFocus.Equals(Focus)) return;
+            Focus = newFocus;
+            _scheduler.FocusUpdate(Focus);
+        }
+
         #region API
 
         /// <summary>
         ///     The partition coordinates of the current focus position.
         /// </summary>
-        public int3 FocusPartitionCoords { get; private set; }
-
-        public int3 FocusPosition { get; private set; }
+        public PriorityUtil.Focus Focus { get; private set; }
 
         /// <summary>
         ///     Gets the chunk manager that stores and accesses chunk data.
@@ -178,7 +188,19 @@ namespace Engine.Scripts.World
 
             ConstructEngineComponents();
 
-            FocusPartitionCoords = new int3(1, 1, 1) * int.MinValue;
+            Focus = new PriorityUtil.Focus(new int3(1, 1, 1) * int.MinValue, new float3(0, 0, 1));
+        }
+
+        private void OnEnable()
+        {
+            if (_focusUpdateRoutine != null) StopCoroutine(_focusUpdateRoutine);
+            _focusUpdateRoutine = StartCoroutine(FocusUpdateRoutine());
+        }
+
+        private void OnDisable()
+        {
+            if (_focusUpdateRoutine != null) StopCoroutine(_focusUpdateRoutine);
+            _focusUpdateRoutine = null;
         }
 
         /// <summary>
@@ -187,31 +209,12 @@ namespace Engine.Scripts.World
         private void Start()
         {
             _isFocused = focus;
+            TryFocusUpdate();
         }
 
-        /// <summary>
-        ///     Updates the focus chunk coordinate and lets the scheduler perform focus and
-        ///     regular scheduling logic every frame.
-        /// </summary>
         private void Update()
         {
-            int3 newFocusCoords = _isFocused ? VoxelUtils.GetPartitionCoords(focus.position) : int3.zero;
-
-            if (!(newFocusCoords == FocusPartitionCoords).AndReduce())
-            {
-                FocusPartitionCoords = newFocusCoords;
-                _scheduler.FocusUpdate(FocusPartitionCoords);
-            }
-
-            _scheduler.ScheduleUpdate(FocusPartitionCoords);
-        }
-
-        private void FixedUpdate()
-        {
-            if (!_isFocused) return;
-
-            FocusPosition = focus.position.Int3();
-            //_occlusionCuller.OccUpdate(FocusPartitionCoords, FocusPosition,focus.forward.Float3());
+            _scheduler.ScheduleUpdate(Focus);
         }
 
         /// <summary>
@@ -230,7 +233,16 @@ namespace Engine.Scripts.World
 
             base.OnDestroy();
             _scheduler.Dispose();
-            ChunkManager.Dispose();
+            ChunkManager?.Dispose();
+        }
+
+        private IEnumerator FocusUpdateRoutine()
+        {
+            while (true)
+            {
+                yield return new WaitForSeconds(.5f);
+                TryFocusUpdate();
+            }
         }
 
         #endregion
