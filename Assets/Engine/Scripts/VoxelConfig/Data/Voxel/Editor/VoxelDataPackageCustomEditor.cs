@@ -27,6 +27,13 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel.Editor
                 EditorUtility.SetDirty(package);
                 AssetDatabase.SaveAssets();
             }
+            
+            if(GUILayout.Button("Remove All Null Entries"))
+            {
+                package.RemoveAllNullEntries();
+                EditorUtility.SetDirty(package);
+                AssetDatabase.SaveAssets();
+            }
         }
 
         private void AddAssetsOfType<T>(List<T> list, string folder)

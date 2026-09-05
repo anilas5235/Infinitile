@@ -35,16 +35,10 @@ namespace Engine.Scripts.Jobs.Chunk
 
                 WorldNoiseOutput worldNoise = WorldNoise(worldPos, ref config.NoiseParams);
 
-                // Basis-Höhenanteil (klima-unabhängig)
-                const float minHeightFrac = 0.36f;
-                const float maxHeightFrac = 0.86f;
-                float baseHeightFrac = math.lerp(minHeightFrac, maxHeightFrac, worldNoise.Elevation);
-
-                // Mappe finale Höhe mit Sicherheitsabstand zur Weltobergrenze (Top-Margin)
-                const int topMarginY = 8; // verhindert Abschneiden an WorldHeight
-                const int minY = 1;
-                int maxY = math.max(minY + 1, ChunkHeight - topMarginY);
-                int height = math.clamp(minY + (int)(baseHeightFrac * (maxY - minY)), minY, maxY);
+                const int minY = 100;
+                const int maxY = ChunkHeight - 1;
+                const int rangeY = maxY - minY;
+                int height = math.clamp(minY + (int)(worldNoise.Elevation * rangeY), 0, maxY);
 
                 BiomeCalculator.BiomSectionInput input = worldNoise.BiomSectionInput();
                 ChunkColumn col = new()

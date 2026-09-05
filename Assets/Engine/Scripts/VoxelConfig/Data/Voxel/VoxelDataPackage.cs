@@ -26,6 +26,13 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel
             DeduplicateLists();
             MarkAllVoxels();
         }
+        
+        public void RemoveAllNullEntries()
+        {
+            voxel?.RemoveAll(v => !v);
+            biomes?.RemoveAll(b => !b);
+            structures?.RemoveAll(s => !s);
+        }
 
         private void DeduplicateLists()
         {
