@@ -5,31 +5,11 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Core{
     /// <summary>
-    /// Utility class for calculating priority values based on distance for job scheduling.
-    /// Uses squared magnitude calculations for efficient priority determination.
+    ///     Utility class for calculating priority values based on distance for job scheduling.
+    ///     Uses squared magnitude calculations for efficient priority determination.
     /// </summary>
     [BurstCompile]
     public static class PriorityUtil{
-        public readonly struct Focus : IEquatable<Focus>{
-            public readonly int3 Pos;
-            public readonly float3 Forward;
-
-            public Focus(int3 pos, float3 forward){
-                Pos = pos;
-                Forward = Quantize45(ref forward);
-            }
-
-            public bool Equals(Focus other) => Pos.Equals(other.Pos) && Forward.Equals(other.Forward);
-
-            public override bool Equals(object obj) => obj is Focus other && Equals(other);
-
-            public override int GetHashCode(){
-                unchecked{
-                    return (Pos.GetHashCode() * 397) ^ Forward.GetHashCode();
-                }
-            }
-        }
-
         private static float3 Quantize45(ref float3 v){
             v = math.normalize(v);
 
@@ -54,8 +34,8 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Calculates priority based on squared distance from focus position for 3D coordinates.
-        /// Lower values indicate higher priority (closer to focus).
+        ///     Calculates priority based on squared distance from focus position for 3D coordinates.
+        ///     Lower values indicate higher priority (closer to focus).
         /// </summary>
         /// <param name="position">The position to calculate priority for.</param>
         /// <param name="focus">The focus position (reference point).</param>
@@ -72,12 +52,13 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         [BurstCompile]
-        public static float ReVerseDistPriority(ref int3 position, ref Focus focus) =>
-            -DistPriority(ref position, ref focus);
+        public static float ReVerseDistPriority(ref int3 position, ref Focus focus){
+            return -DistPriority(ref position, ref focus);
+        }
 
         /// <summary>
-        /// Calculates priority based on squared distance from focus position for 2D coordinates.
-        /// Lower values indicate higher priority (closer to focus).
+        ///     Calculates priority based on squared distance from focus position for 2D coordinates.
+        ///     Lower values indicate higher priority (closer to focus).
         /// </summary>
         /// <param name="position">The 2D position to calculate priority for.</param>
         /// <param name="focus">The 3D focus position (only xz components used).</param>
@@ -96,7 +77,32 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         [BurstCompile]
-        public static float ReVerseDistPriority(ref int2 position, ref Focus focus) =>
-            -DistPriority(ref position, ref focus);
+        public static float ReVerseDistPriority(ref int2 position, ref Focus focus){
+            return -DistPriority(ref position, ref focus);
+        }
+
+        public readonly struct Focus : IEquatable<Focus>{
+            public readonly int3 Pos;
+            public readonly float3 Forward;
+
+            public Focus(int3 pos, float3 forward){
+                Pos = pos;
+                Forward = Quantize45(ref forward);
+            }
+
+            public bool Equals(Focus other){
+                return Pos.Equals(other.Pos) && Forward.Equals(other.Forward);
+            }
+
+            public override bool Equals(object obj){
+                return obj is Focus other && Equals(other);
+            }
+
+            public override int GetHashCode(){
+                unchecked{
+                    return (Pos.GetHashCode() * 397) ^ Forward.GetHashCode();
+                }
+            }
+        }
     }
 }

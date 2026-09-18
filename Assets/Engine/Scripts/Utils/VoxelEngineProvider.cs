@@ -22,25 +22,30 @@ namespace Engine.Scripts.Utils{
         public VoxelEngineSettings Settings{ get; set; }
 
 
-        private NoiseCalculator.NoiseParameters NoiseParameters() =>
-            new(){
+        private NoiseCalculator.NoiseParameters NoiseParameters(){
+            return new NoiseCalculator.NoiseParameters{
                 Seed = Settings.Seed,
                 HumidityScale = Settings.Noise.HumidityScale,
                 TemperatureScale = Settings.Noise.TemperatureScale,
                 ElevationProfile = new NoiseProfile(Settings.Noise.elevationProfile.ToStruct(Settings.Seed)),
                 ContinentalLayer = new WarpedNoiseLayer(Settings.Noise.continentalLayer.ToStruct(Settings.Seed))
             };
+        }
 
         /// <summary>
         ///     Allocates a new <see cref="ChunkManager" /> responsible for chunk data in memory.
         /// </summary>
-        internal ChunkManager ChunkManager() => new(Settings);
+        internal ChunkManager ChunkManager(){
+            return new ChunkManager(Settings);
+        }
 
         /// <summary>
         ///     Allocates a new <see cref="ChunkPool" /> for recycling chunk render objects.
         /// </summary>
         /// <param name="transform">Parent transform for pooled chunk game objects.</param>
-        internal ChunkPool ChunkPool(Transform transform) => new(transform, Settings);
+        internal ChunkPool ChunkPool(Transform transform){
+            return new ChunkPool(transform, Settings);
+        }
 
         /// <summary>
         ///     Creates the top-level <see cref="VoxelEngineScheduler" /> coordinating all sub-schedulers.
@@ -51,9 +56,10 @@ namespace Engine.Scripts.Utils{
             ColliderBakeScheduler colliderBakeScheduler,
             ChunkManager chunkManager,
             ChunkPool chunkPool
-        ) =>
-            new(Settings, cMeshBuildScheduler, chunkScheduler, chunkManager,
+        ){
+            return new VoxelEngineScheduler(Settings, cMeshBuildScheduler, chunkScheduler, chunkManager,
                 colliderBakeScheduler, chunkPool);
+        }
 
         /// <summary>
         ///     Creates a configured <see cref="ChunkScheduler" /> for data generation jobs. Fills missing config fields.
@@ -78,10 +84,12 @@ namespace Engine.Scripts.Utils{
             ChunkPool chunkPool,
             VoxelRegistry voxelRegistry,
             VoxelWorld world
-        ) =>
-            new(Settings, chunkManager, chunkPool, voxelRegistry, world);
+        ){
+            return new CMeshBuildScheduler(Settings, chunkManager, chunkPool, voxelRegistry, world);
+        }
 
-        internal ColliderBakeScheduler ColliderBakeScheduler(ChunkManager chunkManager, ChunkPool chunkPool) =>
-            new(chunkManager, chunkPool);
+        internal ColliderBakeScheduler ColliderBakeScheduler(ChunkManager chunkManager, ChunkPool chunkPool){
+            return new ColliderBakeScheduler(chunkManager, chunkPool);
+        }
     }
 }

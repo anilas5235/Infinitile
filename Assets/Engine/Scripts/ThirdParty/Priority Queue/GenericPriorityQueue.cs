@@ -481,7 +481,9 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
 #endif
         }
 
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator(){
+            return GetEnumerator();
+        }
 
         /// <summary>
         ///     <b>Should not be called in production code.</b>

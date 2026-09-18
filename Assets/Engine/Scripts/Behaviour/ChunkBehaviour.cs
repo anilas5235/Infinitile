@@ -18,6 +18,8 @@ namespace Engine.Scripts.Behaviour{
             foreach (ChunkPartition partition in chunkPartitions) partition.Clear();
         }
 
-        public ChunkPartition GetPartition(int y) => chunkPartitions[y];
+        public ChunkPartition GetPartition(int y){
+            return chunkPartitions[y];
+        }
     }
 }

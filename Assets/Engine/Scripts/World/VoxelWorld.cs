@@ -27,18 +27,18 @@ namespace Engine.Scripts.World{
         [SerializeField] private VoxelEngineSettings settings;
 
         [SerializeField] public bool ShowGizmos;
-
-        private VoxelEngineScheduler _scheduler;
+        private CMeshBuildScheduler _cMeshBuildScheduler;
         private ChunkPool _chunkPool;
         private ChunkScheduler _chunkScheduler;
         private ColliderBakeScheduler _colliderBakeScheduler;
-        private NoiseProfile _noiseProfile;
 
         private Coroutine _focusUpdateRoutine;
 
         private bool _isFocused;
         private bool _isShuttingDown;
-        private CMeshBuildScheduler _cMeshBuildScheduler;
+        private NoiseProfile _noiseProfile;
+
+        private VoxelEngineScheduler _scheduler;
 
         internal event Action<Chunk> ChunkChanged;
         internal event Action<Chunk> ChunkDataReady;
@@ -46,23 +46,34 @@ namespace Engine.Scripts.World{
         internal event Action<int3> PartitionEvicted;
         internal event Action<HashSet<int3>> PartitionBuildRequested;
 
-        internal void RaiseChunkChanged(Chunk chunk) => ChunkChanged?.Invoke(chunk);
+        internal void RaiseChunkChanged(Chunk chunk){
+            ChunkChanged?.Invoke(chunk);
+        }
 
-        internal void RaiseChunkDataReady(Chunk chunk)
-            => ChunkDataReady?.Invoke(chunk);
+        internal void RaiseChunkDataReady(Chunk chunk){
+            ChunkDataReady?.Invoke(chunk);
+        }
 
-        internal void RaiseChunkEvicted(int2 chunkPos) => ChunkEvicted?.Invoke(chunkPos);
+        internal void RaiseChunkEvicted(int2 chunkPos){
+            ChunkEvicted?.Invoke(chunkPos);
+        }
 
-        internal void RaisePartitionEvicted(int3 partitionPos) => PartitionEvicted?.Invoke(partitionPos);
+        internal void RaisePartitionEvicted(int3 partitionPos){
+            PartitionEvicted?.Invoke(partitionPos);
+        }
 
-        internal void RequestPartitionBuild(HashSet<int3> partitions) => PartitionBuildRequested?.Invoke(partitions);
+        internal void RequestPartitionBuild(HashSet<int3> partitions){
+            PartitionBuildRequested?.Invoke(partitions);
+        }
 
         /// <summary>
         ///     Gets the voxel ID at the given world voxel position.
         /// </summary>
         /// <param name="position">World voxel position.</param>
         /// <returns>Voxel ID at the given position.</returns>
-        public ushort GetVoxel(int3 position) => ChunkManager.GetVoxel(position);
+        public ushort GetVoxel(int3 position){
+            return ChunkManager.GetVoxel(position);
+        }
 
         /// <summary>
         ///     Sets the voxel ID at a given world voxel position and optionally triggers a remesh.
@@ -71,10 +82,13 @@ namespace Engine.Scripts.World{
         /// <param name="position">World voxel position.</param>
         /// <param name="remesh">If true, the affected chunks will be re-meshed.</param>
         /// <returns><c>true</c> if the voxel could be set; otherwise, <c>false</c>.</returns>
-        public bool SetVoxel(ushort voxelId, Vector3Int position, bool remesh = true) =>
-            ChunkManager.SetVoxel(voxelId, position.Int3(), remesh);
+        public bool SetVoxel(ushort voxelId, Vector3Int position, bool remesh = true){
+            return ChunkManager.SetVoxel(voxelId, position.Int3(), remesh);
+        }
 
-        public bool IsCollidable(int3 pos) => _chunkPool.IsPartitionActive(pos) && _chunkPool.IsCollidable(pos);
+        public bool IsCollidable(int3 pos){
+            return _chunkPool.IsPartitionActive(pos) && _chunkPool.IsCollidable(pos);
+        }
 
         /// <summary>
         ///     Adjusts derived chunk settings such as load and update distance based on the

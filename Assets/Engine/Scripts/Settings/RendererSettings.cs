@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace Engine.Scripts.Settings{
     /// <summary>
-    /// Renderer configuration options used to control chunk materials, compute shaders, and shadow casting.
+    ///     Renderer configuration options used to control chunk materials, compute shaders, and shadow casting.
     /// </summary>
     [Serializable]
     public class RendererSettings{
@@ -15,12 +15,12 @@ namespace Engine.Scripts.Settings{
         public Material solidMaterial;
 
         /// <summary>
-        /// The material used to render transparent chunk surfaces.
+        ///     The material used to render transparent chunk surfaces.
         /// </summary>
         public Material transparentMaterial;
 
         /// <summary>
-        /// The material used to render foliage chunk surfaces.
+        ///     The material used to render foliage chunk surfaces.
         /// </summary>
         public Material foliageMaterial;
 
@@ -31,12 +31,12 @@ namespace Engine.Scripts.Settings{
         public ComputeShader pointBuilder;
 
         /// <summary>
-        /// The compute shader used to copy built points into render buffers.
+        ///     The compute shader used to copy built points into render buffers.
         /// </summary>
         public ComputeShader copyPoints;
 
         /// <summary>
-        /// The compute shader used to rebuild indirect draw buffers.
+        ///     The compute shader used to rebuild indirect draw buffers.
         /// </summary>
         public ComputeShader rebuildBuffers;
 

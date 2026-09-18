@@ -1,5 +1,4 @@
-﻿using Engine.Scripts.Utils.Extensions;
-using Unity.Burst;
+﻿using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;
 using static Engine.Scripts.Utils.VoxelConstants;

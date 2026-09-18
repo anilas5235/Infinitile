@@ -7,7 +7,6 @@ using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.Utils.Logger;
-using Engine.Scripts.VoxelConfig.Data;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using Unity.Collections;
@@ -31,6 +30,11 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         private readonly VoxelRegistry _voxelRegistry;
         private readonly VoxelWorld _world;
 
+        /// <summary>
+        ///     Indicates whether the scheduler is ready to accept a new list of mesh build jobs.
+        /// </summary>
+        internal bool IsReady = true;
+
         private ChunkAccessor _chunkAccessor;
 
         private Mesh.MeshDataArray _colliderMeshDataArray;
@@ -41,11 +45,6 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
 
         private NativeList<int3> _jobs;
         private NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult> _results;
-
-        /// <summary>
-        ///     Indicates whether the scheduler is ready to accept a new list of mesh build jobs.
-        /// </summary>
-        internal bool IsReady = true;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="CMeshBuildScheduler" /> class.

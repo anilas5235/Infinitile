@@ -33,9 +33,11 @@ namespace Engine.Scripts.VoxelConfig{
         public Material voxelTransparentMaterial;
 
         /// <summary>
-        /// Material used for foliage voxel rendering (foliage mesh layer).
+        ///     Material used for foliage voxel rendering (foliage mesh layer).
         /// </summary>
         public Material voxelFoliageMaterial;
+
+        private Dictionary<FixedString32Bytes, VoxelDataPackage> _voxelPackages;
 
         /// <summary>
         ///     Registry containing all registered <see cref="Voxel" /> instances.
@@ -45,8 +47,6 @@ namespace Engine.Scripts.VoxelConfig{
         public BiomeRegistry BiomeRegistry{ get; } = new();
 
         public VoxelStructureRegistry VoxelStructureRegistry{ get; } = new();
-
-        private Dictionary<FixedString32Bytes, VoxelDataPackage> _voxelPackages;
 
         /// <summary>
         ///     Loads packages, registers voxels and updates materials when the importer is created.
@@ -60,6 +60,16 @@ namespace Engine.Scripts.VoxelConfig{
             SetUpRenderData();
             SetUpGenerationData();
             world.gameObject.SetActive(true);
+        }
+
+        /// <summary>
+        ///     Disposes the registry when the importer is destroyed.
+        /// </summary>
+        protected override void OnDestroy(){
+            base.OnDestroy();
+            VoxelRegistry.Dispose();
+            BiomeRegistry.Dispose();
+            VoxelStructureRegistry.Dispose();
         }
 
         private Dictionary<FixedString32Bytes, VoxelDataPackage> FindPackages(){
@@ -144,16 +154,6 @@ namespace Engine.Scripts.VoxelConfig{
         private void SetUpGenerationData(){
             BiomeRegistry.FinalizeRegistry(VoxelRegistry);
             VoxelStructureRegistry.FinalizeRegistry(VoxelRegistry);
-        }
-
-        /// <summary>
-        ///     Disposes the registry when the importer is destroyed.
-        /// </summary>
-        protected override void OnDestroy(){
-            base.OnDestroy();
-            VoxelRegistry.Dispose();
-            BiomeRegistry.Dispose();
-            VoxelStructureRegistry.Dispose();
         }
 
         /// <summary>

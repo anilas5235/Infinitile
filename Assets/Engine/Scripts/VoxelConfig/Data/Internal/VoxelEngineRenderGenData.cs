@@ -26,13 +26,17 @@ namespace Engine.Scripts.VoxelConfig.Data.Internal{
         /// </summary>
         /// <param name="voxelId">Voxel ID to query.</param>
         /// <returns>Mesh layer associated with the voxel.</returns>
-        public readonly MeshLayer GetMeshLayer(ushort voxelId) => VoxelRenderDefs[voxelId].MeshLayer;
+        public readonly MeshLayer GetMeshLayer(ushort voxelId){
+            return VoxelRenderDefs[voxelId].MeshLayer;
+        }
 
         /// <summary>
         ///     Gets the full render definition for the voxel with the given ID.
         /// </summary>
         /// <param name="voxelId">Voxel ID used to index into the render definition array.</param>
         /// <returns>Render definition for the voxel.</returns>
-        public readonly Voxel.Voxel.VoxelDef GetRenderDef(ushort voxelId) => VoxelRenderDefs[voxelId];
+        public readonly Voxel.Voxel.VoxelDef GetRenderDef(ushort voxelId){
+            return VoxelRenderDefs[voxelId];
+        }
     }
 }

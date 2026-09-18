@@ -18,13 +18,13 @@ namespace Engine.Scripts.VoxelConfig.Registry{
     /// </summary>
     public class VoxelRegistry : TopLevelRegistry<Voxel>{
         internal const int TextureSize = 128; // Texture resolution (square)
-
-        private readonly Registry<Voxel.VoxelDef> _voxelRenderDefRegistry = new(100);
+        private readonly TexRegistry _foliageTexRegistry = new(50);
         private readonly QuadRegistry _quadRegistry = new(40);
+        private readonly List<uint> _quadTexPairs = new();
         private readonly TexRegistry _solidTexRegistry = new(200);
         private readonly TexRegistry _transparentTexRegistry = new(100);
-        private readonly TexRegistry _foliageTexRegistry = new(50);
-        private readonly List<uint> _quadTexPairs = new();
+
+        private readonly Registry<Voxel.VoxelDef> _voxelRenderDefRegistry = new(100);
 
         private VoxelEngineRenderGenData _voxelEngineRenderGenData;
 
@@ -168,7 +168,9 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         ///     Retrieves the data package used for meshing and rendering.
         /// </summary>
         /// <returns>Voxel engine render generation data structure.</returns>
-        public VoxelEngineRenderGenData GetVoxelGenData() => _voxelEngineRenderGenData;
+        public VoxelEngineRenderGenData GetVoxelGenData(){
+            return _voxelEngineRenderGenData;
+        }
 
         private Texture2DArray GetTextureArray(MeshLayer meshLayer){
             return meshLayer switch{
@@ -205,7 +207,9 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         ///     Returns a list of all registered IDs and their corresponding names.
         /// </summary>
         /// <returns>List of ID/name pairs.</returns>
-        public List<KeyValuePair<ushort, FixedString32Bytes>> GetAllEntries() => NameRegistry.GetAllEntries();
+        public List<KeyValuePair<ushort, FixedString32Bytes>> GetAllEntries(){
+            return NameRegistry.GetAllEntries();
+        }
 
         public override void Dispose(){
             if (_voxelEngineRenderGenData.VoxelRenderDefs.IsCreated)

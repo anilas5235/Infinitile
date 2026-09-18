@@ -2,20 +2,19 @@
 using Engine.Scripts.Components;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Settings;
-using Engine.Scripts.Utils.Logger;
 using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Core{
     /// <summary>
-    /// Job state handler for managing chunk data generation jobs.
-    /// Handles enqueuing, dispatching, and result collection for chunk data generation.
+    ///     Job state handler for managing chunk data generation jobs.
+    ///     Handles enqueuing, dispatching, and result collection for chunk data generation.
     /// </summary>
     internal class DataJobStateHandler : JobStateHandler<int2>{
         private readonly ChunkScheduler _chunkScheduler;
         private readonly MeshJobStateHandler _meshJobHandler;
 
         /// <summary>
-        /// Initializes a new instance of the DataJobStateHandler class.
+        ///     Initializes a new instance of the DataJobStateHandler class.
         /// </summary>
         /// <param name="settings">The voxel engine settings.</param>
         /// <param name="chunkManager">The chunk manager reference.</param>
@@ -30,7 +29,7 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Updates focus and reprioritizes all queued chunks based on distance from focus.
+        ///     Updates focus and reprioritizes all queued chunks based on distance from focus.
         /// </summary>
         /// <param name="focus">The new focus position.</param>
         public override void FocusUpdate(PriorityUtil.Focus focus){
@@ -39,7 +38,7 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Enqueues chunks within load distance that need data generation.
+        ///     Enqueues chunks within load distance that need data generation.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if any chunks were enqueued, false if queue is empty.</returns>
@@ -57,7 +56,7 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Dispatches a batch of chunks to the chunk scheduler for data generation.
+        ///     Dispatches a batch of chunks to the chunk scheduler for data generation.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if jobs were dispatched or batch is full, false if scheduler is busy.</returns>
@@ -83,7 +82,7 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Collects results from completed chunk data generation and wakes up the mesh handler.
+        ///     Collects results from completed chunk data generation and wakes up the mesh handler.
         /// </summary>
         /// <returns>True if collection completed, false if scheduler is still working.</returns>
         protected override bool CollectResultsStep(){
@@ -96,15 +95,16 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Determines if a chunk should be scheduled for data generation.
+        ///     Determines if a chunk should be scheduled for data generation.
         /// </summary>
         /// <param name="position">The chunk position to check.</param>
         /// <returns>True if chunk is not loaded and not already queued.</returns>
-        private bool ShouldScheduleForGenerating(int2 position) =>
-            !ChunkManager.IsChunkLoaded(position) && !Set.Contains(position);
+        private bool ShouldScheduleForGenerating(int2 position){
+            return !ChunkManager.IsChunkLoaded(position) && !Set.Contains(position);
+        }
 
         /// <summary>
-        /// Checks if a chunk is still within relevant range of the focus.
+        ///     Checks if a chunk is still within relevant range of the focus.
         /// </summary>
         /// <param name="position">The chunk position to check.</param>
         /// <param name="focus">The current focus position.</param>

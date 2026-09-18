@@ -1,5 +1,4 @@
-﻿using Engine.Scripts.Noise;
-using Engine.Scripts.Utils.Extensions;
+﻿using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Unity.Collections;
 using Unity.Mathematics;

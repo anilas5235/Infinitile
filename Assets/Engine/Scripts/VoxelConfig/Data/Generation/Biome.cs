@@ -24,8 +24,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
         [SerializeField] public Color RepresentativeColor = Color.magenta;
 
-        public BiomeDef ToStruct(VoxelRegistry voxelRegistry) =>
-            new(){
+        public BiomeDef ToStruct(VoxelRegistry voxelRegistry){
+            return new BiomeDef{
                 topBlock = voxelRegistry.GetIdOrThrow(TopBlock.GetFullName()),
                 underBlock = voxelRegistry.GetIdOrThrow(UnderBlock.GetFullName()),
                 stoneBlock = voxelRegistry.GetIdOrThrow(StoneBlock.GetFullName()),
@@ -34,14 +34,16 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                 targetContinental = TargetContinental,
                 targetElevation = TargetHeight
             };
+        }
 
-        public BiomeDef ToStruct() =>
-            new(){
+        public BiomeDef ToStruct(){
+            return new BiomeDef{
                 targetHumidity = TargetHumidity,
                 targetTemperature = TargetTemperature,
                 targetContinental = TargetContinental,
                 targetElevation = TargetHeight
             };
+        }
 
         public struct BiomeDef : IDisposable{
             public ushort topBlock;

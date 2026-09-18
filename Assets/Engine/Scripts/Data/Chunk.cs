@@ -14,14 +14,9 @@ namespace Engine.Scripts.Data{
     /// </summary>
     [BurstCompile]
     public class Chunk : IDisposable{
-        /// <summary>
-        ///     World-space position (chunk origin coordinate).
-        /// </summary>
-        public int2 Position{ get; }
+        public ChunkLightData LightData;
 
         public ChunkVoxelData VoxelData;
-
-        public ChunkLightData LightData;
 
         /// <summary>
         ///     Constructs a new chunk with position and size; initializes data structure.
@@ -31,6 +26,11 @@ namespace Engine.Scripts.Data{
             VoxelData = default;
             LightData = new ChunkLightData(128);
         }
+
+        /// <summary>
+        ///     World-space position (chunk origin coordinate).
+        /// </summary>
+        public int2 Position{ get; }
 
         public void Dispose(){
             VoxelData.Dispose();
@@ -71,7 +71,9 @@ namespace Engine.Scripts.Data{
         /// <summary>
         ///     Reads light value at int3 position.
         /// </summary>
-        public byte GetLight(int3 pos) => _data.Get(GetIndex(pos));
+        public byte GetLight(int3 pos){
+            return _data.Get(GetIndex(pos));
+        }
 
         /// <summary>
         ///     Disposes native resources.
@@ -80,7 +82,9 @@ namespace Engine.Scripts.Data{
             _data.Dispose();
         }
 
-        private static int GetIndex(in int3 pos) => PartitionSize.Flatten(pos);
+        private static int GetIndex(in int3 pos){
+            return PartitionSize.Flatten(pos);
+        }
     }
 
     [BurstCompile]
@@ -95,7 +99,9 @@ namespace Engine.Scripts.Data{
         /// <summary>
         ///     Reads light value at int3 position.
         /// </summary>
-        public byte GetLight(int partitionIndex, int3 pos) => _data[partitionIndex].GetLight(pos);
+        public byte GetLight(int partitionIndex, int3 pos){
+            return _data[partitionIndex].GetLight(pos);
+        }
 
         /// <summary>
         ///     Disposes native resources.
@@ -120,7 +126,9 @@ namespace Engine.Scripts.Data{
     public struct ChunkVoxelData : IDisposable{
         internal UnsafeIntervalList<ushort> Data;
 
-        public UnsafeIntervalList<ushort> GetData() => Data;
+        public UnsafeIntervalList<ushort> GetData(){
+            return Data;
+        }
 
         public ChunkVoxelData(int initCapacity){
             Data = new UnsafeIntervalList<ushort>(initCapacity, Allocator.Domain);
@@ -144,7 +152,9 @@ namespace Engine.Scripts.Data{
         /// <summary>
         ///     Reads voxel at int3 position.
         /// </summary>
-        public ushort GetVoxel(int3 pos) => Data.Get(GetIndex(pos));
+        public ushort GetVoxel(int3 pos){
+            return Data.Get(GetIndex(pos));
+        }
 
         /// <summary>
         ///     Disposes native resources.
@@ -153,6 +163,8 @@ namespace Engine.Scripts.Data{
             Data.Dispose();
         }
 
-        private static int GetIndex(in int3 pos) => ChunkSize.Flatten(pos);
+        private static int GetIndex(in int3 pos){
+            return ChunkSize.Flatten(pos);
+        }
     }
 }

@@ -5,13 +5,6 @@ using Unity.Collections;
 namespace Engine.Scripts.Jobs.Chunk{
     [BurstCompile]
     public static class BiomeCalculator{
-        public struct BiomSectionInput{
-            public float Humidity;
-            public float Temperature;
-            public float Continental;
-            public float Elevation;
-        }
-
         public static ushort SelectBiome(ref BiomSectionInput input, ref GeneratorConfig config){
             NativeArray<Biome.BiomeDef> bioms = config.BiomeDefs;
             if (bioms.Length == 0) return 0;
@@ -38,6 +31,13 @@ namespace Engine.Scripts.Jobs.Chunk{
             }
 
             return bestIndex;
+        }
+
+        public struct BiomSectionInput{
+            public float Humidity;
+            public float Temperature;
+            public float Continental;
+            public float Elevation;
         }
     }
 }

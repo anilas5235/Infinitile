@@ -13,7 +13,7 @@ namespace Engine.Scripts.Utils.Collections{
     [BurstCompile]
     public struct UnsafeIntervalList<T> where T : unmanaged, IEquatable<T>{
         /// <summary>
-        /// Internal node representing an interval with an inclusive cumulative end position.
+        ///     Internal node representing an interval with an inclusive cumulative end position.
         /// </summary>
         internal struct Node{
             public T Value;
@@ -28,17 +28,17 @@ namespace Engine.Scripts.Utils.Collections{
         private UnsafeList<Node> _internal;
 
         /// <summary>
-        /// Total decompressed length (sum of all interval lengths).
+        ///     Total decompressed length (sum of all interval lengths).
         /// </summary>
         public int Length;
 
         /// <summary>
-        /// Current number of compressed nodes.
+        ///     Current number of compressed nodes.
         /// </summary>
         public int CompressedLength => _internal.Length;
 
         /// <summary>
-        /// Creates a new compressed list with the specified initial capacity.
+        ///     Creates a new compressed list with the specified initial capacity.
         /// </summary>
         /// <param name="capacity">Initial number of nodes to allocate.</param>
         /// <param name="allocator">Allocator used for native memory.</param>
@@ -48,21 +48,23 @@ namespace Engine.Scripts.Utils.Collections{
         }
 
         /// <summary>
-        /// Disposes internal native memory.
+        ///     Disposes internal native memory.
         /// </summary>
         public void Dispose(){
             _internal.Dispose();
         }
 
         /// <summary>
-        /// Finds the node index for a decompressed index via binary search.
+        ///     Finds the node index for a decompressed index via binary search.
         /// </summary>
         /// <param name="index">The decompressed index to look up.</param>
         /// <returns>The internal node index containing the given value.</returns>
-        public int NodeIndex(int index) => BinarySearch(index);
+        public int NodeIndex(int index){
+            return BinarySearch(index);
+        }
 
         /// <summary>
-        /// Adds a new interval where the same value is repeated <paramref name="count" /> times.
+        ///     Adds a new interval where the same value is repeated <paramref name="count" /> times.
         /// </summary>
         /// <param name="value">The value to store.</param>
         /// <param name="count">The number of repetitions.</param>
@@ -72,7 +74,7 @@ namespace Engine.Scripts.Utils.Collections{
         }
 
         /// <summary>
-        /// Gets the value at a decompressed position. Complexity: O(log n).
+        ///     Gets the value at a decompressed position. Complexity: O(log n).
         /// </summary>
         /// <param name="index">The decompressed index.</param>
         /// <returns>The value stored at the given index.</returns>
@@ -86,8 +88,8 @@ namespace Engine.Scripts.Utils.Collections{
         }
 
         /// <summary>
-        /// Sets the value at a decompressed position with coalescing logic. Complexity is typically O(log n).
-        /// Returns true if the value changed.
+        ///     Sets the value at a decompressed position with coalescing logic. Complexity is typically O(log n).
+        ///     Returns true if the value changed.
         /// </summary>
         /// <param name="index">The decompressed index.</param>
         /// <param name="value">The new value.</param>
@@ -200,7 +202,7 @@ namespace Engine.Scripts.Utils.Collections{
         }
 
         /// <summary>
-        /// Returns the left neighbor value relative to the specified index.
+        ///     Returns the left neighbor value relative to the specified index.
         /// </summary>
         /// <param name="index">The decompressed index.</param>
         /// <param name="value">The value to receive the left neighbor.</param>
@@ -212,7 +214,7 @@ namespace Engine.Scripts.Utils.Collections{
         }
 
         /// <summary>
-        /// Returns the right neighbor value relative to the specified index.
+        ///     Returns the right neighbor value relative to the specified index.
         /// </summary>
         /// <param name="index">The decompressed index.</param>
         /// <param name="value">The value to receive the right neighbor.</param>
@@ -246,7 +248,7 @@ namespace Engine.Scripts.Utils.Collections{
         }
 
         /// <summary>
-        /// Binary search for the node containing a decompressed index.
+        ///     Binary search for the node containing a decompressed index.
         /// </summary>
         /// <param name="index">The decompressed index to search for.</param>
         /// <returns>The internal node index containing the given index.</returns>
@@ -279,7 +281,7 @@ namespace Engine.Scripts.Utils.Collections{
         }
 
         /// <summary>
-        /// Clears all stored intervals and resets the decompressed length.
+        ///     Clears all stored intervals and resets the decompressed length.
         /// </summary>
         public void Clear(){
             _internal.Clear();
@@ -287,7 +289,7 @@ namespace Engine.Scripts.Utils.Collections{
         }
 
         /// <summary>
-        /// Gets a read-only view of the internal compressed nodes.
+        ///     Gets a read-only view of the internal compressed nodes.
         /// </summary>
         internal UnsafeList<Node>.ReadOnly Internal => _internal.AsReadOnly();
     }

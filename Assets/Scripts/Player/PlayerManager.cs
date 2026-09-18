@@ -11,21 +11,13 @@ using UnityEngine;
 namespace Player{
     public class PlayerManager : MonoBehaviour{
         private PlayerControllerManager _controllerManager;
-        private VoxelEditor _voxelEditor;
-        private VoxelPostProcessHandler _postProcessHandler;
 
         private bool _playerEnabled = true;
-        private VoxelWorld _world;
-        private VoxelRegistry _voxelRegistry;
+        private VoxelPostProcessHandler _postProcessHandler;
         private bool _readyForPlayer;
-
-        private void OnEnable(){
-            _controllerManager = GetComponent<PlayerControllerManager>();
-            _voxelEditor = GetComponent<VoxelEditor>();
-            _postProcessHandler = GetComponent<VoxelPostProcessHandler>();
-            _world = VoxelWorld.Instance;
-            _voxelRegistry = DataImporter.Instance.VoxelRegistry;
-        }
+        private VoxelEditor _voxelEditor;
+        private VoxelRegistry _voxelRegistry;
+        private VoxelWorld _world;
 
         private void Start(){
             DisablePlayer();
@@ -37,6 +29,14 @@ namespace Player{
             transform.position = firstCollidableVoxel.GetVector3() + new Vector3(0.5f, 4f, 0.5f);
             _readyForPlayer = true;
             EnablePlayer();
+        }
+
+        private void OnEnable(){
+            _controllerManager = GetComponent<PlayerControllerManager>();
+            _voxelEditor = GetComponent<VoxelEditor>();
+            _postProcessHandler = GetComponent<VoxelPostProcessHandler>();
+            _world = VoxelWorld.Instance;
+            _voxelRegistry = DataImporter.Instance.VoxelRegistry;
         }
 
         public void DisablePlayer(){

@@ -5,7 +5,7 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.Utils{
     /// <summary>
-    /// Utility methods for converting between world, chunk, partition, and voxel coordinates.
+    ///     Utility methods for converting between world, chunk, partition, and voxel coordinates.
     /// </summary>
     public static class VoxelUtils{
         /// <summary>
@@ -13,7 +13,9 @@ namespace Engine.Scripts.Utils{
         /// </summary>
         /// <param name="position">World position in integer voxel coordinates.</param>
         /// <returns>Chunk origin coordinates in voxel space.</returns>
-        public static int2 GetChunkCoords(Vector3Int position) => GetChunkCoords(position.Int3());
+        public static int2 GetChunkCoords(Vector3Int position){
+            return GetChunkCoords(position.Int3());
+        }
 
         /// <summary>
         ///     Computes chunk origin coordinates (bottom-left in XZ) for the given world position,
@@ -30,14 +32,16 @@ namespace Engine.Scripts.Utils{
         }
 
         /// <summary>
-        /// Gets the partition coordinates for a world position specified as <see cref="Vector3" />.
+        ///     Gets the partition coordinates for a world position specified as <see cref="Vector3" />.
         /// </summary>
         /// <param name="position">World position in floating-point voxel coordinates.</param>
         /// <returns>Partition coordinates containing the given position.</returns>
-        public static int3 GetPartitionCoords(Vector3 position) => GetPartitionCoords(position.Int3());
+        public static int3 GetPartitionCoords(Vector3 position){
+            return GetPartitionCoords(position.Int3());
+        }
 
         /// <summary>
-        /// Gets the partition coordinates for a world position specified as <see cref="int3" />.
+        ///     Gets the partition coordinates for a world position specified as <see cref="int3" />.
         /// </summary>
         /// <param name="position">World position in integer voxel coordinates.</param>
         /// <returns>Partition coordinates containing the given position.</returns>
@@ -51,7 +55,7 @@ namespace Engine.Scripts.Utils{
         }
 
         /// <summary>
-        /// Converts a world position to voxel coordinates local to a partition.
+        ///     Converts a world position to voxel coordinates local to a partition.
         /// </summary>
         /// <param name="partitionPosition">The partition position in partition coordinates.</param>
         /// <param name="worldPosition">The world position in integer voxel coordinates.</param>
@@ -67,7 +71,7 @@ namespace Engine.Scripts.Utils{
 
 
         /// <summary>
-        /// Gets the local voxel coordinates within its chunk for a world position.
+        ///     Gets the local voxel coordinates within its chunk for a world position.
         /// </summary>
         /// <param name="position">World position in integer voxel coordinates.</param>
         /// <returns>Local voxel coordinates within the chunk.</returns>
@@ -76,7 +80,8 @@ namespace Engine.Scripts.Utils{
             return position - ChunkSize.MemberMultiply(chunkCoords.x, 0, chunkCoords.y);
         }
 
-        private static int FloorDivide(int value, int divisor) =>
-            value / divisor - (value < 0 && value % divisor != 0 ? 1 : 0);
+        private static int FloorDivide(int value, int divisor){
+            return value / divisor - (value < 0 && value % divisor != 0 ? 1 : 0);
+        }
     }
 }

@@ -3,34 +3,34 @@ using UnityEngine;
 
 namespace Engine.Scripts.VoxelConfig.Data.Mesh{
     /// <summary>
-    /// Describes a voxel shape as a list of quads and their draw conditions.
+    ///     Describes a voxel shape as a list of quads and their draw conditions.
     /// </summary>
     [CreateAssetMenu(fileName = "Shape", menuName = "Infinitile/Mesh/Shape")]
     public class VoxelShape : ScriptableObject{
         /// <summary>
-        /// The quads that make up this voxel shape.
+        ///     The quads that make up this voxel shape.
         /// </summary>
         public VoxelQuad[] quads;
     }
 
     /// <summary>
-    /// Associates a quad definition with the condition under which it should be drawn.
+    ///     Associates a quad definition with the condition under which it should be drawn.
     /// </summary>
     [Serializable]
     public class VoxelQuad{
         /// <summary>
-        /// The quad definition used for rendering.
+        ///     The quad definition used for rendering.
         /// </summary>
         public QuadDefinition quadDef;
 
         /// <summary>
-        /// The condition that determines when this quad is drawn.
+        ///     The condition that determines when this quad is drawn.
         /// </summary>
         public QuadDrawCondition drawCondition;
     }
 
     /// <summary>
-    /// Specifies the face condition required for drawing a quad.
+    ///     Specifies the face condition required for drawing a quad.
     /// </summary>
     public enum QuadDrawCondition{
         /// <summary>Draw the quad always.</summary>

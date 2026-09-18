@@ -7,8 +7,8 @@ using static UnityEngine.GraphicsBuffer;
 
 namespace Engine.Scripts.Render{
     /// <summary>
-    /// Handles copying of point data from point builders into render buffers using compute shaders.
-    /// Manages point distribution across solid, transparent, and foliage buffer managers.
+    ///     Handles copying of point data from point builders into render buffers using compute shaders.
+    ///     Manages point distribution across solid, transparent, and foliage buffer managers.
     /// </summary>
     public class CopyPointsHandler : IDisposable{
         private readonly int _copyKernelID;
@@ -23,7 +23,7 @@ namespace Engine.Scripts.Render{
         private readonly GraphicsBuffer _transparentPagesBuffer;
 
         /// <summary>
-        /// Initializes a new instance of the CopyPointsHandler class.
+        ///     Initializes a new instance of the CopyPointsHandler class.
         /// </summary>
         /// <param name="copyPoints">The compute shader used for copying points.</param>
         /// <param name="solidBufferManager">The render buffer manager for solid points.</param>
@@ -44,7 +44,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        /// Releases all GPU resources held by this handler.
+        ///     Releases all GPU resources held by this handler.
         /// </summary>
         public void Dispose(){
             _pageCountsBuffer?.Dispose();
@@ -54,7 +54,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        /// Copies point data from the point builder into the respective render buffers.
+        ///     Copies point data from the point builder into the respective render buffers.
         /// </summary>
         /// <param name="pointBuilderHandler">The point builder handler containing built points.</param>
         /// <param name="partition">The partition coordinates for the data.</param>

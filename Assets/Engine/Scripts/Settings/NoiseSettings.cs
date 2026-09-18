@@ -71,14 +71,15 @@ namespace Engine.Scripts.Settings{
 
         [Tooltip("Number of octaves.")] public int octaves = 4;
 
-        public NoiseProfile.Settings ToStruct(int seed) =>
-            new(){
+        public NoiseProfile.Settings ToStruct(int seed){
+            return new NoiseProfile.Settings{
                 Seed = seed,
                 Scale = scale,
                 Persistance = persistance,
                 Lacunarity = lacunarity,
                 Octaves = octaves
             };
+        }
     }
 
     [Serializable]

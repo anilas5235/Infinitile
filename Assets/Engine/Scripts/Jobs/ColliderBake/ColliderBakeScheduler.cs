@@ -15,16 +15,16 @@ namespace Engine.Scripts.Jobs.ColliderBake{
     public class ColliderBakeScheduler : JobScheduler{
         private readonly ChunkManager _chunkManager;
         private readonly ChunkPool _chunkPool;
-
-        private JobHandle _handle;
-
-        private NativeList<int> _jobs;
         private readonly Dictionary<int3, ChunkPartition> _meshes;
 
         /// <summary>
         ///     Indicates whether the scheduler is ready to accept a new batch of collider build jobs.
         /// </summary>
         internal bool IsReady = true;
+
+        private JobHandle _handle;
+
+        private NativeList<int> _jobs;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="ColliderBakeScheduler" /> class.

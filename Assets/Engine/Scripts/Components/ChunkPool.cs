@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using Engine.Scripts.Behaviour;
-using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
 using Engine.Scripts.ThirdParty.Priority_Queue;
 using Engine.Scripts.Utils.Extensions;
@@ -18,9 +17,6 @@ namespace Engine.Scripts.Components{
     ///     Uses a priority queue ordered by distance to focus for eviction.
     /// </summary>
     internal class ChunkPool{
-        internal Action<int2> OnChunkEvicted;
-        internal Action<int3> OnPartitionEvicted;
-
         private readonly Dictionary<int2, ChunkBehaviour> _chunkMap;
         private readonly int _chunkPoolSize;
         private readonly SimpleFastPriorityQueue<int2, float> _chunkQueue;
@@ -31,6 +27,8 @@ namespace Engine.Scripts.Components{
         private readonly int _partitionPoolSize;
         private readonly SimpleFastPriorityQueue<int3, float> _partitionQueue;
         private readonly ObjectPool<ChunkBehaviour> _pool;
+        internal Action<int2> OnChunkEvicted;
+        internal Action<int3> OnPartitionEvicted;
         private bool _emitEvictionEvents = true;
 
         private Focus _focus;
@@ -66,12 +64,16 @@ namespace Engine.Scripts.Components{
             );
         }
 
-        internal bool IsPartitionActive(int3 pos) => _meshMap.ContainsKey(pos);
+        internal bool IsPartitionActive(int3 pos){
+            return _meshMap.ContainsKey(pos);
+        }
 
         /// <summary>
         ///     Returns whether a chunk already has a baked collider.
         /// </summary>
-        internal bool IsCollidable(int3 pos) => _colliderSet.Contains(pos);
+        internal bool IsCollidable(int3 pos){
+            return _colliderSet.Contains(pos);
+        }
 
         /// <summary>
         ///     Updates focus and queue priorities.
@@ -83,20 +85,27 @@ namespace Engine.Scripts.Components{
             _colliderQueue.UpdateAllPriorities(PriorityCalc);
         }
 
-        private float PriorityCalc(int2 position) => ReVerseDistPriority(ref position, ref _focus);
+        private float PriorityCalc(int2 position){
+            return ReVerseDistPriority(ref position, ref _focus);
+        }
 
-        private float PriorityCalc(int3 position) => ReVerseDistPriority(ref position, ref _focus);
+        private float PriorityCalc(int3 position){
+            return ReVerseDistPriority(ref position, ref _focus);
+        }
 
         /// <summary>
         ///     Returns whether a chunk is active (rendered).
         /// </summary>
-        private bool IsChunkActive(int2 pos) => _chunkMap.ContainsKey(pos);
+        private bool IsChunkActive(int2 pos){
+            return _chunkMap.ContainsKey(pos);
+        }
 
         /// <summary>
         ///     Returns existing instance or claims a new one.
         /// </summary>
-        private ChunkBehaviour GetOrClaimChunk(int2 position) =>
-            IsChunkActive(position) ? _chunkMap[position] : ClaimChunk(position);
+        private ChunkBehaviour GetOrClaimChunk(int2 position){
+            return IsChunkActive(position) ? _chunkMap[position] : ClaimChunk(position);
+        }
 
         /// <summary>
         ///     Claims a new instance; evicts oldest if capacity reached.
@@ -117,15 +126,19 @@ namespace Engine.Scripts.Components{
             return behaviour;
         }
 
-        internal float GetPartitionPrioThreshold() =>
-            _partitionQueue.Count < _partitionPoolSize
+        internal float GetPartitionPrioThreshold(){
+            return _partitionQueue.Count < _partitionPoolSize
                 ? float.MinValue
                 : PriorityCalc(_partitionQueue.First);
+        }
 
-        internal ChunkPartition GetOrClaimPartition(int3 position) =>
-            IsPartitionActive(position) ? GetPartition(position) : ClaimPartition(position);
+        internal ChunkPartition GetOrClaimPartition(int3 position){
+            return IsPartitionActive(position) ? GetPartition(position) : ClaimPartition(position);
+        }
 
-        public ChunkPartition GetPartition(int3 pos) => _meshMap[pos];
+        public ChunkPartition GetPartition(int3 pos){
+            return _meshMap[pos];
+        }
 
         private ChunkPartition ClaimPartition(int3 position){
             if (_meshMap.ContainsKey(position))
@@ -175,7 +188,9 @@ namespace Engine.Scripts.Components{
         /// <summary>
         ///     Callback after collider bake: mark chunk collidable.
         /// </summary>
-        internal void ColliderBaked(int3 position) => _colliderSet.Add(position);
+        internal void ColliderBaked(int3 position){
+            _colliderSet.Add(position);
+        }
 
         internal void Dispose(){
             _emitEvictionEvents = false;

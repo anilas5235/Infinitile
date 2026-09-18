@@ -14,15 +14,18 @@ namespace Engine.Scripts.Utils.Logger{
         /// </summary>
         /// <typeparam name="T">Type for which the tag should be created.</typeparam>
         /// <returns>Color-formatted tag string.</returns>
-        public static string GetTag<T>() => GetTag(typeof(T).Name.Split('`')[0]);
+        public static string GetTag<T>(){
+            return GetTag(typeof(T).Name.Split('`')[0]);
+        }
 
         /// <summary>
         ///     Creates a tag with a unique color derived from the given name.
         /// </summary>
         /// <param name="name">Raw tag name.</param>
         /// <returns>Color-formatted tag string.</returns>
-        public static string GetTag(string name) =>
-            $"{LOGTag}<color=#{ColorUtility.ToHtmlStringRGB(GetColor(name))}>{name}</color>";
+        public static string GetTag(string name){
+            return $"{LOGTag}<color=#{ColorUtility.ToHtmlStringRGB(GetColor(name))}>{name}</color>";
+        }
 
         /// <summary>
         ///     Creates a tag with the specified color for the given type.
@@ -30,7 +33,9 @@ namespace Engine.Scripts.Utils.Logger{
         /// <param name="color">Hex code or name of the color (must be a valid Unity color name).</param>
         /// <typeparam name="T">Type for which the tag should be created.</typeparam>
         /// <returns>Color-formatted tag string.</returns>
-        public static string GetTag<T>(string color) => GetTag(typeof(T).Name.Split('`')[0], color);
+        public static string GetTag<T>(string color){
+            return GetTag(typeof(T).Name.Split('`')[0], color);
+        }
 
         /// <summary>
         ///     Creates a tag with the specified color for the given name.
@@ -38,7 +43,9 @@ namespace Engine.Scripts.Utils.Logger{
         /// <param name="name">Tag value.</param>
         /// <param name="color">Hex code or name of the color (must be a valid Unity color name).</param>
         /// <returns>Color-formatted tag string.</returns>
-        public static string GetTag(string name, string color) => $"<color={color}>{name}</color>";
+        public static string GetTag(string name, string color){
+            return $"<color={color}>{name}</color>";
+        }
 
         /// <summary>
         ///     Sets the Unity logger log level (filter).
@@ -123,7 +130,9 @@ namespace Engine.Scripts.Utils.Logger{
         /// </summary>
         /// <param name="hue">Original hue value.</param>
         /// <returns>Adjusted hue value that avoids problematic color ranges.</returns>
-        private static float NormalizeHue(float hue) => Mathf.Lerp(0.7f, 1.6f, hue) % 1;
+        private static float NormalizeHue(float hue){
+            return Mathf.Lerp(0.7f, 1.6f, hue) % 1;
+        }
 
         private static Color GetColor(string name){
             float hue = ((float)name.GetHashCode() % 10000 / 10000 + 1) / 2;

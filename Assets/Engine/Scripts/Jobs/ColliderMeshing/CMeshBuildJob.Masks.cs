@@ -1,6 +1,4 @@
-﻿using Engine.Scripts.VoxelConfig.Data;
-using Engine.Scripts.VoxelConfig.Data.Internal;
-using Engine.Scripts.VoxelConfig.Data.Voxel;
+﻿using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;

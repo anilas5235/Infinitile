@@ -3,36 +3,27 @@ using UnityEngine.InputSystem;
 
 namespace Player{
     /// <summary>
-    /// Handles first-person style camera look using mouse or gamepad input,
-    /// rotating the target camera and player transform.
+    ///     Handles first-person style camera look using mouse or gamepad input,
+    ///     rotating the target camera and player transform.
     /// </summary>
     public class LookController : MonoBehaviour{
-        private Vector2 _lookInput;
-        private float _pitch; // vertical rotation
-
         /// <summary>
-        /// Sensitivity multiplier for look input.
+        ///     Sensitivity multiplier for look input.
         /// </summary>
         [Range(1f, 100f)] public float lookSpeed = 10f;
 
         /// <summary>
-        /// Maximum absolute pitch angle in degrees.
+        ///     Maximum absolute pitch angle in degrees.
         /// </summary>
         [Range(1f, 89f)] public float maxLookAngle = 80f;
 
         [SerializeField] private Camera targetCamera;
+        private Vector2 _lookInput;
+        private float _pitch; // vertical rotation
 
         private void Start(){
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
-        }
-
-        /// <summary>
-        /// Input System callback for look input (mouse delta / right stick).
-        /// </summary>
-        /// <param name="value">2D look delta.</param>
-        public void OnLook(InputValue value){
-            _lookInput = value.Get<Vector2>();
         }
 
         private void Update(){
@@ -48,6 +39,14 @@ namespace Player{
             Vector3 currentEuler = targetCamera.transform.eulerAngles;
             targetCamera.transform.eulerAngles = new Vector3(_pitch, currentEuler.y, 0f);
             transform.Rotate(Vector3.up * (_lookInput.x * lookSpeed * Time.deltaTime));
+        }
+
+        /// <summary>
+        ///     Input System callback for look input (mouse delta / right stick).
+        /// </summary>
+        /// <param name="value">2D look delta.</param>
+        public void OnLook(InputValue value){
+            _lookInput = value.Get<Vector2>();
         }
     }
 }

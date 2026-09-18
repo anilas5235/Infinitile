@@ -60,7 +60,9 @@ namespace Engine.Scripts.Data{
         /// <summary>
         ///     Attempts to get a chunk at a position.
         /// </summary>
-        internal bool TryGetChunk(int2 pos, out ChunkVoxelData chunk) => _chunks.TryGetValue(pos, out chunk);
+        internal bool TryGetChunk(int2 pos, out ChunkVoxelData chunk){
+            return _chunks.TryGetValue(pos, out chunk);
+        }
 
         internal byte GetLightInPartition(int3 partitionPos, int3 voxelPos){
             FindPartitionAndLocalPos(ref partitionPos, ref voxelPos);
@@ -118,19 +120,23 @@ namespace Engine.Scripts.Data{
         /// <summary>
         ///     Checks whether a chunk exists.
         /// </summary>
-        internal bool ContainsChunk(int2 coord) => _chunks.ContainsKey(coord);
+        internal bool ContainsChunk(int2 coord){
+            return _chunks.ContainsKey(coord);
+        }
 
         /// <summary>
         ///     Checks whether a voxel coordinate lies inside chunk bounds.
         /// </summary>
-        public static bool InChunkBounds(int3 chunkLocalPos) =>
-            chunkLocalPos.x >= 0 && chunkLocalPos.x < ChunkWidth &&
-            chunkLocalPos.y >= 0 && chunkLocalPos.y < ChunkHeight &&
-            chunkLocalPos.z >= 0 && chunkLocalPos.z < ChunkDepth;
+        public static bool InChunkBounds(int3 chunkLocalPos){
+            return chunkLocalPos.x >= 0 && chunkLocalPos.x < ChunkWidth &&
+                   chunkLocalPos.y >= 0 && chunkLocalPos.y < ChunkHeight &&
+                   chunkLocalPos.z >= 0 && chunkLocalPos.z < ChunkDepth;
+        }
 
-        public static bool InPartitionBounds(int3 partitionLocalPos) =>
-            partitionLocalPos.x >= 0 && partitionLocalPos.x < PartitionWidth &&
-            partitionLocalPos.y >= 0 && partitionLocalPos.y < PartitionHeight &&
-            partitionLocalPos.z >= 0 && partitionLocalPos.z < PartitionDepth;
+        public static bool InPartitionBounds(int3 partitionLocalPos){
+            return partitionLocalPos.x >= 0 && partitionLocalPos.x < PartitionWidth &&
+                   partitionLocalPos.y >= 0 && partitionLocalPos.y < PartitionHeight &&
+                   partitionLocalPos.z >= 0 && partitionLocalPos.z < PartitionDepth;
+        }
     }
 }

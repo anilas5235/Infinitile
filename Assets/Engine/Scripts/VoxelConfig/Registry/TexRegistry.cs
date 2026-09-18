@@ -9,6 +9,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
     ///     Registers textures for voxel definitions and builds a shared <see cref="Texture2DArray" /> atlas.
     /// </summary>
     internal class TexRegistry : Registry<Texture2D>, IResourceRegistry<Texture2D>{
+        private TextureFormat _texFormat;
         public TexRegistry(int initCapacity) : base(initCapacity){ }
 
         private static int TextureSize => VoxelRegistry.TextureSize;
@@ -17,8 +18,6 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         ///     Gets the resulting texture array after <see cref="PrepareArray" /> has been called.
         /// </summary>
         public Texture2DArray TextureArray{ get; private set; }
-
-        private TextureFormat _texFormat;
 
         /// <summary>
         ///     Registers a texture and assigns an index ID if its size matches the expected atlas size.
@@ -43,10 +42,6 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             }
 
             return base.Register(tex);
-        }
-
-        protected override void PostRegister(ushort id, Texture2D item){
-            VoxelEngineLogger.Info<TexRegistry>($"Registered texture '{item.name}' with ID {id}");
         }
 
         /// <summary>
@@ -74,6 +69,10 @@ namespace Engine.Scripts.VoxelConfig.Registry{
 
             textureArray.Apply();
             TextureArray = textureArray;
+        }
+
+        protected override void PostRegister(ushort id, Texture2D item){
+            VoxelEngineLogger.Info<TexRegistry>($"Registered texture '{item.name}' with ID {id}");
         }
     }
 }

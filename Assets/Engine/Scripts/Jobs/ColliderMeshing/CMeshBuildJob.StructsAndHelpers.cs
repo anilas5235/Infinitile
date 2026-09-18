@@ -82,7 +82,9 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
                 Normal = normal;
             }
 
-            public bool CompareTo(CMask other) => Normal == other.Normal;
+            public bool CompareTo(CMask other){
+                return Normal == other.Normal;
+            }
         }
 
         #endregion

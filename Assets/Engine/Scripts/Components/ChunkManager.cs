@@ -1,18 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using Engine.Scripts.Data;
-using Engine.Scripts.Jobs;
 using Engine.Scripts.Jobs.Core;
-using Engine.Scripts.Render;
 using Engine.Scripts.Settings;
 using Engine.Scripts.ThirdParty.Priority_Queue;
-using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.Utils.Logger;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
-using UnityEngine;
 using static Engine.Scripts.Utils.Extensions.VectorConstants;
 using static Engine.Scripts.Utils.VoxelConstants;
 using static Engine.Scripts.Utils.VoxelUtils;
@@ -23,19 +19,19 @@ namespace Engine.Scripts.Components{
     ///     Tracks remesh / recollider flags and provides voxel access.
     /// </summary>
     public class ChunkManager{
-        private readonly Dictionary<int2, Chunk> _chunks;
         private readonly int _chunkStoreSize;
-        private readonly SimpleFastPriorityQueue<int2, float> _unloadingQueue;
+        private readonly Dictionary<int2, Chunk> _chunks;
         private readonly HashSet<int3> _reCollidePartitions;
 
         private readonly HashSet<int3> _reMeshPartitions;
+        private readonly SimpleFastPriorityQueue<int2, float> _unloadingQueue;
+        internal Action<Chunk> OnChunkChange;
+
+        internal Action OnRemeshRequested;
         private NativeParallelHashMap<int2, ChunkVoxelData> _accessorMap;
 
         private PriorityUtil.Focus _focus;
         private NativeParallelHashMap<int2, ChunkLightData> _lightAccessorMap;
-
-        internal Action OnRemeshRequested;
-        internal Action<Chunk> OnChunkChange;
 
         /// <summary>
         ///     Creates a new manager with capacities from <paramref name="settings" />.
@@ -62,12 +58,16 @@ namespace Engine.Scripts.Components{
         /// <summary>
         ///     Whether a chunk is flagged for remeshing.
         /// </summary>
-        internal bool ShouldReMesh(int3 position) => _reMeshPartitions.Contains(position);
+        internal bool ShouldReMesh(int3 position){
+            return _reMeshPartitions.Contains(position);
+        }
 
         /// <summary>
         ///     Whether a chunk needs collider rebuild.
         /// </summary>
-        internal bool ShouldReCollide(int3 position) => _reCollidePartitions.Contains(position);
+        internal bool ShouldReCollide(int3 position){
+            return _reCollidePartitions.Contains(position);
+        }
 
         /// <summary>
         ///     Disposes native resources and all chunk data.
@@ -246,17 +246,23 @@ namespace Engine.Scripts.Components{
         /// <summary>
         ///     Number of currently loaded chunks.
         /// </summary>
-        public int ChunkCount() => _chunks.Count;
+        public int ChunkCount(){
+            return _chunks.Count;
+        }
 
         /// <summary>
         ///     Checks if a chunk is loaded.
         /// </summary>
-        public bool IsChunkLoaded(int2 position) => _chunks.ContainsKey(position);
+        public bool IsChunkLoaded(int2 position){
+            return _chunks.ContainsKey(position);
+        }
 
         /// <summary>
         ///     Attempts to get a chunk by its position.
         /// </summary>
-        internal bool TryGetChunk(int2 position, out Chunk chunk) => _chunks.TryGetValue(position, out chunk);
+        internal bool TryGetChunk(int2 position, out Chunk chunk){
+            return _chunks.TryGetValue(position, out chunk);
+        }
 
         #endregion
     }

@@ -1,41 +1,43 @@
-﻿using System;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace Player{
     /// <summary>
-    /// Manages switching between walking and flying controllers based on input
-    /// and current grounded state.
+    ///     Manages switching between walking and flying controllers based on input
+    ///     and current grounded state.
     /// </summary>
     public class PlayerControllerManager : MonoBehaviour{
-        /// <summary>
-        /// Fly controller used when the player is in flying mode.
-        /// </summary>
-        [SerializeField] private FlyController flyController;
-
-        /// <summary>
-        /// Look controller responsible for camera rotation.
-        /// </summary>
-        [SerializeField] private LookController lookController;
-
-        /// <summary>
-        /// Walking controller used when the player is in walking mode.
-        /// </summary>
-        [SerializeField] private WalkingController walkingController;
-
-        private CharacterController _characterController;
-
         public enum MovementMode{
             None,
             Walking,
             Flying
         }
 
-        public MovementMode Mode => _mode;
+        /// <summary>
+        ///     Fly controller used when the player is in flying mode.
+        /// </summary>
+        [SerializeField] private FlyController flyController;
 
-        private MovementMode _mode = MovementMode.Walking;
-        private InputAction _jumpInput;
+        /// <summary>
+        ///     Look controller responsible for camera rotation.
+        /// </summary>
+        [SerializeField] private LookController lookController;
+
+        /// <summary>
+        ///     Walking controller used when the player is in walking mode.
+        /// </summary>
+        [SerializeField] private WalkingController walkingController;
+
+        private CharacterController _characterController;
         private bool _crouchPressed;
+        private InputAction _jumpInput;
+
+        public MovementMode Mode{ get; private set; } = MovementMode.Walking;
+
+        private void Update(){
+            if (Mode == MovementMode.Flying && _crouchPressed && _characterController.isGrounded)
+                SwitchMovementMode(MovementMode.Walking);
+        }
 
         private void OnEnable(){
             _characterController = GetComponent<CharacterController>();
@@ -46,22 +48,17 @@ namespace Player{
             SwitchMovementMode(MovementMode.None, true);
         }
 
-        private void Update(){
-            if (_mode == MovementMode.Flying && _crouchPressed && _characterController.isGrounded)
-                SwitchMovementMode(MovementMode.Walking);
-        }
-
         /// <summary>
-        /// Input System callback for the "double jump" action which toggles flying mode
-        /// when currently walking.
+        ///     Input System callback for the "double jump" action which toggles flying mode
+        ///     when currently walking.
         /// </summary>
         /// <param name="value">Button state for the double jump action.</param>
         public void OnDoubleJump(InputValue value){
-            if (_mode == MovementMode.Walking && !value.isPressed) SwitchMovementMode(MovementMode.Flying);
+            if (Mode == MovementMode.Walking && !value.isPressed) SwitchMovementMode(MovementMode.Flying);
         }
 
         /// <summary>
-        /// Input System callback for crouch, used to return to walking mode when grounded in fly mode.
+        ///     Input System callback for crouch, used to return to walking mode when grounded in fly mode.
         /// </summary>
         /// <param name="value">Button state for crouch.</param>
         public void OnCrouch(InputValue value){
@@ -69,13 +66,13 @@ namespace Player{
         }
 
         public void SwitchMovementMode(MovementMode newMode, bool force = false){
-            if (_mode == newMode && !force) return;
-            _mode = newMode;
+            if (Mode == newMode && !force) return;
+            Mode = newMode;
 
-            _characterController.enabled = _mode != MovementMode.None;
-            if (lookController) lookController.enabled = _mode != MovementMode.None;
-            if (flyController) flyController.enabled = _mode == MovementMode.Flying;
-            if (walkingController) walkingController.enabled = _mode == MovementMode.Walking;
+            _characterController.enabled = Mode != MovementMode.None;
+            if (lookController) lookController.enabled = Mode != MovementMode.None;
+            if (flyController) flyController.enabled = Mode == MovementMode.Flying;
+            if (walkingController) walkingController.enabled = Mode == MovementMode.Walking;
         }
     }
 }

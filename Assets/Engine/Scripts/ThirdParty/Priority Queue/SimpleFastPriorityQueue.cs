@@ -52,8 +52,9 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         ///     Returns whether the given item is in the queue.
         ///     O(1)
         /// </summary>
-        public bool Contains(TItem item) =>
-            item == null ? _nullNodesCache.Count > 0 : _itemToNodesCache.ContainsKey(item);
+        public bool Contains(TItem item){
+            return item == null ? _nullNodesCache.Count > 0 : _itemToNodesCache.ContainsKey(item);
+        }
 
         /// <summary>
         ///     Removes the head of the queue (node with minimum priority; ties are broken by order of insertion), and returns it.
@@ -138,7 +139,9 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
             return _queue.Select(x => x.Data).GetEnumerator();
         }
 
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator(){
+            return GetEnumerator();
+        }
 
         /// <summary>
         ///     Given an item of type T, returns the existing SimpleNode in the queue

@@ -8,18 +8,18 @@ using static Engine.Scripts.Utils.VoxelRenderConstants;
 
 namespace Engine.Scripts.Render{
     /// <summary>
-    /// Manages multiple render buffers for a specific material, handling page allocation and rendering.
-    /// Automatically creates new buffers when capacity is exceeded.
+    ///     Manages multiple render buffers for a specific material, handling page allocation and rendering.
+    ///     Automatically creates new buffers when capacity is exceeded.
     /// </summary>
     public class RenderBufferManager : IDisposable{
-        private readonly List<RenderBuffer> _renderBuffers = new();
         private readonly Material _material;
         private readonly Dictionary<int3, AllocInfo> _partitionAllocations = new();
-        private bool _isDisposed;
+        private readonly List<RenderBuffer> _renderBuffers = new();
         private readonly RendererSettings _renderSettings;
+        private bool _isDisposed;
 
         /// <summary>
-        /// Initializes a new instance of the RenderBufferManager class.
+        ///     Initializes a new instance of the RenderBufferManager class.
         /// </summary>
         /// <param name="mat">The material to use for rendering.</param>
         /// <param name="rebuildBufferShader">The compute shader for rebuilding buffers.</param>
@@ -35,17 +35,17 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        /// Gets the compute shader used for rebuilding buffers.
+        ///     Gets the compute shader used for rebuilding buffers.
         /// </summary>
         internal ComputeShader RebuildBufferShader{ get; private set; }
 
         /// <summary>
-        /// Gets the kernel index for the rebuild operation.
+        ///     Gets the kernel index for the rebuild operation.
         /// </summary>
         internal int RebuildKernel{ get; private set; }
 
         /// <summary>
-        /// Releases all GPU resources held by this manager.
+        ///     Releases all GPU resources held by this manager.
         /// </summary>
         public void Dispose(){
             if (_isDisposed) return;
@@ -58,7 +58,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        /// Draws all render buffers using the specified camera.
+        ///     Draws all render buffers using the specified camera.
         /// </summary>
         /// <param name="cam">The camera to render with.</param>
         public void Draw(Camera cam){
@@ -66,7 +66,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        /// Allocates buffer space for a partition's points.
+        ///     Allocates buffer space for a partition's points.
         /// </summary>
         /// <param name="partitionPos">The position of the partition.</param>
         /// <param name="pointCount">The number of points to allocate space for.</param>
@@ -94,7 +94,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        /// Releases the buffer space allocated to a partition.
+        ///     Releases the buffer space allocated to a partition.
         /// </summary>
         /// <param name="partitionPos">The position of the partition.</param>
         /// <returns>True if a partition was released, false if no allocation existed.</returns>
@@ -109,7 +109,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        /// Attempts to allocate pages in existing buffers or creates new ones if needed.
+        ///     Attempts to allocate pages in existing buffers or creates new ones if needed.
         /// </summary>
         /// <param name="pointCount">The total number of points.</param>
         /// <param name="numPages">The number of pages needed.</param>
@@ -128,7 +128,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        /// Releases an allocation from its buffer and removes the partition entry.
+        ///     Releases an allocation from its buffer and removes the partition entry.
         /// </summary>
         /// <param name="allocInfo">The allocation to release.</param>
         /// <param name="partitionPos">The partition position.</param>
@@ -138,7 +138,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        /// Throws if this manager has been disposed.
+        ///     Throws if this manager has been disposed.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Thrown if disposed.</exception>
         private void ThrowIfDisposed(){
@@ -146,7 +146,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        /// Creates and adds a new render buffer to this manager.
+        ///     Creates and adds a new render buffer to this manager.
         /// </summary>
         /// <returns>The newly created render buffer.</returns>
         private RenderBuffer AddNewBuffer(){
@@ -158,7 +158,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        /// Gets the point buffer at the specified index.
+        ///     Gets the point buffer at the specified index.
         /// </summary>
         /// <param name="bufferIndex">The index of the buffer.</param>
         /// <returns>The graphics buffer at the specified index.</returns>
@@ -174,7 +174,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        /// Rebuilds all render buffers that have pending state changes.
+        ///     Rebuilds all render buffers that have pending state changes.
         /// </summary>
         public void RebuildBuffers(){
             foreach (RenderBuffer buffer in _renderBuffers) buffer.RebuildBuffers();

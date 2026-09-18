@@ -1,5 +1,4 @@
 ﻿using Engine.Scripts.Data;
-using Engine.Scripts.Noise;
 using Engine.Scripts.Utils.Extensions;
 using Unity.Burst;
 using Unity.Collections;

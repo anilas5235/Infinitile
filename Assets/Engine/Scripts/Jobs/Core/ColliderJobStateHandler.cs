@@ -7,14 +7,14 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Core{
     /// <summary>
-    /// Job state handler for managing collider baking jobs for partitions.
-    /// Handles enqueuing, dispatching, and result collection for collider generation.
+    ///     Job state handler for managing collider baking jobs for partitions.
+    ///     Handles enqueuing, dispatching, and result collection for collider generation.
     /// </summary>
     internal class ColliderJobStateHandler : JobStateHandler<int3>{
         private readonly ColliderBakeScheduler _colliderBakeScheduler;
 
         /// <summary>
-        /// Initializes a new instance of the ColliderJobStateHandler class.
+        ///     Initializes a new instance of the ColliderJobStateHandler class.
         /// </summary>
         /// <param name="settings">The voxel engine settings.</param>
         /// <param name="chunkManager">The chunk manager reference.</param>
@@ -27,7 +27,7 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Updates focus and reprioritizes all queued partitions based on distance from focus.
+        ///     Updates focus and reprioritizes all queued partitions based on distance from focus.
         /// </summary>
         /// <param name="focus">The new focus position.</param>
         public override void FocusUpdate(PriorityUtil.Focus focus){
@@ -36,7 +36,7 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Enqueues partitions within update distance that need collider baking.
+        ///     Enqueues partitions within update distance that need collider baking.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if any partitions were enqueued, false if queue is empty.</returns>
@@ -55,7 +55,7 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Dispatches a batch of partitions to the collider bake scheduler.
+        ///     Dispatches a batch of partitions to the collider bake scheduler.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if jobs were dispatched or batch is full, false if scheduler is busy.</returns>
@@ -81,7 +81,7 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Collects results from completed collider baking.
+        ///     Collects results from completed collider baking.
         /// </summary>
         /// <returns>True if collection completed, false if scheduler is still working.</returns>
         protected override bool CollectResultsStep(){
@@ -93,25 +93,28 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Determines if a partition should be scheduled for collider baking.
+        ///     Determines if a partition should be scheduled for collider baking.
         /// </summary>
         /// <param name="position">The partition position to check.</param>
         /// <returns>True if partition needs collider baking and is not already queued.</returns>
-        private bool ShouldScheduleForBaking(int3 position) =>
-            ChunkManager.IsChunkLoaded(position.xz) &&
-            (!ChunkPool.IsCollidable(position) || ChunkManager.ShouldReCollide(position)) &&
-            !Set.Contains(position);
+        private bool ShouldScheduleForBaking(int3 position){
+            return ChunkManager.IsChunkLoaded(position.xz) &&
+                   (!ChunkPool.IsCollidable(position) || ChunkManager.ShouldReCollide(position)) &&
+                   !Set.Contains(position);
+        }
 
         /// <summary>
-        /// Checks if a partition's parent chunk is active (has mesh generated).
-        /// Required before collider baking can proceed.
+        ///     Checks if a partition's parent chunk is active (has mesh generated).
+        ///     Required before collider baking can proceed.
         /// </summary>
         /// <param name="position">The partition position to check.</param>
         /// <returns>True if the partition's chunk is active.</returns>
-        private bool CanBakeColliderForChunk(int3 position) => ChunkPool.IsPartitionActive(position);
+        private bool CanBakeColliderForChunk(int3 position){
+            return ChunkPool.IsPartitionActive(position);
+        }
 
         /// <summary>
-        /// Checks if a partition is still within relevant range of the focus.
+        ///     Checks if a partition is still within relevant range of the focus.
         /// </summary>
         /// <param name="position">The partition position to check.</param>
         /// <param name="focus">The current focus position.</param>

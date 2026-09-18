@@ -3,14 +3,14 @@ using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Settings;
-using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Core{
     /// <summary>
-    /// Central scheduler that orchestrates data, mesh, and collider jobs as a round-robin state machine.
-    /// Manages separate priority queues and selects batches according to scheduler settings.
+    ///     Central scheduler that orchestrates data, mesh, and collider jobs as a round-robin state machine.
+    ///     Manages separate priority queues and selects batches according to scheduler settings.
     /// </summary>
     public class VoxelEngineScheduler{
+        private readonly CMeshBuildScheduler _cMeshBuildScheduler;
         private readonly ChunkManager _chunkManager;
         private readonly ChunkPool _chunkPool;
         private readonly ChunkScheduler _chunkScheduler;
@@ -18,13 +18,12 @@ namespace Engine.Scripts.Jobs.Core{
         private readonly ColliderJobStateHandler _colliderJobHandler;
 
         private readonly DataJobStateHandler _dataJobHandler;
-        private readonly CMeshBuildScheduler _cMeshBuildScheduler;
         private readonly MeshJobStateHandler _meshJobHandler;
 
         private SchedulerUpdate _currentUpdate;
 
         /// <summary>
-        /// Creates a new scheduler and initializes all job queues and state handlers.
+        ///     Creates a new scheduler and initializes all job queues and state handlers.
         /// </summary>
         /// <param name="settings">The voxel engine settings.</param>
         /// <param name="cMeshBuildScheduler">The mesh build scheduler.</param>
@@ -56,8 +55,8 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Executes a scheduler tick. Processes queue updates, job dispatching, or result collection
-        /// depending on the current step in the round-robin cycle.
+        ///     Executes a scheduler tick. Processes queue updates, job dispatching, or result collection
+        ///     depending on the current step in the round-robin cycle.
         /// </summary>
         /// <param name="focus">The focus position (e.g., player chunk root).</param>
         internal void ScheduleUpdate(PriorityUtil.Focus focus){
@@ -77,7 +76,7 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Updates priorities of all queues and delegates focus update to managers/pool.
+        ///     Updates priorities of all queues and delegates focus update to managers/pool.
         /// </summary>
         /// <param name="focus">The new focus position.</param>
         internal void FocusUpdate(PriorityUtil.Focus focus){
@@ -89,14 +88,14 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Handles remesh requests by waking up the mesh job handler.
+        ///     Handles remesh requests by waking up the mesh job handler.
         /// </summary>
         private void OnRemesh(){
             _meshJobHandler.WakeUp();
         }
 
         /// <summary>
-        /// Cleans up all sub-scheduler resources and event handlers.
+        ///     Cleans up all sub-scheduler resources and event handlers.
         /// </summary>
         internal void Dispose(){
             _chunkScheduler.Dispose();
@@ -107,7 +106,7 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Enum representing the three job types in the round-robin scheduling cycle.
+        ///     Enum representing the three job types in the round-robin scheduling cycle.
         /// </summary>
         private enum SchedulerUpdate : byte{
             /// <summary>Data generation job update.</summary>
@@ -123,27 +122,27 @@ namespace Engine.Scripts.Jobs.Core{
         #region RuntimeStatsAPI
 
         /// <summary>
-        /// Gets the average execution time of data generation jobs.
+        ///     Gets the average execution time of data generation jobs.
         /// </summary>
         public float DataAvgTiming => _chunkScheduler.AvgTime;
 
         /// <summary>
-        /// Gets the average execution time of mesh building jobs.
+        ///     Gets the average execution time of mesh building jobs.
         /// </summary>
         public float MeshAvgTiming => _cMeshBuildScheduler.AvgTime;
 
         /// <summary>
-        /// Gets the number of chunks in the data generation queue.
+        ///     Gets the number of chunks in the data generation queue.
         /// </summary>
         public int DataQueueCount => _dataJobHandler.QueueCount;
 
         /// <summary>
-        /// Gets the number of partitions in the mesh building queue.
+        ///     Gets the number of partitions in the mesh building queue.
         /// </summary>
         public int MeshQueueCount => _meshJobHandler.QueueCount;
 
         /// <summary>
-        /// Gets the number of partitions in the collider baking queue.
+        ///     Gets the number of partitions in the collider baking queue.
         /// </summary>
         public int BakeQueueCount => _colliderJobHandler.QueueCount;
 
@@ -151,7 +150,7 @@ namespace Engine.Scripts.Jobs.Core{
     }
 
     /// <summary>
-    /// Enum representing the three steps in the scheduler state machine.
+    ///     Enum representing the three steps in the scheduler state machine.
     /// </summary>
     internal enum SchedulerStep{
         /// <summary>Updating and enqueuing new work items.</summary>

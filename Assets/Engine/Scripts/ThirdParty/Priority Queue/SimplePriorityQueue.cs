@@ -157,13 +157,17 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
             List<TItem> queueData = new();
             lock (_queue)
                 //Copy to a separate list because we don't want to 'yield return' inside a lock
+            {
                 foreach (SimpleNode node in _queue)
                     queueData.Add(node.Data);
+            }
 
             return queueData.GetEnumerator();
         }
 
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator(){
+            return GetEnumerator();
+        }
 
         /// <summary>
         ///     Given an item of type T, returns the existing SimpleNode in the queue

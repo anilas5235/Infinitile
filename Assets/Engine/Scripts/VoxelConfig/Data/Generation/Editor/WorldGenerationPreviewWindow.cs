@@ -15,50 +15,42 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
     public class WorldGenerationPreviewWindow : EditorWindow{
         private const int ViewResolution = 512;
         private static readonly int[] ResolutionOptions = { 128, 256, 512, 1024, 2048, 4096, 8192, 16384 };
-
-        private readonly List<VoxelDataPackage> _packages = new();
         private readonly List<Biome> _biomes = new();
 
-        private VoxelEngineSettings _settings;
+        private readonly List<VoxelDataPackage> _packages = new();
+        private bool _autoRebuild = true;
         private UnityEditor.Editor _biomeEditor;
 
         private Texture2D _biomeTexture;
-        private Texture2D _heightTexture;
+        private JobHandle _buildHandle;
+        private bool _buildInProgress;
         private Texture2D _climateTexture;
-        private Texture2D _humidityTemperatureTexture;
-
-        private int _selectedBiomeIndex;
-        private int _resolutionIndex;
-        private Vector2Int _worldOffset;
-        private bool _showHumidity = true;
-        private bool _showTemperature = true;
-        private bool _showContinental = true;
-        private float _phaseContinental = 0.5f;
-        private float _phaseElevation = 0.5f;
-        private bool _autoRebuild = true;
-        private bool _needsRebuild = true;
-        private bool _isDragging;
         private Vector2 _dragStartMouse;
         private Vector2Int _dragStartOffset;
-        private bool _buildInProgress;
-        private JobHandle _buildHandle;
 
         private GeneratorConfig _generatorConfig;
+        private Texture2D _heightTexture;
+        private Texture2D _humidityTemperatureTexture;
+        private bool _isDragging;
         private NativeArray<Color32> _jobBiomeColors;
         private NativeArray<Color32> _jobBiomePixels;
-        private NativeArray<Color32> _jobHeightPixels;
         private NativeArray<Color32> _jobClimatePixels;
+        private NativeArray<Color32> _jobHeightPixels;
         private NativeArray<Color32> _jobHumidityTemperaturePixels;
+        private bool _needsRebuild = true;
+        private float _phaseContinental = 0.5f;
+        private float _phaseElevation = 0.5f;
+        private int _resolutionIndex;
+
+        private int _selectedBiomeIndex;
+
+        private VoxelEngineSettings _settings;
+        private bool _showContinental = true;
+        private bool _showHumidity = true;
+        private bool _showTemperature = true;
+        private Vector2Int _worldOffset;
 
         private Vector2 windowSize;
-
-        [MenuItem("Infinitile/World Generation Preview")]
-        private static void OpenWindow(){
-            WorldGenerationPreviewWindow window = GetWindow<WorldGenerationPreviewWindow>();
-            window.titleContent = new GUIContent("World Gen Preview");
-            window.minSize = new Vector2(920f, 620f);
-            window.Show();
-        }
 
         private void OnEnable(){
             EditorApplication.update += OnEditorUpdate;
@@ -82,6 +74,19 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
             DestroyTexture(ref _humidityTemperatureTexture);
         }
 
+        private void OnDestroy(){
+            _generatorConfig.Dispose();
+            DisposeJobData();
+        }
+
+        [MenuItem("Infinitile/World Generation Preview")]
+        private static void OpenWindow(){
+            WorldGenerationPreviewWindow window = GetWindow<WorldGenerationPreviewWindow>();
+            window.titleContent = new GUIContent("World Gen Preview");
+            window.minSize = new Vector2(920f, 620f);
+            window.Show();
+        }
+
         private void OnEditorUpdate(){
             if (_buildInProgress && _buildHandle.IsCompleted){
                 FinalizeScheduledBuild(true);
@@ -89,11 +94,6 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
             }
 
             if (_autoRebuild && _needsRebuild && !_buildInProgress) ScheduleBuild();
-        }
-
-        private void OnDestroy(){
-            _generatorConfig.Dispose();
-            DisposeJobData();
         }
 
         #region Draw

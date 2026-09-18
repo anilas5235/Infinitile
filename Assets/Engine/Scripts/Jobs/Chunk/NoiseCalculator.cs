@@ -32,35 +32,14 @@ namespace Engine.Scripts.Jobs.Chunk{
             };
         }
 
-        public struct NoiseParameters : IDisposable{
-            public int Seed;
-            public float HumidityScale;
-            public float TemperatureScale;
-
-            [ReadOnly] public NoiseProfile ElevationProfile;
-
-            [ReadOnly] public WarpedNoiseLayer ContinentalLayer;
-
-            public void Dispose(){
-                ElevationProfile.Dispose();
-                ContinentalLayer.Dispose();
-            }
-        }
-
-        public struct WorldNoiseOutput{
-            public float Humidity;
-            public float Temperature;
-            public float Continental;
-            public float Elevation;
-        }
-
-        public static BiomeCalculator.BiomSectionInput BiomSectionInput(this WorldNoiseOutput worldNoise) =>
-            new(){
+        public static BiomeCalculator.BiomSectionInput BiomSectionInput(this WorldNoiseOutput worldNoise){
+            return new BiomeCalculator.BiomSectionInput{
                 Humidity = worldNoise.Humidity,
                 Temperature = worldNoise.Temperature,
                 Continental = worldNoise.Continental,
                 Elevation = worldNoise.Elevation
             };
+        }
 
         public static float GetNormalizedCNoise(float2 position, float2 seed, float scale){
             float2 samplePos = (position + seed) * scale;
@@ -82,6 +61,28 @@ namespace Engine.Scripts.Jobs.Chunk{
             }
 
             return raw;
+        }
+
+        public struct NoiseParameters : IDisposable{
+            public int Seed;
+            public float HumidityScale;
+            public float TemperatureScale;
+
+            [ReadOnly] public NoiseProfile ElevationProfile;
+
+            [ReadOnly] public WarpedNoiseLayer ContinentalLayer;
+
+            public void Dispose(){
+                ElevationProfile.Dispose();
+                ContinentalLayer.Dispose();
+            }
+        }
+
+        public struct WorldNoiseOutput{
+            public float Humidity;
+            public float Temperature;
+            public float Continental;
+            public float Elevation;
         }
     }
 }

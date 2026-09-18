@@ -21,14 +21,15 @@ namespace Engine.Scripts.Jobs.Chunk{
         private readonly ChunkManager _chunkManager;
         private readonly GeneratorConfig _config;
         private readonly VoxelWorld _world;
-        private JobHandle _handle;
-        private NativeList<int2> _jobs;
-        private NativeParallelHashMap<int2, ChunkVoxelData> _results;
 
         /// <summary>
         ///     Indicates whether the scheduler is ready to start a new chunk generation batch.
         /// </summary>
         internal bool IsReady = true;
+
+        private JobHandle _handle;
+        private NativeList<int2> _jobs;
+        private NativeParallelHashMap<int2, ChunkVoxelData> _results;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="ChunkScheduler" /> class with its own result collection.

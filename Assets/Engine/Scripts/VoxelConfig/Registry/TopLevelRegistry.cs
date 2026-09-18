@@ -12,6 +12,8 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         protected bool Initialized{ get; private set; }
         protected bool Finalized{ get; private set; }
 
+        public abstract void Dispose();
+
         protected void InternalInitialize(){
             if (Initialized) throw new InvalidOperationException("Registry is already initialized.");
             Initialized = true;
@@ -58,17 +60,22 @@ namespace Engine.Scripts.VoxelConfig.Registry{
 
         protected virtual void SubRegister(ushort id, FixedString32Bytes fullName, T so){ }
 
-        public bool TryGetId(FixedString32Bytes name, out ushort id) => NameRegistry.TryGetId(name, out id);
+        public bool TryGetId(FixedString32Bytes name, out ushort id){
+            return NameRegistry.TryGetId(name, out id);
+        }
 
-        public ushort GetIdOrThrow(FixedString32Bytes name) =>
-            TryGetId(name, out ushort id)
+        public ushort GetIdOrThrow(FixedString32Bytes name){
+            return TryGetId(name, out ushort id)
                 ? id
                 : throw new KeyNotFoundException($"{name} was not found in the registry.");
+        }
 
-        public bool TryGetName(ushort id, out FixedString32Bytes name) => NameRegistry.TryGet(id, out name);
+        public bool TryGetName(ushort id, out FixedString32Bytes name){
+            return NameRegistry.TryGet(id, out name);
+        }
 
-        public bool TryGet(ushort id, out T so) => SoRegistry.TryGet(id, out so);
-
-        public abstract void Dispose();
+        public bool TryGet(ushort id, out T so){
+            return SoRegistry.TryGet(id, out so);
+        }
     }
 }

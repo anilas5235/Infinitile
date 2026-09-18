@@ -2,20 +2,19 @@
 using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
-using Engine.Scripts.Utils.Logger;
 using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Core{
     /// <summary>
-    /// Job state handler for managing mesh building jobs for partitions.
-    /// Handles enqueuing, dispatching, and result collection for mesh generation.
+    ///     Job state handler for managing mesh building jobs for partitions.
+    ///     Handles enqueuing, dispatching, and result collection for mesh generation.
     /// </summary>
     internal class MeshJobStateHandler : JobStateHandler<int3>{
-        private readonly ColliderJobStateHandler _colliderJobHandler;
         private readonly CMeshBuildScheduler _cMeshBuildScheduler;
+        private readonly ColliderJobStateHandler _colliderJobHandler;
 
         /// <summary>
-        /// Initializes a new instance of the MeshJobStateHandler class.
+        ///     Initializes a new instance of the MeshJobStateHandler class.
         /// </summary>
         /// <param name="settings">The voxel engine settings.</param>
         /// <param name="chunkManager">The chunk manager reference.</param>
@@ -30,7 +29,7 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Updates focus and reprioritizes all queued partitions based on distance from focus.
+        ///     Updates focus and reprioritizes all queued partitions based on distance from focus.
         /// </summary>
         /// <param name="focus">The new focus position.</param>
         public override void FocusUpdate(PriorityUtil.Focus focus){
@@ -39,8 +38,8 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Enqueues partitions within draw distance that need mesh generation.
-        /// Only enqueues if the parent chunk has all neighboring chunks loaded.
+        ///     Enqueues partitions within draw distance that need mesh generation.
+        ///     Only enqueues if the parent chunk has all neighboring chunks loaded.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if any partitions were enqueued, false if queue is empty.</returns>
@@ -65,7 +64,7 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Dispatches a batch of partitions to the mesh build scheduler.
+        ///     Dispatches a batch of partitions to the mesh build scheduler.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if jobs were dispatched or batch is full, false if scheduler is busy.</returns>
@@ -94,7 +93,7 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Collects results from completed mesh building and wakes up the collider handler.
+        ///     Collects results from completed mesh building and wakes up the collider handler.
         /// </summary>
         /// <returns>True if collection completed, false if scheduler is still working.</returns>
         protected override bool CollectResultsStep(){
@@ -107,8 +106,8 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Checks if all neighboring chunks are loaded for a given chunk position.
-        /// Required before mesh generation can proceed.
+        ///     Checks if all neighboring chunks are loaded for a given chunk position.
+        ///     Required before mesh generation can proceed.
         /// </summary>
         /// <param name="position">The chunk position to check.</param>
         /// <returns>True if the chunk and all neighbors are loaded.</returns>
@@ -125,17 +124,18 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        /// Determines if a partition should be scheduled for meshing.
+        ///     Determines if a partition should be scheduled for meshing.
         /// </summary>
         /// <param name="position">The partition position to check.</param>
         /// <returns>True if partition needs meshing and is not already queued.</returns>
-        private bool ShouldScheduleForMeshing(int3 position) =>
-            ChunkManager.IsChunkLoaded(position.xz) &&
-            (!ChunkPool.IsPartitionActive(position) || ChunkManager.ShouldReMesh(position)) &&
-            !Set.Contains(position);
+        private bool ShouldScheduleForMeshing(int3 position){
+            return ChunkManager.IsChunkLoaded(position.xz) &&
+                   (!ChunkPool.IsPartitionActive(position) || ChunkManager.ShouldReMesh(position)) &&
+                   !Set.Contains(position);
+        }
 
         /// <summary>
-        /// Checks if a partition is still within relevant range and priority threshold of the focus.
+        ///     Checks if a partition is still within relevant range and priority threshold of the focus.
         /// </summary>
         /// <param name="position">The partition position to check.</param>
         /// <param name="focus">The current focus position.</param>
