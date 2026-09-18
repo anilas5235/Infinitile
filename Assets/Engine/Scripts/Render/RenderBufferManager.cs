@@ -6,14 +6,12 @@ using Unity.Mathematics;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
 
-namespace Engine.Scripts.Render
-{
+namespace Engine.Scripts.Render{
     /// <summary>
     /// Manages multiple render buffers for a specific material, handling page allocation and rendering.
     /// Automatically creates new buffers when capacity is exceeded.
     /// </summary>
-    public class RenderBufferManager : IDisposable
-    {
+    public class RenderBufferManager : IDisposable{
         private readonly List<RenderBuffer> _renderBuffers = new();
         private readonly Material _material;
         private readonly Dictionary<int3, AllocInfo> _partitionAllocations = new();
@@ -28,8 +26,7 @@ namespace Engine.Scripts.Render
         /// <param name="renderSettings">The renderer settings.</param>
         /// <param name="initialBuffers">The initial number of buffers to create. Defaults to 1.</param>
         public RenderBufferManager(Material mat, ComputeShader rebuildBufferShader, RendererSettings renderSettings,
-            int initialBuffers = 1)
-        {
+            int initialBuffers = 1){
             _material = mat;
             _renderSettings = renderSettings;
             RebuildBufferShader = rebuildBufferShader;
@@ -40,18 +37,17 @@ namespace Engine.Scripts.Render
         /// <summary>
         /// Gets the compute shader used for rebuilding buffers.
         /// </summary>
-        internal ComputeShader RebuildBufferShader { get; private set; }
-        
+        internal ComputeShader RebuildBufferShader{ get; private set; }
+
         /// <summary>
         /// Gets the kernel index for the rebuild operation.
         /// </summary>
-        internal int RebuildKernel { get; private set; }
+        internal int RebuildKernel{ get; private set; }
 
         /// <summary>
         /// Releases all GPU resources held by this manager.
         /// </summary>
-        public void Dispose()
-        {
+        public void Dispose(){
             if (_isDisposed) return;
 
             foreach (RenderBuffer buffer in _renderBuffers) buffer.Dispose();
@@ -65,8 +61,7 @@ namespace Engine.Scripts.Render
         /// Draws all render buffers using the specified camera.
         /// </summary>
         /// <param name="cam">The camera to render with.</param>
-        public void Draw(Camera cam)
-        {
+        public void Draw(Camera cam){
             foreach (RenderBuffer renderBuffer in _renderBuffers) renderBuffer.Draw(_material, cam);
         }
 
@@ -78,16 +73,14 @@ namespace Engine.Scripts.Render
         /// <returns>Allocation information, or default if pointCount is 0.</returns>
         /// <exception cref="ObjectDisposedException">Thrown if this manager has been disposed.</exception>
         /// <exception cref="ArgumentOutOfRangeException">Thrown if pointCount is negative.</exception>
-        public AllocInfo AllocBufferSpace(int3 partitionPos, int pointCount)
-        {
+        public AllocInfo AllocBufferSpace(int3 partitionPos, int pointCount){
             ThrowIfDisposed();
 
             if (pointCount < 0) throw new ArgumentOutOfRangeException(nameof(pointCount), "Point count must be >= 0.");
 
             bool hasAlloc = _partitionAllocations.TryGetValue(partitionPos, out AllocInfo allocInfo);
 
-            if (pointCount == 0)
-            {
+            if (pointCount == 0){
                 if (hasAlloc) Release(allocInfo, partitionPos);
                 return default;
             }
@@ -106,8 +99,7 @@ namespace Engine.Scripts.Render
         /// <param name="partitionPos">The position of the partition.</param>
         /// <returns>True if a partition was released, false if no allocation existed.</returns>
         /// <exception cref="ObjectDisposedException">Thrown if this manager has been disposed.</exception>
-        public bool ReleasePartition(int3 partitionPos)
-        {
+        public bool ReleasePartition(int3 partitionPos){
             ThrowIfDisposed();
 
             if (!_partitionAllocations.TryGetValue(partitionPos, out AllocInfo allocInfo)) return false;
@@ -122,12 +114,10 @@ namespace Engine.Scripts.Render
         /// <param name="pointCount">The total number of points.</param>
         /// <param name="numPages">The number of pages needed.</param>
         /// <returns>The allocation info for the allocated pages.</returns>
-        private AllocInfo AllocPages(int pointCount, int numPages)
-        {
+        private AllocInfo AllocPages(int pointCount, int numPages){
             bool success = false;
             AllocInfo allocation = default;
-            foreach (RenderBuffer rBuffer in _renderBuffers)
-            {
+            foreach (RenderBuffer rBuffer in _renderBuffers){
                 success = rBuffer.TryAllocPages(pointCount, numPages, out allocation);
                 if (success) break;
             }
@@ -142,8 +132,7 @@ namespace Engine.Scripts.Render
         /// </summary>
         /// <param name="allocInfo">The allocation to release.</param>
         /// <param name="partitionPos">The partition position.</param>
-        private void Release(in AllocInfo allocInfo, in int3 partitionPos)
-        {
+        private void Release(in AllocInfo allocInfo, in int3 partitionPos){
             _renderBuffers[allocInfo.BufferIndex].ClearPage(allocInfo);
             _partitionAllocations.Remove(partitionPos);
         }
@@ -152,8 +141,7 @@ namespace Engine.Scripts.Render
         /// Throws if this manager has been disposed.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Thrown if disposed.</exception>
-        private void ThrowIfDisposed()
-        {
+        private void ThrowIfDisposed(){
             if (_isDisposed) throw new ObjectDisposedException(nameof(RenderBufferManager));
         }
 
@@ -161,8 +149,7 @@ namespace Engine.Scripts.Render
         /// Creates and adds a new render buffer to this manager.
         /// </summary>
         /// <returns>The newly created render buffer.</returns>
-        private RenderBuffer AddNewBuffer()
-        {
+        private RenderBuffer AddNewBuffer(){
             RenderBuffer rBuffer = new(this, _renderBuffers.Count, _renderSettings);
             _renderBuffers.Add(rBuffer);
             VoxelEngineLogger.Info<RenderBufferManager>(
@@ -177,8 +164,7 @@ namespace Engine.Scripts.Render
         /// <returns>The graphics buffer at the specified index.</returns>
         /// <exception cref="ObjectDisposedException">Thrown if disposed.</exception>
         /// <exception cref="ArgumentOutOfRangeException">Thrown if bufferIndex is invalid.</exception>
-        public GraphicsBuffer GetBuffer(int bufferIndex)
-        {
+        public GraphicsBuffer GetBuffer(int bufferIndex){
             ThrowIfDisposed();
 
             if (bufferIndex < 0 || bufferIndex >= _renderBuffers.Count)
@@ -190,8 +176,7 @@ namespace Engine.Scripts.Render
         /// <summary>
         /// Rebuilds all render buffers that have pending state changes.
         /// </summary>
-        public void RebuildBuffers()
-        {
+        public void RebuildBuffers(){
             foreach (RenderBuffer buffer in _renderBuffers) buffer.RebuildBuffers();
         }
     }

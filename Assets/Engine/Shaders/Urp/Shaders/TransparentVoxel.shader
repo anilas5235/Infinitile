@@ -144,7 +144,7 @@
 
                 // --- Alpha clip ---
                 clip(alpha - 0.001f);
-                
+
                 // --- Final colour ---
                 return half4(ao_color.rgb * sun_light * glow, alpha);
             }

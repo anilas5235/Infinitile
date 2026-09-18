@@ -12,16 +12,14 @@ using UnityEngine;
 using Biome = Engine.Scripts.VoxelConfig.Data.Generation.Biome;
 using FixedString32Bytes = Unity.Collections.FixedString32Bytes;
 
-namespace Engine.Scripts.VoxelConfig
-{
+namespace Engine.Scripts.VoxelConfig{
     /// <summary>
     ///     Loads all <see cref="VoxelDataPackage" /> assets from Resources, registers their definitions in the
     ///     <see cref="VoxelRegistry" />, and updates materials with texture atlas and mesh layer information.
     ///     The singleton lifecycle controls the registry lifetime.
     /// </summary>
     [DefaultExecutionOrder(-1000)]
-    public class DataImporter : Singleton<DataImporter>
-    {
+    public class DataImporter : Singleton<DataImporter>{
         public VoxelWorld world;
 
         /// <summary>
@@ -42,19 +40,18 @@ namespace Engine.Scripts.VoxelConfig
         /// <summary>
         ///     Registry containing all registered <see cref="Voxel" /> instances.
         /// </summary>
-        public VoxelRegistry VoxelRegistry { get; } = new();
+        public VoxelRegistry VoxelRegistry{ get; } = new();
 
-        public BiomeRegistry BiomeRegistry { get; } = new();
+        public BiomeRegistry BiomeRegistry{ get; } = new();
 
-        public VoxelStructureRegistry VoxelStructureRegistry { get; } = new();
+        public VoxelStructureRegistry VoxelStructureRegistry{ get; } = new();
 
         private Dictionary<FixedString32Bytes, VoxelDataPackage> _voxelPackages;
 
         /// <summary>
         ///     Loads packages, registers voxels and updates materials when the importer is created.
         /// </summary>
-        protected override void Awake()
-        {
+        protected override void Awake(){
             base.Awake();
             _voxelPackages = FindPackages();
             LoadVoxels();
@@ -65,22 +62,17 @@ namespace Engine.Scripts.VoxelConfig
             world.gameObject.SetActive(true);
         }
 
-        private Dictionary<FixedString32Bytes, VoxelDataPackage> FindPackages()
-        {
+        private Dictionary<FixedString32Bytes, VoxelDataPackage> FindPackages(){
             Dictionary<FixedString32Bytes, VoxelDataPackage> packages = new();
 
             VoxelDataPackage[] voxelDataPackages = Resources.LoadAll<VoxelDataPackage>("VoxelDataPackages");
 
             if (voxelDataPackages == null || voxelDataPackages.Length == 0)
-            {
                 throw new InvalidOperationException("No VoxelDataPackage found in Resources/VoxelDataPackages.");
-            }
 
-            foreach (VoxelDataPackage package in voxelDataPackages)
-            {
+            foreach (VoxelDataPackage package in voxelDataPackages){
                 FixedString32Bytes prefix = package.packagePrefix;
-                if (prefix.IsEmpty)
-                {
+                if (prefix.IsEmpty){
                     VoxelEngineLogger.Warn<DataImporter>("VoxelDataPackage prefix is empty. Package will be ignored.");
                     continue;
                 }
@@ -93,18 +85,14 @@ namespace Engine.Scripts.VoxelConfig
             return packages;
         }
 
-        private void LoadVoxels()
-        {
+        private void LoadVoxels(){
             Texture2D texError = Resources.Load<Texture2D>("Artwork/TexError");
             Texture2D texErrorT = Resources.Load<Texture2D>("Artwork/TexErrorT");
             VoxelRegistry.Initialize(texError, texErrorT, texErrorT);
 
-            foreach ((FixedString32Bytes prefix, VoxelDataPackage package) in _voxelPackages)
-            {
-                foreach (Voxel definition in package.voxel)
-                {
-                    if (!definition)
-                    {
+            foreach ((FixedString32Bytes prefix, VoxelDataPackage package) in _voxelPackages){
+                foreach (Voxel definition in package.voxel){
+                    if (!definition){
                         VoxelEngineLogger.Warn<DataImporter>("Found null VoxelDefinition in package: " + prefix);
                         continue;
                     }
@@ -114,16 +102,12 @@ namespace Engine.Scripts.VoxelConfig
             }
         }
 
-        private void LoadBioms()
-        {
+        private void LoadBioms(){
             BiomeRegistry.Initialize();
 
-            foreach ((FixedString32Bytes prefix, VoxelDataPackage package) in _voxelPackages)
-            {
-                foreach (Biome biome in package.biomes)
-                {
-                    if (!biome)
-                    {
+            foreach ((FixedString32Bytes prefix, VoxelDataPackage package) in _voxelPackages){
+                foreach (Biome biome in package.biomes){
+                    if (!biome){
                         VoxelEngineLogger.Warn<DataImporter>("Found null BiomeDefinition in package: " + prefix);
                         continue;
                     }
@@ -133,16 +117,12 @@ namespace Engine.Scripts.VoxelConfig
             }
         }
 
-        private void LoadVoxelStructures()
-        {
+        private void LoadVoxelStructures(){
             VoxelStructureRegistry.Initialize();
 
-            foreach ((FixedString32Bytes prefix, VoxelDataPackage package) in _voxelPackages)
-            {
-                foreach (VoxelStructure structure in package.structures)
-                {
-                    if (!structure)
-                    {
+            foreach ((FixedString32Bytes prefix, VoxelDataPackage package) in _voxelPackages){
+                foreach (VoxelStructure structure in package.structures){
+                    if (!structure){
                         VoxelEngineLogger.Warn<DataImporter>(
                             "Found null VoxelStructureDefinition in package: " + prefix);
                         continue;
@@ -153,8 +133,7 @@ namespace Engine.Scripts.VoxelConfig
             }
         }
 
-        private void SetUpRenderData()
-        {
+        private void SetUpRenderData(){
             VoxelRegistry.FinalizeRegistry();
 
             VoxelRegistry.ApplyToMaterial(voxelSolidMaterial, MeshLayer.Solid);
@@ -162,8 +141,7 @@ namespace Engine.Scripts.VoxelConfig
             VoxelRegistry.ApplyToMaterial(voxelFoliageMaterial, MeshLayer.Foliage);
         }
 
-        private void SetUpGenerationData()
-        {
+        private void SetUpGenerationData(){
             BiomeRegistry.FinalizeRegistry(VoxelRegistry);
             VoxelStructureRegistry.FinalizeRegistry(VoxelRegistry);
         }
@@ -171,8 +149,7 @@ namespace Engine.Scripts.VoxelConfig
         /// <summary>
         ///     Disposes the registry when the importer is destroyed.
         /// </summary>
-        protected override void OnDestroy()
-        {
+        protected override void OnDestroy(){
             base.OnDestroy();
             VoxelRegistry.Dispose();
             BiomeRegistry.Dispose();
@@ -183,12 +160,10 @@ namespace Engine.Scripts.VoxelConfig
         ///     Creates a <see cref="GeneratorConfig" /> with resolved voxel IDs for procedural world generation.
         /// </summary>
         /// <returns>Filled generator configuration structure.</returns>
-        public GeneratorConfig CreateConfig()
-        {
-            GeneratorConfig config = new()
-            {
+        public GeneratorConfig CreateConfig(){
+            GeneratorConfig config = new(){
                 BiomeDefs = BiomeRegistry.BiomeArray,
-                Voxels = VoxelRegistry.VoxelMap,
+                Voxels = VoxelRegistry.VoxelMap
             };
 
             return config;

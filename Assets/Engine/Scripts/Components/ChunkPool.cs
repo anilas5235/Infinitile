@@ -12,14 +12,12 @@ using static Engine.Scripts.Jobs.Core.PriorityUtil;
 using static Engine.Scripts.Utils.VoxelConstants;
 using Object = UnityEngine.Object;
 
-namespace Engine.Scripts.Components
-{
+namespace Engine.Scripts.Components{
     /// <summary>
     ///     Pool for <see cref="ChunkBehaviour" /> instances (render + collider). Handles activation & reclamation.
     ///     Uses a priority queue ordered by distance to focus for eviction.
     /// </summary>
-    internal class ChunkPool
-    {
+    internal class ChunkPool{
         internal Action<int2> OnChunkEvicted;
         internal Action<int3> OnPartitionEvicted;
 
@@ -40,8 +38,7 @@ namespace Engine.Scripts.Components
         /// <summary>
         ///     Constructs a pool based on draw/update distances.
         /// </summary>
-        internal ChunkPool(Transform transform, VoxelEngineSettings settings)
-        {
+        internal ChunkPool(Transform transform, VoxelEngineSettings settings){
             _chunkPoolSize = (settings.Chunk.DrawDistance + 2).SquareSize();
             _chunkMap = new Dictionary<int2, ChunkBehaviour>(_chunkPoolSize);
 
@@ -56,8 +53,7 @@ namespace Engine.Scripts.Components
             _colliderQueue = new SimpleFastPriorityQueue<int3, float>();
 
             _pool = new ObjectPool<ChunkBehaviour>(
-                () =>
-                {
+                () => {
                     GameObject go = Object.Instantiate(settings.Chunk.ChunkPrefab, transform);
                     go.SetActive(false);
                     ChunkBehaviour chunkBehaviour = go.GetComponent<ChunkBehaviour>();
@@ -80,8 +76,7 @@ namespace Engine.Scripts.Components
         /// <summary>
         ///     Updates focus and queue priorities.
         /// </summary>
-        internal void FocusUpdate(Focus focus)
-        {
+        internal void FocusUpdate(Focus focus){
             _focus = focus;
             _chunkQueue.UpdateAllPriorities(PriorityCalc);
             _partitionQueue.UpdateAllPriorities(PriorityCalc);
@@ -100,20 +95,16 @@ namespace Engine.Scripts.Components
         /// <summary>
         ///     Returns existing instance or claims a new one.
         /// </summary>
-        private ChunkBehaviour GetOrClaimChunk(int2 position)
-        {
-            return IsChunkActive(position) ? _chunkMap[position] : ClaimChunk(position);
-        }
+        private ChunkBehaviour GetOrClaimChunk(int2 position) =>
+            IsChunkActive(position) ? _chunkMap[position] : ClaimChunk(position);
 
         /// <summary>
         ///     Claims a new instance; evicts oldest if capacity reached.
         /// </summary>
-        private ChunkBehaviour ClaimChunk(int2 position)
-        {
+        private ChunkBehaviour ClaimChunk(int2 position){
             if (_chunkMap.ContainsKey(position))
                 throw new InvalidOperationException($"Chunk ({position}) already active");
-            if (_chunkQueue.Count >= _chunkPoolSize)
-            {
+            if (_chunkQueue.Count >= _chunkPoolSize){
                 int2 reclaim = _chunkQueue.Dequeue();
                 ReclaimChunk(reclaim);
             }
@@ -126,22 +117,17 @@ namespace Engine.Scripts.Components
             return behaviour;
         }
 
-        internal float GetPartitionPrioThreshold()
-        {
-            return _partitionQueue.Count < _partitionPoolSize
+        internal float GetPartitionPrioThreshold() =>
+            _partitionQueue.Count < _partitionPoolSize
                 ? float.MinValue
                 : PriorityCalc(_partitionQueue.First);
-        }
 
-        internal ChunkPartition GetOrClaimPartition(int3 position)
-        {
-            return IsPartitionActive(position) ? GetPartition(position) : ClaimPartition(position);
-        }
+        internal ChunkPartition GetOrClaimPartition(int3 position) =>
+            IsPartitionActive(position) ? GetPartition(position) : ClaimPartition(position);
 
         public ChunkPartition GetPartition(int3 pos) => _meshMap[pos];
 
-        private ChunkPartition ClaimPartition(int3 position)
-        {
+        private ChunkPartition ClaimPartition(int3 position){
             if (_meshMap.ContainsKey(position))
                 throw new InvalidOperationException($"Partition ({position}) already active");
 
@@ -159,15 +145,13 @@ namespace Engine.Scripts.Components
             return partition;
         }
 
-        private void ReclaimChunk(int2 reclaim)
-        {
+        private void ReclaimChunk(int2 reclaim){
             ChunkBehaviour reclaimBehaviour = _chunkMap[reclaim];
             reclaimBehaviour.ClearData();
             _pool.Release(reclaimBehaviour);
             _chunkMap.Remove(reclaim);
 
-            for (int pId = 0; pId < PartitionsPerChunk; pId++)
-            {
+            for (int pId = 0; pId < PartitionsPerChunk; pId++){
                 int3 partitionPos = new(reclaim.x, pId, reclaim.y);
                 ReclaimPartition(partitionPos);
             }
@@ -175,10 +159,8 @@ namespace Engine.Scripts.Components
             if (_emitEvictionEvents) OnChunkEvicted?.Invoke(reclaim);
         }
 
-        private void ReclaimPartition(int3 partitionPos)
-        {
-            if (_meshMap.TryGetValue(partitionPos, out ChunkPartition reclaimPartition))
-            {
+        private void ReclaimPartition(int3 partitionPos){
+            if (_meshMap.TryGetValue(partitionPos, out ChunkPartition reclaimPartition)){
                 reclaimPartition.Clear();
                 _meshMap.Remove(partitionPos);
             }
@@ -195,8 +177,7 @@ namespace Engine.Scripts.Components
         /// </summary>
         internal void ColliderBaked(int3 position) => _colliderSet.Add(position);
 
-        internal void Dispose()
-        {
+        internal void Dispose(){
             _emitEvictionEvents = false;
             OnChunkEvicted = null;
             OnPartitionEvicted = null;

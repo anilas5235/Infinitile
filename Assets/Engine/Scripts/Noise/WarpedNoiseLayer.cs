@@ -3,8 +3,7 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;
 
-namespace Engine.Scripts.Noise
-{
+namespace Engine.Scripts.Noise{
     /// <summary>
     ///     Encapsulates a single "warped, redistributed" noise layer: a base fBm noise,
     ///     domain-warped via two secondary noise profiles, then remapped through a
@@ -13,8 +12,7 @@ namespace Engine.Scripts.Noise
     ///     distribution matter.
     /// </summary>
     [BurstCompile]
-    public struct WarpedNoiseLayer : IDisposable
-    {
+    public struct WarpedNoiseLayer : IDisposable{
         private NoiseProfile _baseNoise;
         private NoiseProfile _warpX;
         private NoiseProfile _warpY;
@@ -25,8 +23,7 @@ namespace Engine.Scripts.Noise
         ///     Builds the layer and allocates the redistribution curve with the given allocator.
         ///     Caller owns the resulting NativeArray and must call <see cref="Dispose" />.
         /// </summary>
-        public WarpedNoiseLayer(Settings settings)
-        {
+        public WarpedNoiseLayer(Settings settings){
             _baseNoise = new NoiseProfile(settings.BaseNoise);
 
             NoiseProfile.Settings warpSettingsX = settings.WarpNoise;
@@ -39,10 +36,8 @@ namespace Engine.Scripts.Noise
 
             float2[] points = settings.RedistributionPoints;
             if (points == null || points.Length == 0)
-            {
                 // Identity curve fallback: 0->0, 1->1, no remapping.
-                points = new[] { new float2(0f, 0f), new float2(1f, 1f) };
-            }
+                points = new[]{ new float2(0f, 0f), new float2(1f, 1f) };
 
             _redistributionCurve = new NativeArray<float2>(points, Allocator.Domain);
         }
@@ -50,45 +45,29 @@ namespace Engine.Scripts.Noise
         /// <summary>
         ///     Evaluates the fully processed noise value (warped + redistributed) at the given position.
         /// </summary>
-        public float GetNoise(float2 position)
-        {
+        public float GetNoise(float2 position){
             float2 warpedPos = WarpPosition(position);
             float raw = _baseNoise.GetNoise(warpedPos);
             return ApplyRedistribution(raw);
         }
 
-        private float2 WarpPosition(float2 position)
-        {
-            if (_warpStrength <= 0f)
-            {
-                return position;
-            }
+        private float2 WarpPosition(float2 position){
+            if (_warpStrength <= 0f) return position;
 
             float wx = _warpX.GetNoise(position) * 2f - 1f;
             float wy = _warpY.GetNoise(position) * 2f - 1f;
             return position + new float2(wx, wy) * _warpStrength;
         }
 
-        private float ApplyRedistribution(float raw)
-        {
+        private float ApplyRedistribution(float raw){
             int last = _redistributionCurve.Length - 1;
 
-            if (raw <= _redistributionCurve[0].x)
-            {
-                return _redistributionCurve[0].y;
-            }
+            if (raw <= _redistributionCurve[0].x) return _redistributionCurve[0].y;
 
-            if (raw >= _redistributionCurve[last].x)
-            {
-                return _redistributionCurve[last].y;
-            }
+            if (raw >= _redistributionCurve[last].x) return _redistributionCurve[last].y;
 
-            for (int i = 1; i <= last; i++)
-            {
-                if (raw > _redistributionCurve[i].x)
-                {
-                    continue;
-                }
+            for (int i = 1; i <= last; i++){
+                if (raw > _redistributionCurve[i].x) continue;
 
                 float2 a = _redistributionCurve[i - 1];
                 float2 b = _redistributionCurve[i];
@@ -103,17 +82,16 @@ namespace Engine.Scripts.Noise
         ///     Releases the redistribution curve's native memory. Must be called once
         ///     this layer is no longer needed (matching the allocator lifetime rules).
         /// </summary>
-        public void Dispose()
-        {
-            if (_redistributionCurve.IsCreated)
-            {
-                _redistributionCurve.Dispose();
-            }
+        public void Dispose(){
+            if (_redistributionCurve.IsCreated) _redistributionCurve.Dispose();
+
+            _baseNoise.Dispose();
+            _warpX.Dispose();
+            _warpY.Dispose();
         }
 
         [Serializable]
-        public struct Settings
-        {
+        public struct Settings{
             /// <summary>Settings for the primary fBm noise (frequency/octaves/etc).</summary>
             public NoiseProfile.Settings BaseNoise;
 

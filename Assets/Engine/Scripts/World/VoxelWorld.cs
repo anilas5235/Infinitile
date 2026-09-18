@@ -15,20 +15,17 @@ using Engine.Scripts.VoxelConfig;
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Engine.Scripts.World
-{
+namespace Engine.Scripts.World{
     /// <summary>
     ///     Top-level world controller that wires together chunk generation, meshing and colliders
     ///     and exposes a simple API for querying and modifying voxels around a focus transform.
     /// </summary>
     [DefaultExecutionOrder(-101)]
-    public class VoxelWorld : Singleton<VoxelWorld>
-    {
-        
+    public class VoxelWorld : Singleton<VoxelWorld>{
         [SerializeField] private Transform focus;
 
         [SerializeField] private VoxelEngineSettings settings;
-        
+
         [SerializeField] public bool ShowGizmos;
 
         private VoxelEngineScheduler _scheduler;
@@ -59,7 +56,7 @@ namespace Engine.Scripts.World
         internal void RaisePartitionEvicted(int3 partitionPos) => PartitionEvicted?.Invoke(partitionPos);
 
         internal void RequestPartitionBuild(HashSet<int3> partitions) => PartitionBuildRequested?.Invoke(partitions);
-       
+
         /// <summary>
         ///     Gets the voxel ID at the given world voxel position.
         /// </summary>
@@ -76,15 +73,14 @@ namespace Engine.Scripts.World
         /// <returns><c>true</c> if the voxel could be set; otherwise, <c>false</c>.</returns>
         public bool SetVoxel(ushort voxelId, Vector3Int position, bool remesh = true) =>
             ChunkManager.SetVoxel(voxelId, position.Int3(), remesh);
-        
+
         public bool IsCollidable(int3 pos) => _chunkPool.IsPartitionActive(pos) && _chunkPool.IsCollidable(pos);
 
         /// <summary>
         ///     Adjusts derived chunk settings such as load and update distance based on the
         ///     configured draw distance.
         /// </summary>
-        private void ConfigureSettings()
-        {
+        private void ConfigureSettings(){
             settings.Chunk.LoadDistance = settings.Chunk.DrawDistance + 2;
             settings.Chunk.UpdateDistance = math.max(settings.Chunk.DrawDistance - 2, 2);
         }
@@ -93,8 +89,7 @@ namespace Engine.Scripts.World
         ///     Constructs all engine components (noise profile, chunk manager, pools and schedulers)
         ///     via the <see cref="VoxelEngineProvider" />.
         /// </summary>
-        private void ConstructEngineComponents()
-        {
+        private void ConstructEngineComponents(){
             ChunkManager = VoxelEngineProvider.Current.ChunkManager();
             ChunkManager.OnChunkChange += RaiseChunkChanged;
 
@@ -129,23 +124,20 @@ namespace Engine.Scripts.World
             );
         }
 
-        private void HandleChunkEvicted(int2 chunkPos)
-        {
+        private void HandleChunkEvicted(int2 chunkPos){
             if (_isShuttingDown) return;
 
             ChunkManager.UnloadChunk(chunkPos);
             RaiseChunkEvicted(chunkPos);
         }
 
-        private void HandlePartitionEvicted(int3 partitionPos)
-        {
+        private void HandlePartitionEvicted(int3 partitionPos){
             if (_isShuttingDown) return;
 
             RaisePartitionEvicted(partitionPos);
         }
 
-        private void TryFocusUpdate()
-        {
+        private void TryFocusUpdate(){
             if (!_isFocused) return;
             PriorityUtil.Focus newFocus = new(VoxelConstants.WorldToPartitionPos(focus.position.Int3()),
                 focus.forward.Float3());
@@ -160,12 +152,12 @@ namespace Engine.Scripts.World
         /// <summary>
         ///     The partition coordinates of the current focus position.
         /// </summary>
-        public PriorityUtil.Focus Focus { get; private set; }
+        public PriorityUtil.Focus Focus{ get; private set; }
 
         /// <summary>
         ///     Gets the chunk manager that stores and accesses chunk data.
         /// </summary>
-        public ChunkManager ChunkManager { get; private set; }
+        public ChunkManager ChunkManager{ get; private set; }
 
         public VoxelEngineSettings Settings => settings;
 
@@ -177,11 +169,9 @@ namespace Engine.Scripts.World
         ///     Initializes the singleton, configures engine settings via the provider
         ///     and constructs all core engine components.
         /// </summary>
-        protected override void Awake()
-        {
+        protected override void Awake(){
             base.Awake();
-            VoxelEngineProvider.Initialize(new VoxelEngineProvider(), provider =>
-            {
+            VoxelEngineProvider.Initialize(new VoxelEngineProvider(), provider => {
                 ConfigureSettings();
                 provider.Settings = settings;
             });
@@ -191,14 +181,12 @@ namespace Engine.Scripts.World
             Focus = new PriorityUtil.Focus(new int3(1, 1, 1) * int.MinValue, new float3(0, 0, 1));
         }
 
-        private void OnEnable()
-        {
+        private void OnEnable(){
             if (_focusUpdateRoutine != null) StopCoroutine(_focusUpdateRoutine);
             _focusUpdateRoutine = StartCoroutine(FocusUpdateRoutine());
         }
 
-        private void OnDisable()
-        {
+        private void OnDisable(){
             if (_focusUpdateRoutine != null) StopCoroutine(_focusUpdateRoutine);
             _focusUpdateRoutine = null;
         }
@@ -206,26 +194,22 @@ namespace Engine.Scripts.World
         /// <summary>
         ///     Initializes focus state once all objects are created.
         /// </summary>
-        private void Start()
-        {
+        private void Start(){
             _isFocused = focus;
             TryFocusUpdate();
         }
 
-        private void Update()
-        {
+        private void Update(){
             _scheduler.ScheduleUpdate(Focus);
         }
 
         /// <summary>
         ///     Cleans up engine components and disposes schedulers on destruction.
         /// </summary>
-        protected override void OnDestroy()
-        {
+        protected override void OnDestroy(){
             _isShuttingDown = true;
             if (ChunkManager != null) ChunkManager.OnChunkChange -= RaiseChunkChanged;
-            if (_chunkPool != null)
-            {
+            if (_chunkPool != null){
                 _chunkPool.OnChunkEvicted -= HandleChunkEvicted;
                 _chunkPool.OnPartitionEvicted -= HandlePartitionEvicted;
                 _chunkPool.Dispose();
@@ -236,10 +220,8 @@ namespace Engine.Scripts.World
             ChunkManager?.Dispose();
         }
 
-        private IEnumerator FocusUpdateRoutine()
-        {
-            while (true)
-            {
+        private IEnumerator FocusUpdateRoutine(){
+            while (true){
                 yield return new WaitForSeconds(.5f);
                 TryFocusUpdate();
             }

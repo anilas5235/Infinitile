@@ -10,48 +10,37 @@ using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using UnityEngine;
 
-namespace Engine.Scripts.Utils
-{
+namespace Engine.Scripts.Utils{
     /// <summary>
     ///     Factory/provider for core voxel engine subsystems (manager, schedulers, pools, noise profile).
     ///     Supplies configured instances based on <see cref="VoxelEngineSettings" />.
     /// </summary>
-    public class VoxelEngineProvider : Provider<VoxelEngineProvider>
-    {
+    public class VoxelEngineProvider : Provider<VoxelEngineProvider>{
         /// <summary>
         ///     Global engine configuration (seed, noise, chunk, renderer, scheduler settings).
         /// </summary>
-        public VoxelEngineSettings Settings { get; set; }
+        public VoxelEngineSettings Settings{ get; set; }
 
-        
-        private NoiseCalculator.NoiseParameters NoiseParameters()
-        {
-            return new NoiseCalculator.NoiseParameters
-            {
+
+        private NoiseCalculator.NoiseParameters NoiseParameters() =>
+            new(){
                 Seed = Settings.Seed,
                 HumidityScale = Settings.Noise.HumidityScale,
                 TemperatureScale = Settings.Noise.TemperatureScale,
                 ElevationProfile = new NoiseProfile(Settings.Noise.elevationProfile.ToStruct(Settings.Seed)),
                 ContinentalLayer = new WarpedNoiseLayer(Settings.Noise.continentalLayer.ToStruct(Settings.Seed))
             };
-        }
 
         /// <summary>
         ///     Allocates a new <see cref="ChunkManager" /> responsible for chunk data in memory.
         /// </summary>
-        internal ChunkManager ChunkManager()
-        {
-            return new ChunkManager(Settings);
-        }
+        internal ChunkManager ChunkManager() => new(Settings);
 
         /// <summary>
         ///     Allocates a new <see cref="ChunkPool" /> for recycling chunk render objects.
         /// </summary>
         /// <param name="transform">Parent transform for pooled chunk game objects.</param>
-        internal ChunkPool ChunkPool(Transform transform)
-        {
-            return new ChunkPool(transform, Settings);
-        }
+        internal ChunkPool ChunkPool(Transform transform) => new(transform, Settings);
 
         /// <summary>
         ///     Creates the top-level <see cref="VoxelEngineScheduler" /> coordinating all sub-schedulers.
@@ -62,11 +51,9 @@ namespace Engine.Scripts.Utils
             ColliderBakeScheduler colliderBakeScheduler,
             ChunkManager chunkManager,
             ChunkPool chunkPool
-        )
-        {
-            return new VoxelEngineScheduler(Settings, cMeshBuildScheduler, chunkScheduler, chunkManager,
+        ) =>
+            new(Settings, cMeshBuildScheduler, chunkScheduler, chunkManager,
                 colliderBakeScheduler, chunkPool);
-        }
 
         /// <summary>
         ///     Creates a configured <see cref="ChunkScheduler" /> for data generation jobs. Fills missing config fields.
@@ -75,8 +62,7 @@ namespace Engine.Scripts.Utils
             ChunkManager chunkManager,
             GeneratorConfig generatorConfig,
             VoxelWorld world
-        )
-        {
+        ){
             GeneratorConfig cfg = generatorConfig;
             cfg.WaterLevel = Settings.Noise.WaterLevel;
             cfg.GlobalSeed = Settings.Seed;
@@ -92,14 +78,10 @@ namespace Engine.Scripts.Utils
             ChunkPool chunkPool,
             VoxelRegistry voxelRegistry,
             VoxelWorld world
-        )
-        {
-            return new CMeshBuildScheduler(Settings, chunkManager, chunkPool, voxelRegistry, world);
-        }
+        ) =>
+            new(Settings, chunkManager, chunkPool, voxelRegistry, world);
 
-        internal ColliderBakeScheduler ColliderBakeScheduler(ChunkManager chunkManager, ChunkPool chunkPool)
-        {
-            return new ColliderBakeScheduler(chunkManager, chunkPool);
-        }
+        internal ColliderBakeScheduler ColliderBakeScheduler(ChunkManager chunkManager, ChunkPool chunkPool) =>
+            new(chunkManager, chunkPool);
     }
 }

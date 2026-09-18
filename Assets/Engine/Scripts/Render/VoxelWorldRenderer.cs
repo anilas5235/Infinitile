@@ -16,15 +16,13 @@ using UnityEngine.Rendering;
 using static Engine.Scripts.Utils.VoxelConstants;
 using static UnityEngine.GraphicsBuffer;
 
-namespace Engine.Scripts.Render
-{
+namespace Engine.Scripts.Render{
     /// <summary>
     /// Main renderer component for the voxel world, managing partition building and rendering.
     /// Handles async GPU work for geometry generation and updates render buffers.
     /// </summary>
     [RequireComponent(typeof(VoxelWorld))]
-    public class VoxelWorldRenderer : Singleton<VoxelWorldRenderer>
-    {
+    public class VoxelWorldRenderer : Singleton<VoxelWorldRenderer>{
         /// <summary>
         /// Reference to the VoxelWorld instance.
         /// </summary>
@@ -52,8 +50,7 @@ namespace Engine.Scripts.Render
         private RenderBufferManager _foliageBufferManager;
         private bool _buffersRebuildPending;
 
-        protected override void Awake()
-        {
+        protected override void Awake(){
             base.Awake();
 
             _settings = world.Settings;
@@ -81,8 +78,7 @@ namespace Engine.Scripts.Render
 
             VoxelRegistry voxelRegistry = DataImporter.Instance.VoxelRegistry;
             _pointBuilderHandlers = new PointBuilderHandler[_maxInFlight];
-            for (int i = 0; i < _pointBuilderHandlers.Length; i++)
-            {
+            for (int i = 0; i < _pointBuilderHandlers.Length; i++){
                 _pointBuilderHandlers[i] = new PointBuilderHandler(
                     rSettings.pointBuilder,
                     voxelRegistry.VoxelRenderDefBuffer,
@@ -101,8 +97,7 @@ namespace Engine.Scripts.Render
         /// <summary>
         /// Updates pending and in-flight partition builds each frame.
         /// </summary>
-        private void Update()
-        {
+        private void Update(){
             if (_isDestroyed) return;
 
             CompleteFinishedPartitionBuilds();
@@ -112,8 +107,7 @@ namespace Engine.Scripts.Render
         /// <summary>
         /// Registers event handlers for world changes and rendering.
         /// </summary>
-        private void OnEnable()
-        {
+        private void OnEnable(){
             if (world == null) world = VoxelWorld.Instance;
             RenderPipelineManager.beginCameraRendering += Draw;
             world.ChunkChanged += HandleChunkChange;
@@ -126,8 +120,7 @@ namespace Engine.Scripts.Render
         /// <summary>
         /// Unregisters event handlers when disabled.
         /// </summary>
-        private void OnDisable()
-        {
+        private void OnDisable(){
             RenderPipelineManager.beginCameraRendering -= Draw;
             if (world == null) return;
 
@@ -142,8 +135,7 @@ namespace Engine.Scripts.Render
         /// Handles chunk change events by updating the voxel data buffer.
         /// </summary>
         /// <param name="chunk">The chunk that changed.</param>
-        private void HandleChunkChange(Chunk chunk)
-        {
+        private void HandleChunkChange(Chunk chunk){
             AddOrUpdateChunk(chunk.Position, chunk.VoxelData.GetData());
         }
 
@@ -151,23 +143,22 @@ namespace Engine.Scripts.Render
         /// Handles chunk data ready events by updating the voxel data buffer.
         /// </summary>
         /// <param name="chunk">The chunk whose data is ready.</param>
-        private void HandleChunkDataReady(Chunk chunk)
-        {
+        private void HandleChunkDataReady(Chunk chunk){
             AddOrUpdateChunk(chunk.Position, chunk.VoxelData.GetData());
         }
 
         /// <summary>
         /// Cleans up all GPU resources when the renderer is destroyed.
         /// </summary>
-        protected override void OnDestroy()
-        {
+        protected override void OnDestroy(){
             base.OnDestroy();
             _isDestroyed = true;
             _copyPointsHandler?.Dispose();
 
-            if (_pointBuilderHandlers != null)
+            if (_pointBuilderHandlers != null){
                 foreach (PointBuilderHandler handler in _pointBuilderHandlers)
                     handler?.Dispose();
+            }
 
             _solidBufferManager.Dispose();
             _transparentBufferManager.Dispose();
@@ -186,8 +177,7 @@ namespace Engine.Scripts.Render
         /// </summary>
         /// <param name="context">The scriptable render context.</param>
         /// <param name="cam">The camera to render with.</param>
-        private void Draw(ScriptableRenderContext context, Camera cam)
-        {
+        private void Draw(ScriptableRenderContext context, Camera cam){
             _solidBufferManager.Draw(cam);
             _transparentBufferManager.Draw(cam);
             _foliageBufferManager.Draw(cam);
@@ -196,8 +186,7 @@ namespace Engine.Scripts.Render
         /// <summary>
         /// Rebuilds render buffers if changes were made during this frame.
         /// </summary>
-        private void LateUpdate()
-        {
+        private void LateUpdate(){
             if (_isDestroyed || !_buffersRebuildPending) return;
 
             _solidBufferManager.RebuildBuffers();
@@ -209,8 +198,7 @@ namespace Engine.Scripts.Render
         /// <summary>
         /// Requests that render buffers be rebuilt on the next LateUpdate.
         /// </summary>
-        private void RequestBuffersRebuild()
-        {
+        private void RequestBuffersRebuild(){
             if (_isDestroyed) return;
             _buffersRebuildPending = true;
         }
@@ -219,12 +207,10 @@ namespace Engine.Scripts.Render
         /// Processes partition update requests from the world.
         /// </summary>
         /// <param name="partitions">The set of partitions to update.</param>
-        private void UpdatePartitions(HashSet<int3> partitions)
-        {
+        private void UpdatePartitions(HashSet<int3> partitions){
             if (_isDestroyed || partitions == null) return;
 
-            foreach (int3 partition in partitions)
-            {
+            foreach (int3 partition in partitions){
                 _requestedPartitions.Add(partition);
                 EnqueuePartitionBuild(partition);
             }
@@ -234,8 +220,7 @@ namespace Engine.Scripts.Render
         /// Adds a partition to the build queue if not already present.
         /// </summary>
         /// <param name="partition">The partition to build.</param>
-        private void EnqueuePartitionBuild(int3 partition)
-        {
+        private void EnqueuePartitionBuild(int3 partition){
             if (_isDestroyed) return;
             if (_pendingBuilds.Contains(partition)) return;
 
@@ -245,19 +230,16 @@ namespace Engine.Scripts.Render
         /// <summary>
         /// Starts pending partition builds up to the max in-flight limit.
         /// </summary>
-        private void StartPendingPartitionBuilds()
-        {
+        private void StartPendingPartitionBuilds(){
             if (_pointBuilderHandlers == null || _pointBuilderHandlers.Length == 0) return;
 
-            for (int i = 0; i < _maxInFlight; i++)
-            {
+            for (int i = 0; i < _maxInFlight; i++){
                 if (_pendingBuilds.Count < 1) break;
                 if (_inFlightBuilds[i] != null) continue;
 
                 int3 partition = _pendingBuilds.First();
                 _pendingBuilds.Remove(partition);
-                if (_inFlightBuilds.Any(build => build != null && build.Partition.Equals(partition)))
-                {
+                if (_inFlightBuilds.Any(build => build != null && build.Partition.Equals(partition))){
                     EnqueuePartitionBuild(partition);
                     continue;
                 }
@@ -265,8 +247,7 @@ namespace Engine.Scripts.Render
                 PartitionBuildRequest request = new(partition);
                 request.CollectBuffers(_voxelDataBuffers);
 
-                if (!request.IsValid)
-                {
+                if (!request.IsValid){
                     VoxelEngineLogger.Error<VoxelWorldRenderer>(
                         $"Skipping partition {partition} due to missing neighbor data.");
                     continue;
@@ -281,20 +262,17 @@ namespace Engine.Scripts.Render
         /// <summary>
         /// Completes finished partition builds and applies their results.
         /// </summary>
-        private void CompleteFinishedPartitionBuilds()
-        {
+        private void CompleteFinishedPartitionBuilds(){
             bool updatedPartitions = false;
 
-            for (int i = 0; i < _maxInFlight; i++)
-            {
+            for (int i = 0; i < _maxInFlight; i++){
                 InFlightBuild build = _inFlightBuilds[i];
                 if (build == null) continue;
                 if (!build.BuildAwaiter.IsCompleted) continue;
 
                 _inFlightBuilds[i] = null;
 
-                try
-                {
+                try{
                     Awaitable<int[]>.Awaiter buildAwaiter = build.BuildAwaiter;
                     int[] pointCounts = buildAwaiter.GetResult();
                     if (_isDestroyed) return;
@@ -305,8 +283,7 @@ namespace Engine.Scripts.Render
                     _copyPointsHandler.CopyJob(build.Handler, build.Partition, pointCounts);
                     updatedPartitions = true;
                 }
-                catch (Exception e)
-                {
+                catch (Exception e){
                     VoxelEngineLogger.Error<VoxelWorldRenderer>($"Error updating partition {build.Partition}: {e}");
                 }
             }
@@ -320,8 +297,7 @@ namespace Engine.Scripts.Render
         /// </summary>
         /// <param name="chunk">The chunk position.</param>
         /// <param name="voxelData">The voxel data to store.</param>
-        private void AddOrUpdateChunk(int2 chunk, UnsafeIntervalList<ushort> voxelData)
-        {
+        private void AddOrUpdateChunk(int2 chunk, UnsafeIntervalList<ushort> voxelData){
             if (_voxelDataBuffers.TryGetValue(chunk, out GraphicsBuffer existingBuffer)) existingBuffer.Dispose();
 
             int compLength = voxelData.CompressedLength;
@@ -342,8 +318,7 @@ namespace Engine.Scripts.Render
         /// Removes a chunk's voxel data from the GPU buffer when evicted.
         /// </summary>
         /// <param name="chunk">The chunk position.</param>
-        private void RemoveChunkData(int2 chunk)
-        {
+        private void RemoveChunkData(int2 chunk){
             if (!_voxelDataBuffers.TryGetValue(chunk, out GraphicsBuffer existingBuffer)) return;
 
             existingBuffer.Dispose();
@@ -354,8 +329,7 @@ namespace Engine.Scripts.Render
         /// Removes render data for a partition when it's evicted.
         /// </summary>
         /// <param name="partition">The partition position.</param>
-        private void RemovePartitionRenderData(int3 partition)
-        {
+        private void RemovePartitionRenderData(int3 partition){
             if (_isDestroyed) return;
 
             _requestedPartitions.Remove(partition);
@@ -374,8 +348,7 @@ namespace Engine.Scripts.Render
         /// <summary>
         /// Represents an in-flight partition build operation.
         /// </summary>
-        private class InFlightBuild
-        {
+        private class InFlightBuild{
             /// <summary>
             /// The partition coordinates being built.
             /// </summary>
@@ -397,8 +370,7 @@ namespace Engine.Scripts.Render
             /// <param name="partition">The partition position.</param>
             /// <param name="handler">The point builder handler.</param>
             /// <param name="buildAwaiter">The build awaiter.</param>
-            public InFlightBuild(int3 partition, PointBuilderHandler handler, Awaitable<int[]>.Awaiter buildAwaiter)
-            {
+            public InFlightBuild(int3 partition, PointBuilderHandler handler, Awaitable<int[]>.Awaiter buildAwaiter){
                 Partition = partition;
                 Handler = handler;
                 BuildAwaiter = buildAwaiter;
@@ -410,8 +382,7 @@ namespace Engine.Scripts.Render
     /// Contains metadata about a partition for GPU processing.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
-    internal struct PartitionMetadata
-    {
+    internal struct PartitionMetadata{
         /// <summary>
         /// The partition grid coordinates.
         /// </summary>

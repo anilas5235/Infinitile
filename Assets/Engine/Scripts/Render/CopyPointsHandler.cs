@@ -5,14 +5,12 @@ using UnityEngine;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
 using static UnityEngine.GraphicsBuffer;
 
-namespace Engine.Scripts.Render
-{
+namespace Engine.Scripts.Render{
     /// <summary>
     /// Handles copying of point data from point builders into render buffers using compute shaders.
     /// Manages point distribution across solid, transparent, and foliage buffer managers.
     /// </summary>
-    public class CopyPointsHandler : IDisposable
-    {
+    public class CopyPointsHandler : IDisposable{
         private readonly int _copyKernelID;
         private readonly ComputeShader _copyPoints;
         private readonly RenderBufferManager _foliageBufferManager;
@@ -32,8 +30,7 @@ namespace Engine.Scripts.Render
         /// <param name="transparentBufferManager">The render buffer manager for transparent points.</param>
         /// <param name="foliageBufferManager">The render buffer manager for foliage points.</param>
         public CopyPointsHandler(ComputeShader copyPoints, RenderBufferManager solidBufferManager,
-            RenderBufferManager transparentBufferManager, RenderBufferManager foliageBufferManager)
-        {
+            RenderBufferManager transparentBufferManager, RenderBufferManager foliageBufferManager){
             _copyPoints = copyPoints;
             _copyKernelID = copyPoints.FindKernel("CopyPoints");
             _solidBufferManager = solidBufferManager;
@@ -49,8 +46,7 @@ namespace Engine.Scripts.Render
         /// <summary>
         /// Releases all GPU resources held by this handler.
         /// </summary>
-        public void Dispose()
-        {
+        public void Dispose(){
             _pageCountsBuffer?.Dispose();
             _solidPagesBuffer?.Dispose();
             _transparentPagesBuffer?.Dispose();
@@ -63,8 +59,7 @@ namespace Engine.Scripts.Render
         /// <param name="pointBuilderHandler">The point builder handler containing built points.</param>
         /// <param name="partition">The partition coordinates for the data.</param>
         /// <param name="counts">Array of point counts for solid, transparent, and foliage types.</param>
-        internal void CopyJob(PointBuilderHandler pointBuilderHandler, int3 partition, int[] counts)
-        {
+        internal void CopyJob(PointBuilderHandler pointBuilderHandler, int3 partition, int[] counts){
             AllocInfo solidAlloc = _solidBufferManager.AllocBufferSpace(partition, counts[0]);
             AllocInfo transparentAlloc = _transparentBufferManager.AllocBufferSpace(partition, counts[1]);
             AllocInfo foliageAlloc = _foliageBufferManager.AllocBufferSpace(partition, counts[2]);
@@ -88,8 +83,7 @@ namespace Engine.Scripts.Render
             _copyPoints.Dispatch(_copyKernelID, Mathf.CeilToInt(maxPageCount / 8f), 1, 1);
         }
 
-        private void SetSolidBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo solidAlloc)
-        {
+        private void SetSolidBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo solidAlloc){
             _copyPoints.SetBuffer(_copyKernelID, SolidPointsInNameID, pointBuilderHandler.SolidPointsOut);
             _copyPoints.SetBuffer(_copyKernelID, SolidPointsCopyOutNameID,
                 GetTargetBuffer(_solidBufferManager, solidAlloc));
@@ -101,8 +95,7 @@ namespace Engine.Scripts.Render
             _solidPagesBuffer.SetData(solidPageData);
         }
 
-        private void SetTransparentBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo transparentAlloc)
-        {
+        private void SetTransparentBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo transparentAlloc){
             _copyPoints.SetBuffer(_copyKernelID, TransparentPointsInNameID,
                 pointBuilderHandler.TransparentPointsOut);
             _copyPoints.SetBuffer(_copyKernelID, TransparentPointsCopyOutNameID,
@@ -115,8 +108,7 @@ namespace Engine.Scripts.Render
             _transparentPagesBuffer.SetData(transparentPageData);
         }
 
-        private void SetFoliageBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo foliageAlloc)
-        {
+        private void SetFoliageBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo foliageAlloc){
             _copyPoints.SetBuffer(_copyKernelID, FoliagePointsInNameID, pointBuilderHandler.FoliagePointsOut);
             _copyPoints.SetBuffer(_copyKernelID, FoliagePointsCopyOutNameID,
                 GetTargetBuffer(_foliageBufferManager, foliageAlloc));
@@ -128,8 +120,7 @@ namespace Engine.Scripts.Render
             _foliagePagesBuffer.SetData(foliagePageData);
         }
 
-        private GraphicsBuffer GetTargetBuffer(RenderBufferManager bufferManager, AllocInfo allocInfo)
-        {
+        private GraphicsBuffer GetTargetBuffer(RenderBufferManager bufferManager, AllocInfo allocInfo){
             int bufferIndex = allocInfo.Count > 0 ? allocInfo.BufferIndex : 0;
             return bufferManager.GetBuffer(bufferIndex);
         }

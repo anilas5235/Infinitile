@@ -5,14 +5,12 @@ using Unity.Mathematics;
 using static Engine.Scripts.Utils.VoxelConstants;
 using Random = Unity.Mathematics.Random;
 
-namespace Engine.Scripts.Jobs.Chunk
-{
+namespace Engine.Scripts.Jobs.Chunk{
     /// <summary>
     ///     Provides Burst-compiled helpers to place rare world structures such as pyramids, oases,
     ///     igloos, shipwrecks and mineshafts on or within generated terrain.
     /// </summary>
-    internal partial struct ChunkJob
-    {
+    internal partial struct ChunkJob{
         /// <summary>
         ///     Places biome-dependent structures into the voxel buffer using per-column metadata.
         ///     Structures are rare and are positioned deterministically based on chunk position and seed.
@@ -25,14 +23,12 @@ namespace Engine.Scripts.Jobs.Chunk
         [BurstCompile]
         public static void PlaceStructures(ref NativeArray<ushort> vox,
             ref NativeArray<ChunkColumn> chunkColumns, ref int3 chunkWordPos,
-            int randomSeed, ref GeneratorConfig config)
-        {
+            int randomSeed, ref GeneratorConfig config){
             uint seed = (uint)((chunkWordPos.x * 43524) ^ (chunkWordPos.z * 7856) ^ randomSeed ^ 0x85ebca6b);
             Random rng = new(seed == 0 ? 1u : seed);
 
             for (int x = 1; x < ChunkWidth - 1; x++)
-            for (int z = 1; z < ChunkDepth - 1; z++)
-            {
+            for (int z = 1; z < ChunkDepth - 1; z++){
                 int gi = GetColumnIdx(x, z, ChunkDepth);
                 ChunkColumn chunkCol = chunkColumns[gi];
                 int gy = chunkCol.Height;

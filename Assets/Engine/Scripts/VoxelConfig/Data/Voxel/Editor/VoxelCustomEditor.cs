@@ -4,20 +4,17 @@ using Engine.Scripts.VoxelConfig.Data.Mesh;
 using UnityEditor;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Data.Voxel.Editor
-{
+namespace Engine.Scripts.VoxelConfig.Data.Voxel.Editor{
     /// <summary>
     /// Custom inspector for <see cref="Voxel" /> that shows texture fields based on the selected texture mode.
     /// </summary>
     [CustomEditor(typeof(Voxel))]
     [CanEditMultipleObjects]
-    public class VoxelCustomEditor : UnityEditor.Editor
-    {
+    public class VoxelCustomEditor : UnityEditor.Editor{
         /// <summary>
         /// Draws the custom inspector UI for voxel definitions.
         /// </summary>
-        public override void OnInspectorGUI()
-        {
+        public override void OnInspectorGUI(){
             Voxel voxelDef = (Voxel)target;
 
             serializedObject.Update();
@@ -26,7 +23,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel.Editor
             EditorGUILayout.PropertyField(serializedObject.FindProperty("package"));
             EditorGUILayout.TextField("Full Name", voxelDef.GetFullName().ToString());
             EditorGUI.EndDisabledGroup();
-            
+
             EditorGUILayout.PropertyField(serializedObject.FindProperty("meshLayer"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("collision"));
 
@@ -34,8 +31,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel.Editor
 
             EditorGUILayout.PropertyField(serializedObject.FindProperty("glow"));
 
-            if (voxelDef.meshLayer == MeshLayer.Transparent)
-            {
+            if (voxelDef.meshLayer == MeshLayer.Transparent){
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("depthFadeDistance"));
                 if (voxelDef.usePostProcess)
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("postProcess"));
@@ -43,8 +39,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel.Editor
 
             EditorGUILayout.PropertyField(serializedObject.FindProperty("shape"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("textureMode"));
-            switch (voxelDef.TextureMode)
-            {
+            switch (voxelDef.TextureMode){
                 case Voxel.VoxelTexMode.AllSame:
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("all"));
                     break;
@@ -65,8 +60,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel.Editor
                     break;
                 case Voxel.VoxelTexMode.AllUnique:
                     int quadCount = voxelDef.shape.quads.Length;
-                    if (voxelDef.allUnique.Count != quadCount)
-                    {
+                    if (voxelDef.allUnique.Count != quadCount){
                         Dictionary<QuadDefinition, Texture2D> temp = new(quadCount);
                         foreach (VoxelQuad q in voxelDef.shape.quads)
                             temp[q.quadDef] = voxelDef.allUnique.GetValueOrDefault(q.quadDef);
@@ -75,10 +69,11 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel.Editor
                     }
 
                     EditorGUILayout.BeginVertical("Box");
-                    foreach (VoxelQuad q in voxelDef.shape.quads)
+                    foreach (VoxelQuad q in voxelDef.shape.quads){
                         voxelDef.allUnique[q.quadDef] = (Texture2D)EditorGUILayout.ObjectField(
                             $"Face {q.quadDef.name}", voxelDef.allUnique[q.quadDef], typeof(Texture2D),
                             false);
+                    }
 
                     EditorGUILayout.EndVertical();
                     break;

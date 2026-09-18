@@ -3,14 +3,12 @@ using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Unity.Burst;
 using Unity.Collections;
 
-namespace Engine.Scripts.VoxelConfig.Data.Internal
-{
+namespace Engine.Scripts.VoxelConfig.Data.Internal{
     /// <summary>
     ///     Burst-compatible container that exposes voxel render definitions to meshing jobs.
     /// </summary>
     [BurstCompile]
-    public struct VoxelEngineRenderGenData : IDisposable
-    {
+    public struct VoxelEngineRenderGenData : IDisposable{
         /// <summary>
         ///     Backing array of render definitions, indexed by voxel ID.
         /// </summary>
@@ -19,8 +17,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Internal
         /// <summary>
         ///     Disposes the underlying native array holding voxel render definitions.
         /// </summary>
-        public void Dispose()
-        {
+        public void Dispose(){
             VoxelRenderDefs.Dispose();
         }
 
@@ -29,19 +26,13 @@ namespace Engine.Scripts.VoxelConfig.Data.Internal
         /// </summary>
         /// <param name="voxelId">Voxel ID to query.</param>
         /// <returns>Mesh layer associated with the voxel.</returns>
-        public readonly MeshLayer GetMeshLayer(ushort voxelId)
-        {
-            return VoxelRenderDefs[voxelId].MeshLayer;
-        }
+        public readonly MeshLayer GetMeshLayer(ushort voxelId) => VoxelRenderDefs[voxelId].MeshLayer;
 
         /// <summary>
         ///     Gets the full render definition for the voxel with the given ID.
         /// </summary>
         /// <param name="voxelId">Voxel ID used to index into the render definition array.</param>
         /// <returns>Render definition for the voxel.</returns>
-        public readonly Voxel.Voxel.VoxelDef GetRenderDef(ushort voxelId)
-        {
-            return VoxelRenderDefs[voxelId];
-        }
+        public readonly Voxel.Voxel.VoxelDef GetRenderDef(ushort voxelId) => VoxelRenderDefs[voxelId];
     }
 }

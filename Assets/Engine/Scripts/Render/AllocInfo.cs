@@ -3,13 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.Mathematics;
 
-namespace Engine.Scripts.Render
-{
+namespace Engine.Scripts.Render{
     /// <summary>
     /// Represents allocation information for buffer pages, tracking which pages are allocated and how many points they contain.
     /// </summary>
-    public readonly struct AllocInfo
-    {
+    public readonly struct AllocInfo{
         /// <summary>
         /// The index of the render buffer this allocation belongs to.
         /// </summary>
@@ -29,8 +27,7 @@ namespace Engine.Scripts.Render
         /// </summary>
         /// <param name="page">The page to add.</param>
         /// <exception cref="InvalidOperationException">Thrown when trying to add a page to an uninitialized allocation.</exception>
-        public void AddPage(AllocPage page)
-        {
+        public void AddPage(AllocPage page){
             if (_pages == null)
                 throw new InvalidOperationException("Cannot add pages to an AllocInfo with no page list.");
             _pages.Add(page);
@@ -45,8 +42,7 @@ namespace Engine.Scripts.Render
         /// <summary>
         /// Represents a single allocated page with its index and point count.
         /// </summary>
-        public readonly struct AllocPage
-        {
+        public readonly struct AllocPage{
             /// <summary>
             /// The index of the page within the buffer.
             /// </summary>
@@ -62,8 +58,7 @@ namespace Engine.Scripts.Render
             /// </summary>
             /// <param name="pageIndex">The index of the page.</param>
             /// <param name="pointCount">The number of points in the page.</param>
-            public AllocPage(int pageIndex, int pointCount)
-            {
+            public AllocPage(int pageIndex, int pointCount){
                 PageIndex = pageIndex;
                 PointCount = pointCount;
             }
@@ -73,8 +68,7 @@ namespace Engine.Scripts.Render
         /// Initializes a new instance of the AllocInfo struct.
         /// </summary>
         /// <param name="bufferIndex">The index of the render buffer.</param>
-        public AllocInfo(int bufferIndex)
-        {
+        public AllocInfo(int bufferIndex){
             BufferIndex = bufferIndex;
             _pages = new List<AllocPage>();
         }
@@ -83,9 +77,10 @@ namespace Engine.Scripts.Render
         /// Converts the allocation information to an array of index-count pairs.
         /// </summary>
         /// <returns>An array of uint2 values where x is the page index and y is the point count.</returns>
-        public uint2[] ToIndexAndCount()
-        {
-            return IsEmpty ? Array.Empty<uint2>() : _pages.Select(p => new uint2((uint)p.PageIndex, (uint)p.PointCount)).ToArray();
+        public uint2[] ToIndexAndCount(){
+            return IsEmpty
+                ? Array.Empty<uint2>()
+                : _pages.Select(p => new uint2((uint)p.PageIndex, (uint)p.PointCount)).ToArray();
         }
     }
 }

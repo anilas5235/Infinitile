@@ -1,13 +1,11 @@
 ﻿using UnityEngine;
 
-namespace Engine.Scripts.Settings
-{
+namespace Engine.Scripts.Settings{
     /// <summary>
     ///     Central ScriptableObject configuration for the voxel engine (seed, noise, chunk, renderer, scheduler).
     /// </summary>
     [CreateAssetMenu(fileName = "VoxelEngineSettings", menuName = "Voxel/EngineSettings", order = 0)]
-    public class VoxelEngineSettings : ScriptableObject
-    {
+    public class VoxelEngineSettings : ScriptableObject{
         /// <summary>
         ///     Global seed for deterministic world generation.
         /// </summary>

@@ -1,14 +1,12 @@
 ﻿using System;
 using UnityEngine;
 
-namespace Engine.Scripts.Settings
-{
+namespace Engine.Scripts.Settings{
     /// <summary>
     ///     Settings for chunk size and view/load distances. Impacts memory and performance characteristics.
     /// </summary>
     [Serializable]
-    public class ChunkSettings
-    {
+    public class ChunkSettings{
         /// <summary>
         ///     Prefab containing MeshRenderer + Filter + Collider for a chunk.
         /// </summary>

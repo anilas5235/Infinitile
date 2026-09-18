@@ -2,15 +2,13 @@
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Data.Mesh
-{
+namespace Engine.Scripts.VoxelConfig.Data.Mesh{
     /// <summary>
     /// Describes a single quad face used by voxel shapes, including vertex positions, basis vectors, and UVs.
     /// </summary>
     ///
     [CreateAssetMenu(fileName = "Quad", menuName = "Infinitile/Mesh/Quad")]
-    public class QuadDefinition : ScriptableObject
-    {
+    public class QuadDefinition : ScriptableObject{
         public Vector3 position00;
         public Vector3 position01;
         public Vector3 position02;
@@ -27,8 +25,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Mesh
         /// <summary>
         /// Recalculates the quad basis when edited in the Unity editor.
         /// </summary>
-        private void OnValidate()
-        {
+        private void OnValidate(){
             RecalculateNormal();
         }
 #endif
@@ -36,8 +33,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Mesh
         /// <summary>
         /// Recalculates the normal, up, and right vectors from the current vertex positions.
         /// </summary>
-        public void RecalculateNormal()
-        {
+        public void RecalculateNormal(){
             CalculateBasis(out normal, out up, out right);
         }
 
@@ -45,12 +41,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Mesh
         /// Converts this quad definition into its Burst-friendly data representation.
         /// </summary>
         /// <returns>A <see cref="QuadDef" /> struct containing the quad data.</returns>
-        public QuadDef ToStruct()
-        {
+        public QuadDef ToStruct(){
             CalculateBasis(out Vector3 calculatedNormal, out Vector3 calculatedUp, out Vector3 calculatedRight);
 
-            return new QuadDef
-            {
+            return new QuadDef{
                 position00 = position00.Float3(),
                 position01 = position01.Float3(),
                 position02 = position02.Float3(),
@@ -71,8 +65,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Mesh
         /// <param name="calculatedNormal">The calculated normal vector.</param>
         /// <param name="calculatedUp">The calculated up vector.</param>
         /// <param name="calculatedRight">The calculated right vector.</param>
-        private void CalculateBasis(out Vector3 calculatedNormal, out Vector3 calculatedUp, out Vector3 calculatedRight)
-        {
+        private void CalculateBasis(out Vector3 calculatedNormal, out Vector3 calculatedUp,
+            out Vector3 calculatedRight){
             const float epsilon = 1e-6f;
 
             Vector3 edgeA = position01 - position00;
@@ -97,8 +91,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Mesh
         /// <summary>
         /// Burst-friendly quad data used by runtime rendering systems.
         /// </summary>
-        public struct QuadDef
-        {
+        public struct QuadDef{
             /// <summary>
             /// Vertex position 00 relative to the voxel origin.
             /// </summary>

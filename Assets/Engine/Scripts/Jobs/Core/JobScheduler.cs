@@ -2,14 +2,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 
-namespace Engine.Scripts.Jobs.Core
-{
+namespace Engine.Scripts.Jobs.Core{
     /// <summary>
     /// Abstract base class for job schedulers that records execution timings
     /// and exposes a moving average over the last N runs.
     /// </summary>
-    public abstract class JobScheduler
-    {
+    public abstract class JobScheduler{
         private readonly int _records;
         private readonly Queue<long> _timings;
         private readonly Stopwatch _watch;
@@ -19,8 +17,7 @@ namespace Engine.Scripts.Jobs.Core
         /// with the specified number of history records.
         /// </summary>
         /// <param name="records">Maximum number of timing entries to keep in history. Defaults to 16.</param>
-        protected JobScheduler(int records = 16)
-        {
+        protected JobScheduler(int records = 16){
             _records = records;
             _watch = new Stopwatch();
             _timings = new Queue<long>(_records);
@@ -35,8 +32,7 @@ namespace Engine.Scripts.Jobs.Core
         /// <summary>
         /// Starts timing for the current run.
         /// </summary>
-        protected void StartRecord()
-        {
+        protected void StartRecord(){
             _watch.Restart();
         }
 
@@ -44,8 +40,7 @@ namespace Engine.Scripts.Jobs.Core
         /// Stops timing for the current run and enqueues the measured value in the history.
         /// </summary>
         /// <returns>The elapsed time in milliseconds for the current run.</returns>
-        protected long StopRecord()
-        {
+        protected long StopRecord(){
             _watch.Stop();
             long ms = _watch.ElapsedMilliseconds;
 

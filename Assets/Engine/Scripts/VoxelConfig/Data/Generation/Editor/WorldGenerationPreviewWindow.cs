@@ -11,10 +11,8 @@ using Unity.Mathematics;
 using UnityEditor;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
-{
-    public class WorldGenerationPreviewWindow : EditorWindow
-    {
+namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
+    public class WorldGenerationPreviewWindow : EditorWindow{
         private const int ViewResolution = 512;
         private static readonly int[] ResolutionOptions = { 128, 256, 512, 1024, 2048, 4096, 8192, 16384 };
 
@@ -55,27 +53,23 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         private Vector2 windowSize;
 
         [MenuItem("Infinitile/World Generation Preview")]
-        private static void OpenWindow()
-        {
+        private static void OpenWindow(){
             WorldGenerationPreviewWindow window = GetWindow<WorldGenerationPreviewWindow>();
             window.titleContent = new GUIContent("World Gen Preview");
             window.minSize = new Vector2(920f, 620f);
             window.Show();
         }
 
-        private void OnEnable()
-        {
+        private void OnEnable(){
             EditorApplication.update += OnEditorUpdate;
             ReloadAssets();
             _needsRebuild = true;
         }
 
-        private void OnDisable()
-        {
+        private void OnDisable(){
             EditorApplication.update -= OnEditorUpdate;
 
-            if (_biomeEditor)
-            {
+            if (_biomeEditor){
                 DestroyImmediate(_biomeEditor);
                 _biomeEditor = null;
             }
@@ -88,10 +82,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             DestroyTexture(ref _humidityTemperatureTexture);
         }
 
-        private void OnEditorUpdate()
-        {
-            if (_buildInProgress && _buildHandle.IsCompleted)
-            {
+        private void OnEditorUpdate(){
+            if (_buildInProgress && _buildHandle.IsCompleted){
                 FinalizeScheduledBuild(true);
                 Repaint();
             }
@@ -99,16 +91,14 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             if (_autoRebuild && _needsRebuild && !_buildInProgress) ScheduleBuild();
         }
 
-        private void OnDestroy()
-        {
+        private void OnDestroy(){
             _generatorConfig.Dispose();
             DisposeJobData();
         }
 
         #region Draw
 
-        private void OnGUI()
-        {
+        private void OnGUI(){
             windowSize = position.size;
             EditorGUI.BeginChangeCheck();
             EditorGUILayout.BeginHorizontal();
@@ -123,16 +113,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
                 DrawViews();
 
-                if (EditorGUI.EndChangeCheck())
-                {
-                    RequestRebuild();
-                }
+                if (EditorGUI.EndChangeCheck()) RequestRebuild();
             }
             EditorGUILayout.EndHorizontal();
         }
 
-        private void DrawToolbar()
-        {
+        private void DrawToolbar(){
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             {
                 EditorGUILayout.LabelField("Data Source", EditorStyles.boldLabel);
@@ -141,15 +127,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
                 EditorGUILayout.BeginHorizontal();
                 {
-                    if (GUILayout.Button("Reload SOs", GUILayout.Width(120f)))
-                    {
-                        ReloadAssets();
-                    }
+                    if (GUILayout.Button("Reload SOs", GUILayout.Width(120f))) ReloadAssets();
 
-                    using (new EditorGUI.DisabledScope(_buildInProgress))
-                    {
-                        if (GUILayout.Button("Rebuild", GUILayout.Width(120f)))
-                        {
+                    using (new EditorGUI.DisabledScope(_buildInProgress)){
+                        if (GUILayout.Button("Rebuild", GUILayout.Width(120f))){
                             _needsRebuild = true;
                             ScheduleBuild();
                         }
@@ -162,8 +143,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             EditorGUILayout.EndVertical();
         }
 
-        private void DrawBiomeDistributionView()
-        {
+        private void DrawBiomeDistributionView(){
             EditorGUILayout.BeginVertical(EditorStyles.helpBox, GUILayout.Height(windowSize.y * .55f));
             {
                 EditorGUILayout.LabelField("BiomeDistribution", EditorStyles.boldLabel);
@@ -176,13 +156,11 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             EditorGUILayout.EndVertical();
         }
 
-        private void DrawBiomeEditorPanel()
-        {
+        private void DrawBiomeEditorPanel(){
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             EditorGUILayout.LabelField("Biome Editing", EditorStyles.boldLabel);
 
-            if (_biomes.Count == 0)
-            {
+            if (_biomes.Count == 0){
                 EditorGUILayout.HelpBox("Keine Biome in den geladenen VoxelDataPackages gefunden.",
                     MessageType.Warning);
                 EditorGUILayout.EndVertical();
@@ -193,8 +171,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             for (int i = 0; i < _biomes.Count; i++) biomeNames[i] = _biomes[i] ? _biomes[i].name : "<null>";
 
             int newIndex = EditorGUILayout.Popup("Active Biome", _selectedBiomeIndex, biomeNames);
-            if (newIndex != _selectedBiomeIndex)
-            {
+            if (newIndex != _selectedBiomeIndex){
                 _selectedBiomeIndex = newIndex;
                 CreateBiomeEditor();
             }
@@ -204,10 +181,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             EditorGUILayout.EndVertical();
         }
 
-        private void DrawViews()
-        {
-            if (!_settings)
-            {
+        private void DrawViews(){
+            if (!_settings){
                 EditorGUILayout.HelpBox("Bitte ein VoxelEngineSettings-Asset auswählen.", MessageType.Info);
                 return;
             }
@@ -217,8 +192,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 EditorGUILayout.BeginVertical();
                 {
                     _worldOffset = EditorGUILayout.Vector2IntField("World Offset (X/Z)", _worldOffset);
-                    _resolutionIndex = EditorGUILayout.Popup("Resolution", _resolutionIndex, new[]
-                    {
+                    _resolutionIndex = EditorGUILayout.Popup("Resolution", _resolutionIndex, new[]{
                         $"{ResolutionOptions[0]}x{ResolutionOptions[0]}",
                         $"{ResolutionOptions[1]}x{ResolutionOptions[1]}",
                         $"{ResolutionOptions[2]}x{ResolutionOptions[2]}",
@@ -226,7 +200,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                         $"{ResolutionOptions[4]}x{ResolutionOptions[4]}",
                         $"{ResolutionOptions[5]}x{ResolutionOptions[5]}",
                         $"{ResolutionOptions[6]}x{ResolutionOptions[6]}",
-                        $"{ResolutionOptions[7]}x{ResolutionOptions[7]}",
+                        $"{ResolutionOptions[7]}x{ResolutionOptions[7]}"
                     });
                     EditorGUILayout.LabelField("Climate RGB Channels", EditorStyles.boldLabel);
                     _showHumidity = EditorGUILayout.ToggleLeft("Humidity (R)", _showHumidity);
@@ -247,8 +221,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             EditorGUILayout.EndHorizontal();
         }
 
-        private void DrawView(string viewTitle, GUIStyle style, Texture2D texture, bool allowPan)
-        {
+        private void DrawView(string viewTitle, GUIStyle style, Texture2D texture, bool allowPan){
             EditorGUILayout.BeginVertical(style);
             {
                 EditorGUILayout.LabelField(viewTitle, EditorStyles.boldLabel);
@@ -269,21 +242,18 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             EditorGUILayout.EndVertical();
         }
 
-        private void HandlePanInput(Rect viewRect)
-        {
+        private void HandlePanInput(Rect viewRect){
             Event e = Event.current;
             if (e == null) return;
 
-            switch (e.type)
-            {
+            switch (e.type){
                 case EventType.MouseDown when e.button == 0 && viewRect.Contains(e.mousePosition):
                     _isDragging = true;
                     _dragStartMouse = e.mousePosition;
                     _dragStartOffset = _worldOffset;
                     e.Use();
                     return;
-                case EventType.MouseDrag when _isDragging:
-                {
+                case EventType.MouseDrag when _isDragging:{
                     Vector2 delta = e.mousePosition - _dragStartMouse;
                     delta *= ResolutionOptions[_resolutionIndex] / (float)ViewResolution;
                     _worldOffset = _dragStartOffset -
@@ -300,13 +270,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             }
         }
 
-        private void ReloadAssets()
-        {
-            if (!_settings)
-            {
+        private void ReloadAssets(){
+            if (!_settings){
                 string[] settingsGuids = AssetDatabase.FindAssets("t:VoxelEngineSettings");
-                if (settingsGuids.Length > 0)
-                {
+                if (settingsGuids.Length > 0){
                     string settingsPath = AssetDatabase.GUIDToAssetPath(settingsGuids[0]);
                     _settings = AssetDatabase.LoadAssetAtPath<VoxelEngineSettings>(settingsPath);
                 }
@@ -318,8 +285,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
             string[] packageGuids = AssetDatabase.FindAssets("t:VoxelDataPackage");
             HashSet<Biome> uniqueBiomes = new();
-            foreach (string guid in packageGuids)
-            {
+            foreach (string guid in packageGuids){
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 VoxelDataPackage package = AssetDatabase.LoadAssetAtPath<VoxelDataPackage>(path);
                 if (!package) continue;
@@ -327,8 +293,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 _packages.Add(package);
                 if (package.biomes == null) continue;
 
-                foreach (Biome biome in package.biomes)
-                {
+                foreach (Biome biome in package.biomes){
                     if (!biome || !uniqueBiomes.Add(biome)) continue;
 
                     _biomes.Add(biome);
@@ -336,12 +301,11 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             }
 
             _selectedBiomeIndex = Mathf.Clamp(_selectedBiomeIndex, 0, Mathf.Max(0, _biomes.Count - 1));
-            _generatorConfig = new GeneratorConfig
-            {
+            _generatorConfig = new GeneratorConfig{
                 WaterLevel = _settings.Noise.WaterLevel,
                 GlobalSeed = _settings.Seed,
                 BiomeDefs = new NativeArray<Biome.BiomeDef>(_biomes.Count, Allocator.Domain),
-                Voxels = new NativeHashMap<FixedString32Bytes, Voxel.Voxel.VoxelDef>(0, Allocator.Domain),
+                Voxels = new NativeHashMap<FixedString32Bytes, Voxel.Voxel.VoxelDef>(0, Allocator.Domain)
             };
 
             for (int i = 0; i < _biomes.Count; i++) _generatorConfig.BiomeDefs[i] = _biomes[i].ToStruct();
@@ -351,10 +315,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             Repaint();
         }
 
-        private void CreateBiomeEditor()
-        {
-            if (_biomeEditor)
-            {
+        private void CreateBiomeEditor(){
+            if (_biomeEditor){
                 DestroyImmediate(_biomeEditor);
                 _biomeEditor = null;
             }
@@ -369,17 +331,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
         #region JobScheduling
 
-        private void RequestRebuild()
-        {
+        private void RequestRebuild(){
             _needsRebuild = true;
-            if (_autoRebuild && !_buildInProgress)
-            {
-                ScheduleBuild();
-            }
+            if (_autoRebuild && !_buildInProgress) ScheduleBuild();
         }
 
-        private void ScheduleBuild()
-        {
+        private void ScheduleBuild(){
             if (_buildInProgress || !_needsRebuild) return;
             if (!_settings || !_settings.Noise) return;
 
@@ -387,8 +344,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             int resolution = ResolutionOptions[Mathf.Clamp(_resolutionIndex, 0, ResolutionOptions.Length - 1)];
             const int pixelCount = ViewResolution * ViewResolution;
 
-            if (biomeCount == 0)
-            {
+            if (biomeCount == 0){
                 EnsureTexture(ref _biomeTexture, ViewResolution);
                 EnsureTexture(ref _heightTexture, ViewResolution);
                 EnsureTexture(ref _climateTexture, ViewResolution);
@@ -409,11 +365,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             _jobClimatePixels = new NativeArray<Color32>(pixelCount, Allocator.TempJob);
             _jobHumidityTemperaturePixels = new NativeArray<Color32>(pixelCount, Allocator.TempJob);
 
-            for (int i = 0; i < biomeCount; i++)
-            {
+            for (int i = 0; i < biomeCount; i++){
                 Biome biome = _biomes[i];
-                if (!biome)
-                {
+                if (!biome){
                     _jobBiomeColors[i] = new Color32(0, 0, 0, 255);
                     continue;
                 }
@@ -421,8 +375,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 _jobBiomeColors[i] = biome.RepresentativeColor;
             }
 
-            _generatorConfig.NoiseParams = new NoiseCalculator.NoiseParameters
-            {
+            _generatorConfig.NoiseParams = new NoiseCalculator.NoiseParameters{
                 Seed = _settings.Seed,
                 HumidityScale = _settings.Noise.HumidityScale,
                 TemperatureScale = _settings.Noise.TemperatureScale,
@@ -430,8 +383,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 ContinentalLayer = new WarpedNoiseLayer(_settings.Noise.continentalLayer.ToStruct(_settings.Seed))
             };
 
-            WorldViewJob job = new()
-            {
+            WorldViewJob job = new(){
                 Resolution = resolution,
                 WorldOffset = _worldOffset.Int2(),
                 ShowHumidity = _showHumidity ? (byte)1 : (byte)0,
@@ -441,11 +393,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
                 BiomeColors = _jobBiomeColors,
                 BiomeWorldView = _jobBiomePixels,
                 HeightWorldView = _jobHeightPixels,
-                ClimateWorldView = _jobClimatePixels,
+                ClimateWorldView = _jobClimatePixels
             };
 
-            BiomeDistributionJob distributionJob = new()
-            {
+            BiomeDistributionJob distributionJob = new(){
                 Resolution = ViewResolution,
                 Continental = _phaseContinental,
                 Elevation = _phaseElevation,
@@ -464,18 +415,15 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             _needsRebuild = false;
         }
 
-        private void FinalizeScheduledBuild(bool applyResult)
-        {
-            if (!_buildInProgress)
-            {
+        private void FinalizeScheduledBuild(bool applyResult){
+            if (!_buildInProgress){
                 DisposeJobData();
                 return;
             }
 
             _buildHandle.Complete();
 
-            if (applyResult)
-            {
+            if (applyResult){
                 EnsureTexture(ref _biomeTexture, ViewResolution);
                 EnsureTexture(ref _heightTexture, ViewResolution);
                 EnsureTexture(ref _climateTexture, ViewResolution);
@@ -496,8 +444,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             Repaint();
         }
 
-        private void DisposeJobData()
-        {
+        private void DisposeJobData(){
             if (_jobBiomeColors.IsCreated) _jobBiomeColors.Dispose();
 
             if (_jobBiomePixels.IsCreated) _jobBiomePixels.Dispose();
@@ -513,13 +460,11 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
         #region TextureHelpers
 
-        private static void EnsureTexture(ref Texture2D texture, int size)
-        {
+        private static void EnsureTexture(ref Texture2D texture, int size){
             if (texture && texture.width == size && texture.height == size) return;
 
             DestroyTexture(ref texture);
-            texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
-            {
+            texture = new Texture2D(size, size, TextureFormat.RGBA32, false){
                 name = "WorldGenPreviewTexture",
                 filterMode = FilterMode.Point,
                 wrapMode = TextureWrapMode.Clamp,
@@ -527,8 +472,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             };
         }
 
-        private static void FillTexture(Texture2D texture, Color color)
-        {
+        private static void FillTexture(Texture2D texture, Color color){
             if (!texture) return;
 
             Color[] colors = new Color[texture.width * texture.height];
@@ -538,8 +482,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             texture.Apply(false);
         }
 
-        private static void DestroyTexture(ref Texture2D texture)
-        {
+        private static void DestroyTexture(ref Texture2D texture){
             if (!texture) return;
 
             DestroyImmediate(texture);
@@ -551,8 +494,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         #region Jobs
 
         [BurstCompile]
-        private struct WorldViewJob : IJobParallelFor
-        {
+        private struct WorldViewJob : IJobParallelFor{
             public int Resolution;
             public int2 WorldOffset;
             public byte ShowHumidity;
@@ -565,8 +507,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             [WriteOnly] public NativeArray<Color32> HeightWorldView;
             [WriteOnly] public NativeArray<Color32> ClimateWorldView;
 
-            public void Execute(int index)
-            {
+            public void Execute(int index){
                 int x = index % ViewResolution;
                 int z = index / ViewResolution;
                 float step = Resolution / (float)ViewResolution;
@@ -597,8 +538,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
         }
 
         [BurstCompile]
-        private struct BiomeDistributionJob : IJobParallelFor
-        {
+        private struct BiomeDistributionJob : IJobParallelFor{
             public int Resolution;
             public float Continental;
             public float Elevation;
@@ -607,15 +547,13 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             [ReadOnly] public NativeArray<Color32> BiomeColors;
             [WriteOnly] public NativeArray<Color32> Output;
 
-            public void Execute(int index)
-            {
+            public void Execute(int index){
                 int x = index % Resolution;
                 int y = index / Resolution;
                 float step = 1f / Resolution;
                 float humidity = (x + 0.5f) * step;
                 float temperature = (y + 0.5f) * step;
-                BiomeCalculator.BiomSectionInput input = new()
-                {
+                BiomeCalculator.BiomSectionInput input = new(){
                     Humidity = humidity,
                     Temperature = temperature,
                     Continental = Continental,

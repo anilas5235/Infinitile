@@ -5,14 +5,12 @@ using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Settings;
 using Unity.Mathematics;
 
-namespace Engine.Scripts.Jobs.Core
-{
+namespace Engine.Scripts.Jobs.Core{
     /// <summary>
     /// Central scheduler that orchestrates data, mesh, and collider jobs as a round-robin state machine.
     /// Manages separate priority queues and selects batches according to scheduler settings.
     /// </summary>
-    public class VoxelEngineScheduler
-    {
+    public class VoxelEngineScheduler{
         private readonly ChunkManager _chunkManager;
         private readonly ChunkPool _chunkPool;
         private readonly ChunkScheduler _chunkScheduler;
@@ -39,8 +37,7 @@ namespace Engine.Scripts.Jobs.Core
             ChunkScheduler chunkScheduler,
             ChunkManager chunkManager,
             ColliderBakeScheduler colliderBakeScheduler,
-            ChunkPool chunkPool)
-        {
+            ChunkPool chunkPool){
             _cMeshBuildScheduler = cMeshBuildScheduler;
             _chunkScheduler = chunkScheduler;
             _colliderBakeScheduler = colliderBakeScheduler;
@@ -63,10 +60,8 @@ namespace Engine.Scripts.Jobs.Core
         /// depending on the current step in the round-robin cycle.
         /// </summary>
         /// <param name="focus">The focus position (e.g., player chunk root).</param>
-        internal void ScheduleUpdate(PriorityUtil.Focus focus)
-        {
-            switch (_currentUpdate)
-            {
+        internal void ScheduleUpdate(PriorityUtil.Focus focus){
+            switch (_currentUpdate){
                 case SchedulerUpdate.Data:
                     _dataJobHandler.Update(focus);
                     break;
@@ -85,8 +80,7 @@ namespace Engine.Scripts.Jobs.Core
         /// Updates priorities of all queues and delegates focus update to managers/pool.
         /// </summary>
         /// <param name="focus">The new focus position.</param>
-        internal void FocusUpdate(PriorityUtil.Focus focus)
-        {
+        internal void FocusUpdate(PriorityUtil.Focus focus){
             _dataJobHandler.FocusUpdate(focus);
             _meshJobHandler.FocusUpdate(focus);
             _colliderJobHandler.FocusUpdate(focus);
@@ -97,16 +91,14 @@ namespace Engine.Scripts.Jobs.Core
         /// <summary>
         /// Handles remesh requests by waking up the mesh job handler.
         /// </summary>
-        private void OnRemesh()
-        {
+        private void OnRemesh(){
             _meshJobHandler.WakeUp();
         }
 
         /// <summary>
         /// Cleans up all sub-scheduler resources and event handlers.
         /// </summary>
-        internal void Dispose()
-        {
+        internal void Dispose(){
             _chunkScheduler.Dispose();
             _cMeshBuildScheduler.Dispose();
             _colliderBakeScheduler.Dispose();
@@ -117,12 +109,13 @@ namespace Engine.Scripts.Jobs.Core
         /// <summary>
         /// Enum representing the three job types in the round-robin scheduling cycle.
         /// </summary>
-        private enum SchedulerUpdate : byte
-        {
+        private enum SchedulerUpdate : byte{
             /// <summary>Data generation job update.</summary>
             Data,
+
             /// <summary>Mesh building job update.</summary>
             Mesh,
+
             /// <summary>Collider baking job update.</summary>
             Collider
         }
@@ -156,16 +149,17 @@ namespace Engine.Scripts.Jobs.Core
 
         #endregion
     }
-    
+
     /// <summary>
     /// Enum representing the three steps in the scheduler state machine.
     /// </summary>
-    internal enum SchedulerStep
-    {
+    internal enum SchedulerStep{
         /// <summary>Updating and enqueuing new work items.</summary>
         UpdateQueues,
+
         /// <summary>Dispatching jobs to sub-schedulers.</summary>
         JobUpdate,
+
         /// <summary>Collecting and processing results.</summary>
         CollectResults
     }

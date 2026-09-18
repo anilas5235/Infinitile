@@ -5,14 +5,12 @@ using Unity.Mathematics;
 using static Engine.Scripts.Utils.VoxelConstants;
 using Random = Unity.Mathematics.Random;
 
-namespace Engine.Scripts.Jobs.Chunk
-{
+namespace Engine.Scripts.Jobs.Chunk{
     /// <summary>
     ///     Provides Burst-compiled helpers to place biome-dependent vegetation such as trees,
     ///     grass, cacti, crops and mushrooms on top of generated terrain.
     /// </summary>
-    internal partial struct ChunkJob
-    {
+    internal partial struct ChunkJob{
         /// <summary>
         ///     Places vegetation for every suitable surface column in the chunk using biome information
         ///     and a deterministic random stream derived from chunk position and global seed.
@@ -25,14 +23,12 @@ namespace Engine.Scripts.Jobs.Chunk
         [BurstCompile]
         public static void PlaceVegetation(ref NativeArray<ushort> vox,
             ref NativeArray<ChunkColumn> chunkColumns,
-            ref int3 chunkWordPos, int randomSeed, ref GeneratorConfig config)
-        {
+            ref int3 chunkWordPos, int randomSeed, ref GeneratorConfig config){
             uint seed = (uint)((chunkWordPos.x * 73856093) ^ (chunkWordPos.z * 19349663) ^ randomSeed ^ 0x85ebca6b);
             Random rng = new(seed == 0 ? 1u : seed);
 
             for (int x = 1; x < ChunkWidth - 1; x++)
-            for (int z = 1; z < ChunkDepth - 1; z++)
-            {
+            for (int z = 1; z < ChunkDepth - 1; z++){
                 int gi = GetColumnIdx(x, z, ChunkDepth);
                 ChunkColumn chunkCol = chunkColumns[gi];
                 int gy = chunkCol.Height;
@@ -40,36 +36,31 @@ namespace Engine.Scripts.Jobs.Chunk
             }
         }
 
-        private static bool SurfaceHasNeighbor(ref NativeArray<ushort> vox, int cx, int cy, int cz, ushort waterId)
-        {
+        private static bool SurfaceHasNeighbor(ref NativeArray<ushort> vox, int cx, int cy, int cz, ushort waterId){
             int neighbors = 0;
             int3 pos = new(cx - 1, cy, cz);
-            if (InChunk(ref pos))
-            {
+            if (InChunk(ref pos)){
                 ushort voxel = vox[ChunkSize.Flatten(pos)];
                 if (voxel != 0 && voxel != waterId)
                     neighbors++;
             }
 
             pos = new int3(cx + 1, cy, cz);
-            if (InChunk(ref pos))
-            {
+            if (InChunk(ref pos)){
                 ushort voxel = vox[ChunkSize.Flatten(pos)];
                 if (voxel != 0 && voxel != waterId)
                     neighbors++;
             }
 
             pos = new int3(cx, cy, cz + 1);
-            if (InChunk(ref pos))
-            {
+            if (InChunk(ref pos)){
                 ushort voxel = vox[ChunkSize.Flatten(pos)];
                 if (voxel != 0 && voxel != waterId)
                     neighbors++;
             }
 
             pos = new int3(cx, cy, cz - 1);
-            if (InChunk(ref pos))
-            {
+            if (InChunk(ref pos)){
                 ushort voxel = vox[ChunkSize.Flatten(pos)];
                 if (voxel != 0 && voxel != waterId)
                     neighbors++;

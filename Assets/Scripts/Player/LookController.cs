@@ -1,14 +1,12 @@
 ﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
-namespace Player
-{
+namespace Player{
     /// <summary>
     /// Handles first-person style camera look using mouse or gamepad input,
     /// rotating the target camera and player transform.
     /// </summary>
-    public class LookController : MonoBehaviour
-    {
+    public class LookController : MonoBehaviour{
         private Vector2 _lookInput;
         private float _pitch; // vertical rotation
 
@@ -24,8 +22,7 @@ namespace Player
 
         [SerializeField] private Camera targetCamera;
 
-        private void Start()
-        {
+        private void Start(){
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }
@@ -34,13 +31,11 @@ namespace Player
         /// Input System callback for look input (mouse delta / right stick).
         /// </summary>
         /// <param name="value">2D look delta.</param>
-        public void OnLook(InputValue value)
-        {
+        public void OnLook(InputValue value){
             _lookInput = value.Get<Vector2>();
         }
 
-        private void Update()
-        {
+        private void Update(){
             if (!(_lookInput.sqrMagnitude > 0.0001f)) return;
 
             // Yaw (horizontal)

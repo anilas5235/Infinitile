@@ -4,15 +4,13 @@ using Unity.Collections;
 using Unity.Mathematics;
 using static Unity.Mathematics.noise;
 
-namespace Engine.Scripts.Noise
-{
+namespace Engine.Scripts.Noise{
     /// <summary>
     ///     Immutable noise profile wrapper that holds configuration for multi-octave 2D noise
     ///     used in terrain generation.
     /// </summary>
     [BurstCompile]
-    public struct NoiseProfile : IDisposable
-    {
+    public struct NoiseProfile : IDisposable{
         [ReadOnly] private NativeArray<float2> _octaveData; // (frequency, amplitude)
         private readonly float _maxAmplitude;
         private readonly float2 _seedOffset;
@@ -23,8 +21,7 @@ namespace Engine.Scripts.Noise
         ///     ensuring a valid scale value.
         /// </summary>
         /// <param name="settings">Noise parameters such as seed, scale, persistence, lacunarity and octaves.</param>
-        public NoiseProfile(Settings settings)
-        {
+        public NoiseProfile(Settings settings){
             Settings s = settings;
             _scale = s.Scale <= 0f ? 0.0001f : s.Scale;
 
@@ -37,8 +34,7 @@ namespace Engine.Scripts.Noise
             float frequency = 1f;
             float maxAmp = 0f;
 
-            for (int i = 0; i < s.Octaves; i++)
-            {
+            for (int i = 0; i < s.Octaves; i++){
                 _octaveData[i] = new float2(frequency, amplitude);
                 maxAmp += amplitude;
 
@@ -54,8 +50,7 @@ namespace Engine.Scripts.Noise
         /// </summary>
         /// <param name="pos">Position in world space used as input for the noise function.</param>
         /// <returns>Noise value in the range [0,1].</returns>
-        public float GetNoise(float2 pos)
-        {
+        public float GetNoise(float2 pos){
             float2 samplePos = (pos + _seedOffset) / _scale;
 
             float sum = 0f;
@@ -68,8 +63,7 @@ namespace Engine.Scripts.Noise
         ///     Serializable settings used to configure a <see cref="NoiseProfile" />.
         /// </summary>
         [Serializable]
-        public struct Settings
-        {
+        public struct Settings{
             /// <summary>
             ///     Integer seed used to offset noise sampling and make results deterministic.
             /// </summary>
@@ -96,8 +90,7 @@ namespace Engine.Scripts.Noise
             public int Octaves;
         }
 
-        public void Dispose()
-        {
+        public void Dispose(){
             _octaveData.Dispose();
         }
     }

@@ -16,14 +16,12 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Engine.Scripts.Jobs.ColliderMeshing
-{
+namespace Engine.Scripts.Jobs.ColliderMeshing{
     /// <summary>
     ///     Schedules and executes mesh build jobs for Partitions, creates collider meshes
     ///     using a greedy meshing algorithm and applying the results to chunk behaviors.
     /// </summary>
-    internal sealed class CMeshBuildScheduler : JobScheduler
-    {
+    internal sealed class CMeshBuildScheduler : JobScheduler{
         private const MeshUpdateFlags MeshFlags = MeshUpdateFlags.DontRecalculateBounds |
                                                   MeshUpdateFlags.DontValidateIndices |
                                                   MeshUpdateFlags.DontResetBoneBounds;
@@ -63,16 +61,14 @@ namespace Engine.Scripts.Jobs.ColliderMeshing
             ChunkPool chunkPool,
             VoxelRegistry voxelRegistry,
             VoxelWorld world
-        )
-        {
+        ){
             _chunkManager = chunkManager;
             _chunkPool = chunkPool;
             _voxelRegistry = voxelRegistry;
             _world = world;
 
             // Collider uses only Position and Normal from CVertex
-            _colliderVertexParams = new NativeArray<VertexAttributeDescriptor>(2, Allocator.Domain)
-            {
+            _colliderVertexParams = new NativeArray<VertexAttributeDescriptor>(2, Allocator.Domain){
                 [0] = new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float16, 4),
                 [1] = new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float16, 4)
             };
@@ -92,8 +88,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing
         ///     Allocates writable mesh data arrays and schedules the Burst job.
         /// </summary>
         /// <param name="jobs">List of chunk positions whose meshes should be generated or updated.</param>
-        internal void Start(HashSet<int3> jobs)
-        {
+        internal void Start(HashSet<int3> jobs){
             StartRecord();
 
             IsReady = false;
@@ -104,8 +99,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing
 
             _colliderMeshDataArray = Mesh.AllocateWritableMeshData(_jobs.Length);
 
-            CMeshBuildJob job = new()
-            {
+            CMeshBuildJob job = new(){
                 Accessor = _chunkAccessor,
                 Jobs = _jobs,
                 ColliderVertexParams = _colliderVertexParams,
@@ -122,15 +116,13 @@ namespace Engine.Scripts.Jobs.ColliderMeshing
         ///     Completes the scheduled mesh build jobs, applies the generated mesh data to chunk meshes
         ///     and colliders, recalculates bounds and logs timing information.
         /// </summary>
-        internal void Complete()
-        {
+        internal void Complete(){
             double start = Time.realtimeSinceStartupAsDouble;
             _handle.Complete();
 
             Mesh[] colliderMeshes = new Mesh[_jobs.Length];
 
-            for (int index = 0; index < _jobs.Length; index++)
-            {
+            for (int index = 0; index < _jobs.Length; index++){
                 int3 pos = _jobs[index];
                 ChunkPartition partition = _chunkPool.GetOrClaimPartition(pos);
                 _chunkManager.ReMeshedPartition(pos);
@@ -148,27 +140,28 @@ namespace Engine.Scripts.Jobs.ColliderMeshing
             );
 
             double totalTime = (Time.realtimeSinceStartupAsDouble - start) * 1000;
-            if (totalTime >= 4)
+            if (totalTime >= 4){
                 VoxelEngineLogger.Warn<CMeshBuildScheduler>(
                     $"Built {_jobs.Length} meshes, Collected Results in <color=red>{totalTime:0.000}</color>ms"
                 );
+            }
 
             _results.Clear();
             _jobs.Clear();
 
             IsReady = true;
             long totalJobTime = StopRecord();
-            if (totalJobTime > 100)
+            if (totalJobTime > 100){
                 VoxelEngineLogger.Warn<CMeshBuildScheduler>(
                     $"Total Mesh Build Time for {_jobs.Length} jobs: <color=red>{totalJobTime:0.000}</color>ms"
                 );
+            }
         }
 
         /// <summary>
         ///     Disposes all native containers and completes any running jobs before releasing resources.
         /// </summary>
-        internal void Dispose()
-        {
+        internal void Dispose(){
             _handle.Complete();
 
             _colliderVertexParams.Dispose();

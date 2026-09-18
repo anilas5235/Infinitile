@@ -1,14 +1,12 @@
 ﻿using System;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Data.Mesh
-{
+namespace Engine.Scripts.VoxelConfig.Data.Mesh{
     /// <summary>
     /// Describes a voxel shape as a list of quads and their draw conditions.
     /// </summary>
     [CreateAssetMenu(fileName = "Shape", menuName = "Infinitile/Mesh/Shape")]
-    public class VoxelShape : ScriptableObject
-    {
+    public class VoxelShape : ScriptableObject{
         /// <summary>
         /// The quads that make up this voxel shape.
         /// </summary>
@@ -19,8 +17,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Mesh
     /// Associates a quad definition with the condition under which it should be drawn.
     /// </summary>
     [Serializable]
-    public class VoxelQuad
-    {
+    public class VoxelQuad{
         /// <summary>
         /// The quad definition used for rendering.
         /// </summary>
@@ -35,20 +32,25 @@ namespace Engine.Scripts.VoxelConfig.Data.Mesh
     /// <summary>
     /// Specifies the face condition required for drawing a quad.
     /// </summary>
-    public enum QuadDrawCondition
-    {
+    public enum QuadDrawCondition{
         /// <summary>Draw the quad always.</summary>
         Always,
+
         /// <summary>Draw the quad when the face points up.</summary>
         Up,
+
         /// <summary>Draw the quad when the face points down.</summary>
         Down,
+
         /// <summary>Draw the quad when the face points forward.</summary>
         Forward,
+
         /// <summary>Draw the quad when the face points backward.</summary>
         Backward,
+
         /// <summary>Draw the quad when the face points left.</summary>
         Left,
+
         /// <summary>Draw the quad when the face points right.</summary>
         Right
     }

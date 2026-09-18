@@ -5,14 +5,12 @@ using Player;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace UI
-{
+namespace UI{
     /// <summary>
     /// Simple UI widget that displays the texture of the currently selected voxel
     /// and listens to changes from the <see cref="VoxelEditor"/>.
     /// </summary>
-    public class VoxelSelect : MonoBehaviour
-    {
+    public class VoxelSelect : MonoBehaviour{
         /// <summary>
         /// UI element that shows the preview texture of the selected voxel.
         /// </summary>
@@ -28,14 +26,12 @@ namespace UI
         /// </summary>
         public VoxelEditor voxelEditor;
 
-        private void OnEnable()
-        {
+        private void OnEnable(){
             voxelEditor.OnVoxelIdChanged += OnVoxelIdChanged;
             OnVoxelIdChanged(voxelEditor.voxelId);
         }
 
-        private void OnDisable()
-        {
+        private void OnDisable(){
             voxelEditor.OnVoxelIdChanged -= OnVoxelIdChanged;
         }
 
@@ -43,18 +39,14 @@ namespace UI
         /// Updates the stored voxel ID and UI texture whenever the editor selection changes.
         /// </summary>
         /// <param name="newVoxelId">Newly selected voxel ID.</param>
-        private void OnVoxelIdChanged(ushort newVoxelId)
-        {
+        private void OnVoxelIdChanged(ushort newVoxelId){
             voxelId = newVoxelId;
-            if (DataImporter.Instance.VoxelRegistry.TryGet(voxelId, out Voxel definition))
-            {
+            if (DataImporter.Instance.VoxelRegistry.TryGet(voxelId, out Voxel definition)){
                 Texture2D tex = definition.GetDisplayTexture(QuadDrawCondition.Forward);
                 voxelImage.texture = tex;
             }
             else
-            {
                 voxelImage.texture = null;
-            }
         }
     }
 }

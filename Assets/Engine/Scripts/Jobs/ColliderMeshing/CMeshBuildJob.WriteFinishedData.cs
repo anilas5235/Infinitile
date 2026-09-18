@@ -5,20 +5,16 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using static Engine.Scripts.Utils.VoxelConstants;
 
-namespace Engine.Scripts.Jobs.ColliderMeshing
-{
-    internal partial struct CMeshBuildJob
-    {
+namespace Engine.Scripts.Jobs.ColliderMeshing{
+    internal partial struct CMeshBuildJob{
         private static readonly Bounds Bounds = new((PartitionSize / (int3)2).GetVector3(), PartitionSize.GetVector3());
 
-        private void WriteResults(int index, ref PartitionJobData jobData)
-        {
+        private void WriteResults(int index, ref PartitionJobData jobData){
             FillColliderMeshData(in jobData);
 
             Results.TryAdd(
                 jobData.PartitionPos,
-                new PartitionJobResult
-                {
+                new PartitionJobResult{
                     Index = index,
                     PartitionPos = jobData.PartitionPos,
                     ColliderBounds = Bounds
@@ -26,8 +22,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing
             );
         }
 
-        private void FillColliderMeshData(in PartitionJobData jobData)
-        {
+        private void FillColliderMeshData(in PartitionJobData jobData){
             CMeshBuffer cMeshBuffer = jobData.CMeshBuffer;
             Mesh.MeshData colliderMesh = jobData.ColliderMesh;
 

@@ -55,7 +55,6 @@ uint _VoxelsPerChunk;
 
 void BuildPrep(uint3 id : SV_DispatchThreadID)
 {
-
     uint start_interval = 1 + id.x * INTERVALS_PER_THREAD; //+1 because interval 0 is metadata   
 
     uint total_intervals = _CompChunk[0].x;

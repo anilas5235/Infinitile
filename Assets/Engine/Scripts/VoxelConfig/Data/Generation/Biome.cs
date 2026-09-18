@@ -2,14 +2,12 @@ using System;
 using Engine.Scripts.VoxelConfig.Registry;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Data.Generation
-{
+namespace Engine.Scripts.VoxelConfig.Data.Generation{
     /// <summary>
     ///     Defines a biome with its associated structures and configurations.
     /// </summary>
     [CreateAssetMenu(fileName = "BiomeDefinition", menuName = "Infinitile/Generation/Biome")]
-    public class Biome : ScriptableObject
-    {
+    public class Biome : ScriptableObject{
         [SerializeField] public Voxel.Voxel TopBlock;
 
         [SerializeField] public Voxel.Voxel UnderBlock;
@@ -26,10 +24,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation
 
         [SerializeField] public Color RepresentativeColor = Color.magenta;
 
-        public BiomeDef ToStruct(VoxelRegistry voxelRegistry)
-        {
-            return new BiomeDef
-            {
+        public BiomeDef ToStruct(VoxelRegistry voxelRegistry) =>
+            new(){
                 topBlock = voxelRegistry.GetIdOrThrow(TopBlock.GetFullName()),
                 underBlock = voxelRegistry.GetIdOrThrow(UnderBlock.GetFullName()),
                 stoneBlock = voxelRegistry.GetIdOrThrow(StoneBlock.GetFullName()),
@@ -38,21 +34,16 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation
                 targetContinental = TargetContinental,
                 targetElevation = TargetHeight
             };
-        }
-        
-        public BiomeDef ToStruct()
-        {
-            return new BiomeDef
-            {
+
+        public BiomeDef ToStruct() =>
+            new(){
                 targetHumidity = TargetHumidity,
                 targetTemperature = TargetTemperature,
                 targetContinental = TargetContinental,
                 targetElevation = TargetHeight
             };
-        }
 
-        public struct BiomeDef : IDisposable
-        {
+        public struct BiomeDef : IDisposable{
             public ushort topBlock;
             public ushort underBlock;
             public ushort stoneBlock;
@@ -61,9 +52,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation
             public float targetContinental;
             public float targetElevation;
 
-            public void Dispose()
-            {
-            }
+            public void Dispose(){ }
         }
     }
 }

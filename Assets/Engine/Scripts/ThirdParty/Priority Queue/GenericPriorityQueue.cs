@@ -2,16 +2,14 @@
 using System.Collections;
 using System.Collections.Generic;
 
-namespace Engine.Scripts.ThirdParty.Priority_Queue
-{
+namespace Engine.Scripts.ThirdParty.Priority_Queue{
     /// <summary>
     ///     A copy of StablePriorityQueue which also has generic priority-type
     /// </summary>
     /// <typeparam name="TItem">The values in the queue.  Must extend the GenericPriorityQueueNode class</typeparam>
     /// <typeparam name="TPriority">The priority-type.  Must extend IComparable&lt;TPriority&gt;</typeparam>
     public sealed class GenericPriorityQueue<TItem, TPriority> : IFixedSizePriorityQueue<TItem, TPriority>
-        where TItem : GenericPriorityQueueNode<TPriority>
-    {
+        where TItem : GenericPriorityQueueNode<TPriority>{
         private TItem[] _nodes;
         private long _numNodesEverEnqueued;
         private readonly Comparison<TPriority> _comparer;
@@ -20,26 +18,21 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
         ///     Instantiate a new Priority Queue
         /// </summary>
         /// <param name="maxNodes">The max nodes ever allowed to be enqueued (going over this will cause undefined behavior)</param>
-        public GenericPriorityQueue(int maxNodes) : this(maxNodes, Comparer<TPriority>.Default)
-        {
-        }
+        public GenericPriorityQueue(int maxNodes) : this(maxNodes, Comparer<TPriority>.Default){ }
 
         /// <summary>
         ///     Instantiate a new Priority Queue
         /// </summary>
         /// <param name="maxNodes">The max nodes ever allowed to be enqueued (going over this will cause undefined behavior)</param>
         /// <param name="comparer">The comparer used to compare TPriority values.</param>
-        public GenericPriorityQueue(int maxNodes, IComparer<TPriority> comparer) : this(maxNodes, comparer.Compare)
-        {
-        }
+        public GenericPriorityQueue(int maxNodes, IComparer<TPriority> comparer) : this(maxNodes, comparer.Compare){ }
 
         /// <summary>
         ///     Instantiate a new Priority Queue
         /// </summary>
         /// <param name="maxNodes">The max nodes ever allowed to be enqueued (going over this will cause undefined behavior)</param>
         /// <param name="comparer">The comparison function to use to compare TPriority values</param>
-        public GenericPriorityQueue(int maxNodes, Comparison<TPriority> comparer)
-        {
+        public GenericPriorityQueue(int maxNodes, Comparison<TPriority> comparer){
 #if DEBUG
             if (maxNodes <= 0) throw new InvalidOperationException("New queue size cannot be smaller than 1");
 #endif
@@ -54,7 +47,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
         ///     Returns the number of nodes in the queue.
         ///     O(1)
         /// </summary>
-        public int Count { get; private set; }
+        public int Count{ get; private set; }
 
         /// <summary>
         ///     Returns the maximum number of items that can be enqueued at once in this queue.  Once you hit this number (i.e.
@@ -70,8 +63,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
 #if NET_VERSION_4_5
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
-        public void Clear()
-        {
+        public void Clear(){
             Array.Clear(_nodes, 1, Count);
             Count = 0;
         }
@@ -85,14 +77,14 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
 #if NET_VERSION_4_5
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
-        public bool Contains(TItem node)
-        {
+        public bool Contains(TItem node){
 #if DEBUG
             if (node == null) throw new ArgumentNullException("node");
 
-            if (node.Queue != null && !Equals(node.Queue))
+            if (node.Queue != null && !Equals(node.Queue)){
                 throw new InvalidOperationException(
                     "node.Contains was called on a node from another queue.  Please call originalQueue.ResetNode() first");
+            }
 
             if (node.QueueIndex < 0 || node.QueueIndex >= _nodes.Length)
                 throw new InvalidOperationException("node.QueueIndex has been corrupted. Did you change it manually?");
@@ -112,17 +104,17 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
 #if NET_VERSION_4_5
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
-        public void Enqueue(TItem node, TPriority priority)
-        {
+        public void Enqueue(TItem node, TPriority priority){
 #if DEBUG
             if (node == null) throw new ArgumentNullException("node");
 
             if (Count >= _nodes.Length - 1)
                 throw new InvalidOperationException("Queue is full - node cannot be added: " + node);
 
-            if (node.Queue != null && !Equals(node.Queue))
+            if (node.Queue != null && !Equals(node.Queue)){
                 throw new InvalidOperationException(
                     "node.Enqueue was called on a node from another queue.  Please call originalQueue.ResetNode() first");
+            }
 
             if (Contains(node)) throw new InvalidOperationException("Node is already enqueued: " + node);
 
@@ -140,12 +132,10 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
 #if NET_VERSION_4_5
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
-        private void CascadeUp(TItem node)
-        {
+        private void CascadeUp(TItem node){
             //aka Heapify-up
             int parent;
-            if (node.QueueIndex > 1)
-            {
+            if (node.QueueIndex > 1){
                 parent = node.QueueIndex >> 1;
                 TItem parentNode = _nodes[parent];
                 if (HasHigherPriority(parentNode, node))
@@ -158,12 +148,9 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
                 node.QueueIndex = parent;
             }
             else
-            {
                 return;
-            }
 
-            while (parent > 1)
-            {
+            while (parent > 1){
                 parent >>= 1;
                 TItem parentNode = _nodes[parent];
                 if (HasHigherPriority(parentNode, node))
@@ -182,8 +169,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
 #if NET_VERSION_4_5
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
-        private void CascadeDown(TItem node)
-        {
+        private void CascadeDown(TItem node){
             //aka Heapify-down
             int finalQueueIndex = node.QueueIndex;
             int childLeftIndex = 2 * finalQueueIndex;
@@ -194,11 +180,9 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
             // Check if the left-child is higher-priority than the current node
             int childRightIndex = childLeftIndex + 1;
             TItem childLeft = _nodes[childLeftIndex];
-            if (HasHigherPriority(childLeft, node))
-            {
+            if (HasHigherPriority(childLeft, node)){
                 // Check if there is a right child. If not, swap and finish.
-                if (childRightIndex > Count)
-                {
+                if (childRightIndex > Count){
                     node.QueueIndex = childLeftIndex;
                     childLeft.QueueIndex = finalQueueIndex;
                     _nodes[finalQueueIndex] = childLeft;
@@ -208,15 +192,13 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
 
                 // Check if the left-child is higher-priority than the right-child
                 TItem childRight = _nodes[childRightIndex];
-                if (HasHigherPriority(childLeft, childRight))
-                {
+                if (HasHigherPriority(childLeft, childRight)){
                     // left is highest, move it up and continue
                     childLeft.QueueIndex = finalQueueIndex;
                     _nodes[finalQueueIndex] = childLeft;
                     finalQueueIndex = childLeftIndex;
                 }
-                else
-                {
+                else{
                     // right is even higher, move it up and continue
                     childRight.QueueIndex = finalQueueIndex;
                     _nodes[finalQueueIndex] = childRight;
@@ -225,33 +207,25 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
             }
             // Not swapping with left-child, does right-child exist?
             else if (childRightIndex > Count)
-            {
                 return;
-            }
-            else
-            {
+            else{
                 // Check if the right-child is higher-priority than the current node
                 TItem childRight = _nodes[childRightIndex];
-                if (HasHigherPriority(childRight, node))
-                {
+                if (HasHigherPriority(childRight, node)){
                     childRight.QueueIndex = finalQueueIndex;
                     _nodes[finalQueueIndex] = childRight;
                     finalQueueIndex = childRightIndex;
                 }
                 // Neither child is higher-priority than current, so finish and stop.
                 else
-                {
                     return;
-                }
             }
 
-            while (true)
-            {
+            while (true){
                 childLeftIndex = 2 * finalQueueIndex;
 
                 // If leaf node, we're done
-                if (childLeftIndex > Count)
-                {
+                if (childLeftIndex > Count){
                     node.QueueIndex = finalQueueIndex;
                     _nodes[finalQueueIndex] = node;
                     break;
@@ -260,11 +234,9 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
                 // Check if the left-child is higher-priority than the current node
                 childRightIndex = childLeftIndex + 1;
                 childLeft = _nodes[childLeftIndex];
-                if (HasHigherPriority(childLeft, node))
-                {
+                if (HasHigherPriority(childLeft, node)){
                     // Check if there is a right child. If not, swap and finish.
-                    if (childRightIndex > Count)
-                    {
+                    if (childRightIndex > Count){
                         node.QueueIndex = childLeftIndex;
                         childLeft.QueueIndex = finalQueueIndex;
                         _nodes[finalQueueIndex] = childLeft;
@@ -274,15 +246,13 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
 
                     // Check if the left-child is higher-priority than the right-child
                     TItem childRight = _nodes[childRightIndex];
-                    if (HasHigherPriority(childLeft, childRight))
-                    {
+                    if (HasHigherPriority(childLeft, childRight)){
                         // left is highest, move it up and continue
                         childLeft.QueueIndex = finalQueueIndex;
                         _nodes[finalQueueIndex] = childLeft;
                         finalQueueIndex = childLeftIndex;
                     }
-                    else
-                    {
+                    else{
                         // right is even higher, move it up and continue
                         childRight.QueueIndex = finalQueueIndex;
                         _nodes[finalQueueIndex] = childRight;
@@ -290,25 +260,21 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
                     }
                 }
                 // Not swapping with left-child, does right-child exist?
-                else if (childRightIndex > Count)
-                {
+                else if (childRightIndex > Count){
                     node.QueueIndex = finalQueueIndex;
                     _nodes[finalQueueIndex] = node;
                     break;
                 }
-                else
-                {
+                else{
                     // Check if the right-child is higher-priority than the current node
                     TItem childRight = _nodes[childRightIndex];
-                    if (HasHigherPriority(childRight, node))
-                    {
+                    if (HasHigherPriority(childRight, node)){
                         childRight.QueueIndex = finalQueueIndex;
                         _nodes[finalQueueIndex] = childRight;
                         finalQueueIndex = childRightIndex;
                     }
                     // Neither child is higher-priority than current, so finish and stop.
-                    else
-                    {
+                    else{
                         node.QueueIndex = finalQueueIndex;
                         _nodes[finalQueueIndex] = node;
                         break;
@@ -324,8 +290,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
 #if NET_VERSION_4_5
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
-        private bool HasHigherPriority(TItem higher, TItem lower)
-        {
+        private bool HasHigherPriority(TItem higher, TItem lower){
             int cmp = _comparer(higher.Priority, lower.Priority);
             return cmp < 0 || (cmp == 0 && higher.InsertionIndex < lower.InsertionIndex);
         }
@@ -338,21 +303,20 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
 #if NET_VERSION_4_5
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
-        public TItem Dequeue()
-        {
+        public TItem Dequeue(){
 #if DEBUG
             if (Count <= 0) throw new InvalidOperationException("Cannot call Dequeue() on an empty queue");
 
-            if (!IsValidQueue())
+            if (!IsValidQueue()){
                 throw new InvalidOperationException(
                     "Queue has been corrupted (Did you update a node priority manually instead of calling UpdatePriority()?" +
                     "Or add the same node to two different queues?)");
+            }
 #endif
 
             TItem returnMe = _nodes[1];
             //If the node is already the last node, we can remove it immediately
-            if (Count == 1)
-            {
+            if (Count == 1){
                 _nodes[1] = null;
                 Count = 0;
                 return returnMe;
@@ -375,14 +339,14 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
         ///     Attempting to decrease the queue size to a size too small to hold the existing nodes results in undefined behavior
         ///     O(n)
         /// </summary>
-        public void Resize(int maxNodes)
-        {
+        public void Resize(int maxNodes){
 #if DEBUG
             if (maxNodes <= 0) throw new InvalidOperationException("Queue size cannot be smaller than 1");
 
-            if (maxNodes < Count)
+            if (maxNodes < Count){
                 throw new InvalidOperationException("Called Resize(" + maxNodes + "), but current queue contains " +
                                                     Count + " nodes");
+            }
 #endif
 
             TItem[] newArray = new TItem[maxNodes + 1];
@@ -396,10 +360,8 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
         ///     If the queue is empty, behavior is undefined.
         ///     O(1)
         /// </summary>
-        public TItem First
-        {
-            get
-            {
+        public TItem First{
+            get{
 #if DEBUG
                 if (Count <= 0) throw new InvalidOperationException("Cannot call .First on an empty queue");
 #endif
@@ -417,17 +379,17 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
 #if NET_VERSION_4_5
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
-        public void UpdatePriority(TItem node, TPriority priority)
-        {
+        public void UpdatePriority(TItem node, TPriority priority){
 #if DEBUG
             if (node == null) throw new ArgumentNullException("node");
 
             if (node.Queue != null && !Equals(node.Queue))
                 throw new InvalidOperationException("node.UpdatePriority was called on a node from another queue");
 
-            if (!Contains(node))
+            if (!Contains(node)){
                 throw new InvalidOperationException("Cannot call UpdatePriority() on a node which is not enqueued: " +
                                                     node);
+            }
 #endif
 
             node.Priority = priority;
@@ -437,8 +399,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
 #if NET_VERSION_4_5
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
-        private void OnNodeUpdated(TItem node)
-        {
+        private void OnNodeUpdated(TItem node){
             //Bubble the updated node up or down as appropriate
             int parentIndex = node.QueueIndex >> 1;
 
@@ -457,8 +418,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
 #if NET_VERSION_4_5
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
-        public void Remove(TItem node)
-        {
+        public void Remove(TItem node){
 #if DEBUG
             if (node == null) throw new ArgumentNullException("node");
 
@@ -470,8 +430,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
 #endif
 
             //If the node is already the last node, we can remove it immediately
-            if (node.QueueIndex == Count)
-            {
+            if (node.QueueIndex == Count){
                 _nodes[Count] = null;
                 Count--;
                 return;
@@ -495,8 +454,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
 #if NET_VERSION_4_5
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
-        public void ResetNode(TItem node)
-        {
+        public void ResetNode(TItem node){
 #if DEBUG
             if (node == null) throw new ArgumentNullException("node");
 
@@ -513,8 +471,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
         }
 
 
-        public IEnumerator<TItem> GetEnumerator()
-        {
+        public IEnumerator<TItem> GetEnumerator(){
 #if NET_VERSION_4_5 // ArraySegment does not implement IEnumerable before 4.5
             IEnumerable<TItem> e = new ArraySegment<TItem>(_nodes, 1, _numNodes);
             return e.GetEnumerator();
@@ -524,20 +481,15 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
 #endif
         }
 
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         /// <summary>
         ///     <b>Should not be called in production code.</b>
         ///     Checks to make sure the queue is still in a valid state.  Used for testing/debugging the queue.
         /// </summary>
-        public bool IsValidQueue()
-        {
-            for (int i = 1; i < _nodes.Length; i++)
-                if (_nodes[i] != null)
-                {
+        public bool IsValidQueue(){
+            for (int i = 1; i < _nodes.Length; i++){
+                if (_nodes[i] != null){
                     int childLeftIndex = 2 * i;
                     if (childLeftIndex < _nodes.Length && _nodes[childLeftIndex] != null &&
                         HasHigherPriority(_nodes[childLeftIndex], _nodes[i]))
@@ -548,6 +500,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
                         HasHigherPriority(_nodes[childRightIndex], _nodes[i]))
                         return false;
                 }
+            }
 
             return true;
         }

@@ -2,10 +2,8 @@
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelConstants;
 
-namespace Engine.Scripts.Behaviour
-{
-    public class ChunkPartition : MonoBehaviour
-    {
+namespace Engine.Scripts.Behaviour{
+    public class ChunkPartition : MonoBehaviour{
 #if UNITY_EDITOR
         public static bool ShowPartitionGizmos = false;
 #endif
@@ -14,23 +12,21 @@ namespace Engine.Scripts.Behaviour
         /// <summary>
         ///     Dedicated mesh for collider (not shared with render mesh).
         /// </summary>
-        public Mesh ColliderMesh { get; private set; }
+        public Mesh ColliderMesh{ get; private set; }
 
         /// <summary>
         ///     Access to the underlying MeshCollider.
         /// </summary>
         public MeshCollider Collider => _Collider;
 
-        public short PartitionId { get; private set; }
+        public short PartitionId{ get; private set; }
 
-        private void Awake()
-        {
-            ColliderMesh = new Mesh { name = "PCollider" };
+        private void Awake(){
+            ColliderMesh = new Mesh{ name = "PCollider" };
         }
 
 #if UNITY_EDITOR
-        private void OnDrawGizmosSelected()
-        {
+        private void OnDrawGizmosSelected(){
             if (!ShowPartitionGizmos) return;
 
             Gizmos.color = Color.green;
@@ -43,19 +39,16 @@ namespace Engine.Scripts.Behaviour
         }
 #endif
 
-        public void Init(int pId)
-        {
+        public void Init(int pId){
             PartitionId = (short)pId;
             transform.localPosition = new Vector3(0, PartitionHeight * pId, 0);
         }
 
-        public void ApplyColliderMesh()
-        {
+        public void ApplyColliderMesh(){
             Collider.sharedMesh = ColliderMesh;
         }
 
-        public void Clear()
-        {
+        public void Clear(){
             ColliderMesh.Clear();
             Collider.sharedMesh = null;
         }

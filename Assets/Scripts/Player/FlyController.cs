@@ -1,14 +1,12 @@
 ﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
-namespace Player
-{
+namespace Player{
     /// <summary>
     /// Simple free-fly character controller driven by the Unity Input System,
     /// moving relative to a target camera orientation.
     /// </summary>
-    public class FlyController : MonoBehaviour
-    {
+    public class FlyController : MonoBehaviour{
         private Vector2 _moveInput;
         private bool _sprintInput;
         private float _pitch; // vertical rotation
@@ -25,8 +23,7 @@ namespace Player
         private bool _jumpInput;
         private bool _crouchInput;
 
-        private void OnEnable()
-        {
+        private void OnEnable(){
             _controller = GetComponent<CharacterController>();
         }
 
@@ -34,8 +31,7 @@ namespace Player
         /// Input System callback for movement input (WASD / left stick).
         /// </summary>
         /// <param name="value">2D movement vector.</param>
-        public void OnMove(InputValue value)
-        {
+        public void OnMove(InputValue value){
             _moveInput = value.Get<Vector2>();
         }
 
@@ -43,8 +39,7 @@ namespace Player
         /// Input System callback for sprint toggle.
         /// </summary>
         /// <param name="value">Button state indicating whether sprint is active.</param>
-        public void OnSprint(InputValue value)
-        {
+        public void OnSprint(InputValue value){
             _sprintInput = value.isPressed;
         }
 
@@ -52,8 +47,7 @@ namespace Player
         /// Input System callback for jump (ascend) in fly mode.
         /// </summary>
         /// <param name="value">Button state indicating whether ascend is active.</param>
-        public void OnJump(InputValue value)
-        {
+        public void OnJump(InputValue value){
             _jumpInput = value.isPressed;
         }
 
@@ -61,13 +55,11 @@ namespace Player
         /// Input System callback for crouch (descend) in fly mode.
         /// </summary>
         /// <param name="value">Button state indicating whether descend is active.</param>
-        public void OnCrouch(InputValue value)
-        {
+        public void OnCrouch(InputValue value){
             _crouchInput = value.isPressed;
         }
 
-        private void Update()
-        {
+        private void Update(){
             _verticalInput = 0f;
             if (_jumpInput) _verticalInput += 1f;
             if (_crouchInput) _verticalInput -= 1f;
@@ -82,7 +74,7 @@ namespace Player
             if (forward.magnitude > 0.01f) forward.Normalize();
             if (right.magnitude > 0.01f) right.Normalize();
             // Create movement direction
-            Vector3 moveDirection = (forward * _moveInput.y + right * _moveInput.x);
+            Vector3 moveDirection = forward * _moveInput.y + right * _moveInput.x;
 
             // Add vertical movement
             moveDirection.y = _verticalInput;

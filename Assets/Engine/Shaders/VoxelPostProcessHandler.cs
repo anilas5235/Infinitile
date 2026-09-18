@@ -6,14 +6,12 @@ using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using UnityEngine;
 
-namespace Engine.Shaders
-{
+namespace Engine.Shaders{
     /// <summary>
     ///     Applies voxel-specific post-processing effects based on the voxel the target camera is currently inside.
     ///     Uses voxel post-process data for liquids to adjust color grading and fog.
     /// </summary>
-    public class VoxelPostProcessHandler : MonoBehaviour
-    {
+    public class VoxelPostProcessHandler : MonoBehaviour{
         /// <summary>
         ///     Camera whose position is used to sample the current voxel.
         /// </summary>
@@ -28,10 +26,8 @@ namespace Engine.Shaders
 
         private VoxelRegistry _voxelRegistry;
 
-        private void FixedUpdate()
-        {
-            if (!target)
-            {
+        private void FixedUpdate(){
+            if (!target){
                 Debug.LogWarning("VoxelPostProcessHandler: Target camera is not assigned.");
                 return;
             }
@@ -45,8 +41,7 @@ namespace Engine.Shaders
             UpdatePostProcessing(currentVoxelId);
         }
 
-        private void OnEnable()
-        {
+        private void OnEnable(){
             _voxelRegistry = DataImporter.Instance.VoxelRegistry;
             _postProcessManager = PostProcessManager.Instance;
         }
@@ -56,8 +51,7 @@ namespace Engine.Shaders
         ///     Resets previous overrides and only applies effects for transparent liquid voxels.
         /// </summary>
         /// <param name="voxelId">Voxel ID at the camera position.</param>
-        private void UpdatePostProcessing(ushort voxelId)
-        {
+        private void UpdatePostProcessing(ushort voxelId){
             _postProcessManager.ResetLiftGammaGain();
             _postProcessManager.ResetColorAdjustments();
             RenderSettings.fog = false;

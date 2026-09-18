@@ -9,20 +9,18 @@ using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Data.Voxel
-{
+namespace Engine.Scripts.VoxelConfig.Data.Voxel{
     /// <summary>
     /// ScriptableObject that describes a single voxel type, including textures, mesh layer, collision, and optional post-processing data.
     /// </summary>
     [CreateAssetMenu(fileName = "Voxel", menuName = "Infinitile/Voxel/VoxelDefinition")]
-    public class Voxel : ScriptableObject
-    {
+    public class Voxel : ScriptableObject{
         public VoxelDataPackage package;
+
         /// <summary>
         ///     Defines how textures are assigned to voxel faces.
         /// </summary>
-        public enum VoxelTexMode
-        {
+        public enum VoxelTexMode{
             /// <summary>
             /// One texture is used for all faces.
             /// </summary>
@@ -107,8 +105,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel
         /// <summary>
         /// Gets or sets the texture mapping mode for this voxel.
         /// </summary>
-        public VoxelTexMode TextureMode
-        {
+        public VoxelTexMode TextureMode{
             get => textureMode;
             set => textureMode = value;
         }
@@ -119,11 +116,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel
         /// </summary>
         /// <param name="condition">The quad draw condition to filter by.</param>
         /// <returns>A list of quad-definition and texture pairs.</returns>
-        public List<(QuadDefinition, Texture2D)> GetQuadsAndTextures(QuadDrawCondition condition)
-        {
+        public List<(QuadDefinition, Texture2D)> GetQuadsAndTextures(QuadDrawCondition condition){
             List<(QuadDefinition, Texture2D)> result = new();
-            foreach (VoxelQuad quad in shape.quads)
-            {
+            foreach (VoxelQuad quad in shape.quads){
                 if (quad.drawCondition != condition) continue;
                 Texture2D tex = FindTex(quad, condition);
                 if (!tex) continue;
@@ -138,28 +133,24 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel
         /// </summary>
         /// <param name="condition">The draw condition used to select a texture.</param>
         /// <returns>The texture used for display, or null if no texture is available.</returns>
-        public Texture2D GetDisplayTexture(QuadDrawCondition condition)
-        {
-            return textureMode switch
-            {
+        public Texture2D GetDisplayTexture(QuadDrawCondition condition){
+            return textureMode switch{
                 VoxelTexMode.AllUnique => allUnique.First().Value,
                 _ => FindTex(null, condition)
             };
         }
 
-        public FixedString32Bytes GetFullName()
-        {
+        public FixedString32Bytes GetFullName(){
             FixedString32Bytes fullName;
-            try
-            {
+            try{
                 fullName = new FixedString32Bytes(package.packagePrefix + ":" + name);
             }
-            catch (ArgumentException e)
-            {
+            catch (ArgumentException e){
                 VoxelEngineLogger.Error<Voxel>(
                     $"Name '{name}' exceeds the maximum length of {FixedString32Bytes.UTF8MaxLengthInBytes} bytes. Registration skipped.({e.Message})");
                 return "Error";
             }
+
             return fullName;
         }
 
@@ -169,19 +160,15 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel
         /// <param name="quad">The quad to resolve, or null when the mode does not require a quad.</param>
         /// <param name="condition">The draw condition.</param>
         /// <returns>The resolved texture, or null if no texture is assigned.</returns>
-        private Texture2D FindTex(VoxelQuad quad, QuadDrawCondition condition)
-        {
-            return textureMode switch
-            {
+        private Texture2D FindTex(VoxelQuad quad, QuadDrawCondition condition){
+            return textureMode switch{
                 VoxelTexMode.AllSame => all,
-                VoxelTexMode.TopBottomSides => condition switch
-                {
+                VoxelTexMode.TopBottomSides => condition switch{
                     QuadDrawCondition.Up => top,
                     QuadDrawCondition.Down => bottom,
                     _ => side
                 },
-                VoxelTexMode.SixSidesUnique => condition switch
-                {
+                VoxelTexMode.SixSidesUnique => condition switch{
                     QuadDrawCondition.Up => top,
                     QuadDrawCondition.Down => bottom,
                     QuadDrawCondition.Forward => front,
@@ -196,15 +183,15 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel
                 _ => null
             };
         }
-        
+
         /// <summary>
         ///     Render definition for a voxel, including texture slots for all faces, mesh layer,
         ///     collision flag and additional rendering information.
         /// </summary>
         [BurstCompile]
-        public struct VoxelDef
-        {
+        public struct VoxelDef{
             public ushort Id;
+
             /// <summary>Mesh layer (solid, transparent or air).</summary>
             public MeshLayer MeshLayer;
 
@@ -239,8 +226,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel
     /// Optional per-voxel post-processing parameters such as color grading and fog.
     /// </summary>
     [Serializable]
-    public class VoxelPostProcessData
-    {
+    public class VoxelPostProcessData{
         /// <summary>
         /// Color tint applied during post processing.
         /// </summary>

@@ -6,14 +6,12 @@ using Unity.Mathematics;
 using static Engine.Scripts.Jobs.Chunk.NoiseCalculator;
 using static Engine.Scripts.Utils.VoxelConstants;
 
-namespace Engine.Scripts.Jobs.Chunk
-{
+namespace Engine.Scripts.Jobs.Chunk{
     /// <summary>
     ///     Provides Burst-compiled helpers to prepare biome-aware terrain metadata and fill voxel buffers
     ///     for a single chunk based on noise, configuration and climate.
     /// </summary>
-    internal partial struct ChunkJob
-    {
+    internal partial struct ChunkJob{
         private const float BiomeScale = 0.0012f;
 
         /// <summary>
@@ -25,11 +23,9 @@ namespace Engine.Scripts.Jobs.Chunk
         /// <param name="chunkWordPos">World-space origin (in voxels) of the chunk.</param>
         /// <param name="chunkColumns">Output array that will receive per-column height, biome and climate data.</param>
         public static void PrepareChunkMaps(int randomSeed, ref GeneratorConfig config, ref int3 chunkWordPos,
-            NativeArray<ChunkColumn> chunkColumns)
-        {
+            NativeArray<ChunkColumn> chunkColumns){
             for (int x = 0; x < ChunkWidth; x++)
-            for (int z = 0; z < ChunkDepth; z++)
-            {
+            for (int z = 0; z < ChunkDepth; z++){
                 int i = GetColumnIdx(x, z, ChunkDepth);
                 float2 worldPos = new(chunkWordPos.x + x, chunkWordPos.z + z);
 
@@ -41,8 +37,7 @@ namespace Engine.Scripts.Jobs.Chunk
                 int height = math.clamp(minY + (int)(worldNoise.Elevation * rangeY), 0, maxY);
 
                 BiomeCalculator.BiomSectionInput input = worldNoise.BiomSectionInput();
-                ChunkColumn col = new()
-                {
+                ChunkColumn col = new(){
                     Height = height,
                     Biome = BiomeCalculator.SelectBiome(ref input, ref config),
                     Temperature = worldNoise.Temperature,
@@ -64,16 +59,14 @@ namespace Engine.Scripts.Jobs.Chunk
         /// <param name="chunkColumns">Per-column terrain metadata produced by <see cref="PrepareChunkMaps" />.</param>
         /// <param name="config">Generator configuration providing voxel IDs for stone, dirt, grass, etc.</param>
         public static void FillTerrain(NativeArray<ushort> vox, NativeArray<ChunkColumn> chunkColumns,
-            ref GeneratorConfig config)
-        {
+            ref GeneratorConfig config){
             const ushort air = 0;
             ushort waterBlock = config.Voxels["std:Water"].Id;
             ushort ice = config.Voxels["std:Ice"].Id;
             int waterLevel = config.WaterLevel;
 
             for (int x = 0; x < ChunkWidth; x++)
-            for (int z = 0; z < ChunkDepth; z++)
-            {
+            for (int z = 0; z < ChunkDepth; z++){
                 int i = GetColumnIdx(x, z, ChunkDepth);
 
                 ChunkColumn col = chunkColumns[i];
@@ -85,8 +78,7 @@ namespace Engine.Scripts.Jobs.Chunk
 
                 int gy = col.Height;
 
-                for (int y = 0; y < ChunkHeight; y++)
-                {
+                for (int y = 0; y < ChunkHeight; y++){
                     ushort v;
                     if (y < gy - 4) v = st;
                     else if (y < gy) v = under;
@@ -100,8 +92,7 @@ namespace Engine.Scripts.Jobs.Chunk
             }
         }
 
-        private static void SelectSurfaceMaterials(ref GeneratorConfig config, ref ChunkColumn col, ref Random rng)
-        {
+        private static void SelectSurfaceMaterials(ref GeneratorConfig config, ref ChunkColumn col, ref Random rng){
             Biome.BiomeDef biomDef = config.BiomeDefs[col.Biome];
 
             col.TopBlock = biomDef.topBlock;

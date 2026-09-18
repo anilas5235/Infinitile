@@ -1,20 +1,16 @@
 ﻿using UnityEditor;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
-{
+namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
     [CustomPropertyDrawer(typeof(VoxelPlacement))]
-    public class VoxelPlacementCustomEditor : PropertyDrawer
-    {
-        public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
-        {
+    public class VoxelPlacementCustomEditor : PropertyDrawer{
+        public override float GetPropertyHeight(SerializedProperty property, GUIContent label){
             // Calculate height dynamically based on visible fields
             int lines = 2; // shape + origin always visible
 
             PlacementShape shape = (PlacementShape)property.FindPropertyRelative("shape").enumValueIndex;
 
-            switch (shape)
-            {
+            switch (shape){
                 case PlacementShape.Line:
                     lines += 1; // end
                     break;
@@ -34,8 +30,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             return lines * EditorGUIUtility.singleLineHeight;
         }
 
-        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-        {
+        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label){
             EditorGUI.BeginProperty(position, label, property);
 
             SerializedProperty shapeProp = property.FindPropertyRelative("shape");
@@ -48,13 +43,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
 
             PlacementShape shape = (PlacementShape)shapeProp.enumValueIndex;
 
-            Rect r = new Rect(position.x, position.y, position.width, EditorGUIUtility.singleLineHeight);
+            Rect r = new(position.x, position.y, position.width, EditorGUIUtility.singleLineHeight);
 
             DrawField(shapeProp);
             DrawField(originProp);
 
-            switch (shape)
-            {
+            switch (shape){
                 case PlacementShape.Line:
                     DrawField(endProp);
                     break;
@@ -79,8 +73,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor
             r.y -= EditorGUIUtility.singleLineHeight;
             EditorGUI.EndProperty();
 
-            void DrawField(SerializedProperty prop)
-            {
+            void DrawField(SerializedProperty prop){
                 EditorGUI.PropertyField(r, prop);
                 r.y += EditorGUIUtility.singleLineHeight;
             }
