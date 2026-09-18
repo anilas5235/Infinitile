@@ -379,6 +379,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
                 Seed = _settings.Seed,
                 HumidityScale = _settings.Noise.HumidityScale,
                 TemperatureScale = _settings.Noise.TemperatureScale,
+                ElevationDetailStrength = _settings.Noise.ElevationDetailStrength,
                 ElevationProfile = new NoiseProfile(_settings.Noise.elevationProfile.ToStruct(_settings.Seed)),
                 ContinentalLayer = new WarpedNoiseLayer(_settings.Noise.continentalLayer.ToStruct(_settings.Seed))
             };

@@ -21,6 +21,14 @@ namespace Engine.Scripts.Settings{
         [Tooltip("Scale factor for temperature climate noise sampling.")]
         public float TemperatureScale = 0.0009f;
 
+        [Tooltip(
+            "How strongly the elevation profile perturbs the continental shape, as a fraction of the full " +
+            "[0,1] range (e.g. 0.35 = elevation can push the continental height up/down by up to ±0.175). " +
+            "Elevation is applied as a centered detail offset on top of continental, not averaged with it, " +
+            "so continental's large-scale shape (and its redistribution curve) is preserved.")]
+        [Range(0f, 1f)]
+        public float ElevationDetailStrength = 0.35f;
+
         public NoiseProfileSettings elevationProfile = new(){
             scale = 180f,
             persistance = 0.5f,

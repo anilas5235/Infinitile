@@ -22,7 +22,11 @@ namespace Engine.Scripts.Jobs.Chunk{
 
             float rawElevation = noiseParams.ElevationProfile.GetNoise(noiseSamplePos);
 
-            float elevation = math.saturate(continental * .6f + rawElevation * .4f);
+            // Continental (already contrast-shaped via its redistribution curve) defines the large-scale
+            // height shape. Elevation is applied as a centered detail offset on top of it rather than
+            // averaged in, so it can't wash out continental's contrast back towards the middle of the range.
+            float elevationDetail = (rawElevation - 0.5f) * noiseParams.ElevationDetailStrength;
+            float elevation = math.saturate(continental + elevationDetail);
 
             return new WorldNoiseOutput{
                 Humidity = humidity,
@@ -67,6 +71,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             public int Seed;
             public float HumidityScale;
             public float TemperatureScale;
+            public float ElevationDetailStrength;
 
             [ReadOnly] public NoiseProfile ElevationProfile;
 

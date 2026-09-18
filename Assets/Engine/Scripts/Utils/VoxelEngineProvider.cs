@@ -27,6 +27,7 @@ namespace Engine.Scripts.Utils{
                 Seed = Settings.Seed,
                 HumidityScale = Settings.Noise.HumidityScale,
                 TemperatureScale = Settings.Noise.TemperatureScale,
+                ElevationDetailStrength = Settings.Noise.ElevationDetailStrength,
                 ElevationProfile = new NoiseProfile(Settings.Noise.elevationProfile.ToStruct(Settings.Seed)),
                 ContinentalLayer = new WarpedNoiseLayer(Settings.Noise.continentalLayer.ToStruct(Settings.Seed))
             };

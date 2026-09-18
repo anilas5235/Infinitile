@@ -15,23 +15,24 @@ MonoBehaviour:
   WaterLevel: 124
   HumidityScale: 0.001
   TemperatureScale: 0.0009
+  ElevationDetailStrength: 0.4
   elevationProfile:
     scale: 256
-    persistance: 0.5
-    lacunarity: 2
-    octaves: 4
+    persistance: 0.3
+    lacunarity: 1.5
+    octaves: 6
   continentalLayer:
     baseNoise:
       scale: 1024
-      persistance: 0.5
+      persistance: 0.4
       lacunarity: 2
-      octaves: 8
+      octaves: 3
     warpNoise:
       scale: 768
       persistance: 0.5
-      lacunarity: 2
+      lacunarity: 3
       octaves: 2
-    warpStrength: 400
+    warpStrength: 200
     warpSeedOffsetY: 1000
     redistributionCurve:
       serializedVersion: 2
