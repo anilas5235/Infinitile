@@ -15,11 +15,33 @@ namespace Engine.Scripts.Settings{
         [Tooltip("Water surface level in world Y coordinates.")]
         public int WaterLevel = 124;
 
-        [Tooltip("Scale factor for humidity climate noise sampling.")]
-        public float HumidityScale = 0.001f;
+        public NoiseProfileSettings humidityProfile = new(){
+            scale = 700f,
+            persistance = 0.5f,
+            lacunarity = 2f,
+            octaves = 3
+        };
 
-        [Tooltip("Scale factor for temperature climate noise sampling.")]
-        public float TemperatureScale = 0.0009f;
+        public NoiseProfileSettings temperatureProfile = new(){
+            scale = 900f,
+            persistance = 0.5f,
+            lacunarity = 2f,
+            octaves = 3
+        };
+
+        [Tooltip(
+            "How much a high continental value (inland) dries out humidity. 0 = continental has no effect " +
+            "on humidity; 1 = fully inland areas can lose all humidity. Negative values make inland areas " +
+            "wetter instead (e.g. for an inverted/inland-sea world).")]
+        [Range(-1f, 1f)]
+        public float ContinentalHumidityInfluence = 0.4f;
+
+        [Tooltip(
+            "How much a high continental value (inland) widens temperature swings around the middle of the " +
+            "range, mimicking real continentality (colder cold biomes, hotter hot biomes further inland). " +
+            "0 = no effect; 1 = fully inland temperature deviation from the middle is doubled.")]
+        [Range(0f, 2f)]
+        public float ContinentalTemperatureInfluence = 0.6f;
 
         [Tooltip(
             "How strongly the elevation profile perturbs the continental shape, as a fraction of the full " +

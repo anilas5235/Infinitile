@@ -25,10 +25,12 @@ namespace Engine.Scripts.Utils{
         private NoiseCalculator.NoiseParameters NoiseParameters(){
             return new NoiseCalculator.NoiseParameters{
                 Seed = Settings.Seed,
-                HumidityScale = Settings.Noise.HumidityScale,
-                TemperatureScale = Settings.Noise.TemperatureScale,
                 ElevationDetailStrength = Settings.Noise.ElevationDetailStrength,
+                ContinentalHumidityInfluence = Settings.Noise.ContinentalHumidityInfluence,
+                ContinentalTemperatureInfluence = Settings.Noise.ContinentalTemperatureInfluence,
                 ElevationProfile = new NoiseProfile(Settings.Noise.elevationProfile.ToStruct(Settings.Seed)),
+                HumidityProfile = new NoiseProfile(Settings.Noise.humidityProfile.ToStruct(Settings.Seed)),
+                TemperatureProfile = new NoiseProfile(Settings.Noise.temperatureProfile.ToStruct(Settings.Seed)),
                 ContinentalLayer = new WarpedNoiseLayer(Settings.Noise.continentalLayer.ToStruct(Settings.Seed))
             };
         }

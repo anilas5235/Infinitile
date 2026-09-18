@@ -203,9 +203,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
                         $"{ResolutionOptions[7]}x{ResolutionOptions[7]}"
                     });
                     EditorGUILayout.LabelField("Climate RGB Channels", EditorStyles.boldLabel);
-                    _showHumidity = EditorGUILayout.ToggleLeft("Humidity (R)", _showHumidity);
-                    _showTemperature = EditorGUILayout.ToggleLeft("Temperature (G)", _showTemperature);
-                    _showContinental = EditorGUILayout.ToggleLeft("Continental (B)", _showContinental);
+                    _showTemperature = EditorGUILayout.ToggleLeft("Temperature (R)", _showTemperature);
+                    _showContinental = EditorGUILayout.ToggleLeft("Continental (G)", _showContinental);
+                    _showHumidity = EditorGUILayout.ToggleLeft("Humidity (B)", _showHumidity);
                     EditorGUILayout.Separator();
                     DrawView("Biome View", EditorStyles.label, _biomeTexture, true);
                 }
@@ -377,10 +377,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
 
             _generatorConfig.NoiseParams = new NoiseCalculator.NoiseParameters{
                 Seed = _settings.Seed,
-                HumidityScale = _settings.Noise.HumidityScale,
-                TemperatureScale = _settings.Noise.TemperatureScale,
                 ElevationDetailStrength = _settings.Noise.ElevationDetailStrength,
+                ContinentalHumidityInfluence = _settings.Noise.ContinentalHumidityInfluence,
+                ContinentalTemperatureInfluence = _settings.Noise.ContinentalTemperatureInfluence,
                 ElevationProfile = new NoiseProfile(_settings.Noise.elevationProfile.ToStruct(_settings.Seed)),
+                HumidityProfile = new NoiseProfile(_settings.Noise.humidityProfile.ToStruct(_settings.Seed)),
+                TemperatureProfile = new NoiseProfile(_settings.Noise.temperatureProfile.ToStruct(_settings.Seed)),
                 ContinentalLayer = new WarpedNoiseLayer(_settings.Noise.continentalLayer.ToStruct(_settings.Seed))
             };
 
@@ -512,7 +514,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
                 int x = index % ViewResolution;
                 int z = index / ViewResolution;
                 float step = Resolution / (float)ViewResolution;
-                float2 worldPos = new(WorldOffset.x + x * step, WorldOffset.y + z * step);
+                float2 centerOffset = new(Resolution * 0.5f, Resolution * 0.5f);
+                float2 worldPos = new float2(WorldOffset.x + x * step, WorldOffset.y + z * step) - centerOffset;
 
                 NoiseCalculator.WorldNoiseOutput noise = NoiseCalculator.WorldNoise(worldPos, ref Config.NoiseParams);
 
@@ -534,7 +537,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
                 byte continental =
                     ShowContinental == 1 ? (byte)math.round(math.saturate(noise.Continental) * 255f) : (byte)0;
 
-                ClimateWorldView[index] = new Color32(humidity, temperature, continental, 255);
+                ClimateWorldView[index] = new Color32(temperature, continental,humidity, 255);
             }
         }
 

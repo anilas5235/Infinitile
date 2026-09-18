@@ -7,20 +7,35 @@ using Unity.Mathematics;
 namespace Engine.Scripts.Jobs.Chunk{
     [BurstCompile]
     public static class NoiseCalculator{
-        private static readonly float2 HumidityOffset = new(-89f, 311f);
-        private static readonly float2 TemperatureOffset = new(867f, -543f);
-        private static readonly float2 ContinentalOffset = new(-916f, 823f);
+        // Decorrelation offsets for each noise channel. Perlin/Simplex noise stays visibly correlated
+        // (or anti-correlated) with itself under small translations - a shift needs to be well beyond
+        // the largest scale/wavelength in play (continental goes up to ~2500) before two channels sampled
+        // from the same base noise function actually behave like independent fields. Keep these an order
+        // of magnitude past the biggest NoiseProfile/WarpedNoiseLayer scale you configure.
+        private static readonly float2 HumidityOffset = new(15731f, -28411f);
+        private static readonly float2 TemperatureOffset = new(-19207f, 33461f);
+        private static readonly float2 ContinentalOffset = new(27851f, 12907f);
+        private static readonly float2 ElevationOffset = new(-8461f, -19603f);
 
         public static WorldNoiseOutput WorldNoise(float2 worldPos, ref NoiseParameters noiseParams){
             float2 seed2D = new(-noiseParams.Seed, noiseParams.Seed);
             float2 noiseSamplePos = worldPos + seed2D;
 
-            float humidity = GetNormalizedCNoise(noiseSamplePos, HumidityOffset, noiseParams.HumidityScale);
-            float temperature = GetNormalizedCNoise(noiseSamplePos, TemperatureOffset, noiseParams.TemperatureScale);
-
             float continental = noiseParams.ContinentalLayer.GetNoise(worldPos + seed2D + ContinentalOffset);
 
-            float rawElevation = noiseParams.ElevationProfile.GetNoise(noiseSamplePos);
+            float rawHumidity = noiseParams.HumidityProfile.GetNoise(noiseSamplePos + HumidityOffset);
+            float rawTemperature = noiseParams.TemperatureProfile.GetNoise(noiseSamplePos + TemperatureOffset);
+
+            // Continentality shapes climate the way it does in the real world: inland areas (high
+            // continental) dry out and swing to more extreme temperatures in both directions, while
+            // coasts (low continental) stay humid and mild. Elevation itself isn't factored in here
+            // (that's a further refinement - e.g. altitude cooling - left for later).
+            float humidity = math.saturate(rawHumidity - continental * noiseParams.ContinentalHumidityInfluence);
+
+            float temperatureSpread = 1f + continental * noiseParams.ContinentalTemperatureInfluence;
+            float temperature = math.saturate(0.5f + (rawTemperature - 0.5f) * temperatureSpread);
+
+            float rawElevation = noiseParams.ElevationProfile.GetNoise(noiseSamplePos + ElevationOffset);
 
             // Continental (already contrast-shaped via its redistribution curve) defines the large-scale
             // height shape. Elevation is applied as a centered detail offset on top of it rather than
@@ -45,11 +60,6 @@ namespace Engine.Scripts.Jobs.Chunk{
             };
         }
 
-        public static float GetNormalizedCNoise(float2 position, float2 seed, float scale){
-            float2 samplePos = (position + seed) * scale;
-            return math.remap(-1f, 1f, 0f, 1f, noise.cnoise(samplePos));
-        }
-
         [BurstCompile]
         public static float ApplyCurve(float raw, in NativeArray<float2> points){
             if (raw <= points[0].x) return points[0].y;
@@ -69,16 +79,26 @@ namespace Engine.Scripts.Jobs.Chunk{
 
         public struct NoiseParameters : IDisposable{
             public int Seed;
-            public float HumidityScale;
-            public float TemperatureScale;
             public float ElevationDetailStrength;
 
+            /// <summary>How much a high continental value (inland) dries the climate out.</summary>
+            public float ContinentalHumidityInfluence;
+
+            /// <summary>How much a high continental value (inland) widens temperature swings around 0.5.</summary>
+            public float ContinentalTemperatureInfluence;
+
             [ReadOnly] public NoiseProfile ElevationProfile;
+
+            [ReadOnly] public NoiseProfile HumidityProfile;
+
+            [ReadOnly] public NoiseProfile TemperatureProfile;
 
             [ReadOnly] public WarpedNoiseLayer ContinentalLayer;
 
             public void Dispose(){
                 ElevationProfile.Dispose();
+                HumidityProfile.Dispose();
+                TemperatureProfile.Dispose();
                 ContinentalLayer.Dispose();
             }
         }

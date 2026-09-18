@@ -13,26 +13,36 @@ MonoBehaviour:
   m_Name: NoiseSettings2D
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.Settings.NoiseSettings
   WaterLevel: 124
-  HumidityScale: 0.001
-  TemperatureScale: 0.0009
+  humidityProfile:
+    scale: 732
+    persistance: 0.45
+    lacunarity: 1.8
+    octaves: 3
+  temperatureProfile:
+    scale: 863
+    persistance: 0.5
+    lacunarity: 1.8
+    octaves: 3
+  ContinentalHumidityInfluence: 0.4
+  ContinentalTemperatureInfluence: 1.5
   ElevationDetailStrength: 0.4
   elevationProfile:
     scale: 256
-    persistance: 0.3
-    lacunarity: 1.5
-    octaves: 6
+    persistance: 0.6
+    lacunarity: 2
+    octaves: 5
   continentalLayer:
     baseNoise:
-      scale: 1024
-      persistance: 0.4
-      lacunarity: 2
-      octaves: 3
+      scale: 1278
+      persistance: 0.35
+      lacunarity: 2.5
+      octaves: 2
     warpNoise:
-      scale: 768
+      scale: 668
       persistance: 0.5
       lacunarity: 3
       octaves: 2
-    warpStrength: 200
+    warpStrength: 300
     warpSeedOffsetY: 1000
     redistributionCurve:
       serializedVersion: 2
@@ -83,8 +93,8 @@ MonoBehaviour:
         inWeight: 0
         outWeight: 0
       - serializedVersion: 3
-        time: 0.8
-        value: 0.78
+        time: 0.85
+        value: 0.85
         inSlope: 0
         outSlope: 0
         tangentMode: 0
