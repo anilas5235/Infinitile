@@ -30,10 +30,9 @@ namespace Engine.Scripts.Jobs.Chunk{
 
                 WorldNoiseOutput worldNoise = WorldNoise(worldPos, ref config.NoiseParams);
 
-                const int minY = 100;
-                const int maxY = ChunkHeight - 1;
-                const int rangeY = maxY - minY;
-                int height = math.clamp(minY + (int)(worldNoise.Elevation * rangeY), 0, maxY);
+                int height = math.clamp(
+                    MinTerrainHeight + (int)(worldNoise.Elevation * TerrainHeightRange),
+                    0, MaxTerrainHeight);
 
                 BiomeCalculator.BiomSectionInput input = worldNoise.BiomSectionInput();
                 ChunkColumn col = new(){

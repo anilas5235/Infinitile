@@ -18,6 +18,15 @@ namespace Engine.Scripts.Utils{
 
         internal const int VoxelsPerChunk = ChunkWidth * ChunkHeight * ChunkDepth;
 
+        /// <summary>Lowest Y level terrain height can be generated at (bedrock floor for surface terrain).</summary>
+        internal const int MinTerrainHeight = 100;
+
+        /// <summary>Highest Y level terrain height can be generated at.</summary>
+        internal const int MaxTerrainHeight = ChunkHeight - 1;
+
+        /// <summary>Usable vertical span for terrain height generation.</summary>
+        internal const int TerrainHeightRange = MaxTerrainHeight - MinTerrainHeight;
+
 
         internal const int PartitionWidth = 32;
         internal const int PartitionHeight = 32;
