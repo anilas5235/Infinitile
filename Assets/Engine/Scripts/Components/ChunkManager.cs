@@ -95,7 +95,8 @@ namespace Engine.Scripts.Components{
         /// </summary>
         internal void FocusUpdate(PriorityUtil.Focus focus){
             _focus = focus;
-            _unloadingQueue.UpdateAllPriorities(pos => PriorityUtil.ReVerseDistPriority(ref pos, ref focus));
+            // N-01 / PERF-04: static lambda with explicit state instead of a closure capturing the focus
+            _unloadingQueue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.ReVerseDistPriority(ref pos, ref f));
         }
 
         /// <summary>

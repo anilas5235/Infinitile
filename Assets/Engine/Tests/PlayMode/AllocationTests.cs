@@ -99,7 +99,6 @@ namespace Engine.Tests.PlayMode{
                 $"{allocatingFrames} of {FlightFrames} frames allocated managed memory (first at frame {firstAllocatingFrame})");
         }
 
-        [Category("KnownBug")] // N-01 (new, found by TST-E21: FocusUpdate allocates a closure per call)
         [UnityTest]
         public IEnumerator FocusUpdate_DoesNotAllocate(){
             // PERF-04 for the state handlers: re-prioritising the queues on a focus change must not allocate.

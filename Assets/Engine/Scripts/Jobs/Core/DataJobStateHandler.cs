@@ -34,7 +34,8 @@ namespace Engine.Scripts.Jobs.Core{
         /// <param name="focus">The new focus position.</param>
         public override void FocusUpdate(PriorityUtil.Focus focus){
             WakeUp();
-            Queue.UpdateAllPriorities(pos => PriorityUtil.DistPriority(ref pos, ref focus));
+            // N-01 / PERF-04: static lambda with explicit state instead of a closure capturing the focus
+            Queue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.DistPriority(ref pos, ref f));
         }
 
         /// <summary>

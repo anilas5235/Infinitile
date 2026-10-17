@@ -80,9 +80,10 @@ namespace Engine.Scripts.Components{
         /// </summary>
         internal void FocusUpdate(Focus focus){
             _focus = focus;
-            _chunkQueue.UpdateAllPriorities(PriorityCalc);
-            _partitionQueue.UpdateAllPriorities(PriorityCalc);
-            _colliderQueue.UpdateAllPriorities(PriorityCalc);
+            // N-01 / PERF-04: static lambdas with explicit state; instance method groups allocate a delegate per call
+            _chunkQueue.UpdateAllPriorities(focus, static (f, pos) => ReVerseDistPriority(ref pos, ref f));
+            _partitionQueue.UpdateAllPriorities(focus, static (f, pos) => ReVerseDistPriority(ref pos, ref f));
+            _colliderQueue.UpdateAllPriorities(focus, static (f, pos) => ReVerseDistPriority(ref pos, ref f));
         }
 
         private float PriorityCalc(int2 position){

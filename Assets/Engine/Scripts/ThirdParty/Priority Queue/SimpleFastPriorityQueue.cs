@@ -228,10 +228,15 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         }
 
         public void UpdateAllPriorities(Func<TItem, TPriority> updateFunc){
-            foreach (SimpleNode node in _queue){
-                TPriority priority = updateFunc(node.Data);
-                _queue.UpdatePriority(node, priority);
-            }
+            _queue.UpdateAllPriorities(updateFunc, static (f, node) => f(node.Data));
+        }
+
+        /// <summary>
+        ///     N-01 / PERF-04: allocation-free variant; pass the state explicitly and a static lambda so no closure
+        ///     is created per call.
+        /// </summary>
+        public void UpdateAllPriorities<TState>(TState state, Func<TState, TItem, TPriority> updateFunc){
+            _queue.UpdateAllPriorities((state, updateFunc), static (s, node) => s.updateFunc(s.state, node.Data));
         }
 
         /// <summary>
