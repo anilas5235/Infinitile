@@ -3,7 +3,6 @@ using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Jobs.Core;
-using Engine.Scripts.Noise;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils.Provider;
 using Engine.Scripts.VoxelConfig.Registry;
@@ -21,19 +20,6 @@ namespace Engine.Scripts.Utils{
         /// </summary>
         public VoxelEngineSettings Settings{ get; set; }
 
-
-        private NoiseCalculator.NoiseParameters NoiseParameters(){
-            return new NoiseCalculator.NoiseParameters{
-                Seed = Settings.Seed,
-                ElevationDetailStrength = Settings.Noise.ElevationDetailStrength,
-                ContinentalHumidityInfluence = Settings.Noise.ContinentalHumidityInfluence,
-                ContinentalTemperatureInfluence = Settings.Noise.ContinentalTemperatureInfluence,
-                ElevationProfile = new NoiseProfile(Settings.Noise.elevationProfile.ToStruct(Settings.Seed)),
-                HumidityProfile = new NoiseProfile(Settings.Noise.humidityProfile.ToStruct(Settings.Seed)),
-                TemperatureProfile = new NoiseProfile(Settings.Noise.temperatureProfile.ToStruct(Settings.Seed)),
-                ContinentalLayer = new WarpedNoiseLayer(Settings.Noise.continentalLayer.ToStruct(Settings.Seed))
-            };
-        }
 
         /// <summary>
         ///     Allocates a new <see cref="ChunkManager" /> responsible for chunk data in memory.
@@ -75,7 +61,7 @@ namespace Engine.Scripts.Utils{
             GeneratorConfig cfg = generatorConfig;
             cfg.WaterLevel = Settings.Noise.WaterLevel;
             cfg.GlobalSeed = Settings.Seed;
-            cfg.NoiseParams = NoiseParameters();
+            cfg.NoiseParams = Settings.Noise.ToNoiseParameters(Settings.Seed);
             return new ChunkScheduler(Settings, chunkManager, cfg, world);
         }
 

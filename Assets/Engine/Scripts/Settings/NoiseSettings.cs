@@ -1,4 +1,5 @@
 ﻿using System;
+using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Noise;
 using Unity.Mathematics;
 using UnityEngine;
@@ -86,6 +87,25 @@ namespace Engine.Scripts.Settings{
 
         private void OnValidate(){
             continentalLayer.EnsureSevenLinearKeys();
+        }
+
+        /// <summary>
+        ///     Builds the Burst-side noise parameters for these settings. Allocates native memory; the caller owns the
+        ///     result (see <see cref="NoiseCalculator.NoiseParameters.Dispose" />). Shared by the engine provider and
+        ///     the tests/benchmarks (PERF-02).
+        /// </summary>
+        /// <param name="seed">Global world seed.</param>
+        public NoiseCalculator.NoiseParameters ToNoiseParameters(int seed){
+            return new NoiseCalculator.NoiseParameters{
+                Seed = seed,
+                ElevationDetailStrength = ElevationDetailStrength,
+                ContinentalHumidityInfluence = ContinentalHumidityInfluence,
+                ContinentalTemperatureInfluence = ContinentalTemperatureInfluence,
+                ElevationProfile = new NoiseProfile(elevationProfile.ToStruct(seed)),
+                HumidityProfile = new NoiseProfile(humidityProfile.ToStruct(seed)),
+                TemperatureProfile = new NoiseProfile(temperatureProfile.ToStruct(seed)),
+                ContinentalLayer = new WarpedNoiseLayer(continentalLayer.ToStruct(seed))
+            };
         }
     }
 
