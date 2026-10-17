@@ -1,11 +1,14 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using Engine.Scripts.Utils.Collections;
 using Engine.Scripts.Render;
 using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using NUnit.Framework;
+using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -13,8 +16,9 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Tests.PlayMode{
     /// <summary>
-    ///     F-17 (TST-E20 addition): a point builder may be disposed while its GPU read-back is still pending,
-    ///     e.g. when the renderer is destroyed mid-build. Needs PlayMode for the compute dispatch.
+    ///     TST-E20 additions for the renderer: a point builder may be disposed while its GPU read-back is still
+    ///     pending, e.g. when the renderer is destroyed mid-build (F-17), and a rejected chunk upload must keep the
+    ///     chunk's existing buffer (F-18). Needs PlayMode for the compute dispatch and the live renderer.
     /// </summary>
     public class RendererShutdownTests{
         [UnitySetUp]
@@ -77,6 +81,46 @@ namespace Engine.Tests.PlayMode{
                 handler?.Dispose();
                 foreach (GraphicsBuffer buffer in chunkBuffers.Values) buffer.Dispose();
             }
+        }
+
+        [UnityTest]
+        [Timeout(60000)]
+        public IEnumerator AddOrUpdateChunk_RejectedLength_KeepsTheExistingBuffer(){
+            // F-18: the old buffer was disposed before the length check, so a rejected update left a disposed
+            // buffer in the map that the next partition build bound.
+            VoxelWorldRenderer renderer = VoxelWorldRenderer.Instance;
+            Assert.IsNotNull(renderer, "VoxelWorldRenderer missing in scene");
+            Dictionary<int2, GraphicsBuffer> buffers =
+                PlayModeFixtures.GetPrivateField<Dictionary<int2, GraphicsBuffer>>(renderer, "_voxelDataBuffers");
+            float deadline = Time.realtimeSinceStartup + 30f;
+            while (buffers.Count == 0){
+                if (Time.realtimeSinceStartup > deadline) Assert.Fail("no chunk was uploaded to the renderer");
+                yield return null;
+            }
+
+            int2 chunk = default;
+            GraphicsBuffer before = null;
+            foreach (KeyValuePair<int2, GraphicsBuffer> pair in buffers){
+                chunk = pair.Key;
+                before = pair.Value;
+                break;
+            }
+
+            MethodInfo addOrUpdate = PlayModeFixtures.GetPrivateMethod(typeof(VoxelWorldRenderer), "AddOrUpdateChunk");
+            UnsafeIntervalList<ushort> tooShort = new(1, Allocator.Temp);
+            tooShort.AddInterval(PlayModeFixtures.Air, 5);
+            try{
+                TargetInvocationException thrown = Assert.Throws<TargetInvocationException>(
+                    () => addOrUpdate.Invoke(renderer, new object[]{ chunk, tooShort }));
+                Assert.IsNotNull(thrown.InnerException);
+            }
+            finally{
+                tooShort.Dispose();
+            }
+
+            Assert.IsTrue(buffers.TryGetValue(chunk, out GraphicsBuffer after), "the chunk must keep a buffer");
+            Assert.AreSame(before, after, "the existing buffer must be kept");
+            Assert.IsTrue(after.IsValid(), "the kept buffer must not be disposed");
         }
     }
 }

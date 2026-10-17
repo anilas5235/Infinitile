@@ -306,6 +306,9 @@ namespace Engine.Scripts.Render{
         /// <param name="voxelData">The voxel data to store.</param>
         private void AddOrUpdateChunk(int2 chunk, UnsafeIntervalList<ushort> voxelData){
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.GpuUploadChunk.Auto(); // PERF-01
+            // F-18: validate before the old buffer is released, otherwise a rejected update leaves a disposed
+            // buffer in the map that the next partition build binds.
+            if (voxelData.Length != VoxelsPerChunk) throw new Exception("Voxel data length mismatch!");
             if (_voxelDataBuffers.TryGetValue(chunk, out GraphicsBuffer existingBuffer)) existingBuffer.Dispose();
 
             int compLength = voxelData.CompressedLength;
@@ -316,7 +319,6 @@ namespace Engine.Scripts.Render{
 
             intervalData[0] = new uint2((uint)compLength, intervalData[compLength].y);
 
-            if (voxelData.Length != VoxelsPerChunk) throw new Exception("Voxel data length mismatch!");
             GraphicsBuffer dataBuffer = new(Target.Structured, intervalData.Length, Marshal.SizeOf<uint2>());
             dataBuffer.SetData(intervalData);
             _voxelDataBuffers[chunk] = dataBuffer;
