@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Engine.Scripts.Utils.Collections;
 using NUnit.Framework;
@@ -56,15 +56,20 @@ namespace Engine.Tests.EditMode{
 
         /// <summary>Invariants from TST-E13: no empty node, no equal neighbours, strictly increasing end counts.</summary>
         private void AssertInvariants(string context){
-            List<(ushort value, int count)> nodes = Nodes();
+            // Runs after every random op over thousands of nodes: the message (which prints the whole list) is
+            // only built on failure, otherwise the check is quadratic per op and never finishes.
             int previousCount = 0;
-            for (int i = 0; i < nodes.Count; i++){
-                Assert.Greater(nodes[i].count, previousCount, $"{context}: node {i} is empty or counts are not increasing\n{_list}");
-                if (i > 0) Assert.AreNotEqual(nodes[i - 1].value, nodes[i].value, $"{context}: nodes {i - 1} and {i} have equal values\n{_list}");
-                previousCount = nodes[i].count;
+            ushort previousValue = 0;
+            int i = 0;
+            foreach (UnsafeIntervalList<ushort>.Node node in _list.Internal){
+                if (node.Count <= previousCount) Assert.Fail($"{context}: node {i} is empty or counts are not increasing\n{_list}");
+                if (i > 0 && node.Value == previousValue) Assert.Fail($"{context}: nodes {i - 1} and {i} have equal values\n{_list}");
+                previousCount = node.Count;
+                previousValue = node.Value;
+                i++;
             }
 
-            if (nodes.Count > 0) Assert.AreEqual(_list.Length, nodes[^1].count, $"{context}: last node must end at Length");
+            if (i > 0) Assert.AreEqual(_list.Length, previousCount, $"{context}: last node must end at Length");
         }
 
         private static int PickIndex(Random rng, int previous){
@@ -109,7 +114,6 @@ namespace Engine.Tests.EditMode{
             });
         }
 
-        [Category("KnownBug")] // F-12
         [Test]
         public void RandomSets_NodeCountNeverExceedsValueChangesPlusOne(){
             int op = 0;
@@ -137,7 +141,6 @@ namespace Engine.Tests.EditMode{
 
         #region TST-E13 invariants
 
-        [Category("KnownBug")] // F-12
         [Test]
         public void RandomSets_InvariantsHoldAfterEveryOperation(){
             RunRandomSets((_, _, context) => AssertInvariants(context));
@@ -163,7 +166,6 @@ namespace Engine.Tests.EditMode{
             AssertNodes((1, 3), (3, 5));
         }
 
-        [Category("KnownBug")] // F-12
         [Test]
         public void Set_MergeRightAtIndexZero_LeavesNoEmptyNode(){
             // F-12: [A:1][B:3], Set(0, B) must give [B:3], not [A:0][B:3].

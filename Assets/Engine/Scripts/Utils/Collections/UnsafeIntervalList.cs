@@ -139,8 +139,10 @@ namespace Engine.Scripts.Utils.Collections{
                 node.Count--;
                 _internal[nodeIndex] = node;
 
-                if (leftNodeIndex >= 0 && leftNode.Count == node.Count)
-                    _internal.RemoveRange(nodeIndex, 1); // [X,A,Y] -> [X,Y,Y]
+                // F-12: the node is empty when its end equals the previous end (0 for the first node), not only
+                // when a left node exists. [A,Y] at index 0 -> [Y,Y]
+                int previousEnd = leftNodeIndex >= 0 ? leftNode.Count : 0;
+                if (node.Count == previousEnd) _internal.RemoveRange(nodeIndex, 1); // [X,A,Y] -> [X,Y,Y]
             }
             else{
                 // No Coalesce
