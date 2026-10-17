@@ -150,7 +150,19 @@ namespace Engine.Scripts.Render{
         /// </summary>
         internal static int[] ToPointCounts(NativeArray<uint> counts){
             int[] results = new int[counts.Length];
-            for (int i = 0; i < counts.Length; i++) results[i] = (int)counts[i];
+            for (int i = 0; i < counts.Length; i++){
+                // F-03: an append buffer silently drops points beyond its capacity, but the counter keeps growing
+                // (alwaysRenderAllFaces can emit up to 6 faces per voxel). Never request more than the buffer holds.
+                uint count = counts[i];
+                if (count > MaxPointsPerPartition){
+                    VoxelEngineLogger.Warn<PointBuilderHandler>(
+                        $"Point buffer {i} overflowed: {count} points, clamped to {MaxPointsPerPartition}");
+                    count = MaxPointsPerPartition;
+                }
+
+                results[i] = (int)count;
+            }
+
             return results;
         }
 
