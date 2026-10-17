@@ -28,6 +28,12 @@ namespace Engine.Scripts.Components{
         internal Action<Chunk> OnChunkChange;
 
         internal Action OnRemeshRequested;
+
+        /// <summary>
+        ///     F-01: raised before a chunk that is part of the current <see cref="ChunkAccessor" /> is edited or
+        ///     disposed. Schedulers whose jobs read the accessor subscribe and complete their running job first.
+        /// </summary>
+        internal Action AccessorChunkWriting;
         private NativeParallelHashMap<int2, ChunkVoxelData> _accessorMap;
 
         private PriorityUtil.Focus _focus;
@@ -115,6 +121,7 @@ namespace Engine.Scripts.Components{
             if (_unloadingQueue.Contains(position)) _unloadingQueue.Remove(position);
             if (!_chunks.TryGetValue(position, out Chunk chunk)) return;
 
+            CompleteReadersOf(position); // F-01
             chunk.Dispose();
             _chunks.Remove(position);
 
@@ -123,6 +130,14 @@ namespace Engine.Scripts.Components{
                 _reMeshPartitions.Remove(partitionPos);
                 _reCollidePartitions.Remove(partitionPos);
             }
+        }
+
+        /// <summary>
+        ///     F-01: completes any job that still reads <paramref name="chunkPos" /> through the current accessor
+        ///     before the chunk's data is written or disposed.
+        /// </summary>
+        private void CompleteReadersOf(int2 chunkPos){
+            if (_accessorMap.ContainsKey(chunkPos)) AccessorChunkWriting?.Invoke();
         }
 
         /// <summary>
@@ -233,6 +248,7 @@ namespace Engine.Scripts.Components{
 
             if (_reMeshPartitions.Contains(pCoords)) return false;
 
+            CompleteReadersOf(chunkPos); // F-01
             bool result = chunk.VoxelData.SetVoxel(blockPos, voxelId);
             _chunks[chunkPos] = chunk;
             if (remesh && result){

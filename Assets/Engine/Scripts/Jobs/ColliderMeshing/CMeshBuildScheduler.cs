@@ -77,6 +77,9 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             _results = new NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult>(
                 settings.Chunk.DrawDistance.SquareSize(), Allocator.Domain);
             _jobs = new NativeList<int3>(Allocator.Domain);
+
+            // F-01: the job reads chunk data through the accessor; finish it before the manager edits or disposes a chunk.
+            _chunkManager.AccessorChunkWriting += CompleteIfRunning;
         }
 
         /// <summary>
@@ -119,6 +122,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         ///     and colliders, recalculates bounds and logs timing information.
         /// </summary>
         internal void Complete(){
+            if (IsReady) return; // F-01: already completed early by CompleteIfRunning
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.MeshBuildComplete.Auto(); // PERF-01
             double start = Time.realtimeSinceStartupAsDouble;
             _handle.Complete();
@@ -162,9 +166,18 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         }
 
         /// <summary>
+        ///     F-01: completes the running batch synchronously when the chunk manager is about to write a chunk the
+        ///     job may read. The state handler then only clears its batch set in <c>CollectResultsStep</c>.
+        /// </summary>
+        private void CompleteIfRunning(){
+            if (!IsReady) Complete();
+        }
+
+        /// <summary>
         ///     Disposes all native containers and completes any running jobs before releasing resources.
         /// </summary>
         internal void Dispose(){
+            _chunkManager.AccessorChunkWriting -= CompleteIfRunning;
             _handle.Complete();
 
             _colliderVertexParams.Dispose();

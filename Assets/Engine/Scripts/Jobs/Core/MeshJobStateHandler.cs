@@ -97,9 +97,12 @@ namespace Engine.Scripts.Jobs.Core{
         /// </summary>
         /// <returns>True if collection completed, false if scheduler is still working.</returns>
         protected override bool CollectResultsStep(){
-            if (!_cMeshBuildScheduler.IsComplete || _cMeshBuildScheduler.IsReady) return false;
+            // F-01: the scheduler may already be ready if a chunk edit or unload completed the batch early.
+            if (!_cMeshBuildScheduler.IsReady){
+                if (!_cMeshBuildScheduler.IsComplete) return false;
+                _cMeshBuildScheduler.Complete();
+            }
 
-            _cMeshBuildScheduler.Complete();
             Set.Clear();
             _colliderJobHandler.WakeUp();
             return true;

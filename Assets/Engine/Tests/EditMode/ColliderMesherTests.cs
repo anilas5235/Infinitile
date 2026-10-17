@@ -1,33 +1,23 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
-using Engine.Scripts.Components;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.ColliderMeshing;
-using Engine.Scripts.Settings;
 using Engine.Scripts.VoxelConfig.Data.Internal;
-using Engine.Scripts.VoxelConfig.Data.Voxel;
-using Engine.Scripts.VoxelConfig.Registry;
-using Engine.Scripts.World;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 using static Engine.Scripts.Utils.VoxelConstants;
-using Object = UnityEngine.Object;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     TST-E18: greedy collider mesher (CMeshBuildJob) on hand-built chunks, plus the scheduler's behaviour
-    ///     when a chunk is edited or unloaded while a build job is in flight (F-01).
+    ///     TST-E18: greedy collider mesher (CMeshBuildJob) on hand-built chunks. The scheduler race tests (F-01)
+    ///     live in the PlayMode assembly because the chunk prefab needs a live Awake.
     /// </summary>
     public class ColliderMesherTests{
-        private const string ChunkPrefabPath = "Assets/Engine/Prefabs/Chunk.prefab";
-
         private NativeParallelHashMap<int2, ChunkVoxelData> _chunks;
         private NativeParallelHashMap<int2, ChunkLightData> _lights;
         private NativeArray<VertexAttributeDescriptor> _vertexParams;
@@ -218,101 +208,6 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(16384 * 36, indices);
             Assert.IsTrue(vertices <= ushort.MaxValue + 1 || _meshData[0].indexFormat == IndexFormat.UInt32,
                 "meshes with more than 65536 vertices need 32-bit indices");
-        }
-
-        #endregion
-
-        #region CMeshBuildScheduler (F-01)
-
-        private sealed class SchedulerRig : IDisposable{
-            private readonly List<Object> _objects = new();
-            private readonly RegistryTestFixtures _fixtures = new();
-            private readonly VoxelRegistry _registry;
-            private readonly NativeParallelHashMap<int2, ChunkVoxelData> _generated;
-
-            public readonly ChunkManager Manager;
-            public readonly ChunkPool Pool;
-            public readonly CMeshBuildScheduler Scheduler;
-
-            public SchedulerRig(){
-                VoxelEngineSettings settings = TestFixtures.CreateSettings(2);
-                settings.Chunk.ChunkPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ChunkPrefabPath);
-                Assert.IsNotNull(settings.Chunk.ChunkPrefab, ChunkPrefabPath);
-
-                GameObject root = new("ColliderMesherTests.Pool");
-                _objects.Add(root);
-                GameObject worldObject = new("ColliderMesherTests.World");
-                worldObject.SetActive(false); // Awake must not run; only the event hub is used
-                _objects.Add(worldObject);
-                VoxelWorld world = worldObject.AddComponent<VoxelWorld>();
-
-                _registry = _fixtures.CreateStandardVoxelRegistry(out _, out Voxel[] voxels);
-                Assert.AreEqual(TestFixtures.Stone, _registry.GetIdOrThrow(voxels[2].GetFullName()));
-
-                Manager = new ChunkManager(settings);
-                Pool = new ChunkPool(root.transform, settings);
-                Scheduler = new CMeshBuildScheduler(settings, Manager, Pool, _registry, world);
-
-                // Centre chunk: checkerboard in every partition so the build job runs long enough to race.
-                _generated = new NativeParallelHashMap<int2, ChunkVoxelData>(9, Allocator.Persistent);
-                for (int x = -1; x <= 1; x++)
-                for (int z = -1; z <= 1; z++){
-                    int2 pos = new(x, z);
-                    _generated.Add(pos, pos.Equals(int2.zero)
-                        ? BuildChunk(p => ((p.x + p.y + p.z) & 1) == 0 ? TestFixtures.Stone : TestFixtures.Air)
-                        : TestFixtures.CreateUniformChunk(TestFixtures.Air));
-                }
-
-                Manager.AddChunks(_generated); // the manager owns the chunk data from here on
-            }
-
-            public void StartCentreChunkBuild(){
-                HashSet<int3> jobs = new();
-                for (int y = 0; y < PartitionsPerChunk; y++) jobs.Add(new int3(0, y, 0));
-                Scheduler.Start(jobs);
-            }
-
-            public void Dispose(){
-                Scheduler.Dispose(); // completes the handle
-                // Complete() never ran, so the writable mesh data the scheduler allocated is still alive.
-                FieldInfo field = typeof(CMeshBuildScheduler).GetField("_colliderMeshDataArray",
-                    BindingFlags.NonPublic | BindingFlags.Instance);
-                Assert.IsNotNull(field);
-                Mesh.MeshDataArray array = (Mesh.MeshDataArray)field.GetValue(Scheduler);
-                if (array.Length > 0) array.Dispose();
-
-                Manager.Dispose();
-                Pool.Dispose();
-                _registry.Dispose();
-                _generated.Dispose();
-                _fixtures.DestroyAll();
-                foreach (Object obj in _objects)
-                    if (obj) Object.DestroyImmediate(obj);
-            }
-        }
-
-        [Category("KnownBug")] // F-01
-        [Test]
-        public void SetVoxel_WhileBuildJobRuns_CompletesJobFirst(){
-            // F-01: editing chunk data that a scheduled build job is reading must wait for the job.
-            using SchedulerRig rig = new();
-            rig.StartCentreChunkBuild();
-            Assert.IsFalse(rig.Scheduler.IsReady);
-
-            rig.Manager.SetVoxel(TestFixtures.Grass, new int3(5, 40, 5));
-            Assert.IsTrue(rig.Scheduler.IsComplete, "SetVoxel must not modify data while a job reads it");
-        }
-
-        [Category("KnownBug")] // F-01
-        [Test]
-        public void UnloadChunk_WhileBuildJobRuns_CompletesJobFirst(){
-            // F-01: unloading a chunk that a scheduled build job is reading must wait for the job.
-            using SchedulerRig rig = new();
-            rig.StartCentreChunkBuild();
-            Assert.IsFalse(rig.Scheduler.IsReady);
-
-            rig.Manager.UnloadChunk(new int2(1, 0));
-            Assert.IsTrue(rig.Scheduler.IsComplete, "UnloadChunk must not dispose data while a job reads it");
         }
 
         #endregion
