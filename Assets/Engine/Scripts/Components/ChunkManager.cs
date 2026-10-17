@@ -252,6 +252,8 @@ namespace Engine.Scripts.Components{
         internal bool SetVoxel(ushort voxelId, int3 position, bool remesh = true){
             int2 chunkPos = GetChunkCoords(position);
             int3 blockPos = GetLocalVoxelCoords(position);
+            // F-08: reject Y outside the chunk; the flat index would otherwise wrap into a neighbouring column
+            if (blockPos.y < 0 || blockPos.y >= ChunkHeight) return false;
             if (!_chunks.TryGetValue(chunkPos, out Chunk chunk)){
                 VoxelEngineLogger.Warn<ChunkManager>($"Chunk : {chunkPos} not loaded");
                 return false;

@@ -116,7 +116,6 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(TestFixtures.Stone, _manager.GetVoxel(new int3(5, 11, 5)));
         }
 
-        [Category("KnownBug")] // F-08
         [TestCase(ChunkHeight)]
         [TestCase(-1)]
         public void SetVoxel_OutsideChunkHeight_IsRejected(int y){
