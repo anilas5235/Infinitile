@@ -194,7 +194,6 @@ namespace Engine.Tests.EditMode{
             }
         }
 
-        [Category("KnownBug")] // F-15
         [Test]
         public void Checkerboard_DoesNotOverflow16BitIndices(){
             // F-15: a checkerboard partition has 16384 voxels * 24 vertices; UInt16 indices wrap above 65535.

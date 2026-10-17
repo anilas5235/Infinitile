@@ -28,7 +28,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
     [BurstCompile]
     internal struct CMeshBuffer{
         public NativeList<CVertex> CVertexBuffer;
-        public NativeList<ushort> CIndexBuffer;
+        public NativeList<int> CIndexBuffer; // F-15: int so meshes above 65536 vertices can use 32-bit indices
 
         /// <summary>
         ///     Disposes all native lists.
@@ -40,7 +40,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
 
         public void AddCIndex(int index){
             EnsureCapacity(CIndexBuffer, 1);
-            CIndexBuffer.AddNoResize((ushort)index);
+            CIndexBuffer.AddNoResize(index);
         }
 
         public void AddCVertex(CVertex vertex){

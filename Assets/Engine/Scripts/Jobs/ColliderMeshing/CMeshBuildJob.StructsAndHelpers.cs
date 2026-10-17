@@ -46,7 +46,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
                 ChunkPos = partitionPos.xz;
                 CMeshBuffer = new CMeshBuffer{
                     CVertexBuffer = new NativeList<CVertex>(VoxelCount4, Allocator.Temp),
-                    CIndexBuffer = new NativeList<ushort>(VoxelCount6, Allocator.Temp)
+                    CIndexBuffer = new NativeList<int>(VoxelCount6, Allocator.Temp)
                 };
 
                 CollisionVoxels = new NativeHashSet<int3>(VoxelsPerPartition, Allocator.Temp);

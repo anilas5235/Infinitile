@@ -31,10 +31,19 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             colliderMesh.GetVertexData<CVertex>().CopyFrom(cMeshBuffer.CVertexBuffer.AsArray());
 
             int cIndexCount = cMeshBuffer.CIndexBuffer.Length;
-            colliderMesh.SetIndexBufferParams(cIndexCount, IndexFormat.UInt16);
-            NativeArray<ushort> cIndexBuffer = colliderMesh.GetIndexData<ushort>();
-            if (cIndexCount > 0)
-                NativeArray<ushort>.Copy(cMeshBuffer.CIndexBuffer.AsArray(), 0, cIndexBuffer, 0, cIndexCount);
+            // F-15: 16-bit indices wrap above 65536 vertices (a checkerboard partition has 393216); such meshes
+            // get 32-bit indices, smaller ones keep the compact 16-bit format.
+            NativeArray<int> cIndices = cMeshBuffer.CIndexBuffer.AsArray();
+            if (cVertexCount > ushort.MaxValue + 1){
+                colliderMesh.SetIndexBufferParams(cIndexCount, IndexFormat.UInt32);
+                if (cIndexCount > 0)
+                    NativeArray<uint>.Copy(cIndices.Reinterpret<uint>(), 0, colliderMesh.GetIndexData<uint>(), 0, cIndexCount);
+            }
+            else{
+                colliderMesh.SetIndexBufferParams(cIndexCount, IndexFormat.UInt16);
+                NativeArray<ushort> cIndexBuffer = colliderMesh.GetIndexData<ushort>();
+                for (int i = 0; i < cIndexCount; i++) cIndexBuffer[i] = (ushort)cIndices[i];
+            }
 
             colliderMesh.subMeshCount = 1;
             SubMeshDescriptor cDesc = new(0, cIndexCount);
