@@ -55,6 +55,9 @@ namespace Engine.Scripts.Render{
         protected override void Awake(){
             base.Awake();
 
+            // F-21: resolve the world before its settings are read; OnEnable's fallback ran too late for Awake.
+            if (world == null) world = GetComponent<VoxelWorld>();
+            if (world == null) world = VoxelWorld.Instance;
             _settings = world.Settings;
             _maxInFlight = math.max(1, _settings.Scheduler.partitionBuildBatchSize);
 
