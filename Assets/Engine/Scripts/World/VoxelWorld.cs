@@ -106,6 +106,7 @@ namespace Engine.Scripts.World{
         private void ConstructEngineComponents(){
             ChunkManager = VoxelEngineProvider.Current.ChunkManager();
             ChunkManager.OnChunkChange += RaiseChunkChanged;
+            ChunkManager.OnChunkUnloaded += RaiseChunkEvicted; // F-05
 
             _chunkPool = VoxelEngineProvider.Current.ChunkPool(transform);
             _chunkPool.OnChunkEvicted += HandleChunkEvicted;
@@ -141,8 +142,9 @@ namespace Engine.Scripts.World{
         private void HandleChunkEvicted(int2 chunkPos){
             if (_isShuttingDown) return;
 
-            ChunkManager.UnloadChunk(chunkPos);
-            RaiseChunkEvicted(chunkPos);
+            // F-05: UnloadChunk raises ChunkEvicted itself (through OnChunkUnloaded); only a chunk the manager no
+            // longer holds needs the event raised here.
+            if (!ChunkManager.UnloadChunk(chunkPos)) RaiseChunkEvicted(chunkPos);
         }
 
         private void HandlePartitionEvicted(int3 partitionPos){
@@ -222,7 +224,11 @@ namespace Engine.Scripts.World{
         /// </summary>
         protected override void OnDestroy(){
             _isShuttingDown = true;
-            if (ChunkManager != null) ChunkManager.OnChunkChange -= RaiseChunkChanged;
+            if (ChunkManager != null){
+                ChunkManager.OnChunkChange -= RaiseChunkChanged;
+                ChunkManager.OnChunkUnloaded -= RaiseChunkEvicted;
+            }
+
             if (_chunkPool != null){
                 _chunkPool.OnChunkEvicted -= HandleChunkEvicted;
                 _chunkPool.OnPartitionEvicted -= HandlePartitionEvicted;

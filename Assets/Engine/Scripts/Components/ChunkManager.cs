@@ -34,6 +34,12 @@ namespace Engine.Scripts.Components{
         ///     disposed. Schedulers whose jobs read the accessor subscribe and complete their running job first.
         /// </summary>
         internal Action AccessorChunkWriting;
+
+        /// <summary>
+        ///     F-05: raised after <see cref="UnloadChunk" /> removed a loaded chunk, so the world can tell listeners
+        ///     (renderer buffers, pool) that the chunk is gone regardless of who triggered the unload.
+        /// </summary>
+        internal Action<int2> OnChunkUnloaded;
         private NativeParallelHashMap<int2, ChunkVoxelData> _accessorMap;
 
         private PriorityUtil.Focus _focus;
@@ -117,9 +123,13 @@ namespace Engine.Scripts.Components{
             UnloadChunk(position);
         }
 
-        internal void UnloadChunk(int2 position){
+        /// <summary>
+        ///     Unloads a chunk's data and raises <see cref="OnChunkUnloaded" />.
+        /// </summary>
+        /// <returns>True if the chunk was loaded and has been removed.</returns>
+        internal bool UnloadChunk(int2 position){
             if (_unloadingQueue.Contains(position)) _unloadingQueue.Remove(position);
-            if (!_chunks.TryGetValue(position, out Chunk chunk)) return;
+            if (!_chunks.TryGetValue(position, out Chunk chunk)) return false;
 
             CompleteReadersOf(position); // F-01
             chunk.Dispose();
@@ -130,6 +140,9 @@ namespace Engine.Scripts.Components{
                 _reMeshPartitions.Remove(partitionPos);
                 _reCollidePartitions.Remove(partitionPos);
             }
+
+            OnChunkUnloaded?.Invoke(position); // F-05
+            return true;
         }
 
         /// <summary>

@@ -32,7 +32,6 @@ namespace Engine.Tests.PlayMode{
 
         #region F-05
 
-        [Category("KnownBug")] // F-05
         [UnityTest]
         [Timeout(120000)]
         public IEnumerator UnloadChunk_RaisesEvictionAndReleasesRenderBuffer(){
