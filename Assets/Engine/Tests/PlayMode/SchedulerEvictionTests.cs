@@ -145,7 +145,6 @@ namespace Engine.Tests.PlayMode{
 
         #region F-10
 
-        [Category("KnownBug")] // F-10
         [UnityTest]
         [Timeout(120000)]
         public IEnumerator MeshHandler_IdlesOnceVerticalDrawWindowIsMeshed(){

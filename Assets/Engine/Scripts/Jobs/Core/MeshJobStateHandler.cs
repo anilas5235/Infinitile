@@ -50,7 +50,11 @@ namespace Engine.Scripts.Jobs.Core{
             for (int x = -draw; x <= draw; x++)
             for (int z = -draw; z <= draw; z++){
                 if (!CanGenerateMeshForChunk(focus.Pos.xz + new int2(x, z))) continue;
-                for (int y = 0; y < VoxelConstants.PartitionsPerChunk; y++){
+                // F-10: only the vertical draw window is queued, the same filter IsPartitionStillRelevant applies;
+                // queueing all layers made JobUpdateStep drop and re-queue the others every cycle.
+                int minY = math.max(0, focus.Pos.y - draw);
+                int maxY = math.min(VoxelConstants.PartitionsPerChunk - 1, focus.Pos.y + draw);
+                for (int y = minY; y <= maxY; y++){
                     int3 pos = new(x + focus.Pos.x, y, z + focus.Pos.z);
                     if (Queue.Contains(pos) || !ShouldScheduleForMeshing(pos)) continue;
 
