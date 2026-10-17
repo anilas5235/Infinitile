@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Runtime.InteropServices;
 using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig;
@@ -137,13 +136,22 @@ namespace Engine.Scripts.Render{
                 CopyCount(FoliagePointsOut, _readBackCountBuffer, sizeof(uint) * 2);
 
                 await AsyncGPUReadback.RequestIntoNativeArrayAsync(ref _counts, _readBackCountBuffer);
-                int[] results = _counts.Select(c => (int)c).ToArray();
-                return results;
+                return ToPointCounts(_counts);
             }
             catch (Exception e){
                 VoxelEngineLogger.Error<PointBuilderHandler>($"Error reading back point counts: {e}");
                 return new[]{ 0, 0, 0 };
             }
+        }
+
+        /// <summary>
+        ///     Converts the GPU read-back counters (solid, transparent, foliage) to the point counts used for
+        ///     buffer allocation. Extracted so TST-E17 can characterise the read-back clamp (F-03).
+        /// </summary>
+        internal static int[] ToPointCounts(NativeArray<uint> counts){
+            int[] results = new int[counts.Length];
+            for (int i = 0; i < counts.Length; i++) results[i] = (int)counts[i];
+            return results;
         }
 
         /// <summary>
