@@ -85,7 +85,6 @@ namespace Engine.Tests.EditMode{
                 Assert.AreNotEqual(TestFixtures.Ice, VoxelAt(WarmColumn, y), $"y={y}");
         }
 
-        [Category("KnownBug")] // F-07
         [Test]
         public void FillTerrain_ColdColumnFreezesWaterSurface(){
             // F-07: the ice check runs at y == waterLevel where the voxel is already air, so ice never appears.
