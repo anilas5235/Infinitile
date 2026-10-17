@@ -345,7 +345,6 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(dirt - 1, (int)def.Always.x, "pairs are appended in registration order");
         }
 
-        [Category("KnownBug")] // F-22
         [Test]
         public void BiomeRegistry_SameBiomeAssetInTwoPackages_IsRetrievableUnderBothIds(){
             // F-22: TopLevelRegistry.Register ignores the failed SO registration for the second name,

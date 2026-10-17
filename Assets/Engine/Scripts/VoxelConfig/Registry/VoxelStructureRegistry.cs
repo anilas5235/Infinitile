@@ -21,7 +21,6 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             }
 
             VoxelStructure.VoxelStructureDef[] tempArray = new VoxelStructure.VoxelStructureDef[NameRegistry.Count];
-            int index = 0;
             foreach (KeyValuePair<ushort, VoxelStructure> kvp in SoRegistry.GetAllEntries()){
                 VoxelEngineLogger.Info<VoxelStructureRegistry>($"copy structure {kvp.Value.name} to Structure array");
                 VoxelStructure.VoxelStructureDef def;
@@ -34,8 +33,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                     continue;
                 }
 
-                tempArray[index] = def;
-                index++;
+                tempArray[kvp.Key] = def; // F-22: place by id, not by enumeration order
             }
 
             StructureArray = new NativeArray<VoxelStructure.VoxelStructureDef>(tempArray, Allocator.Domain);

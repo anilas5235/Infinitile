@@ -51,7 +51,15 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             }
 
             ushort id = NameRegistry.Register(fullName);
-            SoRegistry.Register(id, so);
+            if (!SoRegistry.Register(id, so)){
+                // F-22: the same asset under a second name would leave a name id without an SO, i.e. a default
+                // (air) entry at the end of the finalized array. Roll the name back and keep the first id.
+                NameRegistry.Unregister(fullName);
+                SoRegistry.TryGetId(so, out ushort firstId);
+                VoxelEngineLogger.Warn<TopLevelRegistry<T>>(
+                    $"{typeof(T).Name} asset '{so.name}' is already registered with ID {firstId}; '{fullName}' skipped.");
+                return;
+            }
 
             SubRegister(id, fullName, so);
 

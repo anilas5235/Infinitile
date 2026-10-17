@@ -36,7 +36,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                         $"Failed to convert biome {kvp.Value.name} to struct: {e.Message}", e);
                 }
 
-                tempArray[index] = def;
+                tempArray[kvp.Key] = def; // F-22: place by id, not by enumeration order
                 index++;
             }
 
