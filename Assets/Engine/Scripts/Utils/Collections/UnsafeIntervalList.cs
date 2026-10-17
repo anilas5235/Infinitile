@@ -69,7 +69,17 @@ namespace Engine.Scripts.Utils.Collections{
         /// <param name="value">The value to store.</param>
         /// <param name="count">The number of repetitions.</param>
         public void AddInterval(T value, int count){
+            if (count <= 0) return; // F-13: an empty run would be a zero-length node
             Length += count;
+
+            // F-13: extend the last run instead of adding a second node with the same value
+            if (_internal.Length > 0 && _internal[_internal.Length - 1].Value.Equals(value)){
+                Node last = _internal[_internal.Length - 1];
+                last.Count = Length;
+                _internal[_internal.Length - 1] = last;
+                return;
+            }
+
             _internal.Add(new Node(value, Length));
         }
 

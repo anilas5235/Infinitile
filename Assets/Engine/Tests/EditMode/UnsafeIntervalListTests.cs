@@ -146,7 +146,6 @@ namespace Engine.Tests.EditMode{
             RunRandomSets((_, _, context) => AssertInvariants(context));
         }
 
-        [Category("KnownBug")] // F-13
         [Test]
         public void AddInterval_EqualNeighbouringRuns_AreMerged(){
             // F-13: AddInterval must merge a run that equals the previous run.
@@ -156,7 +155,6 @@ namespace Engine.Tests.EditMode{
             AssertNodes((1, 5), (2, 9));
         }
 
-        [Category("KnownBug")] // F-13
         [Test]
         public void AddInterval_CountZero_AddsNoNode(){
             // F-13: a zero-length run must not create an empty node.
