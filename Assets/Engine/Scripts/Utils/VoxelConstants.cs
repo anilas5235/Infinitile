@@ -66,7 +66,13 @@ namespace Engine.Scripts.Utils{
         /// <param name="worldPos">The world-space position.</param>
         /// <returns>The partition coordinates containing the world position.</returns>
         public static int3 WorldToPartitionPos(int3 worldPos){
-            return worldPos.MemberDivide(PartitionSize);
+            // D-08: floor division so negative world positions map to the partition that contains them
+            // (truncating division mapped -1 to partition 0).
+            return new int3(
+                VoxelUtils.FloorDivide(worldPos.x, PartitionWidth),
+                VoxelUtils.FloorDivide(worldPos.y, PartitionHeight),
+                VoxelUtils.FloorDivide(worldPos.z, PartitionDepth)
+            );
         }
 
         /// <summary>
