@@ -68,8 +68,12 @@ namespace Engine.Scripts.Jobs.Core{
             int dist = (position - focus.Pos.xz).SqrMagnitude();
             if (dist == 0) return 0f;
 
+            // F-09: a vertical forward has no xz component; normalising it gives NaN, so skip the direction term.
+            float2 forwardXz = focus.Forward.xz;
+            if (math.lengthsq(forwardXz) < 1e-6f) return dist * 3f;
+
             float2 dir = math.normalize(position - focus.Pos.xz);
-            float2 forward = math.normalize(focus.Forward.xz);
+            float2 forward = math.normalize(forwardXz);
 
             float dot = math.dot(forward, dir);
 

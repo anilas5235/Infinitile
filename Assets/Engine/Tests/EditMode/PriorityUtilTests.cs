@@ -83,7 +83,6 @@ namespace Engine.Tests.EditMode{
 
         #region TST-E16
 
-        [Category("KnownBug")] // F-09
         [Test]
         public void DistPriority2D_VerticalForward_GivesFinitePriorities(){
             // F-09: forward (0, ±1, 0) has xz = (0, 0); the 2D overload must not produce NaN.
