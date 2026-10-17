@@ -31,6 +31,8 @@ namespace Engine.Scripts.Render{
 
         private readonly GraphicsBuffer _voxelRenderDefBuffer;
         private NativeArray<uint> _counts;
+        private bool _disposed;
+        private bool _readBackPending;
 
         /// <summary>
         ///     Initializes a new instance of the PointBuilderHandler class.
@@ -80,13 +82,35 @@ namespace Engine.Scripts.Render{
         ///     Releases all GPU resources held by this handler.
         /// </summary>
         public void Dispose(){
-            SolidPointsOut?.Dispose();
-            TransparentPointsOut?.Dispose();
-            FoliagePointsOut?.Dispose();
-            _metadata?.Dispose();
-            _readBackCountBuffer?.Dispose();
-            foreach (GraphicsBuffer chunkBuffer in _preparedChunks) chunkBuffer?.Dispose();
-            _counts.Dispose();
+            if (_disposed) return;
+            _disposed = true;
+
+            // F-17: a read-back into _counts may still be pending; the array cannot be released before it has
+            // completed, and every resource is released on its own so one failure does not leak the others.
+            if (_readBackPending) AsyncGPUReadback.WaitAllRequests();
+
+            SafeDispose(SolidPointsOut);
+            SafeDispose(TransparentPointsOut);
+            SafeDispose(FoliagePointsOut);
+            SafeDispose(_metadata);
+            SafeDispose(_readBackCountBuffer);
+            foreach (GraphicsBuffer chunkBuffer in _preparedChunks) SafeDispose(chunkBuffer);
+
+            try{
+                if (_counts.IsCreated) _counts.Dispose();
+            }
+            catch (Exception e){
+                VoxelEngineLogger.Error<PointBuilderHandler>($"Failed to release the read-back array: {e}");
+            }
+        }
+
+        private static void SafeDispose(GraphicsBuffer buffer){
+            try{
+                buffer?.Dispose();
+            }
+            catch (Exception e){
+                VoxelEngineLogger.Error<PointBuilderHandler>($"Failed to release a GPU buffer: {e}");
+            }
         }
 
         /// <summary>
@@ -135,12 +159,17 @@ namespace Engine.Scripts.Render{
                 CopyCount(TransparentPointsOut, _readBackCountBuffer, sizeof(uint) * 1);
                 CopyCount(FoliagePointsOut, _readBackCountBuffer, sizeof(uint) * 2);
 
+                _readBackPending = true;
                 await AsyncGPUReadback.RequestIntoNativeArrayAsync(ref _counts, _readBackCountBuffer);
+                if (_disposed) return new[]{ 0, 0, 0 }; // F-17: the handler was released while the read-back ran
                 return ToPointCounts(_counts);
             }
             catch (Exception e){
                 VoxelEngineLogger.Error<PointBuilderHandler>($"Error reading back point counts: {e}");
                 return new[]{ 0, 0, 0 };
+            }
+            finally{
+                _readBackPending = false;
             }
         }
 

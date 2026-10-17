@@ -154,6 +154,7 @@ namespace Engine.Scripts.Render{
             _isDestroyed = true;
             _copyPointsHandler?.Dispose();
 
+            // F-17: each handler waits for its pending read-back and releases its resources independently.
             if (_pointBuilderHandlers != null){
                 foreach (PointBuilderHandler handler in _pointBuilderHandlers)
                     handler?.Dispose();
