@@ -107,12 +107,7 @@ namespace Engine.Tests.EditMode{
             public TestScheduler(int records) : base(records){ }
 
             public void Record(long milliseconds){
-                Queue<long> timings = Timings;
-                // Mirrors StopRecord's window handling without a Stopwatch: the test injects the measured value.
-                FieldInfo recordsField = typeof(JobScheduler).GetField("_records", BindingFlags.NonPublic | BindingFlags.Instance);
-                int records = (int)recordsField.GetValue(this);
-                if (timings.Count > records) timings.Dequeue();
-                timings.Enqueue(milliseconds);
+                RecordTiming(milliseconds); // the same window handling StopRecord uses, without a Stopwatch
             }
 
             public Queue<long> Timings =>
@@ -120,7 +115,6 @@ namespace Engine.Tests.EditMode{
                     .GetValue(this);
         }
 
-        [Category("KnownBug")] // F-11
         [Test]
         public void AvgTime_OfConstantTimings_EqualsThatConstant(){
             // F-11: AvgTime divides by a constant 10 instead of the number of samples.
@@ -131,7 +125,6 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(5f, scheduler.AvgTime, 1e-5f, "window full of 5 ms samples");
         }
 
-        [Category("KnownBug")] // F-11
         [Test]
         public void AvgTime_WindowIsBoundedByRecordCount(){
             // F-11: the queue keeps records + 1 entries.
