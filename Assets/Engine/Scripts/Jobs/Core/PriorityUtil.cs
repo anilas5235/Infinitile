@@ -85,6 +85,23 @@ namespace Engine.Scripts.Jobs.Core{
             return -DistPriority(ref position, ref focus);
         }
 
+        /// <summary>
+        ///     F-23 / DEC-14: eviction order is plain (squared) distance from the focus, without the view weighting
+        ///     of <see cref="DistPriority(ref int3, ref Focus)" />; the farthest entry has the lowest value and is
+        ///     dequeued first. Otherwise a chunk behind the player inside the load distance was evicted before a
+        ///     chunk outside it and regenerated.
+        /// </summary>
+        [BurstCompile]
+        public static float EvictionPriority(ref int3 position, ref Focus focus){
+            return -(position - focus.Pos).SqrMagnitude();
+        }
+
+        /// <inheritdoc cref="EvictionPriority(ref int3, ref Focus)" />
+        [BurstCompile]
+        public static float EvictionPriority(ref int2 position, ref Focus focus){
+            return -(position - focus.Pos.xz).SqrMagnitude();
+        }
+
         public readonly struct Focus : IEquatable<Focus>{
             public readonly int3 Pos;
             public readonly float3 Forward;

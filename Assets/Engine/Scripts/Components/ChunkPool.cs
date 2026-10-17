@@ -81,17 +81,18 @@ namespace Engine.Scripts.Components{
         internal void FocusUpdate(Focus focus){
             _focus = focus;
             // N-01 / PERF-04: static lambdas with explicit state; instance method groups allocate a delegate per call
-            _chunkQueue.UpdateAllPriorities(focus, static (f, pos) => ReVerseDistPriority(ref pos, ref f));
-            _partitionQueue.UpdateAllPriorities(focus, static (f, pos) => ReVerseDistPriority(ref pos, ref f));
-            _colliderQueue.UpdateAllPriorities(focus, static (f, pos) => ReVerseDistPriority(ref pos, ref f));
+            // F-23 / DEC-14: reclaim by plain distance
+            _chunkQueue.UpdateAllPriorities(focus, static (f, pos) => EvictionPriority(ref pos, ref f));
+            _partitionQueue.UpdateAllPriorities(focus, static (f, pos) => EvictionPriority(ref pos, ref f));
+            _colliderQueue.UpdateAllPriorities(focus, static (f, pos) => EvictionPriority(ref pos, ref f));
         }
 
         private float PriorityCalc(int2 position){
-            return ReVerseDistPriority(ref position, ref _focus);
+            return EvictionPriority(ref position, ref _focus); // F-23
         }
 
         private float PriorityCalc(int3 position){
-            return ReVerseDistPriority(ref position, ref _focus);
+            return EvictionPriority(ref position, ref _focus); // F-23
         }
 
         /// <summary>

@@ -96,7 +96,8 @@ namespace Engine.Scripts.Components{
         internal void FocusUpdate(PriorityUtil.Focus focus){
             _focus = focus;
             // N-01 / PERF-04: static lambda with explicit state instead of a closure capturing the focus
-            _unloadingQueue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.ReVerseDistPriority(ref pos, ref f));
+            // F-23 / DEC-14: evict by plain distance
+            _unloadingQueue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.EvictionPriority(ref pos, ref f));
         }
 
         /// <summary>
@@ -113,7 +114,7 @@ namespace Engine.Scripts.Components{
 
                 Chunk chunk = new(position){ VoxelData = pair.Value };
                 _chunks.Add(position, chunk);
-                _unloadingQueue.Enqueue(position, PriorityUtil.ReVerseDistPriority(ref position, ref _focus));
+                _unloadingQueue.Enqueue(position, PriorityUtil.EvictionPriority(ref position, ref _focus)); // F-23
             }
         }
 

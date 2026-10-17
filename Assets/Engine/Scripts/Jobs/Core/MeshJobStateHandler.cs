@@ -59,7 +59,8 @@ namespace Engine.Scripts.Jobs.Core{
                     int3 pos = new(x + focus.Pos.x, y, z + focus.Pos.z);
                     if (Queue.Contains(pos) || !ShouldScheduleForMeshing(pos)) continue;
 
-                    if (PriorityUtil.ReVerseDistPriority(ref pos, ref focus) <= prioThreshold) continue;
+                    // F-23: the threshold is the pool's eviction priority, compare in the same measure
+                    if (PriorityUtil.EvictionPriority(ref pos, ref focus) <= prioThreshold) continue;
 
                     Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
                 }
@@ -154,7 +155,7 @@ namespace Engine.Scripts.Jobs.Core{
             return math.abs(position.x - focus.Pos.x) <= drawDistance &&
                    math.abs(position.z - focus.Pos.z) <= drawDistance &&
                    math.abs(position.y - focus.Pos.y) <= drawDistance &&
-                   PriorityUtil.ReVerseDistPriority(ref position, ref focus) > prioThreshold;
+                   PriorityUtil.EvictionPriority(ref position, ref focus) > prioThreshold; // F-23
         }
     }
 }

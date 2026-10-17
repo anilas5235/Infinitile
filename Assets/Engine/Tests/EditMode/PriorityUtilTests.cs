@@ -27,6 +27,27 @@ namespace Engine.Tests.EditMode{
             return PriorityUtil.ReVerseDistPriority(ref position, ref focus);
         }
 
+        #region F-23
+
+        [Test]
+        public void EvictionPriority_IsPlainDistance_IgnoringViewDirection(){
+            // F-23 / DEC-14: eviction must not weight chunks behind the player x5.
+            PriorityUtil.Focus focus = LookingForward();
+            int3 behind = new(0, 0, -3);
+            int3 front = new(0, 0, 6);
+            Assert.AreEqual(-9f, PriorityUtil.EvictionPriority(ref behind, ref focus));
+            Assert.AreEqual(-36f, PriorityUtil.EvictionPriority(ref front, ref focus));
+            Assert.Greater(PriorityUtil.EvictionPriority(ref behind, ref focus), PriorityUtil.EvictionPriority(ref front, ref focus),
+                "the farther chunk must have the lower (first dequeued) priority");
+
+            int2 behind2 = new(0, -3);
+            int2 front2 = new(0, 6);
+            Assert.AreEqual(-9f, PriorityUtil.EvictionPriority(ref behind2, ref focus));
+            Assert.AreEqual(-36f, PriorityUtil.EvictionPriority(ref front2, ref focus));
+        }
+
+        #endregion
+
         #region TST-E07
 
         [Test]
