@@ -117,7 +117,7 @@ namespace Engine.Tests.PlayMode{
             using BakeRig rig = new();
             int3 pos = new(0, 3, 0);
             rig.Pool.GetOrClaimPartition(pos);
-            rig.Bake.Start(new List<int3>{ pos });
+            rig.Bake.Start(new HashSet<int3>{ pos });
             yield return null;
             rig.Bake.Complete();
             Assert.IsTrue(rig.Pool.IsPartitionActive(pos));
@@ -131,7 +131,7 @@ namespace Engine.Tests.PlayMode{
             using BakeRig rig = new();
             int3 pos = new(0, 3, 0);
             rig.Pool.GetOrClaimPartition(pos);
-            rig.Bake.Start(new List<int3>{ pos });
+            rig.Bake.Start(new HashSet<int3>{ pos });
             yield return null;
 
             PlayModeFixtures.GetPrivateMethod(typeof(ChunkPool), "ReclaimPartition").Invoke(rig.Pool, new object[]{ pos });

@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using Engine.Scripts.Components;
+﻿using Engine.Scripts.Components;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Settings;
 using Unity.Mathematics;
@@ -26,6 +25,8 @@ namespace Engine.Scripts.Jobs.Core{
             base(settings, chunkManager, chunkPool){
             _chunkScheduler = chunkScheduler;
             _meshJobHandler = meshJobHandler;
+            int side = 2 * settings.Chunk.LoadDistance + 1;
+            Reserve(side * side, settings.Scheduler.chunkGenBatchSize); // PERF-04
         }
 
         /// <summary>
@@ -77,7 +78,7 @@ namespace Engine.Scripts.Jobs.Core{
 
             if (accepted == 0) return true;
 
-            _chunkScheduler.Start(Set.ToList());
+            _chunkScheduler.Start(Set); // PERF-04: no per-batch list copy
 
             return true;
         }

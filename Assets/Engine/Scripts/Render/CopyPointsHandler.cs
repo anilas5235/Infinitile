@@ -22,6 +22,11 @@ namespace Engine.Scripts.Render{
         private readonly RenderBufferManager _transparentBufferManager;
         private readonly GraphicsBuffer _transparentPagesBuffer;
 
+        // PERF-04: upload staging reused per copy instead of allocated per partition
+        internal const int MaxPagesPerPartition = (MaxPointsPerPartition + PointsPerPage - 1) / PointsPerPage;
+        private readonly uint[] _pageCounts = new uint[3];
+        private readonly uint2[] _pageData = new uint2[MaxPagesPerPartition];
+
         /// <summary>
         ///     Initializes a new instance of the CopyPointsHandler class.
         /// </summary>
@@ -68,8 +73,10 @@ namespace Engine.Scripts.Render{
             int transparentPagesCount = transparentAlloc.Count;
             int foliagePagesCount = foliageAlloc.Count;
 
-            uint[] pageCounts = { (uint)solidPagesCount, (uint)transparentPagesCount, (uint)foliagePagesCount };
-            _pageCountsBuffer.SetData(pageCounts);
+            _pageCounts[0] = (uint)solidPagesCount;
+            _pageCounts[1] = (uint)transparentPagesCount;
+            _pageCounts[2] = (uint)foliagePagesCount;
+            _pageCountsBuffer.SetData(_pageCounts);
             _copyPoints.SetBuffer(_copyKernelID, PageCountsNameID, _pageCountsBuffer);
             _copyPoints.SetInt(PointsPerPageNameID, PointsPerPage);
 
@@ -91,8 +98,8 @@ namespace Engine.Scripts.Render{
 
             if (solidAlloc.Count <= 0) return;
 
-            uint2[] solidPageData = solidAlloc.ToIndexAndCount();
-            _solidPagesBuffer.SetData(solidPageData);
+            int count = solidAlloc.CopyIndexAndCount(_pageData);
+            _solidPagesBuffer.SetData(_pageData, 0, 0, count);
         }
 
         private void SetTransparentBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo transparentAlloc){
@@ -104,8 +111,8 @@ namespace Engine.Scripts.Render{
 
             if (transparentAlloc.Count <= 0) return;
 
-            uint2[] transparentPageData = transparentAlloc.ToIndexAndCount();
-            _transparentPagesBuffer.SetData(transparentPageData);
+            int count = transparentAlloc.CopyIndexAndCount(_pageData);
+            _transparentPagesBuffer.SetData(_pageData, 0, 0, count);
         }
 
         private void SetFoliageBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo foliageAlloc){
@@ -116,8 +123,8 @@ namespace Engine.Scripts.Render{
 
             if (foliageAlloc.Count <= 0) return;
 
-            uint2[] foliagePageData = foliageAlloc.ToIndexAndCount();
-            _foliagePagesBuffer.SetData(foliagePageData);
+            int count = foliageAlloc.CopyIndexAndCount(_pageData);
+            _foliagePagesBuffer.SetData(_pageData, 0, 0, count);
         }
 
         private GraphicsBuffer GetTargetBuffer(RenderBufferManager bufferManager, AllocInfo allocInfo){

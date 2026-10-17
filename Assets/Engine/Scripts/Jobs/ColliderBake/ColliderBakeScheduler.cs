@@ -50,12 +50,13 @@ namespace Engine.Scripts.Jobs.ColliderBake{
         ///     Starts scheduling collider build jobs for the given list of chunk positions.
         /// </summary>
         /// <param name="jobs">The list of chunk positions whose colliders should be built or updated.</param>
-        internal void Start(List<int3> jobs){
+        internal void Start(HashSet<int3> jobs){
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.ColliderBakeSchedule.Auto(); // PERF-01
             StartRecord();
 
             IsReady = false;
 
+            _meshes.EnsureCapacity(jobs.Count); // PERF-04: no growth once the batch size is reached
             foreach (int3 partitionPos in jobs){
                 ChunkPartition behaviour = _chunkPool.GetPartition(partitionPos);
                 _meshes.Add(partitionPos, behaviour);
@@ -76,7 +77,9 @@ namespace Engine.Scripts.Jobs.ColliderBake{
         /// </summary>
         internal void Complete(){
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.ColliderBakeComplete.Auto(); // PERF-01
+#if VOXEL_TIMING_LOGS
             double start = Time.realtimeSinceStartupAsDouble;
+#endif
             _handle.Complete();
 
             foreach ((int3 position, ChunkPartition behaviour) in _meshes){
@@ -91,6 +94,7 @@ namespace Engine.Scripts.Jobs.ColliderBake{
                 behaviour.ApplyColliderMesh();
             }
 
+#if VOXEL_TIMING_LOGS // PERF-04: the timing string was built per batch in the hot path; the PERF-01 markers cover it
             double totalTime = (Time.realtimeSinceStartupAsDouble - start) * 1000;
 
             if (totalTime >= 0.8){
@@ -98,6 +102,7 @@ namespace Engine.Scripts.Jobs.ColliderBake{
                     $"Built {_jobs.Length} colliders, Collected Results in <color=red>{totalTime:0.000}</color>ms"
                 );
             }
+#endif
 
             _jobs.Clear();
             _meshes.Clear();

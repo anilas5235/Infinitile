@@ -60,18 +60,18 @@ namespace Engine.Tests.PlayMode{
                 request.CollectBuffers(chunkBuffers);
                 Assert.IsTrue(request.IsValid);
 
-                Awaitable<int[]>.Awaiter build = handler.BuildPoints(request).GetAwaiter();
-                Assert.IsFalse(build.IsCompleted, "the read-back should still be pending right after the dispatch");
+                handler.BuildPoints(request);
+                Assert.IsFalse(handler.IsReadBackDone, "the read-back should still be pending right after the dispatch");
 
                 PointBuilderHandler disposing = handler;
                 handler = null;
                 Assert.DoesNotThrow(() => disposing.Dispose());
 
                 float deadline = Time.realtimeSinceStartup + 10f;
-                while (!build.IsCompleted && Time.realtimeSinceStartup < deadline) yield return null;
-                Assert.IsTrue(build.IsCompleted, "the build must still finish after the handler was disposed");
+                while (!disposing.IsReadBackDone && Time.realtimeSinceStartup < deadline) yield return null;
+                Assert.IsTrue(disposing.IsReadBackDone, "the build must still finish after the handler was disposed");
                 int[] counts = null;
-                Assert.DoesNotThrow(() => counts = build.GetResult());
+                Assert.DoesNotThrow(() => counts = disposing.CompleteBuild());
                 Assert.IsNotNull(counts);
                 yield return null;
                 Assert.AreEqual(0, errors, "no error may be logged while the pending read-back finishes");

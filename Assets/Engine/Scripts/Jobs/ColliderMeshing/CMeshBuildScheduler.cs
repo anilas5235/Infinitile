@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using Engine.Scripts.Behaviour;
 using Engine.Scripts.Components;
 using Engine.Scripts.Data;
@@ -48,6 +47,9 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         private NativeList<int3> _jobs;
         private NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult> _results;
 
+        // PERF-04: reused per batch instead of a new Mesh[] per Complete
+        private readonly List<Mesh> _colliderMeshes;
+
         /// <summary>
         ///     Initializes a new instance of the <see cref="CMeshBuildScheduler" /> class.
         /// </summary>
@@ -79,6 +81,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             _results = new NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult>(
                 math.max(1, settings.Scheduler.meshingBatchSize), Allocator.Domain);
             _jobs = new NativeList<int3>(Allocator.Domain);
+            _colliderMeshes = new List<Mesh>(math.max(1, settings.Scheduler.meshingBatchSize));
 
             // F-01: the job reads chunk data through the accessor; finish it before the manager edits or disposes a chunk.
             _chunkManager.AccessorChunkWriting += CompleteIfRunning;
@@ -100,7 +103,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
 
             IsReady = false;
 
-            _chunkAccessor = _chunkManager.GetAccessor(jobs.ToList());
+            _chunkAccessor = _chunkManager.GetAccessor(jobs); // PERF-04
 
             foreach (int3 j in jobs) _jobs.Add(j);
             if (_results.Capacity < _jobs.Length) _results.Capacity = _jobs.Length; // F-16
@@ -127,10 +130,13 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         internal void Complete(){
             if (IsReady) return; // F-01: already completed early by CompleteIfRunning
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.MeshBuildComplete.Auto(); // PERF-01
+#if VOXEL_TIMING_LOGS
             double start = Time.realtimeSinceStartupAsDouble;
+#endif
             _handle.Complete();
 
-            Mesh[] colliderMeshes = new Mesh[_jobs.Length];
+            _colliderMeshes.Clear();
+            for (int index = 0; index < _jobs.Length; index++) _colliderMeshes.Add(null);
 
             for (int index = 0; index < _jobs.Length; index++){
                 int3 pos = _jobs[index];
@@ -139,33 +145,40 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
 
                 CMeshBuildJob.PartitionJobResult result = _results[pos];
 
-                colliderMeshes[result.Index] = partition.ColliderMesh;
+                _colliderMeshes[result.Index] = partition.ColliderMesh;
                 partition.ColliderMesh.bounds = result.ColliderBounds;
             }
 
             Mesh.ApplyAndDisposeWritableMeshData(
                 _colliderMeshDataArray,
-                colliderMeshes,
+                _colliderMeshes,
                 MeshFlags
             );
+            _colliderMeshes.Clear();
 
+#if VOXEL_TIMING_LOGS // PERF-04: the timing string was built per batch in the hot path; the PERF-01 markers cover it
             double totalTime = (Time.realtimeSinceStartupAsDouble - start) * 1000;
             if (totalTime >= 4){
                 VoxelEngineLogger.Warn<CMeshBuildScheduler>(
                     $"Built {_jobs.Length} meshes, Collected Results in <color=red>{totalTime:0.000}</color>ms"
                 );
             }
+#endif
 
             _results.Clear();
             _jobs.Clear();
 
             IsReady = true;
+#if VOXEL_TIMING_LOGS
             long totalJobTime = StopRecord();
             if (totalJobTime > 100){
                 VoxelEngineLogger.Warn<CMeshBuildScheduler>(
                     $"Total Mesh Build Time for {_jobs.Length} jobs: <color=red>{totalJobTime:0.000}</color>ms"
                 );
             }
+#else
+            StopRecord();
+#endif
         }
 
         /// <summary>

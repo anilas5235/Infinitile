@@ -66,7 +66,7 @@ namespace Engine.Scripts.Jobs.Chunk{
         ///     Starts a Burst-compiled chunk generation job for the given list of chunk world positions.
         /// </summary>
         /// <param name="jobs">List of chunk world positions to generate.</param>
-        internal void Start(List<int2> jobs){
+        internal void Start(HashSet<int2> jobs){
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.DataGenSchedule.Auto(); // PERF-01
             StartRecord();
             IsReady = false;
@@ -88,16 +88,20 @@ namespace Engine.Scripts.Jobs.Chunk{
         /// </summary>
         internal void Complete(){
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.DataGenComplete.Auto(); // PERF-01
+#if VOXEL_TIMING_LOGS
             double start = Time.realtimeSinceStartupAsDouble;
+#endif
             _handle.Complete();
             _chunkManager.AddChunks(_results);
 
+#if VOXEL_TIMING_LOGS // PERF-04: the timing string was built per batch in the hot path; the PERF-01 markers cover it
             double totalTime = (Time.realtimeSinceStartupAsDouble - start) * 1000;
             if (totalTime >= 1){
                 VoxelEngineLogger.Info<ChunkScheduler>(
                     $"Built {_jobs.Length} ChunkData, Collected Results in <color=red>{totalTime:0.000}</color>ms"
                 );
             }
+#endif
 
             UploadChunks();
 

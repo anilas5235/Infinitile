@@ -19,6 +19,18 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         private readonly IList<SimpleNode> _nullNodesCache;
         private readonly GenericPriorityQueue<SimpleNode, TPriority> _queue;
 
+        // PERF-04: "item == null" on an unconstrained TItem boxes every value-type item under Mono; the null checks
+        // are skipped entirely for value types.
+        private static readonly bool ItemIsValueType = typeof(TItem).IsValueType;
+
+        private static bool IsNull(TItem item){
+            return !ItemIsValueType && item == null;
+        }
+
+        // PERF-04: nodes and per-item lists are pooled so steady-state Enqueue/Dequeue do not allocate.
+        private readonly Stack<SimpleNode> _nodePool = new();
+        private readonly Stack<List<SimpleNode>> _listPool = new();
+
         /// <summary>
         ///     Returns the number of nodes in the queue.
         ///     O(1)
@@ -42,10 +54,39 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         ///     Removes every node from the queue.
         ///     O(n)
         /// </summary>
+        /// <summary>
+        ///     PERF-04: pre-sizes the heap, the item cache and the node/list pools so that growing to
+        ///     <paramref name="capacity" /> items later does not allocate.
+        /// </summary>
+        public void Reserve(int capacity){
+            if (capacity <= 0) return;
+            if (_queue.MaxSize < capacity) _queue.Resize(capacity);
+            _itemToNodesCache.EnsureCapacity(capacity);
+            for (int i = _nodePool.Count + _queue.Count; i < capacity; i++) _nodePool.Push(new SimpleNode(default));
+            for (int i = _listPool.Count + _itemToNodesCache.Count; i < capacity; i++) _listPool.Push(new List<SimpleNode>(1));
+        }
+
         public void Clear(){
             _queue.Clear();
+            foreach (IList<SimpleNode> nodes in _itemToNodesCache.Values) ReturnList(nodes);
             _itemToNodesCache.Clear();
             _nullNodesCache.Clear();
+        }
+
+        private List<SimpleNode> RentList(){
+            return _listPool.Count > 0 ? _listPool.Pop() : new List<SimpleNode>();
+        }
+
+        private void ReturnList(IList<SimpleNode> nodes){
+            if (nodes is not List<SimpleNode> list) return;
+            list.Clear();
+            _listPool.Push(list);
+        }
+
+        private void Recycle(SimpleNode node){
+            node.Data = default;
+            _queue.ResetNode(node);
+            _nodePool.Push(node);
         }
 
         /// <summary>
@@ -53,7 +94,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         ///     O(1)
         /// </summary>
         public bool Contains(TItem item){
-            return item == null ? _nullNodesCache.Count > 0 : _itemToNodesCache.ContainsKey(item);
+            return IsNull(item) ? _nullNodesCache.Count > 0 : _itemToNodesCache.ContainsKey(item);
         }
 
         /// <summary>
@@ -66,7 +107,9 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
 
             SimpleNode node = _queue.Dequeue();
             RemoveFromNodeCache(node);
-            return node.Data;
+            TItem data = node.Data;
+            Recycle(node);
+            return data;
         }
 
         /// <summary>
@@ -77,10 +120,10 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         /// </summary>
         public void Enqueue(TItem item, TPriority priority){
             IList<SimpleNode> nodes;
-            if (item == null)
+            if (IsNull(item))
                 nodes = _nullNodesCache;
             else if (!_itemToNodesCache.TryGetValue(item, out nodes)){
-                nodes = new List<SimpleNode>();
+                nodes = RentList();
                 _itemToNodesCache[item] = nodes;
             }
 
@@ -97,7 +140,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         public void Remove(TItem item){
             SimpleNode removeMe;
             IList<SimpleNode> nodes;
-            if (item == null){
+            if (IsNull(item)){
                 if (_nullNodesCache.Count == 0){
                     throw new InvalidOperationException("Cannot call Remove() on a node which is not enqueued: " +
                                                         item);
@@ -115,6 +158,8 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
 
             _queue.Remove(removeMe);
             nodes.Remove(removeMe);
+            if (!IsNull(item) && nodes.Count == 0) ReturnList(nodes);
+            Recycle(removeMe);
         }
 
         /// <summary>
@@ -147,7 +192,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         ///     Given an item of type T, returns the existing SimpleNode in the queue
         /// </summary>
         private SimpleNode GetExistingNode(TItem item){
-            if (item == null) return _nullNodesCache.Count > 0 ? _nullNodesCache[0] : null;
+            if (IsNull(item)) return _nullNodesCache.Count > 0 ? _nullNodesCache[0] : null;
 
             if (!_itemToNodesCache.TryGetValue(item, out IList<SimpleNode> nodes)) return null;
 
@@ -158,13 +203,13 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         ///     Adds an item to the Node-cache to allow for many methods to be O(1) or O(log n)
         /// </summary>
         private void AddToNodeCache(SimpleNode node){
-            if (node.Data == null){
+            if (IsNull(node.Data)){
                 _nullNodesCache.Add(node);
                 return;
             }
 
             if (!_itemToNodesCache.TryGetValue(node.Data, out IList<SimpleNode> nodes)){
-                nodes = new List<SimpleNode>();
+                nodes = RentList();
                 _itemToNodesCache[node.Data] = nodes;
             }
 
@@ -175,7 +220,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         ///     Removes an item to the Node-cache to allow for many methods to be O(1) or O(log n) (assuming no duplicates)
         /// </summary>
         private void RemoveFromNodeCache(SimpleNode node){
-            if (node.Data == null){
+            if (IsNull(node.Data)){
                 _nullNodesCache.Remove(node);
                 return;
             }
@@ -183,7 +228,9 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
             if (!_itemToNodesCache.TryGetValue(node.Data, out IList<SimpleNode> nodes)) return;
 
             nodes.Remove(node);
-            if (nodes.Count == 0) _itemToNodesCache.Remove(node.Data);
+            if (nodes.Count != 0) return;
+            _itemToNodesCache.Remove(node.Data);
+            ReturnList(nodes);
         }
 
         /// <summary>
@@ -193,7 +240,13 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         /// <param name="priority"></param>
         /// <returns></returns>
         private SimpleNode EnqueueNoLockOrCache(TItem item, TPriority priority){
-            SimpleNode node = new(item);
+            SimpleNode node;
+            if (_nodePool.Count > 0){
+                node = _nodePool.Pop();
+                node.Data = item;
+            }
+            else node = new SimpleNode(item);
+
             if (_queue.Count == _queue.MaxSize) _queue.Resize(_queue.MaxSize * 2 + 1);
 
             _queue.Enqueue(node, priority);
@@ -210,7 +263,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         /// </summary>
         public bool EnqueueWithoutDuplicates(TItem item, TPriority priority){
             IList<SimpleNode> nodes;
-            if (item == null){
+            if (IsNull(item)){
                 if (_nullNodesCache.Count > 0) return false;
 
                 nodes = _nullNodesCache;
@@ -218,7 +271,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
             else if (_itemToNodesCache.ContainsKey(item))
                 return false;
             else{
-                nodes = new List<SimpleNode>();
+                nodes = RentList();
                 _itemToNodesCache[item] = nodes;
             }
 
@@ -280,7 +333,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
                 Data = data;
             }
 
-            public TItem Data{ get; }
+            public TItem Data{ get; set; }
         }
 
         #region Constructors

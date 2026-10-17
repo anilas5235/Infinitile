@@ -25,6 +25,7 @@ namespace Engine.Scripts.Components{
 
         private readonly HashSet<int3> _reMeshPartitions;
         private readonly SimpleFastPriorityQueue<int2, float> _unloadingQueue;
+        private readonly Stack<Chunk> _chunkObjectPool; // PERF-04: unloaded chunk objects are reused
         internal Action<Chunk> OnChunkChange;
 
         internal Action OnRemeshRequested;
@@ -51,11 +52,19 @@ namespace Engine.Scripts.Components{
         internal ChunkManager(VoxelEngineSettings settings){
             _chunkStoreSize = (settings.Chunk.LoadDistance + 2).SquareSize();
 
-            _reMeshPartitions = new HashSet<int3>();
-            _reCollidePartitions = new HashSet<int3>();
+            // PERF-04: sized for the draw window plus the neighbour ring the re-mesh marks reach
+            int reMeshCapacity = (settings.Chunk.DrawDistance + 1).SquareSize() * PartitionsPerChunk;
+            _reMeshPartitions = new HashSet<int3>(reMeshCapacity);
+            _reCollidePartitions = new HashSet<int3>(reMeshCapacity);
 
             _chunks = new Dictionary<int2, Chunk>(_chunkStoreSize);
             _unloadingQueue = new SimpleFastPriorityQueue<int2, float>();
+            _unloadingQueue.Reserve(_chunkStoreSize + 1); // PERF-04: queue nodes are pooled up front
+
+            // PERF-04: every chunk object the store can hold exists from the start, so loading a chunk never
+            // allocates a managed object, not even before the store is full for the first time.
+            _chunkObjectPool = new Stack<Chunk>(_chunkStoreSize);
+            for (int i = 0; i < _chunkStoreSize; i++) _chunkObjectPool.Push(new Chunk());
 
             _accessorMap = new NativeParallelHashMap<int2, ChunkVoxelData>(
                 settings.Scheduler.meshingBatchSize * 6,
@@ -112,7 +121,14 @@ namespace Engine.Scripts.Components{
 
                 if (_unloadingQueue.Count >= _chunkStoreSize) RemoveChunkData(_unloadingQueue.Dequeue());
 
-                Chunk chunk = new(position){ VoxelData = pair.Value };
+                Chunk chunk;
+                if (_chunkObjectPool.Count > 0){
+                    chunk = _chunkObjectPool.Pop();
+                    chunk.Reinit(position);
+                }
+                else chunk = new Chunk(position);
+
+                chunk.VoxelData = pair.Value;
                 _chunks.Add(position, chunk);
                 _unloadingQueue.Enqueue(position, PriorityUtil.EvictionPriority(ref position, ref _focus)); // F-23
             }
@@ -136,6 +152,7 @@ namespace Engine.Scripts.Components{
             CompleteReadersOf(position); // F-01
             chunk.Dispose();
             _chunks.Remove(position);
+            _chunkObjectPool.Push(chunk); // PERF-04
 
             for (int pId = 0; pId < PartitionsPerChunk; pId++){
                 int3 partitionPos = new(position.x, pId, position.y);
@@ -158,7 +175,7 @@ namespace Engine.Scripts.Components{
         /// <summary>
         ///     Builds a <see cref="ChunkAccessor" /> that includes a 3x3 neighborhood for given positions.
         /// </summary>
-        internal ChunkAccessor GetAccessor(List<int3> positions){
+        internal ChunkAccessor GetAccessor(HashSet<int3> positions){ // PERF-04: no per-batch list copy
             _accessorMap.Clear();
             _lightAccessorMap.Clear();
             foreach (int3 position in positions){

@@ -27,10 +27,26 @@ namespace Engine.Scripts.Data{
             LightData = new ChunkLightData(128);
         }
 
+        /// <summary>PERF-04: an empty object for the manager's chunk pool; <see cref="Reinit" /> runs before use.</summary>
+        internal Chunk(){
+            VoxelData = default;
+            LightData = default;
+        }
+
         /// <summary>
         ///     World-space position (chunk origin coordinate).
         /// </summary>
-        public int2 Position{ get; }
+        public int2 Position{ get; private set; }
+
+        /// <summary>
+        ///     PERF-04: re-initialises a disposed chunk object the manager keeps for reuse, so loading a chunk does
+        ///     not allocate a managed object. The caller assigns <see cref="VoxelData" />.
+        /// </summary>
+        internal void Reinit(int2 position){
+            Position = position;
+            VoxelData = default;
+            LightData = new ChunkLightData(128);
+        }
 
         public void Dispose(){
             VoxelData.Dispose();

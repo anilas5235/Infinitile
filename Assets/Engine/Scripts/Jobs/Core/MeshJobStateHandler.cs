@@ -26,6 +26,9 @@ namespace Engine.Scripts.Jobs.Core{
             base(settings, chunkManager, chunkPool){
             _cMeshBuildScheduler = cMeshBuildScheduler;
             _colliderJobHandler = colliderJobHandler;
+            int side = 2 * settings.Chunk.DrawDistance + 1;
+            int layers = math.min(VoxelConstants.PartitionsPerChunk, side);
+            Reserve(side * side * layers, settings.Scheduler.meshingBatchSize); // PERF-04
         }
 
         /// <summary>
