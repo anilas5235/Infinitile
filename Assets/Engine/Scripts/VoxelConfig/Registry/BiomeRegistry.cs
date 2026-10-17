@@ -29,9 +29,11 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                     def = kvp.Value.ToStruct(voxelRegistry);
                 }
                 catch (Exception e){
-                    VoxelEngineLogger.Error<BiomeRegistry>(
-                        $"Failed to convert biome {kvp.Value.name} to struct: {e.Message}. Skipping this biome.");
-                    continue;
+                    // D-04: skipping a biome would leave a zero (air) entry at its id and shift nothing else, so a
+                    // broken biome is a configuration error that fails the registry instead.
+                    for (int i = 0; i < index; i++) tempArray[i].Dispose();
+                    throw new InvalidOperationException(
+                        $"Failed to convert biome {kvp.Value.name} to struct: {e.Message}", e);
                 }
 
                 tempArray[index] = def;
@@ -43,6 +45,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
 
 
         public override void Dispose(){
+            if (!BiomeArray.IsCreated) return; // D-04: FinalizeRegistry may have thrown before creating the array
             foreach (Biome.BiomeDef def in BiomeArray) def.Dispose();
             BiomeArray.Dispose();
         }

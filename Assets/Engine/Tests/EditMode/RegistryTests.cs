@@ -183,7 +183,6 @@ namespace Engine.Tests.EditMode{
 
         #region TST-E09 BiomeRegistry (D-04)
 
-        [Category("KnownBug")] // D-04
         [Test]
         public void BiomeRegistry_FailingBiome_DoesNotShiftIndicesOrYieldAirBiome(){
             // D-04: a biome whose conversion fails must neither shift the biomes after it nor leave a
