@@ -122,6 +122,7 @@ namespace Engine.Scripts.Jobs.Chunk{
 
             _jobs.Dispose();
             _results.Dispose();
+            _config.Dispose(); // D-05: releases the noise parameters created for this scheduler's config
         }
     }
 }

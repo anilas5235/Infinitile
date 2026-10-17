@@ -134,7 +134,6 @@ namespace Engine.Tests.EditMode{
             Assert.IsTrue(config.Voxels.ContainsKey("std:Ice"), "FillTerrain needs std:Ice");
         }
 
-        [Category("KnownBug")] // D-05
         [Test]
         public void CreateConfig_DisposingConfigAndRegistries_DoesNotThrow(){
             // D-05: GeneratorConfig.Dispose disposes BiomeDefs/Voxels, which the registries own and dispose

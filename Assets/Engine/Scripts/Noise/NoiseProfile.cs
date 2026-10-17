@@ -91,6 +91,7 @@ namespace Engine.Scripts.Noise{
         }
 
         public void Dispose(){
+            if (!_octaveData.IsCreated) return; // D-05: a default profile (config without noise) owns nothing
             _octaveData.Dispose();
         }
     }
