@@ -125,7 +125,6 @@ namespace Engine.Tests.PlayMode{
             Assert.IsTrue(rig.Pool.IsCollidable(pos));
         }
 
-        [Category("KnownBug")] // F-04
         [UnityTest]
         public IEnumerator ColliderBake_PartitionReclaimedDuringBake_IsNotMarkedCollidable(){
             // F-04: ColliderBakeScheduler.Complete marks every started position collidable, even one the pool

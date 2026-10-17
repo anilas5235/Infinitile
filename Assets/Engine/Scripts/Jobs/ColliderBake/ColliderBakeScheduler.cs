@@ -80,6 +80,10 @@ namespace Engine.Scripts.Jobs.ColliderBake{
             _handle.Complete();
 
             foreach ((int3 position, ChunkPartition behaviour) in _meshes){
+                // F-04: the pool may have reclaimed (or re-claimed with another object) this partition while the
+                // bake ran; its result belongs to a mesh that is no longer at this position.
+                if (!_chunkPool.IsPartitionActive(position) || _chunkPool.GetPartition(position) != behaviour) continue;
+
                 _chunkPool.ColliderBaked(position);
                 _chunkManager.ReCollidedPartition(position);
 
