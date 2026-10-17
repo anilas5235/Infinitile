@@ -74,8 +74,10 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
                 [1] = new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float16, 4)
             };
 
+            // F-16: one result per job of a batch; a parallel writer cannot grow the map, so it is sized from the
+            // batch size (and grown in Start for a larger batch) instead of the draw distance.
             _results = new NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult>(
-                settings.Chunk.DrawDistance.SquareSize(), Allocator.Domain);
+                math.max(1, settings.Scheduler.meshingBatchSize), Allocator.Domain);
             _jobs = new NativeList<int3>(Allocator.Domain);
 
             // F-01: the job reads chunk data through the accessor; finish it before the manager edits or disposes a chunk.
@@ -101,6 +103,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             _chunkAccessor = _chunkManager.GetAccessor(jobs.ToList());
 
             foreach (int3 j in jobs) _jobs.Add(j);
+            if (_results.Capacity < _jobs.Length) _results.Capacity = _jobs.Length; // F-16
 
             _colliderMeshDataArray = Mesh.AllocateWritableMeshData(_jobs.Length);
 
