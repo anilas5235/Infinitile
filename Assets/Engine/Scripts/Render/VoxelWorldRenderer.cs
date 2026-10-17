@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
 using Engine.Scripts.Data;
 using Engine.Scripts.Settings;
@@ -246,9 +245,10 @@ namespace Engine.Scripts.Render{
                 if (_pendingBuilds.Count < 1) break;
                 if (_inFlightBuilds[i] != null) continue;
 
-                int3 partition = _pendingBuilds.First();
-                _pendingBuilds.Remove(partition);
-                if (_inFlightBuilds.Any(build => build != null && build.Partition.Equals(partition))){
+                // F-24 / PERF-04: plain loops; LINQ First/Any with a capturing lambda allocated every frame.
+                int3 partition = _pendingBuilds[0];
+                _pendingBuilds.RemoveAt(0);
+                if (IsBuildInFlight(partition)){
                     EnqueuePartitionBuild(partition);
                     continue;
                 }
@@ -266,6 +266,15 @@ namespace Engine.Scripts.Render{
                 Awaitable<int[]> buildAwaitable = handler.BuildPoints(request);
                 _inFlightBuilds[i] = new InFlightBuild(partition, handler, buildAwaitable.GetAwaiter());
             }
+        }
+
+        private bool IsBuildInFlight(int3 partition){
+            for (int i = 0; i < _inFlightBuilds.Length; i++){
+                InFlightBuild build = _inFlightBuilds[i];
+                if (build != null && build.Partition.Equals(partition)) return true;
+            }
+
+            return false;
         }
 
         /// <summary>
