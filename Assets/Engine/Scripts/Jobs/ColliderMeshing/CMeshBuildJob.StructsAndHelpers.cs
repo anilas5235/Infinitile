@@ -6,10 +6,8 @@ using Unity.Mathematics;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelConstants;
 
-namespace Engine.Scripts.Jobs.ColliderMeshing
-{
-    internal partial struct CMeshBuildJob
-    {
+namespace Engine.Scripts.Jobs.ColliderMeshing{
+    internal partial struct CMeshBuildJob{
         #region Constants
 
         private const int VoxelCount4 = VoxelsPerPartition * 4;
@@ -20,16 +18,14 @@ namespace Engine.Scripts.Jobs.ColliderMeshing
         #region Structs
 
         [BurstCompile]
-        internal struct PartitionJobResult
-        {
+        internal struct PartitionJobResult{
             public int Index;
             public int3 PartitionPos;
             public Bounds ColliderBounds;
         }
 
         [BurstCompile]
-        private struct PartitionJobData : IDisposable
-        {
+        private struct PartitionJobData : IDisposable{
             public readonly Mesh.MeshData ColliderMesh;
             public readonly int2 ChunkPos;
             public readonly int3 PartitionPos;
@@ -43,14 +39,12 @@ namespace Engine.Scripts.Jobs.ColliderMeshing
 
             public bool HasNoCollision => CollisionVoxels.IsEmpty;
 
-            internal PartitionJobData(Mesh.MeshData colliderMesh, int3 partitionPos, ChunkVoxelData chunkVoxelData)
-            {
+            internal PartitionJobData(Mesh.MeshData colliderMesh, int3 partitionPos, ChunkVoxelData chunkVoxelData){
                 ColliderMesh = colliderMesh;
                 PartitionPos = partitionPos;
                 ChunkVoxelData = chunkVoxelData;
                 ChunkPos = partitionPos.xz;
-                CMeshBuffer = new CMeshBuffer
-                {
+                CMeshBuffer = new CMeshBuffer{
                     CVertexBuffer = new NativeList<CVertex>(VoxelCount4, Allocator.Temp),
                     CIndexBuffer = new NativeList<ushort>(VoxelCount6, Allocator.Temp)
                 };
@@ -60,42 +54,35 @@ namespace Engine.Scripts.Jobs.ColliderMeshing
                 CollisionVertexCount = 0;
             }
 
-            public void Dispose()
-            {
+            public void Dispose(){
                 CMeshBuffer.Dispose();
                 CollisionVoxels.Dispose();
             }
         }
 
         [BurstCompile]
-        private struct AxisInfo
-        {
+        private struct AxisInfo{
             public int UAxis, VAxis, ULimit, VLimit;
         }
 
         [BurstCompile]
-        private struct VQuad
-        {
+        private struct VQuad{
             public float3 V1, V2, V3, V4;
         }
 
-        private interface IMaskComparable<T>
-        {
+        private interface IMaskComparable<T>{
             bool CompareTo(T other);
         }
 
         [BurstCompile]
-        private readonly struct CMask : IMaskComparable<CMask>
-        {
+        private readonly struct CMask : IMaskComparable<CMask>{
             internal readonly sbyte Normal;
 
-            public CMask(sbyte normal)
-            {
+            public CMask(sbyte normal){
                 Normal = normal;
             }
 
-            public bool CompareTo(CMask other)
-            {
+            public bool CompareTo(CMask other){
                 return Normal == other.Normal;
             }
         }
@@ -105,18 +92,16 @@ namespace Engine.Scripts.Jobs.ColliderMeshing
         #region Helpers
 
         [BurstCompile]
-        private ushort GetVoxel(ref PartitionJobData jobData, in int3 voxelPos)
-        {
+        private ushort GetVoxel(ref PartitionJobData jobData, in int3 voxelPos){
             int3 chunkLocalPos = voxelPos;
             chunkLocalPos += jobData.PartitionPos * VoxelsPerPartition;
             return ChunkAccessor.InChunkBounds(chunkLocalPos)
                 ? jobData.ChunkVoxelData.GetVoxel(chunkLocalPos)
                 : Accessor.GetVoxelInPartition(jobData.PartitionPos, voxelPos);
         }
-        
+
         [BurstCompile]
-        private void CreateColliderQuad(ref PartitionJobData jobData, CMask mask, int3 directionMask, in VQuad verts)
-        {
+        private void CreateColliderQuad(ref PartitionJobData jobData, CMask mask, int3 directionMask, in VQuad verts){
             float3 normal = directionMask * mask.Normal;
 
             AddColliderVertices(ref jobData.CMeshBuffer, in verts, normal);
@@ -136,8 +121,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing
         }
 
         [BurstCompile]
-        private void AddColliderVertices(ref CMeshBuffer cMesh, in VQuad verts, float3 normal)
-        {
+        private void AddColliderVertices(ref CMeshBuffer cMesh, in VQuad verts, float3 normal){
             CVertex vertex1 = new(verts.V1, normal);
             CVertex vertex2 = new(verts.V2, normal);
             CVertex vertex3 = new(verts.V3, normal);

@@ -11,9 +11,105 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c3b2e488ee8f4f838bfbe8664412fa7b, type: 3}
   m_Name: NoiseSettings2D
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.Settings.NoiseSettings
   WaterLevel: 124
-  Scale: 256
-  Persistance: 0.5
-  Lacunarity: 2
-  Octaves: 6
+  humidityProfile:
+    scale: 732
+    persistance: 0.45
+    lacunarity: 1.8
+    octaves: 3
+  temperatureProfile:
+    scale: 863
+    persistance: 0.5
+    lacunarity: 1.8
+    octaves: 3
+  ContinentalHumidityInfluence: 0.4
+  ContinentalTemperatureInfluence: 1.5
+  ElevationDetailStrength: 0.4
+  elevationProfile:
+    scale: 256
+    persistance: 0.6
+    lacunarity: 2
+    octaves: 5
+  continentalLayer:
+    baseNoise:
+      scale: 1278
+      persistance: 0.35
+      lacunarity: 2.5
+      octaves: 2
+    warpNoise:
+      scale: 668
+      persistance: 0.5
+      lacunarity: 3
+      octaves: 2
+    warpStrength: 300
+    warpSeedOffsetY: 1000
+    redistributionCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.02
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.3
+        value: 0.12
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.4
+        value: 0.28
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.5
+        value: 0.42
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.6
+        value: 0.55
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.85
+        value: 0.85
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4

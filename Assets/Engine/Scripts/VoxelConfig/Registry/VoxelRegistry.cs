@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using Engine.Scripts.VoxelConfig.Data;
+using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig.Data.Internal;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
@@ -9,113 +9,78 @@ using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
+using static Engine.Scripts.Utils.VoxelRenderConstants;
 
-namespace Engine.Scripts.VoxelConfig.Registry
-{
+namespace Engine.Scripts.VoxelConfig.Registry{
     /// <summary>
     ///     Registry that manages voxel render definitions, texture arrays and name-to-ID mappings.
     ///     Can be finalized to build a NativeArray for Burst-compatible meshing data.
     /// </summary>
-    public class VoxelRegistry : IDisposable
-    {
+    public class VoxelRegistry : TopLevelRegistry<Voxel>{
         internal const int TextureSize = 128; // Texture resolution (square)
-        private static readonly int TexturesNameID = Shader.PropertyToID("_Textures");
-
-        private readonly Registry<VoxelRenderDef> _voxelRenderDefRegistry = new(100);
-        private readonly Registry<VoxelDefinition> _voxelDefinitionRegistry = new(100);
-        private readonly Registry<string> _nameRegistry = new(100);
+        private readonly TexRegistry _foliageTexRegistry = new(50);
         private readonly QuadRegistry _quadRegistry = new(40);
+        private readonly List<uint> _quadTexPairs = new();
         private readonly TexRegistry _solidTexRegistry = new(200);
         private readonly TexRegistry _transparentTexRegistry = new(100);
-        private readonly TexRegistry _foliageTexRegistry = new(50);
-        private readonly List<uint> _quadTexPairs = new();
 
-        private bool _initialized;
+        private readonly Registry<Voxel.VoxelDef> _voxelRenderDefRegistry = new(100);
+
         private VoxelEngineRenderGenData _voxelEngineRenderGenData;
 
-        public GraphicsBuffer VoxelRenderDefBuffer { get; private set; }
+        public GraphicsBuffer VoxelRenderDefBuffer{ get; private set; }
 
-        public GraphicsBuffer QuadBuffer { get; private set; }
+        public GraphicsBuffer QuadBuffer{ get; private set; }
 
-        public GraphicsBuffer QuadTexPairBuffer { get; private set; }
+        public GraphicsBuffer QuadTexPairBuffer{ get; private set; }
+        public NativeHashMap<FixedString32Bytes, Voxel.VoxelDef> VoxelMap{ get; private set; }
 
-        /// <summary>
-        ///     Releases Burst-native resources used by the registry.
-        /// </summary>
-        public void Dispose()
-        {
-            if (_voxelEngineRenderGenData.VoxelRenderDefs.IsCreated)
-                _voxelEngineRenderGenData.VoxelRenderDefs.Dispose();
-            VoxelRenderDefBuffer.Dispose();
-            QuadBuffer.Dispose();
-            QuadTexPairBuffer.Dispose();
+        public void Initialize(Texture2D errorTexSolid, Texture2D errorTexTransparent, Texture2D errorTexFoliage){
+            InternalInitialize();
+
+            RegisterAir();
+
+            RegisterTexture(errorTexSolid, MeshLayer.Solid);
+            RegisterTexture(errorTexTransparent, MeshLayer.Transparent);
+            RegisterTexture(errorTexFoliage, MeshLayer.Foliage);
         }
 
-        public void Initialize()
-        {
-            if (_initialized) return;
-            _initialized = true;
-            Register("std:air", new VoxelRenderDef
-            {
+        private void RegisterAir(){
+            FixedString32Bytes fullName = new("std:air");
+            ushort id = NameRegistry.Register(fullName);
+            if (id != 0) throw new Exception("RegisterAir: ID " + id + " already exists");
+            _voxelRenderDefRegistry.Register(id, new Voxel.VoxelDef{
+                Id = id,
                 MeshLayer = MeshLayer.Air,
                 Collision = false
             });
-            _voxelEngineRenderGenData = new VoxelEngineRenderGenData();
-            Texture2D texError = Resources.Load<Texture2D>("Artwork/TexError");
-            RegisterTexture(texError, MeshLayer.Solid);
-            Texture2D texErrorT = Resources.Load<Texture2D>("Artwork/TexErrorT");
-            RegisterTexture(texErrorT, MeshLayer.Transparent);
+            VoxelEngineLogger.Info<VoxelRegistry>($"Registered Voxel '{fullName}' with ID {id}");
         }
 
-        /// <summary>
-        ///     Registers a voxel definition, builds its texture-based <see cref="VoxelRenderDef" />,
-        ///     and assigns a new voxel ID.
-        /// </summary>
-        /// <param name="packagePrefix">Prefix of the package this definition belongs to.</param>
-        /// <param name="definition">Voxel definition asset to register.</param>
-        public void Register(string packagePrefix, VoxelDefinition definition)
-        {
-            VoxelRenderDef type = new()
-            {
-                MeshLayer = definition.meshLayer,
-                AlwaysRenderAllFaces = definition.alwaysRenderAllFaces,
-                DepthFadeDistance = (half)definition.depthFadeDistance,
-                Glow = (byte)definition.glow,
-                Collision = definition.collision,
-                Always = RegisterFaces(definition, QuadDrawCondition.Always),
-                Right = RegisterFaces(definition, QuadDrawCondition.Right),
-                Left = RegisterFaces(definition, QuadDrawCondition.Left),
-                Up = RegisterFaces(definition, QuadDrawCondition.Up),
-                Down = RegisterFaces(definition, QuadDrawCondition.Down),
-                Front = RegisterFaces(definition, QuadDrawCondition.Forward),
-                Back = RegisterFaces(definition, QuadDrawCondition.Backward)
+        protected override void SubRegister(ushort id, FixedString32Bytes fullName, Voxel so){
+            Voxel.VoxelDef type = new(){
+                Id = id,
+                MeshLayer = so.meshLayer,
+                AlwaysRenderAllFaces = so.alwaysRenderAllFaces,
+                DepthFadeDistance = (half)so.depthFadeDistance,
+                Glow = (byte)so.glow,
+                Collision = so.collision,
+                Always = RegisterFaces(so, QuadDrawCondition.Always),
+                Right = RegisterFaces(so, QuadDrawCondition.Right),
+                Left = RegisterFaces(so, QuadDrawCondition.Left),
+                Up = RegisterFaces(so, QuadDrawCondition.Up),
+                Down = RegisterFaces(so, QuadDrawCondition.Down),
+                Front = RegisterFaces(so, QuadDrawCondition.Forward),
+                Back = RegisterFaces(so, QuadDrawCondition.Backward)
             };
 
-            ushort id = Register(packagePrefix + ":" + definition.name, type);
-            if (id == 0) return;
-            _voxelDefinitionRegistry.Register(definition);
+            _voxelRenderDefRegistry.Register(id, type);
         }
 
-        private ushort Register(string name, VoxelRenderDef renderDef)
-        {
-            Initialize();
-            if (_nameRegistry.TryGetId(name, out ushort existingId))
-            {
-                Debug.LogWarning($"Voxel with name {name} is already registered with ID {existingId}.");
-                return existingId;
-            }
-
-            ushort id = _nameRegistry.Register(name);
-            _voxelRenderDefRegistry.Register(renderDef);
-            return id;
-        }
-
-        private uint2 RegisterFaces(VoxelDefinition definition, QuadDrawCondition condition)
-        {
+        private uint2 RegisterFaces(Voxel definition, QuadDrawCondition condition){
             int baseIndex = _quadTexPairs.Count;
             int texPairsAdded = 0;
-            foreach ((QuadDefinition qDef, Texture2D tex) in definition.GetQuadsAndTextures(condition))
-            {
+            foreach ((QuadDefinition qDef, Texture2D tex) in definition.GetQuadsAndTextures(condition)){
                 ushort texId = RegisterTexture(tex, definition.meshLayer);
                 ushort quadId = _quadRegistry.Register(qDef);
                 _quadTexPairs.Add(quadId | ((uint)texId << 16));
@@ -125,10 +90,8 @@ namespace Engine.Scripts.VoxelConfig.Registry
             return new uint2((uint)baseIndex, (uint)texPairsAdded);
         }
 
-        private ushort RegisterTexture(Texture2D tex, MeshLayer meshLayer)
-        {
-            return meshLayer switch
-            {
+        private ushort RegisterTexture(Texture2D tex, MeshLayer meshLayer){
+            return meshLayer switch{
                 MeshLayer.Solid => _solidTexRegistry.Register(tex),
                 MeshLayer.Transparent => _transparentTexRegistry.Register(tex),
                 MeshLayer.Foliage => _foliageTexRegistry.Register(tex),
@@ -137,74 +100,54 @@ namespace Engine.Scripts.VoxelConfig.Registry
         }
 
         /// <summary>
-        ///     Tries to get an ID for a given name.
-        /// </summary>
-        /// <param name="name">Registered voxel name.</param>
-        /// <param name="id">Resulting voxel ID if found.</param>
-        /// <returns><c>true</c> if the name exists; otherwise, <c>false</c>.</returns>
-        public bool TryGetId(string name, out ushort id)
-        {
-            return _nameRegistry.TryGetId(name, out id);
-        }
-
-        /// <summary>
-        ///     Gets the ID for a given name or throws if it does not exist.
-        /// </summary>
-        /// <param name="name">Registered voxel name.</param>
-        /// <returns>Voxel ID associated with the name.</returns>
-        public ushort GetIdOrThrow(string name)
-        {
-            if (TryGetId(name, out ushort id)) return id;
-            throw new KeyNotFoundException($"No voxel found with name {name}");
-        }
-
-        /// <summary>
-        ///     Tries to get the registered name for a voxel ID.
-        /// </summary>
-        /// <param name="id">Voxel ID.</param>
-        /// <param name="name">Output name if found.</param>
-        /// <returns><c>true</c> if the ID exists; otherwise, <c>false</c>.</returns>
-        public bool TryGetName(ushort id, out string name)
-        {
-            return _nameRegistry.TryGet(id, out name);
-        }
-
-        /// <summary>
-        ///     Tries to get the <see cref="VoxelDefinition" /> associated with the given ID.
-        /// </summary>
-        /// <param name="id">Voxel ID.</param>
-        /// <param name="def">Output voxel definition if found.</param>
-        /// <returns><c>true</c> if the ID has an associated definition; otherwise, <c>false</c>.</returns>
-        public bool TryGetVoxelDefinition(ushort id, out VoxelDefinition def)
-        {
-            return _voxelDefinitionRegistry.TryGet(id, out def);
-        }
-
-        /// <summary>
         ///     Finalizes the registry by preparing texture arrays and GPU buffers for rendering.
         /// </summary>
-        public void FinalizeRegistry()
-        {
+        public void FinalizeRegistry(){
+            InternalFinalize();
             PrepareArrays();
-            PrepareVoxelGenData();
+            PrepareRenderData();
+            PrepareGeneratiionData();
         }
 
-        private void PrepareVoxelGenData()
-        {
+        private void PrepareArrays(){
+            _solidTexRegistry.PrepareArray();
+            _transparentTexRegistry.PrepareArray();
+            _foliageTexRegistry.PrepareArray();
+            _quadRegistry.PrepareArray();
+        }
+
+        private void PrepareGeneratiionData(){
+            if (VoxelMap.IsCreated) VoxelMap.Clear();
+            else{
+                VoxelMap = new NativeHashMap<FixedString32Bytes, Voxel.VoxelDef>(_voxelRenderDefRegistry.Count,
+                    Allocator.Domain);
+            }
+
+            for (ushort i = 0; i < _voxelRenderDefRegistry.Count; i++){
+                if (_voxelRenderDefRegistry.TryGet(i, out Voxel.VoxelDef def) &&
+                    NameRegistry.TryGet(i, out FixedString32Bytes name)){
+                    if (!VoxelMap.TryAdd(name, def))
+                        VoxelEngineLogger.Warn<VoxelRegistry>($"Failed to add voxel ID {def.Id} to VoxelMap.");
+                }
+                else
+                    VoxelEngineLogger.Warn<VoxelRegistry>($"Voxel ID {i} not found in _voxelRenderDefRegistry.");
+            }
+        }
+
+        private void PrepareRenderData(){
             int voxelCount = _voxelRenderDefRegistry.Count;
             if (_voxelEngineRenderGenData.VoxelRenderDefs.IsCreated)
                 _voxelEngineRenderGenData.VoxelRenderDefs.Dispose();
             _voxelEngineRenderGenData.VoxelRenderDefs =
-                new NativeArray<VoxelRenderDef>(voxelCount, Allocator.Domain);
+                new NativeArray<Voxel.VoxelDef>(voxelCount, Allocator.Domain);
 
             VoxelRenderDefBuffer?.Dispose();
             VoxelRenderDefBuffer =
                 new GraphicsBuffer(Target.Structured, voxelCount, Marshal.SizeOf<GPUVoxelDef>());
             GPUVoxelDef[] gpuVoxelDefData = new GPUVoxelDef[voxelCount];
 
-            for (int i = 0; i < voxelCount; i++)
-            {
-                _voxelRenderDefRegistry.TryGet((ushort)i, out VoxelRenderDef def);
+            for (int i = 0; i < voxelCount; i++){
+                _voxelRenderDefRegistry.TryGet((ushort)i, out Voxel.VoxelDef def);
                 _voxelEngineRenderGenData.VoxelRenderDefs[i] = def;
                 gpuVoxelDefData[i] = new GPUVoxelDef(def);
             }
@@ -213,7 +156,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
 
             QuadBuffer?.Dispose();
             QuadBuffer = new GraphicsBuffer(Target.Structured, _quadRegistry.QuadArray.Length,
-                Marshal.SizeOf<QuadDefinition.QuadData>());
+                Marshal.SizeOf<QuadDefinition.QuadDef>());
             QuadBuffer.SetData(_quadRegistry.QuadArray);
 
             QuadTexPairBuffer?.Dispose();
@@ -225,23 +168,12 @@ namespace Engine.Scripts.VoxelConfig.Registry
         ///     Retrieves the data package used for meshing and rendering.
         /// </summary>
         /// <returns>Voxel engine render generation data structure.</returns>
-        public VoxelEngineRenderGenData GetVoxelGenData()
-        {
+        public VoxelEngineRenderGenData GetVoxelGenData(){
             return _voxelEngineRenderGenData;
         }
 
-        private void PrepareArrays()
-        {
-            _solidTexRegistry.PrepareArray();
-            _transparentTexRegistry.PrepareArray();
-            _foliageTexRegistry.PrepareArray();
-            _quadRegistry.PrepareArray();
-        }
-
-        private Texture2DArray GetTextureArray(MeshLayer meshLayer)
-        {
-            return meshLayer switch
-            {
+        private Texture2DArray GetTextureArray(MeshLayer meshLayer){
+            return meshLayer switch{
                 MeshLayer.Solid => _solidTexRegistry.TextureArray,
                 MeshLayer.Transparent => _transparentTexRegistry.TextureArray,
                 MeshLayer.Foliage => _foliageTexRegistry.TextureArray,
@@ -254,33 +186,42 @@ namespace Engine.Scripts.VoxelConfig.Registry
         /// </summary>
         /// <param name="material">Material to assign the texture array to.</param>
         /// <param name="solid">Mesh layer whose texture array should be used.</param>
-        public void ApplyToMaterial(Material material, MeshLayer solid)
-        {
-            if (material)
-            {
+        public void ApplyToMaterial(Material material, MeshLayer solid){
+            if (!Finalized)
+                throw new InvalidOperationException("VoxelRegistry must be finalized before applying to materials.");
+
+            if (material){
                 Texture2DArray texArray = GetTextureArray(solid);
                 if (texArray)
                     material.SetTexture(TexturesNameID, texArray);
                 else
-                    Debug.LogWarning("Texture array is null, cannot assign to material.");
+                    VoxelEngineLogger.Error<VoxelRegistry>("Texture array is null, cannot assign to material.");
+
+                material.SetBuffer(QuadBufferNameID, QuadBuffer);
             }
             else
-            {
-                Debug.LogWarning("Voxel material is null, cannot assign texture array.");
-            }
+                VoxelEngineLogger.Error<VoxelRegistry>("Voxel material is null, cannot assign texture array.");
         }
 
         /// <summary>
         ///     Returns a list of all registered IDs and their corresponding names.
         /// </summary>
         /// <returns>List of ID/name pairs.</returns>
-        public List<KeyValuePair<ushort, string>> GetAllEntries()
-        {
-            return _nameRegistry.GetAllEntries();
+        public List<KeyValuePair<ushort, FixedString32Bytes>> GetAllEntries(){
+            return NameRegistry.GetAllEntries();
         }
 
-        private struct GPUVoxelDef
-        {
+        public override void Dispose(){
+            if (_voxelEngineRenderGenData.VoxelRenderDefs.IsCreated)
+                _voxelEngineRenderGenData.VoxelRenderDefs.Dispose();
+            VoxelRenderDefBuffer.Dispose();
+            QuadBuffer.Dispose();
+            QuadTexPairBuffer.Dispose();
+            VoxelMap.Dispose();
+        }
+
+        //TODO: Compacting?
+        private struct GPUVoxelDef{
             private uint MeshLayer;
             private uint AlwaysRenderAllFaces;
             private half DepthFadeDistance;
@@ -294,8 +235,7 @@ namespace Engine.Scripts.VoxelConfig.Registry
             private uint2 shape_quad_indices_front;
             private uint2 shape_quad_indices_back;
 
-            public GPUVoxelDef(VoxelRenderDef def)
-            {
+            public GPUVoxelDef(Voxel.VoxelDef def){
                 MeshLayer = (uint)def.MeshLayer;
                 AlwaysRenderAllFaces = def.AlwaysRenderAllFaces ? 1u : 0u;
                 DepthFadeDistance = def.DepthFadeDistance;

@@ -1,16 +1,13 @@
 ﻿using System;
 using UnityEngine;
-using UnityEngine.Serialization;
 
-namespace Engine.Scripts.Settings
-{
+namespace Engine.Scripts.Settings{
     /// <summary>
     ///     Configuration for per-update batch sizes of individual schedulers (meshing, streaming, collider).
     ///     Higher values increase parallel work per frame but may cause frame spikes.
     /// </summary>
     [Serializable]
-    public class SchedulerSettings
-    {
+    public class SchedulerSettings{
         /// <summary>
         ///     Number of chunks processed per update for data streaming/generation.
         /// </summary>

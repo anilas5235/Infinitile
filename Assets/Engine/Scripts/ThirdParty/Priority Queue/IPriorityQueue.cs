@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace Engine.Scripts.ThirdParty.Priority_Queue
-{
+namespace Engine.Scripts.ThirdParty.Priority_Queue{
     /// <summary>
     ///     The IPriorityQueue interface.  This is mainly here for purists, and in case I decide to add more implementations
     ///     later.
@@ -9,17 +8,16 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue
     ///     since the JIT can
     ///     (theoretically?) optimize method calls from concrete-types slightly better.
     /// </summary>
-    public interface IPriorityQueue<TItem, in TPriority> : IEnumerable<TItem>
-    {
+    public interface IPriorityQueue<TItem, in TPriority> : IEnumerable<TItem>{
         /// <summary>
         ///     Returns the head of the queue, without removing it (use Dequeue() for that).
         /// </summary>
-        TItem First { get; }
+        TItem First{ get; }
 
         /// <summary>
         ///     Returns the number of nodes in the queue.
         /// </summary>
-        int Count { get; }
+        int Count{ get; }
 
         /// <summary>
         ///     Enqueue a node to the priority queue.  Lower values are placed in front. Ties are broken by first-in-first-out.

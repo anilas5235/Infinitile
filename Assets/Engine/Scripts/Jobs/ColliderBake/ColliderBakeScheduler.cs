@@ -8,19 +8,13 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Engine.Scripts.Jobs.ColliderBake
-{
+namespace Engine.Scripts.Jobs.ColliderBake{
     /// <summary>
     ///     Schedules and manages jobs that build or update physics colliders for active chunk meshes.
     /// </summary>
-    public class ColliderBakeScheduler : JobScheduler
-    {
+    public class ColliderBakeScheduler : JobScheduler{
         private readonly ChunkManager _chunkManager;
         private readonly ChunkPool _chunkPool;
-
-        private JobHandle _handle;
-
-        private NativeList<int> _jobs;
         private readonly Dictionary<int3, ChunkPartition> _meshes;
 
         /// <summary>
@@ -28,13 +22,16 @@ namespace Engine.Scripts.Jobs.ColliderBake
         /// </summary>
         internal bool IsReady = true;
 
+        private JobHandle _handle;
+
+        private NativeList<int> _jobs;
+
         /// <summary>
         ///     Initializes a new instance of the <see cref="ColliderBakeScheduler" /> class.
         /// </summary>
         /// <param name="chunkManager">The chunk manager responsible for tracking chunk state and events.</param>
         /// <param name="chunkPool">The chunk pool providing access to active chunk meshes.</param>
-        internal ColliderBakeScheduler(ChunkManager chunkManager, ChunkPool chunkPool)
-        {
+        internal ColliderBakeScheduler(ChunkManager chunkManager, ChunkPool chunkPool){
             _chunkManager = chunkManager;
             _chunkPool = chunkPool;
             _meshes = new Dictionary<int3, ChunkPartition>();
@@ -51,14 +48,12 @@ namespace Engine.Scripts.Jobs.ColliderBake
         ///     Starts scheduling collider build jobs for the given list of chunk positions.
         /// </summary>
         /// <param name="jobs">The list of chunk positions whose colliders should be built or updated.</param>
-        internal void Start(List<int3> jobs)
-        {
+        internal void Start(List<int3> jobs){
             StartRecord();
 
             IsReady = false;
 
-            foreach (int3 partitionPos in jobs)
-            {
+            foreach (int3 partitionPos in jobs){
                 ChunkPartition behaviour = _chunkPool.GetPartition(partitionPos);
                 _meshes.Add(partitionPos, behaviour);
                 if (behaviour.ColliderMesh.vertexCount > 0)
@@ -66,8 +61,7 @@ namespace Engine.Scripts.Jobs.ColliderBake
                     _jobs.Add(behaviour.ColliderMesh.GetInstanceID());
             }
 
-            ColliderBuildJob job = new()
-            {
+            ColliderBuildJob job = new(){
                 MeshIDs = _jobs
             };
 
@@ -77,13 +71,11 @@ namespace Engine.Scripts.Jobs.ColliderBake
         /// <summary>
         ///     Completes all scheduled collider build jobs and applies the resulting colliders to the associated chunks.
         /// </summary>
-        internal void Complete()
-        {
+        internal void Complete(){
             double start = Time.realtimeSinceStartupAsDouble;
             _handle.Complete();
 
-            foreach ((int3 position, ChunkPartition behaviour) in _meshes)
-            {
+            foreach ((int3 position, ChunkPartition behaviour) in _meshes){
                 _chunkPool.ColliderBaked(position);
                 _chunkManager.ReCollidedPartition(position);
 
@@ -93,10 +85,11 @@ namespace Engine.Scripts.Jobs.ColliderBake
 
             double totalTime = (Time.realtimeSinceStartupAsDouble - start) * 1000;
 
-            if (totalTime >= 0.8)
+            if (totalTime >= 0.8){
                 VoxelEngineLogger.Info<ColliderBakeScheduler>(
                     $"Built {_jobs.Length} colliders, Collected Results in <color=red>{totalTime:0.000}</color>ms"
                 );
+            }
 
             _jobs.Clear();
             _meshes.Clear();
@@ -109,8 +102,7 @@ namespace Engine.Scripts.Jobs.ColliderBake
         /// <summary>
         ///     Disposes the scheduler, ensuring all jobs are completed and native resources are released.
         /// </summary>
-        internal void Dispose()
-        {
+        internal void Dispose(){
             _handle.Complete();
 
             _jobs.Dispose();

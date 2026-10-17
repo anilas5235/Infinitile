@@ -1,21 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using System;
 using System.Runtime.InteropServices;
-using Engine.Scripts.Utils.Logger;
 using Unity.Mathematics;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
 using static UnityEngine.GraphicsBuffer;
 
-namespace Engine.Scripts.Render
-{
+namespace Engine.Scripts.Render{
     /// <summary>
-    /// Handles copying of point data from point builders into render buffers using compute shaders.
-    /// Manages point distribution across solid, transparent, and foliage buffer managers.
+    ///     Handles copying of point data from point builders into render buffers using compute shaders.
+    ///     Manages point distribution across solid, transparent, and foliage buffer managers.
     /// </summary>
-    public class CopyPointsHandler : IDisposable
-    {
+    public class CopyPointsHandler : IDisposable{
         private readonly int _copyKernelID;
         private readonly ComputeShader _copyPoints;
         private readonly RenderBufferManager _foliageBufferManager;
@@ -26,19 +21,16 @@ namespace Engine.Scripts.Render
         private readonly GraphicsBuffer _solidPagesBuffer;
         private readonly RenderBufferManager _transparentBufferManager;
         private readonly GraphicsBuffer _transparentPagesBuffer;
-        
-        private bool _firstDispatch = true;
 
         /// <summary>
-        /// Initializes a new instance of the CopyPointsHandler class.
+        ///     Initializes a new instance of the CopyPointsHandler class.
         /// </summary>
         /// <param name="copyPoints">The compute shader used for copying points.</param>
         /// <param name="solidBufferManager">The render buffer manager for solid points.</param>
         /// <param name="transparentBufferManager">The render buffer manager for transparent points.</param>
         /// <param name="foliageBufferManager">The render buffer manager for foliage points.</param>
         public CopyPointsHandler(ComputeShader copyPoints, RenderBufferManager solidBufferManager,
-            RenderBufferManager transparentBufferManager, RenderBufferManager foliageBufferManager)
-        {
+            RenderBufferManager transparentBufferManager, RenderBufferManager foliageBufferManager){
             _copyPoints = copyPoints;
             _copyKernelID = copyPoints.FindKernel("CopyPoints");
             _solidBufferManager = solidBufferManager;
@@ -52,10 +44,9 @@ namespace Engine.Scripts.Render
         }
 
         /// <summary>
-        /// Releases all GPU resources held by this handler.
+        ///     Releases all GPU resources held by this handler.
         /// </summary>
-        public void Dispose()
-        {
+        public void Dispose(){
             _pageCountsBuffer?.Dispose();
             _solidPagesBuffer?.Dispose();
             _transparentPagesBuffer?.Dispose();
@@ -63,66 +54,75 @@ namespace Engine.Scripts.Render
         }
 
         /// <summary>
-        /// Copies point data from the point builder into the respective render buffers.
+        ///     Copies point data from the point builder into the respective render buffers.
         /// </summary>
         /// <param name="pointBuilderHandler">The point builder handler containing built points.</param>
         /// <param name="partition">The partition coordinates for the data.</param>
         /// <param name="counts">Array of point counts for solid, transparent, and foliage types.</param>
-        internal void CopyJob(PointBuilderHandler pointBuilderHandler, int3 partition, int[] counts)
-        {
+        internal void CopyJob(PointBuilderHandler pointBuilderHandler, int3 partition, int[] counts){
             AllocInfo solidAlloc = _solidBufferManager.AllocBufferSpace(partition, counts[0]);
             AllocInfo transparentAlloc = _transparentBufferManager.AllocBufferSpace(partition, counts[1]);
             AllocInfo foliageAlloc = _foliageBufferManager.AllocBufferSpace(partition, counts[2]);
-            
+
             int solidPagesCount = solidAlloc.Count;
             int transparentPagesCount = transparentAlloc.Count;
             int foliagePagesCount = foliageAlloc.Count;
 
             uint[] pageCounts = { (uint)solidPagesCount, (uint)transparentPagesCount, (uint)foliagePagesCount };
             _pageCountsBuffer.SetData(pageCounts);
+            _copyPoints.SetBuffer(_copyKernelID, PageCountsNameID, _pageCountsBuffer);
+            _copyPoints.SetInt(PointsPerPageNameID, PointsPerPage);
 
-            if (solidPagesCount > 0 || _firstDispatch)
-            {
-                uint2[] solidPageData = solidAlloc.ToIndexAndCount();
-                _solidPagesBuffer.SetData(solidPageData);
-
-                _copyPoints.SetBuffer(_copyKernelID, SolidPointsInNameID, pointBuilderHandler.SolidPointsOut);
-                _copyPoints.SetBuffer(_copyKernelID, SolidPointsCopyOutNameID,
-                    _solidBufferManager.GetBuffer(solidAlloc.BufferIndex));
-                _copyPoints.SetBuffer(_copyKernelID, SolidPagesNameID, _solidPagesBuffer);
-            }
-
-            if (transparentPagesCount > 0 || _firstDispatch)
-            {
-                uint2[] transparentPageData = transparentAlloc.ToIndexAndCount();
-                _transparentPagesBuffer.SetData(transparentPageData);
-
-                _copyPoints.SetBuffer(_copyKernelID, TransparentPointsInNameID,
-                    pointBuilderHandler.TransparentPointsOut);
-                _copyPoints.SetBuffer(_copyKernelID, TransparentPointsCopyOutNameID,
-                    _transparentBufferManager.GetBuffer(transparentAlloc.BufferIndex));
-                _copyPoints.SetBuffer(_copyKernelID, TransparentPagesNameID, _transparentPagesBuffer);
-            }
-
-            if (foliagePagesCount > 0 || _firstDispatch)
-            {
-                uint2[] foliagePageData = foliageAlloc.ToIndexAndCount();
-                _foliagePagesBuffer.SetData(foliagePageData);
-
-                _copyPoints.SetBuffer(_copyKernelID, FoliagePointsInNameID, pointBuilderHandler.FoliagePointsOut);
-                _copyPoints.SetBuffer(_copyKernelID, FoliagePointsCopyOutNameID,
-                    _foliageBufferManager.GetBuffer(foliageAlloc.BufferIndex));
-                _copyPoints.SetBuffer(_copyKernelID, FoliagePagesNameID, _foliagePagesBuffer);
-
-                _copyPoints.SetBuffer(_copyKernelID, PageCountsNameID, _pageCountsBuffer);
-                _copyPoints.SetInt(PointsPerPageNameID, PointsPerPage);
-            }
+            SetSolidBuffers(pointBuilderHandler, solidAlloc);
+            SetTransparentBuffers(pointBuilderHandler, transparentAlloc);
+            SetFoliageBuffers(pointBuilderHandler, foliageAlloc);
 
             int maxPageCount = math.max(solidPagesCount, math.max(transparentPagesCount, foliagePagesCount));
             if (maxPageCount <= 0) return;
 
             _copyPoints.Dispatch(_copyKernelID, Mathf.CeilToInt(maxPageCount / 8f), 1, 1);
-            _firstDispatch = false;
+        }
+
+        private void SetSolidBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo solidAlloc){
+            _copyPoints.SetBuffer(_copyKernelID, SolidPointsInNameID, pointBuilderHandler.SolidPointsOut);
+            _copyPoints.SetBuffer(_copyKernelID, SolidPointsCopyOutNameID,
+                GetTargetBuffer(_solidBufferManager, solidAlloc));
+            _copyPoints.SetBuffer(_copyKernelID, SolidPagesNameID, _solidPagesBuffer);
+
+            if (solidAlloc.Count <= 0) return;
+
+            uint2[] solidPageData = solidAlloc.ToIndexAndCount();
+            _solidPagesBuffer.SetData(solidPageData);
+        }
+
+        private void SetTransparentBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo transparentAlloc){
+            _copyPoints.SetBuffer(_copyKernelID, TransparentPointsInNameID,
+                pointBuilderHandler.TransparentPointsOut);
+            _copyPoints.SetBuffer(_copyKernelID, TransparentPointsCopyOutNameID,
+                GetTargetBuffer(_transparentBufferManager, transparentAlloc));
+            _copyPoints.SetBuffer(_copyKernelID, TransparentPagesNameID, _transparentPagesBuffer);
+
+            if (transparentAlloc.Count <= 0) return;
+
+            uint2[] transparentPageData = transparentAlloc.ToIndexAndCount();
+            _transparentPagesBuffer.SetData(transparentPageData);
+        }
+
+        private void SetFoliageBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo foliageAlloc){
+            _copyPoints.SetBuffer(_copyKernelID, FoliagePointsInNameID, pointBuilderHandler.FoliagePointsOut);
+            _copyPoints.SetBuffer(_copyKernelID, FoliagePointsCopyOutNameID,
+                GetTargetBuffer(_foliageBufferManager, foliageAlloc));
+            _copyPoints.SetBuffer(_copyKernelID, FoliagePagesNameID, _foliagePagesBuffer);
+
+            if (foliageAlloc.Count <= 0) return;
+
+            uint2[] foliagePageData = foliageAlloc.ToIndexAndCount();
+            _foliagePagesBuffer.SetData(foliagePageData);
+        }
+
+        private GraphicsBuffer GetTargetBuffer(RenderBufferManager bufferManager, AllocInfo allocInfo){
+            int bufferIndex = allocInfo.Count > 0 ? allocInfo.BufferIndex : 0;
+            return bufferManager.GetBuffer(bufferIndex);
         }
     }
 }

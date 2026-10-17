@@ -1,10 +1,8 @@
-﻿namespace Engine.Scripts.VoxelConfig.Data.Mesh
-{
+﻿namespace Engine.Scripts.VoxelConfig.Data.Mesh{
     /// <summary>
     ///     Identifies the mesh layer used when rendering a voxel (solid, transparent or air).
     /// </summary>
-    public enum MeshLayer : byte
-    {
+    public enum MeshLayer : byte{
         /// <summary>
         ///     Opaque solid geometry rendered in the regular opaque pass.
         /// </summary>

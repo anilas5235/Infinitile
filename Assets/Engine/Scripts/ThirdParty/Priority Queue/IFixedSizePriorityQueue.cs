@@ -1,16 +1,14 @@
-﻿namespace Engine.Scripts.ThirdParty.Priority_Queue
-{
+﻿namespace Engine.Scripts.ThirdParty.Priority_Queue{
     /// <summary>
     ///     A helper-interface only needed to make writing unit tests a bit easier (hence the 'internal' access modifier)
     /// </summary>
-    internal interface IFixedSizePriorityQueue<TItem, in TPriority> : IPriorityQueue<TItem, TPriority>
-    {
+    internal interface IFixedSizePriorityQueue<TItem, in TPriority> : IPriorityQueue<TItem, TPriority>{
         /// <summary>
         ///     Returns the maximum number of items that can be enqueued at once in this queue.  Once you hit this number (i.e.
         ///     once Count == MaxSize),
         ///     attempting to enqueue another item will cause undefined behavior.
         /// </summary>
-        int MaxSize { get; }
+        int MaxSize{ get; }
 
         /// <summary>
         ///     Resize the queue so it can accept more nodes.  All currently enqueued nodes are remain.

@@ -2,15 +2,12 @@
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Data.Mesh
-{
+namespace Engine.Scripts.VoxelConfig.Data.Mesh{
     /// <summary>
-    /// Describes a single quad face used by voxel shapes, including vertex positions, basis vectors, and UVs.
+    ///     Describes a single quad face used by voxel shapes, including vertex positions, basis vectors, and UVs.
     /// </summary>
-    ///
     [CreateAssetMenu(fileName = "Quad", menuName = "Infinitile/Mesh/Quad")]
-    public class QuadDefinition : ScriptableObject
-    {
+    public class QuadDefinition : ScriptableObject{
         public Vector3 position00;
         public Vector3 position01;
         public Vector3 position02;
@@ -25,32 +22,28 @@ namespace Engine.Scripts.VoxelConfig.Data.Mesh
 
 #if UNITY_EDITOR
         /// <summary>
-        /// Recalculates the quad basis when edited in the Unity editor.
+        ///     Recalculates the quad basis when edited in the Unity editor.
         /// </summary>
-        private void OnValidate()
-        {
+        private void OnValidate(){
             RecalculateNormal();
         }
 #endif
 
         /// <summary>
-        /// Recalculates the normal, up, and right vectors from the current vertex positions.
+        ///     Recalculates the normal, up, and right vectors from the current vertex positions.
         /// </summary>
-        public void RecalculateNormal()
-        {
+        public void RecalculateNormal(){
             CalculateBasis(out normal, out up, out right);
         }
 
         /// <summary>
-        /// Converts this quad definition into its Burst-friendly data representation.
+        ///     Converts this quad definition into its Burst-friendly data representation.
         /// </summary>
-        /// <returns>A <see cref="QuadData" /> struct containing the quad data.</returns>
-        public QuadData ToStruct()
-        {
+        /// <returns>A <see cref="QuadDef" /> struct containing the quad data.</returns>
+        public QuadDef ToStruct(){
             CalculateBasis(out Vector3 calculatedNormal, out Vector3 calculatedUp, out Vector3 calculatedRight);
 
-            return new QuadData
-            {
+            return new QuadDef{
                 position00 = position00.Float3(),
                 position01 = position01.Float3(),
                 position02 = position02.Float3(),
@@ -66,13 +59,13 @@ namespace Engine.Scripts.VoxelConfig.Data.Mesh
         }
 
         /// <summary>
-        /// Calculates the local basis vectors for the quad from its vertex positions.
+        ///     Calculates the local basis vectors for the quad from its vertex positions.
         /// </summary>
         /// <param name="calculatedNormal">The calculated normal vector.</param>
         /// <param name="calculatedUp">The calculated up vector.</param>
         /// <param name="calculatedRight">The calculated right vector.</param>
-        private void CalculateBasis(out Vector3 calculatedNormal, out Vector3 calculatedUp, out Vector3 calculatedRight)
-        {
+        private void CalculateBasis(out Vector3 calculatedNormal, out Vector3 calculatedUp,
+            out Vector3 calculatedRight){
             const float epsilon = 1e-6f;
 
             Vector3 edgeA = position01 - position00;
@@ -95,62 +88,61 @@ namespace Engine.Scripts.VoxelConfig.Data.Mesh
         }
 
         /// <summary>
-        /// Burst-friendly quad data used by runtime rendering systems.
+        ///     Burst-friendly quad data used by runtime rendering systems.
         /// </summary>
-        public struct QuadData
-        {
+        public struct QuadDef{
             /// <summary>
-            /// Vertex position 00 relative to the voxel origin.
+            ///     Vertex position 00 relative to the voxel origin.
             /// </summary>
             public float3 position00;
 
             /// <summary>
-            /// Vertex position 01 relative to the voxel origin.
+            ///     Vertex position 01 relative to the voxel origin.
             /// </summary>
             public float3 position01;
 
             /// <summary>
-            /// Vertex position 02 relative to the voxel origin.
+            ///     Vertex position 02 relative to the voxel origin.
             /// </summary>
             public float3 position02;
 
             /// <summary>
-            /// Vertex position 03 relative to the voxel origin.
+            ///     Vertex position 03 relative to the voxel origin.
             /// </summary>
             public float3 position03;
 
             /// <summary>
-            /// Quad normal vector.
+            ///     Quad normal vector.
             /// </summary>
             public float3 normal;
 
             /// <summary>
-            /// Quad up vector.
+            ///     Quad up vector.
             /// </summary>
             public float3 up;
 
             /// <summary>
-            /// Quad right vector.
+            ///     Quad right vector.
             /// </summary>
             public float3 right;
 
             /// <summary>
-            /// UV coordinate for vertex 00.
+            ///     UV coordinate for vertex 00.
             /// </summary>
             public float2 uv00;
 
             /// <summary>
-            /// UV coordinate for vertex 01.
+            ///     UV coordinate for vertex 01.
             /// </summary>
             public float2 uv01;
 
             /// <summary>
-            /// UV coordinate for vertex 02.
+            ///     UV coordinate for vertex 02.
             /// </summary>
             public float2 uv02;
 
             /// <summary>
-            /// UV coordinate for vertex 03.
+            ///     UV coordinate for vertex 03.
             /// </summary>
             public float2 uv03;
         }

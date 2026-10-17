@@ -1,15 +1,13 @@
-﻿namespace Engine.Scripts.Jobs.Chunk
-{
+﻿namespace Engine.Scripts.Jobs.Chunk{
     /// <summary>
     ///     Represents a data snapshot for a vertical column within a chunk, including height and biome attributes.
     /// </summary>
-    public struct ChunkColumn
-    {
+    public struct ChunkColumn{
         /// <summary>Computed terrain height in voxels.</summary>
         public int Height;
 
         /// <summary>Biome classification for the column.</summary>
-        public Biome Biome;
+        public ushort Biome;
 
         /// <summary>Surface block voxel ID.</summary>
         public ushort TopBlock;

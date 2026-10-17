@@ -1,11 +1,8 @@
 ﻿using System;
 using System.Linq;
 using System.Runtime.InteropServices;
-using Engine.Scripts.Jobs.ColliderMeshing;
-using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig;
-using Engine.Scripts.VoxelConfig.Data;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
@@ -14,21 +11,19 @@ using static Engine.Scripts.Utils.VoxelRenderConstants;
 using static Engine.Scripts.Utils.VoxelConstants;
 using static UnityEngine.GraphicsBuffer;
 
-namespace Engine.Scripts.Render
-{
+namespace Engine.Scripts.Render{
     /// <summary>
-    /// Handles the building of point geometry from voxel data using compute shaders.
-    /// Manages point preparation, building, and provides GPU buffers for solid, transparent, and foliage points.
+    ///     Handles the building of point geometry from voxel data using compute shaders.
+    ///     Manages point preparation, building, and provides GPU buffers for solid, transparent, and foliage points.
     /// </summary>
-    public class PointBuilderHandler : IDisposable
-    {
+    public class PointBuilderHandler : IDisposable{
         private const int PrepChunkCount = 9;
         private const int PrepIntervalsPerThread = 8;
         private const int PrepThreadsX = 64;
+        private readonly int _buildPrepKernelID;
 
         private readonly GraphicsBuffer _metadata;
         private readonly ComputeShader _pointBuilder;
-        private readonly int _buildPrepKernelID;
         private readonly int _pointBuilderKernelID;
         private readonly GraphicsBuffer[] _preparedChunks;
 
@@ -39,14 +34,13 @@ namespace Engine.Scripts.Render
         private NativeArray<uint> _counts;
 
         /// <summary>
-        /// Initializes a new instance of the PointBuilderHandler class.
+        ///     Initializes a new instance of the PointBuilderHandler class.
         /// </summary>
         /// <param name="pointBuilder">The compute shader for building points.</param>
         /// <param name="voxelRenderDef">The GPU buffer containing voxel render definitions.</param>
         /// <param name="voxelQuadTexPair">The GPU buffer containing voxel quad texture pairs.</param>
         public PointBuilderHandler(ComputeShader pointBuilder, GraphicsBuffer voxelRenderDef,
-            GraphicsBuffer voxelQuadTexPair)
-        {
+            GraphicsBuffer voxelQuadTexPair){
             _pointBuilder = pointBuilder;
             _voxelRenderDefBuffer = voxelRenderDef;
             _voxelQuadTexPairBuffer = voxelQuadTexPair;
@@ -69,25 +63,24 @@ namespace Engine.Scripts.Render
         }
 
         /// <summary>
-        /// Gets the GPU buffer containing solid (opaque) points.
+        ///     Gets the GPU buffer containing solid (opaque) points.
         /// </summary>
-        public GraphicsBuffer SolidPointsOut { get; }
+        public GraphicsBuffer SolidPointsOut{ get; }
 
         /// <summary>
-        /// Gets the GPU buffer containing transparent points.
+        ///     Gets the GPU buffer containing transparent points.
         /// </summary>
-        public GraphicsBuffer TransparentPointsOut { get; }
+        public GraphicsBuffer TransparentPointsOut{ get; }
 
         /// <summary>
-        /// Gets the GPU buffer containing foliage points.
+        ///     Gets the GPU buffer containing foliage points.
         /// </summary>
-        public GraphicsBuffer FoliagePointsOut { get; }
+        public GraphicsBuffer FoliagePointsOut{ get; }
 
         /// <summary>
-        /// Releases all GPU resources held by this handler.
+        ///     Releases all GPU resources held by this handler.
         /// </summary>
-        public void Dispose()
-        {
+        public void Dispose(){
             SolidPointsOut?.Dispose();
             TransparentPointsOut?.Dispose();
             FoliagePointsOut?.Dispose();
@@ -98,15 +91,14 @@ namespace Engine.Scripts.Render
         }
 
         /// <summary>
-        /// Asynchronously builds points for the given partition from its voxel data.
+        ///     Asynchronously builds points for the given partition from its voxel data.
         /// </summary>
         /// <param name="data">The partition build request containing chunk data.</param>
         /// <returns>An awaitable that returns an array with solid, transparent, and foliage point counts.</returns>
-        internal async Awaitable<int[]> BuildPoints(PartitionBuildRequest data)
-        {
+        internal async Awaitable<int[]> BuildPoints(PartitionBuildRequest data){
             ResetCounters();
             PartitionMetadata meta = data.GetMetadata();
-            _metadata.SetData(new[] { meta });
+            _metadata.SetData(new[]{ meta });
 
             PrepareChunks(data);
 
@@ -139,8 +131,7 @@ namespace Engine.Scripts.Render
 
             _pointBuilder.Dispatch(_pointBuilderKernelID, 8, 8, 8);
 
-            try
-            {
+            try{
                 CopyCount(SolidPointsOut, _readBackCountBuffer, sizeof(uint) * 0);
                 CopyCount(TransparentPointsOut, _readBackCountBuffer, sizeof(uint) * 1);
                 CopyCount(FoliagePointsOut, _readBackCountBuffer, sizeof(uint) * 2);
@@ -149,40 +140,36 @@ namespace Engine.Scripts.Render
                 int[] results = _counts.Select(c => (int)c).ToArray();
                 return results;
             }
-            catch (Exception e)
-            {
+            catch (Exception e){
                 VoxelEngineLogger.Error<PointBuilderHandler>($"Error reading back point counts: {e}");
-                return new[] { 0, 0, 0 };
+                return new[]{ 0, 0, 0 };
             }
         }
 
         /// <summary>
-        /// Resets the counters for all output point buffers.
+        ///     Resets the counters for all output point buffers.
         /// </summary>
-        private void ResetCounters()
-        {
+        private void ResetCounters(){
             SolidPointsOut.SetCounterValue(0);
             TransparentPointsOut.SetCounterValue(0);
             FoliagePointsOut.SetCounterValue(0);
         }
 
         /// <summary>
-        /// Prepares all chunks for point building by decompressing them.
+        ///     Prepares all chunks for point building by decompressing them.
         /// </summary>
         /// <param name="data">The partition build request containing chunk buffers.</param>
-        private void PrepareChunks(PartitionBuildRequest data)
-        {
+        private void PrepareChunks(PartitionBuildRequest data){
             GraphicsBuffer[] buffers = data.Buffers;
             for (int i = 0; i < buffers.Length; i++) DispatchPrepChunk(i, buffers[i]);
         }
 
         /// <summary>
-        /// Dispatches a compute shader job to decompress a single chunk.
+        ///     Dispatches a compute shader job to decompress a single chunk.
         /// </summary>
         /// <param name="chunkIndex">The index of the chunk to prepare.</param>
         /// <param name="compressedChunk">The compressed chunk data buffer.</param>
-        private void DispatchPrepChunk(int chunkIndex, GraphicsBuffer compressedChunk)
-        {
+        private void DispatchPrepChunk(int chunkIndex, GraphicsBuffer compressedChunk){
             _pointBuilder.SetInt(VoxelsPerChunkNameID, VoxelsPerChunk);
             _pointBuilder.SetBuffer(_buildPrepKernelID, CompChunkNameID, compressedChunk);
             _pointBuilder.SetBuffer(_buildPrepKernelID, UnCompChunkNameID, _preparedChunks[chunkIndex]);

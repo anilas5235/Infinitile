@@ -1,18 +1,17 @@
 ﻿using UnityEngine;
 using static Engine.Scripts.Utils.VoxelConstants;
 
-namespace Engine.Scripts.Utils
-{
+namespace Engine.Scripts.Utils{
     /// <summary>
     ///     Constants for GPU-based voxel rendering pipeline.
     /// </summary>
-    public static class VoxelRenderConstants
-    {
+    public static class VoxelRenderConstants{
         public const int MaxPointsPerPartition = PartitionWidth * PartitionHeight * PartitionDepth * 3;
         public const int RenderBufferSize = PointsPerPage * PagesPerBuffer;
         public const int PointsPerPage = 256;
         public const int PagesPerBuffer = 1024;
 
+        public static readonly int TexturesNameID = Shader.PropertyToID("_Textures");
         public static readonly int QuadBufferNameID = Shader.PropertyToID("_Quad_buffer");
 
         public static readonly int VoxelRenderDefNameID = Shader.PropertyToID("_VoxelRenderDefs");
