@@ -2,10 +2,12 @@
 using Engine.Scripts.Behaviour;
 using Engine.Scripts.Components;
 using Engine.Scripts.Jobs.Core;
+using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Logger;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
+using Unity.Profiling;
 using UnityEngine;
 
 namespace Engine.Scripts.Jobs.ColliderBake{
@@ -49,6 +51,7 @@ namespace Engine.Scripts.Jobs.ColliderBake{
         /// </summary>
         /// <param name="jobs">The list of chunk positions whose colliders should be built or updated.</param>
         internal void Start(List<int3> jobs){
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.ColliderBakeSchedule.Auto(); // PERF-01
             StartRecord();
 
             IsReady = false;
@@ -72,6 +75,7 @@ namespace Engine.Scripts.Jobs.ColliderBake{
         ///     Completes all scheduled collider build jobs and applies the resulting colliders to the associated chunks.
         /// </summary>
         internal void Complete(){
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.ColliderBakeComplete.Auto(); // PERF-01
             double start = Time.realtimeSinceStartupAsDouble;
             _handle.Complete();
 
