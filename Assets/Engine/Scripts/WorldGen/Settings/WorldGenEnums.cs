@@ -1,14 +1,14 @@
 namespace Engine.Scripts.WorldGen.Settings{
-    /// <summary>Which pipeline produces height and biomes (§4, §7, §8). Legacy is the pre-spec hybrid generator (INT-40).</summary>
+    /// <summary>
+    ///     Which pipeline produces height and biomes (§4, §7, §8). The pre-spec hybrid generator (value 2, Legacy)
+    ///     was removed after Phase 2 (INT-40).
+    /// </summary>
     public enum GenArchitecture : byte{
         /// <summary>Height from nested splines over (C, E, PV); biomes classified in 6D including h (§7).</summary>
         TerrainFirst = 0,
 
         /// <summary>Biomes classified in 5D; height from blended per-biome parameters (§8).</summary>
-        BiomeFirst = 1,
-
-        /// <summary>Current hybrid generator (NoiseCalculator + BiomeCalculator). Removed after Phase 2.</summary>
-        Legacy = 2
+        BiomeFirst = 1
     }
 
     /// <summary>Blending method of one stage (§9). Every method returns a normalised weight vector over the active biomes.</summary>

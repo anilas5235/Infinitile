@@ -105,6 +105,35 @@ samples two noise layers. **This is above the PERF-05 initial budget** of 1.5 ms
 quiet machine before deciding whether Terrain-first needs optimising. Biome-first (Phase 2) adds a row to this
 table, the blend methods (Phase 3) one per method.
 
+## 2026-10-18 Phase 2 baseline (`2026-10-18-phase2-editmode-baseline.json`)
+
+Same machine and settings as above, quiet machine (no game or browser load). Phase 2 (Biome-first) adds the
+`BiomeFirstHeight` module and routes every chunk through `WorldSampler.SampleColumn` (INT-10); the legacy
+generator is gone (INT-40), so the `ChunkJob.Run TerrainRle ms/chunk` row ends here. The collider mesh benchmark
+fixture now builds its chunk from the spec sampler (one Plains biome, surface near y = 100 instead of the legacy
+noise surface), so its partition content changed and its rows are not comparable with Phase 1.
+
+| Benchmark | Sample group | Median | Min | Max | vs 2026-10-18 (Phase 1) |
+|---|---|---|---|---|---|
+| ChunkJob.Run, Biome-first (six section 19.2 biomes, 5D classification, per-biome Offset/a_i/J + RLE write) | ChunkJob.Run BiomeFirst ms/chunk | 1.51 ms | 1.42 ms | 2.52 ms | new |
+| ChunkJob.Run, Terrain-first (section 19.1 splines, six section 19.2 biomes, 6D classification + RLE write) | ChunkJob.Run TerrainFirst ms/chunk | 2.16 ms | 2.12 ms | 2.53 ms | -4 % |
+| CMeshBuildJob.Run, surface partition (y=3) | CMeshBuildJob.Run surface ms/partition | 3.78 ms | 3.66 ms | 4.40 ms | fixture changed |
+| CMeshBuildJob.Run, fully solid partition (y=1) | CMeshBuildJob.Run solid ms/partition | 6.86 ms | 6.50 ms | 7.22 ms | fixture changed (-6 %) |
+| UnsafeIntervalList.Set, 10^4 random edits, chunk-sized list | UnsafeIntervalList.Set 10k edits ms | 10.76 ms | 10.52 ms | 14.14 ms | -7 % |
+| PageAllocator, fill one buffer with 3-page partitions and release all | PageAllocator fill+release 1 buffer ms | 0.49 ms | 0.48 ms | 0.58 ms | -53 % (+4 % vs Phase 0) |
+| FrustumCulling.IsVisible, 1024 page AABBs vs 6 planes, 10 passes per sample | FrustumCulling.IsVisible 1024 pages us | 2344 us | 2293 us | 3191 us | -4 % |
+
+PERF-03: no benchmark is slower than its Phase 1 number; the untouched benchmarks sit 4–7 % below the Phase 1 run,
+which confirms that run's foreground load. The page allocator is back at its Phase 0 level (+4 %).
+
+Biome-first costs 1.51 ms per chunk, about 70 % of Terrain-first: the same climate fields, detail octaves and
+peak noise, but the 5D classification picks the biome first and the height is Offset_b + Σ a_{b,i} N_i + J_b P
+from that biome's constants, so no nested splines are evaluated. It sits at the PERF-05 initial budget of 1.5 ms
+per chunk and worker for method 1. Terrain-first measures 2.16 ms on the quiet machine (Phase 1 recorded 2.26 ms
+under load), so it remains above that budget; whether the splines need optimising is a Phase 3+ question, since the
+blend methods will add cost on both paths. The surface-partition collider row halved because the spec fixture's
+surface is flatter than the legacy noise surface, not because the mesher changed.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the

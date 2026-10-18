@@ -1,5 +1,64 @@
 # World Generation (Overview)
 
+# Version 1.3 (Phase 2 — Biome-first)
+
+Phase 2 of `WorldGenSpec.html` adds the Biome-first architecture (section 8) and removes the legacy generator
+(INT-40). `GenArchitecture` now has two values, `TerrainFirst` and `BiomeFirst`; every chunk goes through
+`WorldSampler.SampleColumn`. The shipped `Assets/EngineSettings/WorldGenSettings.asset` still selects Terrain-first
+(the class default for new assets is Biome-first); the blend methods follow in Phase 3, so Biome-first shows a height
+step at every biome boundary for now.
+
+## Biome-first column pipeline
+
+```mermaid
+flowchart LR
+    S[WorldGenSettings SO\nWaterLevel, octave tables] -->|ToConfig| C[WorldGenConfig\nOctaveCoefficients a_b,i, GEN-22]
+    B[BiomeSet SO\nOffset_b, HeightAmplitude_b,\nOctaveWeights_b, Jaggedness_b] --> S
+    C --> F[ClimateFields\nT F C E W PV]
+    F --> K[BiomeClassifier 5D\nno height dimension, BIO-01]
+    K --> W[BlendWeights\none-hot until Phase 3]
+    W --> H[BiomeFirstHeight\nH = Offset + sum a_i N_i + J P\nfrom the blended parameters, BIO-02/03]
+    H --> O[ColumnSample\nHeight, NormalizedHeight]
+    O --> J[ChunkJob.PrepareChunkMaps\nINT-10/11]
+    J --> V[FillTerrain]
+    O --> R[SampleRegion] --> P[Preview views]
+    T[Terrain-first reference] -.->|BIO-20 calibration| B
+```
+
+### Description
+
+- **Classification first** (`WorldSampler.SampleColumn`, Biome-first branch): the biome is the 5D argmin over
+  (T, F, C, E, PV) without a height dimension (BIO-01); the material and height weights are both one-hot on that
+  biome until Phase 3 (BLD-02).
+- **Biome-first height** (`WorldGen/Height/BiomeFirstHeight.cs`): the height-stage weights blend the per-biome
+  parameters, Offset = Σ w_b Offset_b, a_i = Σ w_b a_{b,i} with a_{b,i} = HeightAmplitude_b × OctaveWeights_{b,i}
+  (GEN-22, precomputed in `WorldGenConfig.OctaveCoefficients`), J = Σ w_b J_b, and H is computed once from them
+  (BIO-02). All biomes sample the same N_i and P (BIO-03); because every biome parameter enters H linearly, blending
+  the parameters equals blending the per-biome heights (section 8.3), which Phase 3 relies on. The clamp to
+  [Hmin, Hmax] is recorded as before (GEN-12).
+- **Legacy removal** (INT-40, GEN-08): `NoiseCalculator`, `BiomeCalculator`, `NoiseSettings` and the Elevation
+  noise are gone. `GeneratorConfig` holds `WaterLevel`, `GlobalSeed`, `Voxels` and `WorldGen` only; `WaterLevel`
+  lives on `WorldGenSettings` (DEC-02, default 124) and is part of the canonical JSON. `VoxelEngineSettings`
+  requires a `WorldGenSettings`; the chunk scheduler throws without one. `NoiseProfileSettings` and
+  `WarpedNoiseLayerSettings` moved to `WorldGen/Settings/`.
+- **Preview** (`Editor/WorldGen/WorldGenerationPreviewWindow.cs`, menu Infinitile → World Generation Preview):
+  rewritten on `WorldGenApi.SampleRegion` for both architectures; the settings and biome inspectors sit next to the
+  views, and every edit rebuilds the preview (Undo included). It is the tool for iterating generation parameters.
+- **Height calibration** (`Editor/WorldGen/BiomeFirstCalibration.cs`, panel "Height calibration (BIO-20)" in the
+  preview): samples the Terrain-first pipeline of the same settings over the framed area, groups the columns by
+  their Terrain-first biome and suggests Jaggedness_b = mean J, Offset_b = mean H − Jaggedness_b · mean P and
+  HeightAmplitude_b = std(detail residual) / std(Σ OctaveWeights_{b,i} N_i), so both architectures produce similar
+  height distributions. The J·mean P correction keeps the non-negative ridge term from lifting jagged biomes
+  (Mountain, Snow) above their Terrain-first mean height. Suggestions appear next to the current values; a biome is written only on its Apply click.
+- **Performance** (`Tests/Performance/ChunkGenerationBenchmark.cs`): `ChunkJob.Run BiomeFirst ms/chunk` replaces
+  the legacy `TerrainRle` row; see `Tests/Performance/Baselines/README.md` for the Phase 2 numbers (PERF-02/03).
+
+### Ownership of native memory (D-05)
+
+Unchanged in substance: `GeneratorConfig.Dispose` releases `WorldGen` only; the voxel map belongs to the
+`VoxelRegistry`. `WorldGenConfig.CreateEmpty` is gone with the legacy path, so a `WorldGenSettings` is always the
+source of the config. The 1.1 and 1.2 sections below describe the legacy path as it existed at the time.
+
 # Version 1.2 (Phase 1 — Terrain-first)
 
 Phase 1 of `WorldGenSpec.html` makes the Terrain-first architecture (section 7) the one the game runs:

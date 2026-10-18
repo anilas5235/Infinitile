@@ -171,17 +171,6 @@ namespace Engine.Tests.EditMode{
             Assert.That(col.Height, Is.InRange(0, MaxTerrainHeight), "the spline height exists without biomes (TRN-03)");
         }
 
-        [Test]
-        public void PrepareChunkMaps_Legacy_FillsTheNewColumnFields(){
-            Prepare(new int2(1, 1)); // fixture: empty WorldGen → legacy generator (INT-40)
-            ChunkColumn col = Column(4, 4);
-            Assert.AreEqual(col.Biome, col.SurfaceSource);
-            Assert.AreEqual((float)col.Height, col.HeightF);
-            Assert.AreEqual(0, col.FloraSpecies);
-            Assert.AreEqual(-1, col.FloraSource);
-            Assert.AreEqual(TestFixtures.Grass, col.TopBlock);
-        }
-
         // --- TST-03 -------------------------------------------------------------------------------------------------------
 
         [Test]

@@ -82,7 +82,7 @@ namespace Engine.Tests.EditMode{
             }
 
             StringAssert.Contains("\"Name\": \"Desert\"", first, "BiomeSet contents are inlined");
-            StringAssert.Contains("\"Architecture\": \"Legacy\"", first);
+            StringAssert.Contains("\"Architecture\": \"BiomeFirst\"", first, "class default since Phase 2");
             StringAssert.Contains("\"TemperatureProfile\"", first, "own climate profiles are part of the manifest");
             StringAssert.Contains("\"RedistributionCurve\"", first);
             Assert.IsFalse(first.Contains("0,6"), "no culture-specific decimal separator");
@@ -202,7 +202,7 @@ namespace Engine.Tests.EditMode{
             try{
                 Assert.IsTrue(cfg.IsCreated);
                 Assert.AreEqual(1337u, cfg.Seed);
-                Assert.AreEqual(GenArchitecture.Legacy, cfg.Architecture);
+                Assert.AreEqual(GenArchitecture.BiomeFirst, cfg.Architecture);
                 Assert.AreEqual(6, cfg.OctaveCount);
                 Assert.AreEqual(2, cfg.BiomeCount);
                 CollectionAssert.AreEqual(new[]{ 512f, 256f, 128f, 64f, 32f, 16f }, cfg.OctaveWavelengths.ToArray());
@@ -329,34 +329,8 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void CreateEmpty_IsConstructedSchedulableAndBiomeless(){
-            WorldGenConfig cfg = WorldGenConfig.CreateEmpty(7u);
-            try{
-                Assert.IsTrue(cfg.IsCreated, "0-length arrays count as constructed");
-                Assert.AreEqual(0, cfg.BiomeCount);
-                Assert.AreEqual(0, cfg.OctaveCount);
-                Assert.AreEqual(GenArchitecture.Legacy, cfg.Architecture);
-                Assert.AreEqual(40f, cfg.HeightMin);
-
-                // The mirror must survive a job schedule (ChunkJob carries it even on the legacy path).
-                WorldGenRequest req = new(){ Config = cfg, Origin = int2.zero, Size = new int2(4, 4) };
-                NativeArray<int> biome = new(16, Allocator.TempJob);
-                NativeArray<float> height = new(16, Allocator.TempJob);
-                RegionBuffers buffers = new(){ HardBiome = biome, Height = height };
-                WorldGenApi.SampleRegion(req, ref buffers).Complete();
-                Assert.AreEqual(-1, biome[5], "no biome active");
-                Assert.AreEqual(40f, height[5], "no biome → height clamps to Hmin");
-                biome.Dispose();
-                height.Dispose();
-            }
-            finally{
-                cfg.Dispose();
-            }
-        }
-
-        [Test]
         public void DefaultConfigs_DisposeSafely(){
-            // D-05: a GeneratorConfig without WorldGenSettings carries a default WorldGenConfig that owns nothing.
+            // D-05: a default GeneratorConfig carries a default WorldGenConfig that owns nothing and disposes safely.
             default(WorldGenConfig).Dispose();
             GeneratorConfig generator = default;
             Assert.IsFalse(generator.WorldGen.IsCreated);

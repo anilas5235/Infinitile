@@ -15,7 +15,8 @@ namespace Engine.Scripts.WorldGen.Settings{
     ///         Ownership (D-05): every container in this struct is created by <c>ToConfig</c> for this instance and
     ///         released by <see cref="Dispose" />, which <c>GeneratorConfig.Dispose</c> calls. Nothing here is a view
     ///         of registry memory. A default instance (<see cref="IsCreated" /> false) owns nothing and may be disposed,
-    ///         but it cannot travel inside a job struct: use <see cref="CreateEmpty" /> for the legacy path.
+    ///         but it cannot travel inside a job struct (the job safety system rejects unconstructed containers), so
+    ///         every job-carried config comes from <c>ToConfig</c>.
     ///     </para>
     /// </summary>
     public struct WorldGenConfig : IDisposable{
@@ -102,77 +103,8 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// <summary>Number of active biomes.</summary>
         public int BiomeCount => Biomes.IsCreated ? Biomes.Length : 0;
 
-        /// <summary>False for a default instance; true for <see cref="CreateEmpty" /> and <c>ToConfig</c> results.</summary>
+        /// <summary>False for a default instance; true for <c>ToConfig</c> results.</summary>
         public bool IsCreated => OctaveWavelengths.IsCreated;
-
-        /// <summary>
-        ///     A created but empty config for the legacy path (INT-40): no biomes, no octaves, 1-octave placeholder
-        ///     climate profiles, spec default scalars, <see cref="Architecture" /> = Legacy. <c>GeneratorConfig</c>
-        ///     travels inside job structs (ChunkJob, preview jobs), and the job safety system rejects default
-        ///     (unconstructed) containers even when the job never reads them, so a config without
-        ///     <c>WorldGenSettings</c> must still hold constructed arrays. Owned by the caller like any other instance
-        ///     (D-05); <see cref="Dispose" /> releases it.
-        /// </summary>
-        public static WorldGenConfig CreateEmpty(uint seed = 0u, Allocator allocator = Allocator.Persistent){
-            return new WorldGenConfig{
-                Seed = seed,
-                Architecture = GenArchitecture.Legacy,
-                MaterialMethod = BlendMethod.None,
-                MaterialBlendWidth = 32f,
-                MaterialSigma = 0.04f,
-                HeightMethod = BlendMethod.None,
-                HeightBlendWidth = 32f,
-                HeightSigma = 0.04f,
-                WarpAmplitude = 24f,
-                WarpWavelength = 96f,
-                WarpOctaves = 2,
-                LambdaTemperature = 1f,
-                LambdaHumidity = 1f,
-                LambdaContinental = 2f,
-                LambdaErosion = 1f,
-                LambdaPV = 0.5f,
-                LambdaHeight = 1f,
-                HeightMin = 40f,
-                HeightMax = 250f,
-                PeakWavelength = 192f,
-                EnableClimateOverrides = true,
-                Climate = new ClimateParams{
-                    Temperature = new NoiseProfile(UnitProfile(seed, HashSalts.TemperatureNoise)),
-                    Humidity = new NoiseProfile(UnitProfile(seed, HashSalts.HumidityNoise)),
-                    Continental = new WarpedNoiseLayer(new WarpedNoiseLayer.Settings{
-                        BaseNoise = UnitProfile(seed, HashSalts.ContinentalNoise),
-                        WarpNoise = UnitProfile(seed, HashSalts.ContinentalWarpX),
-                        WarpSaltY = HashSalts.ContinentalWarpY,
-                        WarpStrength = 0f,
-                        RedistributionPoints = null
-                    }),
-                    Erosion = new NoiseProfile(UnitProfile(seed, HashSalts.ErosionNoise)),
-                    Weirdness = new NoiseProfile(UnitProfile(seed, HashSalts.WeirdnessNoise)),
-                    ContinentalHumidityInfluence = 0f,
-                    ContinentalTemperatureInfluence = 0f,
-                    WGain = 1.6f,
-                    FrequencyScale = 1f
-                },
-                OctaveWavelengths = new NativeArray<float>(0, allocator),
-                GlobalOctaveWeights = new NativeArray<float>(0, allocator),
-                Biomes = new NativeArray<Biome.BiomeDef>(0, allocator),
-                OctaveCoefficients = new NativeArray<float>(0, allocator),
-                SplineNodes = new NativeArray<SplineNode>(0, allocator),
-                SplinePoints = new NativeArray<SplinePoint>(0, allocator)
-            };
-        }
-
-        /// <summary>Single-octave unit-scale profile used by <see cref="CreateEmpty" />.</summary>
-        private static NoiseProfile.Settings UnitProfile(uint seed, uint salt){
-            return new NoiseProfile.Settings{
-                Seed = (int)seed,
-                Salt = salt,
-                Scale = 1f,
-                Persistance = 0.5f,
-                Lacunarity = 2f,
-                Octaves = 1
-            };
-        }
 
         /// <summary>a_{b,i} for biome <paramref name="biome" /> and octave <paramref name="octave" />.</summary>
         public float OctaveCoefficient(int biome, int octave){

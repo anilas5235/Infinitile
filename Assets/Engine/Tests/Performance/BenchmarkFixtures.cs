@@ -1,5 +1,4 @@
 using Engine.Scripts.Jobs.Chunk;
-using Engine.Scripts.Settings;
 using Engine.Scripts.WorldGen.Settings;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Data.Internal;
@@ -12,8 +11,8 @@ using UnityEngine;
 namespace Engine.Tests.Performance{
     /// <summary>
     ///     PERF-02: hand-built generator/render inputs so the benchmarks run without the Resources-based
-    ///     DataImporter. Voxel IDs are fixed; the noise parameters come from a default NoiseSettings asset,
-    ///     built exactly like the engine does (NoiseSettings.ToNoiseParameters).
+    ///     DataImporter. Voxel IDs are fixed; the world-gen config comes from WorldGenSettings built in code,
+    ///     exactly like the engine does (WorldGenSettings.ToConfig).
     /// </summary>
     internal static class BenchmarkFixtures{
         internal const ushort Air = 0;
@@ -27,17 +26,33 @@ namespace Engine.Tests.Performance{
         internal const int Seed = 1337;
 
         internal static GeneratorConfig CreateGeneratorConfig(Allocator allocator){
-            NoiseSettings noise = ScriptableObject.CreateInstance<NoiseSettings>();
+            // Phase 2 (INT-40): the only generation input is a WorldGenSettings. One Biome-first biome at offset
+            // 100 with a small amplitude keeps the surface near y = 100 for the tests that fill terrain here;
+            // block ids are patched in because no registry exists in the fixture.
+            WorldGenSettings settings = ScriptableObject.CreateInstance<WorldGenSettings>();
+            BiomeSet set = ScriptableObject.CreateInstance<BiomeSet>();
+            Biome biome = ScriptableObject.CreateInstance<Biome>();
             try{
-                NativeArray<Biome.BiomeDef> biomes = new(2, allocator);
-                biomes[0] = new Biome.BiomeDef{
-                    topBlock = Grass, underBlock = Dirt, stoneBlock = Stone,
-                    targetHumidity = 0.5f, targetTemperature = 0.5f, targetContinental = 0.5f, targetElevation = 0.5f
-                };
-                biomes[1] = new Biome.BiomeDef{
-                    topBlock = Dirt, underBlock = Dirt, stoneBlock = Stone,
-                    targetHumidity = 0.3f, targetTemperature = 0.1f, targetContinental = 0.7f, targetElevation = 0.7f
-                };
+                settings.Architecture = GenArchitecture.BiomeFirst;
+                biome.name = "Plains";
+                biome.TargetTemperature = .5f;
+                biome.TargetHumidity = .5f;
+                biome.TargetContinental = .5f;
+                biome.TargetErosion = .5f;
+                biome.TargetPV = 0f;
+                biome.HeightOffset = 100f;
+                biome.HeightAmplitude = 6f;
+                biome.OctaveWeights = new[]{ 1f, .6f, .3f, .12f, .05f, .02f };
+                biome.Jaggedness = 0f;
+                set.Biomes.Add(biome);
+                settings.Biomes = set;
+
+                WorldGenConfig worldGen = settings.ToConfig(Seed, null, allocator);
+                Biome.BiomeDef def = worldGen.Biomes[0];
+                def.topBlock = Grass;
+                def.underBlock = Dirt;
+                def.stoneBlock = Stone;
+                worldGen.Biomes[0] = def;
 
                 NativeHashMap<FixedString32Bytes, Voxel.VoxelDef> voxels = new(VoxelTypeCount, allocator);
                 voxels.Add("std:air", new Voxel.VoxelDef{ Id = Air, MeshLayer = MeshLayer.Air });
@@ -48,16 +63,16 @@ namespace Engine.Tests.Performance{
                 voxels.Add("std:Ice", new Voxel.VoxelDef{ Id = Ice, MeshLayer = MeshLayer.Solid, Collision = true });
 
                 return new GeneratorConfig{
-                    WaterLevel = noise.WaterLevel,
+                    WaterLevel = settings.WaterLevel,
                     GlobalSeed = Seed,
-                    BiomeDefs = biomes,
                     Voxels = voxels,
-                    NoiseParams = noise.ToNoiseParameters(Seed),
-                    WorldGen = WorldGenConfig.CreateEmpty((uint)Seed, allocator) // legacy path: constructed, empty
+                    WorldGen = worldGen
                 };
             }
             finally{
-                Object.DestroyImmediate(noise);
+                Object.DestroyImmediate(biome);
+                Object.DestroyImmediate(set);
+                Object.DestroyImmediate(settings);
             }
         }
 
@@ -68,11 +83,20 @@ namespace Engine.Tests.Performance{
         ///     ScriptableObjects are returned so the caller can destroy them.
         /// </summary>
         internal static GeneratorConfig CreateTerrainFirstGeneratorConfig(Allocator allocator, List<Object> created){
+            return CreateSpecGeneratorConfig(GenArchitecture.TerrainFirst, allocator, created);
+        }
+
+        /// <summary>Same world as <see cref="CreateTerrainFirstGeneratorConfig" /> on the Biome-first sampler (Phase 2).</summary>
+        internal static GeneratorConfig CreateBiomeFirstGeneratorConfig(Allocator allocator, List<Object> created){
+            return CreateSpecGeneratorConfig(GenArchitecture.BiomeFirst, allocator, created);
+        }
+
+        private static GeneratorConfig CreateSpecGeneratorConfig(GenArchitecture architecture, Allocator allocator, List<Object> created){
             GeneratorConfig config = CreateGeneratorConfig(allocator);
-            config.WorldGen.Dispose();
+            config.WorldGen.Dispose(); // replaced by the six-biome world below
 
             WorldGenSettings settings = Create<WorldGenSettings>("WG", created);
-            settings.Architecture = GenArchitecture.TerrainFirst;
+            settings.Architecture = architecture;
             settings.Splines = Create<TerrainSplineSet>("Splines", created);
             settings.Splines.ResetToPlaceholders();
             BiomeSet set = Create<BiomeSet>("Set", created);
@@ -120,11 +144,10 @@ namespace Engine.Tests.Performance{
 
         /// <summary>
         ///     Releases a config from <see cref="CreateGeneratorConfig" />. Since D-05, <c>GeneratorConfig.Dispose</c>
-        ///     frees only the noise parameters, because at runtime the registries own the biome and voxel arrays; here
-        ///     the fixture created them, so it frees them too.
+        ///     frees only the world-gen config, because at runtime the registry owns the voxel map; here the fixture
+        ///     created it, so it frees it too.
         /// </summary>
         internal static void DisposeGeneratorConfig(ref GeneratorConfig config){
-            if (config.BiomeDefs.IsCreated) config.BiomeDefs.Dispose();
             if (config.Voxels.IsCreated) config.Voxels.Dispose();
             config.Dispose();
         }

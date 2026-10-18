@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using Engine.Scripts.Noise;
-using Engine.Scripts.Settings;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.WorldGen.Core;
@@ -14,17 +13,17 @@ using UnityEngine;
 namespace Engine.Scripts.WorldGen.Settings{
     /// <summary>
     ///     Spec world-generation settings (INT-01, §11.2): architecture, blend methods and widths, classification
-    ///     weights, height range, detail octaves, the climate instances T, F, C, E, W with their couplings (independent
-    ///     of the legacy <see cref="NoiseSettings" />, decision 2026-10-18),
-    ///     the active <see cref="BiomeSet" /> and the Terrain-first <see cref="TerrainSplineSet" />.
+    ///     weights, height range, water level, detail octaves, the climate instances T, F, C, E, W with their
+    ///     couplings, the active <see cref="BiomeSet" /> and the Terrain-first <see cref="TerrainSplineSet" />.
+    ///     Since Phase 2 this asset is the only generation input (the legacy NoiseSettings was removed, INT-40).
     ///     <see cref="ToConfig" /> builds the Burst mirror (INT-03), <see cref="ToCanonicalJson()" /> the
     ///     experiment manifest (INT-02). Defaults are the spec defaults (§9, §6.4, §5.7, §19.1).
     /// </summary>
     [CreateAssetMenu(fileName = "WorldGenSettings", menuName = "Voxel/WorldGenSettings", order = 0)]
     public class WorldGenSettings : ScriptableObject{
         [Header("Architecture (§4)")]
-        [Tooltip("Terrain-first, Biome-first or the legacy hybrid generator (INT-40).")]
-        public GenArchitecture Architecture = GenArchitecture.Legacy;
+        [Tooltip("Terrain-first (spline height, 6D classification) or Biome-first (5D classification, per-biome height).")]
+        public GenArchitecture Architecture = GenArchitecture.BiomeFirst;
 
         [Header("Blending (§9)")]
         public BlendMethod MaterialMethod = BlendMethod.None;
@@ -68,6 +67,9 @@ namespace Engine.Scripts.WorldGen.Settings{
         public float HeightMin = 40f;
 
         public float HeightMax = 250f;
+
+        [Tooltip("Water surface level in world Y (GEN-14, DEC-02: 124). Water fills every column up to this level.")]
+        public int WaterLevel = 124;
 
         [Tooltip("Wavelength of detail octave i in blocks (GEN-09). Length = K.")]
         public float[] OctaveWavelengths ={ 512f, 256f, 128f, 64f, 32f, 16f };
@@ -303,8 +305,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         }
 
         /// <summary>
-        ///     Climate instances T, F, C, E, W from this asset; the legacy <see cref="NoiseSettings" /> no longer takes
-        ///     part. Each instance gets its own gradient salt (GEN-05).
+        ///     Climate instances T, F, C, E, W from this asset. Each instance gets its own gradient salt (GEN-05).
         /// </summary>
         private ClimateParams BuildClimate(int seed){
             return new ClimateParams{
@@ -371,6 +372,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["LambdaHeight"] = LambdaHeight,
                 ["HeightMin"] = HeightMin,
                 ["HeightMax"] = HeightMax,
+                ["WaterLevel"] = WaterLevel,
                 ["OctaveWavelengths"] = OctaveWavelengths ?? Array.Empty<float>(),
                 ["GlobalOctaveWeights"] = GlobalOctaveWeights ?? Array.Empty<float>(),
                 ["PeakWavelength"] = PeakWavelength,

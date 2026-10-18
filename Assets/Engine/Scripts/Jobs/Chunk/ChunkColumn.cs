@@ -1,16 +1,15 @@
 ﻿namespace Engine.Scripts.Jobs.Chunk{
     /// <summary>
-    ///     Represents a data snapshot for a vertical column within a chunk, including height and biome attributes.
-    ///     On the spec path (INT-10) it is filled from <c>WorldSampler.SampleColumn</c>; the legacy generator fills
-    ///     the original fields only.
+    ///     Represents a data snapshot for a vertical column within a chunk, including height and biome attributes,
+    ///     filled from <c>WorldSampler.SampleColumn</c> (INT-10).
     /// </summary>
     public struct ChunkColumn{
         /// <summary>Computed terrain height in voxels (h_int = floor(H)).</summary>
         public int Height;
 
         /// <summary>
-        ///     Hard biome class of the column. Spec path: index into the active BiomeSet (GEN-21), 0 when no biome is
-        ///     active; legacy path: index into <c>GeneratorConfig.BiomeDefs</c> (registry order). Do not mix the two.
+        ///     Hard biome class of the column: index into the active BiomeSet (GEN-21), 0 when no biome is active
+        ///     (then <see cref="SurfaceSource" /> is -1).
         /// </summary>
         public ushort Biome;
 
