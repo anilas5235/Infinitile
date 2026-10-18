@@ -11,7 +11,7 @@ using static UnityEngine.GraphicsBuffer;
 namespace Engine.Scripts.Render{
     /// <summary>
     ///     Manages a single render buffer for storing and rendering voxel point data.
-    ///     Handles page allocation, point storage, and indirect drawing.
+    ///     Page bookkeeping lives in <see cref="PageAllocator" /> (TST-E17); this class owns the GPU side.
     /// </summary>
     internal class RenderBuffer : IDisposable{
         private static readonly uint[] DefaultArgs = { 0u, 1u, 0u, 0u, 0u };
@@ -23,12 +23,10 @@ namespace Engine.Scripts.Render{
         private readonly MaterialPropertyBlock _propertyBlock;
 
         private readonly RendererSettings _renderSettings;
-        private NativeArray<uint> _countsPerPage;
-        private NativeQueue<int> _freePages;
+        private readonly PageAllocator _pages;
         private bool _shouldDraw;
 
         private bool _stateBufferDirty;
-        private uint _totalValidPoints;
 
         /// <summary>
         ///     Initializes a new instance of the RenderBuffer class.
@@ -47,9 +45,7 @@ namespace Engine.Scripts.Render{
             _indexBuffer = new GraphicsBuffer(Target.Append, RenderBufferSize,
                 Marshal.SizeOf<uint>());
 
-            _countsPerPage = new NativeArray<uint>(PagesPerBuffer, Allocator.Domain);
-            _freePages = new NativeQueue<int>(Allocator.Domain);
-            for (int i = 0; i < PagesPerBuffer; i++) _freePages.Enqueue(i);
+            _pages = new PageAllocator(Allocator.Domain);
 
             _countsPerPageBuffer = new GraphicsBuffer(Target.Structured, PagesPerBuffer, sizeof(uint));
 
@@ -66,7 +62,7 @@ namespace Engine.Scripts.Render{
         /// <summary>
         ///     Gets the number of free pages available in this buffer.
         /// </summary>
-        public int FreePages => _freePages.Count;
+        public int FreePages => _pages.FreePages;
 
         /// <summary>
         ///     Gets the index of this buffer within the buffer manager.
@@ -81,8 +77,7 @@ namespace Engine.Scripts.Render{
             _argsBuffer?.Dispose();
             _indexBuffer?.Dispose();
             _countsPerPageBuffer?.Dispose();
-            _countsPerPage.Dispose();
-            _freePages.Dispose();
+            _pages.Dispose();
         }
 
         /// <summary>
@@ -93,44 +88,11 @@ namespace Engine.Scripts.Render{
         /// <param name="allocation">The allocation info if successful, default otherwise.</param>
         /// <returns>True if allocation was successful, false if not enough free pages.</returns>
         public bool TryAllocPages(int pointCount, int numPages, out AllocInfo allocation){
-            allocation = new AllocInfo(BufferIndex);
-            if (numPages <= 0)
-                throw new ArgumentOutOfRangeException(nameof(numPages), "Must allocate at least one page.");
-            if (numPages > FreePages) return false;
-
-            int remainingPoints = pointCount;
-            for (int i = 0; i < numPages; i++){
-                int pageIndex = _freePages.Dequeue();
-                int pointsForPage = math.min(PointsPerPage, remainingPoints);
-                allocation.AddPage(new AllocInfo.AllocPage(pageIndex, pointsForPage));
-                SetPageCount(pageIndex, (uint)pointsForPage);
-
-                remainingPoints -= PointsPerPage;
-            }
+            if (!_pages.TryAllocPages(pointCount, numPages, BufferIndex, out allocation)) return false;
 
             _stateBufferDirty = true;
             if (!_shouldDraw) _shouldDraw = true;
             return true;
-        }
-
-        /// <summary>
-        ///     Checks if the given page index is free (has no points).
-        /// </summary>
-        /// <param name="index">The page index to check.</param>
-        /// <returns>True if the page is free, false otherwise.</returns>
-        private bool IsPageFree(int index){
-            return _countsPerPage[index] == 0;
-        }
-
-        /// <summary>
-        ///     Sets the point count for a specific page.
-        /// </summary>
-        /// <param name="index">The page index.</param>
-        /// <param name="count">The new point count.</param>
-        private void SetPageCount(int index, uint count){
-            _totalValidPoints -= _countsPerPage[index];
-            _totalValidPoints += count;
-            _countsPerPage[index] = count;
         }
 
         /// <summary>
@@ -140,16 +102,10 @@ namespace Engine.Scripts.Render{
         public void ClearPage(in AllocInfo allocInfo){
             if (allocInfo.Count == 0) return;
 
-            foreach (int index in allocInfo.GetPageIndices()){
-                ValidOrThrow(index);
-                if (IsPageFree(index)) continue;
-
-                SetPageCount(index, 0);
-                _freePages.Enqueue(index);
-            }
+            _pages.Release(allocInfo);
 
             _stateBufferDirty = true;
-            if (_shouldDraw && _freePages.Count == PagesPerBuffer) _shouldDraw = false;
+            if (_shouldDraw && _pages.IsEmpty) _shouldDraw = false;
         }
 
         /// <summary>
@@ -178,7 +134,7 @@ namespace Engine.Scripts.Render{
         public void RebuildBuffers(){
             if (!_stateBufferDirty) return;
 
-            _countsPerPageBuffer.SetData(_countsPerPage);
+            _countsPerPageBuffer.SetData(_pages.CountsPerPage);
             _indexBuffer.SetCounterValue(0);
 
             ComputeShader rebuild = _manager.RebuildBufferShader;
@@ -190,21 +146,12 @@ namespace Engine.Scripts.Render{
             rebuild.SetBuffer(kernel, ArgsBufferNameID, _argsBuffer);
             rebuild.SetBuffer(kernel, CountsPerPageNameID, _countsPerPageBuffer);
 
-            rebuild.SetInt(TotalPointCountNameID, (int)_totalValidPoints);
+            rebuild.SetInt(TotalPointCountNameID, (int)_pages.TotalValidPoints);
             rebuild.SetInt(PointsPerPageNameID, PointsPerPage);
             rebuild.SetInt(PagesPerBufferNameID, PagesPerBuffer);
             rebuild.Dispatch(kernel, groupX, 1, 1);
 
             _stateBufferDirty = false;
-        }
-
-        /// <summary>
-        ///     Validates that the given page index is within valid range.
-        /// </summary>
-        /// <param name="index">The page index to validate.</param>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown if index is out of valid range.</exception>
-        private static void ValidOrThrow(int index){
-            if (index is < 0 or >= PagesPerBuffer) throw new ArgumentOutOfRangeException(nameof(index));
         }
     }
 }

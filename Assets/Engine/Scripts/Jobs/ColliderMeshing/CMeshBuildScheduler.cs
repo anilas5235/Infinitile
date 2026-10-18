@@ -5,6 +5,7 @@ using Engine.Scripts.Components;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
+using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig.Registry;
@@ -12,6 +13,7 @@ using Engine.Scripts.World;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -88,6 +90,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         /// </summary>
         /// <param name="jobs">List of chunk positions whose meshes should be generated or updated.</param>
         internal void Start(HashSet<int3> jobs){
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.MeshBuildSchedule.Auto(); // PERF-01
             StartRecord();
 
             IsReady = false;
@@ -116,6 +119,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         ///     and colliders, recalculates bounds and logs timing information.
         /// </summary>
         internal void Complete(){
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.MeshBuildComplete.Auto(); // PERF-01
             double start = Time.realtimeSinceStartupAsDouble;
             _handle.Complete();
 

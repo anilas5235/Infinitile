@@ -3,6 +3,7 @@ using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Settings;
+using Engine.Scripts.Utils;
 
 namespace Engine.Scripts.Jobs.Core{
     /// <summary>
@@ -61,14 +62,15 @@ namespace Engine.Scripts.Jobs.Core{
         /// <param name="focus">The focus position (e.g., player chunk root).</param>
         internal void ScheduleUpdate(PriorityUtil.Focus focus){
             switch (_currentUpdate){
+                // PERF-01: one marker per scheduler stage
                 case SchedulerUpdate.Data:
-                    _dataJobHandler.Update(focus);
+                    using (VoxelProfilerMarkers.SchedulerData.Auto()) _dataJobHandler.Update(focus);
                     break;
                 case SchedulerUpdate.Mesh:
-                    _meshJobHandler.Update(focus);
+                    using (VoxelProfilerMarkers.SchedulerMesh.Auto()) _meshJobHandler.Update(focus);
                     break;
                 case SchedulerUpdate.Collider:
-                    _colliderJobHandler.Update(focus);
+                    using (VoxelProfilerMarkers.SchedulerCollider.Auto()) _colliderJobHandler.Update(focus);
                     break;
             }
 

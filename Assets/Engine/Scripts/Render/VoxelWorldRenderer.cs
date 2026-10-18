@@ -11,6 +11,7 @@ using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using Unity.Mathematics;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.Rendering;
 using static Engine.Scripts.Utils.VoxelConstants;
@@ -111,6 +112,7 @@ namespace Engine.Scripts.Render{
         private void LateUpdate(){
             if (_isDestroyed || !_buffersRebuildPending) return;
 
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderRebuildBuffers.Auto(); // PERF-01
             _solidBufferManager.RebuildBuffers();
             _transparentBufferManager.RebuildBuffers();
             _foliageBufferManager.RebuildBuffers();
@@ -191,6 +193,7 @@ namespace Engine.Scripts.Render{
         /// <param name="context">The scriptable render context.</param>
         /// <param name="cam">The camera to render with.</param>
         private void Draw(ScriptableRenderContext context, Camera cam){
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderDraw.Auto(); // PERF-01
             _solidBufferManager.Draw(cam);
             _transparentBufferManager.Draw(cam);
             _foliageBufferManager.Draw(cam);
@@ -234,6 +237,7 @@ namespace Engine.Scripts.Render{
         private void StartPendingPartitionBuilds(){
             if (_pointBuilderHandlers == null || _pointBuilderHandlers.Length == 0) return;
 
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.PointBuildDispatch.Auto(); // PERF-01
             for (int i = 0; i < _maxInFlight; i++){
                 if (_pendingBuilds.Count < 1) break;
                 if (_inFlightBuilds[i] != null) continue;
@@ -281,7 +285,8 @@ namespace Engine.Scripts.Render{
                     if (!_requestedPartitions.Contains(build.Partition) || _pendingBuilds.Contains(build.Partition))
                         continue;
 
-                    _copyPointsHandler.CopyJob(build.Handler, build.Partition, pointCounts);
+                    using (VoxelProfilerMarkers.PointBuildCopy.Auto()) // PERF-01
+                        _copyPointsHandler.CopyJob(build.Handler, build.Partition, pointCounts);
                     updatedPartitions = true;
                 }
                 catch (Exception e){
@@ -299,6 +304,7 @@ namespace Engine.Scripts.Render{
         /// <param name="chunk">The chunk position.</param>
         /// <param name="voxelData">The voxel data to store.</param>
         private void AddOrUpdateChunk(int2 chunk, UnsafeIntervalList<ushort> voxelData){
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.GpuUploadChunk.Auto(); // PERF-01
             if (_voxelDataBuffers.TryGetValue(chunk, out GraphicsBuffer existingBuffer)) existingBuffer.Dispose();
 
             int compLength = voxelData.CompressedLength;
