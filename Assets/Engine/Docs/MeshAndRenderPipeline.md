@@ -345,8 +345,11 @@ every page change) with per-page frustum culling that runs once per camera and f
   kept; the frozen frustum is drawn as a yellow gizmo. `ShowCullingOverlay` shows visible / allocated pages per
   layer and buffer (read back asynchronously with one frame of latency). All three are Inspector check-boxes on
   `VoxelWorldRenderer`; in the game `CullingDebugKeys` maps them to F7 (overlay), F8 (culling), F9 (freeze).
-  To watch culling in the Editor: enter Play, press F9 (or tick *Freeze Culling*), then orbit the Scene view
-  around the yellow frustum.
+  The Input System only sees the keyboard while the Game view has focus, so the Editor-only
+  `CullingSceneViewKeys` handles F7/F8/F9 with the Scene view focused too and shows the switches there. Without
+  freeze the Scene view camera culls with its own frustum, so nothing ever looks missing from it. To watch
+  culling in the Editor: enter Play, let the Game view render once, press F9 (or tick *Freeze Culling*), then
+  orbit the Scene view around the yellow frustum; F9 again picks up the current game frustum.
 - **Tests (CUL-08).** `FrustumCulling` is the C# reference of the GPU test (EditMode `FrustumCullingTests`); the
   PlayMode `GpuCullingTests` read the GPU set back for 50 random camera poses and compare it page by page, check
   the shadow list, the fallback, the camera life-cycle, freeze, the allocation-free draw path and log culling
