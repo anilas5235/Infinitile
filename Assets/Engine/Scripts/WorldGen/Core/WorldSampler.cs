@@ -29,7 +29,7 @@ namespace Engine.Scripts.WorldGen.Core{
     [BurstCompile]
     public static class WorldSampler{
         /// <summary>T, F, C, E, W, PV at world position <paramref name="p" /> (GEN-07).</summary>
-        [BurstCompile(FloatMode = FloatMode.Strict)]
+        [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
         public static void SampleFields(in float2 p, in WorldGenConfig cfg, out WorldFields fields){
             fields = ClimateFields.Sample(p, cfg.Climate);
         }
@@ -41,7 +41,7 @@ namespace Engine.Scripts.WorldGen.Core{
         }
 
         /// <summary>Full column decision at block column (<paramref name="x" />, <paramref name="z" />).</summary>
-        [BurstCompile(FloatMode = FloatMode.Strict)]
+        [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
         public static void SampleColumn(int x, int z, in WorldGenConfig cfg, out ColumnSample sample){
             float2 p = new(x, z);
             ColumnSample s = default;
@@ -81,7 +81,7 @@ namespace Engine.Scripts.WorldGen.Core{
         ///     to [Hmin, Hmax]; <paramref name="unclamped" /> is H before the clamp, so the clamp engaged exactly when
         ///     the two differ (GEN-12).
         /// </summary>
-        [BurstCompile(FloatMode = FloatMode.Strict)]
+        [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
         public static void SampleBiomeHeight(in float2 p, in BlendWeights weights, in WorldGenConfig cfg,
             out float height, out float unclamped){
             int biomeCount = cfg.BiomeCount;

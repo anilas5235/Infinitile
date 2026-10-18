@@ -219,19 +219,26 @@ namespace Engine.Scripts.WorldGen.Settings{
                 OctaveCoefficients = new NativeArray<float>(active.Count * octaveCount, allocator)
             };
 
-            for (int i = 0; i < octaveCount; i++)
-                cfg.GlobalOctaveWeights[i] = GlobalOctaveWeights != null && i < GlobalOctaveWeights.Length
-                    ? GlobalOctaveWeights[i]
-                    : 0f;
+            // Biome.ToStruct throws on an unknown block name; free what was allocated above before rethrowing.
+            try{
+                for (int i = 0; i < octaveCount; i++)
+                    cfg.GlobalOctaveWeights[i] = GlobalOctaveWeights != null && i < GlobalOctaveWeights.Length
+                        ? GlobalOctaveWeights[i]
+                        : 0f;
 
-            for (int b = 0; b < active.Count; b++){
-                Biome biome = active[b];
-                cfg.Biomes[b] = registry != null ? biome.ToStruct(registry) : biome.ToStruct();
-                for (int i = 0; i < octaveCount; i++){
-                    // GEN-22: a_{b,i} = HeightAmplitude_b × OctaveWeights_{b,i}; missing weights count as 0.
-                    float w = biome.OctaveWeights != null && i < biome.OctaveWeights.Length ? biome.OctaveWeights[i] : 0f;
-                    cfg.OctaveCoefficients[b * octaveCount + i] = biome.HeightAmplitude * w;
+                for (int b = 0; b < active.Count; b++){
+                    Biome biome = active[b];
+                    cfg.Biomes[b] = registry != null ? biome.ToStruct(registry) : biome.ToStruct();
+                    for (int i = 0; i < octaveCount; i++){
+                        // GEN-22: a_{b,i} = HeightAmplitude_b × OctaveWeights_{b,i}; missing weights count as 0.
+                        float w = biome.OctaveWeights != null && i < biome.OctaveWeights.Length ? biome.OctaveWeights[i] : 0f;
+                        cfg.OctaveCoefficients[b * octaveCount + i] = biome.HeightAmplitude * w;
+                    }
                 }
+            }
+            catch{
+                cfg.Dispose();
+                throw;
             }
 
             return cfg;

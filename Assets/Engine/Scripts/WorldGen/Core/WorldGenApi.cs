@@ -80,6 +80,19 @@ namespace Engine.Scripts.WorldGen.Core{
                 throw new ArgumentException("WorldGenRequest.Config is not created (build it with WorldGenSettings.ToConfig).", nameof(request));
 
             int count = request.ColumnCount;
+            // Validate every buffer before the first dummy is allocated, so a rejected request leaks nothing.
+            Validate(buffers.Fields, count, nameof(buffers.Fields));
+            Validate(buffers.Height, count, nameof(buffers.Height));
+            Validate(buffers.ColumnHeight, count, nameof(buffers.ColumnHeight));
+            Validate(buffers.HardBiome, count, nameof(buffers.HardBiome));
+            Validate(buffers.DominantMaterialBiome, count, nameof(buffers.DominantMaterialBiome));
+            Validate(buffers.MaterialWeights, count, nameof(buffers.MaterialWeights));
+            Validate(buffers.HeightWeights, count, nameof(buffers.HeightWeights));
+            Validate(buffers.SurfaceSource, count, nameof(buffers.SurfaceSource));
+            Validate(buffers.FloraSpecies, count, nameof(buffers.FloraSpecies));
+            Validate(buffers.FloraSource, count, nameof(buffers.FloraSource));
+            Validate(buffers.Clamped, count, nameof(buffers.Clamped));
+
             SampleRegionJob job = new(){
                 Config = request.Config,
                 Origin = request.Origin,
@@ -90,17 +103,17 @@ namespace Engine.Scripts.WorldGen.Core{
             // Unrequested buffers are replaced by 1-element dummies (one per field: the safety system rejects two
             // writeable fields sharing a container) so the job struct holds only valid containers; the Write* flags
             // keep the job from touching them. The dummies die with the handle.
-            job.WriteFields = Bind(ref buffers.Fields, out job.Fields, out NativeArray<WorldFields> dFields, count, nameof(buffers.Fields));
-            job.WriteHeight = Bind(ref buffers.Height, out job.Height, out NativeArray<float> dHeight, count, nameof(buffers.Height));
-            job.WriteColumnHeight = Bind(ref buffers.ColumnHeight, out job.ColumnHeight, out NativeArray<int> dColumnHeight, count, nameof(buffers.ColumnHeight));
-            job.WriteHardBiome = Bind(ref buffers.HardBiome, out job.HardBiome, out NativeArray<int> dHardBiome, count, nameof(buffers.HardBiome));
-            job.WriteDominantMaterialBiome = Bind(ref buffers.DominantMaterialBiome, out job.DominantMaterialBiome, out NativeArray<int> dDominant, count, nameof(buffers.DominantMaterialBiome));
-            job.WriteMaterialWeights = Bind(ref buffers.MaterialWeights, out job.MaterialWeights, out NativeArray<BlendWeights> dMaterial, count, nameof(buffers.MaterialWeights));
-            job.WriteHeightWeights = Bind(ref buffers.HeightWeights, out job.HeightWeights, out NativeArray<BlendWeights> dHeightWeights, count, nameof(buffers.HeightWeights));
-            job.WriteSurfaceSource = Bind(ref buffers.SurfaceSource, out job.SurfaceSource, out NativeArray<int> dSurface, count, nameof(buffers.SurfaceSource));
-            job.WriteFloraSpecies = Bind(ref buffers.FloraSpecies, out job.FloraSpecies, out NativeArray<ushort> dSpecies, count, nameof(buffers.FloraSpecies));
-            job.WriteFloraSource = Bind(ref buffers.FloraSource, out job.FloraSource, out NativeArray<int> dFloraSource, count, nameof(buffers.FloraSource));
-            job.WriteClamped = Bind(ref buffers.Clamped, out job.Clamped, out NativeArray<byte> dClamped, count, nameof(buffers.Clamped));
+            job.WriteFields = Bind(ref buffers.Fields, out job.Fields, out NativeArray<WorldFields> dFields);
+            job.WriteHeight = Bind(ref buffers.Height, out job.Height, out NativeArray<float> dHeight);
+            job.WriteColumnHeight = Bind(ref buffers.ColumnHeight, out job.ColumnHeight, out NativeArray<int> dColumnHeight);
+            job.WriteHardBiome = Bind(ref buffers.HardBiome, out job.HardBiome, out NativeArray<int> dHardBiome);
+            job.WriteDominantMaterialBiome = Bind(ref buffers.DominantMaterialBiome, out job.DominantMaterialBiome, out NativeArray<int> dDominant);
+            job.WriteMaterialWeights = Bind(ref buffers.MaterialWeights, out job.MaterialWeights, out NativeArray<BlendWeights> dMaterial);
+            job.WriteHeightWeights = Bind(ref buffers.HeightWeights, out job.HeightWeights, out NativeArray<BlendWeights> dHeightWeights);
+            job.WriteSurfaceSource = Bind(ref buffers.SurfaceSource, out job.SurfaceSource, out NativeArray<int> dSurface);
+            job.WriteFloraSpecies = Bind(ref buffers.FloraSpecies, out job.FloraSpecies, out NativeArray<ushort> dSpecies);
+            job.WriteFloraSource = Bind(ref buffers.FloraSource, out job.FloraSource, out NativeArray<int> dFloraSource);
+            job.WriteClamped = Bind(ref buffers.Clamped, out job.Clamped, out NativeArray<byte> dClamped);
 
             JobHandle handle = job.Schedule(count, 64, dependsOn);
 
@@ -118,12 +131,15 @@ namespace Engine.Scripts.WorldGen.Core{
             return handle;
         }
 
-        /// <summary>Validates a requested buffer or creates a 1-element dummy in its place. Returns whether to write it.</summary>
-        private static bool Bind<T>(ref NativeArray<T> requested, out NativeArray<T> target, out NativeArray<T> dummy,
-            int count, string name) where T : unmanaged{
+        /// <summary>Throws when a requested (created) buffer is shorter than the request.</summary>
+        private static void Validate<T>(NativeArray<T> requested, int count, string name) where T : unmanaged{
+            if (requested.IsCreated && requested.Length < count)
+                throw new ArgumentException($"RegionBuffers.{name} holds {requested.Length} elements, the request needs {count}.");
+        }
+
+        /// <summary>Binds a requested buffer or creates a 1-element dummy in its place. Returns whether to write it.</summary>
+        private static bool Bind<T>(ref NativeArray<T> requested, out NativeArray<T> target, out NativeArray<T> dummy) where T : unmanaged{
             if (requested.IsCreated){
-                if (requested.Length < count)
-                    throw new ArgumentException($"RegionBuffers.{name} holds {requested.Length} elements, the request needs {count}.");
                 target = requested;
                 dummy = default;
                 return true;

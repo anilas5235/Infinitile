@@ -483,10 +483,6 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
         }
 
         /// <summary>
-        ///     Samples the framed region through <see cref="WorldGenApi.SampleRegion" /> (1 sample per block up to the
-        ///     view resolution, then every Stride-th column) and converts the buffers to the four spec textures.
-        /// </summary>
-        /// <summary>
         ///     Rebuilds the WorldGen mirror before any job captures the config (the legacy jobs carry the whole
         ///     GeneratorConfig, so the mirror must be constructed even when no WorldGenSettings is assigned).
         ///     Returns whether the spec views can be built.
@@ -511,6 +507,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
             }
         }
 
+        /// <summary>
+        ///     Samples the framed region through <see cref="WorldGenApi.SampleRegion" /> (1 sample per block up to the
+        ///     view resolution, then every Stride-th column) and converts the buffers to the four spec textures.
+        /// </summary>
         private JobHandle ScheduleSpecBuild(int resolution){
             WorldGenConfig cfg = _generatorConfig.WorldGen;
             int viewSize = Mathf.Min(resolution, ViewResolution);

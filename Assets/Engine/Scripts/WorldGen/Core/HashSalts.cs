@@ -18,7 +18,7 @@ namespace Engine.Scripts.WorldGen.Core{
         /// <summary>Legacy elevation detail field (GEN-08: retired with the legacy path).</summary>
         public const uint ElevationNoise = 0x0A1B2C0Fu;
 
-        /// <summary>Shared blend warp field (§9.2), one salt per axis.</summary>
+        /// <summary>Shared blend warp field (§9.4), one salt per axis.</summary>
         public const uint BlendWarpX = 0x92E4CF09u;
 
         public const uint BlendWarpY = 0xA3F5D00Au;
@@ -55,7 +55,7 @@ namespace Engine.Scripts.WorldGen.Core{
         /// <summary>Which species the column's flora roll selects (VEG-02).</summary>
         public const uint FloraSpecies = 0x095B3610u;
 
-        /// <summary>Tree placement priority against neighbours (VEG-03).</summary>
+        /// <summary>Tree placement priority against neighbours (VEG-05).</summary>
         public const uint TreePriority = 0x1A6C4711u;
     }
 }

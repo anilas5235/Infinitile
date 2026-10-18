@@ -175,6 +175,47 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void DefaultClimate_MatchesTheTst08Fixture(){
+            // TST-08 runs on ClimateFieldTests.CreateClimate; it must stay the climate WorldGenSettings ships (INT-01).
+            WorldGenSettings s = Create<WorldGenSettings>("WG");
+            WorldGenConfig cfg = s.ToConfig(1337, allocator: Allocator.Temp);
+            ClimateParams fixture = ClimateFieldTests.CreateClimate(1337u);
+            try{
+                for (int i = 0; i < 64; i++){
+                    float2 p = new(i * 173.1f - 4000f, i * 59.3f + 900f);
+                    WorldFields a = ClimateFields.Sample(p, cfg.Climate);
+                    WorldFields b = ClimateFields.Sample(p, fixture);
+                    Assert.AreEqual(b.T, a.T, $"T at {p}");
+                    Assert.AreEqual(b.F, a.F, $"F at {p}");
+                    Assert.AreEqual(b.C, a.C, $"C at {p}");
+                    Assert.AreEqual(b.E, a.E, $"E at {p}");
+                    Assert.AreEqual(b.W, a.W, $"W at {p}");
+                }
+            }
+            finally{
+                fixture.Dispose();
+                cfg.Dispose();
+            }
+        }
+
+        [Test]
+        public void SampleRegion_RejectsAShortBufferBeforeScheduling(){
+            WorldGenSettings s = Create<WorldGenSettings>("WG");
+            WorldGenConfig cfg = s.ToConfig(1, allocator: Allocator.TempJob);
+            // Clamped is bound last: the request must fail before the dummies of the earlier buffers are allocated.
+            NativeArray<byte> clamped = new(15, Allocator.TempJob);
+            try{
+                WorldGenRequest req = new(){ Config = cfg, Origin = int2.zero, Size = new int2(4, 4) };
+                RegionBuffers buffers = new(){ Clamped = clamped };
+                Assert.Throws<System.ArgumentException>(() => WorldGenApi.SampleRegion(req, ref buffers));
+            }
+            finally{
+                clamped.Dispose();
+                cfg.Dispose();
+            }
+        }
+
+        [Test]
         public void CreateEmpty_IsConstructedSchedulableAndBiomeless(){
             WorldGenConfig cfg = WorldGenConfig.CreateEmpty(7u);
             try{
