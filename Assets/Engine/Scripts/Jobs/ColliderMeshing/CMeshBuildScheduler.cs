@@ -128,7 +128,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         ///     and colliders, recalculates bounds and logs timing information.
         /// </summary>
         internal void Complete(){
-            if (IsReady) return; // F-01: already completed early by CompleteIfRunning
+            if (IsReady) return;
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.MeshBuildComplete.Auto(); // PERF-01
 #if VOXEL_TIMING_LOGS
             double start = Time.realtimeSinceStartupAsDouble;
@@ -182,11 +182,12 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         }
 
         /// <summary>
-        ///     F-01: completes the running batch synchronously when the chunk manager is about to write a chunk the
-        ///     job may read. The state handler then only clears its batch set in <c>CollectResultsStep</c>.
+        ///     F-01: waits for the running job when the chunk manager is about to write a chunk the job may read.
+        ///     Only the job is completed, its results are applied later by <see cref="Complete" />: applying them here
+        ///     re-entered <see cref="Complete" /> when claiming a partition evicted a chunk of the running batch.
         /// </summary>
         private void CompleteIfRunning(){
-            if (!IsReady) Complete();
+            _handle.Complete();
         }
 
         /// <summary>
