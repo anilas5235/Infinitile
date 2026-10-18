@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
 using NUnit.Framework;
@@ -10,13 +11,15 @@ using Unity.PerformanceTesting;
 namespace Engine.Tests.Performance{
     /// <summary>
     ///     PERF-02: chunk data generation, ms per chunk on a single worker (ChunkJob.Run). One sample group per
-    ///     generation method; at the moment the engine has one (noise terrain + RLE write).
+    ///     architecture: the legacy noise terrain and the Terrain-first sampler (Phase 1); Biome-first follows with
+    ///     Phase 2. Both write the chunk through the same RLE path.
     /// </summary>
     [TestFixture]
     internal class ChunkGenerationBenchmark{
         private const int WarmupCount = 3;
         private const int MeasurementCount = 20;
 
+        private readonly List<UnityEngine.Object> _created = new();
         private GeneratorConfig _config;
         private NativeList<int2> _jobs;
         private NativeParallelHashMap<int2, ChunkVoxelData> _results;
@@ -35,6 +38,8 @@ namespace Engine.Tests.Performance{
             _results.Dispose();
             _jobs.Dispose();
             BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
+            foreach (UnityEngine.Object o in _created) UnityEngine.Object.DestroyImmediate(o);
+            _created.Clear();
         }
 
         [Test]
@@ -49,6 +54,27 @@ namespace Engine.Tests.Performance{
 
             Measure.Method(() => job.Run(_jobs.Length))
                 .SampleGroup(new SampleGroup("ChunkJob.Run TerrainRle ms/chunk", SampleUnit.Millisecond))
+                .WarmupCount(WarmupCount)
+                .MeasurementCount(MeasurementCount)
+                .IterationsPerMeasurement(1)
+                .CleanUp(DisposeResults)
+                .Run();
+        }
+
+        [Test]
+        [Performance]
+        public void ChunkJob_Run_TerrainFirst_MsPerChunk(){
+            BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
+            _config = BenchmarkFixtures.CreateTerrainFirstGeneratorConfig(Allocator.Persistent, _created);
+            ChunkJob job = new(){
+                Jobs = _jobs,
+                Results = _results.AsParallelWriter(),
+                RandomSeed = _config.GlobalSeed,
+                Config = _config
+            };
+
+            Measure.Method(() => job.Run(_jobs.Length))
+                .SampleGroup(new SampleGroup("ChunkJob.Run TerrainFirst ms/chunk", SampleUnit.Millisecond))
                 .WarmupCount(WarmupCount)
                 .MeasurementCount(MeasurementCount)
                 .IterationsPerMeasurement(1)

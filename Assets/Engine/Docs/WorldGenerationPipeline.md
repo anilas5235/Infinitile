@@ -1,4 +1,63 @@
-﻿# World Generation (Overview)
+# World Generation (Overview)
+
+# Version 1.2 (Phase 1 — Terrain-first)
+
+Phase 1 of `WorldGenSpec.html` makes the Terrain-first architecture (section 7) the one the game runs:
+`Assets/EngineSettings/WorldGenSettings.asset` now selects `GenArchitecture.TerrainFirst` with
+`TerrainSplineSet_Default.asset` (the section 19.1 placeholder splines), and the chunk job takes its columns from
+`WorldSampler.SampleColumn` (INT-10). `Legacy` stays selectable (INT-40); Biome-first blending follows in Phase 2.
+
+## Terrain-first column pipeline
+
+```mermaid
+flowchart LR
+    T[TerrainSplineSet SO\nnested splines, TRN-05] -->|Flatten| C[WorldGenConfig\nSplineNodes / SplinePoints / roots]
+    S[WorldGenSettings SO] -->|ToConfig| C
+    C --> F[ClimateFields\nT F C E W PV]
+    F --> N[NestedSpline.Evaluate\nOffset, Amp, J over C E PV\nTRN-01/02]
+    N --> H[H = Offset + Amp * sum g_i N_i + J P\nclamp to Hmin..Hmax, TRN-03]
+    H --> K[BiomeClassifier 6D\nh = saturate of H, TRN-10]
+    K --> O[ColumnSample\nHeight, NormalizedHeight, TerrainParams]
+    O --> J[ChunkJob.PrepareChunkMaps\nINT-10/11]
+    J --> V[FillTerrain\nblocks from SurfaceSource]
+    O --> R[SampleRegion] --> P[Preview: biome 6D, height,\nE, PV, Offset, Amp, J]
+```
+
+### Description
+
+- **Nested splines** (`WorldGen/Height/NestedSpline.cs`): a spline is a list of control points over one axis (C, E or
+  PV) whose values are constants or child splines over another axis (TRN-01). The asset keeps a flat, pre-ordered
+  tree (children have higher node indices), so Burst evaluates a root with one pass from the last node to the first
+  into a fixed-size value list. Interpolation is Fritsch–Carlson monotone cubic Hermite (Wikipedia, "Monotone cubic
+  interpolation") or linear per spline; outside the control range the end value holds (TRN-02).
+- **Terrain-first height** (`WorldGen/Height/TerrainFirstHeight.cs`): Offset, Amp and J are evaluated at the column
+  from the three roots, then H = Offset + Amp · Σ g_i N_i + J · P with the global octave weights g_i and the shared
+  detail octaves; the clamp to [Hmin, Hmax] is recorded as before (GEN-12). No biome takes part (TRN-03), so the
+  height is continuous wherever the fields are (TST-12).
+- **Classification** (`WorldSampler.SampleColumn`): the normalised height h = saturate((H − Hmin)/(Hmax − Hmin)) is the
+  sixth distance dimension with weight λ_h (TRN-10); the material weights are still one-hot (method 1, BLD-02) until
+  Phase 2. A `HeightMethod` other than None is ignored with a warning in Terrain-first (TRN-21).
+- **Spline asset** (`WorldGen/Settings/TerrainSplineSet.cs`): a `ScriptableObject` with named splines, three root
+  indices and `Notes`. `Validate` reports missing roots, unsorted or duplicate X, out-of-range X, cycles, nesting
+  deeper than 8 and more than 127 nodes per root; `Flatten` throws on any problem (R5: no silent repair). `ToJson`
+  / `FromJson` round-trip the human-readable form of section 19.1 (`{"Axis","Interpolation","Points":[{"X","Value"}]}`,
+  TRN-04/05), and `ResetToPlaceholders` restores the spec's placeholder trees. `WorldGenSettings.ToCanonicalJson`
+  inlines the tree (INT-02).
+- **Chunk job** (`Jobs/Chunk/ChunkGenerationTerrain.cs`): with a non-legacy architecture `PrepareChunkMaps` calls
+  `WorldSampler.SampleColumn` per column, independent of the chunk origin, so chunk borders carry no seam (TST-03).
+  `ChunkColumn` gained `SurfaceSource`, `FloraSpecies`, `FloraSource` and `HeightF`; the blocks come from the
+  surface-source biome. `FillTerrain`'s ice override follows `EnableClimateOverrides` (GEN-14). Vegetation stays
+  disabled until Phase 4.
+- **Preview** (`WorldGenerationPreviewWindow`): in Terrain-first the spec views add Offset, Amp and J per column
+  (TRN-06); the 1D spline plots are left to the Phase 5 tooling.
+- **Performance** (`Tests/Performance/ChunkGenerationBenchmark.cs`): `ChunkJob.Run TerrainFirst ms/chunk` sits next
+  to the legacy sample group; see `Tests/Performance/Baselines/README.md` for the Phase 1 numbers (PERF-02/03).
+
+### Ownership of native memory (D-05)
+
+`WorldGenConfig` now also owns `SplineNodes` and `SplinePoints`; both are released by `WorldGenConfig.Dispose`
+with the other arrays, and `CreateEmpty` allocates them with zero length so the job safety system accepts the config
+on the legacy path.
 
 # Version 1.1 (Phase 0 — spec foundations)
 

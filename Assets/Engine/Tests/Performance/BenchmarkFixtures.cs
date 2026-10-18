@@ -5,6 +5,7 @@ using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Data.Internal;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
+using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine;
 
@@ -58,6 +59,63 @@ namespace Engine.Tests.Performance{
             finally{
                 Object.DestroyImmediate(noise);
             }
+        }
+
+        /// <summary>
+        ///     PERF-02 "per architecture": the same generator config on the Terrain-first sampler (INT-10). The
+        ///     WorldGenSettings, the six section 19.2 placeholder biomes and the section 19.1 placeholder splines are
+        ///     built in code (no Resources); block ids are patched in because no registry exists here. The created
+        ///     ScriptableObjects are returned so the caller can destroy them.
+        /// </summary>
+        internal static GeneratorConfig CreateTerrainFirstGeneratorConfig(Allocator allocator, List<Object> created){
+            GeneratorConfig config = CreateGeneratorConfig(allocator);
+            config.WorldGen.Dispose();
+
+            WorldGenSettings settings = Create<WorldGenSettings>("WG", created);
+            settings.Architecture = GenArchitecture.TerrainFirst;
+            settings.Splines = Create<TerrainSplineSet>("Splines", created);
+            settings.Splines.ResetToPlaceholders();
+            BiomeSet set = Create<BiomeSet>("Set", created);
+            set.Biomes.Add(PlaceholderBiome("Plains", .55f, .45f, .45f, .70f, -0.2f, 136, 6, new[]{ 1f, .6f, .3f, .12f, .05f, .02f }, 0, created));
+            set.Biomes.Add(PlaceholderBiome("Desert", .90f, .10f, .45f, .60f, 0f, 134, 8, new[]{ 1f, .8f, .2f, .05f, .02f, .01f }, 0, created));
+            set.Biomes.Add(PlaceholderBiome("Mountain", .35f, .40f, .80f, .15f, 0.6f, 165, 22, new[]{ .7f, .7f, .6f, .45f, .3f, .15f }, 35, created));
+            set.Biomes.Add(PlaceholderBiome("Snow", .15f, .50f, .70f, .35f, 0.3f, 158, 14, new[]{ .8f, .6f, .45f, .3f, .15f, .08f }, 15, created));
+            set.Biomes.Add(PlaceholderBiome("Forest", .50f, .70f, .50f, .55f, 0f, 140, 9, new[]{ 1f, .6f, .35f, .15f, .06f, .03f }, 0, created));
+            set.Biomes.Add(PlaceholderBiome("Ocean", .50f, .80f, .08f, .50f, 0f, 100, 6, new[]{ 1f, .5f, .2f, .05f, .02f, .01f }, 0, created));
+            settings.Biomes = set;
+
+            config.WorldGen = settings.ToConfig(Seed, null, allocator);
+            for (int b = 0; b < config.WorldGen.BiomeCount; b++){
+                Biome.BiomeDef def = config.WorldGen.Biomes[b];
+                def.topBlock = b == 1 ? Dirt : Grass;
+                def.underBlock = Dirt;
+                def.stoneBlock = Stone;
+                config.WorldGen.Biomes[b] = def;
+            }
+
+            return config;
+        }
+
+        private static T Create<T>(string name, List<Object> created) where T : ScriptableObject{
+            T so = ScriptableObject.CreateInstance<T>();
+            so.name = name;
+            created.Add(so);
+            return so;
+        }
+
+        private static Biome PlaceholderBiome(string name, float t, float f, float c, float e, float pv, float offset,
+            float amp, float[] weights, float j, List<Object> created){
+            Biome b = Create<Biome>(name, created);
+            b.TargetTemperature = t;
+            b.TargetHumidity = f;
+            b.TargetContinental = c;
+            b.TargetErosion = e;
+            b.TargetPV = pv;
+            b.HeightOffset = offset;
+            b.HeightAmplitude = amp;
+            b.OctaveWeights = weights;
+            b.Jaggedness = j;
+            return b;
         }
 
         /// <summary>
