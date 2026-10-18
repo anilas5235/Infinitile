@@ -187,26 +187,36 @@ namespace Engine.Scripts.Render{
         protected override void OnDestroy(){
             base.OnDestroy();
             _isDestroyed = true;
-            _copyPointsHandler?.Dispose();
+            // F-17: every resource is released on its own, so one failing Dispose does not leak the rest.
+            SafeDispose(_copyPointsHandler);
 
             // F-17: each handler waits for its pending read-back and releases its resources independently.
             if (_pointBuilderHandlers != null){
                 foreach (PointBuilderHandler handler in _pointBuilderHandlers)
-                    handler?.Dispose();
+                    SafeDispose(handler);
             }
 
-            _solidBufferManager.Dispose();
-            _transparentBufferManager.Dispose();
-            _foliageBufferManager.Dispose();
+            SafeDispose(_solidBufferManager);
+            SafeDispose(_transparentBufferManager);
+            SafeDispose(_foliageBufferManager);
 
-            foreach (GraphicsBuffer buffer in _voxelDataBuffers.Values) buffer.Dispose();
-            foreach (GraphicsBuffer buffer in _freeChunkBuffers) buffer.Dispose();
+            foreach (GraphicsBuffer buffer in _voxelDataBuffers.Values) SafeDispose(buffer);
+            foreach (GraphicsBuffer buffer in _freeChunkBuffers) SafeDispose(buffer);
             _freeChunkBuffers.Clear();
 
             _pendingBuilds.Clear();
             _requestedPartitions.Clear();
 
             _voxelDataBuffers.Clear();
+        }
+
+        private static void SafeDispose(IDisposable resource){
+            try{
+                resource?.Dispose();
+            }
+            catch (Exception e){
+                VoxelEngineLogger.Error<VoxelWorldRenderer>($"Failed to release a render resource: {e}");
+            }
         }
 
         /// <summary>
