@@ -15,9 +15,6 @@ namespace Engine.Scripts.WorldGen.Core{
         public const uint WeirdnessNoise = 0x70C2AD07u;
         public const uint PeakNoise = 0x81D3BE08u;
 
-        /// <summary>Legacy elevation detail field (GEN-08: retired with the legacy path).</summary>
-        public const uint ElevationNoise = 0x0A1B2C0Fu;
-
         /// <summary>Shared blend warp field (§9.4), one salt per axis.</summary>
         public const uint BlendWarpX = 0x92E4CF09u;
 
@@ -39,7 +36,7 @@ namespace Engine.Scripts.WorldGen.Core{
             return Hash.Mix(instanceSalt ^ ((uint)octave + 1u) * 0x85EBCA77u);
         }
 
-        // --- Per-instance sample offsets (GEN-05 replacement for D-03 and the NoiseCalculator offsets) -------------
+        // --- Per-instance sample offsets (GEN-05 replacement for D-03 and the old per-field seed offsets) ------------
         /// <summary>Salt for the x component of an fBm instance's sample offset; combined with the instance salt.</summary>
         public const uint OffsetX = 0xC517F20Cu;
 

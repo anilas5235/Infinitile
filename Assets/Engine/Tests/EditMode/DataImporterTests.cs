@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Engine.Scripts.Jobs.Chunk;
-using Engine.Scripts.Settings;
 using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
+using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
 using Unity.Collections;
 using UnityEngine;
@@ -126,9 +126,7 @@ namespace Engine.Tests.EditMode{
         public void CreateConfig_ArraysAreCreated(){
             LoadPackages();
             GeneratorConfig config = _importer.CreateConfig();
-            Assert.IsTrue(config.BiomeDefs.IsCreated);
             Assert.IsTrue(config.Voxels.IsCreated);
-            Assert.Greater(config.BiomeDefs.Length, 0);
             Assert.IsTrue(config.Voxels.ContainsKey("std:air"));
             Assert.IsTrue(config.Voxels.ContainsKey("std:Water"), "FillTerrain needs std:Water");
             Assert.IsTrue(config.Voxels.ContainsKey("std:Ice"), "FillTerrain needs std:Ice");
@@ -136,19 +134,19 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void CreateConfig_DisposingConfigAndRegistries_DoesNotThrow(){
-            // D-05: GeneratorConfig.Dispose disposes BiomeDefs/Voxels, which the registries own and dispose
-            // again in OnDestroy. Ownership must be clear: disposing both in runtime order must not throw.
+            // D-05: GeneratorConfig.Dispose frees only the world-gen config; the voxel map belongs to the registry,
+            // which disposes it in OnDestroy. Ownership must be clear: disposing both in runtime order must not throw.
             LoadPackages();
-            NoiseSettings noise = ScriptableObject.CreateInstance<NoiseSettings>();
+            WorldGenSettings worldGen = ScriptableObject.CreateInstance<WorldGenSettings>();
             GeneratorConfig config;
             try{
                 config = _importer.CreateConfig();
-                config.WaterLevel = noise.WaterLevel;
+                config.WaterLevel = worldGen.WaterLevel;
                 config.GlobalSeed = TestFixtures.Seed;
-                config.NoiseParams = noise.ToNoiseParameters(TestFixtures.Seed);
+                config.WorldGen = worldGen.ToConfig(TestFixtures.Seed, _importer.VoxelRegistry);
             }
             finally{
-                Object.DestroyImmediate(noise);
+                Object.DestroyImmediate(worldGen);
             }
 
             Exception configError = null;

@@ -13,7 +13,6 @@ MonoBehaviour:
   m_Name: VoxelEngineSettings
   m_EditorClassIdentifier: 
   Seed: 1337
-  Noise: {fileID: 11400000, guid: 0d29f4d418efd7d42a007b66f6e5a547, type: 2}
   WorldGen: {fileID: 11400000, guid: 13207a20fa468951a279ee11e0ff35f5, type: 2}
   Chunk:
     ChunkPrefab: {fileID: 972016758114520785, guid: c64e56d0bf3b95d4786aca3e51faf0ed, type: 3}

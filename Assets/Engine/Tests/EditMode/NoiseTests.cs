@@ -1,38 +1,31 @@
 using System.Collections.Generic;
 using System.Reflection;
-using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Noise;
-using Engine.Scripts.Settings;
 using Engine.Scripts.WorldGen.Core;
+using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>TST-E10 (NoiseProfile, WarpedNoiseLayer, ApplyCurve) and TST-E14 (seeds F-02, warp channels F-06).</summary>
+    /// <summary>TST-E10 (NoiseProfile, WarpedNoiseLayer) and TST-E14 (warp channels F-06; seeds F-02 via GEN-05).</summary>
     public class NoiseTests{
         private readonly List<NoiseProfile> _profiles = new();
         private readonly List<WarpedNoiseLayer> _layers = new();
-        private readonly List<NoiseCalculator.NoiseParameters> _parameters = new();
-        private readonly List<NativeArray<float2>> _arrays = new();
-        private NoiseSettings _settings;
+        private WorldGenSettings _settings;
 
         [SetUp]
         public void SetUp(){
-            _settings = ScriptableObject.CreateInstance<NoiseSettings>();
+            _settings = ScriptableObject.CreateInstance<WorldGenSettings>();
         }
 
         [TearDown]
         public void TearDown(){
             foreach (NoiseProfile profile in _profiles) profile.Dispose();
             foreach (WarpedNoiseLayer layer in _layers) layer.Dispose();
-            foreach (NoiseCalculator.NoiseParameters parameters in _parameters) parameters.Dispose();
-            foreach (NativeArray<float2> array in _arrays) array.Dispose();
             _profiles.Clear();
             _layers.Clear();
-            _parameters.Clear();
-            _arrays.Clear();
             Object.DestroyImmediate(_settings);
         }
 
@@ -58,18 +51,6 @@ namespace Engine.Tests.EditMode{
             });
             _layers.Add(layer);
             return layer;
-        }
-
-        private NativeArray<float2> Points(params float2[] points){
-            NativeArray<float2> array = new(points, Allocator.Persistent);
-            _arrays.Add(array);
-            return array;
-        }
-
-        private NoiseCalculator.NoiseParameters Parameters(int seed){
-            NoiseCalculator.NoiseParameters parameters = _settings.ToNoiseParameters(seed);
-            _parameters.Add(parameters);
-            return parameters;
         }
 
         private static IEnumerable<float2> SamplePositions(){
@@ -154,31 +135,6 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void ApplyCurve_IdentityReturnsInput(){
-            NativeArray<float2> identity = Points(new float2(0f, 0f), new float2(1f, 1f));
-            for (float raw = 0f; raw <= 1f; raw += 0.125f)
-                Assert.AreEqual(raw, NoiseCalculator.ApplyCurve(raw, identity), 1e-6f);
-        }
-
-        [Test]
-        public void ApplyCurve_ClampsBelowAndAbove(){
-            NativeArray<float2> curve = Points(new float2(0.2f, 0.1f), new float2(0.8f, 0.9f));
-            Assert.AreEqual(0.1f, NoiseCalculator.ApplyCurve(-1f, curve), 1e-6f);
-            Assert.AreEqual(0.1f, NoiseCalculator.ApplyCurve(0.2f, curve), 1e-6f);
-            Assert.AreEqual(0.9f, NoiseCalculator.ApplyCurve(0.8f, curve), 1e-6f);
-            Assert.AreEqual(0.9f, NoiseCalculator.ApplyCurve(5f, curve), 1e-6f);
-        }
-
-        [Test]
-        public void ApplyCurve_IsPiecewiseLinear(){
-            NativeArray<float2> curve = Points(new float2(0f, 0f), new float2(0.5f, 1f), new float2(1f, 0f));
-            Assert.AreEqual(0.5f, NoiseCalculator.ApplyCurve(0.25f, curve), 1e-6f);
-            Assert.AreEqual(1f, NoiseCalculator.ApplyCurve(0.5f, curve), 1e-6f);
-            Assert.AreEqual(0.5f, NoiseCalculator.ApplyCurve(0.75f, curve), 1e-6f);
-            Assert.AreEqual(0.2f, NoiseCalculator.ApplyCurve(0.1f, curve), 1e-6f);
-        }
-
-        [Test]
         public void NoiseProfile_DifferentSaltsGiveDifferentFields(){
             // GEN-05: two profiles with identical seed and shape but different salts are different fields.
             NoiseProfile a = Profile(42);
@@ -205,49 +161,19 @@ namespace Engine.Tests.EditMode{
                 NoiseProfile.HashedOffset(1u, HashSalts.HumidityNoise));
         }
 
-        [Test]
-        public void WorldNoise_OutputIsInUnitRange(){
-            NoiseCalculator.NoiseParameters parameters = Parameters(TestFixtures.Seed);
-            foreach (float2 position in SamplePositions()){
-                NoiseCalculator.WorldNoiseOutput output = NoiseCalculator.WorldNoise(position * 40f, ref parameters);
-                Assert.That(output.Humidity, Is.InRange(0f, 1f));
-                Assert.That(output.Temperature, Is.InRange(0f, 1f));
-                Assert.That(output.Continental, Is.InRange(0f, 1f));
-                Assert.That(output.Elevation, Is.InRange(0f, 1f));
-            }
-        }
-
         #endregion
 
         #region TST-E14
 
         [Test]
-        public void WorldNoise_SeedIsNotAPlainTranslation(){
-            // F-02 (fixed by GEN-05 in Phase 0): the old seed offsets (S, S) from the profiles and (-S, S) from
-            // WorldNoise added up to (0, 2S), so WorldNoise(p, S) equalled WorldNoise(p + (0, 2S), 0).
-            const int seed = 123;
-            NoiseCalculator.NoiseParameters seeded = Parameters(seed);
-            NoiseCalculator.NoiseParameters unseeded = Parameters(0);
-            bool anyDifferent = false;
-            foreach (float2 position in SamplePositions()){
-                NoiseCalculator.WorldNoiseOutput a = NoiseCalculator.WorldNoise(position, ref seeded);
-                NoiseCalculator.WorldNoiseOutput b =
-                    NoiseCalculator.WorldNoise(position + new float2(0f, 2f * seed), ref unseeded);
-                anyDifferent |= !Mathf.Approximately(a.Elevation, b.Elevation)
-                                || !Mathf.Approximately(a.Humidity, b.Humidity)
-                                || !Mathf.Approximately(a.Temperature, b.Temperature)
-                                || !Mathf.Approximately(a.Continental, b.Continental);
-            }
-
-            Assert.IsTrue(anyDifferent, "seed S must not be the same world as seed 0 shifted by (0, 2S)");
-        }
-
-        [Test]
-        public void NoiseSettings_ContinentalWarpChannelsDiffer(){
-            // F-06: warp X and warp Y must be different noise fields (own salts since GEN-05).
-            NoiseCalculator.NoiseParameters parameters = Parameters(TestFixtures.Seed);
-            NoiseProfile warpX = WarpProfile(parameters.ContinentalLayer, "_warpX");
-            NoiseProfile warpY = WarpProfile(parameters.ContinentalLayer, "_warpY");
+        public void WorldGenSettings_ContinentalWarpChannelsDiffer(){
+            // F-06: warp X and warp Y must be different noise fields (own salts since GEN-05), built the way
+            // WorldGenSettings.ToConfig builds the continental layer.
+            WarpedNoiseLayer layer = new(_settings.continentalLayer.ToStruct(TestFixtures.Seed,
+                HashSalts.ContinentalNoise, HashSalts.ContinentalWarpX, HashSalts.ContinentalWarpY));
+            _layers.Add(layer);
+            NoiseProfile warpX = WarpProfile(layer, "_warpX");
+            NoiseProfile warpY = WarpProfile(layer, "_warpY");
             bool anyDifferent = false;
             foreach (float2 position in SamplePositions())
                 anyDifferent |= !Mathf.Approximately(warpX.GetNoise(position * 40f), warpY.GetNoise(position * 40f));

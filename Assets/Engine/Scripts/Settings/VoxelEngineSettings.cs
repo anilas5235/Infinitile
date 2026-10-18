@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Engine.Scripts.Settings{
     /// <summary>
-    ///     Central ScriptableObject configuration for the voxel engine (seed, noise, chunk, renderer, scheduler).
+    ///     Central ScriptableObject configuration for the voxel engine (seed, world generation, chunk, renderer, scheduler).
     /// </summary>
     [CreateAssetMenu(fileName = "VoxelEngineSettings", menuName = "Voxel/EngineSettings", order = 0)]
     public class VoxelEngineSettings : ScriptableObject{
@@ -13,13 +13,8 @@ namespace Engine.Scripts.Settings{
         public int Seed = 1337;
 
         /// <summary>
-        ///     Noise parameters (scale, persistence, etc.).
-        /// </summary>
-        public NoiseSettings Noise;
-
-        /// <summary>
-        ///     Spec world-generation settings (INT-01): architecture, blending, biome set, octaves. Optional while the
-        ///     legacy path is the default; when null the engine runs <c>GenArchitecture.Legacy</c>.
+        ///     World-generation settings (INT-01): architecture, blending, climate, biome set, octaves, water level.
+        ///     Required; the engine throws at scheduler creation when it is missing (INT-40).
         /// </summary>
         public WorldGenSettings WorldGen;
 

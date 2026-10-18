@@ -60,15 +60,16 @@ namespace Engine.Scripts.Utils{
             GeneratorConfig generatorConfig,
             VoxelWorld world
         ){
+            // INT-01/INT-40: since Phase 2 the WorldGenSettings asset is the only generation input.
+            if (!Settings.WorldGen)
+                throw new System.InvalidOperationException(
+                    $"{Settings.name}: a WorldGenSettings asset must be assigned (VoxelEngineSettings.WorldGen).");
+
             GeneratorConfig cfg = generatorConfig;
-            cfg.WaterLevel = Settings.Noise.WaterLevel;
+            cfg.WaterLevel = Settings.WorldGen.WaterLevel;
             cfg.GlobalSeed = Settings.Seed;
-            cfg.NoiseParams = Settings.Noise.ToNoiseParameters(Settings.Seed);
-            // INT-03: the Burst mirror of the spec settings. Without a WorldGenSettings asset the legacy path runs with
-            // an empty but constructed mirror (ChunkJob carries the config, so its containers must exist).
-            cfg.WorldGen = Settings.WorldGen
-                ? Settings.WorldGen.ToConfig(Settings.Seed, DataImporter.Instance.VoxelRegistry)
-                : WorldGenConfig.CreateEmpty((uint)Settings.Seed);
+            // INT-03: the Burst mirror of the spec settings (owned by the config, D-05).
+            cfg.WorldGen = Settings.WorldGen.ToConfig(Settings.Seed, DataImporter.Instance.VoxelRegistry);
             return new ChunkScheduler(Settings, chunkManager, cfg, world);
         }
 

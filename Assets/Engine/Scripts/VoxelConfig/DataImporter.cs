@@ -162,7 +162,6 @@ namespace Engine.Scripts.VoxelConfig{
         /// <returns>Filled generator configuration structure.</returns>
         public GeneratorConfig CreateConfig(){
             GeneratorConfig config = new(){
-                BiomeDefs = BiomeRegistry.BiomeArray,
                 Voxels = VoxelRegistry.VoxelMap
             };
 

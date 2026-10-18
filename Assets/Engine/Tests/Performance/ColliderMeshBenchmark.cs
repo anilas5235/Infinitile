@@ -69,14 +69,14 @@ namespace Engine.Tests.Performance{
         [Test]
         [Performance]
         public void CMeshBuildJob_Run_SurfacePartition_MsPerPartition(){
-            // World y 96..127: terrain surface starts at MinTerrainHeight (100), water level is 124.
+            // World y 96..127: the fixture biome puts the surface near y = 100, water level is 124.
             MeasurePartition(new int3(ChunkPos.x, 3, ChunkPos.y), "CMeshBuildJob.Run surface ms/partition");
         }
 
         [Test]
         [Performance]
         public void CMeshBuildJob_Run_SolidPartition_MsPerPartition(){
-            // World y 32..63 is below MinTerrainHeight: entirely stone, six merged quads.
+            // World y 32..63 is far below the surface: entirely stone, six merged quads.
             MeasurePartition(new int3(ChunkPos.x, 1, ChunkPos.y), "CMeshBuildJob.Run solid ms/partition");
         }
 

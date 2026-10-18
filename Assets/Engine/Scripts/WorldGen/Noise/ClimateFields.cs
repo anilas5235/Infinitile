@@ -60,8 +60,8 @@ namespace Engine.Scripts.WorldGen.Noise{
 
     /// <summary>
     ///     Computes T, F, C, E, W and PV once per column (GEN-07). Identical for both architectures and every blend
-    ///     method, given seed and settings; the legacy path (INT-40) keeps its own Elevation field in NoiseCalculator
-    ///     until GEN-08 retires it.
+    ///     method, given seed and settings. The legacy Elevation field is retired (GEN-08); height comes from the
+    ///     architecture's height module only.
     /// </summary>
     [BurstCompile]
     public static class ClimateFields{
