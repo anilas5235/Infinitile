@@ -2,6 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using Engine.Scripts.Noise;
 using Engine.Scripts.VoxelConfig.Data.Generation;
+using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Height;
 using Engine.Scripts.WorldGen.Noise;
@@ -28,7 +29,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         // --- Blending (§9) -------------------------------------------------------------------------------------------
         public BlendMethod MaterialMethod;
 
-        /// <summary>B_mat in blocks (methods 2 and 3).</summary>
+        /// <summary>B_mat in blocks (DistanceBlend only; the material-stage DistortedBoundary is a one-hot warp, §9.7).</summary>
         public float MaterialBlendWidth;
 
         /// <summary>σ_mat in normalised parameter units (method 4).</summary>
@@ -45,6 +46,25 @@ namespace Engine.Scripts.WorldGen.Settings{
         public float WarpWavelength;
 
         public int WarpOctaves;
+
+        /// <summary>
+        ///     Biome-first with both stages on the same method and strength (None; DistanceBlend with B_mat = B_hgt;
+        ///     ParameterSpaceWeighting with σ_mat = σ_hgt): the height weights are the material weights, computed
+        ///     once (PERF-07). Never set for DistortedBoundary, whose stages differ (warp only vs. warp + blend).
+        /// </summary>
+        [MarshalAs(UnmanagedType.U1)] public bool StagesShareWeights;
+
+        /// <summary>Material-stage kernel (DistanceBlend, B_mat); not created for other methods (BLD-12).</summary>
+        public KernelSet MaterialKernel;
+
+        /// <summary>Taps of <see cref="MaterialKernel" />; empty when unused. Owned.</summary>
+        [ReadOnly] public NativeArray<KernelTap> MaterialTaps;
+
+        /// <summary>Height-stage kernel (Biome-first DistanceBlend or DistortedBoundary, B_hgt); not created otherwise.</summary>
+        public KernelSet HeightKernel;
+
+        /// <summary>Taps of <see cref="HeightKernel" />; empty when unused. Owned.</summary>
+        [ReadOnly] public NativeArray<KernelTap> HeightTaps;
 
         // --- Classification weights λ (§6.4) -----------------------------------------------------------------------------
         public float LambdaTemperature;
@@ -119,6 +139,8 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (OctaveCoefficients.IsCreated) OctaveCoefficients.Dispose();
             if (SplineNodes.IsCreated) SplineNodes.Dispose();
             if (SplinePoints.IsCreated) SplinePoints.Dispose();
+            if (MaterialTaps.IsCreated) MaterialTaps.Dispose();
+            if (HeightTaps.IsCreated) HeightTaps.Dispose();
         }
     }
 }

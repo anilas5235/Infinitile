@@ -71,9 +71,10 @@ namespace Engine.Tests.EditMode{
         ///     distinct blocks and the §19.1 placeholder splines. Block ids are patched in because the test has no
         ///     voxel registry.
         /// </summary>
-        private void UseTerrainFirst(bool climateOverrides = true, bool withBiomes = true){
+        private void UseTerrainFirst(bool climateOverrides = true, bool withBiomes = true, BlendMethod material = BlendMethod.None){
             WorldGenSettings s = Create<WorldGenSettings>("WG");
             s.Architecture = GenArchitecture.TerrainFirst;
+            s.MaterialMethod = material;
             s.EnableClimateOverrides = climateOverrides;
             s.Splines = Create<TerrainSplineSet>("Splines");
             s.Splines.ResetToPlaceholders();
@@ -169,6 +170,30 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(0, col.UnderBlock);
             Assert.AreEqual(0, col.StoneBlock);
             Assert.That(col.Height, Is.InRange(0, MaxTerrainHeight), "the spline height exists without biomes (TRN-03)");
+        }
+
+        [Test]
+        public void PrepareChunkMaps_TerrainFirst_SpatialMaterialMethodsAreTheSamplerDecision(
+            [Values(BlendMethod.DistanceBlend, BlendMethod.DistortedBoundary)] BlendMethod material){
+            // Phase 3 (BLD-11, GEN-02): with the chunk's lattice cache the surface source is still the pure
+            // sampler's pick, also where it differs from the hard biome (a transition or a warped boundary).
+            UseTerrainFirst(material: material);
+            int picked = 0;
+            for (int k = 0; k < 24 && picked == 0; k++){
+                int2 chunk = new(k * 31, k * 17);
+                Prepare(chunk);
+                for (int x = 0; x < ChunkWidth; x++)
+                for (int z = 0; z < ChunkDepth; z++){
+                    int wx = chunk.x * ChunkWidth + x, wz = chunk.y * ChunkDepth + z;
+                    ColumnSample s = WorldSampler.SampleColumn(wx, wz, _config.WorldGen);
+                    AssertMatchesSampler(Column(x, z), s, $"({wx},{wz})");
+                    Biome.BiomeDef def = _config.WorldGen.Biomes[s.SurfaceSource];
+                    Assert.AreEqual(def.topBlock, Column(x, z).TopBlock, "blocks come from the surface source (BLD-40)");
+                    if (s.SurfaceSource != s.HardBiome) picked++;
+                }
+            }
+
+            Assert.Greater(picked, 0, "some column takes its surface from a biome other than its hard class");
         }
 
         // --- TST-03 -------------------------------------------------------------------------------------------------------

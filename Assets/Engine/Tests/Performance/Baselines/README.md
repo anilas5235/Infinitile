@@ -134,6 +134,58 @@ under load), so it remains above that budget; whether the splines need optimisin
 blend methods will add cost on both paths. The surface-partition collider row halved because the spec fixture's
 surface is flatter than the legacy noise surface, not because the mesher changed.
 
+## 2026-10-18 Phase 3 baseline (`2026-10-18-phase3-editmode-baseline.json`)
+
+Same machine and settings as above, **not a quiet machine**: a game and a browser were running during the whole
+session, and benchmarks whose code Phase 3 does not touch sit 1–14 % above Phase 2 (collider mesh +8/+11 %,
+frustum +14 %). Phase 3 (blend methods, §9) routes every column through the blend stages and the dithered surface
+pick and gives `ChunkJob.PrepareChunkMaps` a padded lattice cache per chunk (BLD-11). The new rows run one
+architecture x method configuration each (Biome-first: the method on both stages, spec default strengths
+B = 32, σ = 0.04, A = 24) over 16 fixed scattered chunks and record the mean per chunk, because the cost of the
+spatial methods depends on how many columns lie near a boundary; the single-chunk rows are unchanged.
+
+| Benchmark | Sample group | Median | Min | Max | vs 2026-10-18 (Phase 2) |
+|---|---|---|---|---|---|
+| ChunkJob.Run, Biome-first, method 1 (single chunk) | ChunkJob.Run BiomeFirst ms/chunk | 1.58 ms | 1.54 ms | 2.10 ms | +5 % |
+| ChunkJob.Run, Terrain-first, method 1 (single chunk) | ChunkJob.Run TerrainFirst ms/chunk | 2.42 ms | 2.33 ms | 3.12 ms | +12 % (load, see below) |
+| ChunkJob.Run, Terrain-first, None (16 chunks) | ChunkJob.Run TerrainFirst None ms/chunk | 3.39 ms | 2.58 ms | 6.26 ms | new |
+| ChunkJob.Run, Terrain-first, DistanceBlend (16 chunks) | ChunkJob.Run TerrainFirst DistanceBlend ms/chunk | 4.89 ms | 4.54 ms | 10.10 ms | new |
+| ChunkJob.Run, Terrain-first, DistortedBoundary (16 chunks) | ChunkJob.Run TerrainFirst DistortedBoundary ms/chunk | 4.35 ms | 4.16 ms | 4.91 ms | new |
+| ChunkJob.Run, Terrain-first, ParameterSpaceWeighting (16 chunks) | ChunkJob.Run TerrainFirst ParameterSpaceWeighting ms/chunk | 2.65 ms | 2.54 ms | 2.83 ms | new |
+| ChunkJob.Run, Biome-first, None (16 chunks) | ChunkJob.Run BiomeFirst None ms/chunk | 1.85 ms | 1.73 ms | 6.91 ms | new |
+| ChunkJob.Run, Biome-first, DistanceBlend (16 chunks) | ChunkJob.Run BiomeFirst DistanceBlend ms/chunk | 2.87 ms | 2.77 ms | 3.07 ms | new |
+| ChunkJob.Run, Biome-first, DistortedBoundary (16 chunks) | ChunkJob.Run BiomeFirst DistortedBoundary ms/chunk | 3.53 ms | 3.41 ms | 4.06 ms | new |
+| ChunkJob.Run, Biome-first, ParameterSpaceWeighting (16 chunks) | ChunkJob.Run BiomeFirst ParameterSpaceWeighting ms/chunk | 2.02 ms | 1.86 ms | 2.42 ms | new |
+| CMeshBuildJob.Run, surface partition (y=3) | CMeshBuildJob.Run surface ms/partition | 4.07 ms | 3.77 ms | 4.88 ms | +8 % (untouched) |
+| CMeshBuildJob.Run, fully solid partition (y=1) | CMeshBuildJob.Run solid ms/partition | 7.63 ms | 7.12 ms | 9.32 ms | +11 % (untouched) |
+| UnsafeIntervalList.Set, 10^4 random edits, chunk-sized list | UnsafeIntervalList.Set 10k edits ms | 11.58 ms | 11.21 ms | 15.15 ms | +8 % (untouched) |
+| PageAllocator, fill one buffer with 3-page partitions and release all | PageAllocator fill+release 1 buffer ms | 0.50 ms | 0.48 ms | 0.54 ms | +1 % (untouched) |
+| FrustumCulling.IsVisible, 1024 page AABBs vs 6 planes, 10 passes per sample | FrustumCulling.IsVisible 1024 pages us | 2675 us | 2394 us | 3559 us | +14 % (untouched) |
+
+PERF-03: because the load moved untouched benchmarks by up to 14 %, the two existing chunk rows were also
+measured A/B under the same load, Phase 2 (`master`) and Phase 3 back to back, comparing minima (the least
+load-sensitive statistic here):
+
+| Row | Phase 2 minima (3 runs) | Phase 3 minima (4 runs) | Difference |
+|---|---|---|---|
+| ChunkJob.Run BiomeFirst ms/chunk | 1.46, 1.48 ms (one run at 2.79 ms discarded) | 1.54–1.57 ms | about +5 % |
+| ChunkJob.Run TerrainFirst ms/chunk | 2.20, 2.20, 2.27 ms | 2.27–2.33 ms | about +4 % |
+
+So method 1 costs about 5 % more than in Phase 2, within the 10 % of PERF-03: the per-column distance vector,
+the blend-stage dispatch and the (empty) per-chunk cache. Method 1 sets the dominant biome and the surface source
+to the hard class directly instead of running argmax and the dithered pick (identical result, BLD-41).
+
+PERF-05 (initial budgets, a SHOULD to be confirmed on the user's machine): ≤ 3 ms per chunk and worker with the
+spatial methods. Biome-first meets it with DistanceBlend (2.9 ms) and ParameterSpaceWeighting (2.0 ms) and misses it
+with DistortedBoundary (3.5 ms: one warped classification per column for the material stage plus a warped lattice
+for the height kernel). Terrain-first misses it with DistanceBlend (4.9 ms) and DistortedBoundary (4.4 ms), as it
+already misses the 1.5 ms method-1 budget (Phase 1): a Terrain-first lattice point costs a full spline height,
+because h enters the 6D classification, and a chunk with B = 32 (stride 2) needs 32 x 32 lattice points on top of its
+1024 columns, so the spatial methods roughly double the method-1 cost. Options if the budget is to hold:
+reuse the hard class of the columns that are lattice points (a quarter of the chunk's lattice at stride 2),
+optimise the Terrain-first spline evaluation itself, or confirm a higher budget for Terrain-first. The
+uniform-window early-out (PERF-07) already skips the kernel sum away from boundaries.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the

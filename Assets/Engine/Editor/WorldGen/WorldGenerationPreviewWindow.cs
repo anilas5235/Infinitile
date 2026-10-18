@@ -50,6 +50,7 @@ namespace Engine.Editor.WorldGen{
         private bool _showContinental = true;
         private bool _showHumidity = true;
         private Texture2D _biomeTexture;
+        private Texture2D _surfaceTexture;
         private Texture2D _heightTexture;
         private Texture2D _climateTexture;
         private Texture2D _erosionTexture;
@@ -81,11 +82,13 @@ namespace Engine.Editor.WorldGen{
         // --- Job data (TempJob, alive for one build) ---------------------------------------------------------------
         private NativeArray<WorldFields> _jobFields;
         private NativeArray<int> _jobHardBiome;
+        private NativeArray<int> _jobSurfaceSource;
         private NativeArray<float> _jobHeight;
         private NativeArray<byte> _jobClamped;
         private NativeArray<float3> _jobTerrainParams;
         private NativeArray<Color32> _jobBiomeColors;
         private NativeArray<Color32> _jobBiomePixels;
+        private NativeArray<Color32> _jobSurfacePixels;
         private NativeArray<Color32> _jobHeightPixels;
         private NativeArray<Color32> _jobClimatePixels;
         private NativeArray<Color32> _jobErosionPixels;
@@ -112,6 +115,7 @@ namespace Engine.Editor.WorldGen{
             FinalizeScheduledBuild(false); // a running build still reads the config
             DestroyEditors();
             DestroyTexture(ref _biomeTexture);
+            DestroyTexture(ref _surfaceTexture);
             DestroyTexture(ref _heightTexture);
             DestroyTexture(ref _climateTexture);
             DestroyTexture(ref _erosionTexture);
@@ -369,7 +373,7 @@ namespace Engine.Editor.WorldGen{
                     EditorGUILayout.BeginVertical();
                     DrawView("Peaks & valleys", _pvTexture, true);
                     if (_terrainFirst) DrawView("Offset (Hmin..Hmax, blue below water)", _offsetTexture, true);
-                    else GUILayout.FlexibleSpace();
+                    else DrawView(SurfaceTitle, _surfaceTexture, true);
                     EditorGUILayout.EndVertical();
 
                     if (_terrainFirst){
@@ -377,12 +381,21 @@ namespace Engine.Editor.WorldGen{
                         DrawView($"Amp ({_ampRange.x:0.#}..{_ampRange.y:0.#})", _ampTexture, true);
                         DrawView($"Jaggedness ({_jaggednessRange.x:0.#}..{_jaggednessRange.y:0.#})", _jaggednessTexture, true);
                         EditorGUILayout.EndVertical();
+
+                        EditorGUILayout.BeginVertical();
+                        DrawView(SurfaceTitle, _surfaceTexture, true);
+                        GUILayout.FlexibleSpace();
+                        EditorGUILayout.EndVertical();
                     }
                 }
                 EditorGUILayout.EndHorizontal();
             }
             EditorGUILayout.EndVertical();
         }
+
+        /// <summary>Title of the surface-source view: the dithered pick from the material weights (§9.6, BLD-40).</summary>
+        private string SurfaceTitle =>
+            WorldGenSettings ? $"Surface source ({WorldGenSettings.MaterialMethod})" : "Surface source";
 
         private void DrawView(string title, Texture2D texture, bool allowPan, float fixedSize = 0f){
             EditorGUILayout.BeginVertical();
@@ -483,10 +496,12 @@ namespace Engine.Editor.WorldGen{
 
             _jobFields = new NativeArray<WorldFields>(count, Allocator.TempJob);
             _jobHardBiome = new NativeArray<int>(count, Allocator.TempJob);
+            _jobSurfaceSource = new NativeArray<int>(count, Allocator.TempJob);
             _jobHeight = new NativeArray<float>(count, Allocator.TempJob);
             _jobClamped = new NativeArray<byte>(count, Allocator.TempJob);
             if (_terrainFirst) _jobTerrainParams = new NativeArray<float3>(count, Allocator.TempJob);
             _jobBiomePixels = new NativeArray<Color32>(count, Allocator.TempJob);
+            _jobSurfacePixels = new NativeArray<Color32>(count, Allocator.TempJob);
             _jobHeightPixels = new NativeArray<Color32>(count, Allocator.TempJob);
             _jobClimatePixels = new NativeArray<Color32>(count, Allocator.TempJob);
             _jobErosionPixels = new NativeArray<Color32>(count, Allocator.TempJob);
@@ -508,6 +523,7 @@ namespace Engine.Editor.WorldGen{
             RegionBuffers buffers = new(){
                 Fields = _jobFields,
                 HardBiome = _jobHardBiome,
+                SurfaceSource = _jobSurfaceSource,
                 Height = _jobHeight,
                 Clamped = _jobClamped,
                 TerrainParams = _jobTerrainParams // unconstructed in Biome-first: SampleRegion skips it
@@ -517,6 +533,7 @@ namespace Engine.Editor.WorldGen{
             JobHandle views = new SpecViewJob{
                 Fields = _jobFields,
                 HardBiome = _jobHardBiome,
+                SurfaceSource = _jobSurfaceSource,
                 Height = _jobHeight,
                 Clamped = _jobClamped,
                 BiomeColors = _jobBiomeColors,
@@ -527,6 +544,7 @@ namespace Engine.Editor.WorldGen{
                 ShowContinental = _showContinental ? (byte)1 : (byte)0,
                 ShowHumidity = _showHumidity ? (byte)1 : (byte)0,
                 BiomeView = _jobBiomePixels,
+                SurfaceView = _jobSurfacePixels,
                 HeightView = _jobHeightPixels,
                 ClimateView = _jobClimatePixels,
                 ErosionView = _jobErosionPixels,
@@ -559,6 +577,7 @@ namespace Engine.Editor.WorldGen{
 
             if (applyResult){
                 Apply(ref _biomeTexture, _jobBiomePixels, _viewSize);
+                Apply(ref _surfaceTexture, _jobSurfacePixels, _viewSize);
                 Apply(ref _heightTexture, _jobHeightPixels, _viewSize);
                 Apply(ref _climateTexture, _jobClimatePixels, _viewSize);
                 Apply(ref _erosionTexture, _jobErosionPixels, _viewSize);
@@ -635,11 +654,13 @@ namespace Engine.Editor.WorldGen{
         private void DisposeJobData(){
             if (_jobFields.IsCreated) _jobFields.Dispose();
             if (_jobHardBiome.IsCreated) _jobHardBiome.Dispose();
+            if (_jobSurfaceSource.IsCreated) _jobSurfaceSource.Dispose();
             if (_jobHeight.IsCreated) _jobHeight.Dispose();
             if (_jobClamped.IsCreated) _jobClamped.Dispose();
             if (_jobTerrainParams.IsCreated) _jobTerrainParams.Dispose();
             if (_jobBiomeColors.IsCreated) _jobBiomeColors.Dispose();
             if (_jobBiomePixels.IsCreated) _jobBiomePixels.Dispose();
+            if (_jobSurfacePixels.IsCreated) _jobSurfacePixels.Dispose();
             if (_jobHeightPixels.IsCreated) _jobHeightPixels.Dispose();
             if (_jobClimatePixels.IsCreated) _jobClimatePixels.Dispose();
             if (_jobErosionPixels.IsCreated) _jobErosionPixels.Dispose();
@@ -679,6 +700,7 @@ namespace Engine.Editor.WorldGen{
         private struct SpecViewJob : IJobParallelFor{
             [ReadOnly] public NativeArray<WorldFields> Fields;
             [ReadOnly] public NativeArray<int> HardBiome;
+            [ReadOnly] public NativeArray<int> SurfaceSource;
             [ReadOnly] public NativeArray<float> Height;
             [ReadOnly] public NativeArray<byte> Clamped;
             [ReadOnly] public NativeArray<Color32> BiomeColors;
@@ -689,14 +711,15 @@ namespace Engine.Editor.WorldGen{
             public byte ShowContinental;
             public byte ShowHumidity;
             [WriteOnly] public NativeArray<Color32> BiomeView;
+            [WriteOnly] public NativeArray<Color32> SurfaceView;
             [WriteOnly] public NativeArray<Color32> HeightView;
             [WriteOnly] public NativeArray<Color32> ClimateView;
             [WriteOnly] public NativeArray<Color32> ErosionView;
             [WriteOnly] public NativeArray<Color32> PvView;
 
             public void Execute(int index){
-                int biome = HardBiome[index];
-                BiomeView[index] = biome >= 0 && biome < BiomeColors.Length ? BiomeColors[biome] : new Color32(0, 0, 0, 255);
+                BiomeView[index] = BiomeColor(HardBiome[index]);
+                SurfaceView[index] = BiomeColor(SurfaceSource[index]);
 
                 float h = Height[index];
                 byte v = (byte)math.round(math.saturate((h - HeightMin) / math.max(1f, HeightMax - HeightMin)) * 255f);
@@ -717,6 +740,10 @@ namespace Engine.Editor.WorldGen{
 
                 byte pv = (byte)math.round(math.saturate((f.PV + 1f) * 0.5f) * 255f);
                 PvView[index] = new Color32(pv, pv, pv, 255);
+            }
+
+            private Color32 BiomeColor(int biome){
+                return biome >= 0 && biome < BiomeColors.Length ? BiomeColors[biome] : new Color32(0, 0, 0, 255);
             }
         }
 
