@@ -29,7 +29,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         // --- Blending (§9) -------------------------------------------------------------------------------------------
         public BlendMethod MaterialMethod;
 
-        /// <summary>B_mat in blocks (methods 2 and 3).</summary>
+        /// <summary>B_mat in blocks (DistanceBlend only; the material-stage DistortedBoundary is a one-hot warp, §9.7).</summary>
         public float MaterialBlendWidth;
 
         /// <summary>σ_mat in normalised parameter units (method 4).</summary>

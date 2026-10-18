@@ -29,7 +29,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Header("Blending (§9)")]
         public BlendMethod MaterialMethod = BlendMethod.None;
 
-        [Tooltip("B_mat: material blend width in blocks (DistanceBlend, DistortedBoundary).")]
+        [Tooltip("B_mat: material blend width in blocks (DistanceBlend only; material-stage DistortedBoundary is a one-hot warp, §9.7).")]
         public float MaterialBlendWidth = 32f;
 
         [Tooltip("σ_mat: material blend width in normalised parameter units (ParameterSpaceWeighting).")]
