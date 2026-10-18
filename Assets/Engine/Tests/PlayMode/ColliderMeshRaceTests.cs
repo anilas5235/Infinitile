@@ -169,6 +169,22 @@ namespace Engine.Tests.PlayMode{
         }
 
         [Test]
+        public void Start_BatchLargerThanMeshingBatchSize_AppliesEveryResult(){
+            // F-16: the result map was sized from the draw distance and a parallel writer cannot grow it, so a
+            // larger batch lost results. The map now starts at meshingBatchSize and grows in Start.
+            using SchedulerRig rig = new();
+            NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult> results =
+                PlayModeFixtures.GetPrivateField<NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult>>(
+                    rig.Scheduler, "_results");
+            Assert.Less(results.Capacity, PartitionsPerChunk, "the batch must exceed the initial capacity");
+
+            rig.StartCentreChunkBuild();
+            Assert.DoesNotThrow(() => rig.Scheduler.Complete());
+            for (int y = 0; y < PartitionsPerChunk; y++)
+                Assert.IsTrue(rig.Pool.IsPartitionActive(new int3(0, y, 0)), $"partition {y} applied");
+        }
+
+        [Test]
         public void UnloadChunk_OutsideAccessor_DoesNotCompleteJob(){
             // A chunk the job does not read may be unloaded without waiting (no stall for unrelated evictions).
             using SchedulerRig rig = new();

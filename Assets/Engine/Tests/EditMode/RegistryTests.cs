@@ -251,6 +251,8 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void TexRegistry_ArrayIndexEqualsRegisteredId(){
+            if (!SystemInfo.supportsAsyncGPUReadback || SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
+                Assert.Ignore("needs a graphics device with GPU read-back to check the texture layers");
             TexRegistry registry = new(4);
             Color32[] colours ={ new(255, 0, 0, 255), new(0, 255, 0, 255), new(0, 0, 255, 255) };
             ushort[] ids = new ushort[colours.Length];
