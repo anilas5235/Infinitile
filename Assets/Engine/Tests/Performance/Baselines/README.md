@@ -47,6 +47,32 @@ Testing package records the total, not the mean), so one buffer costs about 225 
 Mono with safety checks on. The GPU kernel tests the same 1024 pages
 in one dispatch of 8 thread groups.
 
+## 2026-10-18 Phase 0 baseline (`2026-10-18-phase0-editmode-baseline.json`)
+
+Same machine and settings as above. Phase 0 (WorldGenSpec foundations) replaces the noise basis of
+`NoiseProfile`/`WarpedNoiseLayer` with the seeded simplex (GEN-05, GEN-15), so `ChunkJob.Run` is the benchmark
+whose code changed; `GeneratorConfig` also grew the `WorldGen` mirror, which the job carries but does not read on
+the legacy path.
+
+| Benchmark | Sample group | Median | Min | Max | vs 2026-10-18 (Phase C) |
+|---|---|---|---|---|---|
+| ChunkJob.Run (noise terrain + RLE write) | ChunkJob.Run TerrainRle ms/chunk | 1.10 ms | 1.09 ms | 1.14 ms | +1.5 % |
+| CMeshBuildJob.Run, surface partition (y=3) | CMeshBuildJob.Run surface ms/partition | 6.75 ms | 6.50 ms | 7.05 ms | +3 % |
+| CMeshBuildJob.Run, fully solid partition (y=1) | CMeshBuildJob.Run solid ms/partition | 6.71 ms | 6.54 ms | 6.85 ms | +2 % |
+| UnsafeIntervalList.Set, 10^4 random edits, chunk-sized list | UnsafeIntervalList.Set 10k edits ms | 10.75 ms | 10.63 ms | 11.36 ms | +3 % |
+| PageAllocator, fill one buffer with 3-page partitions and release all | PageAllocator fill+release 1 buffer ms | 0.47 ms | 0.46 ms | 0.55 ms | +1 % |
+| FrustumCulling.IsVisible, 1024 page AABBs vs 6 planes, 10 passes per sample | FrustumCulling.IsVisible 1024 pages us | 2273 us | 2243 us | 2876 us | +1 % |
+
+PERF-03: no benchmark is more than 10 % slower than the previous baseline. The seeded simplex costs about the same
+per sample as the old basis; the 1–3 % spread across benchmarks whose code did not change is Editor state.
+
+Lesson recorded for future runs: the first Phase 0 runs showed `ChunkJob.Run` at 30.5 ms and `CMeshBuildJob.Run`
+at 167 ms (about 25x). The cause was not the new code but Burst direct-call entry points in `WorldSampler` that
+returned structs and carried `bool` fields in their signatures. Burst reports such errors only in `Editor.log`
+(`Burst error BC1063/BC1064`) at domain reload and then runs **every** job in the Editor managed, including jobs in
+unrelated code. A 10x or larger slowdown of all Burst benchmarks while managed benchmarks stay put is that
+symptom; `WorldSamplerTests.SampleColumn_CompilesWithBurst` now turns it into a test failure.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the
