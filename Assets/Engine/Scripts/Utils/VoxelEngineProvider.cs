@@ -67,7 +67,7 @@ namespace Engine.Scripts.Utils{
             // INT-03: the Burst mirror of the spec settings. Without a WorldGenSettings asset the legacy path runs with
             // an empty but constructed mirror (ChunkJob carries the config, so its containers must exist).
             cfg.WorldGen = Settings.WorldGen
-                ? Settings.WorldGen.ToConfig(Settings.Seed, Settings.Noise, DataImporter.Instance.VoxelRegistry)
+                ? Settings.WorldGen.ToConfig(Settings.Seed, DataImporter.Instance.VoxelRegistry)
                 : WorldGenConfig.CreateEmpty((uint)Settings.Seed);
             return new ChunkScheduler(Settings, chunkManager, cfg, world);
         }

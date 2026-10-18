@@ -17,10 +17,10 @@ MonoBehaviour:
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   TargetHumidity: 0.4
   TargetTemperature: 0.35
-  TargetContinental: 0.85
+  TargetContinental: 0.8
   TargetErosion: 0.15
   TargetPV: 0.6
-  TargetHeight: 0.7
+  TargetHeight: 0.75
   HeightOffset: 165
   HeightAmplitude: 22
   OctaveWeights:

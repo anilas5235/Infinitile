@@ -67,8 +67,7 @@ namespace Engine.Tests.EditMode{
             set.Biomes.AddRange(biomes);
             WorldGenSettings s = Create<WorldGenSettings>("WG");
             s.Biomes = set;
-            NoiseSettings noise = Create<NoiseSettings>("Noise");
-            WorldGenConfig cfg = s.ToConfig(seed, noise);
+            WorldGenConfig cfg = s.ToConfig(seed);
             _native.Add(cfg);
             return cfg;
         }

@@ -12,7 +12,6 @@ Generation Preview and, from Phase 1 on, the chunk job.
 flowchart LR
     S[WorldGenSettings SO\nINT-01] -->|ToConfig| C[WorldGenConfig\nBurst mirror, INT-03]
     B[BiomeSet SO\nGEN-20/21] --> S
-    N[NoiseSettings SO\nT F C profiles] --> C
     C --> W[WorldSampler.SampleColumn\nGEN-01]
     W --> F[ClimateFields\nT F C E W PV, GEN-07]
     F --> K[BiomeClassifier\n5D argmin, GEN-23]
@@ -34,8 +33,8 @@ flowchart LR
   with `ClimateFrequencyScale` scaling the position and `WGain` on W (GEN-07). `DetailOctaves` (K octaves,
   wavelengths 512…16) and `PeakNoise` (P = (1 − |n|)²) supply the height detail (GEN-09, GEN-10).
 - **Settings** (`WorldGen/Settings/`): `WorldGenSettings` holds architecture, blend methods and widths, λ weights,
-  height range, octave tables, E/W profiles and references to a `BiomeSet` and a `TerrainSplineSet` (stub until
-  Phase 1). `ToCanonicalJson` produces a deterministic manifest with the biome set inlined (INT-02). `ToConfig`
+  height range, octave tables, the T/F/C/E/W climate profiles with their couplings (independent of the legacy
+  `NoiseSettings`) and references to a `BiomeSet` and a `TerrainSplineSet` (stub until Phase 1). `ToCanonicalJson` produces a deterministic manifest with the biome set inlined (INT-02). `ToConfig`
   builds the `WorldGenConfig` mirror: flattened NativeArrays, the per-biome octave coefficients
   a_{b,i} = HeightAmplitude × OctaveWeights (GEN-22) and the climate instances.
 - **Biome** gained TargetErosion, TargetPV, HeightOffset, HeightAmplitude, OctaveWeights, Jaggedness and FloraRules

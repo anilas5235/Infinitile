@@ -16,11 +16,11 @@ MonoBehaviour:
   UnderBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   TargetHumidity: 0.5
-  TargetTemperature: 0.2
+  TargetTemperature: 0.15
   TargetContinental: 0.7
   TargetErosion: 0.35
   TargetPV: 0.3
-  TargetHeight: 1
+  TargetHeight: 0.85
   HeightOffset: 158
   HeightAmplitude: 14
   OctaveWeights:

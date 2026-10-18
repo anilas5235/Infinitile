@@ -82,6 +82,8 @@ namespace Engine.Tests.EditMode{
 
             StringAssert.Contains("\"Name\": \"Desert\"", first, "BiomeSet contents are inlined");
             StringAssert.Contains("\"Architecture\": \"Legacy\"", first);
+            StringAssert.Contains("\"TemperatureProfile\"", first, "own climate profiles are part of the manifest");
+            StringAssert.Contains("\"RedistributionCurve\"", first);
             Assert.IsFalse(first.Contains("0,6"), "no culture-specific decimal separator");
         }
 
@@ -124,9 +126,7 @@ namespace Engine.Tests.EditMode{
             WorldGenSettings s = Settings(
                 Biome("Plains", 6f, new[]{ 1f, 0.6f, 0.3f, 0.12f, 0.05f, 0.02f }, 0.7f, -0.2f),
                 Biome("Mountain", 22f, new[]{ 0.7f, 0.7f, 0.6f }, 0.15f, 0.6f)); // short weight list → zeros
-            NoiseSettings noise = Create<NoiseSettings>("Noise");
-
-            WorldGenConfig cfg = s.ToConfig(1337, noise, allocator: Allocator.Temp);
+            WorldGenConfig cfg = s.ToConfig(1337, allocator: Allocator.Temp);
             try{
                 Assert.IsTrue(cfg.IsCreated);
                 Assert.AreEqual(1337u, cfg.Seed);
@@ -149,7 +149,7 @@ namespace Engine.Tests.EditMode{
                 Assert.AreEqual(12, cfg.OctaveCoefficients.Length);
 
                 Assert.AreEqual(1.6f, cfg.Climate.WGain);
-                Assert.AreEqual(0.4f, cfg.Climate.ContinentalHumidityInfluence, "coupling comes from NoiseSettings");
+                Assert.AreEqual(0.4f, cfg.Climate.ContinentalHumidityInfluence, "coupling comes from WorldGenSettings itself");
                 WorldFields f = ClimateFields.Sample(new float2(123f, -456f), cfg.Climate);
                 Assert.That(f.E, Is.InRange(0f, 1f));
                 Assert.That(f.PV, Is.InRange(-1f, 1f));
@@ -162,15 +162,13 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void ToConfig_ThrowsOnEmptyBiomeSlot(){
             WorldGenSettings s = Settings(Biome("Plains", 6f, new[]{ 1f }), null);
-            NoiseSettings noise = Create<NoiseSettings>("Noise");
-            Assert.Throws<System.InvalidOperationException>(() => s.ToConfig(1, noise, allocator: Allocator.Temp));
+            Assert.Throws<System.InvalidOperationException>(() => s.ToConfig(1, allocator: Allocator.Temp));
         }
 
         [Test]
         public void ToConfig_WithoutBiomeSetGivesEmptyBiomes(){
             WorldGenSettings s = Create<WorldGenSettings>("WG");
-            NoiseSettings noise = Create<NoiseSettings>("Noise");
-            WorldGenConfig cfg = s.ToConfig(1, noise, allocator: Allocator.Temp);
+            WorldGenConfig cfg = s.ToConfig(1, allocator: Allocator.Temp);
             Assert.AreEqual(0, cfg.BiomeCount);
             Assert.AreEqual(0, cfg.OctaveCoefficients.Length);
             cfg.Dispose();

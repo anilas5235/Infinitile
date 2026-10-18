@@ -13,7 +13,8 @@ using UnityEngine;
 namespace Engine.Scripts.WorldGen.Settings{
     /// <summary>
     ///     Spec world-generation settings (INT-01, §11.2): architecture, blend methods and widths, classification
-    ///     weights, height range, detail octaves, climate instances not covered by <see cref="NoiseSettings" /> (E, W),
+    ///     weights, height range, detail octaves, the climate instances T, F, C, E, W with their couplings (independent
+    ///     of the legacy <see cref="NoiseSettings" />, decision 2026-10-18),
     ///     the active <see cref="BiomeSet" /> and the Terrain-first <see cref="TerrainSplineSet" />.
     ///     <see cref="ToConfig" /> builds the Burst mirror (INT-03), <see cref="ToCanonicalJson()" /> the
     ///     experiment manifest (INT-02). Defaults are the spec defaults (§9, §6.4, §5.7, §19.1).
@@ -83,6 +84,56 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Tooltip("Global frequency multiplier for T, F, C, E and W (GEN-07).")]
         public float ClimateFrequencyScale = 1f;
 
+        [Tooltip("Temperature T: fBm, spec default scale 900 (§5.5).")]
+        public NoiseProfileSettings temperatureProfile = new(){
+            scale = 900f,
+            persistance = 0.5f,
+            lacunarity = 2f,
+            octaves = 3
+        };
+
+        [Tooltip("Humidity F: fBm, spec default scale 700 (§5.5).")]
+        public NoiseProfileSettings humidityProfile = new(){
+            scale = 700f,
+            persistance = 0.5f,
+            lacunarity = 2f,
+            octaves = 3
+        };
+
+        [Tooltip("Continentalness C: warped fBm with redistribution curve, spec default scale 2500, warp 400 (§5.5).")]
+        public WarpedNoiseLayerSettings continentalLayer = new(){
+            baseNoise = new NoiseProfileSettings{
+                scale = 2500f,
+                persistance = 0.5f,
+                lacunarity = 2f,
+                octaves = 5
+            },
+            warpNoise = new NoiseProfileSettings{
+                scale = 1800f,
+                persistance = 0.5f,
+                lacunarity = 2f,
+                octaves = 2
+            },
+            warpStrength = 400f,
+            redistributionCurve = new AnimationCurve(
+                new Keyframe(0f, 0.02f),
+                new Keyframe(0.3f, 0.12f),
+                new Keyframe(0.4f, 0.28f),
+                new Keyframe(0.5f, 0.42f),
+                new Keyframe(0.6f, 0.55f),
+                new Keyframe(0.8f, 0.78f),
+                new Keyframe(1f, 1f)
+            )
+        };
+
+        [Tooltip("How much a high continental value (inland) dries out humidity (DEC-06 coupling).")]
+        [Range(-1f, 1f)]
+        public float ContinentalHumidityInfluence = 0.4f;
+
+        [Tooltip("How much a high continental value widens the temperature swing around the middle (DEC-06 coupling).")]
+        [Range(0f, 2f)]
+        public float ContinentalTemperatureInfluence = 0.6f;
+
         public NoiseProfileSettings erosionProfile = new(){
             scale = 1200f,
             persistance = 0.5f,
@@ -111,6 +162,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         public int OctaveCount => OctaveWavelengths?.Length ?? 0;
 
         private void OnValidate(){
+            continentalLayer?.EnsureSevenLinearKeys();
             if (OctaveWavelengths == null || OctaveWavelengths.Length == 0)
                 Debug.LogWarning($"{name}: OctaveWavelengths must hold at least one octave.", this);
             else if (OctaveWavelengths.Length > DetailOctaves.MaxOctaves)
@@ -128,12 +180,9 @@ namespace Engine.Scripts.WorldGen.Settings{
         ///     (D-05); <c>GeneratorConfig.Dispose</c> does so for the engine.
         /// </summary>
         /// <param name="seed">World seed.</param>
-        /// <param name="noise">Legacy noise settings supplying the T, F and C instances and couplings.</param>
         /// <param name="registry">Voxel registry for block ids; null leaves the block ids at 0 (tests, preview).</param>
         /// <param name="allocator">Allocator of the flattened arrays.</param>
-        public WorldGenConfig ToConfig(int seed, NoiseSettings noise, VoxelRegistry registry = null,
-            Allocator allocator = Allocator.Persistent){
-            if (noise == null) throw new ArgumentNullException(nameof(noise));
+        public WorldGenConfig ToConfig(int seed, VoxelRegistry registry = null, Allocator allocator = Allocator.Persistent){
             int octaveCount = OctaveCount;
             if (octaveCount == 0) throw new InvalidOperationException($"{name}: OctaveWavelengths is empty.");
             if (octaveCount > DetailOctaves.MaxOctaves)
@@ -163,7 +212,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 HeightMax = HeightMax,
                 PeakWavelength = PeakWavelength,
                 EnableClimateOverrides = EnableClimateOverrides,
-                Climate = BuildClimate(seed, noise),
+                Climate = BuildClimate(seed),
                 OctaveWavelengths = new NativeArray<float>(OctaveWavelengths, allocator),
                 GlobalOctaveWeights = new NativeArray<float>(octaveCount, allocator),
                 Biomes = new NativeArray<Biome.BiomeDef>(active.Count, allocator),
@@ -189,19 +238,19 @@ namespace Engine.Scripts.WorldGen.Settings{
         }
 
         /// <summary>
-        ///     Climate instances: T, F, C from <paramref name="noise" /> (shared with the legacy path so both paths
-        ///     see the same climate), E and W from this asset. Each gets its own gradient salt (GEN-05).
+        ///     Climate instances T, F, C, E, W from this asset; the legacy <see cref="NoiseSettings" /> no longer takes
+        ///     part. Each instance gets its own gradient salt (GEN-05).
         /// </summary>
-        private ClimateParams BuildClimate(int seed, NoiseSettings noise){
+        private ClimateParams BuildClimate(int seed){
             return new ClimateParams{
-                Temperature = new NoiseProfile(noise.temperatureProfile.ToStruct(seed, HashSalts.TemperatureNoise)),
-                Humidity = new NoiseProfile(noise.humidityProfile.ToStruct(seed, HashSalts.HumidityNoise)),
-                Continental = new WarpedNoiseLayer(noise.continentalLayer.ToStruct(seed,
+                Temperature = new NoiseProfile(temperatureProfile.ToStruct(seed, HashSalts.TemperatureNoise)),
+                Humidity = new NoiseProfile(humidityProfile.ToStruct(seed, HashSalts.HumidityNoise)),
+                Continental = new WarpedNoiseLayer(continentalLayer.ToStruct(seed,
                     HashSalts.ContinentalNoise, HashSalts.ContinentalWarpX, HashSalts.ContinentalWarpY)),
                 Erosion = new NoiseProfile(erosionProfile.ToStruct(seed, HashSalts.ErosionNoise)),
                 Weirdness = new NoiseProfile(weirdnessProfile.ToStruct(seed, HashSalts.WeirdnessNoise)),
-                ContinentalHumidityInfluence = noise.ContinentalHumidityInfluence,
-                ContinentalTemperatureInfluence = noise.ContinentalTemperatureInfluence,
+                ContinentalHumidityInfluence = ContinentalHumidityInfluence,
+                ContinentalTemperatureInfluence = ContinentalTemperatureInfluence,
                 WGain = WGain,
                 FrequencyScale = ClimateFrequencyScale
             };
@@ -262,6 +311,11 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["PeakWavelength"] = PeakWavelength,
                 ["WGain"] = WGain,
                 ["ClimateFrequencyScale"] = ClimateFrequencyScale,
+                ["TemperatureProfile"] = ProfileTree(temperatureProfile),
+                ["HumidityProfile"] = ProfileTree(humidityProfile),
+                ["ContinentalLayer"] = LayerTree(continentalLayer),
+                ["ContinentalHumidityInfluence"] = ContinentalHumidityInfluence,
+                ["ContinentalTemperatureInfluence"] = ContinentalTemperatureInfluence,
                 ["ErosionProfile"] = ProfileTree(erosionProfile),
                 ["WeirdnessProfile"] = ProfileTree(weirdnessProfile),
                 ["EnableClimateOverrides"] = EnableClimateOverrides,
@@ -281,6 +335,19 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["Persistance"] = p.persistance,
                 ["Lacunarity"] = p.lacunarity,
                 ["Octaves"] = p.octaves
+            };
+        }
+
+        private static Dictionary<string, object> LayerTree(WarpedNoiseLayerSettings l){
+            if (l == null) return null;
+            List<object> curve = new();
+            if (l.redistributionCurve != null)
+                foreach (Keyframe k in l.redistributionCurve.keys) curve.Add(new[]{ k.time, k.value });
+            return new Dictionary<string, object>{
+                ["BaseNoise"] = ProfileTree(l.baseNoise),
+                ["WarpNoise"] = ProfileTree(l.warpNoise),
+                ["WarpStrength"] = l.warpStrength,
+                ["RedistributionCurve"] = curve
             };
         }
 

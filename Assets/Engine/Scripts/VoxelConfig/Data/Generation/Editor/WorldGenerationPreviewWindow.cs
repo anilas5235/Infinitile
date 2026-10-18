@@ -501,7 +501,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
             }
 
             try{
-                _generatorConfig.WorldGen = _settings.WorldGen.ToConfig(_settings.Seed, _settings.Noise);
+                _generatorConfig.WorldGen = _settings.WorldGen.ToConfig(_settings.Seed);
                 return true;
             }
             catch (System.Exception e){
