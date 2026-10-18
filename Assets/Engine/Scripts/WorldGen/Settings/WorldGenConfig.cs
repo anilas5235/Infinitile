@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using Engine.Scripts.Noise;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Core;
+using Engine.Scripts.WorldGen.Height;
 using Engine.Scripts.WorldGen.Noise;
 using Unity.Collections;
 
@@ -80,6 +81,21 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// </summary>
         [ReadOnly] public NativeArray<float> OctaveCoefficients;
 
+        /// <summary>Flattened Terrain-first spline trees (TRN-01, TRN-05), pre-ordered per root. Owned.</summary>
+        [ReadOnly] public NativeArray<SplineNode> SplineNodes;
+
+        /// <summary>Control points of <see cref="SplineNodes" />. Owned.</summary>
+        [ReadOnly] public NativeArray<SplinePoint> SplinePoints;
+
+        /// <summary>Offset(C,E,PV) root; NodeCount 0 when no spline set is assigned.</summary>
+        public SplineRoot OffsetSpline;
+
+        /// <summary>Amp(C,E,PV) root.</summary>
+        public SplineRoot AmpSpline;
+
+        /// <summary>J(C,E,PV) root (own extension, TRN-04).</summary>
+        public SplineRoot JaggednessSpline;
+
         /// <summary>Number of detail octaves K.</summary>
         public int OctaveCount => OctaveWavelengths.IsCreated ? OctaveWavelengths.Length : 0;
 
@@ -140,7 +156,9 @@ namespace Engine.Scripts.WorldGen.Settings{
                 OctaveWavelengths = new NativeArray<float>(0, allocator),
                 GlobalOctaveWeights = new NativeArray<float>(0, allocator),
                 Biomes = new NativeArray<Biome.BiomeDef>(0, allocator),
-                OctaveCoefficients = new NativeArray<float>(0, allocator)
+                OctaveCoefficients = new NativeArray<float>(0, allocator),
+                SplineNodes = new NativeArray<SplineNode>(0, allocator),
+                SplinePoints = new NativeArray<SplinePoint>(0, allocator)
             };
         }
 
@@ -167,6 +185,8 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (GlobalOctaveWeights.IsCreated) GlobalOctaveWeights.Dispose();
             if (Biomes.IsCreated) Biomes.Dispose();
             if (OctaveCoefficients.IsCreated) OctaveCoefficients.Dispose();
+            if (SplineNodes.IsCreated) SplineNodes.Dispose();
+            if (SplinePoints.IsCreated) SplinePoints.Dispose();
         }
     }
 }
