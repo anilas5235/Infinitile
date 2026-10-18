@@ -145,10 +145,12 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
 
                 CMeshBuildJob.PartitionJobResult result = _results[pos];
 
+                partition.MarkMeshChanged(); // F-04: a bake of the previous mesh is stale
                 _colliderMeshes[result.Index] = partition.ColliderMesh;
                 partition.ColliderMesh.bounds = result.ColliderBounds;
             }
 
+            _chunkPool.NotifyPartitionMeshWriting(); // F-04: a running bake may still read these meshes
             Mesh.ApplyAndDisposeWritableMeshData(
                 _colliderMeshDataArray,
                 _colliderMeshes,

@@ -17,7 +17,8 @@ namespace Engine.Scripts.Jobs.ColliderBake{
     public class ColliderBakeScheduler : JobScheduler{
         private readonly ChunkManager _chunkManager;
         private readonly ChunkPool _chunkPool;
-        private readonly Dictionary<int3, ChunkPartition> _meshes;
+        // F-04: the mesh version at Start tells Complete whether the partition's mesh changed during the bake
+        private readonly Dictionary<int3, (ChunkPartition partition, int meshVersion)> _meshes;
 
         /// <summary>
         ///     Indicates whether the scheduler is ready to accept a new batch of collider build jobs.
@@ -36,9 +37,12 @@ namespace Engine.Scripts.Jobs.ColliderBake{
         internal ColliderBakeScheduler(ChunkManager chunkManager, ChunkPool chunkPool){
             _chunkManager = chunkManager;
             _chunkPool = chunkPool;
-            _meshes = new Dictionary<int3, ChunkPartition>();
+            _meshes = new Dictionary<int3, (ChunkPartition, int)>();
 
             _jobs = new NativeList<int>(Allocator.Persistent);
+
+            // F-04: Physics.BakeMesh reads the collider mesh; finish it before the pool or the mesher rewrites one.
+            _chunkPool.PartitionMeshWriting += CompleteJobIfRunning;
         }
 
         /// <summary>
@@ -59,7 +63,7 @@ namespace Engine.Scripts.Jobs.ColliderBake{
             _meshes.EnsureCapacity(jobs.Count); // PERF-04: no growth once the batch size is reached
             foreach (int3 partitionPos in jobs){
                 ChunkPartition behaviour = _chunkPool.GetPartition(partitionPos);
-                _meshes.Add(partitionPos, behaviour);
+                _meshes.Add(partitionPos, (behaviour, behaviour.MeshVersion));
                 if (behaviour.ColliderMesh.vertexCount > 0)
                     // Avoid colliders for empty meshes
                     _jobs.Add(behaviour.ColliderMesh.GetInstanceID());
@@ -82,10 +86,12 @@ namespace Engine.Scripts.Jobs.ColliderBake{
 #endif
             _handle.Complete();
 
-            foreach ((int3 position, ChunkPartition behaviour) in _meshes){
-                // F-04: the pool may have reclaimed (or re-claimed with another object) this partition while the
-                // bake ran; its result belongs to a mesh that is no longer at this position.
-                if (!_chunkPool.IsPartitionActive(position) || _chunkPool.GetPartition(position) != behaviour) continue;
+            foreach ((int3 position, (ChunkPartition behaviour, int meshVersion)) in _meshes){
+                // F-04: the pool may have reclaimed (and possibly re-claimed, which reuses the same object) this
+                // partition, or the mesher may have rewritten its mesh while the bake ran; the result is stale then.
+                // A re-meshed partition keeps its re-collide flag, a reclaimed one is not collidable, so both re-bake.
+                if (!_chunkPool.IsPartitionActive(position) || _chunkPool.GetPartition(position) != behaviour ||
+                    behaviour.MeshVersion != meshVersion) continue;
 
                 _chunkPool.ColliderBaked(position);
                 _chunkManager.ReCollidedPartition(position);
@@ -113,9 +119,17 @@ namespace Engine.Scripts.Jobs.ColliderBake{
         }
 
         /// <summary>
+        ///     F-04: waits for the running bake job; its results are still applied by <see cref="Complete" />.
+        /// </summary>
+        private void CompleteJobIfRunning(){
+            _handle.Complete();
+        }
+
+        /// <summary>
         ///     Disposes the scheduler, ensuring all jobs are completed and native resources are released.
         /// </summary>
         internal void Dispose(){
+            _chunkPool.PartitionMeshWriting -= CompleteJobIfRunning;
             _handle.Complete();
 
             _jobs.Dispose();

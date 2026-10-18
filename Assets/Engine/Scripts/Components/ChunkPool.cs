@@ -29,6 +29,12 @@ namespace Engine.Scripts.Components{
         private readonly ObjectPool<ChunkBehaviour> _pool;
         internal Action<int2> OnChunkEvicted;
         internal Action<int3> OnPartitionEvicted;
+
+        /// <summary>
+        ///     F-04: raised before a partition's collider mesh is cleared or rewritten. A collider bake job may still be
+        ///     reading that mesh, so listeners finish it first.
+        /// </summary>
+        internal Action PartitionMeshWriting;
         private bool _emitEvictionEvents = true;
 
         private Focus _focus;
@@ -159,6 +165,7 @@ namespace Engine.Scripts.Components{
             ChunkBehaviour behaviour = GetOrClaimChunk(position.xz);
             ChunkPartition partition = behaviour.GetPartition(position.y);
 
+            PartitionMeshWriting?.Invoke(); // F-04
             partition.Clear();
             _meshMap.Add(position, partition);
             _partitionQueue.Enqueue(position, PriorityCalc(position));
@@ -186,6 +193,7 @@ namespace Engine.Scripts.Components{
 
         private void ReclaimPartition(int3 partitionPos){
             if (_meshMap.TryGetValue(partitionPos, out ChunkPartition reclaimPartition)){
+                PartitionMeshWriting?.Invoke(); // F-04
                 reclaimPartition.Clear();
                 _meshMap.Remove(partitionPos);
             }
@@ -195,6 +203,13 @@ namespace Engine.Scripts.Components{
             _colliderSet.Remove(partitionPos);
 
             if (_emitEvictionEvents) OnPartitionEvicted?.Invoke(partitionPos);
+        }
+
+        /// <summary>
+        ///     F-04: tells listeners that collider meshes of active partitions are about to be rewritten.
+        /// </summary>
+        internal void NotifyPartitionMeshWriting(){
+            PartitionMeshWriting?.Invoke();
         }
 
         /// <summary>
@@ -208,6 +223,7 @@ namespace Engine.Scripts.Components{
             _emitEvictionEvents = false;
             OnChunkEvicted = null;
             OnPartitionEvicted = null;
+            PartitionMeshWriting = null;
         }
     }
 }
