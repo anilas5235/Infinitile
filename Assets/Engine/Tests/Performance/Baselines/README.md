@@ -33,7 +33,7 @@ Same machine and settings as above. Phase C adds the CPU frustum reference and s
 | CMeshBuildJob.Run, fully solid partition (y=1) | CMeshBuildJob.Run solid ms/partition | 6.60 ms | 6.38 ms | 6.96 ms | -26 % |
 | UnsafeIntervalList.Set, 10^4 random edits, chunk-sized list | UnsafeIntervalList.Set 10k edits ms | 10.39 ms | 10.24 ms | 10.60 ms | -7 % |
 | PageAllocator, fill one buffer with 3-page partitions and release all | PageAllocator fill+release 1 buffer ms | 0.47 ms | 0.43 ms | 0.55 ms | +2 % |
-| FrustumCulling.IsVisible, 1024 page AABBs vs 6 planes (managed C#, no Burst) | FrustumCulling.IsVisible 1024 pages us | 2248 us | 2216 us | 3160 us | new |
+| FrustumCulling.IsVisible, 1024 page AABBs vs 6 planes, 10 passes per sample (managed C#, no Burst) | FrustumCulling.IsVisible 1024 pages us | 2248 us | 2216 us | 3160 us | new |
 
 PERF-03: no benchmark is more than 10 % slower than the 2026-10-17 baseline (the page allocator pays
 about 2 % for writing the bounds per page). The collider mesh and interval list numbers improved; nothing in
@@ -42,7 +42,9 @@ in between), not a code change.
 
 The frustum reference is deliberately plain managed C# over `Unity.Mathematics` (it is the oracle the GPU
 test is compared with, PERF-02 "CPU frustum test reference"), so its cost says what a CPU fallback would cost
-without Burst, about 2.2 us per page in Mono with safety checks on. The GPU kernel tests the same 1024 pages
+without Burst. Each sample covers 10 passes over the buffer (`IterationsPerMeasurement(10)`; the Performance
+Testing package records the total, not the mean), so one buffer costs about 225 us, about 0.22 us per page in
+Mono with safety checks on. The GPU kernel tests the same 1024 pages
 in one dispatch of 8 thread groups.
 
 ## Re-running

@@ -120,8 +120,9 @@ namespace Engine.Scripts.Render{
             BufferCullLists lists = state.GetLists(this);
 
             culler.Cull(this, lists.Main, state.Planes, float3.zero, parameters.CullingEnabled);
+            // the main pass only stops casting; it still receives shadows when they are on, as before Phase C
             Graphics.DrawProceduralIndirect(mat, DrawBounds, MeshTopology.Triangles, lists.Main.Args, 0, cam,
-                lists.Main.PropertyBlock, ShadowCastingMode.Off, false);
+                lists.Main.PropertyBlock, ShadowCastingMode.Off, parameters.Shadows);
 
             if (!parameters.Shadows) return;
             culler.Cull(this, lists.Shadow, state.Planes, parameters.ShadowExtrusion, parameters.CullingEnabled);
