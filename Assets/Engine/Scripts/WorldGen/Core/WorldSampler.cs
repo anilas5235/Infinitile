@@ -94,9 +94,17 @@ namespace Engine.Scripts.WorldGen.Core{
                 s.NormalizedHeight = NormalizedHeight(s.Height, cfg);
             }
 
-            s.DominantMaterialBiome = biomeCount > 0 ? s.MaterialWeights.ArgMax(biomeCount) : -1;
-            // §9.6: dithered surface pick from the material weights (BLD-40); one-hot weights return their biome (BLD-41).
-            s.SurfaceSource = SurfacePick.Pick(x, z, cfg.Seed, HashSalts.SurfacePick, s.MaterialWeights, biomeCount);
+            if (cfg.MaterialMethod == BlendMethod.None){
+                // One-hot weights: argmax and the dithered pick are the hard class itself (BLD-41), so method 1 skips
+                // both (PERF-03: the method-1 path keeps its Phase 2 cost).
+                s.DominantMaterialBiome = s.HardBiome;
+                s.SurfaceSource = s.HardBiome;
+            }
+            else{
+                s.DominantMaterialBiome = biomeCount > 0 ? s.MaterialWeights.ArgMax(biomeCount) : -1;
+                // §9.6: dithered surface pick from the material weights (BLD-40).
+                s.SurfaceSource = SurfacePick.Pick(x, z, cfg.Seed, HashSalts.SurfacePick, s.MaterialWeights, biomeCount);
+            }
 
             s.Clamped = s.Height != unclamped;
             s.ColumnHeight = (int)math.floor(s.Height);

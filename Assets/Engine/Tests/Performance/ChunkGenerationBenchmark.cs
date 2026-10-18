@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
+using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -13,6 +15,12 @@ namespace Engine.Tests.Performance{
     ///     PERF-02: chunk data generation, ms per chunk on a single worker (ChunkJob.Run). One sample group per
     ///     architecture: the Terrain-first sampler (Phase 1) and the Biome-first sampler (Phase 2). Both write the
     ///     chunk through the same RLE path. The legacy "TerrainRle" row ended with the legacy generator (INT-40).
+    ///     <para>
+    ///         Phase 3 adds one row per architecture x blend method (PERF-02). The cost of the spatial methods
+    ///         depends on how many columns lie near a boundary, so these rows average over a fixed set of
+    ///         <see cref="MethodChunkCount" /> scattered chunks instead of the single chunk of the rows above, which
+    ///         stay as they are for comparison with earlier baselines (PERF-03).
+    ///     </para>
     /// </summary>
     [TestFixture]
     internal class ChunkGenerationBenchmark{
@@ -29,7 +37,7 @@ namespace Engine.Tests.Performance{
             _config = BenchmarkFixtures.CreateGeneratorConfig(Allocator.Persistent);
             _jobs = new NativeList<int2>(1, Allocator.Persistent);
             _jobs.Add(new int2(3, -7));
-            _results = new NativeParallelHashMap<int2, ChunkVoxelData>(1, Allocator.Persistent);
+            _results = new NativeParallelHashMap<int2, ChunkVoxelData>(MethodChunkCount, Allocator.Persistent);
         }
 
         [TearDown]
@@ -82,6 +90,38 @@ namespace Engine.Tests.Performance{
                 .IterationsPerMeasurement(1)
                 .CleanUp(DisposeResults)
                 .Run();
+        }
+
+        private const int MethodChunkCount = 16;
+
+        [Test]
+        [Performance]
+        public void ChunkJob_Run_PerMethod_MsPerChunk(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,
+            [Values(BlendMethod.None, BlendMethod.DistanceBlend, BlendMethod.DistortedBoundary, BlendMethod.ParameterSpaceWeighting)]
+            BlendMethod method){
+            BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
+            _config = BenchmarkFixtures.CreateSpecGeneratorConfig(architecture, method, Allocator.Persistent, _created);
+            _jobs.Clear();
+            Random rng = new(42);
+            for (int i = 0; i < MethodChunkCount; i++) _jobs.Add(rng.NextInt2(-1000, 1000));
+            ChunkJob job = new(){
+                Jobs = _jobs,
+                Results = _results.AsParallelWriter(),
+                RandomSeed = _config.GlobalSeed,
+                Config = _config
+            };
+
+            // Measure.Method records the time of one call; one call here generates all chunks, so the per-chunk mean
+            // is recorded with Measure.Custom instead.
+            SampleGroup group = new($"ChunkJob.Run {architecture} {method} ms/chunk", SampleUnit.Millisecond);
+            for (int i = 0; i < WarmupCount + MeasurementCount; i++){
+                Stopwatch watch = Stopwatch.StartNew();
+                job.Run(_jobs.Length);
+                watch.Stop();
+                DisposeResults();
+                if (i >= WarmupCount) Measure.Custom(group, watch.Elapsed.TotalMilliseconds / MethodChunkCount);
+            }
         }
 
         private void DisposeResults(){

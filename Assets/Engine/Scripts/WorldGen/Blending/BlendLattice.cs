@@ -13,9 +13,10 @@ namespace Engine.Scripts.WorldGen.Blending{
     ///     <para>
     ///         PERF-07 early-out: a lattice point is a boundary point when one of its 8 neighbours (inside the
     ///         lattice) has another class; <see cref="BoundarySat" /> is the summed-area table of that mask. A kernel
-    ///         window whose bounding box holds no boundary point is a single class (the box is connected, so two
-    ///         different classes in it would need two differing neighbours, both flagged), and the kernel blend of a
-    ///         single class is exactly one-hot (Σk / Σk = 1).
+    ///         window whose bounding box holds no boundary point is a single class (the box is connected and lies
+    ///         inside the lattice, so two different classes in it would need two differing neighbours inside the
+    ///         lattice, both flagged), and the kernel blend of a single class is exactly one-hot (Σk / Σk = 1). No
+    ///         margin beyond the kernel reach is therefore needed.
     ///     </para>
     ///     Lives in Allocator.Temp inside the job that builds it (INT-12).
     /// </summary>
@@ -39,13 +40,12 @@ namespace Engine.Scripts.WorldGen.Blending{
 
         /// <summary>
         ///     Classifies every lattice point that a kernel with reach <paramref name="reach" /> can touch from a
-        ///     column in [<paramref name="minColumn" />, <paramref name="maxColumn" />] (inclusive), plus one point of
-        ///     margin for the boundary mask.
+        ///     column in [<paramref name="minColumn" />, <paramref name="maxColumn" />] (inclusive).
         /// </summary>
         public static BlendLattice Build(int2 minColumn, int2 maxColumn, int reach, int stride, bool warped,
             in WorldGenConfig cfg, Allocator allocator){
-            int2 lo = FloorDiv(minColumn - reach, stride) - 1;
-            int2 hi = FloorDiv(maxColumn + reach, stride) + 1;
+            int2 lo = FloorDiv(minColumn - reach, stride);
+            int2 hi = FloorDiv(maxColumn + reach, stride);
             BlendLattice lattice = new(){
                 Origin = lo * stride,
                 Size = hi - lo + 1,

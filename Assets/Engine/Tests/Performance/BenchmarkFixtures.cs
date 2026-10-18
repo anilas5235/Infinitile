@@ -83,20 +83,27 @@ namespace Engine.Tests.Performance{
         ///     ScriptableObjects are returned so the caller can destroy them.
         /// </summary>
         internal static GeneratorConfig CreateTerrainFirstGeneratorConfig(Allocator allocator, List<Object> created){
-            return CreateSpecGeneratorConfig(GenArchitecture.TerrainFirst, allocator, created);
+            return CreateSpecGeneratorConfig(GenArchitecture.TerrainFirst, BlendMethod.None, allocator, created);
         }
 
         /// <summary>Same world as <see cref="CreateTerrainFirstGeneratorConfig" /> on the Biome-first sampler (Phase 2).</summary>
         internal static GeneratorConfig CreateBiomeFirstGeneratorConfig(Allocator allocator, List<Object> created){
-            return CreateSpecGeneratorConfig(GenArchitecture.BiomeFirst, allocator, created);
+            return CreateSpecGeneratorConfig(GenArchitecture.BiomeFirst, BlendMethod.None, allocator, created);
         }
 
-        private static GeneratorConfig CreateSpecGeneratorConfig(GenArchitecture architecture, Allocator allocator, List<Object> created){
+        /// <summary>
+        ///     The same world with blend method <paramref name="method" /> on the material stage and, in Biome-first, on
+        ///     the height stage too (PERF-02 "per architecture x method", Phase 3); strengths are the spec defaults.
+        /// </summary>
+        internal static GeneratorConfig CreateSpecGeneratorConfig(GenArchitecture architecture, BlendMethod method,
+            Allocator allocator, List<Object> created){
             GeneratorConfig config = CreateGeneratorConfig(allocator);
             config.WorldGen.Dispose(); // replaced by the six-biome world below
 
             WorldGenSettings settings = Create<WorldGenSettings>("WG", created);
             settings.Architecture = architecture;
+            settings.MaterialMethod = method;
+            settings.HeightMethod = architecture == GenArchitecture.BiomeFirst ? method : BlendMethod.None;
             settings.Splines = Create<TerrainSplineSet>("Splines", created);
             settings.Splines.ResetToPlaceholders();
             BiomeSet set = Create<BiomeSet>("Set", created);
