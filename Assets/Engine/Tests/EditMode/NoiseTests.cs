@@ -123,6 +123,38 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void WarpedNoiseLayer_Redistribution_ClampsOutsideAndIsPiecewiseLinearInside(){
+            // The curve covers only [0.4, 0.6] of the raw range: below the first point it returns the first y, above
+            // the last point the last y, and between points it interpolates linearly (3 points, 2 segments).
+            float2[] points ={ new(0.4f, 0.1f), new(0.5f, 0.3f), new(0.6f, 0.9f) };
+            WarpedNoiseLayer curved = Layer(7, points, 0f);
+            NoiseProfile baseNoise = WarpProfile(Layer(7, null, 0f), "_baseNoise");
+            int below = 0, above = 0, inside = 0;
+            foreach (float2 position in SamplePositions()){
+                float raw = baseNoise.GetNoise(position);
+                float expected;
+                if (raw <= 0.4f){
+                    expected = 0.1f;
+                    below++;
+                }
+                else if (raw >= 0.6f){
+                    expected = 0.9f;
+                    above++;
+                }
+                else{
+                    expected = raw <= 0.5f ? math.lerp(0.1f, 0.3f, (raw - 0.4f) / 0.1f) : math.lerp(0.3f, 0.9f, (raw - 0.5f) / 0.1f);
+                    inside++;
+                }
+
+                Assert.AreEqual(expected, curved.GetNoise(position), 1e-5f, $"raw {raw} at {position}");
+            }
+
+            Assert.That(below, Is.GreaterThan(0), "no sample below the curve");
+            Assert.That(above, Is.GreaterThan(0), "no sample above the curve");
+            Assert.That(inside, Is.GreaterThan(0), "no sample inside the curve");
+        }
+
+        [Test]
         public void WarpedNoiseLayer_WarpChannelsDiffer(){
             // F-06 intent at struct level: the Y channel has its own salt, decorrelating the X and Y warp channels (GEN-05).
             WarpedNoiseLayer layer = Layer(7, null);

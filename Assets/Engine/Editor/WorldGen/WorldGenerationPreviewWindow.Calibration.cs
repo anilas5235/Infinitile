@@ -22,7 +22,7 @@ namespace Engine.Editor.WorldGen{
                 _calibrationFoldout = EditorGUILayout.Foldout(_calibrationFoldout, "Height calibration (BIO-20)", true, EditorStyles.foldoutHeader);
                 if (_calibrationFoldout){
                     EditorGUILayout.LabelField(
-                        "Samples the Terrain-first pipeline of the assigned settings over the framed area, groups the columns by their Terrain-first biome and suggests Offset = mean H, Amplitude from the detail residual spread and Jaggedness = mean J. Nothing is written until you click Apply.",
+                        "Samples the Terrain-first pipeline of the assigned settings over the framed area, groups the columns by their Terrain-first biome and suggests Jaggedness = mean J, Offset = mean H − Jaggedness · mean P (the ridge term is not counted twice) and Amplitude from the detail residual spread. Nothing is written until you click Apply.",
                         EditorStyles.wordWrappedMiniLabel);
 
                     WorldGenSettings settings = WorldGenSettings;
@@ -71,7 +71,7 @@ namespace Engine.Editor.WorldGen{
             for (int i = 0; i < _suggestions.Length; i++){
                 BiomeFirstCalibration.Suggestion s = _suggestions[i];
                 Biome biome = BiomeAt(settings, s.Biome);
-                bool applicable = biome && s.Count > 0;
+                bool applicable = Applicable(s, biome);
                 anyApplicable |= applicable;
                 EditorGUILayout.BeginHorizontal();
                 {
@@ -99,10 +99,16 @@ namespace Engine.Editor.WorldGen{
             {
                 using (new EditorGUI.DisabledScope(!anyApplicable)){
                     if (GUILayout.Button("Apply all")){
+                        // One undo step for the whole table.
+                        Undo.IncrementCurrentGroup();
+                        Undo.SetCurrentGroupName("Apply all Biome-first height calibrations");
+                        int group = Undo.GetCurrentGroup();
                         for (int i = 0; i < _suggestions.Length; i++){
                             Biome biome = BiomeAt(settings, _suggestions[i].Biome);
-                            if (biome && _suggestions[i].Count > 0) ApplySuggestion(i, biome);
+                            if (Applicable(_suggestions[i], biome)) ApplySuggestion(i, biome);
                         }
+
+                        Undo.CollapseUndoOperations(group);
                     }
                 }
 
@@ -116,6 +122,14 @@ namespace Engine.Editor.WorldGen{
 
         private static string Pair(float current, float suggested){
             return $"{current:0.##} -> {suggested:0.##}";
+        }
+
+        /// <summary>
+        ///     A suggestion is applied only to the biome it was computed for: the biome list may have been reordered
+        ///     or edited since the run, so the slot must still hold a biome of the same name.
+        /// </summary>
+        private static bool Applicable(BiomeFirstCalibration.Suggestion s, Biome biome){
+            return biome && biome.name == s.Name && s.Count > 0;
         }
 
         private static Biome BiomeAt(WorldGenSettings settings, int index){

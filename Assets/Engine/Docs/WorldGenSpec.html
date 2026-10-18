@@ -461,7 +461,7 @@ Height:          H(p) = Offset(p) + Σ_i a_i(p) · N_i(p) + J(p) · P(p)   ≡  
 <div class="req"><span class="id">BIO-11</span><span class="kw must">MUST</span>With method 4 and σ → 0, Biome-first output converges to the hard-boundary version (TST-06).</div>
 
 <h3>8.5 Height calibration helper</h3>
-<div class="req"><span class="id">BIO-20</span><span class="kw should">SHOULD</span>Editor tool <em>"Suggest Biome-first height parameters from Terrain-first"</em>: sample Terrain-first over the current preview area, group columns by their Terrain-first biome, and suggest <code>Offset_b</code> = mean H, <code>HeightAmplitude_b</code> from the standard deviation of the detail residual, <code>Jaggedness_b</code> from the mean J. Shows suggestions next to current values; writes nothing without an explicit click. Purpose: both architectures produce similar overall height distributions.</div>
+<div class="req"><span class="id">BIO-20</span><span class="kw should">SHOULD</span>Editor tool <em>"Suggest Biome-first height parameters from Terrain-first"</em>: sample Terrain-first over the current preview area, group columns by their Terrain-first biome, and suggest <code>Offset_b</code> = mean H − <code>Jaggedness_b</code>·mean P (the ridge term J·P is non-negative and Biome-first adds it again; clarified 2026-10-18), <code>HeightAmplitude_b</code> from the standard deviation of the detail residual, <code>Jaggedness_b</code> from the mean J. Shows suggestions next to current values; writes nothing without an explicit click. Purpose: both architectures produce similar overall height distributions.</div>
 
 <!-- ============================================================ -->
 <h2 id="s9">9 · Blending methods</h2>

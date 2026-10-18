@@ -725,7 +725,7 @@ namespace Engine.Editor.WorldGen{
         ///     same <see cref="BiomeClassifier" /> as the sampler, so the plane is the hard class the world would get
         ///     at those field values (GEN-23 tie rule included).
         /// </summary>
-        [BurstCompile]
+        [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
         private struct DistributionJob : IJobParallelFor{
             public int Resolution;
             public float Continental;

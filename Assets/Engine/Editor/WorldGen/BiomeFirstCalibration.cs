@@ -13,8 +13,11 @@ namespace Engine.Editor.WorldGen{
     /// <summary>
     ///     BIO-20: "Suggest Biome-first height parameters from Terrain-first". Samples the Terrain-first pipeline of
     ///     the same settings over a region, groups the columns by their Terrain-first (6D) biome and suggests per
-    ///     biome b: Offset_b = mean H, Jaggedness_b = mean J and HeightAmplitude_b from the standard deviation of the
-    ///     detail residual r = H − Offset − J·P = Amp·Σ g_i N_i. Biome-first produces the detail term
+    ///     biome b: Jaggedness_b = mean J, Offset_b = mean H − Jaggedness_b · mean P and HeightAmplitude_b from the
+    ///     standard deviation of the detail residual r = H − Offset − J·P = Amp·Σ g_i N_i. The ridge term is
+    ///     non-negative (mean P ≈ 0.4…0.5), so Offset_b = mean H alone would lift every jagged biome by about
+    ///     J_b · mean P in Biome-first; subtracting it makes the Biome-first mean height match (decision 2026-10-18).
+    ///     Biome-first produces the detail term
     ///     HeightAmplitude_b · Σ w_{b,i} N_i with the biome's own octave weights w_b, so the amplitude that matches
     ///     the Terrain-first spread is std(r) / std(Σ w_{b,i} N_i) over the biome's columns. Clamped columns (GEN-12)
     ///     are skipped because their H no longer follows the formula.
@@ -127,12 +130,13 @@ namespace Engine.Editor.WorldGen{
                     if (n > 0){
                         double meanH = stats[b * StatCount + StatCount_SumH] / n;
                         double meanJ = stats[b * StatCount + StatCount_SumJ] / n;
+                        double meanP = stats[b * StatCount + StatCount_SumP] / n;
                         double meanR = stats[b * StatCount + StatCount_SumR] / n;
                         double varR = math.max(0.0, stats[b * StatCount + StatCount_SumR2] / n - meanR * meanR);
                         double meanD = stats[b * StatCount + StatCount_SumD] / n;
                         double varD = math.max(0.0, stats[b * StatCount + StatCount_SumD2] / n - meanD * meanD);
-                        s.Offset = (float)meanH;
                         s.Jaggedness = (float)meanJ;
+                        s.Offset = (float)(meanH - s.Jaggedness * meanP);
                         s.AmplitudeAvailable = varD > 1e-12;
                         s.Amplitude = s.AmplitudeAvailable ? (float)math.sqrt(varR / varD) : biome.HeightAmplitude;
                     }
@@ -163,7 +167,7 @@ namespace Engine.Editor.WorldGen{
             return result;
         }
 
-        private const int StatCount = 7;
+        private const int StatCount = 8;
         private const int StatCount_N = 0;
         private const int StatCount_SumH = 1;
         private const int StatCount_SumJ = 2;
@@ -171,13 +175,15 @@ namespace Engine.Editor.WorldGen{
         private const int StatCount_SumR2 = 4;
         private const int StatCount_SumD = 5;
         private const int StatCount_SumD2 = 6;
+        private const int StatCount_SumP = 7;
 
         /// <summary>
-        ///     Per-biome sums over the region in double precision: n, ΣH, ΣJ, Σr, Σr², ΣD_b, ΣD_b² with
+        ///     Per-biome sums over the region in double precision: n, ΣH, ΣJ, Σr, Σr², ΣD_b, ΣD_b², ΣP with
         ///     r = Amp(p) · Σ_i g_i N_i(p) (the Terrain-first detail residual) and D_b = Σ_i w_{b,i} N_i(p) (the
-        ///     biome's own detail with its current octave weights). One sampler call per column (INT-10).
+        ///     biome's own detail with its current octave weights) and P the shared peak noise (BIO-03). One sampler
+        ///     call per column (INT-10).
         /// </summary>
-        [BurstCompile]
+        [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
         private struct CalibrationJob : IJob{
             [ReadOnly] public WorldGenConfig Config;
             [ReadOnly] public NativeArray<float> Weights;
@@ -211,6 +217,7 @@ namespace Engine.Editor.WorldGen{
                     Stats[k + StatCount_SumR2] += r * r;
                     Stats[k + StatCount_SumD] += detailBiome;
                     Stats[k + StatCount_SumD2] += (double)detailBiome * detailBiome;
+                    Stats[k + StatCount_SumP] += PeakNoise.Sample(p, Config.PeakWavelength, Config.Seed);
                 }
             }
         }

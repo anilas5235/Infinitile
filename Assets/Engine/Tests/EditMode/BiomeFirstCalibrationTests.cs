@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Engine.Editor.WorldGen;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Core;
+using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
 using Unity.Collections;
@@ -12,7 +13,8 @@ using Object = UnityEngine.Object;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     BIO-20: the calibration helper suggests Offset_b = mean H, Jaggedness_b = mean J and HeightAmplitude_b
+    ///     BIO-20: the calibration helper suggests Jaggedness_b = mean J, Offset_b = mean H − Jaggedness_b · mean P and
+    ///     HeightAmplitude_b
     ///     from the detail residual of the Terrain-first reference, writes nothing and restores the settings.
     /// </summary>
     public class BiomeFirstCalibrationTests{
@@ -109,7 +111,7 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void TrySuggest_OffsetAndJaggednessAreTheTerrainFirstMeans(){
+        public void TrySuggest_JaggednessIsMeanJ_OffsetIsMeanHMinusRidgeMean(){
             Assert.IsTrue(BiomeFirstCalibration.TrySuggest(_settings, Seed, Origin, Size, Stride, out BiomeFirstCalibration.Suggestion[] s, out string error), error);
 
             // Recompute the per-biome means over the unclamped columns straight from the Terrain-first sampler.
@@ -117,7 +119,7 @@ namespace Engine.Tests.EditMode{
             WorldGenConfig cfg = _settings.ToConfig(Seed, null, Allocator.Temp);
             _settings.Architecture = GenArchitecture.BiomeFirst;
             try{
-                double[] n = new double[s.Length], sumH = new double[s.Length], sumJ = new double[s.Length];
+                double[] n = new double[s.Length], sumH = new double[s.Length], sumJ = new double[s.Length], sumP = new double[s.Length];
                 for (int y = 0; y < Size; y++)
                 for (int x = 0; x < Size; x++){
                     ColumnSample c = WorldSampler.SampleColumn(Origin.x + x * Stride, Origin.y + y * Stride, cfg);
@@ -125,13 +127,15 @@ namespace Engine.Tests.EditMode{
                     n[c.HardBiome] += 1;
                     sumH[c.HardBiome] += c.Height;
                     sumJ[c.HardBiome] += c.TerrainParams.z;
+                    sumP[c.HardBiome] += PeakNoise.Sample(new float2(Origin.x + x * Stride, Origin.y + y * Stride), cfg.PeakWavelength, cfg.Seed);
                 }
 
                 for (int b = 0; b < s.Length; b++){
                     Assert.AreEqual((int)n[b], s[b].Count, s[b].Name);
                     if (n[b] == 0) continue;
-                    Assert.AreEqual(sumH[b] / n[b], s[b].Offset, 1e-3, $"{s[b].Name} offset");
-                    Assert.AreEqual(sumJ[b] / n[b], s[b].Jaggedness, 1e-4, $"{s[b].Name} jaggedness");
+                    double meanJ = sumJ[b] / n[b];
+                    Assert.AreEqual(meanJ, s[b].Jaggedness, 1e-4, $"{s[b].Name} jaggedness");
+                    Assert.AreEqual(sumH[b] / n[b] - meanJ * (sumP[b] / n[b]), s[b].Offset, 1e-3, $"{s[b].Name} offset");
                 }
             }
             finally{

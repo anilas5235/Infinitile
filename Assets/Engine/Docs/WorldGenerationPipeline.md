@@ -46,9 +46,10 @@ flowchart LR
   views, and every edit rebuilds the preview (Undo included). It is the tool for iterating generation parameters.
 - **Height calibration** (`Editor/WorldGen/BiomeFirstCalibration.cs`, panel "Height calibration (BIO-20)" in the
   preview): samples the Terrain-first pipeline of the same settings over the framed area, groups the columns by
-  their Terrain-first biome and suggests Offset_b = mean H, Jaggedness_b = mean J and HeightAmplitude_b =
-  std(detail residual) / std(Σ OctaveWeights_{b,i} N_i), so both architectures produce similar height
-  distributions. Suggestions appear next to the current values; a biome is written only on its Apply click.
+  their Terrain-first biome and suggests Jaggedness_b = mean J, Offset_b = mean H − Jaggedness_b · mean P and
+  HeightAmplitude_b = std(detail residual) / std(Σ OctaveWeights_{b,i} N_i), so both architectures produce similar
+  height distributions. The J·mean P correction keeps the non-negative ridge term from lifting jagged biomes
+  (Mountain, Snow) above their Terrain-first mean height. Suggestions appear next to the current values; a biome is written only on its Apply click.
 - **Performance** (`Tests/Performance/ChunkGenerationBenchmark.cs`): `ChunkJob.Run BiomeFirst ms/chunk` replaces
   the legacy `TerrainRle` row; see `Tests/Performance/Baselines/README.md` for the Phase 2 numbers (PERF-02/03).
 
