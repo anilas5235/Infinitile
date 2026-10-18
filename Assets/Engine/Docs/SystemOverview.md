@@ -57,6 +57,7 @@ Important entry points:
 - `VoxelWorldRenderer`
 - `RenderBufferManager`
 - `RenderBuffer`
+- `GpuCuller`
 - `PointBuilderHandler`
 - `CopyPointsHandler`
 
@@ -127,6 +128,12 @@ It manages render buffers for solid, transparent, and foliage data, copies point
 ### `RenderBufferManager`
 Allocates and tracks global render buffers per material group.
 It is responsible for page allocation, release, and buffer rebuilds.
+Each `RenderBuffer` keeps a point count and a world-space AABB per page (`PageAllocator`, `PageBounds`).
+
+### `GpuCuller`
+Phase C GPU page culling (`PageCulling.compute`).
+It keeps a `CameraCullState` per camera (frustum planes, visible page list and indirect args per render buffer), culls every buffer per camera and frame, and drives the optional shadow pass with light-extruded bounds.
+`FrustumCulling` is the C# reference of the GPU test used by the tests.
 
 ### `PointBuilderHandler`
 Builds point data for a partition from voxel data using compute shaders.
