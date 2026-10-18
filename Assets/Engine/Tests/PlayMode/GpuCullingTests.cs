@@ -1,11 +1,14 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Render;
+using Engine.Scripts.World;
 using NUnit.Framework;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.TestTools.Constraints;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
@@ -35,8 +38,34 @@ namespace Engine.Tests.PlayMode{
 
         private const int MinPagesForComparison = 256;
         private const int MinPagesForTiming = 512;
-        private const int FrameSamples = 60;
-        private const int WarmupFrames = 10;
+
+        /// <summary>
+        ///     Draw distance for the timing comparison: at the scene default (6 chunks) the Editor is not GPU-bound
+        ///     and culling on/off measure the same frame time, so the world is reloaded with this distance.
+        /// </summary>
+        private const int TimingDrawDistance = 10;
+
+        private const int TimingWidth = 1280;
+        private const int TimingHeight = 720;
+
+        /// <summary>
+        ///     The viewpoint is rendered this many times per frame so the voxel draw dominates the GPU frame (one
+        ///     Editor frame is CPU-bound and its GPU time is mostly idle gaps, hiding the saving).
+        /// </summary>
+        private const int TimingCameraCount = 4;
+        /// <summary>
+        ///     Culling on and off are measured in interleaved rounds and compared by median frame time, so drift and
+        ///     spikes from whatever else uses the GPU (other windows, the Scene view) cancel out as far as possible.
+        /// </summary>
+        private const int TimingRounds = 5;
+        private const int FramesPerRound = 30;
+        private const int WarmupFrames = 5;
+
+        /// <summary>
+        ///     If the per-round medians of one state spread wider than this fraction of the overall median, the
+        ///     machine is too busy for a meaningful GPU comparison and only the page counts are asserted.
+        /// </summary>
+        private const double MaxRoundSpread = 0.3;
 
         private GameObject _cameraObject;
         private Camera _camera;
@@ -375,85 +404,201 @@ namespace Engine.Tests.PlayMode{
             yield return null;
         }
 
+        /// <summary>
+        ///     Reloads the game scene with another draw distance; the settings asset is shared in memory. Waits for
+        ///     an idle scheduler first: unloading the scene while a CMeshBuildJob runs frees the registry's
+        ///     VoxelRenderDefs under the job (shutdown order between DataImporter and VoxelWorld, not Phase C).
+        /// </summary>
+        private static IEnumerator ReloadWorldWithDrawDistance(int drawDistance){
+            float deadline = Time.realtimeSinceStartup + 300f;
+            while (!SchedulerSleeping() && Time.realtimeSinceStartup < deadline) yield return null;
+            VoxelWorld.Instance.Settings.Chunk.DrawDistance = drawDistance;
+            AsyncOperation load = SceneManager.LoadSceneAsync(PlayModeFixtures.SceneName, LoadSceneMode.Single);
+            while (!load.isDone) yield return null;
+            yield return PlayModeFixtures.LoadGameScene();
+        }
+
+        /// <summary>True when every scheduler handler sleeps, i.e. the world around the focus is fully built.</summary>
+        private static bool SchedulerSleeping(){
+            VoxelEngineScheduler scheduler =
+                PlayModeFixtures.GetPrivateField<VoxelEngineScheduler>(VoxelWorld.Instance, "_scheduler");
+            DataJobStateHandler data = PlayModeFixtures.GetPrivateField<DataJobStateHandler>(scheduler, "_dataJobHandler");
+            MeshJobStateHandler mesh = PlayModeFixtures.GetPrivateField<MeshJobStateHandler>(scheduler, "_meshJobHandler");
+            ColliderJobStateHandler collider =
+                PlayModeFixtures.GetPrivateField<ColliderJobStateHandler>(scheduler, "_colliderJobHandler");
+            return data.Sleeping && mesh.Sleeping && collider.Sleeping;
+        }
+
         [UnityTest]
-        [Timeout(180000)]
-        public IEnumerator CullingOnVsOff_AtFixedViewpoint_ReducesVisiblePages_AndLogsFrameTimes(){
-            // CUL-08 performance comparison: same viewpoint, culling on and off. The visible page count is the
-            // deterministic part (the kernel must cull something); frame times are logged, GPU time via
-            // FrameTimingManager where the platform provides it, else CPU frame time.
+        [Timeout(600000)]
+        public IEnumerator CullingOnVsOff_AtFixedViewpoint_ReducesVisiblePagesAndGpuTime(){
+            // CUL-08 performance comparison: same viewpoint, culling on and off, in a world with a larger draw
+            // distance so the draw is GPU-bound. The visible page count must drop and, where FrameTimingManager
+            // provides GPU times, the GPU frame time must drop too; CPU frame time is logged. The world is always
+            // reloaded with the default draw distance before anything is asserted (no yield in finally).
+            int originalDrawDistance = VoxelWorld.Instance.Settings.Chunk.DrawDistance;
+            yield return ReloadWorldWithDrawDistance(TimingDrawDistance);
             VoxelWorldRenderer renderer = Renderer();
-            yield return WaitForPages(renderer, MinPagesForTiming, 120f);
             GpuCuller culler = Culler(renderer);
-            Camera cam = GameCamera();
-            bool originalCulling = renderer.GpuCulling;
-            bool originalFreeze = renderer.FreezeCulling;
-            try{
+
+            string failure = null;
+            float deadline = Time.realtimeSinceStartup + 300f;
+            while (!(SchedulerSleeping() && SolidPages(renderer) >= MinPagesForTiming)){
+                if (Time.realtimeSinceStartup > deadline){
+                    failure = $"the world did not reach a steady state with {MinPagesForTiming} solid pages in 300 s";
+                    break;
+                }
+
+                yield return null;
+            }
+
+            // The test camera renders the game camera's view into a render texture every frame, independent of
+            // whether the Editor's Game view is visible, at a fixed resolution (the Game view may not render at all
+            // while the Test Runner covers it).
+            // Created after the reload: the fixture's camera belonged to the unloaded scene.
+            GameObject cameraObject = new("GpuCullingTests timing cameras");
+            Camera[] cameras = new Camera[TimingCameraCount];
+            RenderTexture target = new(TimingWidth, TimingHeight, 24);
+            if (failure == null){
+                Camera game = GameCamera(); // after the wait: the player (and its camera) spawns a few frames in
+                for (int i = 0; i < TimingCameraCount; i++){
+                    GameObject child = new($"camera {i}");
+                    child.transform.SetParent(cameraObject.transform, false);
+                    cameras[i] = child.AddComponent<Camera>();
+                    cameras[i].CopyFrom(game);
+                    cameras[i].targetTexture = target;
+                    cameras[i].enabled = true;
+                }
+
+                yield return null;
+                yield return null;
+            }
+
+            Camera cam = cameras[0];
+
+            uint visibleOn = 0, visibleOff = 0, allocated = 0;
+            int totalPages = 0;
+            FrameTimes on = new(), off = new();
+            if (failure == null){
                 renderer.FreezeCulling = true; // fixed viewpoint even if the player drifts
                 yield return null;
-
-                // deterministic part: visible pages with culling on < pages with culling off (= allocated)
-                Assert.IsTrue(culler.TryGetState(cam, out CameraCullState state), "the game camera has no cull state");
-                RenderBufferManager solid = Layers(renderer)[0];
-                solid.RebuildBuffers();
-                RenderBuffer buffer = solid.Buffers[0];
-                CullList list = new(buffer);
-                uint visibleOn, visibleOff;
-                uint allocated = (uint)buffer.Pages.AllocatedPages; // same frame as the read-back: the world keeps streaming
                 try{
-                    visibleOn = CullAndReadBack(culler, buffer, list, state.Planes, float3.zero, true);
-                    visibleOff = CullAndReadBack(culler, buffer, list, state.Planes, float3.zero, false);
+                    Assert.IsTrue(culler.TryGetState(cam, out CameraCullState state),
+                        $"game camera '{cam.name}' has no cull state ({culler.CameraCount} cameras culled, frame {Time.frameCount})");
+                    RenderBufferManager solid = Layers(renderer)[0];
+                    solid.RebuildBuffers();
+                    RenderBuffer buffer = solid.Buffers[0];
+                    allocated = (uint)buffer.Pages.AllocatedPages; // same frame as the read-back
+                    totalPages = SolidPages(renderer);
+                    CullList list = new(buffer);
+                    try{
+                        visibleOn = CullAndReadBack(culler, buffer, list, state.Planes, float3.zero, true);
+                        visibleOff = CullAndReadBack(culler, buffer, list, state.Planes, float3.zero, false);
+                    }
+                    finally{
+                        list.Dispose();
+                    }
                 }
-                finally{
-                    list.Dispose();
+                catch (Exception e){
+                    failure = e.Message;
+                }
+            }
+
+            if (failure == null){
+                for (int round = 0; round < TimingRounds; round++){
+                    renderer.GpuCulling = true;
+                    yield return MeasureRound(on);
+                    renderer.GpuCulling = false;
+                    yield return MeasureRound(off);
                 }
 
                 renderer.GpuCulling = true;
-                yield return MeasureFrames(FrameSamples, result => LogTiming("culling on", result));
-                renderer.GpuCulling = false;
-                yield return MeasureFrames(FrameSamples, result => LogTiming("culling off", result));
+            }
 
-                Debug.Log($"solid buffer 0 at the fixed viewpoint: {visibleOn} pages with culling on, {visibleOff} with culling off");
-                Assert.AreEqual(allocated, visibleOff);
-                Assert.Less(visibleOn, visibleOff, "culling must remove pages at the benchmark viewpoint");
+            for (int i = 0; i < TimingCameraCount; i++){
+                if (cameras[i] == null) continue;
+                cameras[i].enabled = false;
+                cameras[i].targetTexture = null;
             }
-            finally{
-                renderer.GpuCulling = originalCulling;
-                renderer.FreezeCulling = originalFreeze;
-            }
+
+            Object.Destroy(cameraObject);
+            target.Release();
+            Object.Destroy(target);
+            yield return ReloadWorldWithDrawDistance(originalDrawDistance); // later tests expect the default world
+            Assert.IsNull(failure, failure);
+
+            LogTiming("culling on", on);
+            LogTiming("culling off", off);
+            Debug.Log($"solid buffer 0 at the fixed viewpoint (draw distance {TimingDrawDistance}, {TimingCameraCount} cameras): {visibleOn} pages with culling on, {visibleOff} with culling off, {totalPages} solid pages in total");
+            Assert.AreEqual(allocated, visibleOff);
+            Assert.Less(visibleOn, visibleOff, "culling must remove pages at the benchmark viewpoint");
+            if (!on.GpuAvailable || !off.GpuAvailable)
+                Debug.LogWarning("FrameTimingManager gave no GPU times; only the page counts were checked");
+            else if (on.RoundSpread > MaxRoundSpread || off.RoundSpread > MaxRoundSpread)
+                Debug.LogWarning($"GPU frame times too unstable for a comparison (round spread on {on.RoundSpread:P0}, off {off.RoundSpread:P0}); only the page counts were checked");
+            else
+                Assert.Less(on.GpuMs, off.GpuMs, "GPU frame time must drop with culling on");
         }
 
-        private struct FrameTimes{
-            public double CpuMs;
-            public double GpuMs;
-            public bool GpuAvailable;
-        }
+        /// <summary>Per-frame CPU and GPU times of one state over all rounds, summarised by medians.</summary>
+        private sealed class FrameTimes{
+            private readonly List<double> _cpu = new();
+            private readonly List<double> _gpu = new();
+            private readonly List<double> _roundGpuMedians = new();
 
-        private static IEnumerator MeasureFrames(int frames, Action<FrameTimes> report){
-            FrameTiming[] timing = new FrameTiming[1];
-            for (int i = 0; i < WarmupFrames; i++) yield return null;
+            public double CpuMs => Median(_cpu);
+            public double GpuMs => Median(_gpu);
+            public bool GpuAvailable => _gpu.Count > 0;
+            public int Frames => _cpu.Count;
 
-            double cpu = 0, gpu = 0;
-            int gpuSamples = 0;
-            for (int i = 0; i < frames; i++){
-                yield return null;
-                cpu += Time.unscaledDeltaTime * 1000.0;
-                FrameTimingManager.CaptureFrameTimings();
-                if (FrameTimingManager.GetLatestTimings(1, timing) == 1 && timing[0].gpuFrameTime > 0){
-                    gpu += timing[0].gpuFrameTime;
-                    gpuSamples++;
+            /// <summary>Widest deviation of a round's GPU median from the overall GPU median, as a fraction.</summary>
+            public double RoundSpread{
+                get{
+                    if (_roundGpuMedians.Count == 0) return 0;
+                    double overall = GpuMs;
+                    double spread = 0;
+                    foreach (double m in _roundGpuMedians) spread = Math.Max(spread, Math.Abs(m - overall) / overall);
+                    return spread;
                 }
             }
 
-            report(new FrameTimes{
-                CpuMs = cpu / frames,
-                GpuMs = gpuSamples > 0 ? gpu / gpuSamples : 0,
-                GpuAvailable = gpuSamples > 0
-            });
+            public void AddRound(List<double> cpu, List<double> gpu){
+                _cpu.AddRange(cpu);
+                _gpu.AddRange(gpu);
+                if (gpu.Count > 0) _roundGpuMedians.Add(Median(gpu));
+            }
+
+            private static double Median(List<double> values){
+                if (values.Count == 0) return 0;
+                List<double> sorted = new(values);
+                sorted.Sort();
+                int mid = sorted.Count / 2;
+                return sorted.Count % 2 == 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+            }
+        }
+
+        private static IEnumerator MeasureRound(FrameTimes into){
+            FrameTiming[] timing = new FrameTiming[1];
+            for (int i = 0; i < WarmupFrames; i++) yield return null;
+
+            List<double> cpu = new(FramesPerRound);
+            List<double> gpu = new(FramesPerRound);
+            for (int i = 0; i < FramesPerRound; i++){
+                yield return null;
+                cpu.Add(Time.unscaledDeltaTime * 1000.0);
+                FrameTimingManager.CaptureFrameTimings();
+                if (FrameTimingManager.GetLatestTimings(1, timing) == 1 && timing[0].gpuFrameTime > 0)
+                    gpu.Add(timing[0].gpuFrameTime);
+            }
+
+            into.AddRound(cpu, gpu);
         }
 
         private static void LogTiming(string label, FrameTimes t){
-            string gpu = t.GpuAvailable ? $"GPU {t.GpuMs:0.00} ms" : "GPU timing unavailable (FrameTimingManager)";
-            Debug.Log($"{label}: CPU frame {t.CpuMs:0.00} ms, {gpu}, {FrameSamples} frames");
+            string gpu = t.GpuAvailable
+                ? $"GPU {t.GpuMs:0.00} ms (round spread {t.RoundSpread:P0})"
+                : "GPU timing unavailable (FrameTimingManager)";
+            Debug.Log($"{label}: median CPU frame {t.CpuMs:0.00} ms, median {gpu}, {t.Frames} frames in {TimingRounds} rounds");
         }
     }
 }
