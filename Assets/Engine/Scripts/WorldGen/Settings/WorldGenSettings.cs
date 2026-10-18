@@ -171,6 +171,36 @@ namespace Engine.Scripts.WorldGen.Settings{
                 Debug.LogWarning($"{name}: GlobalOctaveWeights ({GlobalOctaveWeights.Length}) and OctaveWavelengths ({OctaveWavelengths.Length}) differ in length.", this);
             if (HeightMin >= HeightMax)
                 Debug.LogWarning($"{name}: HeightMin must be below HeightMax.", this);
+            foreach ((string field, float value) in InvalidWavelengths())
+                Debug.LogWarning($"{name}: {field} must be a positive, finite wavelength, got {value}.", this);
+        }
+
+        /// <summary>
+        ///     Every wavelength (in blocks) that the samplers divide by and that is not positive and finite. They are
+        ///     reported rather than clamped (R5).
+        /// </summary>
+        private IEnumerable<(string field, float value)> InvalidWavelengths(){
+            if (OctaveWavelengths != null)
+                for (int i = 0; i < OctaveWavelengths.Length; i++)
+                    if (!IsValidWavelength(OctaveWavelengths[i])) yield return ($"OctaveWavelengths[{i}]", OctaveWavelengths[i]);
+            if (!IsValidWavelength(PeakWavelength)) yield return (nameof(PeakWavelength), PeakWavelength);
+            if (!IsValidWavelength(WarpWavelength)) yield return (nameof(WarpWavelength), WarpWavelength);
+
+            (string field, NoiseProfileSettings profile)[] profiles ={
+                (nameof(temperatureProfile), temperatureProfile),
+                (nameof(humidityProfile), humidityProfile),
+                (nameof(continentalLayer) + ".baseNoise", continentalLayer?.baseNoise),
+                (nameof(continentalLayer) + ".warpNoise", continentalLayer?.warpNoise),
+                (nameof(erosionProfile), erosionProfile),
+                (nameof(weirdnessProfile), weirdnessProfile)
+            };
+            foreach ((string field, NoiseProfileSettings profile) in profiles)
+                if (profile != null && !IsValidWavelength(profile.scale)) yield return (field + ".scale", profile.scale);
+        }
+
+        private static bool IsValidWavelength(float wavelength){
+            // NaN fails the comparison.
+            return wavelength > 0f && !float.IsPositiveInfinity(wavelength);
         }
 
         // --- INT-03: Burst mirror -------------------------------------------------------------------------------------
@@ -187,6 +217,8 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (octaveCount == 0) throw new InvalidOperationException($"{name}: OctaveWavelengths is empty.");
             if (octaveCount > DetailOctaves.MaxOctaves)
                 throw new InvalidOperationException($"{name}: more than {DetailOctaves.MaxOctaves} detail octaves.");
+            foreach ((string field, float value) in InvalidWavelengths())
+                throw new InvalidOperationException($"{name}: {field} must be a positive, finite wavelength, got {value}.");
 
             List<Biome> active = ActiveBiomes();
 

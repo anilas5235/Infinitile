@@ -166,6 +166,27 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void ToConfig_RejectsInvalidWavelengths(){
+            WorldGenSettings octave = Create<WorldGenSettings>("WG");
+            octave.OctaveWavelengths = new[]{ 512f, 0f };
+            WorldGenSettings peak = Create<WorldGenSettings>("WG");
+            peak.PeakWavelength = float.NaN;
+            WorldGenSettings warp = Create<WorldGenSettings>("WG");
+            warp.WarpWavelength = float.PositiveInfinity;
+            WorldGenSettings climate = Create<WorldGenSettings>("WG");
+            climate.continentalLayer.warpNoise.scale = -1800f;
+
+            StringAssert.Contains("OctaveWavelengths[1]",
+                Assert.Throws<System.InvalidOperationException>(() => octave.ToConfig(1, allocator: Allocator.Temp)).Message);
+            StringAssert.Contains("PeakWavelength",
+                Assert.Throws<System.InvalidOperationException>(() => peak.ToConfig(1, allocator: Allocator.Temp)).Message);
+            StringAssert.Contains("WarpWavelength",
+                Assert.Throws<System.InvalidOperationException>(() => warp.ToConfig(1, allocator: Allocator.Temp)).Message);
+            StringAssert.Contains("continentalLayer.warpNoise.scale",
+                Assert.Throws<System.InvalidOperationException>(() => climate.ToConfig(1, allocator: Allocator.Temp)).Message);
+        }
+
+        [Test]
         public void ToConfig_WithoutBiomeSetGivesEmptyBiomes(){
             WorldGenSettings s = Create<WorldGenSettings>("WG");
             WorldGenConfig cfg = s.ToConfig(1, allocator: Allocator.Temp);
