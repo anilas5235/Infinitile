@@ -167,6 +167,7 @@ namespace Engine.Scripts.Settings{
                 BaseNoise = baseNoise.ToStruct(seed),
                 WarpNoise = warpNoise.ToStruct(seed),
                 WarpStrength = warpStrength,
+                WarpSeedOffsetY = warpSeedOffsetY, // F-06: without it warp X and warp Y were the same field
                 RedistributionPoints = points
             };
         }

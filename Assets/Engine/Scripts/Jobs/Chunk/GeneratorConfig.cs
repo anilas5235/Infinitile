@@ -19,15 +19,29 @@ namespace Engine.Scripts.Jobs.Chunk{
         /// </summary>
         public int GlobalSeed;
 
+        /// <summary>
+        ///     D-05 ownership: a view of <c>BiomeRegistry.BiomeArray</c>. The registry owns and disposes it; the
+        ///     config never does.
+        /// </summary>
         [NativeDisableParallelForRestriction] public NativeArray<Biome.BiomeDef> BiomeDefs;
 
+        /// <summary>
+        ///     D-05 ownership: a view of <c>VoxelRegistry.VoxelMap</c>. The registry owns and disposes it; the
+        ///     config never does.
+        /// </summary>
         [NativeDisableParallelForRestriction] public NativeHashMap<FixedString32Bytes, Voxel.VoxelDef> Voxels;
 
+        /// <summary>
+        ///     D-05 ownership: created for this config (see <c>VoxelEngineProvider.ChunkDataScheduler</c>) and
+        ///     released by <see cref="Dispose" />, which the <c>ChunkScheduler</c> calls when it is disposed.
+        /// </summary>
         public NoiseCalculator.NoiseParameters NoiseParams;
 
+        /// <summary>
+        ///     Releases the noise parameters only. <see cref="BiomeDefs" /> and <see cref="Voxels" /> belong
+        ///     to their registries (D-05).
+        /// </summary>
         public void Dispose(){
-            if (BiomeDefs.IsCreated) BiomeDefs.Dispose();
-            if (Voxels.IsCreated) Voxels.Dispose();
             NoiseParams.Dispose();
         }
     }

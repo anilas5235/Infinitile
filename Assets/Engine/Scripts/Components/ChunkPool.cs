@@ -44,15 +44,21 @@ namespace Engine.Scripts.Components{
             _meshMap = new Dictionary<int3, ChunkPartition>(_partitionPoolSize);
 
             _colliderPoolSize = settings.Chunk.UpdateDistance.SquareSize() * PartitionsPerChunk;
-            _colliderSet = new HashSet<int3>(_colliderPoolSize);
+            // PERF-04: an entry per active partition (cleared on reclaim), so the set never rehashes during flight
+            _colliderSet = new HashSet<int3>(_partitionPoolSize);
 
             _chunkQueue = new SimpleFastPriorityQueue<int2, float>();
             _partitionQueue = new SimpleFastPriorityQueue<int3, float>();
             _colliderQueue = new SimpleFastPriorityQueue<int3, float>();
+            // PERF-04: the queues hold at most one entry over the pool size before a reclaim
+            _chunkQueue.Reserve(_chunkPoolSize + 1);
+            _partitionQueue.Reserve(_partitionPoolSize + 1);
+            _colliderQueue.Reserve(_colliderPoolSize + 1);
 
             _pool = new ObjectPool<ChunkBehaviour>(
                 () => {
                     GameObject go = Object.Instantiate(settings.Chunk.ChunkPrefab, transform);
+                    go.name = "Chunk"; // PERF-04: named once; renaming per claim built a string every claim
                     go.SetActive(false);
                     ChunkBehaviour chunkBehaviour = go.GetComponent<ChunkBehaviour>();
                     chunkBehaviour.Init();
@@ -62,6 +68,11 @@ namespace Engine.Scripts.Components{
                 chunkBehaviour => chunkBehaviour.gameObject.SetActive(false),
                 null, false, _chunkPoolSize, _chunkPoolSize
             );
+
+            // PERF-04: instantiate the whole pool now; claiming a chunk during flight must not Instantiate.
+            ChunkBehaviour[] warmUp = new ChunkBehaviour[_chunkPoolSize];
+            for (int i = 0; i < warmUp.Length; i++) warmUp[i] = _pool.Get();
+            for (int i = 0; i < warmUp.Length; i++) _pool.Release(warmUp[i]);
         }
 
         internal bool IsPartitionActive(int3 pos){
@@ -80,17 +91,19 @@ namespace Engine.Scripts.Components{
         /// </summary>
         internal void FocusUpdate(Focus focus){
             _focus = focus;
-            _chunkQueue.UpdateAllPriorities(PriorityCalc);
-            _partitionQueue.UpdateAllPriorities(PriorityCalc);
-            _colliderQueue.UpdateAllPriorities(PriorityCalc);
+            // N-01 / PERF-04: static lambdas with explicit state; instance method groups allocate a delegate per call
+            // F-23 / DEC-14: reclaim by plain distance
+            _chunkQueue.UpdateAllPriorities(focus, static (f, pos) => EvictionPriority(ref pos, ref f));
+            _partitionQueue.UpdateAllPriorities(focus, static (f, pos) => EvictionPriority(ref pos, ref f));
+            _colliderQueue.UpdateAllPriorities(focus, static (f, pos) => EvictionPriority(ref pos, ref f));
         }
 
         private float PriorityCalc(int2 position){
-            return ReVerseDistPriority(ref position, ref _focus);
+            return EvictionPriority(ref position, ref _focus); // F-23
         }
 
         private float PriorityCalc(int3 position){
-            return ReVerseDistPriority(ref position, ref _focus);
+            return EvictionPriority(ref position, ref _focus); // F-23
         }
 
         /// <summary>
@@ -119,8 +132,7 @@ namespace Engine.Scripts.Components{
             }
 
             ChunkBehaviour behaviour = _pool.Get();
-            behaviour.transform.position = new float3(position.x * ChunkWidth, 0, position.y * ChunkDepth);
-            behaviour.name = $"Chunk({position.x},{position.y})";
+            behaviour.Transform.position = new float3(position.x * ChunkWidth, 0, position.y * ChunkDepth);
             _chunkMap.Add(position, behaviour);
             _chunkQueue.Enqueue(position, PriorityCalc(position));
             return behaviour;

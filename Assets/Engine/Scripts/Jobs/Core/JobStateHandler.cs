@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Engine.Scripts.Components;
 using Engine.Scripts.Settings;
 using Engine.Scripts.ThirdParty.Priority_Queue;
+using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Core{
     /// <summary>
@@ -52,6 +53,14 @@ namespace Engine.Scripts.Jobs.Core{
         ///     Gets the current step of the scheduler state machine.
         /// </summary>
         public SchedulerStep CurrentStep{ get; private set; } = SchedulerStep.UpdateQueues;
+
+        /// <summary>
+        ///     PERF-04: pre-sizes the queue and the in-flight set so that filling them during flight does not allocate.
+        /// </summary>
+        protected void Reserve(int queueCapacity, int batchSize){
+            Queue.Reserve(queueCapacity);
+            Set.EnsureCapacity(math.max(1, batchSize));
+        }
 
         /// <summary>
         ///     Gets the number of items in the priority queue.

@@ -31,6 +31,14 @@ namespace Engine.Scripts.Render{
 
         private readonly GraphicsBuffer _voxelRenderDefBuffer;
         private NativeArray<uint> _counts;
+        private readonly PartitionMetadata[] _metadataUpload = new PartitionMetadata[1]; // PERF-04
+        // PERF-04: SetInts takes a params array; these constants are passed as pre-built arrays
+        private static readonly int[] ChunkSizeInts = { ChunkSize.x, ChunkSize.y, ChunkSize.z };
+        private static readonly int[] PartitionSizeInts = { PartitionSize.x, PartitionSize.y, PartitionSize.z };
+        private readonly int[] _pointCounts = new int[3]; // PERF-04: result array reused per handler
+        private bool _disposed;
+        private bool _readBackPending;
+        private AsyncGPUReadbackRequest _readBackRequest; // PERF-04: polled; the awaited version allocated per build
 
         /// <summary>
         ///     Initializes a new instance of the PointBuilderHandler class.
@@ -80,24 +88,51 @@ namespace Engine.Scripts.Render{
         ///     Releases all GPU resources held by this handler.
         /// </summary>
         public void Dispose(){
-            SolidPointsOut?.Dispose();
-            TransparentPointsOut?.Dispose();
-            FoliagePointsOut?.Dispose();
-            _metadata?.Dispose();
-            _readBackCountBuffer?.Dispose();
-            foreach (GraphicsBuffer chunkBuffer in _preparedChunks) chunkBuffer?.Dispose();
-            _counts.Dispose();
+            if (_disposed) return;
+            _disposed = true;
+
+            // F-17: a read-back into _counts may still be pending; the array cannot be released before it has
+            // completed, and every resource is released on its own so one failure does not leak the others.
+            if (_readBackPending) _readBackRequest.WaitForCompletion();
+
+            SafeDispose(SolidPointsOut);
+            SafeDispose(TransparentPointsOut);
+            SafeDispose(FoliagePointsOut);
+            SafeDispose(_metadata);
+            SafeDispose(_readBackCountBuffer);
+            foreach (GraphicsBuffer chunkBuffer in _preparedChunks) SafeDispose(chunkBuffer);
+
+            try{
+                if (_counts.IsCreated) _counts.Dispose();
+            }
+            catch (Exception e){
+                VoxelEngineLogger.Error<PointBuilderHandler>($"Failed to release the read-back array: {e}");
+            }
+        }
+
+        private static void SafeDispose(GraphicsBuffer buffer){
+            try{
+                buffer?.Dispose();
+            }
+            catch (Exception e){
+                VoxelEngineLogger.Error<PointBuilderHandler>($"Failed to release a GPU buffer: {e}");
+            }
         }
 
         /// <summary>
-        ///     Asynchronously builds points for the given partition from its voxel data.
+        ///     True once the read-back of the last <see cref="BuildPoints" /> call has finished (or none is pending).
+        /// </summary>
+        internal bool IsReadBackDone => !_readBackPending || _readBackRequest.done;
+
+        /// <summary>
+        ///     Dispatches the point build for the given partition and starts the read-back of the point counts.
+        ///     Poll <see cref="IsReadBackDone" /> and then call <see cref="CompleteBuild" /> for the counts.
         /// </summary>
         /// <param name="data">The partition build request containing chunk data.</param>
-        /// <returns>An awaitable that returns an array with solid, transparent, and foliage point counts.</returns>
-        internal async Awaitable<int[]> BuildPoints(PartitionBuildRequest data){
+        internal void BuildPoints(PartitionBuildRequest data){
             ResetCounters();
-            PartitionMetadata meta = data.GetMetadata();
-            _metadata.SetData(new[]{ meta });
+            _metadataUpload[0] = data.GetMetadata();
+            _metadata.SetData(_metadataUpload);
 
             PrepareChunks(data);
 
@@ -108,8 +143,8 @@ namespace Engine.Scripts.Render{
             _pointBuilder.SetInt(VoxelQuadTexPairCountNameID, _voxelQuadTexPairBuffer.count);
 
             _pointBuilder.SetInt(VoxelsPerChunkNameID, VoxelsPerChunk);
-            _pointBuilder.SetInts(ChunkSizeNameID, ChunkSize.x, ChunkSize.y, ChunkSize.z);
-            _pointBuilder.SetInts(PartitionSizeNameID, PartitionSize.x, PartitionSize.y, PartitionSize.z);
+            _pointBuilder.SetInts(ChunkSizeNameID, ChunkSizeInts);
+            _pointBuilder.SetInts(PartitionSizeNameID, PartitionSizeInts);
 
             _pointBuilder.SetBuffer(_pointBuilderKernelID, MainChunkNameID, _preparedChunks[0]);
             _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkUpNameID, _preparedChunks[1]);
@@ -130,18 +165,37 @@ namespace Engine.Scripts.Render{
 
             _pointBuilder.Dispatch(_pointBuilderKernelID, 8, 8, 8);
 
-            try{
-                CopyCount(SolidPointsOut, _readBackCountBuffer, sizeof(uint) * 0);
-                CopyCount(TransparentPointsOut, _readBackCountBuffer, sizeof(uint) * 1);
-                CopyCount(FoliagePointsOut, _readBackCountBuffer, sizeof(uint) * 2);
+            CopyCount(SolidPointsOut, _readBackCountBuffer, sizeof(uint) * 0);
+            CopyCount(TransparentPointsOut, _readBackCountBuffer, sizeof(uint) * 1);
+            CopyCount(FoliagePointsOut, _readBackCountBuffer, sizeof(uint) * 2);
 
-                await AsyncGPUReadback.RequestIntoNativeArrayAsync(ref _counts, _readBackCountBuffer);
-                return ToPointCounts(_counts);
+            _readBackRequest = AsyncGPUReadback.RequestIntoNativeArray(ref _counts, _readBackCountBuffer);
+            _readBackPending = true;
+        }
+
+        /// <summary>
+        ///     Finishes the pending build: converts the read-back counters to the solid, transparent and foliage
+        ///     point counts. Zero counts are returned when the handler was released while the read-back ran (F-17)
+        ///     or the read-back failed.
+        /// </summary>
+        /// <returns>The handler-owned counts array (valid until the next build).</returns>
+        internal int[] CompleteBuild(){
+            if (!_readBackPending) return _pointCounts;
+            _readBackPending = false;
+
+            if (_disposed){ // F-17: the handler was released while the read-back ran
+                Array.Clear(_pointCounts, 0, _pointCounts.Length);
+                return _pointCounts;
             }
-            catch (Exception e){
-                VoxelEngineLogger.Error<PointBuilderHandler>($"Error reading back point counts: {e}");
-                return new[]{ 0, 0, 0 };
+
+            if (_readBackRequest.hasError){
+                VoxelEngineLogger.Error<PointBuilderHandler>("Error reading back point counts: the GPU read-back failed");
+                Array.Clear(_pointCounts, 0, _pointCounts.Length);
+                return _pointCounts;
             }
+
+            ToPointCounts(_counts, _pointCounts);
+            return _pointCounts;
         }
 
         /// <summary>
@@ -150,8 +204,24 @@ namespace Engine.Scripts.Render{
         /// </summary>
         internal static int[] ToPointCounts(NativeArray<uint> counts){
             int[] results = new int[counts.Length];
-            for (int i = 0; i < counts.Length; i++) results[i] = (int)counts[i];
+            ToPointCounts(counts, results);
             return results;
+        }
+
+        /// <summary>PERF-04: fills a caller-owned array instead of allocating one per read-back.</summary>
+        internal static void ToPointCounts(NativeArray<uint> counts, int[] results){
+            for (int i = 0; i < counts.Length; i++){
+                // F-03: an append buffer silently drops points beyond its capacity, but the counter keeps growing
+                // (alwaysRenderAllFaces can emit up to 6 faces per voxel). Never request more than the buffer holds.
+                uint count = counts[i];
+                if (count > MaxPointsPerPartition){
+                    VoxelEngineLogger.Warn<PointBuilderHandler>(
+                        $"Point buffer {i} overflowed: {count} points, clamped to {MaxPointsPerPartition}");
+                    count = MaxPointsPerPartition;
+                }
+
+                results[i] = (int)count;
+            }
         }
 
         /// <summary>

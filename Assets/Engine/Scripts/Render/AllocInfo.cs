@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using Unity.Mathematics;
+using UnityEngine.Pool;
 
 namespace Engine.Scripts.Render{
     /// <summary>
@@ -39,7 +39,24 @@ namespace Engine.Scripts.Render{
         /// </summary>
         /// <returns>An array of page indices.</returns>
         public int[] GetPageIndices(){
-            return _pages.Select(p => p.PageIndex).ToArray();
+            int[] indices = new int[Count];
+            for (int i = 0; i < indices.Length; i++) indices[i] = _pages[i].PageIndex;
+            return indices;
+        }
+
+        /// <summary>Page at <paramref name="index" /> (0 .. <see cref="Count" /> - 1).</summary>
+        public AllocPage GetPage(int index){
+            return _pages[index];
+        }
+
+        /// <summary>
+        ///     PERF-04: writes the (page index, point count) pairs into a caller-owned array instead of allocating
+        ///     one per copy; returns the number of pairs written.
+        /// </summary>
+        public int CopyIndexAndCount(uint2[] target){
+            int count = Count;
+            for (int i = 0; i < count; i++) target[i] = new uint2((uint)_pages[i].PageIndex, (uint)_pages[i].PointCount);
+            return count;
         }
 
         /// <summary>
@@ -73,7 +90,33 @@ namespace Engine.Scripts.Render{
         /// <param name="bufferIndex">The index of the render buffer.</param>
         public AllocInfo(int bufferIndex){
             BufferIndex = bufferIndex;
-            _pages = new List<AllocPage>();
+            _pages = ListPool<AllocPage>.Get(); // PERF-04: page lists are pooled, one was allocated per build
+            // PERF-04: a list never grows while pages are added; a fresh list from the pool gets its final size once
+            if (_pages.Capacity < CopyPointsHandler.MaxPagesPerPartition)
+                _pages.Capacity = CopyPointsHandler.MaxPagesPerPartition;
+        }
+
+        /// <summary>
+        ///     PERF-04: fills the shared list pool with <paramref name="count" /> lists of their final capacity so
+        ///     allocations made during flight never create a list.
+        /// </summary>
+        internal static void PrewarmPageLists(int count){
+            List<AllocPage>[] lists = new List<AllocPage>[count];
+            for (int i = 0; i < count; i++){
+                lists[i] = ListPool<AllocPage>.Get();
+                if (lists[i].Capacity < CopyPointsHandler.MaxPagesPerPartition)
+                    lists[i].Capacity = CopyPointsHandler.MaxPagesPerPartition;
+            }
+
+            for (int i = 0; i < count; i++) ListPool<AllocPage>.Release(lists[i]);
+        }
+
+        /// <summary>
+        ///     PERF-04: returns the page list to the pool. Called by the buffer manager when the allocation is
+        ///     released; the struct must not be used afterwards.
+        /// </summary>
+        internal void Recycle(){
+            if (_pages != null) ListPool<AllocPage>.Release(_pages);
         }
 
         /// <summary>
@@ -81,9 +124,10 @@ namespace Engine.Scripts.Render{
         /// </summary>
         /// <returns>An array of uint2 values where x is the page index and y is the point count.</returns>
         public uint2[] ToIndexAndCount(){
-            return IsEmpty
-                ? Array.Empty<uint2>()
-                : _pages.Select(p => new uint2((uint)p.PageIndex, (uint)p.PointCount)).ToArray();
+            if (IsEmpty) return Array.Empty<uint2>();
+            uint2[] pairs = new uint2[Count];
+            CopyIndexAndCount(pairs);
+            return pairs;
         }
     }
 }

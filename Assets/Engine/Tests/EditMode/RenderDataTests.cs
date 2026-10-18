@@ -189,7 +189,6 @@ namespace Engine.Tests.EditMode{
 
         #region read-back clamp (F-03)
 
-        [Category("KnownBug")] // F-03
         [Test]
         public void PointCounts_AreClampedToMaxPointsPerPartition(){
             // F-03: a corrupt or overflowing GPU counter must never request more than a partition can hold.

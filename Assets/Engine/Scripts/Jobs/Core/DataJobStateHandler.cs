@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using Engine.Scripts.Components;
+﻿using Engine.Scripts.Components;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Settings;
 using Unity.Mathematics;
@@ -26,6 +25,8 @@ namespace Engine.Scripts.Jobs.Core{
             base(settings, chunkManager, chunkPool){
             _chunkScheduler = chunkScheduler;
             _meshJobHandler = meshJobHandler;
+            int side = 2 * settings.Chunk.LoadDistance + 1;
+            Reserve(side * side, settings.Scheduler.chunkGenBatchSize); // PERF-04
         }
 
         /// <summary>
@@ -34,7 +35,8 @@ namespace Engine.Scripts.Jobs.Core{
         /// <param name="focus">The new focus position.</param>
         public override void FocusUpdate(PriorityUtil.Focus focus){
             WakeUp();
-            Queue.UpdateAllPriorities(pos => PriorityUtil.DistPriority(ref pos, ref focus));
+            // N-01 / PERF-04: static lambda with explicit state instead of a closure capturing the focus
+            Queue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.DistPriority(ref pos, ref f));
         }
 
         /// <summary>
@@ -76,7 +78,7 @@ namespace Engine.Scripts.Jobs.Core{
 
             if (accepted == 0) return true;
 
-            _chunkScheduler.Start(Set.ToList());
+            _chunkScheduler.Start(Set); // PERF-04: no per-batch list copy
 
             return true;
         }

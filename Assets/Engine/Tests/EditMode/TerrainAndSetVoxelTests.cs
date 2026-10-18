@@ -85,7 +85,6 @@ namespace Engine.Tests.EditMode{
                 Assert.AreNotEqual(TestFixtures.Ice, VoxelAt(WarmColumn, y), $"y={y}");
         }
 
-        [Category("KnownBug")] // F-07
         [Test]
         public void FillTerrain_ColdColumnFreezesWaterSurface(){
             // F-07: the ice check runs at y == waterLevel where the voxel is already air, so ice never appears.
@@ -117,7 +116,6 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(TestFixtures.Stone, _manager.GetVoxel(new int3(5, 11, 5)));
         }
 
-        [Category("KnownBug")] // F-08
         [TestCase(ChunkHeight)]
         [TestCase(-1)]
         public void SetVoxel_OutsideChunkHeight_IsRejected(int y){

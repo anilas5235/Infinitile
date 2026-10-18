@@ -27,6 +27,27 @@ namespace Engine.Tests.EditMode{
             return PriorityUtil.ReVerseDistPriority(ref position, ref focus);
         }
 
+        #region F-23
+
+        [Test]
+        public void EvictionPriority_IsPlainDistance_IgnoringViewDirection(){
+            // F-23 / DEC-14: eviction must not weight chunks behind the player x5.
+            PriorityUtil.Focus focus = LookingForward();
+            int3 behind = new(0, 0, -3);
+            int3 front = new(0, 0, 6);
+            Assert.AreEqual(-9f, PriorityUtil.EvictionPriority(ref behind, ref focus));
+            Assert.AreEqual(-36f, PriorityUtil.EvictionPriority(ref front, ref focus));
+            Assert.Greater(PriorityUtil.EvictionPriority(ref behind, ref focus), PriorityUtil.EvictionPriority(ref front, ref focus),
+                "the farther chunk must have the lower (first dequeued) priority");
+
+            int2 behind2 = new(0, -3);
+            int2 front2 = new(0, 6);
+            Assert.AreEqual(-9f, PriorityUtil.EvictionPriority(ref behind2, ref focus));
+            Assert.AreEqual(-36f, PriorityUtil.EvictionPriority(ref front2, ref focus));
+        }
+
+        #endregion
+
         #region TST-E07
 
         [Test]
@@ -83,7 +104,6 @@ namespace Engine.Tests.EditMode{
 
         #region TST-E16
 
-        [Category("KnownBug")] // F-09
         [Test]
         public void DistPriority2D_VerticalForward_GivesFinitePriorities(){
             // F-09: forward (0, ±1, 0) has xz = (0, 0); the 2D overload must not produce NaN.
@@ -108,12 +128,7 @@ namespace Engine.Tests.EditMode{
             public TestScheduler(int records) : base(records){ }
 
             public void Record(long milliseconds){
-                Queue<long> timings = Timings;
-                // Mirrors StopRecord's window handling without a Stopwatch: the test injects the measured value.
-                FieldInfo recordsField = typeof(JobScheduler).GetField("_records", BindingFlags.NonPublic | BindingFlags.Instance);
-                int records = (int)recordsField.GetValue(this);
-                if (timings.Count > records) timings.Dequeue();
-                timings.Enqueue(milliseconds);
+                RecordTiming(milliseconds); // the same window handling StopRecord uses, without a Stopwatch
             }
 
             public Queue<long> Timings =>
@@ -121,7 +136,6 @@ namespace Engine.Tests.EditMode{
                     .GetValue(this);
         }
 
-        [Category("KnownBug")] // F-11
         [Test]
         public void AvgTime_OfConstantTimings_EqualsThatConstant(){
             // F-11: AvgTime divides by a constant 10 instead of the number of samples.
@@ -132,7 +146,6 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(5f, scheduler.AvgTime, 1e-5f, "window full of 5 ms samples");
         }
 
-        [Category("KnownBug")] // F-11
         [Test]
         public void AvgTime_WindowIsBoundedByRecordCount(){
             // F-11: the queue keeps records + 1 entries.

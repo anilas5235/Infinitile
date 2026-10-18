@@ -80,7 +80,7 @@ namespace Engine.Scripts.Utils{
             return position - ChunkSize.MemberMultiply(chunkCoords.x, 0, chunkCoords.y);
         }
 
-        private static int FloorDivide(int value, int divisor){
+        internal static int FloorDivide(int value, int divisor){
             return value / divisor - (value < 0 && value % divisor != 0 ? 1 : 0);
         }
     }

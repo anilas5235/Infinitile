@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 
 namespace Engine.Scripts.Jobs.Core{
     /// <summary>
@@ -11,6 +10,7 @@ namespace Engine.Scripts.Jobs.Core{
         private readonly int _records;
         private readonly Queue<long> _timings;
         private readonly Stopwatch _watch;
+        private long _sum;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="JobScheduler" /> class
@@ -24,10 +24,10 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        ///     Gets the average time of the last recorded runs. The value is derived from
-        ///     the internal millisecond timings and divided by 10 to preserve legacy scaling.
+        ///     Gets the average time in milliseconds of the last recorded runs (at most <c>records</c> of them).
+        ///     F-11: a real mean over the window instead of sum / 10.
         /// </summary>
-        public float AvgTime => (float)_timings.Sum() / 10;
+        public float AvgTime => _timings.Count == 0 ? 0f : (float)_sum / _timings.Count;
 
         /// <summary>
         ///     Starts timing for the current run.
@@ -43,11 +43,18 @@ namespace Engine.Scripts.Jobs.Core{
         protected long StopRecord(){
             _watch.Stop();
             long ms = _watch.ElapsedMilliseconds;
-
-            if (_timings.Count > _records) _timings.Dequeue();
-
-            _timings.Enqueue(ms);
+            RecordTiming(ms);
             return ms;
+        }
+
+        /// <summary>
+        ///     Adds a measured run to the fixed window of the last <c>records</c> runs (F-11: the queue used to
+        ///     hold records + 1 entries).
+        /// </summary>
+        protected void RecordTiming(long milliseconds){
+            if (_timings.Count >= _records) _sum -= _timings.Dequeue();
+            _timings.Enqueue(milliseconds);
+            _sum += milliseconds;
         }
     }
 }

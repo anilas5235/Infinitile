@@ -46,7 +46,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
                 ChunkPos = partitionPos.xz;
                 CMeshBuffer = new CMeshBuffer{
                     CVertexBuffer = new NativeList<CVertex>(VoxelCount4, Allocator.Temp),
-                    CIndexBuffer = new NativeList<ushort>(VoxelCount6, Allocator.Temp)
+                    CIndexBuffer = new NativeList<int>(VoxelCount6, Allocator.Temp)
                 };
 
                 CollisionVoxels = new NativeHashSet<int3>(VoxelsPerPartition, Allocator.Temp);
@@ -93,8 +93,9 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
 
         [BurstCompile]
         private ushort GetVoxel(ref PartitionJobData jobData, in int3 voxelPos){
+            // F-14: partitions are stacked only along Y inside a chunk; x/z are already chunk-local
             int3 chunkLocalPos = voxelPos;
-            chunkLocalPos += jobData.PartitionPos * VoxelsPerPartition;
+            chunkLocalPos.y += jobData.PartitionPos.y * PartitionHeight;
             return ChunkAccessor.InChunkBounds(chunkLocalPos)
                 ? jobData.ChunkVoxelData.GetVoxel(chunkLocalPos)
                 : Accessor.GetVoxelInPartition(jobData.PartitionPos, voxelPos);

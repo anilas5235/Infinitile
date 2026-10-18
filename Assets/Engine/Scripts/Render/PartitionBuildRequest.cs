@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Engine.Scripts.Utils.Logger;
 using Unity.Mathematics;
 using UnityEngine;
@@ -15,7 +16,7 @@ namespace Engine.Scripts.Render{
         /// <summary>
         ///     The partition coordinates for this build request.
         /// </summary>
-        public readonly int3 Partition;
+        public int3 Partition{ get; private set; }
 
         private readonly GraphicsBuffer[] _buffers = new GraphicsBuffer[RequiredChunks.Length];
 
@@ -32,6 +33,15 @@ namespace Engine.Scripts.Render{
         ///     Gets a value indicating whether this build request has successfully collected all required buffers.
         /// </summary>
         public bool IsValid{ get; private set; }
+
+        /// <summary>
+        ///     PERF-04: re-targets a pooled request so the renderer does not allocate one per build.
+        /// </summary>
+        public void Reset(int3 partition){
+            Partition = partition;
+            IsValid = false;
+            Array.Clear(_buffers, 0, _buffers.Length);
+        }
 
         /// <summary>
         ///     Gets the graphics buffers for all required chunks, or null if IsValid is false.

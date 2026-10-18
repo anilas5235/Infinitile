@@ -75,8 +75,19 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
         }
 
         private void OnDestroy(){
-            _generatorConfig.Dispose();
+            DisposeGeneratorConfig();
             DisposeJobData();
+        }
+
+        /// <summary>
+        ///     D-05: the preview allocates its own BiomeDefs and Voxels (no registry owns them), so it releases
+        ///     them here; GeneratorConfig.Dispose only releases the noise parameters.
+        /// </summary>
+        private void DisposeGeneratorConfig(){
+            if (_generatorConfig.BiomeDefs.IsCreated) _generatorConfig.BiomeDefs.Dispose();
+            if (_generatorConfig.Voxels.IsCreated) _generatorConfig.Voxels.Dispose();
+            _generatorConfig.Dispose();
+            _generatorConfig = default;
         }
 
         [MenuItem("Infinitile/World Generation Preview")]
@@ -281,7 +292,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
 
             _packages.Clear();
             _biomes.Clear();
-            _generatorConfig.Dispose();
+            DisposeGeneratorConfig();
 
             string[] packageGuids = AssetDatabase.FindAssets("t:VoxelDataPackage");
             HashSet<Biome> uniqueBiomes = new();
@@ -301,6 +312,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
             }
 
             _selectedBiomeIndex = Mathf.Clamp(_selectedBiomeIndex, 0, Mathf.Max(0, _biomes.Count - 1));
+            // D-05: unlike the runtime config, the preview owns its biome and voxel containers (see DisposeGeneratorConfig).
             _generatorConfig = new GeneratorConfig{
                 WaterLevel = _settings.Noise.WaterLevel,
                 GlobalSeed = _settings.Seed,

@@ -135,6 +135,7 @@ namespace Engine.Scripts.Render{
         private void Release(in AllocInfo allocInfo, in int3 partitionPos){
             _renderBuffers[allocInfo.BufferIndex].ClearPage(allocInfo);
             _partitionAllocations.Remove(partitionPos);
+            allocInfo.Recycle(); // PERF-04
         }
 
         /// <summary>

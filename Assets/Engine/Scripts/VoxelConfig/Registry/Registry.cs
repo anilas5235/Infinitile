@@ -40,9 +40,22 @@ namespace Engine.Scripts.VoxelConfig.Registry{
 
         protected virtual void PostRegister(ushort id, T item){ }
 
+        /// <summary>
+        ///     F-22: rolls back the most recent registration so a caller can undo it when a dependent registration
+        ///     failed. Only the last id can be removed; ids must stay contiguous.
+        /// </summary>
+        public bool Unregister(T item){
+            if (!ForwardMap.TryGetValue(item, out ushort id) || id != Count - 1) return false;
+            ForwardMap.Remove(item);
+            _backwardMap.Remove(id);
+            _isFull = false;
+            return true;
+        }
+
         public bool Register(ushort id, T item){
             if (ForwardMap.TryGetValue(item, out ushort existingId)){
-                VoxelEngineLogger.Warn<Registry<T>>($"Register: ID {id} already exists. Ignoring.");
+                VoxelEngineLogger.Warn<Registry<T>>(
+                    $"Register: item is already registered with ID {existingId}; ID {id} ignored.");
                 return false;
             }
 

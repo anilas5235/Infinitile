@@ -82,7 +82,6 @@ namespace Engine.Tests.EditMode{
             }, false);
         }
 
-        [Category("KnownBug")] // D-08
         [Test]
         public void WorldToPartitionPos_AgreesWithVoxelUtils_ForNegativePositions(){
             // D-08: WorldToPartitionPos uses truncating division; must match the floor division of VoxelUtils.
@@ -92,7 +91,6 @@ namespace Engine.Tests.EditMode{
             });
         }
 
-        [Category("KnownBug")] // D-08
         [Test]
         public void WorldToChunkPos_AgreesWithVoxelUtils_ForNegativePositions(){
             // D-08

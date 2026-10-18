@@ -454,6 +454,17 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
 #if NET_VERSION_4_5
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
+        /// <summary>
+        ///     N-01 / PERF-04: recomputes every priority in place and re-heapifies bottom-up. Does not allocate when
+        ///     <paramref name="updateFunc" /> is a cached (static) delegate; the caller state travels in
+        ///     <paramref name="state" />. Replaces updating node by node while enumerating the heap, which moved
+        ///     nodes past the enumerator.
+        /// </summary>
+        public void UpdateAllPriorities<TState>(TState state, Func<TState, TItem, TPriority> updateFunc){
+            for (int i = 1; i <= Count; i++) _nodes[i].Priority = updateFunc(state, _nodes[i]);
+            for (int i = Count >> 1; i >= 1; i--) CascadeDown(_nodes[i]);
+        }
+
         public void ResetNode(TItem node){
 #if DEBUG
             if (node == null) throw new ArgumentNullException("node");

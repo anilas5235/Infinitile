@@ -78,7 +78,8 @@ namespace Engine.Scripts.Render{
         internal void Release(in AllocInfo allocInfo){
             if (allocInfo.Count == 0) return;
 
-            foreach (int index in allocInfo.GetPageIndices()){
+            for (int i = 0; i < allocInfo.Count; i++){ // PERF-04: no index array per release
+                int index = allocInfo.GetPage(i).PageIndex;
                 ValidOrThrow(index);
                 if (IsPageFree(index)) continue;
 

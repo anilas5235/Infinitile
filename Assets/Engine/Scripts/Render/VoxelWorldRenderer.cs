@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
 using Engine.Scripts.Data;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Collections;
+using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Registry;
@@ -33,6 +33,21 @@ namespace Engine.Scripts.Render{
         private readonly HashSet<int3> _requestedPartitions = new();
 
         private readonly Dictionary<int2, GraphicsBuffer> _voxelDataBuffers = new();
+
+        // PERF-04: a GraphicsBuffer is a managed object; released chunk buffers are kept for reuse so that chunk
+        // uploads during flight do not allocate. Lengths are rounded up so a free buffer fits more often; the
+        // decompress kernel reads the interval count from element 0, not from the buffer length.
+        private const int ChunkBufferGranularity = 512;
+
+        /// <summary>
+        ///     PERF-04: default element count of a pre-allocated chunk buffer. Four intervals per voxel column cover
+        ///     the usual layered terrain; a longer chunk gets a larger buffer on demand.
+        /// </summary>
+        private const int DefaultChunkBufferLength =
+            (ChunkWidth * ChunkDepth * 4 + 1 + ChunkBufferGranularity - 1) / ChunkBufferGranularity * ChunkBufferGranularity;
+
+        private readonly List<GraphicsBuffer> _freeChunkBuffers = new();
+        private int _chunkStoreSize;
         private bool _buffersRebuildPending;
 
         private int _copyKernelID;
@@ -40,6 +55,8 @@ namespace Engine.Scripts.Render{
         private RenderBufferManager _foliageBufferManager;
 
         private InFlightBuild[] _inFlightBuilds;
+        private PartitionBuildRequest[] _buildRequests; // PERF-04: one reusable request per in-flight slot
+        private uint2[] _intervalUpload = Array.Empty<uint2>(); // PERF-04: reused chunk upload staging
         private bool _isDestroyed;
         private int _maxInFlight = 1;
 
@@ -55,10 +72,28 @@ namespace Engine.Scripts.Render{
         protected override void Awake(){
             base.Awake();
 
+            // F-21: resolve the world before its settings are read; OnEnable's fallback ran too late for Awake.
+            if (world == null) world = GetComponent<VoxelWorld>();
+            if (world == null) world = VoxelWorld.Instance;
             _settings = world.Settings;
             _maxInFlight = math.max(1, _settings.Scheduler.partitionBuildBatchSize);
 
+            // PERF-04: sized for the partition pool so the request bookkeeping does not grow during flight
+            int partitionPoolSize = _settings.Chunk.DrawDistance.SquareSize() * PartitionsPerChunk;
+            _requestedPartitions.EnsureCapacity(partitionPoolSize);
+            _pendingBuilds.Capacity = math.max(_pendingBuilds.Capacity, partitionPoolSize);
+            AllocInfo.PrewarmPageLists(partitionPoolSize * 3); // solid, transparent and foliage per partition
+
+            // PERF-04: one GPU buffer per chunk the manager's store can hold (same formula as ChunkManager), created
+            // now instead of one managed GraphicsBuffer object per chunk upload during flight.
+            _chunkStoreSize = (_settings.Chunk.LoadDistance + 2).SquareSize();
+            _freeChunkBuffers.Capacity = _chunkStoreSize;
+            for (int i = 0; i < _chunkStoreSize; i++)
+                _freeChunkBuffers.Add(new GraphicsBuffer(Target.Structured, DefaultChunkBufferLength, Marshal.SizeOf<uint2>()));
+
             _inFlightBuilds = new InFlightBuild[_maxInFlight];
+            _buildRequests = new PartitionBuildRequest[_maxInFlight];
+            for (int i = 0; i < _maxInFlight; i++) _buildRequests[i] = new PartitionBuildRequest(default);
 
             RendererSettings rSettings = _settings.Renderer;
 
@@ -154,6 +189,7 @@ namespace Engine.Scripts.Render{
             _isDestroyed = true;
             _copyPointsHandler?.Dispose();
 
+            // F-17: each handler waits for its pending read-back and releases its resources independently.
             if (_pointBuilderHandlers != null){
                 foreach (PointBuilderHandler handler in _pointBuilderHandlers)
                     handler?.Dispose();
@@ -164,6 +200,8 @@ namespace Engine.Scripts.Render{
             _foliageBufferManager.Dispose();
 
             foreach (GraphicsBuffer buffer in _voxelDataBuffers.Values) buffer.Dispose();
+            foreach (GraphicsBuffer buffer in _freeChunkBuffers) buffer.Dispose();
+            _freeChunkBuffers.Clear();
 
             _pendingBuilds.Clear();
             _requestedPartitions.Clear();
@@ -240,16 +278,18 @@ namespace Engine.Scripts.Render{
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.PointBuildDispatch.Auto(); // PERF-01
             for (int i = 0; i < _maxInFlight; i++){
                 if (_pendingBuilds.Count < 1) break;
-                if (_inFlightBuilds[i] != null) continue;
+                if (_inFlightBuilds[i].Active) continue;
 
-                int3 partition = _pendingBuilds.First();
-                _pendingBuilds.Remove(partition);
-                if (_inFlightBuilds.Any(build => build != null && build.Partition.Equals(partition))){
+                // F-24 / PERF-04: plain loops; LINQ First/Any with a capturing lambda allocated every frame.
+                int3 partition = _pendingBuilds[0];
+                _pendingBuilds.RemoveAt(0);
+                if (IsBuildInFlight(partition)){
                     EnqueuePartitionBuild(partition);
                     continue;
                 }
 
-                PartitionBuildRequest request = new(partition);
+                PartitionBuildRequest request = _buildRequests[i];
+                request.Reset(partition);
                 request.CollectBuffers(_voxelDataBuffers);
 
                 if (!request.IsValid){
@@ -259,9 +299,26 @@ namespace Engine.Scripts.Render{
                 }
 
                 PointBuilderHandler handler = _pointBuilderHandlers[i];
-                Awaitable<int[]> buildAwaitable = handler.BuildPoints(request);
-                _inFlightBuilds[i] = new InFlightBuild(partition, handler, buildAwaitable.GetAwaiter());
+                try{
+                    // PERF-04: a plain dispatch plus a polled read-back; the async version boxed a state machine per build
+                    handler.BuildPoints(request);
+                }
+                catch (Exception e){
+                    VoxelEngineLogger.Error<VoxelWorldRenderer>($"Error updating partition {partition}: {e}");
+                    continue;
+                }
+
+                _inFlightBuilds[i] = new InFlightBuild(partition, handler);
             }
+        }
+
+        private bool IsBuildInFlight(int3 partition){
+            for (int i = 0; i < _inFlightBuilds.Length; i++){
+                InFlightBuild build = _inFlightBuilds[i];
+                if (build.Active && build.Partition.Equals(partition)) return true;
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -272,14 +329,13 @@ namespace Engine.Scripts.Render{
 
             for (int i = 0; i < _maxInFlight; i++){
                 InFlightBuild build = _inFlightBuilds[i];
-                if (build == null) continue;
-                if (!build.BuildAwaiter.IsCompleted) continue;
+                if (!build.Active) continue;
+                if (!build.Handler.IsReadBackDone) continue;
 
-                _inFlightBuilds[i] = null;
+                _inFlightBuilds[i] = default;
 
                 try{
-                    Awaitable<int[]>.Awaiter buildAwaiter = build.BuildAwaiter;
-                    int[] pointCounts = buildAwaiter.GetResult();
+                    int[] pointCounts = build.Handler.CompleteBuild();
                     if (_isDestroyed) return;
 
                     if (!_requestedPartitions.Contains(build.Partition) || _pendingBuilds.Contains(build.Partition))
@@ -305,20 +361,53 @@ namespace Engine.Scripts.Render{
         /// <param name="voxelData">The voxel data to store.</param>
         private void AddOrUpdateChunk(int2 chunk, UnsafeIntervalList<ushort> voxelData){
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.GpuUploadChunk.Auto(); // PERF-01
-            if (_voxelDataBuffers.TryGetValue(chunk, out GraphicsBuffer existingBuffer)) existingBuffer.Dispose();
+            // F-18: validate before the old buffer is released, otherwise a rejected update leaves a disposed
+            // buffer in the map that the next partition build binds.
+            if (voxelData.Length != VoxelsPerChunk) throw new Exception("Voxel data length mismatch!");
 
             int compLength = voxelData.CompressedLength;
-            uint2[] intervalData = new uint2[compLength + 1];
+            int uploadLength = compLength + 1;
+
+            // PERF-04: keep the chunk's buffer when it is large enough, otherwise release it for reuse
+            GraphicsBuffer dataBuffer = null;
+            if (_voxelDataBuffers.TryGetValue(chunk, out GraphicsBuffer existingBuffer)){
+                if (existingBuffer.count >= uploadLength) dataBuffer = existingBuffer;
+                else ReleaseChunkBuffer(existingBuffer);
+            }
+            dataBuffer ??= RentChunkBuffer(uploadLength);
+            // PERF-04: staging array is kept and grown, not allocated per upload
+            if (_intervalUpload.Length < uploadLength) _intervalUpload = new uint2[math.max(uploadLength, _intervalUpload.Length * 2)];
+            uint2[] intervalData = _intervalUpload;
             int i = 1;
             foreach (UnsafeIntervalList<ushort>.Node n in voxelData.Internal)
                 intervalData[i++] = new uint2(n.Value, (uint)n.Count);
 
             intervalData[0] = new uint2((uint)compLength, intervalData[compLength].y);
 
-            if (voxelData.Length != VoxelsPerChunk) throw new Exception("Voxel data length mismatch!");
-            GraphicsBuffer dataBuffer = new(Target.Structured, intervalData.Length, Marshal.SizeOf<uint2>());
-            dataBuffer.SetData(intervalData);
+            dataBuffer.SetData(intervalData, 0, 0, uploadLength);
             _voxelDataBuffers[chunk] = dataBuffer;
+        }
+
+        /// <summary>PERF-04: first free buffer that holds <paramref name="uploadLength" /> elements, or a new one.</summary>
+        private GraphicsBuffer RentChunkBuffer(int uploadLength){
+            for (int i = 0; i < _freeChunkBuffers.Count; i++){
+                GraphicsBuffer free = _freeChunkBuffers[i];
+                if (free.count < uploadLength) continue;
+                _freeChunkBuffers.RemoveAt(i);
+                return free;
+            }
+
+            int length = (uploadLength + ChunkBufferGranularity - 1) / ChunkBufferGranularity * ChunkBufferGranularity;
+            return new GraphicsBuffer(Target.Structured, length, Marshal.SizeOf<uint2>());
+        }
+
+        private void ReleaseChunkBuffer(GraphicsBuffer buffer){
+            if (_isDestroyed || _freeChunkBuffers.Count >= _chunkStoreSize){
+                buffer.Dispose();
+                return;
+            }
+
+            _freeChunkBuffers.Add(buffer);
         }
 
         /// <summary>
@@ -328,7 +417,7 @@ namespace Engine.Scripts.Render{
         private void RemoveChunkData(int2 chunk){
             if (!_voxelDataBuffers.TryGetValue(chunk, out GraphicsBuffer existingBuffer)) return;
 
-            existingBuffer.Dispose();
+            ReleaseChunkBuffer(existingBuffer); // PERF-04
             _voxelDataBuffers.Remove(chunk);
         }
 
@@ -355,11 +444,11 @@ namespace Engine.Scripts.Render{
         /// <summary>
         ///     Represents an in-flight partition build operation.
         /// </summary>
-        private class InFlightBuild{
+        private struct InFlightBuild{ // PERF-04: a struct slot, not a class allocated per build
             /// <summary>
-            ///     The awaiter for the build operation's result.
+            ///     True while this slot holds a build.
             /// </summary>
-            public readonly Awaitable<int[]>.Awaiter BuildAwaiter;
+            public readonly bool Active;
 
             /// <summary>
             ///     The point builder handler responsible for this build.
@@ -375,12 +464,11 @@ namespace Engine.Scripts.Render{
             ///     Initializes a new instance of the InFlightBuild class.
             /// </summary>
             /// <param name="partition">The partition position.</param>
-            /// <param name="handler">The point builder handler.</param>
-            /// <param name="buildAwaiter">The build awaiter.</param>
-            public InFlightBuild(int3 partition, PointBuilderHandler handler, Awaitable<int[]>.Awaiter buildAwaiter){
+            /// <param name="handler">The point builder handler; its read-back state tells when the build is done.</param>
+            public InFlightBuild(int3 partition, PointBuilderHandler handler){
+                Active = true;
                 Partition = partition;
                 Handler = handler;
-                BuildAwaiter = buildAwaiter;
             }
         }
     }

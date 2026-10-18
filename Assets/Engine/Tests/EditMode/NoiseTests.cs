@@ -211,7 +211,6 @@ namespace Engine.Tests.EditMode{
             Assert.IsTrue(anyDifferent, "seed S must not be the same world as seed 0 shifted by (0, 2S)");
         }
 
-        [Category("KnownBug")] // F-06
         [Test]
         public void NoiseSettings_ToStruct_CopiesWarpSeedOffsetY(){
             // F-06: WarpedNoiseLayerSettings.ToStruct never copies warpSeedOffsetY.
@@ -220,7 +219,6 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(1000, layerSettings.WarpSeedOffsetY);
         }
 
-        [Category("KnownBug")] // F-06
         [Test]
         public void NoiseSettings_ContinentalWarpChannelsDiffer(){
             // F-06: with the offset dropped, warp X and warp Y are the same noise field.

@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using Engine.Scripts.Components;
+﻿using Engine.Scripts.Components;
 using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
@@ -24,6 +23,8 @@ namespace Engine.Scripts.Jobs.Core{
             ColliderBakeScheduler colliderBakeScheduler)
             : base(settings, chunkManager, chunkPool){
             _colliderBakeScheduler = colliderBakeScheduler;
+            int side = 2 * settings.Chunk.UpdateDistance + 1;
+            Reserve(side * side * VoxelConstants.PartitionsPerChunk, settings.Scheduler.colliderBatchSize); // PERF-04
         }
 
         /// <summary>
@@ -32,7 +33,8 @@ namespace Engine.Scripts.Jobs.Core{
         /// <param name="focus">The new focus position.</param>
         public override void FocusUpdate(PriorityUtil.Focus focus){
             WakeUp();
-            Queue.UpdateAllPriorities(pos => PriorityUtil.DistPriority(ref pos, ref focus));
+            // N-01 / PERF-04: static lambda with explicit state instead of a closure capturing the focus
+            Queue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.DistPriority(ref pos, ref f));
         }
 
         /// <summary>
@@ -75,7 +77,7 @@ namespace Engine.Scripts.Jobs.Core{
 
             if (accepted == 0) return true;
 
-            _colliderBakeScheduler.Start(Set.ToList());
+            _colliderBakeScheduler.Start(Set); // PERF-04: no per-batch list copy
 
             return true;
         }

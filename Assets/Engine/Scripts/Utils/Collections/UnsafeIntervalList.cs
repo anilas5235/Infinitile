@@ -69,7 +69,17 @@ namespace Engine.Scripts.Utils.Collections{
         /// <param name="value">The value to store.</param>
         /// <param name="count">The number of repetitions.</param>
         public void AddInterval(T value, int count){
+            if (count <= 0) return; // F-13: an empty run would be a zero-length node
             Length += count;
+
+            // F-13: extend the last run instead of adding a second node with the same value
+            if (_internal.Length > 0 && _internal[_internal.Length - 1].Value.Equals(value)){
+                Node last = _internal[_internal.Length - 1];
+                last.Count = Length;
+                _internal[_internal.Length - 1] = last;
+                return;
+            }
+
             _internal.Add(new Node(value, Length));
         }
 
@@ -139,8 +149,10 @@ namespace Engine.Scripts.Utils.Collections{
                 node.Count--;
                 _internal[nodeIndex] = node;
 
-                if (leftNodeIndex >= 0 && leftNode.Count == node.Count)
-                    _internal.RemoveRange(nodeIndex, 1); // [X,A,Y] -> [X,Y,Y]
+                // F-12: the node is empty when its end equals the previous end (0 for the first node), not only
+                // when a left node exists. [A,Y] at index 0 -> [Y,Y]
+                int previousEnd = leftNodeIndex >= 0 ? leftNode.Count : 0;
+                if (node.Count == previousEnd) _internal.RemoveRange(nodeIndex, 1); // [X,A,Y] -> [X,Y,Y]
             }
             else{
                 // No Coalesce

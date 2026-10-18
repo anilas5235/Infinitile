@@ -83,7 +83,8 @@ namespace Engine.Scripts.Jobs.Chunk{
                     else if (y == gy) v = gy < waterLevel ? waterBlock : top;
                     else v = y < waterLevel ? waterBlock : air;
 
-                    if (y == waterLevel && v == waterBlock && col.Temperature < .2f) v = ice;
+                    // F-07: the water surface is the topmost water voxel at waterLevel - 1 (y == waterLevel is air).
+                    if (y == waterLevel - 1 && v == waterBlock && col.Temperature < .2f) v = ice;
 
                     vox[ChunkSize.Flatten(x, y, z)] = v;
                 }

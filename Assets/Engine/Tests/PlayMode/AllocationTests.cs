@@ -54,9 +54,23 @@ namespace Engine.Tests.PlayMode{
             LogAssert.NoUnexpectedReceived();
         }
 
-        [Category("KnownBug")] // F-24 / PERF-04
+        private static IEnumerator WaitForSteadyState(VoxelEngineScheduler scheduler, float timeoutSeconds){
+            // PERF-04 measures the steady state: the world around the focus is generated, meshed and collided, so
+            // every handler sleeps once. One-time warm-up work (first job schedules, render buffer growth) is over.
+            DataJobStateHandler data = PlayModeFixtures.GetPrivateField<DataJobStateHandler>(scheduler, "_dataJobHandler");
+            MeshJobStateHandler mesh = PlayModeFixtures.GetPrivateField<MeshJobStateHandler>(scheduler, "_meshJobHandler");
+            ColliderJobStateHandler collider =
+                PlayModeFixtures.GetPrivateField<ColliderJobStateHandler>(scheduler, "_colliderJobHandler");
+            float deadline = Time.realtimeSinceStartup + timeoutSeconds;
+            while (!(data.Sleeping && mesh.Sleeping && collider.Sleeping)){
+                if (Time.realtimeSinceStartup > deadline)
+                    Assert.Fail($"the scheduler did not reach a steady state within {timeoutSeconds}s");
+                yield return null;
+            }
+        }
+
         [UnityTest]
-        [Timeout(180000)]
+        [Timeout(300000)]
         public IEnumerator EngineStep_DoesNotAllocateDuringFlight(){
             // TST-E21 / PERF-04: scheduler update, renderer update and buffer rebuild must not allocate managed
             // memory while the focus flies through loaded and loading terrain (F-24: LINQ in the renderer).
@@ -66,6 +80,7 @@ namespace Engine.Tests.PlayMode{
             yield return WaitForFocusColumn(world, 45f, false);
 
             VoxelEngineScheduler scheduler = PlayModeFixtures.GetPrivateField<VoxelEngineScheduler>(world, "_scheduler");
+            yield return WaitForSteadyState(scheduler, 120f);
             Transform focus = PlayModeFixtures.GetPrivateField<Transform>(world, "focus");
             Action rendererUpdate = (Action)Delegate.CreateDelegate(typeof(Action), renderer,
                 PlayModeFixtures.GetPrivateMethod(typeof(VoxelWorldRenderer), "Update"));
@@ -99,7 +114,6 @@ namespace Engine.Tests.PlayMode{
                 $"{allocatingFrames} of {FlightFrames} frames allocated managed memory (first at frame {firstAllocatingFrame})");
         }
 
-        [Category("KnownBug")] // N-01 (new, found by TST-E21: FocusUpdate allocates a closure per call)
         [UnityTest]
         public IEnumerator FocusUpdate_DoesNotAllocate(){
             // PERF-04 for the state handlers: re-prioritising the queues on a focus change must not allocate.

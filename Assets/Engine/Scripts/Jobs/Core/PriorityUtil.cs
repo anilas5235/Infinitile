@@ -68,8 +68,12 @@ namespace Engine.Scripts.Jobs.Core{
             int dist = (position - focus.Pos.xz).SqrMagnitude();
             if (dist == 0) return 0f;
 
+            // F-09: a vertical forward has no xz component; normalising it gives NaN, so skip the direction term.
+            float2 forwardXz = focus.Forward.xz;
+            if (math.lengthsq(forwardXz) < 1e-6f) return dist * 3f;
+
             float2 dir = math.normalize(position - focus.Pos.xz);
-            float2 forward = math.normalize(focus.Forward.xz);
+            float2 forward = math.normalize(forwardXz);
 
             float dot = math.dot(forward, dir);
 
@@ -79,6 +83,23 @@ namespace Engine.Scripts.Jobs.Core{
         [BurstCompile]
         public static float ReVerseDistPriority(ref int2 position, ref Focus focus){
             return -DistPriority(ref position, ref focus);
+        }
+
+        /// <summary>
+        ///     F-23 / DEC-14: eviction order is plain (squared) distance from the focus, without the view weighting
+        ///     of <see cref="DistPriority(ref int3, ref Focus)" />; the farthest entry has the lowest value and is
+        ///     dequeued first. Otherwise a chunk behind the player inside the load distance was evicted before a
+        ///     chunk outside it and regenerated.
+        /// </summary>
+        [BurstCompile]
+        public static float EvictionPriority(ref int3 position, ref Focus focus){
+            return -(position - focus.Pos).SqrMagnitude();
+        }
+
+        /// <inheritdoc cref="EvictionPriority(ref int3, ref Focus)" />
+        [BurstCompile]
+        public static float EvictionPriority(ref int2 position, ref Focus focus){
+            return -(position - focus.Pos.xz).SqrMagnitude();
         }
 
         public readonly struct Focus : IEquatable<Focus>{

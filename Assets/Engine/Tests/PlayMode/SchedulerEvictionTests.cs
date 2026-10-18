@@ -32,7 +32,6 @@ namespace Engine.Tests.PlayMode{
 
         #region F-05
 
-        [Category("KnownBug")] // F-05
         [UnityTest]
         [Timeout(120000)]
         public IEnumerator UnloadChunk_RaisesEvictionAndReleasesRenderBuffer(){
@@ -118,14 +117,13 @@ namespace Engine.Tests.PlayMode{
             using BakeRig rig = new();
             int3 pos = new(0, 3, 0);
             rig.Pool.GetOrClaimPartition(pos);
-            rig.Bake.Start(new List<int3>{ pos });
+            rig.Bake.Start(new HashSet<int3>{ pos });
             yield return null;
             rig.Bake.Complete();
             Assert.IsTrue(rig.Pool.IsPartitionActive(pos));
             Assert.IsTrue(rig.Pool.IsCollidable(pos));
         }
 
-        [Category("KnownBug")] // F-04
         [UnityTest]
         public IEnumerator ColliderBake_PartitionReclaimedDuringBake_IsNotMarkedCollidable(){
             // F-04: ColliderBakeScheduler.Complete marks every started position collidable, even one the pool
@@ -133,7 +131,7 @@ namespace Engine.Tests.PlayMode{
             using BakeRig rig = new();
             int3 pos = new(0, 3, 0);
             rig.Pool.GetOrClaimPartition(pos);
-            rig.Bake.Start(new List<int3>{ pos });
+            rig.Bake.Start(new HashSet<int3>{ pos });
             yield return null;
 
             PlayModeFixtures.GetPrivateMethod(typeof(ChunkPool), "ReclaimPartition").Invoke(rig.Pool, new object[]{ pos });
@@ -145,9 +143,43 @@ namespace Engine.Tests.PlayMode{
 
         #endregion
 
+        #region F-23
+
+        [UnityTest]
+        public IEnumerator PartitionPool_Full_EvictsTheFarthestPartitionNotTheOneBehindThePlayer(){
+            // F-23 / DEC-14: the pool queues used the view-weighted priority (x5 behind the player), so a
+            // partition 3 behind (weighted 45) was reclaimed before one 6 in front (weighted 36).
+            VoxelEngineSettings settings = PlayModeFixtures.CreateSettings(0, VoxelWorld.Instance.Settings.Chunk.ChunkPrefab);
+            GameObject root = new("SchedulerEvictionTests.PoolRig");
+            ChunkPool pool = new(root.transform, settings); // partition pool = 1 chunk x PartitionsPerChunk = 8
+            try{
+                pool.FocusUpdate(new PriorityUtil.Focus(int3.zero, new float3(1, 0, 0)));
+                int3 behind = new(-3, 0, 0);
+                int3 front = new(6, 0, 0);
+                pool.GetOrClaimPartition(behind);
+                pool.GetOrClaimPartition(front);
+                int3[] fillers = { new(1, 0, 0), new(2, 0, 0), new(1, 1, 0), new(2, 1, 0), new(1, 0, 1), new(2, 0, 1) };
+                foreach (int3 filler in fillers) pool.GetOrClaimPartition(filler); // 8 claimed = pool size
+                Assert.IsTrue(pool.IsPartitionActive(behind));
+                Assert.IsTrue(pool.IsPartitionActive(front));
+                yield return null;
+
+                pool.GetOrClaimPartition(new int3(0, 1, 0)); // one over capacity: exactly one partition is reclaimed
+
+                Assert.IsTrue(pool.IsPartitionActive(behind), "the closer partition behind the player must stay");
+                Assert.IsFalse(pool.IsPartitionActive(front), "the farthest partition must be the one reclaimed (DEC-14)");
+            }
+            finally{
+                pool.Dispose();
+                Object.Destroy(root);
+                Object.Destroy(settings);
+            }
+        }
+
+        #endregion
+
         #region F-10
 
-        [Category("KnownBug")] // F-10
         [UnityTest]
         [Timeout(120000)]
         public IEnumerator MeshHandler_IdlesOnceVerticalDrawWindowIsMeshed(){
