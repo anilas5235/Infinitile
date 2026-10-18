@@ -4,6 +4,9 @@ using Engine.Scripts.Noise;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
+using Engine.Scripts.WorldGen.Core;
+using Engine.Scripts.WorldGen.Noise;
+using Engine.Scripts.WorldGen.Settings;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
@@ -52,6 +55,25 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
 
         private Vector2 windowSize;
 
+        // Spec pipeline views (Phase 0): filled through WorldGenApi.SampleRegion, so the preview shows exactly what
+        // WorldSampler computes (TST-E12).
+        private Texture2D _specBiomeTexture;
+        private Texture2D _specHeightTexture;
+        private Texture2D _erosionTexture;
+        private Texture2D _pvTexture;
+        private NativeArray<Color32> _jobSpecBiomeColors;
+        private NativeArray<Color32> _jobSpecBiomePixels;
+        private NativeArray<Color32> _jobSpecHeightPixels;
+        private NativeArray<Color32> _jobErosionPixels;
+        private NativeArray<Color32> _jobPvPixels;
+        private NativeArray<WorldFields> _jobFields;
+        private NativeArray<int> _jobHardBiome;
+        private NativeArray<float> _jobHeight;
+        private NativeArray<byte> _jobClamped;
+        private int _specViewSize;
+        private bool _specBuildScheduled;
+        private float _clampedShare;
+
         private void OnEnable(){
             EditorApplication.update += OnEditorUpdate;
             ReloadAssets();
@@ -72,6 +94,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
             DestroyTexture(ref _heightTexture);
             DestroyTexture(ref _climateTexture);
             DestroyTexture(ref _humidityTemperatureTexture);
+            DestroyTexture(ref _specBiomeTexture);
+            DestroyTexture(ref _specHeightTexture);
+            DestroyTexture(ref _erosionTexture);
+            DestroyTexture(ref _pvTexture);
         }
 
         private void OnDestroy(){
@@ -81,7 +107,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
 
         /// <summary>
         ///     D-05: the preview allocates its own BiomeDefs and Voxels (no registry owns them), so it releases
-        ///     them here; GeneratorConfig.Dispose only releases the noise parameters.
+        ///     them here; GeneratorConfig.Dispose releases the noise parameters and the WorldGen config.
         /// </summary>
         private void DisposeGeneratorConfig(){
             if (_generatorConfig.BiomeDefs.IsCreated) _generatorConfig.BiomeDefs.Dispose();
@@ -94,7 +120,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
         private static void OpenWindow(){
             WorldGenerationPreviewWindow window = GetWindow<WorldGenerationPreviewWindow>();
             window.titleContent = new GUIContent("World Gen Preview");
-            window.minSize = new Vector2(920f, 620f);
+            window.minSize = new Vector2(1400f, 620f);
             window.Show();
         }
 
@@ -228,8 +254,38 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
                     DrawView("HeightMap", EditorStyles.label, _heightTexture, true);
                 }
                 EditorGUILayout.EndVertical();
+
+                DrawSpecViews();
             }
             EditorGUILayout.EndHorizontal();
+        }
+
+        /// <summary>
+        ///     Spec-pipeline views (Phase 0): hard 5D biome, common-formula height with the clamped share (GEN-12),
+        ///     erosion and peaks-and-valleys. Needs a WorldGenSettings asset on the VoxelEngineSettings.
+        /// </summary>
+        private void DrawSpecViews(){
+            if (!_settings.WorldGen){
+                EditorGUILayout.BeginVertical(GUILayout.Width(260f));
+                EditorGUILayout.HelpBox(
+                    "Assign a WorldGenSettings asset to the VoxelEngineSettings to see the spec views " +
+                    "(hard biome, height, erosion, peaks & valleys).", MessageType.Info);
+                EditorGUILayout.EndVertical();
+                return;
+            }
+
+            EditorGUILayout.BeginVertical();
+            {
+                DrawView("Spec Biome (5D hard class)", EditorStyles.label, _specBiomeTexture, true);
+                DrawView($"Spec Height (clamped {_clampedShare:P1})", EditorStyles.label, _specHeightTexture, true);
+            }
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.BeginVertical();
+            {
+                DrawView("Erosion", EditorStyles.label, _erosionTexture, true);
+                DrawView("Peaks & Valleys", EditorStyles.label, _pvTexture, true);
+            }
+            EditorGUILayout.EndVertical();
         }
 
         private void DrawView(string viewTitle, GUIStyle style, Texture2D texture, bool allowPan){
@@ -418,10 +474,86 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
             JobHandle distributionHandle = distributionJob.Schedule(pixelCount, 64);
 
             JobHandle combined = JobHandle.CombineDependencies(biomeHandle, distributionHandle);
+            combined = JobHandle.CombineDependencies(combined, ScheduleSpecBuild(resolution));
 
             _buildHandle = combined;
             _buildInProgress = true;
             _needsRebuild = false;
+        }
+
+        /// <summary>
+        ///     Samples the framed region through <see cref="WorldGenApi.SampleRegion" /> (1 sample per block up to the
+        ///     view resolution, then every Stride-th column) and converts the buffers to the four spec textures.
+        /// </summary>
+        private JobHandle ScheduleSpecBuild(int resolution){
+            _specBuildScheduled = false;
+            if (!_settings.WorldGen) return default;
+
+            // D-05: the previous build is complete here, so its config is no longer read.
+            _generatorConfig.WorldGen.Dispose();
+            try{
+                _generatorConfig.WorldGen = _settings.WorldGen.ToConfig(_settings.Seed, _settings.Noise);
+            }
+            catch (System.Exception e){
+                _generatorConfig.WorldGen = default;
+                Debug.LogException(e);
+                return default;
+            }
+
+            WorldGenConfig cfg = _generatorConfig.WorldGen;
+            int viewSize = Mathf.Min(resolution, ViewResolution);
+            int stride = Mathf.Max(1, resolution / ViewResolution);
+            int count = viewSize * viewSize;
+            _specViewSize = viewSize;
+
+            _jobFields = new NativeArray<WorldFields>(count, Allocator.TempJob);
+            _jobHardBiome = new NativeArray<int>(count, Allocator.TempJob);
+            _jobHeight = new NativeArray<float>(count, Allocator.TempJob);
+            _jobClamped = new NativeArray<byte>(count, Allocator.TempJob);
+            _jobSpecBiomePixels = new NativeArray<Color32>(count, Allocator.TempJob);
+            _jobSpecHeightPixels = new NativeArray<Color32>(count, Allocator.TempJob);
+            _jobErosionPixels = new NativeArray<Color32>(count, Allocator.TempJob);
+            _jobPvPixels = new NativeArray<Color32>(count, Allocator.TempJob);
+
+            int biomeCount = cfg.BiomeCount;
+            _jobSpecBiomeColors = new NativeArray<Color32>(Mathf.Max(1, biomeCount), Allocator.TempJob);
+            for (int i = 0; i < biomeCount; i++){
+                Biome biome = _settings.WorldGen.Biomes.Biomes[i];
+                _jobSpecBiomeColors[i] = biome ? (Color32)biome.RepresentativeColor : new Color32(0, 0, 0, 255);
+            }
+
+            // Same framing as WorldViewJob: the world offset sits at the centre of the view.
+            int half = resolution / 2;
+            WorldGenRequest request = new(){
+                Config = cfg,
+                Origin = new int2(_worldOffset.x - half, _worldOffset.y - half),
+                Size = new int2(viewSize, viewSize),
+                Stride = stride
+            };
+            RegionBuffers buffers = new(){
+                Fields = _jobFields,
+                HardBiome = _jobHardBiome,
+                Height = _jobHeight,
+                Clamped = _jobClamped
+            };
+            JobHandle sampled = WorldGenApi.SampleRegion(request, ref buffers);
+
+            SpecViewJob view = new(){
+                Fields = _jobFields,
+                HardBiome = _jobHardBiome,
+                Height = _jobHeight,
+                Clamped = _jobClamped,
+                BiomeColors = _jobSpecBiomeColors,
+                HeightMin = cfg.HeightMin,
+                HeightMax = cfg.HeightMax,
+                WaterLevel = _settings.Noise.WaterLevel,
+                BiomeView = _jobSpecBiomePixels,
+                HeightView = _jobSpecHeightPixels,
+                ErosionView = _jobErosionPixels,
+                PvView = _jobPvPixels
+            };
+            _specBuildScheduled = true;
+            return view.Schedule(count, 64, sampled);
         }
 
         private void FinalizeScheduledBuild(bool applyResult){
@@ -446,6 +578,26 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
                 _heightTexture.Apply(false);
                 _climateTexture.Apply(false);
                 _humidityTemperatureTexture.Apply(false);
+
+                if (_specBuildScheduled){
+                    EnsureTexture(ref _specBiomeTexture, _specViewSize);
+                    EnsureTexture(ref _specHeightTexture, _specViewSize);
+                    EnsureTexture(ref _erosionTexture, _specViewSize);
+                    EnsureTexture(ref _pvTexture, _specViewSize);
+                    _specBiomeTexture.SetPixelData(_jobSpecBiomePixels, 0);
+                    _specHeightTexture.SetPixelData(_jobSpecHeightPixels, 0);
+                    _erosionTexture.SetPixelData(_jobErosionPixels, 0);
+                    _pvTexture.SetPixelData(_jobPvPixels, 0);
+                    _specBiomeTexture.Apply(false);
+                    _specHeightTexture.Apply(false);
+                    _erosionTexture.Apply(false);
+                    _pvTexture.Apply(false);
+
+                    // GEN-12: share of columns whose height hit the clamp.
+                    int clamped = 0;
+                    for (int i = 0; i < _jobClamped.Length; i++) clamped += _jobClamped[i];
+                    _clampedShare = _jobClamped.Length > 0 ? clamped / (float)_jobClamped.Length : 0f;
+                }
             }
 
             DisposeJobData();
@@ -463,6 +615,17 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
             if (_jobClimatePixels.IsCreated) _jobClimatePixels.Dispose();
 
             if (_jobHumidityTemperaturePixels.IsCreated) _jobHumidityTemperaturePixels.Dispose();
+
+            if (_jobSpecBiomeColors.IsCreated) _jobSpecBiomeColors.Dispose();
+            if (_jobSpecBiomePixels.IsCreated) _jobSpecBiomePixels.Dispose();
+            if (_jobSpecHeightPixels.IsCreated) _jobSpecHeightPixels.Dispose();
+            if (_jobErosionPixels.IsCreated) _jobErosionPixels.Dispose();
+            if (_jobPvPixels.IsCreated) _jobPvPixels.Dispose();
+            if (_jobFields.IsCreated) _jobFields.Dispose();
+            if (_jobHardBiome.IsCreated) _jobHardBiome.Dispose();
+            if (_jobHeight.IsCreated) _jobHeight.Dispose();
+            if (_jobClamped.IsCreated) _jobClamped.Dispose();
+            _specBuildScheduled = false;
         }
 
         #endregion
@@ -571,6 +734,42 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
                 };
                 ushort biomeIndex = BiomeCalculator.SelectBiome(ref input, ref Config);
                 Output[index] = BiomeColors[biomeIndex];
+            }
+        }
+
+        /// <summary>Converts the sampled region buffers to the four spec textures. Reads only; no sampler call (GEN-16 n/a).</summary>
+        [BurstCompile]
+        private struct SpecViewJob : IJobParallelFor{
+            [ReadOnly] public NativeArray<WorldFields> Fields;
+            [ReadOnly] public NativeArray<int> HardBiome;
+            [ReadOnly] public NativeArray<float> Height;
+            [ReadOnly] public NativeArray<byte> Clamped;
+            [ReadOnly] public NativeArray<Color32> BiomeColors;
+            public float HeightMin;
+            public float HeightMax;
+            public int WaterLevel;
+            [WriteOnly] public NativeArray<Color32> BiomeView;
+            [WriteOnly] public NativeArray<Color32> HeightView;
+            [WriteOnly] public NativeArray<Color32> ErosionView;
+            [WriteOnly] public NativeArray<Color32> PvView;
+
+            public void Execute(int index){
+                int biome = HardBiome[index];
+                BiomeView[index] = biome >= 0 && biome < BiomeColors.Length ? BiomeColors[biome] : new Color32(0, 0, 0, 255);
+
+                float h = Height[index];
+                byte v = (byte)math.round(math.saturate((h - HeightMin) / math.max(1f, HeightMax - HeightMin)) * 255f);
+                Color32 heightColor = h < WaterLevel
+                    ? new Color32((byte)(v / 2), (byte)(v / 2), (byte)math.min(255, v + 80), 255) // below water: blue tint
+                    : new Color32(v, v, v, 255);
+                if (Clamped[index] != 0) heightColor = new Color32(255, 0, 0, 255); // GEN-12
+                HeightView[index] = heightColor;
+
+                byte e = (byte)math.round(math.saturate(Fields[index].E) * 255f);
+                ErosionView[index] = new Color32(e, e, e, 255);
+
+                byte pv = (byte)math.round(math.saturate((Fields[index].PV + 1f) * 0.5f) * 255f);
+                PvView[index] = new Color32(pv, pv, pv, 255);
             }
         }
 
