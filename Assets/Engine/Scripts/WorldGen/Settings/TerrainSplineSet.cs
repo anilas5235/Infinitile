@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Engine.Scripts.WorldGen.Height;
 using Unity.Collections;
 using UnityEngine;
@@ -317,9 +318,9 @@ namespace Engine.Scripts.WorldGen.Settings{
                 parsed.Add(((float)x, pointValue));
             }
 
-            // A stable sort by X keeps authoring order free; duplicates are reported by Validate.
-            parsed.Sort((a, b) => a.x.CompareTo(b.x));
-            foreach ((float x, object pointValue) in parsed){
+            // A stable sort by X keeps authoring order free; duplicates keep their order and are reported by Validate.
+            // (List.Sort is unstable, OrderBy is stable.)
+            foreach ((float x, object pointValue) in parsed.OrderBy(point => point.x)){
                 SplinePointData p = new(){ X = x };
                 if (pointValue is double v) p.Value = (float)v;
                 else p.Child = ImportSpline(pointValue, $"{path}[{x.ToString(CultureInfo.InvariantCulture)}]", splines, depth + 1);

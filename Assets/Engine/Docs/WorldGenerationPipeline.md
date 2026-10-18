@@ -5,7 +5,8 @@
 Phase 1 of `WorldGenSpec.html` makes the Terrain-first architecture (section 7) the one the game runs:
 `Assets/EngineSettings/WorldGenSettings.asset` now selects `GenArchitecture.TerrainFirst` with
 `TerrainSplineSet_Default.asset` (the section 19.1 placeholder splines), and the chunk job takes its columns from
-`WorldSampler.SampleColumn` (INT-10). `Legacy` stays selectable (INT-40); Biome-first blending follows in Phase 2.
+`WorldSampler.SampleColumn` (INT-10). `Legacy` stays selectable (INT-40); Biome-first follows in Phase 2, the blend
+methods in Phase 3.
 
 ## Terrain-first column pipeline
 
@@ -36,18 +37,19 @@ flowchart LR
   height is continuous wherever the fields are (TST-12).
 - **Classification** (`WorldSampler.SampleColumn`): the normalised height h = saturate((H − Hmin)/(Hmax − Hmin)) is the
   sixth distance dimension with weight λ_h (TRN-10); the material weights are still one-hot (method 1, BLD-02) until
-  Phase 2. A `HeightMethod` other than None is ignored with a warning in Terrain-first (TRN-21).
+  Phase 3. A `HeightMethod` other than None is ignored with a warning in Terrain-first (TRN-21).
 - **Spline asset** (`WorldGen/Settings/TerrainSplineSet.cs`): a `ScriptableObject` with named splines, three root
   indices and `Notes`. `Validate` reports missing roots, unsorted or duplicate X, out-of-range X, cycles, nesting
   deeper than 8 and more than 127 nodes per root; `Flatten` throws on any problem (R5: no silent repair). `ToJson`
   / `FromJson` round-trip the human-readable form of section 19.1 (`{"Axis","Interpolation","Points":[{"X","Value"}]}`,
-  TRN-04/05), and `ResetToPlaceholders` restores the spec's placeholder trees. `WorldGenSettings.ToCanonicalJson`
+  TRN-05), and `ResetToPlaceholders` restores the spec's placeholder trees. `WorldGenSettings.ToCanonicalJson`
   inlines the tree (INT-02).
 - **Chunk job** (`Jobs/Chunk/ChunkGenerationTerrain.cs`): with a non-legacy architecture `PrepareChunkMaps` calls
   `WorldSampler.SampleColumn` per column, independent of the chunk origin, so chunk borders carry no seam (TST-03).
   `ChunkColumn` gained `SurfaceSource`, `FloraSpecies`, `FloraSource` and `HeightF`; the blocks come from the
   surface-source biome. `FillTerrain`'s ice override follows `EnableClimateOverrides` (GEN-14). Vegetation stays
-  disabled until Phase 4.
+  disabled until Phase 4. `ChunkJob` compiles with `CompileSynchronously` and `FloatMode.Strict` because it calls the
+  sampler (GEN-16).
 - **Preview** (`WorldGenerationPreviewWindow`): in Terrain-first the spec views add Offset, Amp and J per column
   (TRN-06); the 1D spline plots are left to the Phase 5 tooling.
 - **Performance** (`Tests/Performance/ChunkGenerationBenchmark.cs`): `ChunkJob.Run TerrainFirst ms/chunk` sits next

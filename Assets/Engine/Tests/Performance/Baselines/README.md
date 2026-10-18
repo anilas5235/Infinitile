@@ -100,8 +100,10 @@ anything but the `ChunkJob.Run` rows from it.**
 
 Terrain-first costs about 2x the legacy path per chunk: every column evaluates three nested splines, the shared
 detail octaves and the 6D classification over six biomes (`WorldSampler.SampleColumn`), where the legacy path
-samples two noise layers. The spec sets no per-chunk budget for Phase 1 (PERF-02 asks for the number per
-architecture); Biome-first blending in Phase 2 adds a row to this table.
+samples two noise layers. **This is above the PERF-05 initial budget** of 1.5 ms per chunk and worker for method 1
+(a SHOULD, to be confirmed against the user's machine); the busy machine inflates the number, so re-measure on a
+quiet machine before deciding whether Terrain-first needs optimising. Biome-first (Phase 2) adds a row to this
+table, the blend methods (Phase 3) one per method.
 
 ## Re-running
 

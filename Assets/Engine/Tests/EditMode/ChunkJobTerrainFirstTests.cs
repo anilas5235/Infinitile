@@ -6,6 +6,7 @@ using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
@@ -236,6 +237,16 @@ namespace Engine.Tests.EditMode{
                 results.Dispose();
                 jobs.Dispose();
             }
+        }
+
+        [Test]
+        public void ChunkJob_CompilesSynchronouslyWithStrictFloats(){
+            // GEN-16: every job that calls the sampler compiles synchronously with FloatMode.Strict.
+            BurstCompileAttribute burst = (BurstCompileAttribute)System.Attribute.GetCustomAttribute(
+                typeof(ChunkJob), typeof(BurstCompileAttribute));
+            Assert.IsNotNull(burst, "ChunkJob is Burst-compiled");
+            Assert.IsTrue(burst.CompileSynchronously, "GEN-16: CompileSynchronously");
+            Assert.AreEqual(FloatMode.Strict, burst.FloatMode, "GEN-16: FloatMode.Strict");
         }
 
         // --- GEN-14 -------------------------------------------------------------------------------------------------------

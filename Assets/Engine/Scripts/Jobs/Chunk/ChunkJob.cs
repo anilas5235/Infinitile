@@ -10,8 +10,10 @@ namespace Engine.Scripts.Jobs.Chunk{
     /// <summary>
     ///     Parallel job that procedurally generates chunk data (terrain, caves, ores, structures, vegetation)
     ///     for multiple chunks in parallel.
+    ///     GEN-16: the job calls <c>WorldSampler</c>, so it compiles synchronously with strict float mode; a Mono
+    ///     fallback during async compilation or a relaxed float mode could otherwise change the generated world.
     /// </summary>
-    [BurstCompile]
+    [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
     internal partial struct ChunkJob : IJobParallelFor{
         [ReadOnly] public NativeList<int2> Jobs; // Chunk world positions
         [WriteOnly] public NativeParallelHashMap<int2, ChunkVoxelData>.ParallelWriter Results; // Result mapping

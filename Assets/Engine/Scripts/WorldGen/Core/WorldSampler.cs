@@ -15,8 +15,8 @@ namespace Engine.Scripts.WorldGen.Core{
     ///     <para>
     ///         Phase 0: fields, hard 5D classification, one-hot weights and the common height formula §5.7
     ///         composed from the classified biome's parameters (§8.2 with one-hot weights). Phase 1: the
-    ///         Terrain-first path (spline height, then 6D classification, §7). Phase 2 adds the blend methods,
-    ///         Phase 3 the surface pick, Phase 4 flora.
+    ///         Terrain-first path (spline height, then 6D classification, §7). Phase 2 completes Biome-first,
+    ///         Phase 3 adds the blend methods and the surface pick, Phase 4 flora.
     ///     </para>
     ///     <para>
     ///         The <c>out</c>-parameter overloads are Burst direct-call entry points (GEN-16): managed callers
@@ -57,14 +57,14 @@ namespace Engine.Scripts.WorldGen.Core{
                 s.NormalizedHeight = math.saturate((s.Height - cfg.HeightMin) / (cfg.HeightMax - cfg.HeightMin));
                 s.HardBiome = BiomeClassifier.Classify(s.Fields, s.NormalizedHeight, cfg);
 
-                // Phase 0/1: material method 1 (None) (§9.2); Phase 2 routes through the per-stage methods (BLD-02).
+                // Phase 0/1: material method 1 (None) (§9.2); Phase 3 routes through the per-stage methods (BLD-02).
                 s.MaterialWeights = BlendWeights.OneHot(s.HardBiome);
                 s.HeightWeights = s.MaterialWeights;
                 s.DominantMaterialBiome = s.HardBiome;
             }
             else{
                 // Biome-first (§8) and the sampler view of the legacy path: hard 5D classification, one-hot weights
-                // and the biome-composed height. Phase 2 adds the blend methods.
+                // and the biome-composed height. Phase 3 adds the blend methods.
                 s.HardBiome = BiomeClassifier.Classify(s.Fields, cfg);
                 s.MaterialWeights = BlendWeights.OneHot(s.HardBiome);
                 s.HeightWeights = s.MaterialWeights;

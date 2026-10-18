@@ -8,7 +8,10 @@
         /// <summary>Computed terrain height in voxels (h_int = floor(H)).</summary>
         public int Height;
 
-        /// <summary>Biome classification for the column (hard class; 0 when no biome is active).</summary>
+        /// <summary>
+        ///     Hard biome class of the column. Spec path: index into the active BiomeSet (GEN-21), 0 when no biome is
+        ///     active; legacy path: index into <c>GeneratorConfig.BiomeDefs</c> (registry order). Do not mix the two.
+        /// </summary>
         public ushort Biome;
 
         /// <summary>Surface block voxel ID.</summary>

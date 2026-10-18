@@ -238,6 +238,22 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void ToConfig_RejectsAnEmptyHeightRange(){
+            // TRN-10: h = (H - Hmin)/(Hmax - Hmin) would be NaN or infinite.
+            WorldGenSettings equal = Create<WorldGenSettings>("WG");
+            equal.HeightMin = equal.HeightMax = 120f;
+            WorldGenSettings inverted = Create<WorldGenSettings>("WG");
+            inverted.HeightMin = 250f;
+            inverted.HeightMax = 40f;
+            WorldGenSettings nan = Create<WorldGenSettings>("WG");
+            nan.HeightMax = float.NaN;
+
+            foreach (WorldGenSettings s in new[]{ equal, inverted, nan })
+                StringAssert.Contains("HeightMin",
+                    Assert.Throws<System.InvalidOperationException>(() => s.ToConfig(1, allocator: Allocator.Temp)).Message);
+        }
+
+        [Test]
         public void ToConfig_RejectsInvalidScales(){
             WorldGenSettings octave = Create<WorldGenSettings>("WG");
             octave.OctaveWavelengths = new[]{ 512f, 0f };

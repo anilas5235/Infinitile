@@ -222,6 +222,9 @@ namespace Engine.Scripts.WorldGen.Settings{
                 throw new InvalidOperationException($"{name}: more than {DetailOctaves.MaxOctaves} detail octaves.");
             foreach ((string field, float value) in InvalidScales())
                 throw new InvalidOperationException($"{name}: {field} must be positive and finite, got {value}.");
+            // h = (H - Hmin)/(Hmax - Hmin) is a classification dimension (TRN-10, GEN-13): an empty range gives NaN.
+            if (!(HeightMin < HeightMax) || float.IsInfinity(HeightMin) || float.IsInfinity(HeightMax))
+                throw new InvalidOperationException($"{name}: HeightMin ({HeightMin}) must be finite and below HeightMax ({HeightMax}).");
 
             List<Biome> active = ActiveBiomes();
 
