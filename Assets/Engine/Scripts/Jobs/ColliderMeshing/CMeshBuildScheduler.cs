@@ -172,7 +172,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
 
             IsReady = true;
 #if VOXEL_TIMING_LOGS
-            long totalJobTime = StopRecord();
+            double totalJobTime = StopRecord();
             if (totalJobTime > 100){
                 VoxelEngineLogger.Warn<CMeshBuildScheduler>(
                     $"Total Mesh Build Time for {_jobs.Length} jobs: <color=red>{totalJobTime:0.000}</color>ms"

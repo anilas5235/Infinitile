@@ -8,9 +8,9 @@ namespace Engine.Scripts.Jobs.Core{
     /// </summary>
     public abstract class JobScheduler{
         private readonly int _records;
-        private readonly Queue<long> _timings;
+        private readonly Queue<double> _timings;
         private readonly Stopwatch _watch;
-        private long _sum;
+        private double _sum;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="JobScheduler" /> class
@@ -20,7 +20,7 @@ namespace Engine.Scripts.Jobs.Core{
         protected JobScheduler(int records = 16){
             _records = records;
             _watch = new Stopwatch();
-            _timings = new Queue<long>(_records);
+            _timings = new Queue<double>(_records);
         }
 
         /// <summary>
@@ -30,7 +30,8 @@ namespace Engine.Scripts.Jobs.Core{
         public float AvgTime => _timings.Count == 0 ? 0f : (float)_sum / _timings.Count;
 
         /// <summary>
-        ///     Starts timing for the current run.
+        ///     Starts timing for the current run. The run lasts from scheduling the job until its results are
+        ///     collected, so it includes the frames the job waited for the scheduler.
         /// </summary>
         protected void StartRecord(){
             _watch.Restart();
@@ -40,9 +41,9 @@ namespace Engine.Scripts.Jobs.Core{
         ///     Stops timing for the current run and enqueues the measured value in the history.
         /// </summary>
         /// <returns>The elapsed time in milliseconds for the current run.</returns>
-        protected long StopRecord(){
+        protected double StopRecord(){
             _watch.Stop();
-            long ms = _watch.ElapsedMilliseconds;
+            double ms = _watch.Elapsed.TotalMilliseconds; // F-11: sub-millisecond resolution
             RecordTiming(ms);
             return ms;
         }
@@ -51,7 +52,7 @@ namespace Engine.Scripts.Jobs.Core{
         ///     Adds a measured run to the fixed window of the last <c>records</c> runs (F-11: the queue used to
         ///     hold records + 1 entries).
         /// </summary>
-        protected void RecordTiming(long milliseconds){
+        protected void RecordTiming(double milliseconds){
             if (_timings.Count >= _records) _sum -= _timings.Dequeue();
             _timings.Enqueue(milliseconds);
             _sum += milliseconds;
