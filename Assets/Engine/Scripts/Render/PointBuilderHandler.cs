@@ -58,9 +58,11 @@ namespace Engine.Scripts.Render{
                 _preparedChunks[i] = new GraphicsBuffer(Target.Structured, VoxelsPerChunk, sizeof(uint));
 
             int vSize = Marshal.SizeOf<Vertex>();
-            SolidPointsOut = new GraphicsBuffer(Target.Append, MaxPointsPerPartition, vSize);
-            TransparentPointsOut = new GraphicsBuffer(Target.Append, MaxPointsPerPartition, vSize);
-            FoliagePointsOut = new GraphicsBuffer(Target.Append, MaxPointsPerPartition, vSize);
+            // F-03: counter buffers; the shader skips writes at or beyond MaxPointsPerPartition
+            const Target pointTarget = Target.Structured | Target.Counter;
+            SolidPointsOut = new GraphicsBuffer(pointTarget, MaxPointsPerPartition, vSize);
+            TransparentPointsOut = new GraphicsBuffer(pointTarget, MaxPointsPerPartition, vSize);
+            FoliagePointsOut = new GraphicsBuffer(pointTarget, MaxPointsPerPartition, vSize);
 
             _metadata = new GraphicsBuffer(Target.Structured, 1, Marshal.SizeOf<PartitionMetadata>());
             _readBackCountBuffer = new GraphicsBuffer(Target.Raw, 3, sizeof(uint));
@@ -162,6 +164,7 @@ namespace Engine.Scripts.Render{
             _pointBuilder.SetBuffer(_pointBuilderKernelID, FoliagePointsOutNameID, FoliagePointsOut);
 
             _pointBuilder.SetInt(PartitionIndexNameID, 0);
+            _pointBuilder.SetInt(PointCapacityNameID, MaxPointsPerPartition); // F-03
 
             _pointBuilder.Dispatch(_pointBuilderKernelID, 8, 8, 8);
 
@@ -211,7 +214,7 @@ namespace Engine.Scripts.Render{
         /// <summary>PERF-04: fills a caller-owned array instead of allocating one per read-back.</summary>
         internal static void ToPointCounts(NativeArray<uint> counts, int[] results){
             for (int i = 0; i < counts.Length; i++){
-                // F-03: an append buffer silently drops points beyond its capacity, but the counter keeps growing
+                // F-03: the shader skips points beyond the buffer capacity, but the counter keeps growing
                 // (alwaysRenderAllFaces can emit up to 6 faces per voxel). Never request more than the buffer holds.
                 uint count = counts[i];
                 if (count > MaxPointsPerPartition){

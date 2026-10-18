@@ -43,6 +43,7 @@ namespace Engine.Scripts.Utils{
         public static readonly int TransparentPointsOutNameID = Shader.PropertyToID("_TransparentPointsOut");
         public static readonly int FoliagePointsOutNameID = Shader.PropertyToID("_FoliagePointsOut");
         public static readonly int PartitionIndexNameID = Shader.PropertyToID("_PartitionIndex");
+        public static readonly int PointCapacityNameID = Shader.PropertyToID("_PointCapacity");
 
         public static readonly int SolidPointsInNameID = Shader.PropertyToID("_SolidPointsIn");
         public static readonly int SolidPointsCopyOutNameID = Shader.PropertyToID("_SolidPointsCopyOut");
