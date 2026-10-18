@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Engine.Scripts.Noise;
 using Unity.Burst;
 using Unity.Collections;
@@ -7,24 +7,15 @@ using Unity.Mathematics;
 namespace Engine.Scripts.Jobs.Chunk{
     [BurstCompile]
     public static class NoiseCalculator{
-        // Decorrelation offsets for each noise channel. Perlin/Simplex noise stays visibly correlated
-        // (or anti-correlated) with itself under small translations - a shift needs to be well beyond
-        // the largest scale/wavelength in play (continental goes up to ~2500) before two channels sampled
-        // from the same base noise function actually behave like independent fields. Keep these an order
-        // of magnitude past the biggest NoiseProfile/WarpedNoiseLayer scale you configure.
-        private static readonly float2 HumidityOffset = new(15731f, -28411f);
-        private static readonly float2 TemperatureOffset = new(-19207f, 33461f);
-        private static readonly float2 ContinentalOffset = new(27851f, 12907f);
-        private static readonly float2 ElevationOffset = new(-8461f, -19603f);
-
+        /// <summary>
+        ///     Legacy climate sampler (INT-40). Every profile carries its own gradient salt and hashed sample offset
+        ///     (GEN-05), so no seed or decorrelation offset is added to the position here any more (D-03, F-02).
+        /// </summary>
         public static WorldNoiseOutput WorldNoise(float2 worldPos, ref NoiseParameters noiseParams){
-            float2 seed2D = new(-noiseParams.Seed, noiseParams.Seed);
-            float2 noiseSamplePos = worldPos + seed2D;
+            float continental = noiseParams.ContinentalLayer.GetNoise(worldPos);
 
-            float continental = noiseParams.ContinentalLayer.GetNoise(worldPos + seed2D + ContinentalOffset);
-
-            float rawHumidity = noiseParams.HumidityProfile.GetNoise(noiseSamplePos + HumidityOffset);
-            float rawTemperature = noiseParams.TemperatureProfile.GetNoise(noiseSamplePos + TemperatureOffset);
+            float rawHumidity = noiseParams.HumidityProfile.GetNoise(worldPos);
+            float rawTemperature = noiseParams.TemperatureProfile.GetNoise(worldPos);
 
             // Continentality shapes climate the way it does in the real world: inland areas (high
             // continental) dry out and swing to more extreme temperatures in both directions, while
@@ -35,7 +26,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             float temperatureSpread = 1f + continental * noiseParams.ContinentalTemperatureInfluence;
             float temperature = math.saturate(0.5f + (rawTemperature - 0.5f) * temperatureSpread);
 
-            float rawElevation = noiseParams.ElevationProfile.GetNoise(noiseSamplePos + ElevationOffset);
+            float rawElevation = noiseParams.ElevationProfile.GetNoise(worldPos);
 
             // Continental (already contrast-shaped via its redistribution curve) defines the large-scale
             // height shape. Elevation is applied as a centered detail offset on top of it rather than
@@ -78,6 +69,7 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         public struct NoiseParameters : IDisposable{
+            /// <summary>World seed the profiles were built from (informational; the profiles carry it themselves).</summary>
             public int Seed;
             public float ElevationDetailStrength;
 

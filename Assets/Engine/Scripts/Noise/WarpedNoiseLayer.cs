@@ -9,7 +9,8 @@ namespace Engine.Scripts.Noise{
     ///     domain-warped via two secondary noise profiles, then remapped through a
     ///     piecewise-linear redistribution curve. Used for large-scale features like
     ///     continentalness, where organic shapes and precise control over the value
-    ///     distribution matter.
+    ///     distribution matter. Runs on the seeded simplex basis (GEN-15); the two warp
+    ///     channels are decorrelated by their own salts instead of a seed offset (GEN-05, F-06).
     /// </summary>
     [BurstCompile]
     public struct WarpedNoiseLayer : IDisposable{
@@ -28,7 +29,7 @@ namespace Engine.Scripts.Noise{
 
             NoiseProfile.Settings warpSettingsX = settings.WarpNoise;
             NoiseProfile.Settings warpSettingsY = settings.WarpNoise;
-            warpSettingsY.Seed += settings.WarpSeedOffsetY;
+            warpSettingsY.Salt = settings.WarpSaltY;
 
             _warpX = new NoiseProfile(warpSettingsX);
             _warpY = new NoiseProfile(warpSettingsY);
@@ -95,14 +96,17 @@ namespace Engine.Scripts.Noise{
             /// <summary>Settings for the primary fBm noise (frequency/octaves/etc).</summary>
             public NoiseProfile.Settings BaseNoise;
 
-            /// <summary>Settings for the domain-warp noise (typically lower frequency than BaseNoise).</summary>
+            /// <summary>
+            ///     Settings for the domain-warp noise (typically lower frequency than BaseNoise); its Salt is the X
+            ///     channel's gradient salt.
+            /// </summary>
             public NoiseProfile.Settings WarpNoise;
+
+            /// <summary>Gradient salt of the Y warp channel so X/Y don't correlate (GEN-05).</summary>
+            public uint WarpSaltY;
 
             /// <summary>Strength of the domain warp offset, in world-space units.</summary>
             public float WarpStrength;
-
-            /// <summary>Seed offset applied to the Y warp channel so X/Y don't correlate.</summary>
-            public int WarpSeedOffsetY;
 
             /// <summary>
             ///     Piecewise-linear control points (input, output), sorted ascending by x.

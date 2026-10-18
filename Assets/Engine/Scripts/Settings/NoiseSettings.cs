@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Noise;
+using Engine.Scripts.WorldGen.Core;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -73,7 +74,6 @@ namespace Engine.Scripts.Settings{
                 octaves = 2
             },
             warpStrength = 400f,
-            warpSeedOffsetY = 1000,
             redistributionCurve = new AnimationCurve(
                 new Keyframe(0f, 0.02f),
                 new Keyframe(0.3f, 0.12f),
@@ -101,10 +101,11 @@ namespace Engine.Scripts.Settings{
                 ElevationDetailStrength = ElevationDetailStrength,
                 ContinentalHumidityInfluence = ContinentalHumidityInfluence,
                 ContinentalTemperatureInfluence = ContinentalTemperatureInfluence,
-                ElevationProfile = new NoiseProfile(elevationProfile.ToStruct(seed)),
-                HumidityProfile = new NoiseProfile(humidityProfile.ToStruct(seed)),
-                TemperatureProfile = new NoiseProfile(temperatureProfile.ToStruct(seed)),
-                ContinentalLayer = new WarpedNoiseLayer(continentalLayer.ToStruct(seed))
+                ElevationProfile = new NoiseProfile(elevationProfile.ToStruct(seed, HashSalts.ElevationNoise)),
+                HumidityProfile = new NoiseProfile(humidityProfile.ToStruct(seed, HashSalts.HumidityNoise)),
+                TemperatureProfile = new NoiseProfile(temperatureProfile.ToStruct(seed, HashSalts.TemperatureNoise)),
+                ContinentalLayer = new WarpedNoiseLayer(continentalLayer.ToStruct(seed,
+                    HashSalts.ContinentalNoise, HashSalts.ContinentalWarpX, HashSalts.ContinentalWarpY))
             };
         }
     }
@@ -121,9 +122,12 @@ namespace Engine.Scripts.Settings{
 
         [Tooltip("Number of octaves.")] public int octaves = 4;
 
-        public NoiseProfile.Settings ToStruct(int seed){
+        /// <param name="seed">World seed.</param>
+        /// <param name="salt">Per-instance gradient salt from <see cref="HashSalts" /> (GEN-05).</param>
+        public NoiseProfile.Settings ToStruct(int seed, uint salt){
             return new NoiseProfile.Settings{
                 Seed = seed,
+                Salt = salt,
                 Scale = scale,
                 Persistance = persistance,
                 Lacunarity = lacunarity,
@@ -143,9 +147,6 @@ namespace Engine.Scripts.Settings{
         /// <summary>Strength of the domain warp offset, in world-space units.</summary>
         public float warpStrength = 1f;
 
-        /// <summary>Seed offset applied to the Y warp channel so X/Y don't correlate.</summary>
-        public int warpSeedOffsetY = 1000;
-
         public AnimationCurve redistributionCurve = new(
             new Keyframe(0f, 0f),
             new Keyframe(0.3f, 0.3f),
@@ -156,7 +157,11 @@ namespace Engine.Scripts.Settings{
             new Keyframe(1f, 1f)
         );
 
-        public WarpedNoiseLayer.Settings ToStruct(int seed){
+        /// <param name="seed">World seed.</param>
+        /// <param name="baseSalt">Gradient salt of the base noise.</param>
+        /// <param name="warpSaltX">Gradient salt of the X warp channel.</param>
+        /// <param name="warpSaltY">Gradient salt of the Y warp channel (F-06: must differ from X).</param>
+        public WarpedNoiseLayer.Settings ToStruct(int seed, uint baseSalt, uint warpSaltX, uint warpSaltY){
             float2[] points = new float2[redistributionCurve.length];
             for (int i = 0; i < redistributionCurve.length; i++){
                 Keyframe key = redistributionCurve.keys[i];
@@ -164,10 +169,10 @@ namespace Engine.Scripts.Settings{
             }
 
             return new WarpedNoiseLayer.Settings{
-                BaseNoise = baseNoise.ToStruct(seed),
-                WarpNoise = warpNoise.ToStruct(seed),
+                BaseNoise = baseNoise.ToStruct(seed, baseSalt),
+                WarpNoise = warpNoise.ToStruct(seed, warpSaltX),
+                WarpSaltY = warpSaltY,
                 WarpStrength = warpStrength,
-                WarpSeedOffsetY = warpSeedOffsetY, // F-06: without it warp X and warp Y were the same field
                 RedistributionPoints = points
             };
         }

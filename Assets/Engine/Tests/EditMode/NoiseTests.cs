@@ -3,6 +3,7 @@ using System.Reflection;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Noise;
 using Engine.Scripts.Settings;
+using Engine.Scripts.WorldGen.Core;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -35,20 +36,24 @@ namespace Engine.Tests.EditMode{
             Object.DestroyImmediate(_settings);
         }
 
-        private NoiseProfile Profile(int seed, float scale = 50f, int octaves = 4){
+        private NoiseProfile Profile(int seed, float scale = 50f, int octaves = 4, uint salt = HashSalts.TemperatureNoise){
             NoiseProfile profile = new(new NoiseProfile.Settings{
-                Seed = seed, Scale = scale, Persistance = 0.5f, Lacunarity = 2f, Octaves = octaves
+                Seed = seed, Salt = salt, Scale = scale, Persistance = 0.5f, Lacunarity = 2f, Octaves = octaves
             });
             _profiles.Add(profile);
             return profile;
         }
 
-        private WarpedNoiseLayer Layer(int seed, int warpSeedOffsetY, float2[] points, float warpStrength = 40f){
+        private WarpedNoiseLayer Layer(int seed, float2[] points, float warpStrength = 40f){
             WarpedNoiseLayer layer = new(new WarpedNoiseLayer.Settings{
-                BaseNoise = new NoiseProfile.Settings{ Seed = seed, Scale = 120f, Persistance = 0.5f, Lacunarity = 2f, Octaves = 3 },
-                WarpNoise = new NoiseProfile.Settings{ Seed = seed, Scale = 90f, Persistance = 0.5f, Lacunarity = 2f, Octaves = 2 },
+                BaseNoise = new NoiseProfile.Settings{
+                    Seed = seed, Salt = HashSalts.ContinentalNoise, Scale = 120f, Persistance = 0.5f, Lacunarity = 2f, Octaves = 3
+                },
+                WarpNoise = new NoiseProfile.Settings{
+                    Seed = seed, Salt = HashSalts.ContinentalWarpX, Scale = 90f, Persistance = 0.5f, Lacunarity = 2f, Octaves = 2
+                },
+                WarpSaltY = HashSalts.ContinentalWarpY,
                 WarpStrength = warpStrength,
-                WarpSeedOffsetY = warpSeedOffsetY,
                 RedistributionPoints = points
             });
             _layers.Add(layer);
@@ -115,8 +120,8 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void WarpedNoiseLayer_OutputIsInUnitRangeAndDeterministic(){
             float2[] points ={ new(0f, 0.02f), new(0.5f, 0.42f), new(1f, 1f) };
-            WarpedNoiseLayer a = Layer(7, 1000, points);
-            WarpedNoiseLayer b = Layer(7, 1000, points);
+            WarpedNoiseLayer a = Layer(7, points);
+            WarpedNoiseLayer b = Layer(7, points);
             foreach (float2 position in SamplePositions()){
                 float value = a.GetNoise(position);
                 Assert.That(value, Is.InRange(0f, 1f), $"at {position}");
@@ -126,8 +131,8 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void WarpedNoiseLayer_WithoutPoints_UsesIdentityCurve(){
-            WarpedNoiseLayer identity = Layer(7, 1000, null, 0f);
-            WarpedNoiseLayer emptyPoints = Layer(7, 1000, new float2[0], 0f);
+            WarpedNoiseLayer identity = Layer(7, null, 0f);
+            WarpedNoiseLayer emptyPoints = Layer(7, new float2[0], 0f);
             NoiseProfile baseNoise = WarpProfile(identity, "_baseNoise");
             foreach (float2 position in SamplePositions()){
                 float expected = baseNoise.GetNoise(position);
@@ -138,8 +143,8 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void WarpedNoiseLayer_WarpChannelsDiffer(){
-            // F-06 intent at struct level: an explicit WarpSeedOffsetY decorrelates the X and Y warp channels.
-            WarpedNoiseLayer layer = Layer(7, 1000, null);
+            // F-06 intent at struct level: the Y channel has its own salt, decorrelating the X and Y warp channels (GEN-05).
+            WarpedNoiseLayer layer = Layer(7, null);
             NoiseProfile warpX = WarpProfile(layer, "_warpX");
             NoiseProfile warpY = WarpProfile(layer, "_warpY");
             bool anyDifferent = false;
@@ -174,6 +179,33 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void NoiseProfile_DifferentSaltsGiveDifferentFields(){
+            // GEN-05: two profiles with identical seed and shape but different salts are different fields.
+            NoiseProfile a = Profile(42);
+            NoiseProfile b = Profile(42, salt: HashSalts.HumidityNoise);
+            int same = 0, total = 0;
+            foreach (float2 position in SamplePositions()){
+                total++;
+                if (Mathf.Approximately(a.GetNoise(position), b.GetNoise(position))) same++;
+            }
+
+            Assert.Less(same, total / 10, "salts must decorrelate the fields");
+        }
+
+        [Test]
+        public void NoiseProfile_HashedOffsetIsBounded(){
+            // GEN-05: |o| <= 10^4 for every seed and salt.
+            for (uint seed = 0; seed < 2000; seed += 7){
+                float2 offset = NoiseProfile.HashedOffset(seed, HashSalts.TemperatureNoise);
+                Assert.LessOrEqual(math.abs(offset.x), NoiseProfile.MaxOffset);
+                Assert.LessOrEqual(math.abs(offset.y), NoiseProfile.MaxOffset);
+            }
+
+            Assert.AreNotEqual(NoiseProfile.HashedOffset(1u, HashSalts.TemperatureNoise),
+                NoiseProfile.HashedOffset(1u, HashSalts.HumidityNoise));
+        }
+
+        [Test]
         public void WorldNoise_OutputIsInUnitRange(){
             NoiseCalculator.NoiseParameters parameters = Parameters(TestFixtures.Seed);
             foreach (float2 position in SamplePositions()){
@@ -189,11 +221,10 @@ namespace Engine.Tests.EditMode{
 
         #region TST-E14
 
-        [Category("KnownBug")] // F-02
         [Test]
         public void WorldNoise_SeedIsNotAPlainTranslation(){
-            // F-02: the seed offsets (S, S) from the profiles and (-S, S) from WorldNoise add up to (0, 2S),
-            // so WorldNoise(p, S) currently equals WorldNoise(p + (0, 2S), 0).
+            // F-02 (fixed by GEN-05 in Phase 0): the old seed offsets (S, S) from the profiles and (-S, S) from
+            // WorldNoise added up to (0, 2S), so WorldNoise(p, S) equalled WorldNoise(p + (0, 2S), 0).
             const int seed = 123;
             NoiseCalculator.NoiseParameters seeded = Parameters(seed);
             NoiseCalculator.NoiseParameters unseeded = Parameters(0);
@@ -212,16 +243,8 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void NoiseSettings_ToStruct_CopiesWarpSeedOffsetY(){
-            // F-06: WarpedNoiseLayerSettings.ToStruct never copies warpSeedOffsetY.
-            _settings.continentalLayer.warpSeedOffsetY = 1000;
-            WarpedNoiseLayer.Settings layerSettings = _settings.continentalLayer.ToStruct(TestFixtures.Seed);
-            Assert.AreEqual(1000, layerSettings.WarpSeedOffsetY);
-        }
-
-        [Test]
         public void NoiseSettings_ContinentalWarpChannelsDiffer(){
-            // F-06: with the offset dropped, warp X and warp Y are the same noise field.
+            // F-06: warp X and warp Y must be different noise fields (own salts since GEN-05).
             NoiseCalculator.NoiseParameters parameters = Parameters(TestFixtures.Seed);
             NoiseProfile warpX = WarpProfile(parameters.ContinentalLayer, "_warpX");
             NoiseProfile warpY = WarpProfile(parameters.ContinentalLayer, "_warpY");
