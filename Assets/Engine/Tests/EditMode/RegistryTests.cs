@@ -339,9 +339,9 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void BiomeRegistry_SameBiomeAssetInTwoPackages_IsRetrievableUnderBothIds(){
-            // F-22: TopLevelRegistry.Register ignores the failed SO registration for the second name,
-            // leaving a default (air) BiomeDef at the end of BiomeArray.
+        public void BiomeRegistry_SameBiomeAssetInTwoPackages_RollsBackOnTopLevelFailure(){
+            // F-22: TopLevelRegistry.Register ignored the failed SO registration for the second name,
+            // leaving a default (air) BiomeDef at the end of BiomeArray. The second name is now rolled back.
             VoxelRegistry voxels = StandardVoxels(out Voxel[] v);
             BiomeRegistry registry = new();
             _disposables.Add(registry);
@@ -355,12 +355,9 @@ namespace Engine.Tests.EditMode{
             Assert.IsTrue(registry.TryGet(first, out Biome so));
             Assert.AreSame(plains, so);
 
-            if (registry.TryGetId("mod:Plains", out ushort second)){
-                Assert.IsTrue(registry.TryGet(second, out so), "the second name must resolve to the asset");
-                Assert.AreSame(plains, so);
-                Assert.Less(second, registry.BiomeArray.Length);
-                Assert.AreEqual(voxels.GetIdOrThrow("std:Grass"), registry.BiomeArray[second].topBlock);
-            }
+            Assert.IsFalse(registry.TryGetId("mod:Plains", out _), "the second name is rolled back");
+            Assert.AreEqual(1, registry.BiomeArray.Length, "no entry for the rolled-back name");
+            Assert.AreEqual(voxels.GetIdOrThrow("std:Grass"), registry.BiomeArray[first].topBlock);
 
             ushort air = voxels.GetIdOrThrow("std:air");
             for (int i = 0; i < registry.BiomeArray.Length; i++)
