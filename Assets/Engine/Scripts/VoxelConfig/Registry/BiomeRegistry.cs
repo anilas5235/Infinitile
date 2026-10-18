@@ -21,7 +21,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             }
 
             Biome.BiomeDef[] tempArray = new Biome.BiomeDef[NameRegistry.Count];
-            int index = 0;
+            bool[] converted = new bool[tempArray.Length];
             foreach (KeyValuePair<ushort, Biome> kvp in SoRegistry.GetAllEntries()){
                 VoxelEngineLogger.Info<BiomeRegistry>($"copy biome {kvp.Value.name} to Biome array");
                 Biome.BiomeDef def;
@@ -31,13 +31,15 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                 catch (Exception e){
                     // D-04: skipping a biome would leave a zero (air) entry at its id and shift nothing else, so a
                     // broken biome is a configuration error that fails the registry instead.
-                    for (int i = 0; i < index; i++) tempArray[i].Dispose();
+                    // Entries are placed by id (F-22), so release the converted slots, not the first n.
+                    for (int i = 0; i < tempArray.Length; i++)
+                        if (converted[i]) tempArray[i].Dispose();
                     throw new InvalidOperationException(
                         $"Failed to convert biome {kvp.Value.name} to struct: {e.Message}", e);
                 }
 
                 tempArray[kvp.Key] = def; // F-22: place by id, not by enumeration order
-                index++;
+                converted[kvp.Key] = true;
             }
 
             BiomeArray = new NativeArray<Biome.BiomeDef>(tempArray, Allocator.Domain);

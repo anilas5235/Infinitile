@@ -8,7 +8,7 @@ struct VoxelDef
 {
     uint MeshLayer;
     uint AlwaysRenderAllFaces;
-    half DepthFadeDistance;
+    uint DepthFadeDistance; // F-19: fp16 bits, read with f16tof32
     uint Glow;
     uint Collision;
     uint2 ShapeQuadIndicesAlwaysRender;
@@ -101,9 +101,12 @@ StructuredBuffer<uint> _NeighborChunk6; //(-1,0)
 StructuredBuffer<uint> _NeighborChunk7; //(-1,1)
 
 RWStructuredBuffer<PartitionMetadata> _Metadata;
-AppendStructuredBuffer<PointData> _SolidPointsOut;
-AppendStructuredBuffer<PointData> _TransparentPointsOut;
-AppendStructuredBuffer<PointData> _FoliagePointsOut;
+// F-03: counter buffers instead of append buffers, so a write past the capacity is skipped explicitly.
+// The counter keeps counting; the CPU clamps the read-back count to _PointCapacity.
+RWStructuredBuffer<PointData> _SolidPointsOut;
+RWStructuredBuffer<PointData> _TransparentPointsOut;
+RWStructuredBuffer<PointData> _FoliagePointsOut;
+uint _PointCapacity;
 
 VoxelDef get_voxel_def(uint voxelId)
 {
@@ -251,16 +254,22 @@ void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uin
         if (is_solid(front_in_chunk + quad.up - quad.right)) ao_mask |= 1 << 7; // UpLeft
 
         set_ao(packed, ao_mask);
+        set_depth_fade_dist(packed, f16tof32(myDef.DepthFadeDistance)); // F-19
+        set_glow(packed, myDef.Glow);
 
         p.packed = packed;
 
+        uint idx;
         switch (myDef.MeshLayer)
         {
-        case 0: _SolidPointsOut.Append(p);
+        case 0: idx = _SolidPointsOut.IncrementCounter();
+            if (idx < _PointCapacity) _SolidPointsOut[idx] = p; // F-03
             break;
-        case 1: _TransparentPointsOut.Append(p);
+        case 1: idx = _TransparentPointsOut.IncrementCounter();
+            if (idx < _PointCapacity) _TransparentPointsOut[idx] = p; // F-03
             break;
-        case 2: _FoliagePointsOut.Append(p);
+        case 2: idx = _FoliagePointsOut.IncrementCounter();
+            if (idx < _PointCapacity) _FoliagePointsOut[idx] = p; // F-03
             break;
         default: break;
         }

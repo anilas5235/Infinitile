@@ -52,10 +52,13 @@ namespace Engine.Scripts.Render{
         /// <param name="allocation">The allocation info if successful, an empty allocation otherwise.</param>
         /// <returns>True if allocation was successful, false if not enough free pages.</returns>
         internal bool TryAllocPages(int pointCount, int numPages, int bufferIndex, out AllocInfo allocation){
-            allocation = new AllocInfo(bufferIndex);
+            allocation = default;
             if (numPages <= 0)
                 throw new ArgumentOutOfRangeException(nameof(numPages), "Must allocate at least one page.");
             if (numPages > FreePages) return false;
+
+            // PERF-04: take a pooled page list only on success; a failed attempt never returned its list to the pool
+            allocation = new AllocInfo(bufferIndex);
 
             int remainingPoints = pointCount;
             for (int i = 0; i < numPages; i++){

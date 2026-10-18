@@ -4,7 +4,9 @@ using System.Collections.Generic;
 using Engine.Scripts.Components;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.ColliderMeshing;
+using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
+using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.World;
 using NUnit.Framework;
@@ -57,9 +59,10 @@ namespace Engine.Tests.PlayMode{
             public readonly ChunkManager Manager;
             public readonly ChunkPool Pool;
             public readonly CMeshBuildScheduler Scheduler;
+            public readonly int DrawDistance = 2;
 
             public SchedulerRig(){
-                _settings = PlayModeFixtures.CreateSettings(2, VoxelWorld.Instance.Settings.Chunk.ChunkPrefab);
+                _settings = PlayModeFixtures.CreateSettings(DrawDistance, VoxelWorld.Instance.Settings.Chunk.ChunkPrefab);
                 _root = new GameObject("ColliderMeshRaceTests.Pool");
                 _worldObject = new GameObject("ColliderMeshRaceTests.World");
                 _worldObject.SetActive(false); // Awake must not run; only the event hub is used
@@ -109,8 +112,22 @@ namespace Engine.Tests.PlayMode{
 
             rig.Manager.SetVoxel(PlayModeFixtures.Grass, new int3(5, 40, 5));
             Assert.IsTrue(rig.Scheduler.IsComplete, "SetVoxel must not modify data while a job reads it");
-            Assert.IsTrue(rig.Scheduler.IsReady, "the completed batch must be applied so the next one can start");
+            Assert.IsFalse(rig.Scheduler.IsReady, "only the job is completed; results are applied by Complete");
+
+            rig.Scheduler.Complete();
+            Assert.IsTrue(rig.Scheduler.IsReady);
             Assert.IsTrue(rig.Pool.IsPartitionActive(new int3(0, 2, 0)), "batch results applied");
+        }
+
+        [Test]
+        public void SetVoxel_InNeighbourChunk_WhileBuildJobRuns_CompletesJobFirst(){
+            // F-01: the job also reads the 3x3 neighbours of the meshed chunk through the accessor.
+            using SchedulerRig rig = new();
+            rig.StartCentreChunkBuild();
+            Assert.IsFalse(rig.Scheduler.IsReady);
+
+            rig.Manager.SetVoxel(PlayModeFixtures.Grass, new int3(ChunkWidth + 1, 40, 5));
+            Assert.IsTrue(rig.Scheduler.IsComplete, "SetVoxel in a neighbour must not modify data while a job reads it");
         }
 
         [Test]
@@ -122,8 +139,49 @@ namespace Engine.Tests.PlayMode{
 
             rig.Manager.UnloadChunk(new int2(1, 0));
             Assert.IsTrue(rig.Scheduler.IsComplete, "UnloadChunk must not dispose data while a job reads it");
-            Assert.IsTrue(rig.Scheduler.IsReady);
             Assert.IsFalse(rig.Manager.IsChunkLoaded(new int2(1, 0)));
+
+            rig.Scheduler.Complete();
+            Assert.IsTrue(rig.Scheduler.IsReady);
+        }
+
+        [Test]
+        public void Complete_WhenClaimEvictsAnAccessorChunk_DoesNotReenter(){
+            // F-01 regression: claiming a partition in Complete can evict a pool chunk; the world then unloads that
+            // chunk, and if it is in the accessor the scheduler is asked to finish its job. Finishing the whole batch
+            // there re-entered Complete and broke the outer loop (disposed mesh data, cleared job list).
+            using SchedulerRig rig = new();
+            rig.Pool.OnChunkEvicted += pos => rig.Manager.UnloadChunk(pos); // what VoxelWorld does on eviction
+
+            // Far focus: the accessor chunk (1, 0) is the farthest pooled chunk, so it is reclaimed first.
+            PriorityUtil.Focus focus = new(new int3(-50, 0, -50), new float3(0, 0, 1));
+            rig.Pool.FocusUpdate(focus);
+            rig.Pool.GetOrClaimPartition(new int3(1, 0, 0));
+            int chunkPoolSize = (rig.DrawDistance + 2).SquareSize(); // same formula as ChunkPool
+            for (int i = 1; i < chunkPoolSize; i++) rig.Pool.GetOrClaimPartition(new int3(-20 - i, 0, -20));
+
+            rig.StartCentreChunkBuild();
+            Assert.DoesNotThrow(() => rig.Scheduler.Complete());
+            Assert.IsTrue(rig.Scheduler.IsReady);
+            Assert.IsFalse(rig.Manager.IsChunkLoaded(new int2(1, 0)), "the evicted accessor chunk was unloaded");
+            for (int y = 0; y < PartitionsPerChunk; y++)
+                Assert.IsTrue(rig.Pool.IsPartitionActive(new int3(0, y, 0)), $"partition {y} applied");
+        }
+
+        [Test]
+        public void Start_BatchLargerThanMeshingBatchSize_AppliesEveryResult(){
+            // F-16: the result map was sized from the draw distance and a parallel writer cannot grow it, so a
+            // larger batch lost results. The map now starts at meshingBatchSize and grows in Start.
+            using SchedulerRig rig = new();
+            NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult> results =
+                PlayModeFixtures.GetPrivateField<NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult>>(
+                    rig.Scheduler, "_results");
+            Assert.Less(results.Capacity, PartitionsPerChunk, "the batch must exceed the initial capacity");
+
+            rig.StartCentreChunkBuild();
+            Assert.DoesNotThrow(() => rig.Scheduler.Complete());
+            for (int y = 0; y < PartitionsPerChunk; y++)
+                Assert.IsTrue(rig.Pool.IsPartitionActive(new int3(0, y, 0)), $"partition {y} applied");
         }
 
         [Test]

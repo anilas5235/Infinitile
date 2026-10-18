@@ -127,12 +127,12 @@ namespace Engine.Tests.EditMode{
         private sealed class TestScheduler : JobScheduler{
             public TestScheduler(int records) : base(records){ }
 
-            public void Record(long milliseconds){
+            public void Record(double milliseconds){
                 RecordTiming(milliseconds); // the same window handling StopRecord uses, without a Stopwatch
             }
 
-            public Queue<long> Timings =>
-                (Queue<long>)typeof(JobScheduler).GetField("_timings", BindingFlags.NonPublic | BindingFlags.Instance)
+            public Queue<double> Timings =>
+                (Queue<double>)typeof(JobScheduler).GetField("_timings", BindingFlags.NonPublic | BindingFlags.Instance)
                     .GetValue(this);
         }
 
@@ -152,6 +152,14 @@ namespace Engine.Tests.EditMode{
             TestScheduler scheduler = new(16);
             for (int i = 0; i < 40; i++) scheduler.Record(1);
             Assert.LessOrEqual(scheduler.Timings.Count, 16);
+        }
+
+        [Test]
+        public void AvgTime_KeepsSubMillisecondTimings(){
+            // F-11: ElapsedMilliseconds truncated every run below 1 ms to 0.
+            TestScheduler scheduler = new(16);
+            for (int i = 0; i < 4; i++) scheduler.Record(0.4);
+            Assert.AreEqual(0.4f, scheduler.AvgTime, 1e-5f);
         }
 
         #endregion

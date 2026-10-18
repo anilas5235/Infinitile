@@ -96,7 +96,7 @@ float get_depth_fade_dist(in uint4 packed)
 
 void set_depth_fade_dist(inout uint4 packed, in float depth_fade_dist)
 {
-    packed.z = (packed.z & 0xFFFF00FF) | (f32tof16(depth_fade_dist) << 8);
+    packed.z = (packed.z & 0xFF0000FF) | ((f32tof16(depth_fade_dist) & 0xFFFF) << 8); // F-19: bits 8-23
 }
 
 float get_glow(uint4 packed)
@@ -106,7 +106,7 @@ float get_glow(uint4 packed)
 
 void set_glow(inout uint4 packed, in float glow)
 {
-    packed.z = (packed.z & 0x00FFFFFF) | ((uint)(glow) << 24);
+    packed.z = (packed.z & 0x00FFFFFF) | (((uint)glow & 0xFF) << 24);
 }
 
 #endif

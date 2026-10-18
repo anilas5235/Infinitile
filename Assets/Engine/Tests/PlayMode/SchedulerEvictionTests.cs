@@ -141,6 +141,42 @@ namespace Engine.Tests.PlayMode{
             Assert.IsFalse(rig.Pool.IsCollidable(pos), "a reclaimed partition must not be marked collidable");
         }
 
+        [UnityTest]
+        public IEnumerator ColliderBake_PartitionReclaimedAndReclaimedDuringBake_IsNotMarkedCollidable(){
+            // F-04: a re-claim at the same position hands back the same pooled ChunkPartition object, so an
+            // object comparison alone lets the stale bake mark the freshly cleared partition collidable.
+            using BakeRig rig = new();
+            int3 pos = new(0, 3, 0);
+            rig.Pool.GetOrClaimPartition(pos);
+            rig.Bake.Start(new HashSet<int3>{ pos });
+            yield return null;
+
+            PlayModeFixtures.GetPrivateMethod(typeof(ChunkPool), "ReclaimPartition").Invoke(rig.Pool, new object[]{ pos });
+            Assert.IsTrue(rig.Bake.IsComplete, "the bake must finish before the pool clears the mesh it reads");
+            rig.Pool.GetOrClaimPartition(pos);
+            Assert.IsTrue(rig.Pool.IsPartitionActive(pos));
+
+            rig.Bake.Complete();
+            Assert.IsFalse(rig.Pool.IsCollidable(pos), "reclaim -> claim -> bake complete must leave it non-collidable");
+        }
+
+        [UnityTest]
+        public IEnumerator ColliderBake_PartitionReMeshedDuringBake_IsNotMarkedCollidable(){
+            // F-04: new mesh data applied while the bake ran makes the bake result stale.
+            using BakeRig rig = new();
+            int3 pos = new(0, 3, 0);
+            rig.Pool.GetOrClaimPartition(pos);
+            rig.Bake.Start(new HashSet<int3>{ pos });
+            yield return null;
+
+            rig.Pool.NotifyPartitionMeshWriting();
+            Assert.IsTrue(rig.Bake.IsComplete, "the bake must finish before the mesher rewrites the mesh it reads");
+            rig.Pool.GetPartition(pos).MarkMeshChanged();
+
+            rig.Bake.Complete();
+            Assert.IsFalse(rig.Pool.IsCollidable(pos), "a re-meshed partition must be baked again");
+        }
+
         #endregion
 
         #region F-23

@@ -18,7 +18,9 @@ namespace Engine.Tests.PlayMode{
     /// </summary>
     public class AllocationTests{
         private const int FlightFrames = 300;
-        private const float FlightSpeed = 30f;
+        // TST-E21: a fixed distance per frame, not speed * deltaTime; headless frames are so short that 300 frames
+        // barely moved the focus. 300 * 0.5 units cross several chunk borders, so new chunks load during flight.
+        private const float FlightStepPerFrame = 0.5f;
 
         [UnitySetUp]
         public IEnumerator SetUp(){
@@ -97,7 +99,7 @@ namespace Engine.Tests.PlayMode{
             int firstAllocatingFrame = -1;
             Vector3 start = focus.position;
             for (int frame = 0; frame < FlightFrames; frame++){
-                focus.position += new Vector3(FlightSpeed * Time.deltaTime, 0f, 0f);
+                focus.position += new Vector3(FlightStepPerFrame, 0f, 0f);
                 try{
                     Assert.That(engineStep, Is.Not.AllocatingGCMemory());
                 }
@@ -110,6 +112,7 @@ namespace Engine.Tests.PlayMode{
             }
 
             Debug.Log($"flight covered {(focus.position - start).magnitude:0} units; {allocatingFrames}/{FlightFrames} frames allocated");
+            Assert.Greater((focus.position - start).magnitude, ChunkWidth, "the flight must cross a chunk border");
             Assert.AreEqual(0, allocatingFrames,
                 $"{allocatingFrames} of {FlightFrames} frames allocated managed memory (first at frame {firstAllocatingFrame})");
         }

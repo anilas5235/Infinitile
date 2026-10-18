@@ -21,6 +21,13 @@ namespace Engine.Scripts.Behaviour{
 
         public short PartitionId{ get; private set; }
 
+        /// <summary>
+        ///     F-04: incremented whenever <see cref="ColliderMesh" /> is cleared or rewritten, so a collider bake that
+        ///     started on an older version can tell that its result is stale. Partition objects are reused per chunk,
+        ///     so comparing the object alone does not detect a reclaim followed by a re-claim.
+        /// </summary>
+        public int MeshVersion{ get; private set; }
+
         private void Awake(){
             ColliderMesh = new Mesh{ name = "PCollider" };
         }
@@ -49,8 +56,14 @@ namespace Engine.Scripts.Behaviour{
         }
 
         public void Clear(){
+            MeshVersion++;
             ColliderMesh.Clear();
             Collider.sharedMesh = null;
+        }
+
+        /// <summary>F-04: called before new collider mesh data is applied to <see cref="ColliderMesh" />.</summary>
+        public void MarkMeshChanged(){
+            MeshVersion++;
         }
     }
 }

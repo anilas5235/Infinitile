@@ -75,8 +75,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
         }
 
         private void OnDestroy(){
+            FinalizeScheduledBuild(false); // a running build still reads the config; completes it and frees job data
             DisposeGeneratorConfig();
-            DisposeJobData();
         }
 
         /// <summary>
@@ -292,6 +292,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
 
             _packages.Clear();
             _biomes.Clear();
+            FinalizeScheduledBuild(false); // a running build still reads the config
             DisposeGeneratorConfig();
 
             string[] packageGuids = AssetDatabase.FindAssets("t:VoxelDataPackage");
@@ -387,16 +388,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
                 _jobBiomeColors[i] = biome.RepresentativeColor;
             }
 
-            _generatorConfig.NoiseParams = new NoiseCalculator.NoiseParameters{
-                Seed = _settings.Seed,
-                ElevationDetailStrength = _settings.Noise.ElevationDetailStrength,
-                ContinentalHumidityInfluence = _settings.Noise.ContinentalHumidityInfluence,
-                ContinentalTemperatureInfluence = _settings.Noise.ContinentalTemperatureInfluence,
-                ElevationProfile = new NoiseProfile(_settings.Noise.elevationProfile.ToStruct(_settings.Seed)),
-                HumidityProfile = new NoiseProfile(_settings.Noise.humidityProfile.ToStruct(_settings.Seed)),
-                TemperatureProfile = new NoiseProfile(_settings.Noise.temperatureProfile.ToStruct(_settings.Seed)),
-                ContinentalLayer = new WarpedNoiseLayer(_settings.Noise.continentalLayer.ToStruct(_settings.Seed))
-            };
+            // D-05: the previous build's noise parameters are no longer read (no build is in progress here)
+            _generatorConfig.NoiseParams.Dispose();
+            _generatorConfig.NoiseParams = _settings.Noise.ToNoiseParameters(_settings.Seed);
 
             WorldViewJob job = new(){
                 Resolution = resolution,

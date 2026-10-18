@@ -207,6 +207,17 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(16384 * 36, indices);
             Assert.IsTrue(vertices <= ushort.MaxValue + 1 || _meshData[0].indexFormat == IndexFormat.UInt32,
                 "meshes with more than 65536 vertices need 32-bit indices");
+            Assert.Less(MaxIndex(), vertices, "every index must address a written vertex (no wrap-around)");
+        }
+
+        private long MaxIndex(int index = 0){
+            Mesh.MeshData mesh = _meshData[index];
+            long max = -1;
+            if (mesh.indexFormat == IndexFormat.UInt16)
+                foreach (ushort i in mesh.GetIndexData<ushort>()) max = math.max(max, i);
+            else
+                foreach (uint i in mesh.GetIndexData<uint>()) max = math.max(max, i);
+            return max;
         }
 
         #endregion

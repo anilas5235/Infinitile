@@ -14,6 +14,22 @@ namespace Engine.Scripts.Render{
         /// </summary>
         public readonly int BufferIndex;
 
+        /// <summary>
+        ///     PERF-04: initial capacity of a pooled page list. Lists that had to grow go back to the pool with their
+        ///     larger capacity. Sizing every list for <see cref="CopyPointsHandler.MaxPagesPerPartition" /> pinned about
+        ///     3 KB per list, although typical partitions need a few pages.
+        /// </summary>
+        private const int InitialPageCapacity = 16;
+
+        /// <summary>
+        ///     PERF-04: page lists are pooled, one was allocated per build. An own pool instead of
+        ///     <see cref="ListPool{T}" />, because that pool's collection check scans every pooled list on each release.
+        /// </summary>
+        private static readonly ObjectPool<List<AllocPage>> PageListPool = new(
+            static () => new List<AllocPage>(InitialPageCapacity), null, static list => list.Clear(), null,
+            false, 64, 1 << 16
+        );
+
         private readonly List<AllocPage> _pages;
 
         /// <summary>
@@ -90,25 +106,17 @@ namespace Engine.Scripts.Render{
         /// <param name="bufferIndex">The index of the render buffer.</param>
         public AllocInfo(int bufferIndex){
             BufferIndex = bufferIndex;
-            _pages = ListPool<AllocPage>.Get(); // PERF-04: page lists are pooled, one was allocated per build
-            // PERF-04: a list never grows while pages are added; a fresh list from the pool gets its final size once
-            if (_pages.Capacity < CopyPointsHandler.MaxPagesPerPartition)
-                _pages.Capacity = CopyPointsHandler.MaxPagesPerPartition;
+            _pages = PageListPool.Get();
         }
 
         /// <summary>
-        ///     PERF-04: fills the shared list pool with <paramref name="count" /> lists of their final capacity so
-        ///     allocations made during flight never create a list.
+        ///     PERF-04: fills the list pool with <paramref name="count" /> lists so allocations made during flight never
+        ///     create a list.
         /// </summary>
         internal static void PrewarmPageLists(int count){
             List<AllocPage>[] lists = new List<AllocPage>[count];
-            for (int i = 0; i < count; i++){
-                lists[i] = ListPool<AllocPage>.Get();
-                if (lists[i].Capacity < CopyPointsHandler.MaxPagesPerPartition)
-                    lists[i].Capacity = CopyPointsHandler.MaxPagesPerPartition;
-            }
-
-            for (int i = 0; i < count; i++) ListPool<AllocPage>.Release(lists[i]);
+            for (int i = 0; i < count; i++) lists[i] = PageListPool.Get();
+            for (int i = 0; i < count; i++) PageListPool.Release(lists[i]);
         }
 
         /// <summary>
@@ -116,7 +124,7 @@ namespace Engine.Scripts.Render{
         ///     released; the struct must not be used afterwards.
         /// </summary>
         internal void Recycle(){
-            if (_pages != null) ListPool<AllocPage>.Release(_pages);
+            if (_pages != null) PageListPool.Release(_pages);
         }
 
         /// <summary>

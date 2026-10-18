@@ -1,11 +1,13 @@
 using Engine.Scripts.Components;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
+using Engine.Scripts.Settings;
 using Engine.Scripts.Utils.Extensions;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Mathematics;
 using static Engine.Scripts.Utils.VoxelConstants;
+using Object = UnityEngine.Object;
 
 namespace Engine.Tests.EditMode{
     /// <summary>TST-E15: FillTerrain ice placement (F-07) and ChunkManager.SetVoxel Y bounds (F-08).</summary>
@@ -19,6 +21,7 @@ namespace Engine.Tests.EditMode{
         private NativeArray<ChunkColumn> _columns;
         private ChunkManager _manager;
         private NativeParallelHashMap<int2, ChunkVoxelData> _chunks;
+        private VoxelEngineSettings _settings;
 
         [SetUp]
         public void SetUp(){
@@ -29,11 +32,12 @@ namespace Engine.Tests.EditMode{
 
         [TearDown]
         public void TearDown(){
-            _config.Dispose();
+            TestFixtures.DisposeGeneratorConfig(ref _config);
             _vox.Dispose();
             _columns.Dispose();
             _manager?.Dispose();
             if (_chunks.IsCreated) _chunks.Dispose();
+            if (_settings != null) Object.DestroyImmediate(_settings);
         }
 
         private void PrepareColumns(){
@@ -101,7 +105,8 @@ namespace Engine.Tests.EditMode{
         #region SetVoxel
 
         private void CreateManagerWithStoneChunk(){
-            _manager = new ChunkManager(TestFixtures.CreateSettings(2));
+            _settings = TestFixtures.CreateSettings(2);
+            _manager = new ChunkManager(_settings);
             _chunks = new NativeParallelHashMap<int2, ChunkVoxelData>(1, Allocator.Persistent);
             _chunks.Add(int2.zero, TestFixtures.CreateUniformChunk(TestFixtures.Stone));
             _manager.AddChunks(_chunks); // the manager owns the chunk data from here on

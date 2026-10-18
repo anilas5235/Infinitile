@@ -23,10 +23,17 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                     new NativeHashMap<ushort, NativeArray<VoxelPlacement>>(parts.Length, Allocator.Domain)
             };
 
-            foreach (StructurePart part in parts){
-                NativeArray<VoxelPlacement> placements = new(part.placements.Length, Allocator.Domain);
-                placements.CopyFrom(part.placements);
-                def.PlacementData.TryAdd(voxelRegistry.GetIdOrThrow(part.voxel.GetFullName()), placements);
+            try{
+                foreach (StructurePart part in parts){
+                    ushort id = voxelRegistry.GetIdOrThrow(part.voxel.GetFullName());
+                    NativeArray<VoxelPlacement> placements = new(part.placements.Length, Allocator.Domain);
+                    placements.CopyFrom(part.placements);
+                    if (!def.PlacementData.TryAdd(id, placements)) placements.Dispose();
+                }
+            }
+            catch{
+                def.Dispose(); // D-04: release the partly built maps before the registry rethrows
+                throw;
             }
 
             return def;

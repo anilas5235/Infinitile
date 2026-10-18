@@ -224,7 +224,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         private struct GPUVoxelDef{
             private uint MeshLayer;
             private uint AlwaysRenderAllFaces;
-            private half DepthFadeDistance;
+            private uint DepthFadeDistance; // F-19: fp16 bits in the low half; HLSL half is 32-bit under fxc
             private uint Glow;
             private uint Collision;
             private uint2 shape_quad_indices_alwaysRender;
@@ -238,7 +238,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             public GPUVoxelDef(Voxel.VoxelDef def){
                 MeshLayer = (uint)def.MeshLayer;
                 AlwaysRenderAllFaces = def.AlwaysRenderAllFaces ? 1u : 0u;
-                DepthFadeDistance = def.DepthFadeDistance;
+                DepthFadeDistance = def.DepthFadeDistance.value; // F-19: read with f16tof32 on the GPU
                 Glow = def.Glow;
                 Collision = def.Collision ? 1u : 0u;
                 shape_quad_indices_alwaysRender = def.Always;

@@ -128,7 +128,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         ///     and colliders, recalculates bounds and logs timing information.
         /// </summary>
         internal void Complete(){
-            if (IsReady) return; // F-01: already completed early by CompleteIfRunning
+            if (IsReady) return;
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.MeshBuildComplete.Auto(); // PERF-01
 #if VOXEL_TIMING_LOGS
             double start = Time.realtimeSinceStartupAsDouble;
@@ -145,10 +145,12 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
 
                 CMeshBuildJob.PartitionJobResult result = _results[pos];
 
+                partition.MarkMeshChanged(); // F-04: a bake of the previous mesh is stale
                 _colliderMeshes[result.Index] = partition.ColliderMesh;
                 partition.ColliderMesh.bounds = result.ColliderBounds;
             }
 
+            _chunkPool.NotifyPartitionMeshWriting(); // F-04: a running bake may still read these meshes
             Mesh.ApplyAndDisposeWritableMeshData(
                 _colliderMeshDataArray,
                 _colliderMeshes,
@@ -170,7 +172,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
 
             IsReady = true;
 #if VOXEL_TIMING_LOGS
-            long totalJobTime = StopRecord();
+            double totalJobTime = StopRecord();
             if (totalJobTime > 100){
                 VoxelEngineLogger.Warn<CMeshBuildScheduler>(
                     $"Total Mesh Build Time for {_jobs.Length} jobs: <color=red>{totalJobTime:0.000}</color>ms"
@@ -182,11 +184,12 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         }
 
         /// <summary>
-        ///     F-01: completes the running batch synchronously when the chunk manager is about to write a chunk the
-        ///     job may read. The state handler then only clears its batch set in <c>CollectResultsStep</c>.
+        ///     F-01: waits for the running job when the chunk manager is about to write a chunk the job may read.
+        ///     Only the job is completed, its results are applied later by <see cref="Complete" />: applying them here
+        ///     re-entered <see cref="Complete" /> when claiming a partition evicted a chunk of the running batch.
         /// </summary>
         private void CompleteIfRunning(){
-            if (!IsReady) Complete();
+            _handle.Complete();
         }
 
         /// <summary>

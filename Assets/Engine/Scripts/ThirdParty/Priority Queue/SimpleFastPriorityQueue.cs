@@ -51,10 +51,6 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         }
 
         /// <summary>
-        ///     Removes every node from the queue.
-        ///     O(n)
-        /// </summary>
-        /// <summary>
         ///     PERF-04: pre-sizes the heap, the item cache and the node/list pools so that growing to
         ///     <paramref name="capacity" /> items later does not allocate.
         /// </summary>
@@ -66,6 +62,10 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
             for (int i = _listPool.Count + _itemToNodesCache.Count; i < capacity; i++) _listPool.Push(new List<SimpleNode>(1));
         }
 
+        /// <summary>
+        ///     Removes every node from the queue.
+        ///     O(n)
+        /// </summary>
         public void Clear(){
             _queue.Clear();
             foreach (IList<SimpleNode> nodes in _itemToNodesCache.Values) ReturnList(nodes);
