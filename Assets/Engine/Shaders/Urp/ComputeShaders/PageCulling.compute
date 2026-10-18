@@ -1,0 +1,69 @@
+#pragma kernel CullPages
+#pragma kernel WriteArgs
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase C (CUL-02): per camera and RenderBuffer, one thread per page. A page is appended to _VisiblePages when it
+// holds points and its AABB (optionally extruded along the light for the shadow list, CUL-05) touches the camera
+// frustum. WriteArgs then turns the appended count (copied into _ArgsBuffer[4] by GraphicsBuffer.CopyCount) into the
+// indirect vertex count: visiblePages × points per page × 6 vertices. The vertex shader pulls points through the
+// visible page list (CUL-03), so no per-point index buffer exists any more.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Mirrors Engine.Scripts.Render.PageBounds (24 bytes)
+struct PageBounds
+{
+    float3 boundsMin;
+    float3 boundsMax;
+};
+
+StructuredBuffer<uint> _CountsPerPage; // points per page, 0 = free page
+StructuredBuffer<PageBounds> _PageBounds; // CUL-01: AABB per page from the owning partition
+AppendStructuredBuffer<uint> _VisiblePages;
+RWStructuredBuffer<uint> _ArgsBuffer; // [0] vertex count, [1] instance count, [2] start vertex, [3] start instance, [4] visible pages
+
+float4 _FrustumPlanes[6]; // (normal, distance), normals point inward (GeometryUtility.CalculateFrustumPlanes)
+float3 _ShadowExtrusion; // CUL-05: light direction × shadow distance, 0 for the main pass
+uint _PagesPerBuffer;
+uint _PointsPerPage;
+uint _CullingEnabled; // CUL-06: 0 = every page with points is visible
+
+// Positive-vertex test, same as FrustumCulling.IsVisible on the C# side (CUL-04).
+bool intersects_frustum(float3 boundsMin, float3 boundsMax)
+{
+    [unroll]
+    for (int i = 0; i < 6; ++i)
+    {
+        float4 plane = _FrustumPlanes[i];
+        float3 n = plane.xyz;
+        float3 positive = float3(n.x > 0 ? boundsMax.x : boundsMin.x,
+                                 n.y > 0 ? boundsMax.y : boundsMin.y,
+                                 n.z > 0 ? boundsMax.z : boundsMin.z);
+        if (dot(n, positive) + plane.w < 0) return false;
+    }
+    return true;
+}
+
+[numthreads(128, 1, 1)]
+void CullPages(uint3 id : SV_DispatchThreadID)
+{
+    uint page = id.x;
+    if (page >= _PagesPerBuffer) return;
+    if (_CountsPerPage[page] == 0) return;
+
+    if (_CullingEnabled != 0)
+    {
+        PageBounds b = _PageBounds[page];
+        // Extruded box (CUL-05): every position that can shadow the page lies inside it. Zero extrusion = the page.
+        float3 boundsMin = min(b.boundsMin, b.boundsMin + _ShadowExtrusion);
+        float3 boundsMax = max(b.boundsMax, b.boundsMax + _ShadowExtrusion);
+        if (!intersects_frustum(boundsMin, boundsMax)) return;
+    }
+
+    _VisiblePages.Append(page);
+}
+
+[numthreads(1, 1, 1)]
+void WriteArgs(uint3 id : SV_DispatchThreadID)
+{
+    _ArgsBuffer[0] = _ArgsBuffer[4] * _PointsPerPage * 6u;
+}

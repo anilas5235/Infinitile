@@ -35,7 +35,7 @@ namespace Engine.Tests.Performance{
         public void TryAllocPages_FillBuffer_ThenReleaseAll(){
             Measure.Method(() => {
                     for (int i = 0; i < PartitionCount; i++)
-                        _allocator.TryAllocPages(PointsPerPartition, PagesPerPartition, 0, out _allocations[i]);
+                        _allocator.TryAllocPages(PointsPerPartition, PagesPerPartition, 0, default, out _allocations[i]);
                     for (int i = 0; i < PartitionCount; i++) _allocator.Release(_allocations[i]);
                 })
                 .SampleGroup(new SampleGroup("PageAllocator fill+release 1 buffer ms", SampleUnit.Millisecond))

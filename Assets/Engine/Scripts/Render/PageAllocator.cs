@@ -6,12 +6,14 @@ using static Engine.Scripts.Utils.VoxelRenderConstants;
 namespace Engine.Scripts.Render{
     /// <summary>
     ///     Pure page bookkeeping for one <see cref="RenderBuffer" />: which of the <see cref="PagesPerBuffer" /> pages
-    ///     are free and how many points each allocated page holds. Holds no GPU resources, so it can be unit-tested
-    ///     and benchmarked without a graphics device (TST-E17, PERF-02). Extracted from <see cref="RenderBuffer" />
-    ///     without behaviour changes.
+    ///     are free, how many points each allocated page holds and, since Phase C, the world-space bounds of the
+    ///     partition that owns each page (CUL-01). Holds no GPU resources, so it can be unit-tested and benchmarked
+    ///     without a graphics device (TST-E17, PERF-02). Extracted from <see cref="RenderBuffer" /> without behaviour
+    ///     changes.
     /// </summary>
     internal sealed class PageAllocator : IDisposable{
         private NativeArray<uint> _countsPerPage;
+        private NativeArray<PageBounds> _boundsPerPage;
         private NativeQueue<int> _freePages;
 
         /// <summary>
@@ -20,6 +22,7 @@ namespace Engine.Scripts.Render{
         /// <param name="allocator">Allocator for the internal containers (the engine uses <see cref="Allocator.Domain" />).</param>
         internal PageAllocator(Allocator allocator){
             _countsPerPage = new NativeArray<uint>(PagesPerBuffer, allocator);
+            _boundsPerPage = new NativeArray<PageBounds>(PagesPerBuffer, allocator);
             _freePages = new NativeQueue<int>(allocator);
             for (int i = 0; i < PagesPerBuffer; i++) _freePages.Enqueue(i);
             TotalValidPoints = 0;
@@ -27,6 +30,9 @@ namespace Engine.Scripts.Render{
 
         /// <summary>Number of pages that are currently free.</summary>
         internal int FreePages => _freePages.Count;
+
+        /// <summary>Number of pages that are currently allocated.</summary>
+        internal int AllocatedPages => PagesPerBuffer - _freePages.Count;
 
         /// <summary>True when no page is allocated.</summary>
         internal bool IsEmpty => _freePages.Count == PagesPerBuffer;
@@ -37,8 +43,12 @@ namespace Engine.Scripts.Render{
         /// <summary>Point count per page, indexed by page; 0 means the page is free.</summary>
         internal NativeArray<uint> CountsPerPage => _countsPerPage;
 
+        /// <summary>CUL-01: world-space AABB per page from the owning partition; a free page holds an empty box.</summary>
+        internal NativeArray<PageBounds> BoundsPerPage => _boundsPerPage;
+
         public void Dispose(){
             _countsPerPage.Dispose();
+            _boundsPerPage.Dispose();
             _freePages.Dispose();
         }
 
@@ -49,9 +59,11 @@ namespace Engine.Scripts.Render{
         /// <param name="pointCount">The total number of points to allocate space for.</param>
         /// <param name="numPages">The number of pages to allocate (must be at least 1).</param>
         /// <param name="bufferIndex">Buffer index stored in the resulting <see cref="AllocInfo" />.</param>
+        /// <param name="bounds">CUL-01: bounds of the partition the pages belong to, stored for every page.</param>
         /// <param name="allocation">The allocation info if successful, an empty allocation otherwise.</param>
         /// <returns>True if allocation was successful, false if not enough free pages.</returns>
-        internal bool TryAllocPages(int pointCount, int numPages, int bufferIndex, out AllocInfo allocation){
+        internal bool TryAllocPages(int pointCount, int numPages, int bufferIndex, in PageBounds bounds,
+            out AllocInfo allocation){
             allocation = default;
             if (numPages <= 0)
                 throw new ArgumentOutOfRangeException(nameof(numPages), "Must allocate at least one page.");
@@ -66,6 +78,7 @@ namespace Engine.Scripts.Render{
                 int pointsForPage = math.min(PointsPerPage, remainingPoints);
                 allocation.AddPage(new AllocInfo.AllocPage(pageIndex, pointsForPage));
                 SetPageCount(pageIndex, (uint)pointsForPage);
+                _boundsPerPage[pageIndex] = bounds;
 
                 remainingPoints -= PointsPerPage;
             }
@@ -87,6 +100,7 @@ namespace Engine.Scripts.Render{
                 if (IsPageFree(index)) continue;
 
                 SetPageCount(index, 0);
+                _boundsPerPage[index] = default; // CUL-01: cleared when released
                 _freePages.Enqueue(index);
             }
         }
@@ -95,6 +109,12 @@ namespace Engine.Scripts.Render{
         internal uint GetPageCount(int index){
             ValidOrThrow(index);
             return _countsPerPage[index];
+        }
+
+        /// <summary>CUL-01: bounds stored for a page (an empty box when the page is free).</summary>
+        internal PageBounds GetPageBounds(int index){
+            ValidOrThrow(index);
+            return _boundsPerPage[index];
         }
 
         private bool IsPageFree(int index){

@@ -54,6 +54,28 @@ namespace Engine.Scripts.Render{
         private CopyPointsHandler _copyPointsHandler;
         private RenderBufferManager _foliageBufferManager;
 
+        // Phase C: GPU culling (§E2)
+        private GpuCuller _culler;
+        private Camera _overlayCamera; // CUL-06: the game camera whose counts the overlay shows
+        private RenderBufferManager[] _layers; // PERF-04: fixed array for per-frame loops
+
+        /// <summary>
+        ///     CUL-06: GPU frustum culling on/off at runtime (initialised from <see cref="RendererSettings.gpuCulling" />).
+        ///     Off falls back to "every page with points is visible"; the image must not change.
+        /// </summary>
+        public bool GpuCulling{ get; set; } = true;
+
+        /// <summary>
+        ///     CUL-06: keeps the last frustum of every camera, so you can fly out and look at what was culled.
+        /// </summary>
+        public bool FreezeCulling{ get; set; }
+
+        /// <summary>
+        ///     CUL-06: draws visible pages / total pages per buffer and layer for the game camera. Debug only: the
+        ///     read-backs and the label strings allocate while it is on.
+        /// </summary>
+        public bool ShowCullingOverlay{ get; set; }
+
         private InFlightBuild[] _inFlightBuilds;
         private PartitionBuildRequest[] _buildRequests; // PERF-04: one reusable request per in-flight slot
         private uint2[] _intervalUpload = Array.Empty<uint2>(); // PERF-04: reused chunk upload staging
@@ -97,21 +119,13 @@ namespace Engine.Scripts.Render{
 
             RendererSettings rSettings = _settings.Renderer;
 
-            _solidBufferManager = new RenderBufferManager(
-                rSettings.solidMaterial,
-                rSettings.rebuildBuffers,
-                rSettings
-            );
-            _transparentBufferManager = new RenderBufferManager(
-                rSettings.transparentMaterial,
-                rSettings.rebuildBuffers,
-                rSettings
-            );
-            _foliageBufferManager = new RenderBufferManager(
-                rSettings.foliageMaterial,
-                rSettings.rebuildBuffers,
-                rSettings
-            );
+            _solidBufferManager = new RenderBufferManager(rSettings.solidMaterial);
+            _transparentBufferManager = new RenderBufferManager(rSettings.transparentMaterial);
+            _foliageBufferManager = new RenderBufferManager(rSettings.foliageMaterial);
+            _layers = new[]{ _solidBufferManager, _transparentBufferManager, _foliageBufferManager };
+
+            _culler = new GpuCuller(rSettings.pageCulling);
+            GpuCulling = rSettings.gpuCulling;
 
             VoxelRegistry voxelRegistry = DataImporter.Instance.VoxelRegistry;
             _pointBuilderHandlers = new PointBuilderHandler[_maxInFlight];
@@ -145,7 +159,9 @@ namespace Engine.Scripts.Render{
         ///     Rebuilds render buffers if changes were made during this frame.
         /// </summary>
         private void LateUpdate(){
-            if (_isDestroyed || !_buffersRebuildPending) return;
+            if (_isDestroyed) return;
+            _culler.ReleaseStaleCameras(Time.frameCount); // CUL-04
+            if (!_buffersRebuildPending) return;
 
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderRebuildBuffers.Auto(); // PERF-01
             _solidBufferManager.RebuildBuffers();
@@ -196,6 +212,7 @@ namespace Engine.Scripts.Render{
                     SafeDispose(handler);
             }
 
+            SafeDispose(_culler); // per-camera lists before the buffers they point at
             SafeDispose(_solidBufferManager);
             SafeDispose(_transparentBufferManager);
             SafeDispose(_foliageBufferManager);
@@ -236,15 +253,99 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     Draws all render buffers for the given camera.
+        ///     Culls and draws all render buffers for the given camera (CUL-02, CUL-04). Runs once per camera that
+        ///     renders, from <see cref="RenderPipelineManager.beginCameraRendering" />.
         /// </summary>
         /// <param name="context">The scriptable render context.</param>
         /// <param name="cam">The camera to render with.</param>
         private void Draw(ScriptableRenderContext context, Camera cam){
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderDraw.Auto(); // PERF-01
-            _solidBufferManager.Draw(cam);
-            _transparentBufferManager.Draw(cam);
-            _foliageBufferManager.Draw(cam);
+            if (_isDestroyed || _culler == null) return;
+
+            CameraCullState state = _culler.BeginCamera(cam, FreezeCulling, Time.frameCount);
+            CullingParameters parameters = BuildCullingParameters();
+
+            _solidBufferManager.Draw(cam, _culler, state, parameters);
+            _transparentBufferManager.Draw(cam, _culler, state, parameters);
+            _foliageBufferManager.Draw(cam, _culler, state, parameters);
+
+            if (ShowCullingOverlay && cam.cameraType == CameraType.Game) UpdateOverlayReadbacks(cam, state);
+        }
+
+        /// <summary>
+        ///     CUL-05: the shadow list tests page bounds extruded along the main light by the shadow distance. Without
+        ///     a main light or with shadows off only the main pass is drawn.
+        /// </summary>
+        private CullingParameters BuildCullingParameters(){
+            bool shadows = _settings.Renderer.shadows != ShadowCastingMode.Off;
+            float3 extrusion = float3.zero;
+            if (shadows){
+                Light sun = RenderSettings.sun;
+                if (sun == null) shadows = false;
+                else extrusion = (float3)sun.transform.forward * ShadowDistance();
+            }
+
+            return new CullingParameters(GpuCulling, shadows, extrusion);
+        }
+
+        private static float ShadowDistance(){
+            RenderPipelineAsset asset = GraphicsSettings.currentRenderPipeline;
+            if (asset is UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset urp) return urp.shadowDistance;
+            return QualitySettings.shadowDistance;
+        }
+
+        /// <summary>CUL-06: polls and re-requests the visible page counts of every buffer for the overlay.</summary>
+        private void UpdateOverlayReadbacks(Camera cam, CameraCullState state){
+            _overlayCamera = cam;
+            for (int l = 0; l < _layers.Length; l++){
+                IReadOnlyList<RenderBuffer> buffers = _layers[l].Buffers;
+                for (int b = 0; b < buffers.Count; b++){
+                    if (!state.TryGetLists(buffers[b], out BufferCullLists lists)) continue;
+                    lists.Main.UpdateVisibleCountReadback();
+                    if (lists.HasShadow) lists.Shadow.UpdateVisibleCountReadback();
+                }
+            }
+        }
+
+        /// <summary>
+        ///     CUL-06 debug overlay: visible pages / allocated pages per buffer and layer for the game camera, plus the
+        ///     culling and freeze switches. Allocates strings; only active while <see cref="ShowCullingOverlay" /> is on.
+        /// </summary>
+        private void OnGUI(){
+            if (!ShowCullingOverlay || _isDestroyed || _layers == null) return;
+
+            GUILayout.BeginArea(new Rect(10, 10, 420, 400), GUI.skin.box);
+            GUILayout.Label($"GPU culling: {(GpuCulling ? "on" : "off")}   freeze: {(FreezeCulling ? "on" : "off")}");
+            CameraCullState state = null;
+            if (_overlayCamera == null || !_culler.TryGetState(_overlayCamera, out state)){
+                GUILayout.Label("no game camera culled yet");
+            }
+            else{
+                for (int l = 0; l < _layers.Length; l++){
+                    RenderBufferManager layer = _layers[l];
+                    IReadOnlyList<RenderBuffer> buffers = layer.Buffers;
+                    uint visible = 0;
+                    int total = 0;
+                    for (int b = 0; b < buffers.Count; b++){
+                        total += buffers[b].Pages.AllocatedPages;
+                        if (state.TryGetLists(buffers[b], out BufferCullLists lists)) visible += lists.Main.LastVisibleCount;
+                    }
+
+                    GUILayout.Label($"{layer.LayerName}: {visible} / {total} pages visible");
+                    for (int b = 0; b < buffers.Count; b++){
+                        string shadow = "";
+                        uint bufferVisible = 0;
+                        if (state.TryGetLists(buffers[b], out BufferCullLists lists)){
+                            bufferVisible = lists.Main.LastVisibleCount;
+                            if (lists.HasShadow) shadow = $"   shadow {lists.Shadow.LastVisibleCount}";
+                        }
+
+                        GUILayout.Label($"    buffer {b}: {bufferVisible} / {buffers[b].Pages.AllocatedPages}{shadow}");
+                    }
+                }
+            }
+
+            GUILayout.EndArea();
         }
 
         /// <summary>

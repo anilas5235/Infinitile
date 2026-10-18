@@ -36,12 +36,21 @@ namespace Engine.Scripts.Settings{
         public ComputeShader copyPoints;
 
         /// <summary>
-        ///     The compute shader used to rebuild indirect draw buffers.
+        ///     Phase C: the compute shader that culls render pages per camera and writes the indirect draw args
+        ///     (PageCulling.compute, kernels CullPages and WriteArgs).
         /// </summary>
-        public ComputeShader rebuildBuffers;
+        public ComputeShader pageCulling;
+
+        [Header("Culling")]
+        /// <summary>
+        /// CUL-06: GPU frustum culling of render pages. Off draws every page that holds points, for debugging and
+        /// before/after comparison; the image must be identical.
+        /// </summary>
+        public bool gpuCulling = true;
 
         /// <summary>
-        ///     Whether chunk meshes cast shadows.
+        ///     Whether chunk meshes cast shadows. With shadows on, every buffer is drawn a second time as shadow caster
+        ///     with a list of pages whose bounds extruded along the main light reach the view (CUL-05).
         /// </summary>
         [HideInInspector] public ShadowCastingMode shadows = ShadowCastingMode.Off;
     }

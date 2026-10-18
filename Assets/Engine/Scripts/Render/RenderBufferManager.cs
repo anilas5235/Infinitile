@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Engine.Scripts.Settings;
 using Engine.Scripts.Utils.Logger;
 using Unity.Mathematics;
 using UnityEngine;
@@ -15,34 +14,23 @@ namespace Engine.Scripts.Render{
         private readonly Material _material;
         private readonly Dictionary<int3, AllocInfo> _partitionAllocations = new();
         private readonly List<RenderBuffer> _renderBuffers = new();
-        private readonly RendererSettings _renderSettings;
         private bool _isDisposed;
 
         /// <summary>
         ///     Initializes a new instance of the RenderBufferManager class.
         /// </summary>
         /// <param name="mat">The material to use for rendering.</param>
-        /// <param name="rebuildBufferShader">The compute shader for rebuilding buffers.</param>
-        /// <param name="renderSettings">The renderer settings.</param>
         /// <param name="initialBuffers">The initial number of buffers to create. Defaults to 1.</param>
-        public RenderBufferManager(Material mat, ComputeShader rebuildBufferShader, RendererSettings renderSettings,
-            int initialBuffers = 1){
+        public RenderBufferManager(Material mat, int initialBuffers = 1){
             _material = mat;
-            _renderSettings = renderSettings;
-            RebuildBufferShader = rebuildBufferShader;
-            RebuildKernel = rebuildBufferShader.FindKernel("ReBuildIndexAndArgs");
             for (int i = 0; i < initialBuffers; i++) AddNewBuffer();
         }
 
-        /// <summary>
-        ///     Gets the compute shader used for rebuilding buffers.
-        /// </summary>
-        internal ComputeShader RebuildBufferShader{ get; private set; }
+        /// <summary>Name of the material, used to label this layer in the culling overlay (CUL-06).</summary>
+        public string LayerName => _material != null ? _material.name : "<no material>";
 
-        /// <summary>
-        ///     Gets the kernel index for the rebuild operation.
-        /// </summary>
-        internal int RebuildKernel{ get; private set; }
+        /// <summary>The render buffers of this manager, in buffer-index order.</summary>
+        internal IReadOnlyList<RenderBuffer> Buffers => _renderBuffers;
 
         /// <summary>
         ///     Releases all GPU resources held by this manager.
@@ -58,11 +46,15 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     Draws all render buffers using the specified camera.
+        ///     Culls and draws all render buffers for the specified camera (CUL-02).
         /// </summary>
         /// <param name="cam">The camera to render with.</param>
-        public void Draw(Camera cam){
-            foreach (RenderBuffer renderBuffer in _renderBuffers) renderBuffer.Draw(_material, cam);
+        /// <param name="culler">The culler that dispatches the kernels.</param>
+        /// <param name="state">The camera's culling state for this frame.</param>
+        /// <param name="parameters">Culling switches and the shadow extrusion for this frame.</param>
+        internal void Draw(Camera cam, GpuCuller culler, CameraCullState state, in CullingParameters parameters){
+            foreach (RenderBuffer renderBuffer in _renderBuffers)
+                renderBuffer.Draw(_material, cam, culler, state, parameters);
         }
 
         /// <summary>
@@ -88,7 +80,7 @@ namespace Engine.Scripts.Render{
             int numPages = (int)math.ceil(pointCount / (float)PointsPerPage);
 
             if (hasAlloc) Release(allocInfo, partitionPos);
-            AllocInfo allocation = AllocPages(pointCount, numPages);
+            AllocInfo allocation = AllocPages(pointCount, numPages, PageBounds.FromPartition(partitionPos));
             _partitionAllocations[partitionPos] = allocation;
             return allocation;
         }
@@ -113,16 +105,17 @@ namespace Engine.Scripts.Render{
         /// </summary>
         /// <param name="pointCount">The total number of points.</param>
         /// <param name="numPages">The number of pages needed.</param>
+        /// <param name="bounds">CUL-01: bounds of the owning partition, stored per page.</param>
         /// <returns>The allocation info for the allocated pages.</returns>
-        private AllocInfo AllocPages(int pointCount, int numPages){
+        private AllocInfo AllocPages(int pointCount, int numPages, in PageBounds bounds){
             bool success = false;
             AllocInfo allocation = default;
             foreach (RenderBuffer rBuffer in _renderBuffers){
-                success = rBuffer.TryAllocPages(pointCount, numPages, out allocation);
+                success = rBuffer.TryAllocPages(pointCount, numPages, bounds, out allocation);
                 if (success) break;
             }
 
-            if (!success) AddNewBuffer().TryAllocPages(pointCount, numPages, out allocation);
+            if (!success) AddNewBuffer().TryAllocPages(pointCount, numPages, bounds, out allocation);
 
             return allocation;
         }
@@ -151,7 +144,7 @@ namespace Engine.Scripts.Render{
         /// </summary>
         /// <returns>The newly created render buffer.</returns>
         private RenderBuffer AddNewBuffer(){
-            RenderBuffer rBuffer = new(this, _renderBuffers.Count, _renderSettings);
+            RenderBuffer rBuffer = new(_renderBuffers.Count);
             _renderBuffers.Add(rBuffer);
             VoxelEngineLogger.Info<RenderBufferManager>(
                 $"Added new RenderBuffer for {_material.name}. Total buffers: {_renderBuffers.Count}");
@@ -175,7 +168,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     Rebuilds all render buffers that have pending state changes.
+        ///     Uploads the page state of all render buffers that have pending changes.
         /// </summary>
         public void RebuildBuffers(){
             foreach (RenderBuffer buffer in _renderBuffers) buffer.RebuildBuffers();

@@ -61,10 +61,15 @@ namespace Engine.Scripts.Utils{
         public static readonly int CountsPerPageNameID = Shader.PropertyToID("_CountsPerPage");
 
         public static readonly int PointDataNameID = Shader.PropertyToID("_PointData");
-        public static readonly int IndexBufferNameID = Shader.PropertyToID("_IndexBuffer");
         public static readonly int ArgsBufferNameID = Shader.PropertyToID("_ArgsBuffer");
-        public static readonly int TotalPointCountNameID = Shader.PropertyToID("_TotalPointCount");
         public static readonly int PointsPerPageNameID = Shader.PropertyToID("_PointsPerPage");
         public static readonly int PagesPerBufferNameID = Shader.PropertyToID("_PagesPerBuffer");
+
+        // Phase C: GPU culling (PageCulling.compute and the vertex pulling in VoxelShaderCommon.hlsl)
+        public static readonly int PageBoundsNameID = Shader.PropertyToID("_PageBounds");
+        public static readonly int VisiblePagesNameID = Shader.PropertyToID("_VisiblePages");
+        public static readonly int FrustumPlanesNameID = Shader.PropertyToID("_FrustumPlanes");
+        public static readonly int ShadowExtrusionNameID = Shader.PropertyToID("_ShadowExtrusion");
+        public static readonly int CullingEnabledNameID = Shader.PropertyToID("_CullingEnabled");
     }
 }
