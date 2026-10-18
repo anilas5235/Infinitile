@@ -218,14 +218,13 @@ namespace Engine.Tests.EditMode{
 
                 Assert.IsTrue(results.TryGetValue(new int2(-1, 0), out ChunkVoxelData west));
                 Assert.IsTrue(results.TryGetValue(new int2(0, 0), out ChunkVoxelData east));
-                int water = _config.WaterLevel;
                 for (int z = 0; z < ChunkDepth; z++){
                     ColumnSample a = WorldSampler.SampleColumn(-1, z, _config.WorldGen);
                     ColumnSample b = WorldSampler.SampleColumn(0, z, _config.WorldGen);
                     Biome.BiomeDef defA = _config.WorldGen.Biomes[a.SurfaceSource];
                     Biome.BiomeDef defB = _config.WorldGen.Biomes[b.SurfaceSource];
-                    ushort expectedA = a.ColumnHeight < water ? TestFixtures.Water : defA.topBlock;
-                    ushort expectedB = b.ColumnHeight < water ? TestFixtures.Water : defB.topBlock;
+                    ushort expectedA = defA.topBlock; // GEN-14: top block at h_int even under water
+                    ushort expectedB = defB.topBlock;
                     Assert.AreEqual(expectedA, west.GetVoxel(new int3(ChunkWidth - 1, a.ColumnHeight, z)), $"west z={z}");
                     Assert.AreEqual(expectedB, east.GetVoxel(new int3(0, b.ColumnHeight, z)), $"east z={z}");
                     Assert.AreEqual(defA.underBlock, west.GetVoxel(new int3(ChunkWidth - 1, a.ColumnHeight - 1, z)));

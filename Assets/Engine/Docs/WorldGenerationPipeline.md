@@ -47,7 +47,8 @@ flowchart LR
 - **Chunk job** (`Jobs/Chunk/ChunkGenerationTerrain.cs`): with a non-legacy architecture `PrepareChunkMaps` calls
   `WorldSampler.SampleColumn` per column, independent of the chunk origin, so chunk borders carry no seam (TST-03).
   `ChunkColumn` gained `SurfaceSource`, `FloraSpecies`, `FloraSource` and `HeightF`; the blocks come from the
-  surface-source biome. `FillTerrain`'s ice override follows `EnableClimateOverrides` (GEN-14). Vegetation stays
+  surface-source biome. `FillTerrain` places the top block at h_int even under water, so Ocean floors are sand
+  (GEN-14, GEN-25); its ice override follows `EnableClimateOverrides` (GEN-14). Vegetation stays
   disabled until Phase 4. `ChunkJob` compiles with `CompileSynchronously` and `FloatMode.Strict` because it calls the
   sampler (GEN-16).
 - **Preview** (`WorldGenerationPreviewWindow`): in Terrain-first the spec views add Offset, Amp and J per column

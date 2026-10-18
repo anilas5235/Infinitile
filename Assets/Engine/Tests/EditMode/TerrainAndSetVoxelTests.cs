@@ -72,7 +72,7 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(TestFixtures.Stone, VoxelAt(WarmColumn, 95));
             Assert.AreEqual(TestFixtures.Dirt, VoxelAt(WarmColumn, 96));
             Assert.AreEqual(TestFixtures.Dirt, VoxelAt(WarmColumn, 99));
-            Assert.AreEqual(TestFixtures.Water, VoxelAt(WarmColumn, 100), "surface below water level is flooded");
+            Assert.AreEqual(TestFixtures.Grass, VoxelAt(WarmColumn, 100), "the top block sits at h_int even under water (GEN-14)");
             Assert.AreEqual(TestFixtures.Water, VoxelAt(WarmColumn, water - 1));
             Assert.AreEqual(TestFixtures.Air, VoxelAt(WarmColumn, water));
             Assert.AreEqual(TestFixtures.Air, VoxelAt(WarmColumn, ChunkHeight - 1));

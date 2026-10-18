@@ -134,7 +134,8 @@ namespace Engine.Scripts.Jobs.Chunk{
                     ushort v;
                     if (y < gy - 4) v = st;
                     else if (y < gy) v = under;
-                    else if (y == gy) v = gy < waterLevel ? waterBlock : top;
+                    // GEN-14: the top block sits at h_int even under water, so Ocean floors are sand (GEN-25).
+                    else if (y == gy) v = top;
                     else v = y < waterLevel ? waterBlock : air;
 
                     // F-07: the water surface is the topmost water voxel at waterLevel - 1 (y == waterLevel is air).
