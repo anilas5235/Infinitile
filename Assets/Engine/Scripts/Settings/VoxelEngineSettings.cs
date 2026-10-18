@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using Engine.Scripts.WorldGen.Settings;
+using UnityEngine;
 
 namespace Engine.Scripts.Settings{
     /// <summary>
@@ -15,6 +16,12 @@ namespace Engine.Scripts.Settings{
         ///     Noise parameters (scale, persistence, etc.).
         /// </summary>
         public NoiseSettings Noise;
+
+        /// <summary>
+        ///     Spec world-generation settings (INT-01): architecture, blending, biome set, octaves. Optional while the
+        ///     legacy path is the default; when null the engine runs <c>GenArchitecture.Legacy</c>.
+        /// </summary>
+        public WorldGenSettings WorldGen;
 
         /// <summary>
         ///     Chunk related settings (dimensions, distances, prefabs).

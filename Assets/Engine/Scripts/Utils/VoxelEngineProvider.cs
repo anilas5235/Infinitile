@@ -5,6 +5,7 @@ using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils.Provider;
+using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using UnityEngine;
@@ -62,6 +63,10 @@ namespace Engine.Scripts.Utils{
             cfg.WaterLevel = Settings.Noise.WaterLevel;
             cfg.GlobalSeed = Settings.Seed;
             cfg.NoiseParams = Settings.Noise.ToNoiseParameters(Settings.Seed);
+            // INT-03: the Burst mirror of the spec settings; default (owns nothing) when no WorldGenSettings is assigned.
+            cfg.WorldGen = Settings.WorldGen
+                ? Settings.WorldGen.ToConfig(Settings.Seed, Settings.Noise, DataImporter.Instance.VoxelRegistry)
+                : default;
             return new ChunkScheduler(Settings, chunkManager, cfg, world);
         }
 

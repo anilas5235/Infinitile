@@ -18,5 +18,18 @@ MonoBehaviour:
   TargetHumidity: 0.8
   TargetTemperature: 0.5
   TargetContinental: 0.1
+  TargetErosion: 0.5
+  TargetPV: 0
   TargetHeight: 0.1
+  HeightOffset: 100
+  HeightAmplitude: 6
+  OctaveWeights:
+  - 1
+  - 0.5
+  - 0.2
+  - 0.05
+  - 0.02
+  - 0.01
+  Jaggedness: 0
+  FloraRules: []
   RepresentativeColor: {r: 0, g: 0.118253864, b: 0.4943396, a: 1}
