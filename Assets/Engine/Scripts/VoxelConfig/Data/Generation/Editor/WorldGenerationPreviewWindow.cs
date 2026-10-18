@@ -74,6 +74,16 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
         private bool _specBuildScheduled;
         private float _clampedShare;
 
+        // Terrain-first spline parameters (TRN-06): Offset, Amp and J at every column of the framed region, taken
+        // from the same SampleRegion call as the views above. The 1D spline plots arrive with the Phase 5 tooling.
+        private Texture2D _offsetTexture;
+        private Texture2D _ampTexture;
+        private Texture2D _jaggednessTexture;
+        private NativeArray<float3> _jobTerrainParams;
+        private bool _terrainFirst;
+        private float2 _ampRange;
+        private float2 _jaggednessRange;
+
         private void OnEnable(){
             EditorApplication.update += OnEditorUpdate;
             ReloadAssets();
@@ -98,6 +108,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
             DestroyTexture(ref _specHeightTexture);
             DestroyTexture(ref _erosionTexture);
             DestroyTexture(ref _pvTexture);
+            DestroyTexture(ref _offsetTexture);
+            DestroyTexture(ref _ampTexture);
+            DestroyTexture(ref _jaggednessTexture);
         }
 
         private void OnDestroy(){
@@ -261,8 +274,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
         }
 
         /// <summary>
-        ///     Spec-pipeline views (Phase 0): hard 5D biome, common-formula height with the clamped share (GEN-12),
-        ///     erosion and peaks-and-valleys. Needs a WorldGenSettings asset on the VoxelEngineSettings.
+        ///     Spec-pipeline views: hard biome class (5D in Biome-first, 6D with h in Terrain-first), height with the
+        ///     clamped share (GEN-12), erosion and peaks-and-valleys; in Terrain-first also the spline parameters
+        ///     Offset, Amp and J (TRN-06). Needs a WorldGenSettings asset on the VoxelEngineSettings.
         /// </summary>
         private void DrawSpecViews(){
             if (!_settings.WorldGen){
@@ -276,7 +290,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
 
             EditorGUILayout.BeginVertical();
             {
-                DrawView("Spec Biome (5D hard class)", EditorStyles.label, _specBiomeTexture, true);
+                DrawView(_terrainFirst ? "Spec Biome (6D hard class)" : "Spec Biome (5D hard class)",
+                    EditorStyles.label, _specBiomeTexture, true);
                 DrawView($"Spec Height (clamped {_clampedShare:P1})", EditorStyles.label, _specHeightTexture, true);
             }
             EditorGUILayout.EndVertical();
@@ -284,6 +299,16 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
             {
                 DrawView("Erosion", EditorStyles.label, _erosionTexture, true);
                 DrawView("Peaks & Valleys", EditorStyles.label, _pvTexture, true);
+            }
+            EditorGUILayout.EndVertical();
+
+            if (!_terrainFirst) return;
+            EditorGUILayout.BeginVertical();
+            {
+                DrawView("Offset (Hmin..Hmax, blue below water)", EditorStyles.label, _offsetTexture, true);
+                DrawView($"Amp ({_ampRange.x:0.#}..{_ampRange.y:0.#})", EditorStyles.label, _ampTexture, true);
+                DrawView($"Jaggedness ({_jaggednessRange.x:0.#}..{_jaggednessRange.y:0.#})", EditorStyles.label,
+                    _jaggednessTexture, true);
             }
             EditorGUILayout.EndVertical();
         }
@@ -522,6 +547,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
             _jobHardBiome = new NativeArray<int>(count, Allocator.TempJob);
             _jobHeight = new NativeArray<float>(count, Allocator.TempJob);
             _jobClamped = new NativeArray<byte>(count, Allocator.TempJob);
+            _terrainFirst = cfg.Architecture == GenArchitecture.TerrainFirst;
+            if (_terrainFirst) _jobTerrainParams = new NativeArray<float3>(count, Allocator.TempJob);
             _jobSpecBiomePixels = new NativeArray<Color32>(count, Allocator.TempJob);
             _jobSpecHeightPixels = new NativeArray<Color32>(count, Allocator.TempJob);
             _jobErosionPixels = new NativeArray<Color32>(count, Allocator.TempJob);
@@ -546,7 +573,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
                 Fields = _jobFields,
                 HardBiome = _jobHardBiome,
                 Height = _jobHeight,
-                Clamped = _jobClamped
+                Clamped = _jobClamped,
+                TerrainParams = _jobTerrainParams // unconstructed in Biome-first: SampleRegion skips it
             };
             JobHandle sampled = WorldGenApi.SampleRegion(request, ref buffers);
 
@@ -609,12 +637,63 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
                     int clamped = 0;
                     for (int i = 0; i < _jobClamped.Length; i++) clamped += _jobClamped[i];
                     _clampedShare = _jobClamped.Length > 0 ? clamped / (float)_jobClamped.Length : 0f;
+
+                    if (_terrainFirst) ApplyTerrainParamViews();
                 }
             }
 
             DisposeJobData();
             _buildInProgress = false;
             Repaint();
+        }
+
+        /// <summary>
+        ///     TRN-06: Offset on the height scale (blue below the water level), Amp and J normalised to the range
+        ///     seen in the framed region (shown in the view titles). Main-thread conversion of at most
+        ///     ViewResolution x ViewResolution pixels.
+        /// </summary>
+        private void ApplyTerrainParamViews(){
+            int count = _jobTerrainParams.Length;
+            WorldGenConfig cfg = _generatorConfig.WorldGen;
+            float waterLevel = _settings.Noise.WaterLevel;
+            float2 amp = new(float.MaxValue, float.MinValue), jag = new(float.MaxValue, float.MinValue);
+            for (int i = 0; i < count; i++){
+                float3 t = _jobTerrainParams[i];
+                amp = new float2(math.min(amp.x, t.y), math.max(amp.y, t.y));
+                jag = new float2(math.min(jag.x, t.z), math.max(jag.y, t.z));
+            }
+
+            if (count == 0) amp = jag = float2.zero;
+            _ampRange = amp;
+            _jaggednessRange = jag;
+
+            Color32[] offsetPixels = new Color32[count];
+            Color32[] ampPixels = new Color32[count];
+            Color32[] jagPixels = new Color32[count];
+            float heightSpan = math.max(1f, cfg.HeightMax - cfg.HeightMin);
+            float ampSpan = math.max(1e-6f, amp.y - amp.x);
+            float jagSpan = math.max(1e-6f, jag.y - jag.x);
+            for (int i = 0; i < count; i++){
+                float3 t = _jobTerrainParams[i];
+                byte o = (byte)math.round(math.saturate((t.x - cfg.HeightMin) / heightSpan) * 255f);
+                offsetPixels[i] = t.x < waterLevel
+                    ? new Color32((byte)(o / 2), (byte)(o / 2), (byte)math.min(255, o + 80), 255)
+                    : new Color32(o, o, o, 255);
+                byte a = (byte)math.round(math.saturate((t.y - amp.x) / ampSpan) * 255f);
+                ampPixels[i] = new Color32(a, a, a, 255);
+                byte j = (byte)math.round(math.saturate((t.z - jag.x) / jagSpan) * 255f);
+                jagPixels[i] = new Color32(j, j, j, 255);
+            }
+
+            EnsureTexture(ref _offsetTexture, _specViewSize);
+            EnsureTexture(ref _ampTexture, _specViewSize);
+            EnsureTexture(ref _jaggednessTexture, _specViewSize);
+            _offsetTexture.SetPixels32(offsetPixels);
+            _ampTexture.SetPixels32(ampPixels);
+            _jaggednessTexture.SetPixels32(jagPixels);
+            _offsetTexture.Apply(false);
+            _ampTexture.Apply(false);
+            _jaggednessTexture.Apply(false);
         }
 
         private void DisposeJobData(){
@@ -637,6 +716,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
             if (_jobHardBiome.IsCreated) _jobHardBiome.Dispose();
             if (_jobHeight.IsCreated) _jobHeight.Dispose();
             if (_jobClamped.IsCreated) _jobClamped.Dispose();
+            if (_jobTerrainParams.IsCreated) _jobTerrainParams.Dispose();
             _specBuildScheduled = false;
         }
 

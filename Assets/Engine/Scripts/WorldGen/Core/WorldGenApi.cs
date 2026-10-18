@@ -60,6 +60,12 @@ namespace Engine.Scripts.WorldGen.Core{
 
         /// <summary>1 where the height clamp engaged (GEN-12), else 0.</summary>
         public NativeArray<byte> Clamped;
+
+        /// <summary>Normalised height h (TRN-10).</summary>
+        public NativeArray<float> NormalizedHeight;
+
+        /// <summary>Terrain-first (Offset, Amp, J) per column (TRN-06 preview); zero in Biome-first.</summary>
+        public NativeArray<float3> TerrainParams;
     }
 
     /// <summary>
@@ -92,6 +98,8 @@ namespace Engine.Scripts.WorldGen.Core{
             Validate(buffers.FloraSpecies, count, nameof(buffers.FloraSpecies));
             Validate(buffers.FloraSource, count, nameof(buffers.FloraSource));
             Validate(buffers.Clamped, count, nameof(buffers.Clamped));
+            Validate(buffers.NormalizedHeight, count, nameof(buffers.NormalizedHeight));
+            Validate(buffers.TerrainParams, count, nameof(buffers.TerrainParams));
 
             SampleRegionJob job = new(){
                 Config = request.Config,
@@ -114,6 +122,8 @@ namespace Engine.Scripts.WorldGen.Core{
             job.WriteFloraSpecies = Bind(ref buffers.FloraSpecies, out job.FloraSpecies, out NativeArray<ushort> dSpecies);
             job.WriteFloraSource = Bind(ref buffers.FloraSource, out job.FloraSource, out NativeArray<int> dFloraSource);
             job.WriteClamped = Bind(ref buffers.Clamped, out job.Clamped, out NativeArray<byte> dClamped);
+            job.WriteNormalizedHeight = Bind(ref buffers.NormalizedHeight, out job.NormalizedHeight, out NativeArray<float> dNormalized);
+            job.WriteTerrainParams = Bind(ref buffers.TerrainParams, out job.TerrainParams, out NativeArray<float3> dTerrainParams);
 
             JobHandle handle = job.Schedule(count, 64, dependsOn);
 
@@ -128,6 +138,8 @@ namespace Engine.Scripts.WorldGen.Core{
             handle = DisposeDummy(dSpecies, handle);
             handle = DisposeDummy(dFloraSource, handle);
             handle = DisposeDummy(dClamped, handle);
+            handle = DisposeDummy(dNormalized, handle);
+            handle = DisposeDummy(dTerrainParams, handle);
             return handle;
         }
 
@@ -173,6 +185,8 @@ namespace Engine.Scripts.WorldGen.Core{
             public bool WriteFloraSpecies;
             public bool WriteFloraSource;
             public bool WriteClamped;
+            public bool WriteNormalizedHeight;
+            public bool WriteTerrainParams;
 
             // Dummies are length 1, so the per-index restriction is lifted; the flags guarantee they are never written.
             [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<WorldFields> Fields;
@@ -186,6 +200,8 @@ namespace Engine.Scripts.WorldGen.Core{
             [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<ushort> FloraSpecies;
             [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<int> FloraSource;
             [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<byte> Clamped;
+            [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<float> NormalizedHeight;
+            [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<float3> TerrainParams;
 
             public void Execute(int index){
                 int i = index % Width;
@@ -203,6 +219,8 @@ namespace Engine.Scripts.WorldGen.Core{
                 if (WriteFloraSpecies) FloraSpecies[index] = s.FloraSpecies;
                 if (WriteFloraSource) FloraSource[index] = s.FloraSource;
                 if (WriteClamped) Clamped[index] = s.Clamped ? (byte)1 : (byte)0;
+                if (WriteNormalizedHeight) NormalizedHeight[index] = s.NormalizedHeight;
+                if (WriteTerrainParams) TerrainParams[index] = s.TerrainParams;
             }
         }
     }

@@ -73,6 +73,38 @@ returned structs and carried `bool` fields in their signatures. Burst reports su
 unrelated code. A 10x or larger slowdown of all Burst benchmarks while managed benchmarks stay put is that
 symptom; `WorldSamplerTests.SampleColumn_CompilesWithBurst` now turns it into a test failure.
 
+## 2026-10-18 Phase 1 baseline (`2026-10-18-phase1-editmode-baseline.json`)
+
+Same machine and settings as above, **but not a quiet machine**: a game (about 3.6 cores) and a browser (about
+1.4 cores) were running during all three attempts of this run; the table shows the best attempt. Phase 1
+(Terrain-first) routes `ChunkJob.PrepareChunkMaps` through `WorldSampler.SampleColumn` when the config selects a
+non-legacy architecture (INT-10) and adds four fields to `ChunkColumn`; the legacy path only gained those field
+writes. No other benchmarked code changed.
+
+| Benchmark | Sample group | Median | Min | Max | vs 2026-10-18 (Phase 0) |
+|---|---|---|---|---|---|
+| ChunkJob.Run, legacy (noise terrain + RLE write) | ChunkJob.Run TerrainRle ms/chunk | 1.11 ms | 1.06 ms | 1.66 ms | +1 % |
+| ChunkJob.Run, Terrain-first (section 19.1 splines, six section 19.2 biomes, 6D classification + RLE write) | ChunkJob.Run TerrainFirst ms/chunk | 2.26 ms | 2.16 ms | 3.75 ms | new |
+| CMeshBuildJob.Run, surface partition (y=3) | CMeshBuildJob.Run surface ms/partition | 7.20 ms | 6.75 ms | 9.53 ms | +7 % |
+| CMeshBuildJob.Run, fully solid partition (y=1) | CMeshBuildJob.Run solid ms/partition | 7.27 ms | 6.81 ms | 8.94 ms | +8 % |
+| UnsafeIntervalList.Set, 10^4 random edits, chunk-sized list | UnsafeIntervalList.Set 10k edits ms | 11.53 ms | 11.07 ms | 15.49 ms | +7 % |
+| PageAllocator, fill one buffer with 3-page partitions and release all | PageAllocator fill+release 1 buffer ms | 1.04 ms | 0.59 ms | 3.19 ms | +121 % (load noise, see below) |
+| FrustumCulling.IsVisible, 1024 page AABBs vs 6 planes, 10 passes per sample | FrustumCulling.IsVisible 1024 pages us | 2454 us | 2366 us | 2656 us | +8 % |
+
+PERF-03: the one benchmark whose code changed in Phase 1 (`ChunkJob.Run` on the legacy path) is within 1 % of
+Phase 0. The collider mesh, interval list and frustum numbers moved 7–8 % although their code is untouched, and
+the page allocator (a 0.5 ms benchmark) doubled with a 0.59 ms minimum and a 3.19 ms maximum; both are the
+foreground load, not Phase 1. The two discarded attempts put the same untouched benchmarks 20–40 % above
+Phase 0 with the minima near the Phase 0 medians. **Re-run this baseline on a quiet machine before reading
+anything but the `ChunkJob.Run` rows from it.**
+
+Terrain-first costs about 2x the legacy path per chunk: every column evaluates three nested splines, the shared
+detail octaves and the 6D classification over six biomes (`WorldSampler.SampleColumn`), where the legacy path
+samples two noise layers. **This is above the PERF-05 initial budget** of 1.5 ms per chunk and worker for method 1
+(a SHOULD, to be confirmed against the user's machine); the busy machine inflates the number, so re-measure on a
+quiet machine before deciding whether Terrain-first needs optimising. Biome-first (Phase 2) adds a row to this
+table, the blend methods (Phase 3) one per method.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the

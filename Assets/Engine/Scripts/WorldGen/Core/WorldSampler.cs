@@ -1,5 +1,6 @@
 using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Classify;
+using Engine.Scripts.WorldGen.Height;
 using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Burst;
@@ -12,10 +13,10 @@ namespace Engine.Scripts.WorldGen.Core{
     ///     both call it; the region API (<see cref="WorldGenApi" />) wraps <see cref="SampleColumn(int,int,in WorldGenConfig)" />
     ///     in a job.
     ///     <para>
-    ///         Phase 0 skeleton: fields, hard 5D classification, one-hot weights and the common height formula §5.7
-    ///         composed from the classified biome's parameters (§8.2 with one-hot weights). Phase 1 adds the
-    ///         Terrain-first spline path and 6D classification, Phase 2 the blend methods, Phase 3 the surface pick,
-    ///         Phase 4 flora.
+    ///         Phase 0: fields, hard 5D classification, one-hot weights and the common height formula §5.7
+    ///         composed from the classified biome's parameters (§8.2 with one-hot weights). Phase 1: the
+    ///         Terrain-first path (spline height, then 6D classification, §7). Phase 2 completes Biome-first,
+    ///         Phase 3 adds the blend methods and the surface pick, Phase 4 flora.
     ///     </para>
     ///     <para>
     ///         The <c>out</c>-parameter overloads are Burst direct-call entry points (GEN-16): managed callers
@@ -47,19 +48,34 @@ namespace Engine.Scripts.WorldGen.Core{
             ColumnSample s = default;
             SampleFields(p, cfg, out s.Fields);
 
-            // Phase 0: hard 5D classification for every architecture. Terrain-first (6D with h) arrives with the
-            // spline height in Phase 1 (TRN-01…06).
-            s.HardBiome = BiomeClassifier.Classify(s.Fields, cfg);
+            float unclamped;
+            if (cfg.Architecture == GenArchitecture.TerrainFirst){
+                // Terrain-first (§7): the spline height comes first and does not depend on any biome (TRN-03);
+                // the normalised height h then takes part in the 6D classification (TRN-10). The height stage does
+                // not exist here (TRN-21).
+                TerrainFirstHeight.Sample(p, s.Fields, cfg, out s.TerrainParams, out s.Height, out unclamped);
+                s.NormalizedHeight = math.saturate((s.Height - cfg.HeightMin) / (cfg.HeightMax - cfg.HeightMin));
+                s.HardBiome = BiomeClassifier.Classify(s.Fields, s.NormalizedHeight, cfg);
 
-            // Phase 0: method 1 (None) in both stages (§9.2). Phase 2 routes through the per-stage methods (BLD-02).
-            s.MaterialWeights = BlendWeights.OneHot(s.HardBiome);
-            s.HeightWeights = s.MaterialWeights;
-            s.DominantMaterialBiome = s.HardBiome;
+                // Phase 0/1: material method 1 (None) (§9.2); Phase 3 routes through the per-stage methods (BLD-02).
+                s.MaterialWeights = BlendWeights.OneHot(s.HardBiome);
+                s.HeightWeights = s.MaterialWeights;
+                s.DominantMaterialBiome = s.HardBiome;
+            }
+            else{
+                // Biome-first (§8) and the sampler view of the legacy path: hard 5D classification, one-hot weights
+                // and the biome-composed height. Phase 3 adds the blend methods.
+                s.HardBiome = BiomeClassifier.Classify(s.Fields, cfg);
+                s.MaterialWeights = BlendWeights.OneHot(s.HardBiome);
+                s.HeightWeights = s.MaterialWeights;
+                s.DominantMaterialBiome = s.HardBiome;
+                SampleBiomeHeight(p, s.HeightWeights, cfg, out s.Height, out unclamped);
+                s.NormalizedHeight = math.saturate((s.Height - cfg.HeightMin) / (cfg.HeightMax - cfg.HeightMin));
+            }
 
             // Surface pick (§9.6) arrives in Phase 3; until then the dominant material biome supplies the blocks.
             s.SurfaceSource = s.DominantMaterialBiome;
 
-            SampleBiomeHeight(p, s.HeightWeights, cfg, out s.Height, out float unclamped);
             s.Clamped = s.Height != unclamped;
             s.ColumnHeight = (int)math.floor(s.Height);
 

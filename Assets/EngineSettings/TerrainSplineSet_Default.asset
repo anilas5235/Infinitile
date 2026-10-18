@@ -1,0 +1,179 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 39448e70d8b984c4fa860ece129255a5, type: 3}
+  m_Name: TerrainSplineSet_Default
+  m_EditorClassIdentifier: Engine.Runtime::Engine.Scripts.WorldGen.Settings.TerrainSplineSet
+  Notes: "Placeholder Terrain-first splines (WorldGenSpec \xA719.1). Only to get
+    a plausible starting world; replace them."
+  OffsetRoot: 0
+  AmpRoot: 7
+  JaggednessRoot: 9
+  Splines:
+  - Name: Offset
+    Axis: 0
+    Interpolation: 0
+    Points:
+    - X: 0
+      Value: 70
+      Child: -1
+    - X: 0.3
+      Value: 110
+      Child: -1
+    - X: 0.4
+      Value: 122
+      Child: -1
+    - X: 0.5
+      Value: 0
+      Child: 1
+    - X: 0.75
+      Value: 0
+      Child: 3
+    - X: 1
+      Value: 0
+      Child: 6
+  - Name: 'Offset[0.5]'
+    Axis: 1
+    Interpolation: 0
+    Points:
+    - X: 0
+      Value: 0
+      Child: 2
+    - X: 0.6
+      Value: 132
+      Child: -1
+    - X: 1
+      Value: 128
+      Child: -1
+  - Name: 'Offset[0.5][0]'
+    Axis: 2
+    Interpolation: 0
+    Points:
+    - X: -1
+      Value: 128
+      Child: -1
+    - X: 0
+      Value: 136
+      Child: -1
+    - X: 1
+      Value: 150
+      Child: -1
+  - Name: 'Offset[0.75]'
+    Axis: 1
+    Interpolation: 0
+    Points:
+    - X: 0
+      Value: 0
+      Child: 4
+    - X: 0.5
+      Value: 0
+      Child: 5
+    - X: 1
+      Value: 138
+      Child: -1
+  - Name: 'Offset[0.75][0]'
+    Axis: 2
+    Interpolation: 0
+    Points:
+    - X: -1
+      Value: 135
+      Child: -1
+    - X: 0
+      Value: 160
+      Child: -1
+    - X: 1
+      Value: 195
+      Child: -1
+  - Name: 'Offset[0.75][0.5]'
+    Axis: 2
+    Interpolation: 0
+    Points:
+    - X: -1
+      Value: 132
+      Child: -1
+    - X: 0
+      Value: 145
+      Child: -1
+    - X: 1
+      Value: 165
+      Child: -1
+  - Name: 'Offset[1]'
+    Axis: 1
+    Interpolation: 0
+    Points:
+    - X: 0
+      Value: 175
+      Child: -1
+    - X: 1
+      Value: 145
+      Child: -1
+  - Name: Amp
+    Axis: 0
+    Interpolation: 0
+    Points:
+    - X: 0
+      Value: 4
+      Child: -1
+    - X: 0.4
+      Value: 6
+      Child: -1
+    - X: 0.75
+      Value: 0
+      Child: 8
+    - X: 1
+      Value: 26
+      Child: -1
+  - Name: 'Amp[0.75]'
+    Axis: 1
+    Interpolation: 0
+    Points:
+    - X: 0
+      Value: 22
+      Child: -1
+    - X: 1
+      Value: 8
+      Child: -1
+  - Name: Jaggedness
+    Axis: 0
+    Interpolation: 0
+    Points:
+    - X: 0
+      Value: 0
+      Child: -1
+    - X: 0.6
+      Value: 0
+      Child: -1
+    - X: 0.8
+      Value: 0
+      Child: 10
+    - X: 1
+      Value: 50
+      Child: -1
+  - Name: 'Jaggedness[0.8]'
+    Axis: 1
+    Interpolation: 0
+    Points:
+    - X: 0
+      Value: 0
+      Child: 11
+    - X: 0.5
+      Value: 0
+      Child: -1
+  - Name: 'Jaggedness[0.8][0]'
+    Axis: 2
+    Interpolation: 0
+    Points:
+    - X: 0
+      Value: 0
+      Child: -1
+    - X: 1
+      Value: 40
+      Child: -1

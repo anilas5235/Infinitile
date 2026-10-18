@@ -6,6 +6,7 @@ using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Flora;
+using Engine.Scripts.WorldGen.Height;
 using Engine.Scripts.WorldGen.Noise;
 using Unity.Collections;
 using UnityEngine;
@@ -155,7 +156,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Tooltip("Active biomes (GEN-20). Indices in jobs are indices into this set.")]
         public BiomeSet Biomes;
 
-        [Tooltip("Terrain-first splines (TRN-05). Optional in Phase 0.")]
+        [Tooltip("Terrain-first splines (TRN-05); required when Architecture is TerrainFirst.")]
         public TerrainSplineSet Splines;
 
         /// <summary>Number of detail octaves K.</summary>
@@ -221,8 +222,21 @@ namespace Engine.Scripts.WorldGen.Settings{
                 throw new InvalidOperationException($"{name}: more than {DetailOctaves.MaxOctaves} detail octaves.");
             foreach ((string field, float value) in InvalidScales())
                 throw new InvalidOperationException($"{name}: {field} must be positive and finite, got {value}.");
+            // h = (H - Hmin)/(Hmax - Hmin) is a classification dimension (TRN-10, GEN-13): an empty range gives NaN.
+            if (!(HeightMin < HeightMax) || float.IsInfinity(HeightMin) || float.IsInfinity(HeightMax))
+                throw new InvalidOperationException($"{name}: HeightMin ({HeightMin}) must be finite and below HeightMax ({HeightMax}).");
 
             List<Biome> active = ActiveBiomes();
+
+            // TRN-21: the height stage does not exist in Terrain-first; a configured method is reported and ignored.
+            BlendMethod heightMethod = HeightMethod;
+            if (Architecture == GenArchitecture.TerrainFirst && heightMethod != BlendMethod.None){
+                Debug.LogWarning($"{name}: HeightMethod {heightMethod} is ignored in Terrain-first (TRN-21); the height is already continuous.", this);
+                heightMethod = BlendMethod.None;
+            }
+
+            if (Architecture == GenArchitecture.TerrainFirst && !Splines)
+                throw new InvalidOperationException($"{name}: Terrain-first needs a TerrainSplineSet (TRN-05).");
 
             WorldGenConfig cfg = new(){
                 Seed = (uint)seed,
@@ -230,7 +244,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 MaterialMethod = MaterialMethod,
                 MaterialBlendWidth = MaterialBlendWidth,
                 MaterialSigma = MaterialSigma,
-                HeightMethod = HeightMethod,
+                HeightMethod = heightMethod,
                 HeightBlendWidth = HeightBlendWidth,
                 HeightSigma = HeightSigma,
                 WarpAmplitude = WarpAmplitude,
@@ -253,8 +267,18 @@ namespace Engine.Scripts.WorldGen.Settings{
                 OctaveCoefficients = new NativeArray<float>(active.Count * octaveCount, allocator)
             };
 
-            // Biome.ToStruct throws on an unknown block name; free what was allocated above before rethrowing.
+            // Biome.ToStruct and TerrainSplineSet.Flatten throw on bad data; free what was allocated above before
+            // rethrowing.
             try{
+                if (Splines){
+                    Splines.Flatten(allocator, out cfg.SplineNodes, out cfg.SplinePoints,
+                        out cfg.OffsetSpline, out cfg.AmpSpline, out cfg.JaggednessSpline);
+                }
+                else{
+                    cfg.SplineNodes = new NativeArray<SplineNode>(0, allocator);
+                    cfg.SplinePoints = new NativeArray<SplinePoint>(0, allocator);
+                }
+
                 for (int i = 0; i < octaveCount; i++)
                     cfg.GlobalOctaveWeights[i] = GlobalOctaveWeights != null && i < GlobalOctaveWeights.Length
                         ? GlobalOctaveWeights[i]
@@ -361,9 +385,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["WeirdnessProfile"] = ProfileTree(weirdnessProfile),
                 ["EnableClimateOverrides"] = EnableClimateOverrides,
                 ["Biomes"] = BiomeSetTree(),
-                ["Splines"] = Splines
-                    ? new Dictionary<string, object>{ ["Name"] = Splines.name, ["Notes"] = Splines.Notes ?? "" }
-                    : null
+                ["Splines"] = Splines ? Splines.ToTree() : null
             };
             if (seed.HasValue) tree["Seed"] = seed.Value;
             return tree;

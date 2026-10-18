@@ -11,6 +11,7 @@ using NUnit.Framework;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace Engine.Tests.EditMode{
     /// <summary>INT-01…03, GEN-20…22: settings asset, canonical JSON, Burst mirror and biome set.</summary>
@@ -103,6 +104,77 @@ namespace Engine.Tests.EditMode{
             StringAssert.Contains("\"Seed\": 42", s.ToCanonicalJson(42));
         }
 
+        [Test]
+        public void ToCanonicalJson_InlinesTheSplineSet(){
+            WorldGenSettings s = Settings(Biome("Plains", 6f, new[]{ 1f }));
+            StringAssert.Contains("\"Splines\": null", s.ToCanonicalJson());
+
+            s.Splines = Create<TerrainSplineSet>("Splines");
+            s.Splines.ResetToPlaceholders();
+            string withSplines = s.ToCanonicalJson();
+            StringAssert.Contains("\"Offset\": {", withSplines, "nested spline tree is inlined");
+            StringAssert.Contains("\"Jaggedness\": {", withSplines);
+            StringAssert.Contains("\"Axis\": \"PV\"", withSplines);
+
+            s.Splines.Splines[s.Splines.OffsetRoot].Points[0].Value = 71f;
+            Assert.AreNotEqual(withSplines, s.ToCanonicalJson(), "a control point value takes part");
+        }
+
+        // --- TRN-05 / TRN-21 ------------------------------------------------------------------------------------------
+
+        [Test]
+        public void ToConfig_TerrainFirst_FlattensTheSplinesAndWarnsAboutAHeightMethod(){
+            WorldGenSettings s = Settings(Biome("Plains", 6f, new[]{ 1f }));
+            s.Architecture = GenArchitecture.TerrainFirst;
+            s.Splines = Create<TerrainSplineSet>("Splines");
+            s.Splines.ResetToPlaceholders();
+            s.HeightMethod = BlendMethod.DistanceBlend;
+
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("HeightMethod DistanceBlend is ignored in Terrain-first"));
+            WorldGenConfig cfg = s.ToConfig(1, allocator: Allocator.Temp);
+            try{
+                Assert.AreEqual(GenArchitecture.TerrainFirst, cfg.Architecture);
+                Assert.AreEqual(BlendMethod.None, cfg.HeightMethod, "TRN-21: the height stage is ignored");
+                Assert.AreEqual(BlendMethod.None, cfg.MaterialMethod);
+                Assert.AreEqual(12, cfg.SplineNodes.Length, "12 splines in the §19.1 placeholders");
+                Assert.AreEqual(0, cfg.OffsetSpline.NodeStart);
+                Assert.AreEqual(7, cfg.OffsetSpline.NodeCount);
+                Assert.AreEqual(7, cfg.AmpSpline.NodeStart);
+                Assert.AreEqual(2, cfg.AmpSpline.NodeCount);
+                Assert.AreEqual(9, cfg.JaggednessSpline.NodeStart);
+                Assert.AreEqual(3, cfg.JaggednessSpline.NodeCount);
+                for (int n = 0; n < cfg.SplineNodes.Length; n++)
+                for (int k = 0; k < cfg.SplineNodes[n].PointCount; k++){
+                    int child = cfg.SplinePoints[cfg.SplineNodes[n].PointStart + k].Child;
+                    if (child >= 0) Assert.Greater(child, n, "children follow their parent (pre-order)");
+                }
+            }
+            finally{
+                cfg.Dispose();
+            }
+        }
+
+        [Test]
+        public void ToConfig_TerrainFirst_WithoutSplinesThrows(){
+            WorldGenSettings s = Settings(Biome("Plains", 6f, new[]{ 1f }));
+            s.Architecture = GenArchitecture.TerrainFirst;
+            Assert.Throws<System.InvalidOperationException>(() => s.ToConfig(1, allocator: Allocator.Temp));
+        }
+
+        [Test]
+        public void ToConfig_BiomeFirst_IgnoresAnInvalidSplineSetOnlyWhenAbsent(){
+            // Biome-first does not need splines, but an assigned, broken set is still reported (R5: no silent repair).
+            WorldGenSettings s = Settings(Biome("Plains", 6f, new[]{ 1f }));
+            s.Architecture = GenArchitecture.BiomeFirst;
+            WorldGenConfig cfg = s.ToConfig(1, allocator: Allocator.Temp);
+            Assert.AreEqual(0, cfg.SplineNodes.Length);
+            Assert.AreEqual(0, cfg.OffsetSpline.NodeCount);
+            cfg.Dispose();
+
+            s.Splines = Create<TerrainSplineSet>("Broken");
+            Assert.Throws<System.InvalidOperationException>(() => s.ToConfig(1, allocator: Allocator.Temp));
+        }
+
         // --- GEN-20/21 ----------------------------------------------------------------------------------------------
 
         [Test]
@@ -163,6 +235,22 @@ namespace Engine.Tests.EditMode{
         public void ToConfig_ThrowsOnEmptyBiomeSlot(){
             WorldGenSettings s = Settings(Biome("Plains", 6f, new[]{ 1f }), null);
             Assert.Throws<System.InvalidOperationException>(() => s.ToConfig(1, allocator: Allocator.Temp));
+        }
+
+        [Test]
+        public void ToConfig_RejectsAnEmptyHeightRange(){
+            // TRN-10: h = (H - Hmin)/(Hmax - Hmin) would be NaN or infinite.
+            WorldGenSettings equal = Create<WorldGenSettings>("WG");
+            equal.HeightMin = equal.HeightMax = 120f;
+            WorldGenSettings inverted = Create<WorldGenSettings>("WG");
+            inverted.HeightMin = 250f;
+            inverted.HeightMax = 40f;
+            WorldGenSettings nan = Create<WorldGenSettings>("WG");
+            nan.HeightMax = float.NaN;
+
+            foreach (WorldGenSettings s in new[]{ equal, inverted, nan })
+                StringAssert.Contains("HeightMin",
+                    Assert.Throws<System.InvalidOperationException>(() => s.ToConfig(1, allocator: Allocator.Temp)).Message);
         }
 
         [Test]

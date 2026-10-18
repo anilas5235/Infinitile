@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a3025dd839ab71f45a64dc0bbf94576c, type: 3}
   m_Name: WorldGenSettings
   m_EditorClassIdentifier: 
-  Architecture: 2
+  Architecture: 0
   MaterialMethod: 0
   MaterialBlendWidth: 32
   MaterialSigma: 0.04
@@ -152,4 +152,4 @@ MonoBehaviour:
     octaves: 3
   EnableClimateOverrides: 1
   Biomes: {fileID: 11400000, guid: f0ebb416c9f7eb0ebd760b80683faf16, type: 2}
-  Splines: {fileID: 0}
+  Splines: {fileID: 11400000, guid: 0514b19bf2060874fa278a044246d671, type: 2}
