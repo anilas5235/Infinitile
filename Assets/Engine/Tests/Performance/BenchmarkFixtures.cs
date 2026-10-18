@@ -68,11 +68,20 @@ namespace Engine.Tests.Performance{
         ///     ScriptableObjects are returned so the caller can destroy them.
         /// </summary>
         internal static GeneratorConfig CreateTerrainFirstGeneratorConfig(Allocator allocator, List<Object> created){
+            return CreateSpecGeneratorConfig(GenArchitecture.TerrainFirst, allocator, created);
+        }
+
+        /// <summary>Same world as <see cref="CreateTerrainFirstGeneratorConfig" /> on the Biome-first sampler (Phase 2).</summary>
+        internal static GeneratorConfig CreateBiomeFirstGeneratorConfig(Allocator allocator, List<Object> created){
+            return CreateSpecGeneratorConfig(GenArchitecture.BiomeFirst, allocator, created);
+        }
+
+        private static GeneratorConfig CreateSpecGeneratorConfig(GenArchitecture architecture, Allocator allocator, List<Object> created){
             GeneratorConfig config = CreateGeneratorConfig(allocator);
             config.WorldGen.Dispose();
 
             WorldGenSettings settings = Create<WorldGenSettings>("WG", created);
-            settings.Architecture = GenArchitecture.TerrainFirst;
+            settings.Architecture = architecture;
             settings.Splines = Create<TerrainSplineSet>("Splines", created);
             settings.Splines.ResetToPlaceholders();
             BiomeSet set = Create<BiomeSet>("Set", created);

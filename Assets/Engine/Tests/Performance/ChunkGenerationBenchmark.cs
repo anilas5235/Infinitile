@@ -11,8 +11,8 @@ using Unity.PerformanceTesting;
 namespace Engine.Tests.Performance{
     /// <summary>
     ///     PERF-02: chunk data generation, ms per chunk on a single worker (ChunkJob.Run). One sample group per
-    ///     architecture: the legacy noise terrain and the Terrain-first sampler (Phase 1); Biome-first follows with
-    ///     Phase 2. Both write the chunk through the same RLE path.
+    ///     architecture: the legacy noise terrain, the Terrain-first sampler (Phase 1) and the Biome-first sampler
+    ///     (Phase 2). All write the chunk through the same RLE path.
     /// </summary>
     [TestFixture]
     internal class ChunkGenerationBenchmark{
@@ -75,6 +75,27 @@ namespace Engine.Tests.Performance{
 
             Measure.Method(() => job.Run(_jobs.Length))
                 .SampleGroup(new SampleGroup("ChunkJob.Run TerrainFirst ms/chunk", SampleUnit.Millisecond))
+                .WarmupCount(WarmupCount)
+                .MeasurementCount(MeasurementCount)
+                .IterationsPerMeasurement(1)
+                .CleanUp(DisposeResults)
+                .Run();
+        }
+
+        [Test]
+        [Performance]
+        public void ChunkJob_Run_BiomeFirst_MsPerChunk(){
+            BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
+            _config = BenchmarkFixtures.CreateBiomeFirstGeneratorConfig(Allocator.Persistent, _created);
+            ChunkJob job = new(){
+                Jobs = _jobs,
+                Results = _results.AsParallelWriter(),
+                RandomSeed = _config.GlobalSeed,
+                Config = _config
+            };
+
+            Measure.Method(() => job.Run(_jobs.Length))
+                .SampleGroup(new SampleGroup("ChunkJob.Run BiomeFirst ms/chunk", SampleUnit.Millisecond))
                 .WarmupCount(WarmupCount)
                 .MeasurementCount(MeasurementCount)
                 .IterationsPerMeasurement(1)
