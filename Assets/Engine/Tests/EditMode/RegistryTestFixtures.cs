@@ -91,6 +91,14 @@ namespace Engine.Tests.EditMode{
             return biome;
         }
 
+        public VoxelStructure CreateStructure(string name, Voxel voxel){
+            VoxelStructure structure = ScriptableObject.CreateInstance<VoxelStructure>();
+            structure.name = name;
+            structure.parts = new[]{ new StructurePart{ voxel = voxel, placements = new VoxelPlacement[1] } };
+            _created.Add(structure);
+            return structure;
+        }
+
         /// <summary>A small, finalised voxel registry: std:air (0), std:Grass (1), std:Dirt (2), std:Stone (3).</summary>
         public VoxelRegistry CreateStandardVoxelRegistry(out VoxelDataPackage package, out Voxel[] voxels){
             package = CreatePackage(Prefix);

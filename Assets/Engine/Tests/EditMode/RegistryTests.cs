@@ -184,9 +184,9 @@ namespace Engine.Tests.EditMode{
         #region TST-E09 BiomeRegistry (D-04)
 
         [Test]
-        public void BiomeRegistry_FailingBiome_DoesNotShiftIndicesOrYieldAirBiome(){
+        public void BiomeRegistry_FailingBiome_FailsFinalizationWithoutAnArray(){
             // D-04: a biome whose conversion fails must neither shift the biomes after it nor leave a
-            // zero-initialised (air-filled) BiomeDef in the array.
+            // zero-initialised (air-filled) BiomeDef in the array. The fix rejects the whole registry.
             VoxelRegistry voxels = StandardVoxels(out Voxel[] v);
             BiomeRegistry registry = new();
             _disposables.Add(registry);
@@ -198,31 +198,24 @@ namespace Engine.Tests.EditMode{
             registry.Register(RegistryTestFixtures.Prefix, broken);
             registry.Register(RegistryTestFixtures.Prefix, hills);
 
-            LogAssert.ignoreFailingMessages = true;
-            try{
-                registry.FinalizeRegistry(voxels);
-            }
-            catch (InvalidOperationException){
-                Assert.Pass("the registry rejected the broken biome at finalisation");
-            }
-            finally{
-                LogAssert.ignoreFailingMessages = false;
-            }
+            Assert.Throws<InvalidOperationException>(() => registry.FinalizeRegistry(voxels),
+                "the registry must reject the broken biome at finalisation");
+            Assert.IsFalse(registry.BiomeArray.IsCreated, "no partially filled (air) biome array is published");
+        }
 
-            ushort air = voxels.GetIdOrThrow("std:air");
-            for (int i = 0; i < registry.BiomeArray.Length; i++){
-                Biome.BiomeDef def = registry.BiomeArray[i];
-                Assert.AreNotEqual(air, def.topBlock, $"BiomeArray[{i}] has an air top block");
-                Assert.AreNotEqual(air, def.underBlock, $"BiomeArray[{i}] has an air under block");
-                Assert.AreNotEqual(air, def.stoneBlock, $"BiomeArray[{i}] has an air stone block");
-            }
+        [Test]
+        public void VoxelStructureRegistry_FailingStructure_FailsFinalizationWithoutAnArray(){
+            // D-04 pattern: skipping a structure left a default def at its id, whose uncreated placement map made
+            // the registry's Dispose throw (and leak every later structure).
+            VoxelRegistry voxels = StandardVoxels(out Voxel[] v);
+            VoxelStructureRegistry registry = new();
+            _disposables.Add(registry);
+            registry.Initialize();
+            registry.Register(RegistryTestFixtures.Prefix, _fixtures.CreateStructure("Good", v[0]));
+            registry.Register(RegistryTestFixtures.Prefix, _fixtures.CreateStructure("Broken", null));
 
-            Assert.IsTrue(registry.TryGetId("std:Hills", out ushort hillsId));
-            Assert.Less(hillsId, registry.BiomeArray.Length);
-            Assert.AreEqual(voxels.GetIdOrThrow("std:Stone"), registry.BiomeArray[hillsId].topBlock,
-                "BiomeArray[id of Hills] must be the Hills definition");
-            Assert.IsTrue(registry.TryGetId("std:Plains", out ushort plainsId));
-            Assert.AreEqual(voxels.GetIdOrThrow("std:Grass"), registry.BiomeArray[plainsId].topBlock);
+            Assert.Throws<InvalidOperationException>(() => registry.FinalizeRegistry(voxels));
+            Assert.IsFalse(registry.StructureArray.IsCreated, "no partially filled structure array is published");
         }
 
         #endregion

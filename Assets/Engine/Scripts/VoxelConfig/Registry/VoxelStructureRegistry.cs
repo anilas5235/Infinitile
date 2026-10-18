@@ -21,6 +21,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             }
 
             VoxelStructure.VoxelStructureDef[] tempArray = new VoxelStructure.VoxelStructureDef[NameRegistry.Count];
+            bool[] converted = new bool[tempArray.Length];
             foreach (KeyValuePair<ushort, VoxelStructure> kvp in SoRegistry.GetAllEntries()){
                 VoxelEngineLogger.Info<VoxelStructureRegistry>($"copy structure {kvp.Value.name} to Structure array");
                 VoxelStructure.VoxelStructureDef def;
@@ -28,18 +29,23 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                     def = kvp.Value.ToStruct(voxelRegistry);
                 }
                 catch (Exception e){
-                    VoxelEngineLogger.Error<VoxelStructureRegistry>(
-                        $"Failed to convert structure {kvp.Value.name} to struct: {e.Message}. Skipping this structure.");
-                    continue;
+                    // D-04: a skipped structure left a default def (uncreated placement map) at its id, which made
+                    // Dispose throw. A broken structure is a configuration error that fails the registry instead.
+                    for (int i = 0; i < tempArray.Length; i++)
+                        if (converted[i]) tempArray[i].Dispose();
+                    throw new InvalidOperationException(
+                        $"Failed to convert structure {kvp.Value.name} to struct: {e.Message}", e);
                 }
 
                 tempArray[kvp.Key] = def; // F-22: place by id, not by enumeration order
+                converted[kvp.Key] = true;
             }
 
             StructureArray = new NativeArray<VoxelStructure.VoxelStructureDef>(tempArray, Allocator.Domain);
         }
 
         public override void Dispose(){
+            if (!StructureArray.IsCreated) return; // D-04: FinalizeRegistry may have thrown before creating the array
             foreach (VoxelStructure.VoxelStructureDef def in StructureArray) def.Dispose();
             StructureArray.Dispose();
         }
