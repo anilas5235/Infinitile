@@ -1,5 +1,7 @@
-﻿using Engine.Scripts.Utils.Extensions;
+using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.VoxelConfig.Data.Generation;
+using Engine.Scripts.WorldGen.Core;
+using Engine.Scripts.WorldGen.Settings;
 using Unity.Collections;
 using Unity.Mathematics;
 using static Engine.Scripts.Jobs.Chunk.NoiseCalculator;
@@ -15,14 +17,20 @@ namespace Engine.Scripts.Jobs.Chunk{
 
         /// <summary>
         ///     Computes climate values, terrain height and biome information for every column of a chunk.
+        ///     With a spec architecture (Terrain-first or Biome-first, INT-10) every column comes from
+        ///     <see cref="WorldSampler.SampleColumn" />; otherwise the legacy noise generator runs (INT-40).
         /// </summary>
-        /// <param name="noiseProfile">Noise profile used to sample base terrain height.</param>
         /// <param name="randomSeed">Random seed used to offset noise sampling for deterministic variation.</param>
-        /// <param name="config">Generator configuration providing water level and voxel IDs.</param>
+        /// <param name="config">Generator configuration providing water level, voxel IDs and the spec config.</param>
         /// <param name="chunkWordPos">World-space origin (in voxels) of the chunk.</param>
         /// <param name="chunkColumns">Output array that will receive per-column height, biome and climate data.</param>
         public static void PrepareChunkMaps(int randomSeed, ref GeneratorConfig config, ref int3 chunkWordPos,
             NativeArray<ChunkColumn> chunkColumns){
+            if (UsesSpecSampler(ref config)){
+                PrepareChunkMapsSpec(ref config, ref chunkWordPos, chunkColumns);
+                return;
+            }
+
             for (int x = 0; x < ChunkWidth; x++)
             for (int z = 0; z < ChunkDepth; z++){
                 int i = GetColumnIdx(x, z, ChunkDepth);
@@ -37,13 +45,57 @@ namespace Engine.Scripts.Jobs.Chunk{
                 BiomeCalculator.BiomSectionInput input = worldNoise.BiomSectionInput();
                 ChunkColumn col = new(){
                     Height = height,
+                    HeightF = height,
                     Biome = BiomeCalculator.SelectBiome(ref input, ref config),
                     Temperature = worldNoise.Temperature,
-                    Humidity = worldNoise.Humidity
+                    Humidity = worldNoise.Humidity,
+                    FloraSource = -1
                 };
+                col.SurfaceSource = col.Biome;
                 uint seed = (uint)((chunkWordPos.x + x) ^ (chunkWordPos.z + z) ^ randomSeed ^ 0x85ebca6b);
                 Random rng = new(seed == 0 ? 1u : seed);
                 SelectSurfaceMaterials(ref config, ref col, ref rng);
+                chunkColumns[i] = col;
+            }
+        }
+
+        /// <summary>
+        ///     INT-40: the spec sampler runs when a constructed <see cref="WorldGenConfig" /> selects a spec
+        ///     architecture; <see cref="GenArchitecture.Legacy" /> (and the empty config) keeps the old generator.
+        /// </summary>
+        private static bool UsesSpecSampler(ref GeneratorConfig config){
+            return config.WorldGen.IsCreated && config.WorldGen.Architecture != GenArchitecture.Legacy;
+        }
+
+        /// <summary>
+        ///     INT-10/11: one <see cref="WorldSampler.SampleColumn" /> call per column, independent of the chunk
+        ///     origin, so neighbouring chunks agree on every border column (TST-03). The blocks come from the
+        ///     surface-source biome (§9.6); a column without an active biome (-1) gets air.
+        /// </summary>
+        private static void PrepareChunkMapsSpec(ref GeneratorConfig config, ref int3 chunkWordPos,
+            NativeArray<ChunkColumn> chunkColumns){
+            for (int x = 0; x < ChunkWidth; x++)
+            for (int z = 0; z < ChunkDepth; z++){
+                int i = GetColumnIdx(x, z, ChunkDepth);
+                WorldSampler.SampleColumn(chunkWordPos.x + x, chunkWordPos.z + z, config.WorldGen, out ColumnSample s);
+
+                ChunkColumn col = new(){
+                    Height = math.clamp(s.ColumnHeight, 0, MaxTerrainHeight),
+                    HeightF = s.Height,
+                    Biome = (ushort)math.max(0, s.HardBiome),
+                    Temperature = s.Fields.T,
+                    Humidity = s.Fields.F,
+                    SurfaceSource = s.SurfaceSource,
+                    FloraSpecies = s.FloraSpecies,
+                    FloraSource = s.FloraSource
+                };
+                if (s.SurfaceSource >= 0 && s.SurfaceSource < config.WorldGen.BiomeCount){
+                    Biome.BiomeDef def = config.WorldGen.Biomes[s.SurfaceSource];
+                    col.TopBlock = def.topBlock;
+                    col.UnderBlock = def.underBlock;
+                    col.StoneBlock = def.stoneBlock;
+                }
+
                 chunkColumns[i] = col;
             }
         }
@@ -62,6 +114,8 @@ namespace Engine.Scripts.Jobs.Chunk{
             ushort waterBlock = config.Voxels["std:Water"].Id;
             ushort ice = config.Voxels["std:Ice"].Id;
             int waterLevel = config.WaterLevel;
+            // GEN-14: the ice override is a climate override; the spec config can switch it off (legacy: always on).
+            bool iceOverride = !config.WorldGen.IsCreated || config.WorldGen.EnableClimateOverrides;
 
             for (int x = 0; x < ChunkWidth; x++)
             for (int z = 0; z < ChunkDepth; z++){
@@ -84,7 +138,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                     else v = y < waterLevel ? waterBlock : air;
 
                     // F-07: the water surface is the topmost water voxel at waterLevel - 1 (y == waterLevel is air).
-                    if (y == waterLevel - 1 && v == waterBlock && col.Temperature < .2f) v = ice;
+                    if (iceOverride && y == waterLevel - 1 && v == waterBlock && col.Temperature < .2f) v = ice;
 
                     vox[ChunkSize.Flatten(x, y, z)] = v;
                 }
