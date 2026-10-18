@@ -25,7 +25,8 @@ MonoBehaviour:
     foliageMaterial: {fileID: 2100000, guid: daf19eb8c4aeb474ebe2bb4b7e1f87a6, type: 2}
     pointBuilder: {fileID: 7200000, guid: b253108f447042e389630ea3cd8affd1, type: 3}
     copyPoints: {fileID: 7200000, guid: d6821e19a578d8a468410694549d56e8, type: 3}
-    rebuildBuffers: {fileID: 7200000, guid: 2cded031692db1345b8b6cceb7abce13, type: 3}
+    pageCulling: {fileID: 7200000, guid: 7c3e1a9f5b2d4e8a9f0c6d1b2a3e4f50, type: 3}
+    gpuCulling: 1
     shadows: 0
   Scheduler:
     chunkGenBatchSize: 8

@@ -22,12 +22,4 @@ struct PartitionMetadata
     float3 boundsMax; // AABB max
 };
 
-struct ChunkMetadata
-{
-    int2 chunkPos; // World chunk XZ coordinates
-    float3 boundsMin; // AABB min for coarse culling
-    float3 boundsMax; // AABB max
-    uint partitionMask; // Bitmask: which of 8 partitions are active (bit Y)
-};
-
 #endif

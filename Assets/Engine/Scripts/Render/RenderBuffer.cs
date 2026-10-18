@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using Engine.Scripts.Settings;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
@@ -11,18 +10,14 @@ using static UnityEngine.GraphicsBuffer;
 namespace Engine.Scripts.Render{
     /// <summary>
     ///     Manages a single render buffer for storing and rendering voxel point data.
-    ///     Page bookkeeping lives in <see cref="PageAllocator" /> (TST-E17); this class owns the GPU side.
+    ///     Page bookkeeping lives in <see cref="PageAllocator" /> (TST-E17); this class owns the GPU side: the point
+    ///     buffer plus the per-page count and bounds buffers the culling kernel reads (CUL-01). The visible page lists
+    ///     and indirect args are per camera and live in <see cref="CameraCullState" /> (CUL-04).
     /// </summary>
     internal class RenderBuffer : IDisposable{
-        private static readonly uint[] DefaultArgs = { 0u, 1u, 0u, 0u, 0u };
-        private readonly GraphicsBuffer _argsBuffer;
-        private readonly GraphicsBuffer _countsPerPageBuffer;
-        private readonly GraphicsBuffer _indexBuffer;
+        /// <summary>Points are already in world space, so the draw bounds only have to be large enough to never cull.</summary>
+        private static readonly Bounds DrawBounds = new(Vector3.zero, Vector3.one * 100000);
 
-        private readonly RenderBufferManager _manager;
-        private readonly MaterialPropertyBlock _propertyBlock;
-
-        private readonly RendererSettings _renderSettings;
         private readonly PageAllocator _pages;
         private bool _shouldDraw;
 
@@ -31,33 +26,30 @@ namespace Engine.Scripts.Render{
         /// <summary>
         ///     Initializes a new instance of the RenderBuffer class.
         /// </summary>
-        /// <param name="manager">The parent RenderBufferManager.</param>
         /// <param name="bufferIndex">The index of this buffer.</param>
-        /// <param name="renderSettings">The renderer settings.</param>
-        public RenderBuffer(RenderBufferManager manager, int bufferIndex, RendererSettings renderSettings){
-            _manager = manager;
-            _renderSettings = renderSettings;
+        public RenderBuffer(int bufferIndex){
             BufferIndex = bufferIndex;
-            PointBuffer = new GraphicsBuffer(Target.Structured, RenderBufferSize,
-                Marshal.SizeOf<Vertex>());
-            _argsBuffer = new GraphicsBuffer(Target.IndirectArguments, 5, sizeof(uint));
-            _argsBuffer.SetData(DefaultArgs);
-            _indexBuffer = new GraphicsBuffer(Target.Append, RenderBufferSize,
-                Marshal.SizeOf<uint>());
+            PointBuffer = new GraphicsBuffer(Target.Structured, RenderBufferSize, Marshal.SizeOf<Vertex>());
 
             _pages = new PageAllocator(Allocator.Domain);
 
-            _countsPerPageBuffer = new GraphicsBuffer(Target.Structured, PagesPerBuffer, sizeof(uint));
-
-            _propertyBlock = new MaterialPropertyBlock();
-            _propertyBlock.SetBuffer(PointDataNameID, PointBuffer);
-            _propertyBlock.SetBuffer(IndexBufferNameID, _indexBuffer);
+            CountsPerPageBuffer = new GraphicsBuffer(Target.Structured, PagesPerBuffer, sizeof(uint));
+            PageBoundsBuffer = new GraphicsBuffer(Target.Structured, PagesPerBuffer, Marshal.SizeOf<PageBounds>());
         }
 
         /// <summary>
         ///     Gets the GPU buffer containing vertex/point data.
         /// </summary>
         public GraphicsBuffer PointBuffer{ get; }
+
+        /// <summary>Points per page on the GPU (0 = free page); read by the culling kernel and the vertex shader.</summary>
+        internal GraphicsBuffer CountsPerPageBuffer{ get; }
+
+        /// <summary>CUL-01: world-space AABB per page on the GPU; read by the culling kernel.</summary>
+        internal GraphicsBuffer PageBoundsBuffer{ get; }
+
+        /// <summary>CPU-side page state (counts and bounds), the reference for the GPU copies.</summary>
+        internal PageAllocator Pages => _pages;
 
         /// <summary>
         ///     Gets the number of free pages available in this buffer.
@@ -69,14 +61,16 @@ namespace Engine.Scripts.Render{
         /// </summary>
         public int BufferIndex{ get; }
 
+        /// <summary>True while the buffer holds at least one allocated page.</summary>
+        internal bool ShouldDraw => _shouldDraw;
+
         /// <summary>
         ///     Releases all GPU resources held by this buffer.
         /// </summary>
         public void Dispose(){
             PointBuffer?.Dispose();
-            _argsBuffer?.Dispose();
-            _indexBuffer?.Dispose();
-            _countsPerPageBuffer?.Dispose();
+            CountsPerPageBuffer?.Dispose();
+            PageBoundsBuffer?.Dispose();
             _pages.Dispose();
         }
 
@@ -85,10 +79,11 @@ namespace Engine.Scripts.Render{
         /// </summary>
         /// <param name="pointCount">The total number of points to allocate space for.</param>
         /// <param name="numPages">The number of pages to allocate.</param>
+        /// <param name="bounds">CUL-01: bounds of the partition the points belong to.</param>
         /// <param name="allocation">The allocation info if successful, default otherwise.</param>
         /// <returns>True if allocation was successful, false if not enough free pages.</returns>
-        public bool TryAllocPages(int pointCount, int numPages, out AllocInfo allocation){
-            if (!_pages.TryAllocPages(pointCount, numPages, BufferIndex, out allocation)) return false;
+        public bool TryAllocPages(int pointCount, int numPages, in PageBounds bounds, out AllocInfo allocation){
+            if (!_pages.TryAllocPages(pointCount, numPages, BufferIndex, bounds, out allocation)) return false;
 
             _stateBufferDirty = true;
             if (!_shouldDraw) _shouldDraw = true;
@@ -109,49 +104,60 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     Draws this buffer's content using indirect rendering.
+        ///     Culls this buffer's pages for <paramref name="cam" /> and draws the visible ones with indirect
+        ///     rendering (CUL-02). With shadows on, a second list of pages whose extruded bounds reach the frustum is
+        ///     drawn as shadow casters only (CUL-05).
         /// </summary>
         /// <param name="mat">The material to use for rendering.</param>
         /// <param name="cam">The camera to render with.</param>
-        public void Draw(Material mat, Camera cam){
+        /// <param name="culler">The culler that dispatches the kernels.</param>
+        /// <param name="state">The camera's culling state (planes and per-buffer lists).</param>
+        /// <param name="parameters">Culling switches and the shadow extrusion for this frame.</param>
+        public void Draw(Material mat, Camera cam, GpuCuller culler, CameraCullState state,
+            in CullingParameters parameters){
             if (!_shouldDraw) return;
-            Graphics.DrawProceduralIndirect(
-                mat,
-                new Bounds(Vector3.zero, Vector3.one * 100000),
-                MeshTopology.Triangles,
-                _argsBuffer,
-                0,
-                cam,
-                _propertyBlock,
-                _renderSettings.shadows,
-                _renderSettings.shadows != ShadowCastingMode.Off
-            );
+
+            BufferCullLists lists = state.GetLists(this);
+
+            culler.Cull(this, lists.Main, state.Planes, float3.zero, parameters.CullingEnabled);
+            Graphics.DrawProceduralIndirect(mat, DrawBounds, MeshTopology.Triangles, lists.Main.Args, 0, cam,
+                lists.Main.PropertyBlock, ShadowCastingMode.Off, false);
+
+            if (!parameters.Shadows) return;
+            culler.Cull(this, lists.Shadow, state.Planes, parameters.ShadowExtrusion, parameters.CullingEnabled);
+            Graphics.DrawProceduralIndirect(mat, DrawBounds, MeshTopology.Triangles, lists.Shadow.Args, 0, cam,
+                lists.Shadow.PropertyBlock, ShadowCastingMode.ShadowsOnly, true);
         }
 
         /// <summary>
-        ///     Rebuilds the index buffer and arguments buffer if the state has changed.
+        ///     Uploads the page counts and bounds to the GPU if the page state has changed. The visible page lists
+        ///     are rebuilt per camera and frame by the culling kernel, so nothing else is derived here (CUL-03).
         /// </summary>
         public void RebuildBuffers(){
             if (!_stateBufferDirty) return;
 
-            _countsPerPageBuffer.SetData(_pages.CountsPerPage);
-            _indexBuffer.SetCounterValue(0);
-
-            ComputeShader rebuild = _manager.RebuildBufferShader;
-            int kernel = _manager.RebuildKernel;
-
-            int groupX = (int)math.ceil(PagesPerBuffer / 128f);
-
-            rebuild.SetBuffer(kernel, IndexBufferNameID, _indexBuffer);
-            rebuild.SetBuffer(kernel, ArgsBufferNameID, _argsBuffer);
-            rebuild.SetBuffer(kernel, CountsPerPageNameID, _countsPerPageBuffer);
-
-            rebuild.SetInt(TotalPointCountNameID, (int)_pages.TotalValidPoints);
-            rebuild.SetInt(PointsPerPageNameID, PointsPerPage);
-            rebuild.SetInt(PagesPerBufferNameID, PagesPerBuffer);
-            rebuild.Dispatch(kernel, groupX, 1, 1);
+            CountsPerPageBuffer.SetData(_pages.CountsPerPage);
+            PageBoundsBuffer.SetData(_pages.BoundsPerPage);
 
             _stateBufferDirty = false;
+        }
+    }
+
+    /// <summary>Per-frame culling switches handed from <see cref="VoxelWorldRenderer" /> to every buffer draw.</summary>
+    internal readonly struct CullingParameters{
+        /// <summary>CUL-06: false draws every page with points.</summary>
+        public readonly bool CullingEnabled;
+
+        /// <summary>CUL-05: true adds the shadow-caster draw with the extruded list.</summary>
+        public readonly bool Shadows;
+
+        /// <summary>CUL-05: main light direction times shadow distance.</summary>
+        public readonly float3 ShadowExtrusion;
+
+        public CullingParameters(bool cullingEnabled, bool shadows, float3 shadowExtrusion){
+            CullingEnabled = cullingEnabled;
+            Shadows = shadows;
+            ShadowExtrusion = shadowExtrusion;
         }
     }
 }

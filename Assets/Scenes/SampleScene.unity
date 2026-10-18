@@ -1085,6 +1085,7 @@ GameObject:
   - component: {fileID: 1592505029}
   - component: {fileID: 1592505030}
   - component: {fileID: 1592505031}
+  - component: {fileID: 1592505032}
   m_Layer: 0
   m_Name: World
   m_TagString: Untagged
@@ -1135,6 +1136,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Runtime.Engine.Render.VoxelWorldRenderer
   world: {fileID: 1592505030}
+--- !u!114 &1592505032
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1592505027}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cdb6e2abf61c2be46af19860b4ede215, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UI.CullingDebugKeys
+  overlayKey: 100
+  cullingKey: 101
+  freezeKey: 102
 --- !u!1 &1610362568
 GameObject:
   m_ObjectHideFlags: 0

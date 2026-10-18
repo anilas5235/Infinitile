@@ -2,14 +2,12 @@ using System;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Engine.Scripts.Render;
-using Engine.Scripts.Settings;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Mathematics;
-using UnityEditor;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
 using Object = UnityEngine.Object;
@@ -20,8 +18,6 @@ namespace Engine.Tests.EditMode{
     ///     and AllocInfo.ToIndexAndCount.
     /// </summary>
     public class RenderDataTests{
-        private const string RebuildShaderPath = "Assets/Engine/Shaders/Urp/ComputeShaders/ReBuildBuffers.compute";
-
         private PageAllocator _pages;
         private RenderBufferManager _bufferManager;
         private Material _material;
@@ -97,7 +93,7 @@ namespace Engine.Tests.EditMode{
         public void PageAllocator_AllocatesCeilOfPointsOverPageSize(int points, int expectedPages, int lastPageCount){
             int numPages = (int)math.ceil(points / (float)PointsPerPage);
             Assert.AreEqual(expectedPages, numPages);
-            Assert.IsTrue(_pages.TryAllocPages(points, numPages, 3, out AllocInfo info));
+            Assert.IsTrue(_pages.TryAllocPages(points, numPages, 3, default, out AllocInfo info));
             Assert.AreEqual(3, info.BufferIndex);
             Assert.AreEqual(expectedPages, info.Count);
             Assert.AreEqual(PagesPerBuffer - expectedPages, _pages.FreePages);
@@ -112,7 +108,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void PageAllocator_ReleaseReturnsAllPages_AndDoubleReleaseIsNoOp(){
-            Assert.IsTrue(_pages.TryAllocPages(700, 3, 0, out AllocInfo info));
+            Assert.IsTrue(_pages.TryAllocPages(700, 3, 0, default, out AllocInfo info));
             Assert.IsFalse(_pages.IsEmpty);
 
             _pages.Release(info);
@@ -127,17 +123,17 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void PageAllocator_FailsWhenNotEnoughFreePages(){
-            Assert.IsTrue(_pages.TryAllocPages(PagesPerBuffer * PointsPerPage, PagesPerBuffer, 0, out AllocInfo all));
+            Assert.IsTrue(_pages.TryAllocPages(PagesPerBuffer * PointsPerPage, PagesPerBuffer, 0, default, out AllocInfo all));
             Assert.AreEqual(0, _pages.FreePages);
-            Assert.IsFalse(_pages.TryAllocPages(1, 1, 0, out AllocInfo none));
+            Assert.IsFalse(_pages.TryAllocPages(1, 1, 0, default, out AllocInfo none));
             Assert.IsTrue(none.IsEmpty);
             _pages.Release(all);
-            Assert.IsFalse(_pages.TryAllocPages(1, PagesPerBuffer + 1, 0, out _));
+            Assert.IsFalse(_pages.TryAllocPages(1, PagesPerBuffer + 1, 0, default, out _));
         }
 
         [Test]
         public void PageAllocator_ZeroPages_Throws(){
-            Assert.Throws<ArgumentOutOfRangeException>(() => _pages.TryAllocPages(1, 0, 0, out _));
+            Assert.Throws<ArgumentOutOfRangeException>(() => _pages.TryAllocPages(1, 0, 0, default, out _));
         }
 
         [Test]
@@ -146,16 +142,41 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(PagesPerBuffer, _pages.FreePages);
         }
 
+        [Test]
+        public void PageAllocator_StoresPartitionBoundsPerPage_AndClearsThemOnRelease(){
+            // CUL-01: every page carries the AABB of its partition; a released page holds an empty box again.
+            PageBounds bounds = PageBounds.FromPartition(new int3(2, 3, -1));
+            Assert.AreEqual(new float3(64f, 96f, -32f), bounds.Min);
+            Assert.AreEqual(new float3(96f, 128f, 0f), bounds.Max);
+
+            Assert.IsTrue(_pages.TryAllocPages(700, 3, 0, bounds, out AllocInfo info));
+            foreach (int index in info.GetPageIndices()){
+                PageBounds stored = _pages.GetPageBounds(index);
+                Assert.AreEqual(bounds.Min, stored.Min, $"page {index} min");
+                Assert.AreEqual(bounds.Max, stored.Max, $"page {index} max");
+            }
+
+            _pages.Release(info);
+            foreach (int index in info.GetPageIndices()){
+                PageBounds stored = _pages.GetPageBounds(index);
+                Assert.AreEqual(float3.zero, stored.Min, $"page {index} min after release");
+                Assert.AreEqual(float3.zero, stored.Max, $"page {index} max after release");
+            }
+        }
+
+        [Test]
+        public void PageBounds_Is24Bytes(){
+            Assert.AreEqual(24, Marshal.SizeOf<PageBounds>(), "must match the PageBounds struct in PageCulling.compute");
+        }
+
         #endregion
 
         #region RenderBufferManager
 
         private void CreateBufferManager(){
             if (!SystemInfo.supportsComputeShaders) Assert.Ignore("compute shaders not supported on this device");
-            ComputeShader rebuild = AssetDatabase.LoadAssetAtPath<ComputeShader>(RebuildShaderPath);
-            Assert.IsNotNull(rebuild, RebuildShaderPath);
             _material = new Material(Shader.Find("Hidden/InternalErrorShader")){ name = "RenderDataTests" };
-            _bufferManager = new RenderBufferManager(_material, rebuild, new RendererSettings());
+            _bufferManager = new RenderBufferManager(_material);
         }
 
         [Test]

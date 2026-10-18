@@ -3,8 +3,8 @@ using Unity.Profiling;
 namespace Engine.Scripts.Utils{
     /// <summary>
     ///     PERF-01: one <see cref="ProfilerMarker" /> per pipeline stage. All names start with "Voxel." so the
-    ///     stages can be filtered in the Profiler. Stages that do not exist yet (light, culling) are added
-    ///     together with their phase.
+    ///     stages can be filtered in the Profiler. Stages that do not exist yet (light) are added together with
+    ///     their phase.
     /// </summary>
     internal static class VoxelProfilerMarkers{
         // Scheduler ticks (VoxelEngineScheduler round robin)
@@ -29,6 +29,7 @@ namespace Engine.Scripts.Utils{
         internal static readonly ProfilerMarker PointBuildDispatch = new("Voxel.PointBuild.Dispatch");
         internal static readonly ProfilerMarker PointBuildCopy = new("Voxel.PointBuild.Copy");
         internal static readonly ProfilerMarker RenderRebuildBuffers = new("Voxel.Render.RebuildBuffers");
+        internal static readonly ProfilerMarker RenderCulling = new("Voxel.Render.Culling"); // Phase C (CUL-02)
         internal static readonly ProfilerMarker RenderDraw = new("Voxel.Render.Draw");
     }
 }

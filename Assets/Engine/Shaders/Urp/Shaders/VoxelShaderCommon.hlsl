@@ -25,19 +25,38 @@ struct VoxelVertexData
 // Vertex helpers
 // ─────────────────────────────────────────────────────────────────────────────
 StructuredBuffer<PointData> _PointData;
-StructuredBuffer<uint> _IndexBuffer;
+// Phase C (CUL-03): points are pulled through the per-camera visible page list instead of a per-point index buffer.
+// Both buffers belong to the RenderBuffer being drawn; _VisiblePages is written by PageCulling.compute per frame.
+StructuredBuffer<uint> _VisiblePages;
+StructuredBuffer<uint> _CountsPerPage;
+
+// Must match Engine.Scripts.Utils.VoxelRenderConstants.PointsPerPage
+#define POINTS_PER_PAGE 256u
 
 VoxelVertexData fetch_vertex_data(uint vertexID)
 {
-    // Calculate point and corner indices
-    uint pointID = vertexID / 6;
-    uint index = _IndexBuffer[pointID];
+    // Slot = one point of one visible page; the indirect vertex count is visiblePages * POINTS_PER_PAGE * 6
+    uint slot = vertexID / 6;
+    uint page = _VisiblePages[slot / POINTS_PER_PAGE];
+    uint inPage = slot % POINTS_PER_PAGE;
     uint cornerID = vertexID % 6;
+
+    VoxelVertexData v;
+    if (inPage >= _CountsPerPage[page])
+    {
+        // Unused slot of a partly filled page: all six corners at the same position give a zero-area triangle
+        // that the rasteriser drops (CUL-03).
+        v.positionOS = 0;
+        v.uv = 0;
+        v.packed = 0;
+        return v;
+    }
+
+    uint index = page * POINTS_PER_PAGE + inPage;
 
     // Fetch point data directly
     PointData p = _PointData[index];
 
-    VoxelVertexData v;
     v.positionOS = p.position;
     v.packed = p.packed;
 
