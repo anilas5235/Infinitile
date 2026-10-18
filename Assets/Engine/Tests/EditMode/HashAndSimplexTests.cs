@@ -159,64 +159,12 @@ namespace Engine.Tests.EditMode{
         public void Simplex_HasNoSecondaryAutocorrelationPeak(float wavelength){
             // TST-13: 16k blocks along x, z and both diagonals. Beyond one wavelength the autocorrelation must stay
             // below 0.2 (a permutation-table noise shows a peak near 1 at its period, e.g. 289 noise units).
-            foreach (float2 direction in new[]{
-                         new float2(1f, 0f), new float2(0f, 1f),
-                         math.normalize(new float2(1f, 1f)), math.normalize(new float2(1f, -1f))
-                     }){
-                float peak = MaxAutocorrelationBeyondWavelength(direction, wavelength, out int peakLag);
+            foreach (float2 direction in NoiseStatistics.Directions){
+                float peak = NoiseStatistics.MaxAutocorrelationBeyondWavelength(
+                    p => SeededSimplex.Noise(p / wavelength, Seed, Salt), direction, wavelength, 1024, out int peakLag);
                 Debug.Log($"TST-13: wavelength {wavelength}, dir {direction}: max |autocorr| {peak:F3} at lag {peakLag}");
                 Assert.Less(peak, 0.2f, $"secondary autocorrelation peak along {direction} at lag {peakLag}");
             }
-        }
-
-        private static float MaxAutocorrelationBeyondWavelength(float2 direction, float wavelength, out int peakLag){
-            // One 16k-block line holds only 16384 / wavelength independent features, so the estimate for a long
-            // wavelength is averaged over parallel lines (3 wavelengths apart, i.e. independent) until it covers
-            // at least 1024 features. 16 blocks → 1 line, 192 → 12 lines, 512 → 32 lines.
-            const int samples = 16384;
-            int lines = math.max(1, (int)math.ceil(wavelength * 1024f / samples));
-            float2 perpendicular = new(-direction.y, direction.x);
-            int lagStep = math.max(1, (int)(wavelength / 4f));
-            int minLag = (int)math.ceil(wavelength);
-            int lagCount = (samples / 2 - minLag) / lagStep + 1;
-            double[] covariance = new double[lagCount];
-            double variance = 0;
-            float[] values = new float[samples];
-
-            for (int line = 0; line < lines; line++){
-                float2 origin = new float2(12345.5f, -6789.25f) + perpendicular * (line * 3f * wavelength);
-                double mean = 0;
-                for (int i = 0; i < samples; i++){
-                    // World position in blocks → noise units at 1/wavelength, like a detail octave.
-                    values[i] = SeededSimplex.Noise((origin + direction * i) / wavelength, Seed, Salt);
-                    mean += values[i];
-                }
-
-                mean /= samples;
-                for (int i = 0; i < samples; i++){
-                    values[i] -= (float)mean;
-                    variance += values[i] * values[i] / samples;
-                }
-
-                for (int l = 0; l < lagCount; l++){
-                    int lag = minLag + l * lagStep;
-                    int n = samples - lag;
-                    double cov = 0;
-                    for (int i = 0; i < n; i++) cov += values[i] * values[i + lag];
-                    covariance[l] += cov / n;
-                }
-            }
-
-            float peak = 0f;
-            peakLag = 0;
-            for (int l = 0; l < lagCount; l++){
-                float corr = (float)(covariance[l] / variance); // both sums are over the same number of lines
-                if (math.abs(corr) <= peak) continue;
-                peak = math.abs(corr);
-                peakLag = minLag + l * lagStep;
-            }
-
-            return peak;
         }
 
         #endregion
