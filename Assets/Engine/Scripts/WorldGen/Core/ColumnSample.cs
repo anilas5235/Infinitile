@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Noise;
 
@@ -17,7 +18,7 @@ namespace Engine.Scripts.WorldGen.Core{
         public int ColumnHeight;
 
         /// <summary>True when the unclamped H lay outside [Hmin, Hmax] (GEN-12).</summary>
-        public bool Clamped;
+        [MarshalAs(UnmanagedType.U1)] public bool Clamped; // blittable for the Burst direct call
 
         /// <summary>Hard classification argmin_b d_b (GEN-23); -1 when no biome is active.</summary>
         public int HardBiome;

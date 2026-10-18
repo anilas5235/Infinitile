@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using Engine.Scripts.Noise;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Core;
@@ -59,7 +60,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         public float PeakWavelength;
 
         /// <summary>D-06: run the ice override after terrain fill.</summary>
-        public bool EnableClimateOverrides;
+        [MarshalAs(UnmanagedType.U1)] public bool EnableClimateOverrides; // blittable for the Burst direct calls
 
         /// <summary>Climate noise instances (T, F, C, E, W) and couplings. Owned.</summary>
         public ClimateParams Climate;

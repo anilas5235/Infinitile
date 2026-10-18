@@ -7,6 +7,7 @@ using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -70,6 +71,28 @@ namespace Engine.Tests.EditMode{
             WorldGenConfig cfg = s.ToConfig(seed, noise);
             _native.Add(cfg);
             return cfg;
+        }
+
+        private delegate void SampleColumnFn(int x, int z, in WorldGenConfig cfg, out ColumnSample sample);
+
+        /// <summary>
+        ///     GEN-16 guard: a Burst compile error in a direct-call entry point (struct return, bool in the
+        ///     signature) is only logged at domain reload and disables Burst for every job in the Editor, which
+        ///     made all Phase 0.5 benchmarks run managed. Compiling the entry point as a function pointer surfaces
+        ///     such an error as a test failure.
+        /// </summary>
+        [Test]
+        public void SampleColumn_CompilesWithBurst(){
+            Assert.IsTrue(BurstCompiler.IsEnabled, "Burst compilation is disabled in the Editor (Jobs > Burst)");
+            FunctionPointer<SampleColumnFn> fp = BurstCompiler.CompileFunctionPointer<SampleColumnFn>(WorldSampler.SampleColumn);
+            Assert.IsTrue(fp.IsCreated);
+
+            WorldGenConfig cfg = Config(5, PlaceholderBiomes());
+            fp.Invoke(17, -23, cfg, out ColumnSample viaPointer);
+            ColumnSample viaDirectCall = WorldSampler.SampleColumn(17, -23, cfg);
+            Assert.AreEqual(viaDirectCall.Height, viaPointer.Height);
+            Assert.AreEqual(viaDirectCall.HardBiome, viaPointer.HardBiome);
+            Assert.AreEqual(viaDirectCall.Fields.T, viaPointer.Fields.T);
         }
 
         private NativeArray<T> Alloc<T>(int count) where T : unmanaged{
