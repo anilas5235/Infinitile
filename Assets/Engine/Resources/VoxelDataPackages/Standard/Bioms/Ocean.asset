@@ -12,11 +12,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73ce5c2ac5ec3364a915ef3d1b97af22, type: 3}
   m_Name: Ocean
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.VoxelConfig.Data.Generation.Biome
-  TopBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
+  TopBlock: {fileID: 11400000, guid: b5df436b2cc46cf419e666fccd2d96b3, type: 2}
   UnderBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   TargetHumidity: 0.8
   TargetTemperature: 0.5
-  TargetContinental: 0.1
-  TargetHeight: 0.1
+  TargetContinental: 0.08
+  TargetErosion: 0.5
+  TargetPV: 0
+  TargetHeight: 0.2
+  HeightOffset: 100
+  HeightAmplitude: 6
+  OctaveWeights:
+  - 1
+  - 0.5
+  - 0.2
+  - 0.05
+  - 0.02
+  - 0.01
+  Jaggedness: 0
+  FloraRules: []
   RepresentativeColor: {r: 0, g: 0.118253864, b: 0.4943396, a: 1}

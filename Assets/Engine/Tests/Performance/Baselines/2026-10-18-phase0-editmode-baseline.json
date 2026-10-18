@@ -1,0 +1,370 @@
+{
+    "TestSuite": "Editmode",
+    "Date": 1792331855845,
+    "Player": {
+        "Development": true,
+        "ScreenWidth": 1920,
+        "ScreenHeight": 1080,
+        "ScreenRefreshRate": 60,
+        "Fullscreen": false,
+        "Vsync": 0,
+        "AntiAliasing": 0,
+        "Batchmode": false,
+        "RenderThreadingMode": "MultiThreaded",
+        "MtRendering": true,
+        "GraphicsJobs": false,
+        "GpuSkinning": true,
+        "Platform": "WindowsEditor",
+        "ColorSpace": "Linear",
+        "AnisotropicFiltering": "ForceEnable",
+        "BlendWeights": "FourBones",
+        "GraphicsApi": "Direct3D11",
+        "ScriptingBackend": "Mono2x",
+        "AndroidTargetSdkVersion": "AndroidApiLevelAuto",
+        "AndroidBuildSystem": "Gradle",
+        "BuildTarget": "StandaloneWindows64",
+        "StereoRenderingPath": "MultiPass"
+    },
+    "Hardware": {
+        "OperatingSystem": "Windows 11  (10.0.26300)",
+        "DeviceModel": "B550 Steel Legend (To Be Filled By O.E.M.)",
+        "DeviceName": "NIKLAS-GAMINGPC",
+        "ProcessorType": "AMD Ryzen 7 5800X 8-Core Processor ",
+        "ProcessorCount": 16,
+        "GraphicsDeviceName": "AMD Radeon RX 6900 XT",
+        "SystemMemorySizeMB": 32690
+    },
+    "Editor": {
+        "Version": "6000.3.11f1",
+        "Branch": "6000.3/staging",
+        "Changeset": "3000ef702840",
+        "Date": 1772572323
+    },
+    "Dependencies": [
+        "com.unity.2d.sprite@1.0.0",
+        "com.unity.ai.navigation@2.0.14",
+        "com.unity.collab-proxy@2.11.4",
+        "com.unity.ide.rider@3.0.40",
+        "com.unity.inputsystem@1.19.0",
+        "com.unity.multiplayer.center@1.0.1",
+        "com.unity.pipeline@0.8.0-exp.1",
+        "com.unity.render-pipelines.universal@17.3.0",
+        "com.unity.test-framework@1.6.0",
+        "com.unity.test-framework.performance@3.2.0",
+        "com.unity.timeline@1.8.12",
+        "com.unity.ugui@2.0.0",
+        "com.unity.visualscripting@1.9.12",
+        "com.unity.modules.accessibility@1.0.0",
+        "com.unity.modules.adaptiveperformance@1.0.0",
+        "com.unity.modules.ai@1.0.0",
+        "com.unity.modules.androidjni@1.0.0",
+        "com.unity.modules.animation@1.0.0",
+        "com.unity.modules.assetbundle@1.0.0",
+        "com.unity.modules.audio@1.0.0",
+        "com.unity.modules.cloth@1.0.0",
+        "com.unity.modules.director@1.0.0",
+        "com.unity.modules.imageconversion@1.0.0",
+        "com.unity.modules.imgui@1.0.0",
+        "com.unity.modules.jsonserialize@1.0.0",
+        "com.unity.modules.particlesystem@1.0.0",
+        "com.unity.modules.physics@1.0.0",
+        "com.unity.modules.physics2d@1.0.0",
+        "com.unity.modules.screencapture@1.0.0",
+        "com.unity.modules.terrain@1.0.0",
+        "com.unity.modules.terrainphysics@1.0.0",
+        "com.unity.modules.tilemap@1.0.0",
+        "com.unity.modules.ui@1.0.0",
+        "com.unity.modules.uielements@1.0.0",
+        "com.unity.modules.umbra@1.0.0",
+        "com.unity.modules.unityanalytics@1.0.0",
+        "com.unity.modules.unitywebrequest@1.0.0",
+        "com.unity.modules.unitywebrequestassetbundle@1.0.0",
+        "com.unity.modules.unitywebrequestaudio@1.0.0",
+        "com.unity.modules.unitywebrequesttexture@1.0.0",
+        "com.unity.modules.unitywebrequestwww@1.0.0",
+        "com.unity.modules.vectorgraphics@1.0.0",
+        "com.unity.modules.vehicles@1.0.0",
+        "com.unity.modules.video@1.0.0",
+        "com.unity.modules.vr@1.0.0",
+        "com.unity.modules.wind@1.0.0",
+        "com.unity.modules.xr@1.0.0",
+        "com.unity.modules.subsystems@1.0.0",
+        "com.unity.modules.hierarchycore@1.0.0",
+        "com.unity.ext.nunit@2.0.5",
+        "com.unity.render-pipelines.core@17.3.0",
+        "com.unity.shadergraph@17.3.0",
+        "com.unity.render-pipelines.universal-config@17.0.3",
+        "com.unity.nuget.mono-cecil@1.11.6",
+        "com.unity.nuget.newtonsoft-json@3.2.2",
+        "com.unity.searcher@4.9.4",
+        "com.unity.burst@1.8.28",
+        "com.unity.mathematics@1.3.3",
+        "com.unity.collections@2.6.2"
+    ],
+    "Results": [
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_TerrainRle_MsPerChunk",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_TerrainRle_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainRle ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        1.0954999999999998,
+                        1.1006,
+                        1.1008999999999994,
+                        1.0848000000000014,
+                        1.0891000000000002,
+                        1.0949000000000009,
+                        1.0932000000000013,
+                        1.1414000000000009,
+                        1.1220999999999997,
+                        1.0991999999999998,
+                        1.0949999999999989,
+                        1.0946999999999996,
+                        1.1141999999999968,
+                        1.0950999999999989,
+                        1.096599999999999,
+                        1.0963999999999992,
+                        1.0947999999999994,
+                        1.107599999999998,
+                        1.0916999999999997,
+                        1.1029000000000018
+                    ],
+                    "Min": 1.0848000000000014,
+                    "Max": 1.1414000000000009,
+                    "Median": 1.0959499999999994,
+                    "Average": 1.1005349999999997,
+                    "StandardDeviation": 0.012462274070168624,
+                    "Sum": 22.010699999999994
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ColliderMeshBenchmark.CMeshBuildJob_Run_SolidPartition_MsPerPartition",
+            "ClassName": "Engine.Tests.Performance.ColliderMeshBenchmark",
+            "MethodName": "CMeshBuildJob_Run_SolidPartition_MsPerPartition",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "CMeshBuildJob.Run solid ms/partition",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        6.648700000000002,
+                        6.6709,
+                        6.7883,
+                        6.668300000000002,
+                        6.742699999999999,
+                        6.680399999999999,
+                        6.8452000000000059,
+                        6.674300000000002,
+                        6.664199999999994,
+                        6.767800000000008,
+                        6.703800000000001,
+                        6.741700000000009,
+                        6.731899999999996,
+                        6.669600000000003,
+                        6.708300000000008,
+                        6.687699999999992,
+                        6.803200000000004,
+                        6.711399999999998,
+                        6.763900000000007,
+                        6.542399999999987
+                    ],
+                    "Min": 6.542399999999987,
+                    "Max": 6.8452000000000059,
+                    "Median": 6.706050000000005,
+                    "Average": 6.710735,
+                    "StandardDeviation": 0.06458381589067376,
+                    "Sum": 134.2147
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ColliderMeshBenchmark.CMeshBuildJob_Run_SurfacePartition_MsPerPartition",
+            "ClassName": "Engine.Tests.Performance.ColliderMeshBenchmark",
+            "MethodName": "CMeshBuildJob_Run_SurfacePartition_MsPerPartition",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "CMeshBuildJob.Run surface ms/partition",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        7.0503,
+                        6.503499999999999,
+                        6.890700000000003,
+                        6.665999999999997,
+                        6.680900000000001,
+                        6.9206999999999969,
+                        6.692,
+                        6.731499999999997,
+                        6.684100000000001,
+                        6.842500000000001,
+                        6.682000000000002,
+                        6.706000000000003,
+                        6.917500000000004,
+                        6.718500000000006,
+                        6.845100000000002,
+                        6.716199999999986,
+                        6.822199999999981,
+                        6.88069999999999,
+                        6.878799999999984,
+                        6.766100000000023
+                    ],
+                    "Min": 6.503499999999999,
+                    "Max": 7.0503,
+                    "Median": 6.74880000000001,
+                    "Average": 6.779764999999999,
+                    "StandardDeviation": 0.12155929941801969,
+                    "Sum": 135.5953
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.FrustumCullingBenchmark.IsVisible_OneBufferOfPages",
+            "ClassName": "Engine.Tests.Performance.FrustumCullingBenchmark",
+            "MethodName": "IsVisible_OneBufferOfPages",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "FrustumCulling.IsVisible 1024 pages us",
+                    "Unit": 1,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        2293.3,
+                        2876.099999999999,
+                        2272.399999999999,
+                        2276.9000000000015,
+                        2242.5999999999995,
+                        2266.7000000000003,
+                        2288.9999999999977,
+                        2371.8,
+                        2266.7000000000003,
+                        2270.500000000002,
+                        2270.299999999999,
+                        2265.0999999999967,
+                        2259.700000000002,
+                        2280.700000000003,
+                        2335.000000000001,
+                        2262.2,
+                        2278.599999999997,
+                        2276.4000000000024,
+                        2272.7000000000003,
+                        2265.0999999999967
+                    ],
+                    "Min": 2242.5999999999995,
+                    "Max": 2876.099999999999,
+                    "Median": 2272.5499999999997,
+                    "Average": 2309.5899999999997,
+                    "StandardDeviation": 132.81187409264266,
+                    "Sum": 46191.8
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.PageAllocatorBenchmark.TryAllocPages_FillBuffer_ThenReleaseAll",
+            "ClassName": "Engine.Tests.Performance.PageAllocatorBenchmark",
+            "MethodName": "TryAllocPages_FillBuffer_ThenReleaseAll",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "PageAllocator fill+release 1 buffer ms",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        0.5441000000000003,
+                        0.4878,
+                        0.4734999999999996,
+                        0.4733999999999998,
+                        0.47160000000000049,
+                        0.4771000000000001,
+                        0.4885999999999999,
+                        0.4922999999999984,
+                        0.4773999999999994,
+                        0.4750999999999994,
+                        0.4730999999999988,
+                        0.4677000000000007,
+                        0.4748000000000001,
+                        0.4648000000000003,
+                        0.5464000000000002,
+                        0.5119000000000007,
+                        0.4659000000000013,
+                        0.46910000000000098,
+                        0.4746000000000024,
+                        0.46820000000000308
+                    ],
+                    "Min": 0.4648000000000003,
+                    "Max": 0.5464000000000002,
+                    "Median": 0.4747000000000013,
+                    "Average": 0.4838700000000003,
+                    "StandardDeviation": 0.02308731469876896,
+                    "Sum": 9.677400000000006
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.UnsafeIntervalListBenchmark.Set_10kRandomEdits_ChunkSizedList",
+            "ClassName": "Engine.Tests.Performance.UnsafeIntervalListBenchmark",
+            "MethodName": "Set_10kRandomEdits_ChunkSizedList",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "UnsafeIntervalList.Set 10k edits ms",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        10.7046,
+                        10.636700000000005,
+                        10.764700000000005,
+                        10.711,
+                        10.629099999999994,
+                        11.355000000000004,
+                        10.7496,
+                        10.763500000000008,
+                        10.667500000000004,
+                        10.80279999999999,
+                        10.772399999999977,
+                        10.65610000000001,
+                        10.713899999999996,
+                        10.749500000000012,
+                        10.674499999999997,
+                        10.732,
+                        10.752399999999997,
+                        10.805399999999992,
+                        10.7551,
+                        10.80940000000001
+                    ],
+                    "Min": 10.629099999999994,
+                    "Max": 11.355000000000004,
+                    "Median": 10.749550000000009,
+                    "Average": 10.76026,
+                    "StandardDeviation": 0.1463256758057182,
+                    "Sum": 215.2052
+                }
+            ]
+        }
+    ]
+}

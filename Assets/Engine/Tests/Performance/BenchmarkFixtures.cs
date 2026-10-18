@@ -1,5 +1,6 @@
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Settings;
+using Engine.Scripts.WorldGen.Settings;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Data.Internal;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
@@ -50,7 +51,8 @@ namespace Engine.Tests.Performance{
                     GlobalSeed = Seed,
                     BiomeDefs = biomes,
                     Voxels = voxels,
-                    NoiseParams = noise.ToNoiseParameters(Seed)
+                    NoiseParams = noise.ToNoiseParameters(Seed),
+                    WorldGen = WorldGenConfig.CreateEmpty((uint)Seed, allocator) // legacy path: constructed, empty
                 };
             }
             finally{

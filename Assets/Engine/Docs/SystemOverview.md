@@ -86,6 +86,15 @@ Unity-facing runtime components that connect the world, scheduler, and renderer.
 ### `Noise`
 Procedural generation utilities used by chunk data jobs and world generation.
 
+### `WorldGen`
+The spec world generator (`WorldGenSpec.html`, see `Docs/WorldGenerationPipeline.md` version 1.1):
+- `WorldGen/Core` — hashing, salts, `WorldSampler` (pure per-column sampler), `ColumnSample`, `WorldGenApi.SampleRegion`
+- `WorldGen/Noise` — seeded simplex, climate fields, detail octaves, peak noise
+- `WorldGen/Classify` — 5D/6D biome classifier
+- `WorldGen/Blending` — `BlendWeights` and (from Phase 2) the blend methods
+- `WorldGen/Settings` — `WorldGenSettings`, `BiomeSet`, `TerrainSplineSet`, the Burst mirror `WorldGenConfig`, canonical JSON
+- `WorldGen/Flora` — flora rules (filled in Phase 4)
+
 ## Core systems and what they do
 
 ### `VoxelWorld`

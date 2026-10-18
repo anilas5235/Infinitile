@@ -1,6 +1,7 @@
 ﻿using System;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
+using Engine.Scripts.WorldGen.Settings;
 using Unity.Collections;
 
 namespace Engine.Scripts.Jobs.Chunk{
@@ -38,11 +39,20 @@ namespace Engine.Scripts.Jobs.Chunk{
         public NoiseCalculator.NoiseParameters NoiseParams;
 
         /// <summary>
-        ///     Releases the noise parameters only. <see cref="BiomeDefs" /> and <see cref="Voxels" /> belong
+        ///     Spec world-generation parameters (INT-03). D-05 ownership: built by <c>WorldGenSettings.ToConfig</c> (or
+        ///     <c>WorldGenConfig.CreateEmpty</c> for the legacy path without settings) for this config and released by
+        ///     <see cref="Dispose" />. Must be created whenever the config is handed to a job, because the job safety
+        ///     system rejects unconstructed nested containers.
+        /// </summary>
+        public WorldGenConfig WorldGen;
+
+        /// <summary>
+        ///     Releases the noise parameters and the world-gen config. <see cref="BiomeDefs" /> and <see cref="Voxels" /> belong
         ///     to their registries (D-05).
         /// </summary>
         public void Dispose(){
             NoiseParams.Dispose();
+            WorldGen.Dispose();
         }
     }
 }

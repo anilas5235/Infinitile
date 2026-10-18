@@ -17,6 +17,19 @@ MonoBehaviour:
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   TargetHumidity: 0.4
   TargetTemperature: 0.35
-  TargetContinental: 0.85
-  TargetHeight: 0.7
+  TargetContinental: 0.8
+  TargetErosion: 0.15
+  TargetPV: 0.6
+  TargetHeight: 0.75
+  HeightOffset: 165
+  HeightAmplitude: 22
+  OctaveWeights:
+  - 0.7
+  - 0.7
+  - 0.6
+  - 0.45
+  - 0.3
+  - 0.15
+  Jaggedness: 35
+  FloraRules: []
   RepresentativeColor: {r: 0.7207546, g: 0.7207546, b: 0.7207546, a: 1}

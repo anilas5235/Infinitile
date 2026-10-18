@@ -1,6 +1,7 @@
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Settings;
+using Engine.Scripts.WorldGen.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Data.Internal;
@@ -49,7 +50,8 @@ namespace Engine.Tests.EditMode{
                     GlobalSeed = Seed,
                     BiomeDefs = biomes,
                     Voxels = voxels,
-                    NoiseParams = noise.ToNoiseParameters(Seed)
+                    NoiseParams = noise.ToNoiseParameters(Seed),
+                    WorldGen = WorldGenConfig.CreateEmpty((uint)Seed, allocator) // legacy path: constructed, empty
                 };
             }
             finally{

@@ -15,8 +15,21 @@ MonoBehaviour:
   TopBlock: {fileID: 11400000, guid: 2e8eca1efe0447d4b845f277ce2ada8f, type: 2}
   UnderBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
-  TargetHumidity: 0.65
+  TargetHumidity: 0.7
   TargetTemperature: 0.5
-  TargetContinental: 0.45
-  TargetHeight: 0.35
+  TargetContinental: 0.5
+  TargetErosion: 0.55
+  TargetPV: 0
+  TargetHeight: 0.5
+  HeightOffset: 140
+  HeightAmplitude: 9
+  OctaveWeights:
+  - 1
+  - 0.6
+  - 0.35
+  - 0.15
+  - 0.06
+  - 0.03
+  Jaggedness: 0
+  FloraRules: []
   RepresentativeColor: {r: 0.25391784, g: 0.3509434, b: 0, a: 1}

@@ -43,7 +43,6 @@ MonoBehaviour:
       lacunarity: 3
       octaves: 2
     warpStrength: 300
-    warpSeedOffsetY: 1000
     redistributionCurve:
       serializedVersion: 2
       m_Curve:
