@@ -34,7 +34,7 @@ namespace Engine.Tests.Performance{
             DisposeResults();
             _results.Dispose();
             _jobs.Dispose();
-            _config.Dispose();
+            BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
         }
 
         [Test]

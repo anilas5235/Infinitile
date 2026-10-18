@@ -63,7 +63,7 @@ namespace Engine.Tests.Performance{
             foreach (KeyValue<int2, ChunkVoxelData> kv in _chunks) kv.Value.Dispose();
             _chunks.Dispose();
             _lights.Dispose();
-            _config.Dispose();
+            BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
         }
 
         [Test]

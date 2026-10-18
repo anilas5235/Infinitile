@@ -58,6 +58,17 @@ namespace Engine.Tests.Performance{
             }
         }
 
+        /// <summary>
+        ///     Releases a config from <see cref="CreateGeneratorConfig" />. Since D-05, <c>GeneratorConfig.Dispose</c>
+        ///     frees only the noise parameters, because at runtime the registries own the biome and voxel arrays; here
+        ///     the fixture created them, so it frees them too.
+        /// </summary>
+        internal static void DisposeGeneratorConfig(ref GeneratorConfig config){
+            if (config.BiomeDefs.IsCreated) config.BiomeDefs.Dispose();
+            if (config.Voxels.IsCreated) config.Voxels.Dispose();
+            config.Dispose();
+        }
+
         /// <summary>Render definitions indexed by voxel ID; only the collision flag matters for the collider mesher.</summary>
         internal static VoxelEngineRenderGenData CreateRenderGenData(Allocator allocator){
             NativeArray<Voxel.VoxelDef> defs = new(VoxelTypeCount, allocator);
