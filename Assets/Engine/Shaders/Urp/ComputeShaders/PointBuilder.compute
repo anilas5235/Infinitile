@@ -8,7 +8,7 @@ struct VoxelDef
 {
     uint MeshLayer;
     uint AlwaysRenderAllFaces;
-    half DepthFadeDistance;
+    uint DepthFadeDistance; // F-19: fp16 bits, read with f16tof32
     uint Glow;
     uint Collision;
     uint2 ShapeQuadIndicesAlwaysRender;
@@ -254,6 +254,8 @@ void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uin
         if (is_solid(front_in_chunk + quad.up - quad.right)) ao_mask |= 1 << 7; // UpLeft
 
         set_ao(packed, ao_mask);
+        set_depth_fade_dist(packed, f16tof32(myDef.DepthFadeDistance)); // F-19
+        set_glow(packed, myDef.Glow);
 
         p.packed = packed;
 

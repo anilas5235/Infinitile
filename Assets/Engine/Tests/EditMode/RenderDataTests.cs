@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Engine.Scripts.Render;
 using Engine.Scripts.Settings;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
+using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
 using NUnit.Framework;
 using Unity.Collections;
@@ -64,6 +65,25 @@ namespace Engine.Tests.EditMode{
             Type type = typeof(VoxelRegistry).GetNestedType("GPUVoxelDef", BindingFlags.NonPublic);
             Assert.IsNotNull(type, "VoxelRegistry.GPUVoxelDef not found");
             Assert.AreEqual(76, Marshal.SizeOf(type));
+        }
+
+        [Test]
+        public void GpuVoxelDef_DepthFadeDistance_IsFp16BitsInA32BitSlot(){
+            // F-19: HLSL `half` in a structured buffer is a 32-bit float under fxc. The C# side wrote a 2-byte half,
+            // so the shader read the fp16 bits plus padding as a float. The slot is now a uint holding the fp16 bits.
+            Type type = typeof(VoxelRegistry).GetNestedType("GPUVoxelDef", BindingFlags.NonPublic);
+            Assert.IsNotNull(type, "VoxelRegistry.GPUVoxelDef not found");
+            FieldInfo field = type.GetField("DepthFadeDistance", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(field, "GPUVoxelDef.DepthFadeDistance not found");
+            Assert.AreEqual(typeof(uint), field.FieldType);
+            Assert.AreEqual(8, (int)Marshal.OffsetOf(type, "DepthFadeDistance"), "HLSL VoxelDef offset");
+            Assert.AreEqual(12, (int)Marshal.OffsetOf(type, "Glow"), "HLSL VoxelDef offset");
+
+            Voxel.VoxelDef def = new(){ DepthFadeDistance = (half)4.5f, Glow = 200 };
+            object gpuDef = Activator.CreateInstance(type, def);
+            uint bits = (uint)field.GetValue(gpuDef);
+            Assert.AreEqual(math.f32tof16(4.5f), bits);
+            Assert.AreEqual(4.5f, math.f16tof32(bits));
         }
 
         #endregion
