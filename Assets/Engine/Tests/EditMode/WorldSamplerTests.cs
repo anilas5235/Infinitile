@@ -4,6 +4,7 @@ using Engine.Scripts.Settings;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Classify;
 using Engine.Scripts.WorldGen.Core;
+using Engine.Scripts.WorldGen.Height;
 using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
@@ -63,10 +64,21 @@ namespace Engine.Tests.EditMode{
         }
 
         private WorldGenConfig Config(int seed, params Biome[] biomes){
+            return Config(seed, GenArchitecture.Legacy, biomes);
+        }
+
+        /// <summary>Config for <paramref name="architecture" />; Terrain-first gets the §19.1 placeholder splines.</summary>
+        private WorldGenConfig Config(int seed, GenArchitecture architecture, params Biome[] biomes){
             BiomeSet set = Create<BiomeSet>("Set");
             set.Biomes.AddRange(biomes);
             WorldGenSettings s = Create<WorldGenSettings>("WG");
             s.Biomes = set;
+            s.Architecture = architecture;
+            if (architecture == GenArchitecture.TerrainFirst){
+                s.Splines = Create<TerrainSplineSet>("Splines");
+                s.Splines.ResetToPlaceholders();
+            }
+
             WorldGenConfig cfg = s.ToConfig(seed);
             _native.Add(cfg);
             return cfg;
@@ -92,6 +104,13 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(viaDirectCall.Height, viaPointer.Height);
             Assert.AreEqual(viaDirectCall.HardBiome, viaPointer.HardBiome);
             Assert.AreEqual(viaDirectCall.Fields.T, viaPointer.Fields.T);
+
+            WorldGenConfig terrainFirst = Config(5, GenArchitecture.TerrainFirst, PlaceholderBiomes());
+            fp.Invoke(17, -23, terrainFirst, out ColumnSample tfPointer);
+            ColumnSample tfDirect = WorldSampler.SampleColumn(17, -23, terrainFirst);
+            Assert.AreEqual(tfDirect.Height, tfPointer.Height);
+            Assert.AreEqual(tfDirect.TerrainParams, tfPointer.TerrainParams);
+            Assert.AreEqual(tfDirect.HardBiome, tfPointer.HardBiome);
         }
 
         private NativeArray<T> Alloc<T>(int count) where T : unmanaged{
@@ -218,6 +237,104 @@ namespace Engine.Tests.EditMode{
             Assert.Greater(differentHeights, 190, "a different seed gives different terrain");
         }
 
+        // --- Terrain-first (§7, TRN-03, TRN-10) ---------------------------------------------------------------------
+
+        [Test]
+        public void SampleColumn_TerrainFirst_HeightFollowsTheSplineFormula(){
+            WorldGenConfig cfg = Config(2024, GenArchitecture.TerrainFirst, PlaceholderBiomes());
+            float[] g ={ 1f, .5f, .25f, .125f, .0625f, .03125f };
+            int2[] points ={ new(0, 0), new(1234, -5678), new(-77, 4096), new(100000, 100000), new(-9000, 777) };
+            foreach (int2 p in points){
+                ColumnSample s = WorldSampler.SampleColumn(p.x, p.y, cfg);
+                WorldFields f = s.Fields;
+                float offset = NestedSpline.Evaluate(cfg.OffsetSpline, f.C, f.E, f.PV, cfg.SplineNodes, cfg.SplinePoints);
+                float amp = NestedSpline.Evaluate(cfg.AmpSpline, f.C, f.E, f.PV, cfg.SplineNodes, cfg.SplinePoints);
+                float j = NestedSpline.Evaluate(cfg.JaggednessSpline, f.C, f.E, f.PV, cfg.SplineNodes, cfg.SplinePoints);
+                // Managed evaluation vs the Burst-compiled entry point: equal up to float contraction (1 ulp).
+                Assert.AreEqual(offset, s.TerrainParams.x, 1e-3f, $"Offset at {p}");
+                Assert.AreEqual(amp, s.TerrainParams.y, 1e-4f, $"Amp at {p}");
+                Assert.AreEqual(j, s.TerrainParams.z, 1e-4f, $"J at {p}");
+
+                float detail = 0f;
+                for (int i = 0; i < 6; i++) detail += g[i] * DetailOctaves.Sample(i, p, 512f / (1 << i), 2024u);
+                float expected = offset + amp * detail + j * PeakNoise.Sample(p, 192f, 2024u);
+                bool expectClamped = expected < 40f || expected > 250f;
+                expected = math.clamp(expected, 40f, 250f);
+                Assert.AreEqual(expected, s.Height, 1e-3f, $"H at {p}");
+                Assert.AreEqual(expectClamped, s.Clamped);
+                Assert.AreEqual((int)math.floor(s.Height), s.ColumnHeight);
+                Assert.AreEqual(math.saturate((s.Height - 40f) / 210f), s.NormalizedHeight, 1e-6f);
+            }
+        }
+
+        [Test]
+        public void SampleColumn_TerrainFirst_ClassifiesInSixDimensions(){
+            WorldGenConfig cfg = Config(2024, GenArchitecture.TerrainFirst, PlaceholderBiomes());
+            for (int n = 0; n < 400; n++){
+                int x = n * 613 - 100000, z = n * 379 + 2500;
+                ColumnSample s = WorldSampler.SampleColumn(x, z, cfg);
+                int expected = BiomeClassifier.Classify(s.Fields, s.NormalizedHeight, cfg);
+                Assert.AreEqual(expected, s.HardBiome, $"6D class at ({x},{z})");
+                Assert.AreEqual(s.HardBiome, s.SurfaceSource);
+                Assert.AreEqual(1f, s.MaterialWeights.Sum(), 1e-6f);
+                Assert.AreEqual(s.HardBiome, s.MaterialWeights.ArgMax());
+            }
+
+            // Two biomes that differ only in their height target: 5D would always tie to index 0; 6D splits on h.
+            Biome low = Biome("Low", .5f, .5f, .5f, .5f, 0f, 0, 0, new float[6], 0);
+            Biome high = Biome("High", .5f, .5f, .5f, .5f, 0f, 0, 0, new float[6], 0);
+            low.TargetHeight = 0.2f;
+            high.TargetHeight = 0.9f;
+            WorldGenConfig pair = Config(2024, GenArchitecture.TerrainFirst, low, high);
+            int lows = 0, highs = 0;
+            for (int n = 0; n < 400; n++){
+                int x = n * 613 - 100000, z = n * 379 + 2500;
+                ColumnSample s = WorldSampler.SampleColumn(x, z, pair);
+                int expected = s.NormalizedHeight > 0.55f ? 1 : 0;
+                Assert.AreEqual(expected, s.HardBiome, $"h = {s.NormalizedHeight} at ({x},{z})");
+                if (expected == 0) lows++;
+                else highs++;
+            }
+
+            Assert.Greater(lows, 0);
+            Assert.Greater(highs, 0, "the placeholder world reaches h > 0.55 somewhere in the sample");
+        }
+
+        [Test]
+        public void SampleColumn_TerrainFirst_HeightDoesNotDependOnBiomes(){
+            // TRN-03/TRN-10: H is a function of the fields and splines only; the biome set changes only the class.
+            WorldGenConfig all = Config(31, GenArchitecture.TerrainFirst, PlaceholderBiomes());
+            WorldGenConfig one = Config(31, GenArchitecture.TerrainFirst, PlaceholderBiomes()[2]);
+            for (int n = 0; n < 100; n++){
+                int x = n * 911 - 40000, z = n * 557;
+                Assert.AreEqual(WorldSampler.SampleColumn(x, z, all).Height, WorldSampler.SampleColumn(x, z, one).Height);
+            }
+
+            Assert.AreEqual(0, WorldSampler.SampleColumn(5, 5, one).HardBiome);
+        }
+
+        [Test]
+        public void SampleColumn_TerrainFirst_IsContinuousAcrossBiomeBoundaries(){
+            // Hard biome boundaries do not step the height (the height does not know the biome).
+            WorldGenConfig cfg = Config(2024, GenArchitecture.TerrainFirst, PlaceholderBiomes());
+            int boundaries = 0;
+            float maxStep = 0f;
+            ColumnSample previous = WorldSampler.SampleColumn(-20000, 0, cfg);
+            for (int x = -19999; x < 20000; x++){
+                ColumnSample s = WorldSampler.SampleColumn(x, 0, cfg);
+                if (s.HardBiome != previous.HardBiome){
+                    boundaries++;
+                    maxStep = math.max(maxStep, math.abs(s.Height - previous.Height));
+                }
+
+                previous = s;
+            }
+
+            Assert.Greater(boundaries, 5, "the walk crosses biome boundaries");
+            // Per-block height steps come from the octaves alone; the largest octave slope is a few blocks at most.
+            Assert.Less(maxStep, 8f, $"height jump of {maxStep} at a biome boundary");
+        }
+
         // --- Region API (GEN-17) ---------------------------------------------------------------------------------------
 
         [Test]
@@ -236,7 +353,9 @@ namespace Engine.Tests.EditMode{
                 SurfaceSource = Alloc<int>(count),
                 FloraSpecies = Alloc<ushort>(count),
                 FloraSource = Alloc<int>(count),
-                Clamped = Alloc<byte>(count)
+                Clamped = Alloc<byte>(count),
+                NormalizedHeight = Alloc<float>(count),
+                TerrainParams = Alloc<float3>(count)
             };
 
             WorldGenApi.SampleRegion(req, ref buffers).Complete();
@@ -258,6 +377,31 @@ namespace Engine.Tests.EditMode{
                 Assert.AreEqual(s.FloraSpecies, buffers.FloraSpecies[index]);
                 Assert.AreEqual(s.FloraSource, buffers.FloraSource[index]);
                 Assert.AreEqual(s.Clamped ? 1 : 0, buffers.Clamped[index]);
+                Assert.AreEqual(s.NormalizedHeight, buffers.NormalizedHeight[index]);
+                Assert.AreEqual(s.TerrainParams, buffers.TerrainParams[index]);
+            }
+        }
+
+        [Test]
+        public void SampleRegion_TerrainFirst_MatchesSampleColumn(){
+            WorldGenConfig cfg = Config(99, GenArchitecture.TerrainFirst, PlaceholderBiomes());
+            WorldGenRequest req = new(){ Config = cfg, Origin = new int2(3000, -4000), Size = new int2(16, 16), Stride = 4 };
+            int count = req.ColumnCount;
+            RegionBuffers buffers = new(){
+                Height = Alloc<float>(count),
+                HardBiome = Alloc<int>(count),
+                TerrainParams = Alloc<float3>(count),
+                NormalizedHeight = Alloc<float>(count)
+            };
+            WorldGenApi.SampleRegion(req, ref buffers).Complete();
+            for (int j = 0; j < 16; j++)
+            for (int i = 0; i < 16; i++){
+                ColumnSample s = WorldSampler.SampleColumn(3000 + i * 4, -4000 + j * 4, cfg);
+                int index = j * 16 + i;
+                Assert.AreEqual(s.Height, buffers.Height[index]);
+                Assert.AreEqual(s.HardBiome, buffers.HardBiome[index]);
+                Assert.AreEqual(s.TerrainParams, buffers.TerrainParams[index]);
+                Assert.AreEqual(s.NormalizedHeight, buffers.NormalizedHeight[index]);
             }
         }
 

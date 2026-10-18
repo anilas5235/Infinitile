@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Noise;
+using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Core{
     /// <summary>
@@ -16,6 +17,12 @@ namespace Engine.Scripts.WorldGen.Core{
 
         /// <summary>h_int = floor(H): the surface block Y.</summary>
         public int ColumnHeight;
+
+        /// <summary>h = saturate((H − Hmin)/(Hmax − Hmin)) (TRN-10); the sixth classification dimension in Terrain-first.</summary>
+        public float NormalizedHeight;
+
+        /// <summary>Terrain-first spline values (Offset, Amp, J) at the column (TRN-01); zero in Biome-first.</summary>
+        public float3 TerrainParams;
 
         /// <summary>True when the unclamped H lay outside [Hmin, Hmax] (GEN-12).</summary>
         [MarshalAs(UnmanagedType.U1)] public bool Clamped; // blittable for the Burst direct call
