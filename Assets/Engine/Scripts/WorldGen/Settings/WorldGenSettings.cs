@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Engine.Scripts.Noise;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Registry;
+using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Height;
@@ -176,6 +177,8 @@ namespace Engine.Scripts.WorldGen.Settings{
                 Debug.LogWarning($"{name}: HeightMin must be below HeightMax.", this);
             foreach ((string field, float value) in InvalidScales())
                 Debug.LogWarning($"{name}: {field} must be positive and finite, got {value}.", this);
+            foreach ((string field, float value) in InvalidBlendStrengths(HeightMethod))
+                Debug.LogWarning($"{name}: {field} is invalid for the selected blend method, got {value}.", this);
         }
 
         /// <summary>
@@ -201,6 +204,28 @@ namespace Engine.Scripts.WorldGen.Settings{
             };
             foreach ((string field, NoiseProfileSettings profile) in profiles)
                 if (profile != null && !IsPositiveFinite(profile.scale)) yield return (field + ".scale", profile.scale);
+        }
+
+        /// <summary>
+        ///     Blend strengths the selected methods use that would break them (§9.7): B ≤ 0 leaves the kernel empty,
+        ///     σ ≤ 0 divides by zero, a non-finite or negative A or fewer than one warp octave has no meaning. Unused
+        ///     strengths are not checked. Reported, not clamped (R5).
+        /// </summary>
+        private IEnumerable<(string field, float value)> InvalidBlendStrengths(BlendMethod heightMethod){
+            bool biomeFirst = Architecture == GenArchitecture.BiomeFirst;
+            bool heightUsed = biomeFirst && heightMethod != BlendMethod.None;
+            if (MaterialMethod == BlendMethod.DistanceBlend && !IsPositiveFinite(MaterialBlendWidth))
+                yield return (nameof(MaterialBlendWidth), MaterialBlendWidth);
+            if (heightUsed && heightMethod is BlendMethod.DistanceBlend or BlendMethod.DistortedBoundary && !IsPositiveFinite(HeightBlendWidth))
+                yield return (nameof(HeightBlendWidth), HeightBlendWidth);
+            if (MaterialMethod == BlendMethod.ParameterSpaceWeighting && !IsPositiveFinite(MaterialSigma))
+                yield return (nameof(MaterialSigma), MaterialSigma);
+            if (heightUsed && heightMethod == BlendMethod.ParameterSpaceWeighting && !IsPositiveFinite(HeightSigma))
+                yield return (nameof(HeightSigma), HeightSigma);
+            bool warpUsed = MaterialMethod == BlendMethod.DistortedBoundary || heightUsed && heightMethod == BlendMethod.DistortedBoundary;
+            if (warpUsed && (!(WarpAmplitude >= 0f) || float.IsPositiveInfinity(WarpAmplitude)))
+                yield return (nameof(WarpAmplitude), WarpAmplitude);
+            if (warpUsed && WarpOctaves < 1) yield return (nameof(WarpOctaves), WarpOctaves);
         }
 
         private static bool IsPositiveFinite(float value){
@@ -239,6 +264,8 @@ namespace Engine.Scripts.WorldGen.Settings{
 
             if (Architecture == GenArchitecture.TerrainFirst && !Splines)
                 throw new InvalidOperationException($"{name}: Terrain-first needs a TerrainSplineSet (TRN-05).");
+            foreach ((string field, float value) in InvalidBlendStrengths(heightMethod))
+                throw new InvalidOperationException($"{name}: {field} is invalid for the selected blend method, got {value}.");
 
             WorldGenConfig cfg = new(){
                 Seed = (uint)seed,
@@ -280,6 +307,21 @@ namespace Engine.Scripts.WorldGen.Settings{
                     cfg.SplineNodes = new NativeArray<SplineNode>(0, allocator);
                     cfg.SplinePoints = new NativeArray<SplinePoint>(0, allocator);
                 }
+
+                // BLD-12: kernel taps once per settings change; empty arrays for stages without a spatial kernel.
+                bool biomeFirst = Architecture == GenArchitecture.BiomeFirst;
+                if (MaterialMethod == BlendMethod.DistanceBlend)
+                    cfg.MaterialKernel = KernelSet.Build(MaterialBlendWidth, allocator, out cfg.MaterialTaps);
+                else cfg.MaterialTaps = new NativeArray<KernelTap>(0, allocator);
+                if (biomeFirst && heightMethod is BlendMethod.DistanceBlend or BlendMethod.DistortedBoundary)
+                    cfg.HeightKernel = KernelSet.Build(HeightBlendWidth, allocator, out cfg.HeightTaps);
+                else cfg.HeightTaps = new NativeArray<KernelTap>(0, allocator);
+                cfg.StagesShareWeights = biomeFirst && MaterialMethod == heightMethod && MaterialMethod switch{
+                    BlendMethod.None => true,
+                    BlendMethod.DistanceBlend => MaterialBlendWidth == HeightBlendWidth,
+                    BlendMethod.ParameterSpaceWeighting => MaterialSigma == HeightSigma,
+                    _ => false // DistortedBoundary: warp only (material) vs. warp + distance blend (height)
+                };
 
                 for (int i = 0; i < octaveCount; i++)
                     cfg.GlobalOctaveWeights[i] = GlobalOctaveWeights != null && i < GlobalOctaveWeights.Length

@@ -70,10 +70,14 @@ namespace Engine.Scripts.WorldGen.Core{
 
     /// <summary>
     ///     Public region API of the world generator (GEN-17). Fills the requested <see cref="RegionBuffers" /> by
-    ///     running <see cref="WorldSampler.SampleColumn" /> per column in a Burst job. Generic engine functionality,
+    ///     running <see cref="WorldSampler.SampleColumn" /> per column in a Burst job, tile by tile with a blend
+    ///     lattice per tile for the spatial methods. Generic engine functionality,
     ///     used by the preview window and later by Part II; it contains no research code (R4).
     /// </summary>
     public static class WorldGenApi{
+        /// <summary>Samples per tile edge: one job index per tile, each with its own blend lattice (BLD-11).</summary>
+        private const int TileSize = 64;
+
         /// <summary>
         ///     Schedules the sampling of <paramref name="request" /> into the created arrays of
         ///     <paramref name="buffers" />. Returns the job handle; the caller completes it before reading.
@@ -104,8 +108,9 @@ namespace Engine.Scripts.WorldGen.Core{
             SampleRegionJob job = new(){
                 Config = request.Config,
                 Origin = request.Origin,
-                Width = request.Size.x,
-                Stride = math.max(1, request.Stride)
+                Size = request.Size,
+                Stride = math.max(1, request.Stride),
+                TilesX = (request.Size.x + TileSize - 1) / TileSize
             };
 
             // Unrequested buffers are replaced by 1-element dummies (one per field: the safety system rejects two
@@ -125,7 +130,8 @@ namespace Engine.Scripts.WorldGen.Core{
             job.WriteNormalizedHeight = Bind(ref buffers.NormalizedHeight, out job.NormalizedHeight, out NativeArray<float> dNormalized);
             job.WriteTerrainParams = Bind(ref buffers.TerrainParams, out job.TerrainParams, out NativeArray<float3> dTerrainParams);
 
-            JobHandle handle = job.Schedule(count, 64, dependsOn);
+            int tiles = job.TilesX * ((request.Size.y + TileSize - 1) / TileSize);
+            JobHandle handle = job.Schedule(tiles, 1, dependsOn);
 
             handle = DisposeDummy(dFields, handle);
             handle = DisposeDummy(dHeight, handle);
@@ -166,13 +172,18 @@ namespace Engine.Scripts.WorldGen.Core{
             return dummy.IsCreated ? dummy.Dispose(handle) : handle;
         }
 
-        /// <summary>One column per index; GEN-16: synchronous compile, strict float mode.</summary>
+        /// <summary>
+        ///     One tile of TileSize² samples per index. Spatial blend methods get a padded lattice per tile (BLD-11),
+        ///     the same cache the chunk job uses, so the region equals the chunks and the pure sampler (TST-02).
+        ///     GEN-16: synchronous compile, strict float mode.
+        /// </summary>
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
         private struct SampleRegionJob : IJobParallelFor{
             [ReadOnly] public WorldGenConfig Config;
             public int2 Origin;
-            public int Width;
+            public int2 Size;
             public int Stride;
+            public int TilesX;
 
             public bool WriteFields;
             public bool WriteHeight;
@@ -188,7 +199,8 @@ namespace Engine.Scripts.WorldGen.Core{
             public bool WriteNormalizedHeight;
             public bool WriteTerrainParams;
 
-            // Dummies are length 1, so the per-index restriction is lifted; the flags guarantee they are never written.
+            // Each tile writes many indices, and dummies are length 1, so the per-index restriction is lifted; tiles
+            // never overlap and the flags guarantee dummies are never written.
             [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<WorldFields> Fields;
             [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<float> Height;
             [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<int> ColumnHeight;
@@ -203,10 +215,18 @@ namespace Engine.Scripts.WorldGen.Core{
             [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<float> NormalizedHeight;
             [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<float3> TerrainParams;
 
-            public void Execute(int index){
-                int i = index % Width;
-                int j = index / Width;
-                ColumnSample s = WorldSampler.SampleColumn(Origin.x + i * Stride, Origin.y + j * Stride, Config);
+            public void Execute(int tile){
+                int2 first = new int2(tile % TilesX, tile / TilesX) * TileSize;
+                int2 last = math.min(first + TileSize, Size) - 1;
+                BlendCache cache = BlendCache.Build(Config, Origin + first * Stride, Origin + last * Stride, Stride, Allocator.Temp);
+                for (int j = first.y; j <= last.y; j++)
+                for (int i = first.x; i <= last.x; i++)
+                    Write(j * Size.x + i, Origin.x + i * Stride, Origin.y + j * Stride, cache);
+                cache.Dispose();
+            }
+
+            private void Write(int index, int x, int z, in BlendCache cache){
+                WorldSampler.SampleColumn(x, z, Config, cache, out ColumnSample s);
 
                 if (WriteFields) Fields[index] = s.Fields;
                 if (WriteHeight) Height[index] = s.Height;

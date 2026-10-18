@@ -69,9 +69,11 @@ namespace Engine.Tests.EditMode{
         ///     Two Biome-first biomes that differ in temperature and in their height parameters, so the boundary
         ///     between them carries a cliff (offset 120 vs 160). Block ids are patched in (no registry).
         /// </summary>
-        private void UseBiomeFirst(){
+        private void UseBiomeFirst(BlendMethod material = BlendMethod.None, BlendMethod height = BlendMethod.None){
             WorldGenSettings s = Create<WorldGenSettings>("WG");
             s.Architecture = GenArchitecture.BiomeFirst;
+            s.MaterialMethod = material;
+            s.HeightMethod = height;
             BiomeSet set = Create<BiomeSet>("Set");
             set.Biomes.Add(MakeBiome("Cold", .25f, 160f, 14f, 15f));
             set.Biomes.Add(MakeBiome("Warm", .75f, 120f, 6f, 0f));
@@ -187,6 +189,28 @@ namespace Engine.Tests.EditMode{
                 AssertMatchesSampler(leftEdge[z], a, $"left edge z={z}");
                 AssertMatchesSampler(Column(0, z), b, $"right edge z={z}");
             }
+        }
+
+        [Test]
+        public void PrepareChunkMaps_BiomeFirst_SpatialMethodsAreTheSamplerDecision(
+            [Values(BlendMethod.DistanceBlend, BlendMethod.DistortedBoundary)] BlendMethod height){
+            // Phase 3 (BLD-11, GEN-02): the chunk's padded lattice cache gives the pure sampler's result, also at
+            // boundaries, where the blended height and the dithered surface pick differ from the hard biome.
+            UseBiomeFirst(BlendMethod.DistanceBlend, height);
+            int blended = 0;
+            for (int k = 0; k < 40 && blended == 0; k++){
+                int2 chunk = new(k * 23 - 400, k * 29);
+                Prepare(chunk);
+                for (int x = 0; x < ChunkWidth; x++)
+                for (int z = 0; z < ChunkDepth; z++){
+                    int wx = chunk.x * ChunkWidth + x, wz = chunk.y * ChunkDepth + z;
+                    ColumnSample s = WorldSampler.SampleColumn(wx, wz, _config.WorldGen);
+                    AssertMatchesSampler(Column(x, z), s, $"({wx},{wz})");
+                    if (s.HeightWeights.Max(2) < 1f) blended++;
+                }
+            }
+
+            Assert.Greater(blended, 0, "some sampled column lies in a transition");
         }
 
         [Test]

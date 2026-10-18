@@ -1,4 +1,5 @@
 using Engine.Scripts.VoxelConfig.Data.Generation;
+using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Burst;
@@ -39,6 +40,29 @@ namespace Engine.Scripts.WorldGen.Classify{
             for (int b = 0; b < count; b++){
                 float d = DistanceSquared(f, cfg.Biomes[b], cfg);
                 if (d < bestDistance){ // strict: equal distances keep the lower index (GEN-23)
+                    bestDistance = d;
+                    best = b;
+                }
+            }
+
+            return best;
+        }
+
+        /// <summary>
+        ///     Every active biome's squared distance d_b² into <paramref name="distancesSq" /> (slot b; a 16-float
+        ///     vector, not weights) and the hard class argmin_b d_b with the same tie rule as <see cref="Classify(in WorldFields,in WorldGenConfig)" />.
+        ///     6D with <paramref name="h" /> when <paramref name="withHeight" /> (Terrain-first), else 5D. Computed once
+        ///     per column and shared by the hard class and method 4 (PERF-07).
+        /// </summary>
+        public static int Distances(in WorldFields f, float h, bool withHeight, in WorldGenConfig cfg, out BlendWeights distancesSq){
+            distancesSq = default;
+            int count = cfg.BiomeCount;
+            int best = -1;
+            float bestDistance = float.MaxValue;
+            for (int b = 0; b < count; b++){
+                float d = withHeight ? DistanceSquared(f, h, cfg.Biomes[b], cfg) : DistanceSquared(f, cfg.Biomes[b], cfg);
+                distancesSq[b] = d;
+                if (d < bestDistance){
                     bestDistance = d;
                     best = b;
                 }

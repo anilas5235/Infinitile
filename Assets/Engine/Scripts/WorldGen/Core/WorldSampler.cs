@@ -16,7 +16,8 @@ namespace Engine.Scripts.WorldGen.Core{
     ///         Phase 0: fields, hard 5D classification, one-hot weights and the common height formula §5.7.
     ///         Phase 1: the Terrain-first path (spline height, then 6D classification, §7). Phase 2: the
     ///         Biome-first path (5D classification, then the height composed from the biome parameters, §8,
-    ///         <see cref="BiomeFirstHeight" />). Phase 3 adds the blend methods and the surface pick, Phase 4 flora.
+    ///         <see cref="BiomeFirstHeight" />). Phase 3: the four blend methods per stage (<see cref="BlendMethods" />)
+    ///         and the dithered surface pick (<see cref="SurfacePick" />). Phase 4 adds flora.
     ///     </para>
     ///     <para>
     ///         The <c>out</c>-parameter overloads are Burst direct-call entry points (GEN-16): managed callers
@@ -41,42 +42,61 @@ namespace Engine.Scripts.WorldGen.Core{
             return fields;
         }
 
-        /// <summary>Full column decision at block column (<paramref name="x" />, <paramref name="z" />).</summary>
+        /// <summary>
+        ///     Full column decision at block column (<paramref name="x" />, <paramref name="z" />): the pure function
+        ///     (GEN-01). Spatial blend methods evaluate every kernel tap here, so this is the slow reference; jobs
+        ///     pass a <see cref="BlendCache" /> to the overload below and get the same bits (GEN-02).
+        /// </summary>
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
         public static void SampleColumn(int x, int z, in WorldGenConfig cfg, out ColumnSample sample){
+            BlendCache noCache = default;
+            SampleColumn(x, z, cfg, noCache, out sample);
+        }
+
+        /// <summary>
+        ///     <see cref="SampleColumn(int,int,in WorldGenConfig,out ColumnSample)" /> with the padded lattices of the
+        ///     surrounding block of columns (BLD-11); called from Burst jobs only. Taps outside the cache fall back to
+        ///     direct evaluation, so the result never depends on the cache (R3, GEN-02). Direct-call entry point
+        ///     (GEN-16), so a managed caller such as a test of <c>PrepareChunkMaps</c> runs the job's code.
+        /// </summary>
+        [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
+        public static void SampleColumn(int x, int z, in WorldGenConfig cfg, in BlendCache cache, out ColumnSample sample){
             float2 p = new(x, z);
+            int2 column = new(x, z);
+            int biomeCount = cfg.BiomeCount;
             ColumnSample s = default;
             SampleFields(p, cfg, out s.Fields);
 
             float unclamped;
+            BlendWeights distancesSq;
             if (cfg.Architecture == GenArchitecture.TerrainFirst){
-                // Terrain-first (§7): the spline height comes first and does not depend on any biome (TRN-03);
-                // the normalised height h then takes part in the 6D classification (TRN-10). The height stage does
-                // not exist here (TRN-21).
+                // Terrain-first (§7): the spline height comes first and does not depend on any biome (TRN-03, TRN-20:
+                // identical for every material method); the normalised height h then takes part in the 6D
+                // classification (TRN-10). The height stage does not exist here (TRN-21).
                 TerrainFirstHeight.Sample(p, s.Fields, cfg, out s.TerrainParams, out s.Height, out unclamped);
-                s.NormalizedHeight = math.saturate((s.Height - cfg.HeightMin) / (cfg.HeightMax - cfg.HeightMin));
-                s.HardBiome = BiomeClassifier.Classify(s.Fields, s.NormalizedHeight, cfg);
-
-                // Phase 0/1: material method 1 (None) (§9.2); Phase 3 routes through the per-stage methods (BLD-02).
-                s.MaterialWeights = BlendWeights.OneHot(s.HardBiome);
-                s.HeightWeights = s.MaterialWeights;
-                s.DominantMaterialBiome = s.HardBiome;
+                s.NormalizedHeight = NormalizedHeight(s.Height, cfg);
+                s.HardBiome = BiomeClassifier.Distances(s.Fields, s.NormalizedHeight, true, cfg, out distancesSq);
+                s.MaterialWeights = BlendMethods.Compute(BlendStage.Material, cfg.MaterialMethod, column, s.HardBiome,
+                    distancesSq, cfg, cache);
+                s.HeightWeights = BlendWeights.OneHot(s.HardBiome);
             }
             else{
-                // Biome-first (§8): hard 5D classification (BIO-01, no height dimension), then the height is
-                // composed from the height-stage weights (BIO-02). Phase 2 has only method None, so both weight
-                // sets are one-hot and the height jumps at biome boundaries; Phase 3 adds the blend methods
-                // (material and height stage separately, BLD-02).
-                s.HardBiome = BiomeClassifier.Classify(s.Fields, cfg);
-                s.MaterialWeights = BlendWeights.OneHot(s.HardBiome);
-                s.HeightWeights = s.MaterialWeights;
-                s.DominantMaterialBiome = s.HardBiome;
+                // Biome-first (§8): 5D classification (BIO-01, no height dimension); each stage computes its weights
+                // with its own method (BLD-01), and the height is composed from the height-stage weights (BIO-02).
+                s.HardBiome = BiomeClassifier.Distances(s.Fields, 0f, false, cfg, out distancesSq);
+                s.MaterialWeights = BlendMethods.Compute(BlendStage.Material, cfg.MaterialMethod, column, s.HardBiome,
+                    distancesSq, cfg, cache);
+                // PERF-07: the same method with the same strength gives the same weights; compute them once.
+                s.HeightWeights = cfg.StagesShareWeights
+                    ? s.MaterialWeights
+                    : BlendMethods.Compute(BlendStage.Height, cfg.HeightMethod, column, s.HardBiome, distancesSq, cfg, cache);
                 BiomeFirstHeight.Sample(p, s.HeightWeights, cfg, out s.Height, out unclamped);
-                s.NormalizedHeight = math.saturate((s.Height - cfg.HeightMin) / (cfg.HeightMax - cfg.HeightMin));
+                s.NormalizedHeight = NormalizedHeight(s.Height, cfg);
             }
 
-            // Surface pick (§9.6) arrives in Phase 3; until then the dominant material biome supplies the blocks.
-            s.SurfaceSource = s.DominantMaterialBiome;
+            s.DominantMaterialBiome = biomeCount > 0 ? s.MaterialWeights.ArgMax(biomeCount) : -1;
+            // §9.6: dithered surface pick from the material weights (BLD-40); one-hot weights return their biome (BLD-41).
+            s.SurfaceSource = SurfacePick.Pick(x, z, cfg.Seed, HashSalts.SurfacePick, s.MaterialWeights, biomeCount);
 
             s.Clamped = s.Height != unclamped;
             s.ColumnHeight = (int)math.floor(s.Height);
@@ -85,6 +105,33 @@ namespace Engine.Scripts.WorldGen.Core{
             s.FloraSpecies = 0;
             s.FloraSource = -1;
             sample = s;
+        }
+
+        /// <summary>h = saturate((H − Hmin)/(Hmax − Hmin)) (TRN-10).</summary>
+        public static float NormalizedHeight(float height, in WorldGenConfig cfg){
+            return math.saturate((height - cfg.HeightMin) / (cfg.HeightMax - cfg.HeightMin));
+        }
+
+        /// <summary>
+        ///     Hard classification nn(q) at world position <paramref name="q" /> (§9.3): the architecture's own vector,
+        ///     5D in Biome-first, 6D with h(q) in Terrain-first. At an integer column it equals that column's
+        ///     <see cref="ColumnSample.HardBiome" />; -1 without active biomes. Direct-call entry point (GEN-16): the
+        ///     lattice of a managed <c>BlendCache.Build</c> classifies with the jobs' code.
+        /// </summary>
+        [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
+        public static int ClassifyAt(in float2 q, in WorldGenConfig cfg){
+            WorldFields f = ClimateFields.Sample(q, cfg.Climate);
+            if (cfg.Architecture != GenArchitecture.TerrainFirst) return BiomeClassifier.Classify(f, cfg);
+            TerrainFirstHeight.Sample(q, f, cfg, out float3 _, out float height, out float _);
+            return BiomeClassifier.Classify(f, NormalizedHeight(height, cfg), cfg);
+        }
+
+        /// <summary>
+        ///     nn~(q) = nn(q + A·Ω(q)) (§9.4): every field, and in Terrain-first h, sampled at the warped position.
+        /// </summary>
+        [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
+        public static int ClassifyWarpedAt(in float2 q, in WorldGenConfig cfg){
+            return ClassifyAt(WarpField.Warp(q, cfg), cfg);
         }
 
         /// <inheritdoc cref="SampleColumn(int,int,in WorldGenConfig,out ColumnSample)" />
