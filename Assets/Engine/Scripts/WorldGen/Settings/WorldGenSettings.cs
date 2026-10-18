@@ -171,20 +171,22 @@ namespace Engine.Scripts.WorldGen.Settings{
                 Debug.LogWarning($"{name}: GlobalOctaveWeights ({GlobalOctaveWeights.Length}) and OctaveWavelengths ({OctaveWavelengths.Length}) differ in length.", this);
             if (HeightMin >= HeightMax)
                 Debug.LogWarning($"{name}: HeightMin must be below HeightMax.", this);
-            foreach ((string field, float value) in InvalidWavelengths())
-                Debug.LogWarning($"{name}: {field} must be a positive, finite wavelength, got {value}.", this);
+            foreach ((string field, float value) in InvalidScales())
+                Debug.LogWarning($"{name}: {field} must be positive and finite, got {value}.", this);
         }
 
         /// <summary>
-        ///     Every wavelength (in blocks) that the samplers divide by and that is not positive and finite. They are
-        ///     reported rather than clamped (R5).
+        ///     Every wavelength (in blocks) the samplers divide by, and the climate frequency multiplier, that is not
+        ///     positive and finite. They are reported rather than clamped (R5).
         /// </summary>
-        private IEnumerable<(string field, float value)> InvalidWavelengths(){
+        private IEnumerable<(string field, float value)> InvalidScales(){
             if (OctaveWavelengths != null)
                 for (int i = 0; i < OctaveWavelengths.Length; i++)
-                    if (!IsValidWavelength(OctaveWavelengths[i])) yield return ($"OctaveWavelengths[{i}]", OctaveWavelengths[i]);
-            if (!IsValidWavelength(PeakWavelength)) yield return (nameof(PeakWavelength), PeakWavelength);
-            if (!IsValidWavelength(WarpWavelength)) yield return (nameof(WarpWavelength), WarpWavelength);
+                    if (!IsPositiveFinite(OctaveWavelengths[i])) yield return ($"OctaveWavelengths[{i}]", OctaveWavelengths[i]);
+            if (!IsPositiveFinite(PeakWavelength)) yield return (nameof(PeakWavelength), PeakWavelength);
+            if (!IsPositiveFinite(WarpWavelength)) yield return (nameof(WarpWavelength), WarpWavelength);
+            // Not a divisor, but 0 flattens every climate field and a negative value mirrors the world (GEN-07).
+            if (!IsPositiveFinite(ClimateFrequencyScale)) yield return (nameof(ClimateFrequencyScale), ClimateFrequencyScale);
 
             (string field, NoiseProfileSettings profile)[] profiles ={
                 (nameof(temperatureProfile), temperatureProfile),
@@ -195,12 +197,12 @@ namespace Engine.Scripts.WorldGen.Settings{
                 (nameof(weirdnessProfile), weirdnessProfile)
             };
             foreach ((string field, NoiseProfileSettings profile) in profiles)
-                if (profile != null && !IsValidWavelength(profile.scale)) yield return (field + ".scale", profile.scale);
+                if (profile != null && !IsPositiveFinite(profile.scale)) yield return (field + ".scale", profile.scale);
         }
 
-        private static bool IsValidWavelength(float wavelength){
+        private static bool IsPositiveFinite(float value){
             // NaN fails the comparison.
-            return wavelength > 0f && !float.IsPositiveInfinity(wavelength);
+            return value > 0f && !float.IsPositiveInfinity(value);
         }
 
         // --- INT-03: Burst mirror -------------------------------------------------------------------------------------
@@ -217,8 +219,8 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (octaveCount == 0) throw new InvalidOperationException($"{name}: OctaveWavelengths is empty.");
             if (octaveCount > DetailOctaves.MaxOctaves)
                 throw new InvalidOperationException($"{name}: more than {DetailOctaves.MaxOctaves} detail octaves.");
-            foreach ((string field, float value) in InvalidWavelengths())
-                throw new InvalidOperationException($"{name}: {field} must be a positive, finite wavelength, got {value}.");
+            foreach ((string field, float value) in InvalidScales())
+                throw new InvalidOperationException($"{name}: {field} must be positive and finite, got {value}.");
 
             List<Biome> active = ActiveBiomes();
 

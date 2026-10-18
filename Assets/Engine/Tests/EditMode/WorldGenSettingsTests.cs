@@ -166,7 +166,7 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void ToConfig_RejectsInvalidWavelengths(){
+        public void ToConfig_RejectsInvalidScales(){
             WorldGenSettings octave = Create<WorldGenSettings>("WG");
             octave.OctaveWavelengths = new[]{ 512f, 0f };
             WorldGenSettings peak = Create<WorldGenSettings>("WG");
@@ -175,6 +175,8 @@ namespace Engine.Tests.EditMode{
             warp.WarpWavelength = float.PositiveInfinity;
             WorldGenSettings climate = Create<WorldGenSettings>("WG");
             climate.continentalLayer.warpNoise.scale = -1800f;
+            WorldGenSettings frequency = Create<WorldGenSettings>("WG");
+            frequency.ClimateFrequencyScale = 0f;
 
             StringAssert.Contains("OctaveWavelengths[1]",
                 Assert.Throws<System.InvalidOperationException>(() => octave.ToConfig(1, allocator: Allocator.Temp)).Message);
@@ -184,6 +186,8 @@ namespace Engine.Tests.EditMode{
                 Assert.Throws<System.InvalidOperationException>(() => warp.ToConfig(1, allocator: Allocator.Temp)).Message);
             StringAssert.Contains("continentalLayer.warpNoise.scale",
                 Assert.Throws<System.InvalidOperationException>(() => climate.ToConfig(1, allocator: Allocator.Temp)).Message);
+            StringAssert.Contains("ClimateFrequencyScale",
+                Assert.Throws<System.InvalidOperationException>(() => frequency.ToConfig(1, allocator: Allocator.Temp)).Message);
         }
 
         [Test]
