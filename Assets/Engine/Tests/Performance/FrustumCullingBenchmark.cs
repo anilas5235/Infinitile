@@ -12,7 +12,8 @@ namespace Engine.Tests.Performance{
     ///     PERF-02: the CPU frustum test reference. Tests one buffer of page bounds (1024 pages, a block of
     ///     partitions around the camera, part of them in view) against six planes with
     ///     <see cref="FrustumCulling.IsVisible(in PageBounds, in FrustumPlanes)" />. The GPU kernel does the same
-    ///     work per page, so this is what a CPU fallback would cost per buffer and camera.
+    ///     work per page, so this is what a CPU fallback would cost per buffer and camera. Each sample is the total
+    ///     of <see cref="IterationsPerMeasurement" /> passes over the buffer (Measure.Method does not average them).
     /// </summary>
     [TestFixture]
     internal class FrustumCullingBenchmark{

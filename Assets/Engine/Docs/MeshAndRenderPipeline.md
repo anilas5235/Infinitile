@@ -336,9 +336,9 @@ every page change) with per-page frustum culling that runs once per camera and f
   append buffer, args and property block per render buffer). States are created on first sight and released when
   the camera is destroyed or has not rendered for 300 frames.
 - **Shadows (CUL-05).** With `RendererSettings.shadows` not `Off` and a main light, every buffer is culled a second
-  time with the AABB extruded along the light direction by the shadow distance and drawn `ShadowsOnly`. The
-  mechanics are in place; the voxel shaders have no `ShadowCaster` pass yet, so this path does not produce shadows
-  until one is added.
+  time with the AABB extruded along the light direction by the shadow distance and drawn `ShadowsOnly`; the main
+  pass stops casting but still receives shadows. The mechanics are in place; the voxel shaders have no
+  `ShadowCaster` pass yet, so this path does not produce shadows until one is added.
 - **Debugging (CUL-06).** `RendererSettings.gpuCulling` (default on) and `VoxelWorldRenderer.GpuCulling` fall back
   to "every page with points is visible". `FreezeCulling` keeps the game camera's last unfrozen frustum and culls
   *every* camera with it, so the Scene view (or a detached game camera) shows exactly the pages the game camera
