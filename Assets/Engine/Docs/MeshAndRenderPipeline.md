@@ -340,9 +340,13 @@ every page change) with per-page frustum culling that runs once per camera and f
   mechanics are in place; the voxel shaders have no `ShadowCaster` pass yet, so this path does not produce shadows
   until one is added.
 - **Debugging (CUL-06).** `RendererSettings.gpuCulling` (default on) and `VoxelWorldRenderer.GpuCulling` fall back
-  to "every page with points is visible". `FreezeCulling` keeps the last planes so you can fly out and look at what
-  was culled; `ShowCullingOverlay` shows visible / allocated pages per layer and buffer (read back asynchronously
-  with one frame of latency).
+  to "every page with points is visible". `FreezeCulling` keeps the game camera's last unfrozen frustum and culls
+  *every* camera with it, so the Scene view (or a detached game camera) shows exactly the pages the game camera
+  kept; the frozen frustum is drawn as a yellow gizmo. `ShowCullingOverlay` shows visible / allocated pages per
+  layer and buffer (read back asynchronously with one frame of latency). All three are Inspector check-boxes on
+  `VoxelWorldRenderer`; in the game `CullingDebugKeys` maps them to F7 (overlay), F8 (culling), F9 (freeze).
+  To watch culling in the Editor: enter Play, press F9 (or tick *Freeze Culling*), then orbit the Scene view
+  around the yellow frustum.
 - **Tests (CUL-08).** `FrustumCulling` is the C# reference of the GPU test (EditMode `FrustumCullingTests`); the
   PlayMode `GpuCullingTests` read the GPU set back for 50 random camera poses and compare it page by page, check
   the shadow list, the fallback, the camera life-cycle, freeze, the allocation-free draw path and log culling

@@ -323,6 +323,43 @@ namespace Engine.Tests.PlayMode{
         }
 
         [UnityTest]
+        public IEnumerator FreezeCulling_AppliesTheGameFrustumToEveryCamera(){
+            // CUL-06: while frozen, a Scene view camera culls with the game camera's last unfrozen frustum, so the
+            // Scene view shows exactly the pages the game camera kept; once unfrozen it goes back to its own
+            VoxelWorldRenderer renderer = Renderer();
+            ComputeShader shader = PlayModeFixtures.GetPrivateField<ComputeShader>(Culler(renderer), "_shader");
+            using GpuCuller culler = new(shader);
+            GameObject sceneObject = new("GpuCullingTests scene view camera");
+            Camera sceneCamera = sceneObject.AddComponent<Camera>();
+            sceneCamera.enabled = false;
+            sceneCamera.cameraType = CameraType.SceneView;
+            sceneCamera.transform.SetPositionAndRotation(new Vector3(300f, 120f, -50f), Quaternion.Euler(45f, 180f, 0f));
+
+            Assert.AreEqual(CameraType.Game, _camera.cameraType);
+            Assert.IsFalse(culler.TryGetFrozenFrustum(out _), "no game frustum before a game camera was seen");
+            _camera.transform.SetPositionAndRotation(new Vector3(0f, 50f, 0f), Quaternion.identity);
+            FrustumPlanes game = culler.BeginCamera(_camera, false, 1).Planes;
+            FrustumPlanes own = culler.BeginCamera(sceneCamera, false, 1).Planes;
+            Assert.AreNotEqual(game.P0, own.P0, "the two cameras must look at different things");
+            Assert.IsTrue(culler.TryGetFrozenFrustum(out Matrix4x4 inverseViewProjection));
+            Assert.AreNotEqual(Matrix4x4.zero, inverseViewProjection);
+
+            FrustumPlanes frozenScene = culler.BeginCamera(sceneCamera, true, 2).Planes;
+            FrustumPlanes frozenGame = culler.BeginCamera(_camera, true, 2).Planes;
+            for (int i = 0; i < FrustumPlanes.Count; i++){
+                Assert.AreEqual(game[i], frozenScene[i], $"scene view plane {i} must be the game camera's while frozen");
+                Assert.AreEqual(game[i], frozenGame[i], $"game plane {i} changed while frozen");
+            }
+
+            FrustumPlanes refreshed = culler.BeginCamera(sceneCamera, false, 3).Planes;
+            for (int i = 0; i < FrustumPlanes.Count; i++)
+                Assert.AreEqual(own[i], refreshed[i], $"scene view plane {i} must be its own again once unfrozen");
+
+            Object.Destroy(sceneObject);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator Draw_DoesNotAllocateAfterWarmUp(){
             // PERF-04 for the draw callback: culling and indirect draw submission per camera must be alloc-free
             VoxelWorldRenderer renderer = Renderer();

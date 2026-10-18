@@ -59,22 +59,34 @@ namespace Engine.Scripts.Render{
         private Camera _overlayCamera; // CUL-06: the game camera whose counts the overlay shows
         private RenderBufferManager[] _layers; // PERF-04: fixed array for per-frame loops
 
+        [Header("Culling debug (CUL-06)")]
+        [Tooltip("GPU page culling; off draws every page with points. Initialised from RendererSettings.gpuCulling.")]
+        [SerializeField] private bool gpuCulling = true;
+
+        [Tooltip("Keeps the game camera's frustum: every camera (Scene view included) then draws exactly what the game camera kept. A gizmo shows the frozen frustum.")]
+        [SerializeField] private bool freezeCulling;
+
+        [Tooltip("Visible / allocated pages per layer and buffer for the game camera (allocates while on).")]
+        [SerializeField] private bool showCullingOverlay;
+
         /// <summary>
         ///     CUL-06: GPU frustum culling on/off at runtime (initialised from <see cref="RendererSettings.gpuCulling" />).
         ///     Off falls back to "every page with points is visible"; the image must not change.
         /// </summary>
-        public bool GpuCulling{ get; set; } = true;
+        public bool GpuCulling{ get => gpuCulling; set => gpuCulling = value; }
 
         /// <summary>
-        ///     CUL-06: keeps the last frustum of every camera, so you can fly out and look at what was culled.
+        ///     CUL-06: keeps the last unfrozen frustum of the game camera and culls every camera with it, so you can
+        ///     fly out (Scene view, or a free game camera) and look at what was culled. The frozen frustum is drawn
+        ///     as a yellow gizmo in the Scene view.
         /// </summary>
-        public bool FreezeCulling{ get; set; }
+        public bool FreezeCulling{ get => freezeCulling; set => freezeCulling = value; }
 
         /// <summary>
         ///     CUL-06: draws visible pages / total pages per buffer and layer for the game camera. Debug only: the
         ///     read-backs and the label strings allocate while it is on.
         /// </summary>
-        public bool ShowCullingOverlay{ get; set; }
+        public bool ShowCullingOverlay{ get => showCullingOverlay; set => showCullingOverlay = value; }
 
         private InFlightBuild[] _inFlightBuilds;
         private PartitionBuildRequest[] _buildRequests; // PERF-04: one reusable request per in-flight slot
@@ -347,6 +359,29 @@ namespace Engine.Scripts.Render{
 
             GUILayout.EndArea();
         }
+
+#if UNITY_EDITOR
+        private static readonly Vector3[] FrustumCorners = new Vector3[8];
+
+        /// <summary>CUL-06: draws the frozen game-camera frustum in the Scene view while culling is frozen.</summary>
+        private void OnDrawGizmos(){
+            if (!freezeCulling || _culler == null || !_culler.TryGetFrozenFrustum(out Matrix4x4 inverseViewProjection))
+                return;
+
+            // corners of the clip-space cube (GL convention: z from -1 near to +1 far) back in world space
+            for (int i = 0; i < 8; i++){
+                Vector3 ndc = new((i & 1) == 0 ? -1f : 1f, (i & 2) == 0 ? -1f : 1f, (i & 4) == 0 ? -1f : 1f);
+                FrustumCorners[i] = inverseViewProjection.MultiplyPoint(ndc);
+            }
+
+            Gizmos.color = Color.yellow;
+            for (int i = 0; i < 8; i++){
+                if ((i & 1) == 0) Gizmos.DrawLine(FrustumCorners[i], FrustumCorners[i | 1]); // x edges
+                if ((i & 2) == 0) Gizmos.DrawLine(FrustumCorners[i], FrustumCorners[i | 2]); // y edges
+                if ((i & 4) == 0) Gizmos.DrawLine(FrustumCorners[i], FrustumCorners[i | 4]); // near-far edges
+            }
+        }
+#endif
 
         /// <summary>
         ///     Requests that render buffers be rebuilt on the next LateUpdate.

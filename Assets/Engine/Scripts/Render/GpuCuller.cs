@@ -30,6 +30,9 @@ namespace Engine.Scripts.Render{
         private readonly List<Camera> _stale = new(); // PERF-04: reused when releasing camera states
         private readonly Plane[] _planeScratch = new Plane[FrustumPlanes.Count];
         private readonly Vector4[] _planeUpload = new Vector4[FrustumPlanes.Count];
+        private FrustumPlanes _gamePlanes; // CUL-06: last unfrozen game-camera frustum, used by every camera while frozen
+        private Matrix4x4 _gameInverseViewProjection;
+        private bool _hasGamePlanes;
         private bool _isDisposed;
 
         /// <param name="pageCullingShader">The <c>PageCulling.compute</c> asset (kernels CullPages and WriteArgs).</param>
@@ -51,8 +54,9 @@ namespace Engine.Scripts.Render{
 
         /// <summary>
         ///     Returns the state of <paramref name="cam" /> for this frame, creating it on first sight (CUL-04), and
-        ///     refreshes its frustum planes unless culling is frozen (CUL-06: the last planes stay in use so the
-        ///     camera can fly out and look at what was culled).
+        ///     refreshes its frustum planes unless culling is frozen. CUL-06: while frozen, every camera culls with
+        ///     the last unfrozen frustum of the game camera, so the Scene view (or a detached game camera) shows
+        ///     exactly the pages the game camera kept and nothing it culled.
         /// </summary>
         internal CameraCullState BeginCamera(Camera cam, bool freeze, int frame){
             if (!_cameras.TryGetValue(cam, out CameraCullState state)){
@@ -61,12 +65,34 @@ namespace Engine.Scripts.Render{
             }
 
             state.LastUsedFrame = frame;
-            if (!freeze || !state.HasPlanes){
+            if (!freeze){
+                state.Planes = FrustumPlanes.FromCamera(cam, _planeScratch);
+                state.HasPlanes = true;
+                if (cam.cameraType == CameraType.Game){
+                    _gamePlanes = state.Planes;
+                    _gameInverseViewProjection = (cam.projectionMatrix * cam.worldToCameraMatrix).inverse;
+                    _hasGamePlanes = true;
+                }
+            }
+            else if (_hasGamePlanes){
+                state.Planes = _gamePlanes;
+                state.HasPlanes = true;
+            }
+            else if (!state.HasPlanes){
                 state.Planes = FrustumPlanes.FromCamera(cam, _planeScratch);
                 state.HasPlanes = true;
             }
 
             return state;
+        }
+
+        /// <summary>
+        ///     CUL-06: the frustum every camera uses while culling is frozen (inverse view-projection of the game
+        ///     camera at its last unfrozen frame), for drawing it as a gizmo. False until a game camera has rendered.
+        /// </summary>
+        internal bool TryGetFrozenFrustum(out Matrix4x4 inverseViewProjection){
+            inverseViewProjection = _gameInverseViewProjection;
+            return _hasGamePlanes;
         }
 
         /// <summary>
