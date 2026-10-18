@@ -64,7 +64,7 @@ namespace Engine.Tests.EditMode{
         }
 
         private WorldGenConfig Config(int seed, params Biome[] biomes){
-            return Config(seed, GenArchitecture.Legacy, biomes);
+            return Config(seed, GenArchitecture.BiomeFirst, biomes);
         }
 
         /// <summary>Config for <paramref name="architecture" />; Terrain-first gets the §19.1 placeholder splines.</summary>
@@ -85,6 +85,9 @@ namespace Engine.Tests.EditMode{
         }
 
         private delegate void SampleColumnFn(int x, int z, in WorldGenConfig cfg, out ColumnSample sample);
+
+        private delegate void BiomeHeightFn(in float2 p, in BlendWeights weights, in WorldGenConfig cfg,
+            out float height, out float unclamped);
 
         /// <summary>
         ///     GEN-16 guard: a Burst compile error in a direct-call entry point (struct return, bool in the
@@ -111,6 +114,24 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(tfDirect.Height, tfPointer.Height);
             Assert.AreEqual(tfDirect.TerrainParams, tfPointer.TerrainParams);
             Assert.AreEqual(tfDirect.HardBiome, tfPointer.HardBiome);
+        }
+
+        [Test]
+        public void BiomeFirstHeight_CompilesWithBurst(){
+            // GEN-16 guard for the second direct-call entry point (the calibration helper and tests call it).
+            Assert.IsTrue(BurstCompiler.IsEnabled, "Burst compilation is disabled in the Editor (Jobs > Burst)");
+            FunctionPointer<BiomeHeightFn> fp = BurstCompiler.CompileFunctionPointer<BiomeHeightFn>(BiomeFirstHeight.Sample);
+            Assert.IsTrue(fp.IsCreated);
+
+            WorldGenConfig cfg = Config(5, PlaceholderBiomes());
+            BlendWeights w = default;
+            w[0] = 0.25f;
+            w[2] = 0.75f;
+            float2 p = new(321f, -77f);
+            fp.Invoke(p, w, cfg, out float hPointer, out float uPointer);
+            BiomeFirstHeight.Sample(p, w, cfg, out float hDirect, out float uDirect);
+            Assert.AreEqual(hDirect, hPointer);
+            Assert.AreEqual(uDirect, uPointer);
         }
 
         private NativeArray<T> Alloc<T>(int count) where T : unmanaged{
@@ -333,6 +354,96 @@ namespace Engine.Tests.EditMode{
             Assert.Greater(boundaries, 5, "the walk crosses biome boundaries");
             // Per-block height steps come from the octaves alone; the largest octave slope is a few blocks at most.
             Assert.Less(maxStep, 8f, $"height jump of {maxStep} at a biome boundary");
+        }
+
+        // --- Biome-first (§8, BIO-01…03, GEN-22, TST-05) -------------------------------------------------------------
+
+        [Test]
+        public void SampleColumn_BiomeFirst_ClassifiesInFiveDimensionsBeforeTheHeight(){
+            // BIO-01: the class is argmin over (T, F, C, E, (PV+1)/2) only; h never enters, and the one-hot weights
+            // of both stages follow the hard class (method None).
+            WorldGenConfig cfg = Config(4242, GenArchitecture.BiomeFirst, PlaceholderBiomes());
+            Unity.Mathematics.Random rng = new(11);
+            int classesSeen = 0;
+            for (int n = 0; n < 500; n++){
+                int2 p = rng.NextInt2(-30000, 30000);
+                ColumnSample s = WorldSampler.SampleColumn(p.x, p.y, cfg);
+                Assert.AreEqual(BiomeClassifier.Classify(s.Fields, cfg), s.HardBiome, $"5D class at {p}");
+                Assert.AreEqual(s.HardBiome, s.MaterialWeights.ArgMax());
+                Assert.AreEqual(1f, s.HeightWeights[s.HardBiome]);
+                Assert.AreEqual(float3.zero, s.TerrainParams, "no spline parameters in Biome-first");
+                classesSeen |= 1 << s.HardBiome;
+            }
+
+            Assert.Greater(math.countbits(classesSeen), 3, "the placeholder world shows several biomes");
+        }
+
+        [Test]
+        public void SampleColumn_BiomeFirst_HeightIsTheHardBiomesFormula(){
+            // With one-hot weights the blended parameters are the hard biome's own (§8.2): H = Offset_b + Σ a_{b,i} N_i + J_b P
+            // with a_{b,i} = HeightAmplitude_b · OctaveWeights_{b,i} (GEN-22).
+            Biome[] biomes = PlaceholderBiomes();
+            WorldGenConfig cfg = Config(77, GenArchitecture.BiomeFirst, biomes);
+            for (int n = 0; n < 200; n++){
+                int x = n * 613 - 50000, z = n * 389 + 17;
+                ColumnSample s = WorldSampler.SampleColumn(x, z, cfg);
+                Biome b = biomes[s.HardBiome];
+                float2 p = new(x, z);
+                float expected = b.HeightOffset;
+                for (int i = 0; i < 6; i++)
+                    expected += b.HeightAmplitude * b.OctaveWeights[i] * DetailOctaves.Sample(i, p, 512f / (1 << i), 77u);
+                expected += b.Jaggedness * PeakNoise.Sample(p, 192f, 77u);
+                Assert.AreEqual(math.clamp(expected, 40f, 250f), s.Height, 1e-3f, $"H at ({x},{z}) in {b.name}");
+            }
+        }
+
+        [Test]
+        public void BiomeFirstHeight_IsLinearInTheWeights(){
+            // TST-05: computing H once from blended parameters equals Σ w_b H_b, because every biome samples the
+            // same N_i and P (BIO-03) and only the coefficients differ (BIO-02).
+            WorldGenConfig cfg = Config(2025, GenArchitecture.BiomeFirst, PlaceholderBiomes());
+            Unity.Mathematics.Random rng = new(3);
+            for (int n = 0; n < 200; n++){
+                float2 p = rng.NextFloat2(-20000f, 20000f);
+                BlendWeights w = default;
+                float sum = 0f;
+                for (int b = 0; b < cfg.BiomeCount; b++){
+                    w[b] = rng.NextFloat();
+                    sum += w[b];
+                }
+
+                float expected = 0f;
+                for (int b = 0; b < cfg.BiomeCount; b++){
+                    w[b] /= sum;
+                    BiomeFirstHeight.Sample(p, BlendWeights.OneHot(b), cfg, out _, out float hb);
+                    expected += w[b] * hb;
+                }
+
+                BiomeFirstHeight.Sample(p, w, cfg, out float height, out float unclamped);
+                Assert.AreEqual(expected, unclamped, 1e-3f, $"Σ w_b H_b at {p}");
+                Assert.AreEqual(math.clamp(unclamped, cfg.HeightMin, cfg.HeightMax), height);
+            }
+        }
+
+        [Test]
+        public void SampleColumn_BiomeFirst_StepsAtBiomeBoundaries(){
+            // Phase 2 acceptance: without a height blend the Offsets differ across a boundary, so cliffs appear;
+            // the counterpart of SampleColumn_TerrainFirst_IsContinuousAcrossBiomeBoundaries.
+            WorldGenConfig cfg = Config(2024, GenArchitecture.BiomeFirst, PlaceholderBiomes());
+            int boundaries = 0, steps = 0;
+            ColumnSample previous = WorldSampler.SampleColumn(-20000, 0, cfg);
+            for (int x = -19999; x < 20000; x++){
+                ColumnSample s = WorldSampler.SampleColumn(x, 0, cfg);
+                if (s.HardBiome != previous.HardBiome){
+                    boundaries++;
+                    if (math.abs(s.Height - previous.Height) > 8f) steps++;
+                }
+
+                previous = s;
+            }
+
+            Assert.Greater(boundaries, 5, "the walk crosses biome boundaries");
+            Assert.Greater(steps, 0, "at least one boundary shows a cliff (expected without blending)");
         }
 
         // --- Region API (GEN-17) ---------------------------------------------------------------------------------------

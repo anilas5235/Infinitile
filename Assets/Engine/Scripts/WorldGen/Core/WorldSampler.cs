@@ -13,10 +13,10 @@ namespace Engine.Scripts.WorldGen.Core{
     ///     both call it; the region API (<see cref="WorldGenApi" />) wraps <see cref="SampleColumn(int,int,in WorldGenConfig)" />
     ///     in a job.
     ///     <para>
-    ///         Phase 0: fields, hard 5D classification, one-hot weights and the common height formula §5.7
-    ///         composed from the classified biome's parameters (§8.2 with one-hot weights). Phase 1: the
-    ///         Terrain-first path (spline height, then 6D classification, §7). Phase 2 completes Biome-first,
-    ///         Phase 3 adds the blend methods and the surface pick, Phase 4 flora.
+    ///         Phase 0: fields, hard 5D classification, one-hot weights and the common height formula §5.7.
+    ///         Phase 1: the Terrain-first path (spline height, then 6D classification, §7). Phase 2: the
+    ///         Biome-first path (5D classification, then the height composed from the biome parameters, §8,
+    ///         <see cref="BiomeFirstHeight" />). Phase 3 adds the blend methods and the surface pick, Phase 4 flora.
     ///     </para>
     ///     <para>
     ///         The <c>out</c>-parameter overloads are Burst direct-call entry points (GEN-16): managed callers
@@ -63,13 +63,15 @@ namespace Engine.Scripts.WorldGen.Core{
                 s.DominantMaterialBiome = s.HardBiome;
             }
             else{
-                // Biome-first (§8) and the sampler view of the legacy path: hard 5D classification, one-hot weights
-                // and the biome-composed height. Phase 3 adds the blend methods.
+                // Biome-first (§8): hard 5D classification (BIO-01, no height dimension), then the height is
+                // composed from the height-stage weights (BIO-02). Phase 2 has only method None, so both weight
+                // sets are one-hot and the height jumps at biome boundaries; Phase 3 adds the blend methods
+                // (material and height stage separately, BLD-02).
                 s.HardBiome = BiomeClassifier.Classify(s.Fields, cfg);
                 s.MaterialWeights = BlendWeights.OneHot(s.HardBiome);
                 s.HeightWeights = s.MaterialWeights;
                 s.DominantMaterialBiome = s.HardBiome;
-                SampleBiomeHeight(p, s.HeightWeights, cfg, out s.Height, out unclamped);
+                BiomeFirstHeight.Sample(p, s.HeightWeights, cfg, out s.Height, out unclamped);
                 s.NormalizedHeight = math.saturate((s.Height - cfg.HeightMin) / (cfg.HeightMax - cfg.HeightMin));
             }
 
@@ -89,52 +91,6 @@ namespace Engine.Scripts.WorldGen.Core{
         public static ColumnSample SampleColumn(int x, int z, in WorldGenConfig cfg){
             SampleColumn(x, z, cfg, out ColumnSample sample);
             return sample;
-        }
-
-        /// <summary>
-        ///     Biome-first height (§8.2, §5.7): Offset, a_i and J are weighted sums of the per-biome constants with
-        ///     <paramref name="weights" />, then H = Offset + Σ a_i N_i + J P. <paramref name="height" /> is H clamped
-        ///     to [Hmin, Hmax]; <paramref name="unclamped" /> is H before the clamp, so the clamp engaged exactly when
-        ///     the two differ (GEN-12).
-        /// </summary>
-        [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
-        public static void SampleBiomeHeight(in float2 p, in BlendWeights weights, in WorldGenConfig cfg,
-            out float height, out float unclamped){
-            int biomeCount = cfg.BiomeCount;
-            int octaveCount = cfg.OctaveCount;
-
-            float offset = 0f;
-            float jaggedness = 0f;
-            for (int b = 0; b < biomeCount; b++){
-                float w = weights[b];
-                if (w == 0f) continue;
-                offset += w * cfg.Biomes[b].heightOffset;
-                jaggedness += w * cfg.Biomes[b].jaggedness;
-            }
-
-            float h = offset;
-            for (int i = 0; i < octaveCount; i++){
-                float a = 0f;
-                for (int b = 0; b < biomeCount; b++){
-                    float w = weights[b];
-                    if (w != 0f) a += w * cfg.OctaveCoefficients[b * octaveCount + i];
-                }
-
-                if (a != 0f) h += a * DetailOctaves.Sample(i, p, cfg.OctaveWavelengths[i], cfg.Seed);
-            }
-
-            if (jaggedness != 0f) h += jaggedness * PeakNoise.Sample(p, cfg.PeakWavelength, cfg.Seed);
-
-            unclamped = h;
-            height = math.clamp(h, cfg.HeightMin, cfg.HeightMax);
-        }
-
-        /// <inheritdoc cref="SampleBiomeHeight(in float2,in BlendWeights,in WorldGenConfig,out float,out float)" />
-        /// <param name="clamped">Whether the clamp to [Hmin, Hmax] engaged (GEN-12).</param>
-        public static float SampleBiomeHeight(in float2 p, in BlendWeights weights, in WorldGenConfig cfg, out bool clamped){
-            SampleBiomeHeight(p, weights, cfg, out float height, out float unclamped);
-            clamped = height != unclamped;
-            return height;
         }
     }
 }
