@@ -8,6 +8,7 @@ using Engine.Scripts.Utils.Provider;
 using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
+using Engine.Scripts.WorldGen.Settings;
 using UnityEngine;
 
 namespace Engine.Scripts.Utils{
@@ -63,10 +64,11 @@ namespace Engine.Scripts.Utils{
             cfg.WaterLevel = Settings.Noise.WaterLevel;
             cfg.GlobalSeed = Settings.Seed;
             cfg.NoiseParams = Settings.Noise.ToNoiseParameters(Settings.Seed);
-            // INT-03: the Burst mirror of the spec settings; default (owns nothing) when no WorldGenSettings is assigned.
+            // INT-03: the Burst mirror of the spec settings. Without a WorldGenSettings asset the legacy path runs with
+            // an empty but constructed mirror (ChunkJob carries the config, so its containers must exist).
             cfg.WorldGen = Settings.WorldGen
                 ? Settings.WorldGen.ToConfig(Settings.Seed, Settings.Noise, DataImporter.Instance.VoxelRegistry)
-                : default;
+                : WorldGenConfig.CreateEmpty((uint)Settings.Seed);
             return new ChunkScheduler(Settings, chunkManager, cfg, world);
         }
 

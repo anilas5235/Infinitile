@@ -447,6 +447,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
             // D-05: the previous build's noise parameters are no longer read (no build is in progress here)
             _generatorConfig.NoiseParams.Dispose();
             _generatorConfig.NoiseParams = _settings.Noise.ToNoiseParameters(_settings.Seed);
+            bool specAvailable = RebuildWorldGenConfig();
 
             WorldViewJob job = new(){
                 Resolution = resolution,
@@ -474,7 +475,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
             JobHandle distributionHandle = distributionJob.Schedule(pixelCount, 64);
 
             JobHandle combined = JobHandle.CombineDependencies(biomeHandle, distributionHandle);
-            combined = JobHandle.CombineDependencies(combined, ScheduleSpecBuild(resolution));
+            if (specAvailable) combined = JobHandle.CombineDependencies(combined, ScheduleSpecBuild(resolution));
 
             _buildHandle = combined;
             _buildInProgress = true;
@@ -485,21 +486,32 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
         ///     Samples the framed region through <see cref="WorldGenApi.SampleRegion" /> (1 sample per block up to the
         ///     view resolution, then every Stride-th column) and converts the buffers to the four spec textures.
         /// </summary>
-        private JobHandle ScheduleSpecBuild(int resolution){
-            _specBuildScheduled = false;
-            if (!_settings.WorldGen) return default;
-
+        /// <summary>
+        ///     Rebuilds the WorldGen mirror before any job captures the config (the legacy jobs carry the whole
+        ///     GeneratorConfig, so the mirror must be constructed even when no WorldGenSettings is assigned).
+        ///     Returns whether the spec views can be built.
+        /// </summary>
+        private bool RebuildWorldGenConfig(){
             // D-05: the previous build is complete here, so its config is no longer read.
             _generatorConfig.WorldGen.Dispose();
-            try{
-                _generatorConfig.WorldGen = _settings.WorldGen.ToConfig(_settings.Seed, _settings.Noise);
-            }
-            catch (System.Exception e){
-                _generatorConfig.WorldGen = default;
-                Debug.LogException(e);
-                return default;
+            _specBuildScheduled = false;
+            if (!_settings.WorldGen){
+                _generatorConfig.WorldGen = WorldGenConfig.CreateEmpty((uint)_settings.Seed);
+                return false;
             }
 
+            try{
+                _generatorConfig.WorldGen = _settings.WorldGen.ToConfig(_settings.Seed, _settings.Noise);
+                return true;
+            }
+            catch (System.Exception e){
+                _generatorConfig.WorldGen = WorldGenConfig.CreateEmpty((uint)_settings.Seed);
+                Debug.LogException(e);
+                return false;
+            }
+        }
+
+        private JobHandle ScheduleSpecBuild(int resolution){
             WorldGenConfig cfg = _generatorConfig.WorldGen;
             int viewSize = Mathf.Min(resolution, ViewResolution);
             int stride = Mathf.Max(1, resolution / ViewResolution);

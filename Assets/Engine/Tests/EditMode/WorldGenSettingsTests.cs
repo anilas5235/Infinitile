@@ -4,6 +4,7 @@ using System.Threading;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Settings;
 using Engine.Scripts.VoxelConfig.Data.Generation;
+using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
@@ -173,6 +174,32 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(0, cfg.BiomeCount);
             Assert.AreEqual(0, cfg.OctaveCoefficients.Length);
             cfg.Dispose();
+        }
+
+        [Test]
+        public void CreateEmpty_IsConstructedSchedulableAndBiomeless(){
+            WorldGenConfig cfg = WorldGenConfig.CreateEmpty(7u);
+            try{
+                Assert.IsTrue(cfg.IsCreated, "0-length arrays count as constructed");
+                Assert.AreEqual(0, cfg.BiomeCount);
+                Assert.AreEqual(0, cfg.OctaveCount);
+                Assert.AreEqual(GenArchitecture.Legacy, cfg.Architecture);
+                Assert.AreEqual(40f, cfg.HeightMin);
+
+                // The mirror must survive a job schedule (ChunkJob carries it even on the legacy path).
+                WorldGenRequest req = new(){ Config = cfg, Origin = int2.zero, Size = new int2(4, 4) };
+                NativeArray<int> biome = new(16, Allocator.TempJob);
+                NativeArray<float> height = new(16, Allocator.TempJob);
+                RegionBuffers buffers = new(){ HardBiome = biome, Height = height };
+                WorldGenApi.SampleRegion(req, ref buffers).Complete();
+                Assert.AreEqual(-1, biome[5], "no biome active");
+                Assert.AreEqual(40f, height[5], "no biome → height clamps to Hmin");
+                biome.Dispose();
+                height.Dispose();
+            }
+            finally{
+                cfg.Dispose();
+            }
         }
 
         [Test]
