@@ -29,7 +29,7 @@ The important idea is that the systems are decoupled:
 - `VoxelWorld` owns world state and events.
 - `VoxelEngineScheduler` coordinates work between data, mesh, and collider jobs.
 - `VoxelWorldRenderer` owns GPU-side render data and draw submission.
-- `VoxelDataImporter` loads voxel definitions and builds registries used by both world generation and rendering.
+- `DataImporter` loads voxel definitions and builds registries used by both world generation and rendering.
 
 ## Main folders and responsibilities
 
@@ -47,7 +47,7 @@ Async and scheduled work for generation, meshing, and collider baking.
 Important subareas:
 - `Jobs/Core` — scheduler state machines and orchestration
 - `Jobs/Chunk` — chunk data generation jobs
-- `Jobs/Meshing` — partition mesh generation
+- `Jobs/ColliderMeshing` — partition collider mesh generation (greedy meshing)
 - `Jobs/ColliderBake` — collider baking jobs
 
 ### `Render`
@@ -64,9 +64,9 @@ Important entry points:
 Voxel definition assets, registries, shapes, and editor tooling for authoring voxel content.
 
 Important entry points:
-- `VoxelDataImporter`
+- `DataImporter`
 - `VoxelRegistry`
-- `VoxelDefinition`
+- `Voxel`
 - `VoxelShape`
 - `QuadDefinition`
 
@@ -104,15 +104,15 @@ It also tracks queue counts and average timings for diagnostics.
 Dispatches chunk data generation jobs.
 It is used by the data job state handler.
 
-### `MeshBuildScheduler`
-Dispatches partition mesh generation jobs.
+### `CMeshBuildScheduler`
+Dispatches partition collider mesh generation jobs.
 It is used by the mesh job state handler.
 
 ### `ColliderBakeScheduler`
 Dispatches collider baking jobs.
 It is used by the collider job state handler.
 
-### `VoxelDataImporter`
+### `DataImporter`
 Loads voxel data packages from `Resources/VoxelDataPackages`, registers voxel definitions, builds texture and quad registries, and exposes the resulting runtime render data.
 This is the main setup point for voxel content.
 
@@ -135,13 +135,21 @@ It prepares neighboring chunks, runs the point builder shader, and reads back po
 ### `CopyPointsHandler`
 Copies built point data into the target render buffers and prepares page metadata for shader consumption.
 
+## Assemblies
+
+- `Engine.Runtime` (`Assets/Engine/Engine.Runtime.asmdef`) — all runtime engine code under `Assets/Engine/Scripts`.
+- `Engine.Editor` (`Assets/Engine/Editor/Engine.Editor.asmdef`) — editor tooling; the `Editor` folders under
+  `Scripts` join it through `Engine.Editor.asmref` files.
+- `Engine.Tests.EditMode`, `Engine.Tests.PlayMode`, `Engine.Tests.Performance` (`Assets/Engine/Tests/...`) — the
+  test assemblies. Runtime internals they use are exposed with `InternalsVisibleTo` in `Scripts/AssemblyInfo.cs`.
+
 ## Important runtime entry points
 
 If you are changing behavior, these are the places to inspect first:
 
 - World startup and initialization:
   - `VoxelWorld`
-  - `VoxelDataImporter`
+  - `DataImporter`
   - `VoxelEngineScheduler`
 
 - Chunk generation flow:
@@ -150,7 +158,7 @@ If you are changing behavior, these are the places to inspect first:
   - `ChunkManager`
 
 - Mesh generation flow:
-  - `MeshBuildScheduler`
+  - `CMeshBuildScheduler`
   - `MeshJobStateHandler`
   - `PartitionBuildRequest`
 
@@ -166,7 +174,7 @@ If you are changing behavior, these are the places to inspect first:
   - `RenderBuffer`
 
 - Voxel authoring / content setup:
-  - `VoxelDefinition`
+  - `Voxel`
   - `VoxelShape`
   - `QuadDefinition`
   - `VoxelRegistry`
@@ -210,8 +218,8 @@ If you keep that separation in mind, most changes become easier to place correct
 - `Assets/Engine/Scripts/World/VoxelWorld.cs`
 - `Assets/Engine/Scripts/Render/VoxelWorldRenderer.cs`
 - `Assets/Engine/Scripts/Jobs/Core/VoxelEngineScheduler.cs`
-- `Assets/Engine/Scripts/VoxelConfig/Data/VoxelDataImporter.cs`
-- `Assets/Engine/Scripts/VoxelConfig/Data/VoxelRegistry.cs`
+- `Assets/Engine/Scripts/VoxelConfig/DataImporter.cs`
+- `Assets/Engine/Scripts/VoxelConfig/Registry/VoxelRegistry.cs`
 - `Assets/Engine/Scripts/Settings/VoxelEngineSettings.cs`
 
 ## Notes for future agents
