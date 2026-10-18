@@ -1,5 +1,116 @@
 # World Generation (Overview)
 
+# Version 1.4 (Phase 3 — Blending methods)
+
+Phase 3 of `WorldGenSpec.html` adds the four blend methods of section 9 per stage (BLD-01): the material stage in
+both architectures, the height stage in Biome-first (Terrain-first height has no biome input, so its height is the
+same for every material method, TST-04). That gives 8 configurations: Terrain-first × 4 material methods and
+Biome-first × 4 methods. Both stages take the method and strength from `WorldGenSettings` (`MaterialMethod`,
+`MaterialBlendWidth` B_mat, `MaterialSigma`; `HeightMethod`, `HeightBlendWidth` B_hgt, `HeightSigma`; `WarpAmplitude`
+A, `WarpWavelength`, `WarpOctaves`), and they can be switched in the preview's settings inspector and in the game.
+The values are the spec defaults and placeholders (R5).
+
+## Blend stages in the column pipeline
+
+```mermaid
+flowchart LR
+    F[ClimateFields
+T F C E W PV] --> D[BiomeClassifier.Distances
+d_b squared + hard class
+once per column, PERF-07]
+    D --> M[BlendMethods.Compute
+material stage]
+    D --> HS[BlendMethods.Compute
+height stage, Biome-first]
+    L[BlendCache
+per chunk / 64x64 tile
+nn and warped nn lattices, BLD-11] --> M
+    L --> HS
+    M --> MW[MaterialWeights] --> SP[SurfacePick
+dithered, BLD-40] --> SS[SurfaceSource]
+    MW --> DM[DominantMaterialBiome
+argmax]
+    HS --> HW[HeightWeights] --> BH[BiomeFirstHeight
+blended parameters]
+    SS --> J[ChunkJob.FillTerrain
+surface blocks]
+```
+
+### Description
+
+- **Methods** (`WorldGen/Blending/BlendMethods.cs`): one enum switch per stage (R2), every result normalised, Σ w = 1
+  (BLD-02).
+  - **1 None**: one-hot on the hard class.
+  - **2 DistanceBlend**: the compact kernel k(r) = (1 − r²/R²)² over the hard classes nn(q) of a world-aligned lattice
+    (§9.3).
+  - **3 DistortedBoundary**: the hard class at the warped position q + A·Ω(q), where Ω is a two-octave simplex warp
+    (`WorldGen/Noise/WarpField.cs`, salts BlendWarpX/Y).
+    - Material stage: one-hot on the warped class.
+    - Height stage: warp plus the kernel of method 2 over the warped classes with B_hgt (BLD-22).
+    - A = 0 reduces it to the unwarped method.
+  - **4 ParameterSpaceWeighting**: the shifted Gaussian w_b ∝ exp(−(d_b² − d_min²)/(2σ²)) over the parameter-space
+    distances.
+    - The hard class always gets the largest weight (BLD-31), and σ → 0 gives method 1 (TST-06).
+    - It needs no neighbourhood.
+- **Kernel taps** (`WorldGen/Blending/KernelTaps.cs`): per-phase tap lists on a lattice of stride
+  clamp(floor(R/4), 1, 2), in a fixed row-major order (BLD-10/12). They are built once in `WorldGenSettings.ToConfig`
+  and owned by `WorldGenConfig` (`MaterialTaps`, `HeightTaps`). The phase uses floor modulo, so negative columns get
+  the same taps as positive ones.
+- **Lattice cache** (`WorldGen/Blending/BlendLattice.cs`, BLD-11): `ChunkJob.PrepareChunkMaps` builds a `BlendCache`
+  per chunk, and `WorldGenApi.SampleRegion` builds one per 64×64 tile (the region job now runs one index per tile).
+  - The cache holds a padded lattice of nn(q) for DistanceBlend and one of the warped classes for the
+    DistortedBoundary height stage. Both are classified by the same Burst entry points the pure sampler calls per
+    tap (`WorldSampler.ClassifyAt` / `ClassifyWarpedAt`).
+  - A cached column is therefore bit-identical to the pure `SampleColumn(x, z, cfg)` (GEN-02, TST-01).
+  - A summed-area table of boundary points lets a kernel window with one class return one-hot weights without
+    summing (PERF-07).
+  - A zoomed-out preview, where the columns are further apart than the taps, skips the lattice and evaluates the
+    taps directly, with the same result.
+- **Shared work** (PERF-07):
+  - The squared parameter-space distances and the hard class are computed once per column and shared by
+    classification and method 4.
+  - In Biome-first, the height stage reuses the material weights when both stages use the same method and strength
+    (`WorldGenConfig.StagesShareWeights`; never for DistortedBoundary, whose stages differ).
+  - Method 1 sets the dominant biome and the surface source to the hard class directly.
+- **Surface source** (`WorldGen/Blending/SurfacePick.cs`, BLD-40/41): a white-noise dithered pick from the material
+  weights, using hash salt SurfacePick.
+  - If rounding leaves the cumulative sum just below the threshold, it falls back to the last biome with non-zero
+    weight, so it never returns "none" for non-empty weights (TST-14).
+  - One-hot weights return their own biome.
+  - `FillTerrain` takes the surface blocks from this biome (INT-11).
+- **Validation** (`WorldGenSettings`): a strength the selected method uses and cannot work with is reported in
+  `OnValidate` and rejected by `ToConfig` with an `InvalidOperationException`:
+  - B ≤ 0
+  - σ ≤ 0
+  - A < 0 or non-finite
+  - fewer than one warp octave
+
+  Unused strengths are not checked, and nothing is clamped (R5).
+- **Preview** (`Editor/WorldGen/WorldGenerationPreviewWindow.cs`): the new "Surface source" view shows the dithered
+  pick next to the hard-class biome view, so the material methods are visible. In Biome-first the height view shows
+  the height methods. Method dropdowns, strength sliders and side-by-side comparison follow in Phase 5 (INT-20).
+- **Tests** (`Tests/EditMode/BlendingTests.cs`): TST-01, 04, 05, 06, 07, 09 and 14, plus:
+  - kernel taps and floor-modulo phases
+  - the warp field
+  - each method against its formula
+  - validation
+  - a Burst guard for the new entry points
+
+  The chunk-job tests check the spatial methods against the sampler in both architectures.
+- **Performance** (`Tests/Performance/ChunkGenerationBenchmark.cs`): new rows `ChunkJob.Run <architecture> <method>
+  ms/chunk`, each the mean over 16 fixed chunks. See `Tests/Performance/Baselines/README.md` for the Phase 3 numbers:
+  - Method 1 costs about 5 % more than in Phase 2 (PERF-03).
+  - Terrain-first DistanceBlend and DistortedBoundary and Biome-first DistortedBoundary are above the initial 3 ms
+    PERF-05 budget.
+
+### Ownership of native memory (D-05)
+
+- `WorldGenConfig` owns `MaterialTaps` and `HeightTaps` (only created when a method uses them); `WorldGenConfig.Dispose`
+  releases them with the rest.
+- A `BlendCache` lives in `Allocator.Temp` inside the job that builds it (one chunk or one region tile) and is disposed
+  there (INT-12).
+- A default `BlendCache` means "no cache": the sampler then evaluates every tap itself.
+
 # Version 1.3 (Phase 2 — Biome-first)
 
 Phase 2 of `WorldGenSpec.html` adds the Biome-first architecture (section 8) and removes the legacy generator
