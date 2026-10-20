@@ -1,5 +1,131 @@
 # World Generation (Overview)
 
+# Version 1.6 (Phase 5 — Preview tooling)
+
+Phase 5 of `WorldGenSpec.html` (§11.5) turns the preview window into the comparison tool for Part I. In the window you
+can switch architecture, blend method and strength. You can compare two configurations side by side with a difference
+view (INT-20/21), read the boundary lengths of every biome pair with implausible pairs flagged (GEN-24), and see every
+spline level as a 1D plot (TRN-06). The game gets a debug key that regenerates the loaded world with another
+configuration, plus camera bookmarks (INT-30). Generation itself does not change in this phase; every tool reads
+`WorldGenApi.SampleRegion` or the Burst spline evaluator, so the preview still shows what the chunk job builds.
+With this, Part I is complete.
+
+## Preview and comparison data flow
+
+```mermaid
+flowchart LR
+    S[WorldGenSettings asset] --> A[configuration A
+the asset itself
+edits with Undo]
+    S --> B[configuration B
+PreviewConfiguration overrides
+on a transient clone]
+    A --> PA[PreviewPass A
+ToConfig, SampleRegion,
+ViewJob, boundary CountJob]
+    B --> PB[PreviewPass B
+same region and seed]
+    PA --> V[views and statistics
+clamped share, boundaries,
+flora, max weight]
+    PB --> V
+    PA --> D[PreviewDiff
+Signed / Mismatch / Pixels]
+    PB --> D
+    S --> SP[SplinePlots
+Flatten + PlotJob per node]
+    S --> G[WorldGenDebugKeys
+transient variant] --> R[VoxelWorld.Regenerate]
+```
+
+### Description
+
+- **Configurations** (`Editor/WorldGen/PreviewConfiguration.cs`, INT-20/21): the knobs the preview switches.
+  - The knobs are architecture, the method of each stage (`MaterialMethod`, `HeightMethod`), the strengths
+    (B_mat, σ_mat, B_hgt, σ_hgt) and the warp of DistortedBoundary (A, λ_d, octaves).
+  - Configuration A is the asset. Its controls `Capture` the knobs, draw them and `ApplyTo` the asset with Undo.
+  - Configuration B is preview-only (decision 2026-10-20):
+    - `BuildConfig` instantiates a hidden clone of the asset, applies the knobs and calls `ToConfig`, then destroys the
+      clone. The asset is never written.
+    - "Copy A → B" and "Apply B to asset" are the only bridges between the two.
+    - B shares biomes, splines and climate with the asset.
+  - `Describe()` lists only the strengths the selected methods use. Terrain-first has no height stage (TRN-21).
+- **Passes** (`Editor/WorldGen/PreviewPass.cs`): each configuration owns one `PreviewPass` with persistent region
+  buffers and textures.
+  - `Schedule` builds the config, calls `SampleRegion`, then chains the `ViewJob` (all colour views, hillshade on
+    the height view) and the boundary `CountJob`.
+  - `Finish` uploads the textures and computes:
+    - clamped share;
+    - mean maximum material weight;
+    - flora counts per species;
+    - the boundary list.
+  - Views (`PreviewView`):
+    - height (with hillshade: light from the NW at 45°, adjustable exaggeration);
+    - hard biome, dominant material biome, maximum material weight, surface source and flora;
+    - climate, erosion and peaks/valleys;
+    - in Terrain-first, also the spline outputs Offset, Amp and J.
+- **Comparison** (`Editor/WorldGen/PreviewDiff.cs`, INT-21): with "Compare A/B" on, the window shows A | B | Diff for
+  the selected view. Both passes use the same region and seed. The difference reads sampled buffers only.
+  - Height: signed B − A. Red means B is higher, blue means B is lower, with square-root scaling to the largest
+    difference. Statistics: mean |Δ|, max |Δ|, mean Δ and the share of columns with |Δ| ≥ 1 block.
+  - Categorical views (hard, dominant, surface, flora): a mismatch mask (magenta) over the A view dimmed to 30 %,
+    plus the share of mismatching columns.
+  - Any other view: the per-channel pixel difference, amplified ×4.
+- **Boundary lengths** (`Editor/WorldGen/BiomeBoundaryStats.cs`, GEN-24):
+  - A Burst job counts the 4-neighbour edges between different dominant material biomes per unordered pair.
+  - Length = edges × sample stride, in blocks, sorted longest first, with each pair's share of all boundaries.
+  - `BiomeSet.ImplausibleNeighbours` lists pairs that should not touch (default Desert–Snow). Those pairs are shown
+    in red. The list is preview-only and is not part of the canonical JSON.
+- **Spline plots** (`Editor/WorldGen/SplinePlots.cs`, TRN-06):
+  - `TerrainSplineSet.Flatten` can record every node in pre-order (`FlatSpline`: tree, source point, depth, subtree).
+    A subtree is contiguous, so `SplineRoot{NodeStart, NodeCount}` evaluates it on its own.
+  - A Burst `PlotJob` per node samples the curve over its axis range, the value at every control point (a nested
+    child counts as a point), and the value at the probe (C, E, PV) from the Distribution sliders.
+  - The window draws each level as a 1D plot with the probe marked.
+- **In game** (`Scripts/UI/WorldGenDebugKeys.cs`, INT-30):
+  - F10 regenerates the loaded world with the next configuration and Shift+F10 with the previous one. The list holds
+    the asset as assigned, Biome-first × 4 methods, and Terrain-first with None and with DistanceBlend. Strengths are
+    the asset's.
+  - Each variant is a transient copy of the asset, destroyed right after `VoxelWorld.Regenerate`.
+  - F1–F4 restore a camera bookmark (position, yaw, pitch) and Shift+F1–F4 store one. Bookmarks persist in
+    PlayerPrefs.
+  - `PlayerManager.HoldUntilGrounded` keeps the player in place until the ground has colliders again, and lifts the
+    player when the new terrain would bury them.
+- **World reset** (`World/VoxelWorld.cs`, INT-30): `Regenerate(WorldGenSettings = null)` runs in this order:
+  1. Builds the new `ChunkScheduler` (the provider takes the override), so invalid settings throw while the world is
+     still intact.
+  2. Completes and applies the running batches (`VoxelEngineScheduler.CompleteRunning`).
+  3. Disposes the schedulers.
+  4. Evicts everything through the normal events: `ChunkPool.ReclaimAll` for the pool chunks, partitions and colliders,
+     then `ChunkManager.UnloadAll` for the load ring. The renderer releases its buffers.
+  5. Rebuilds the schedulers and resets the focus, so loading restarts around the player. World edits are lost.
+- **Fix**: `DataImporter.OnDestroy` now waits for the world's jobs (`VoxelWorld.WaitForJobs`) before it disposes the
+  registries those jobs read. The scene's destruction order is undefined, and a running `ChunkJob` used to throw at
+  play-mode exit.
+- **Tests**:
+  - `PreviewCompareTests`: knob round trip; B leaves the asset's canonical JSON unchanged; `Describe`; the three
+    difference kinds.
+  - `BiomeBoundaryStatsTests`: edges × stride; unordered pairs sorted longest first; out-of-range ids ignored;
+    implausible pairs in either order but never inactive or empty biomes; the default asset flags Desert–Snow.
+  - `SplinePlotsTests`: the flatten order covers every node with contiguous subtrees; plots hit constant knots and
+    children agree with their parents; an invalid set reports an error.
+  - PlayMode `WorldRegenerationTests`: everything is evicted; the other architecture changes the terrain;
+    regenerating with the asset reproduces it.
+- **Performance**: no chunk-job code changed, so the generation benchmarks only confirm there is no regression.
+  See `Tests/Performance/Baselines/README.md` (Phase 5). PERF-05 (Biome-first spatial-blend misses, accepted in
+  Phase 3) is still to be revisited now that Phases 4 and 5 are done.
+
+### Ownership of native memory (D-05)
+
+- `PreviewPass` owns its persistent region buffers, pixel arrays, boundary edge counts and its `WorldGenConfig`. The
+  config is replaced at the start of the next build and released in `Dispose`. The window completes a running
+  build, then disposes both passes in `OnDisable`.
+- `PreviewConfiguration.BuildConfig` returns a config the caller disposes. The transient clone is destroyed inside
+  the call.
+- `PreviewDiff` and `SplinePlots` allocate only TempJob scratch, which is released before they return.
+- `VoxelWorld.Regenerate`: the new `GeneratorConfig.WorldGen` belongs to the new `ChunkScheduler`, like the original.
+  The old one is released when the old scheduler is disposed. The `WorldGenSettings` passed in stays the caller's.
+
 # Version 1.5 (Phase 4 — Flora)
 
 Phase 4 of `WorldGenSpec.html` brings vegetation back (§10, INT-11). Placement is a pure function of
