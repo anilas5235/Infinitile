@@ -284,6 +284,15 @@ far:
 - Candidate optimisations are in the Phase 3 notes above: reuse the column hard classes for lattice points inside
   the chunk, and a faster Terrain-first spline evaluation.
 
+Neither is a simple change:
+- With B = 32 the lattice has stride 2 and covers the chunk ± (reach 15 + `FloraPadding`), about 37 x 37 ≈ 1370
+  points. Only 16 x 16 = 256 of them (≈ 19 %) coincide with chunk columns, so reuse would save about 0.35 ms
+  (Terrain-first DistanceBlend ≈ 3.7 ms), still over budget. It would also need `SampleCore` split into two
+  passes while keeping the cached and pure samplers bit-identical (GEN-02).
+- DistortedBoundary has no lattice to share: every column classifies at its own warped position.
+
+**Accepted by the user on 2026-10-20 (PERF-05, for now):** the three configurations stay over the 3 ms target.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the
