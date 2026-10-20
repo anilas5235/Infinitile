@@ -31,5 +31,26 @@ MonoBehaviour:
   - 0.3
   - 0.15
   Jaggedness: 35
-  FloraRules: []
+  FloraRules:
+  - SpeciesVoxel: {fileID: 11400000, guid: 970fe84b79e76ed42a636f8d60feca7d, type: 2}
+    SpeciesStructure: {fileID: 0}
+    Probability: 0.05
+    RequiresSurfaceFromSameBiome: 0
+    MinHeightAboveWater: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 11400000, guid: 10218f21e1d9ac948ac6846e1469b188, type: 2}
+    SpeciesStructure: {fileID: 0}
+    Probability: 0.02
+    RequiresSurfaceFromSameBiome: 0
+    MinHeightAboveWater: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 11400000, guid: ad4d203a2cf19f544b576099a0c1ce6d, type: 2}
+    SpeciesStructure: {fileID: 0}
+    Probability: 0.01
+    RequiresSurfaceFromSameBiome: 0
+    MinHeightAboveWater: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
   RepresentativeColor: {r: 0.7207546, g: 0.7207546, b: 0.7207546, a: 1}
