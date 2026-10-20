@@ -1086,6 +1086,7 @@ GameObject:
   - component: {fileID: 1592505030}
   - component: {fileID: 1592505031}
   - component: {fileID: 1592505032}
+  - component: {fileID: 1592505033}
   m_Layer: 0
   m_Name: World
   m_TagString: Untagged
@@ -1136,6 +1137,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Runtime.Engine.Render.VoxelWorldRenderer
   world: {fileID: 1592505030}
+  gpuCulling: 1
+  freezeCulling: 0
+  showCullingOverlay: 0
 --- !u!114 &1592505032
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1151,6 +1155,58 @@ MonoBehaviour:
   overlayKey: 100
   cullingKey: 101
   freezeKey: 102
+--- !u!114 &1592505033
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1592505027}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: feda58cb5df53f34594987af887d8dd6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UI.WorldGenDebugKeys
+  regenerateKey: 103
+  bookmarkKeys: 5e0000005f0000006000000061000000
+  player: {fileID: 0}
+  labelSeconds: 3
+  configurations:
+  - Name: As assigned
+    AsAssigned: 1
+    Architecture: 1
+    MaterialMethod: 0
+    HeightMethod: 0
+  - Name: 
+    AsAssigned: 0
+    Architecture: 1
+    MaterialMethod: 0
+    HeightMethod: 0
+  - Name: 
+    AsAssigned: 0
+    Architecture: 1
+    MaterialMethod: 1
+    HeightMethod: 1
+  - Name: 
+    AsAssigned: 0
+    Architecture: 1
+    MaterialMethod: 3
+    HeightMethod: 3
+  - Name: 
+    AsAssigned: 0
+    Architecture: 1
+    MaterialMethod: 2
+    HeightMethod: 2
+  - Name: 
+    AsAssigned: 0
+    Architecture: 0
+    MaterialMethod: 0
+    HeightMethod: 0
+  - Name: 
+    AsAssigned: 0
+    Architecture: 0
+    MaterialMethod: 1
+    HeightMethod: 0
 --- !u!1 &1610362568
 GameObject:
   m_ObjectHideFlags: 0

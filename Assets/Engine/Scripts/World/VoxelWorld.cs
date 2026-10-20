@@ -12,6 +12,7 @@ using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.VoxelConfig;
+using Engine.Scripts.WorldGen.Settings;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -112,6 +113,20 @@ namespace Engine.Scripts.World{
             _chunkPool.OnChunkEvicted += HandleChunkEvicted;
             _chunkPool.OnPartitionEvicted += HandlePartitionEvicted;
 
+            ConstructSchedulers(VoxelEngineProvider.Current.ChunkDataScheduler(
+                ChunkManager,
+                DataImporter.Instance.CreateConfig(),
+                this
+            ));
+        }
+
+        /// <summary>
+        ///     Constructs the job schedulers around the existing chunk manager and pool; INT-30 rebuilds them with
+        ///     another data scheduler when the world is regenerated.
+        /// </summary>
+        private void ConstructSchedulers(ChunkScheduler chunkScheduler){
+            _chunkScheduler = chunkScheduler;
+
             _cMeshBuildScheduler = VoxelEngineProvider.Current.MeshBuildScheduler(
                 ChunkManager,
                 _chunkPool,
@@ -122,12 +137,6 @@ namespace Engine.Scripts.World{
             _colliderBakeScheduler = VoxelEngineProvider.Current.ColliderBakeScheduler(
                 ChunkManager,
                 _chunkPool
-            );
-
-            _chunkScheduler = VoxelEngineProvider.Current.ChunkDataScheduler(
-                ChunkManager,
-                DataImporter.Instance.CreateConfig(),
-                this
             );
 
             _scheduler = VoxelEngineProvider.Current.VoxelEngineScheduler(
@@ -153,6 +162,17 @@ namespace Engine.Scripts.World{
             RaisePartitionEvicted(partitionPos);
         }
 
+        /// <summary>
+        ///     Waits for the running generation, mesh and bake jobs, e.g. before the <see cref="DataImporter" />
+        ///     releases the registries they read. Destruction order between the two is not defined.
+        /// </summary>
+        internal void WaitForJobs(){
+            _scheduler?.WaitForJobs();
+        }
+
+        /// <summary>A focus no real position equals, so the next focus update always reaches the schedulers.</summary>
+        private static PriorityUtil.Focus UnsetFocus => new(new int3(1, 1, 1) * int.MinValue, new float3(0, 0, 1));
+
         private void TryFocusUpdate(){
             if (!_isFocused) return;
             PriorityUtil.Focus newFocus = new(VoxelConstants.WorldToPartitionPos(focus.position.Int3()),
@@ -164,6 +184,36 @@ namespace Engine.Scripts.World{
         }
 
         #region API
+
+        /// <summary>
+        ///     INT-30: regenerates the world with <paramref name="worldGen" /> (null = the asset of the engine
+        ///     settings), e.g. to compare configurations at the same spot. Running jobs are completed, every loaded
+        ///     chunk is evicted through the normal events (the renderer releases its buffers, colliders are cleared)
+        ///     and the schedulers are rebuilt; loading restarts around the focus. The settings are copied into the
+        ///     generation config, so the caller keeps ownership of <paramref name="worldGen" /> and may destroy it
+        ///     afterwards. Edits made to the world are lost. Throws like <see cref="WorldGenSettings.ToConfig" />
+        ///     before anything is torn down.
+        /// </summary>
+        public void Regenerate(WorldGenSettings worldGen = null){
+            if (_isShuttingDown) return;
+
+            // Built first, so invalid settings throw while the running world is still intact.
+            ChunkScheduler chunkScheduler = VoxelEngineProvider.Current.ChunkDataScheduler(
+                ChunkManager,
+                DataImporter.Instance.CreateConfig(),
+                this,
+                worldGen
+            );
+
+            _scheduler.CompleteRunning();
+            _scheduler.Dispose(); // unsubscribes the F-01 / F-04 listeners and releases the old config (D-05)
+            _chunkPool.ReclaimAll(); // pool chunks: partitions, colliders and chunk data, with eviction events
+            ChunkManager.UnloadAll(); // the load ring outside the draw distance
+
+            ConstructSchedulers(chunkScheduler);
+            Focus = UnsetFocus;
+            TryFocusUpdate();
+        }
 
         /// <summary>
         ///     The partition coordinates of the current focus position.
@@ -194,7 +244,7 @@ namespace Engine.Scripts.World{
 
             ConstructEngineComponents();
 
-            Focus = new PriorityUtil.Focus(new int3(1, 1, 1) * int.MinValue, new float3(0, 0, 1));
+            Focus = UnsetFocus;
         }
 
         private void OnEnable(){

@@ -42,6 +42,20 @@ namespace Player{
         }
 
         /// <summary>
+        ///     Current camera pitch in degrees.
+        /// </summary>
+        public float Pitch => _pitch;
+
+        /// <summary>
+        ///     Sets the camera pitch in degrees (clamped), e.g. when a camera bookmark is restored (INT-30).
+        /// </summary>
+        public void SetPitch(float pitch){
+            _pitch = Mathf.Clamp(pitch, -maxLookAngle, maxLookAngle);
+            Vector3 currentEuler = targetCamera.transform.eulerAngles;
+            targetCamera.transform.eulerAngles = new Vector3(_pitch, currentEuler.y, 0f);
+        }
+
+        /// <summary>
         ///     Input System callback for look input (mouse delta / right stick).
         /// </summary>
         /// <param name="value">2D look delta.</param>

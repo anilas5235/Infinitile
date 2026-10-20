@@ -119,6 +119,13 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
+        ///     Waits for the running job without applying its results; <see cref="Complete" /> still applies them.
+        /// </summary>
+        internal void CompleteJob(){
+            _handle.Complete();
+        }
+
+        /// <summary>
         ///     Disposes all native containers after ensuring that the scheduled job has completed.
         /// </summary>
         internal void Dispose(){

@@ -97,6 +97,25 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
+        ///     INT-30: completes and applies every running batch (data, mesh, collider) so the scheduler can be disposed
+        ///     without dropping a writable mesh-data array or a job that still reads chunk data.
+        /// </summary>
+        internal void CompleteRunning(){
+            if (!_chunkScheduler.IsReady) _chunkScheduler.Complete();
+            _cMeshBuildScheduler.Complete(); // returns at once when idle
+            if (!_colliderBakeScheduler.IsReady) _colliderBakeScheduler.Complete();
+        }
+
+        /// <summary>
+        ///     Waits for every running job without applying results, before data the jobs read (registries) is released.
+        /// </summary>
+        internal void WaitForJobs(){
+            _chunkScheduler.CompleteJob();
+            _cMeshBuildScheduler.CompleteIfRunning();
+            _colliderBakeScheduler.CompleteJobIfRunning();
+        }
+
+        /// <summary>
         ///     Cleans up all sub-scheduler resources and event handlers.
         /// </summary>
         internal void Dispose(){

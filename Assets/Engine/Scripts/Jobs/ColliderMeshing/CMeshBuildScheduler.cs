@@ -188,7 +188,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         ///     Only the job is completed, its results are applied later by <see cref="Complete" />: applying them here
         ///     re-entered <see cref="Complete" /> when claiming a partition evicted a chunk of the running batch.
         /// </summary>
-        private void CompleteIfRunning(){
+        internal void CompleteIfRunning(){
             _handle.Complete();
         }
 

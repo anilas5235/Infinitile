@@ -67,6 +67,9 @@ namespace Engine.Scripts.VoxelConfig{
         /// </summary>
         protected override void OnDestroy(){
             base.OnDestroy();
+            // The chunk and mesh jobs read the registries; the world may still have them running when the scene
+            // unloads and this importer is destroyed first.
+            if (world) world.WaitForJobs();
             VoxelRegistry.Dispose();
             BiomeRegistry.Dispose();
             VoxelStructureRegistry.Dispose();
