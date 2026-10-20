@@ -235,6 +235,8 @@ DistanceBlend. The DistanceBlend share is most likely the padded `BlendCache`: w
 height in Terrain-first). Options if this is to come down: evaluate the ring columns directly instead of padding the lattice
 (they are few after the multi-block pre-filter), or pad only on the sides where candidates exist.
 
+**Accepted by the user on 2026-10-20 (PERF-03):** the +11…13 % flora cost with DistanceBlend stays as it is.
+
 PERF-05: Biome-first DistanceBlend stays within 3 ms with flora (2.87 ms); the configurations that already missed
 the budget in Phase 3 still miss it.
 
