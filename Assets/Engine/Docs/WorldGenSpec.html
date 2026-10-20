@@ -129,6 +129,7 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
     <li><a href="#s18">18 · Phases (Part II)</a></li>
     <li class="toc-part">Appendix</li>
     <li><a href="#s19">19 · Defaults &amp; schemas</a></li>
+    <li><a href="#s20">20 · Ideas (not scheduled)</a></li>
   </ol>
 </nav>
 
@@ -967,6 +968,30 @@ core_weight: 0.95
 bootstrap: {replicates: 2000, cluster: seed, seed: 12345}
 test_pairs: [[Plains, Desert], [Plains, Mountain], [Mountain, Snow]]
 implausible_pairs: [[Desert, Snow]]</code></pre>
+
+<h2 id="s20">20 · Ideas (not scheduled)</h2>
+<p>Possible improvements found during the phases. They are not requirements and belong to no phase until the user schedules them.</p>
+
+<h3>20.1 Shared GPU buffer for chunk voxel data</h3>
+<p class="small">Recorded 2026-10-20 (Phase 4, from the TST-E21 investigation).</p>
+<ul class="tight">
+<li><b>Today:</b> <code>VoxelWorldRenderer</code> keeps one <code>GraphicsBuffer</code> per chunk for the compressed voxel intervals. A pool pre-allocated at start-up keeps flight allocation-free (PERF-04) only while every chunk fits the default buffer length. Since Phase 4 that length is 8 intervals per voxel column, about 31 MB with LoadDistance 8. A chunk that needs more still creates a new buffer, and with it a managed object, during flight.</li>
+<li><b>Measured in the TST-E21 flight:</b> without flora, the median is 4.0 and the maximum 6 intervals per column; with flora, the median is 4.6 and the maximum 6. Denser flora, caves or structures will raise this.</li>
+<li><b>Idea:</b>
+  <ul class="tight">
+  <li>Use one large structured buffer for all chunks and sub-allocate a range per chunk, e.g. with a page or free-list allocator like the render buffers' <code>PageAllocator</code>.</li>
+  <li>The partition build gets the chunk's offset and length instead of its own buffer.</li>
+  <li>Growth reallocates the one buffer: rarely, and it can be pre-sized from LoadDistance × the average length.</li>
+  <li>Memory then follows the actual data instead of the worst case per chunk.</li>
+  </ul></li>
+<li><b>Costs and risks:</b>
+  <ul class="tight">
+  <li>Changes the point-builder and decompress kernels (offset addressing) and the buffer bookkeeping in the renderer.</li>
+  <li>Fragmentation needs compaction or size classes.</li>
+  <li>A growth step copies the whole buffer on the GPU.</li>
+  </ul></li>
+<li><b>Acceptance if scheduled:</b> TST-E21 at 0/300 with no per-chunk buffer objects; GPU memory for voxel data at most that of the pooled design; the mesh build and upload benchmarks not slower (PERF-03).</li>
+</ul>
 </main>
 </div>
 </body>

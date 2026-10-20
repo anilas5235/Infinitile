@@ -31,7 +31,10 @@
         /// <summary>Biome whose top/under/stone blocks the column uses (§9.6); -1 when no biome is active. INT-10.</summary>
         public int SurfaceSource;
 
-        /// <summary>Flora species id at the column, 0 = none (VEG-06). Assigned in Phase 4. INT-10.</summary>
+        /// <summary>
+        ///     Flora species id at the column, 0 = none (VEG-06): a single-block plant, or a multi-block species at its
+        ///     anchor column, equal to <c>ColumnSample.FloraSpecies</c>. INT-10.
+        /// </summary>
         public ushort FloraSpecies;
 
         /// <summary>Biome whose flora rule produced <see cref="FloraSpecies" />; -1 when none. INT-10.</summary>

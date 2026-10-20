@@ -30,6 +30,7 @@ MonoBehaviour:
   LambdaHeight: 1
   HeightMin: 40
   HeightMax: 250
+  WaterLevel: 124
   OctaveWavelengths:
   - 512
   - 256

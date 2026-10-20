@@ -54,5 +54,8 @@ namespace Engine.Scripts.WorldGen.Core{
 
         /// <summary>Tree placement priority against neighbours (VEG-05).</summary>
         public const uint TreePriority = 0x1A6C4711u;
+
+        /// <summary>Height of a stacked voxel species such as a cactus 1–3 high (VEG-05, own extension).</summary>
+        public const uint FloraStackHeight = 0x2B7D5812u;
     }
 }

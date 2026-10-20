@@ -1,5 +1,123 @@
 # World Generation (Overview)
 
+# Version 1.5 (Phase 4 — Flora)
+
+Phase 4 of `WorldGenSpec.html` brings vegetation back (§10, INT-11). Placement is a pure function of
+(x, z, seed, settings) on the material-stage result (VEG-01): the same decision comes out of `WorldSampler.SampleColumn`,
+`WorldGenApi.SampleRegion` and the chunk job, so plants and trees have no chunk seams. Each biome carries a list of
+`FloraRule`s; the Standard biomes have the spec placeholder rules (R5, not tuned).
+
+## Flora in the column pipeline
+
+```mermaid
+flowchart LR
+    C[WorldSampler.SampleCore
+height, weights, surface source] --> R[FloraPlacement.RollRule]
+    R --> FB[flora biome
+SurfacePick salt FloraBiome
+VEG-02]
+    FB --> SP[species
+Hash01 FloraSpecies vs
+cumulative probabilities]
+    SP --> G[ground checks
+same surface, above water,
+not clamped at Hmax, solid top
+VEG-03/04]
+    G --> MB{multi-block?}
+    MB -- no --> P[plant at h+1]
+    MB -- yes --> A[anchor if no candidate
+within r_tree outranks it
+Hash32 TreePriority, VEG-05]
+    A --> S[stamp structure / stack
+in-chunk voxels only]
+```
+
+### Description
+
+- **Rules** (`WorldGen/Flora/FloraRules.cs`, VEG-03): a `FloraRule` names a species (one voxel or one
+  `VoxelStructure`), a per-column probability, `RequiresSurfaceFromSameBiome` (default false) and
+  `MinHeightAboveWater` (default 1).
+  - Extension: `MinStackHeight` / `MaxStackHeight` (default 1) stack a single voxel, for the cactus 1–3 of the
+    placeholder rules. A stack above 1 counts as multi-block.
+- **Config** (`WorldGen/Flora/FloraConfigBuilder.cs`): `WorldGenSettings.ToConfig` flattens the rules of the active biomes into
+  `WorldGenConfig.FloraRules`; each `BiomeDef` addresses its range.
+  - Species ids are 1-based, in first-use order (`WorldGenSettings.FloraSpeciesNames()`, [0] = "none").
+  - Structures are expanded to voxel offsets once (`FloraStructures`, `FloraVoxels`):
+    - offset (0, 0, 0) is the first voxel above the top block;
+    - Line is inclusive;
+    - Box is centred on its origin;
+    - Circle is a horizontal disc (a ring when not filled);
+    - Cylinder stacks circles.
+  - Other tables:
+    - `FloraMultiBlockIntervals`: the cumulative ranges of multi-block rules, used as a sample-free pre-filter.
+    - `FloraReach`: the largest horizontal structure extent.
+    - `FloraPadding`: reach + r_tree, or 0 without multi-block rules.
+    - `VoxelClasses`: the replace class per voxel id.
+  - A rule with neither or both species fields is skipped with a warning; a biome whose probabilities sum past 1 is
+    reported.
+  - `TreeSpacingRadius` (r_tree, default 3, must be ≥ 0) lives in `WorldGenSettings`.
+- **Decision** (`WorldGen/Flora/FloraPlacement.cs`), per column:
+  1. The flora biome is a dithered pick from w_mat with salt FloraBiome, independent of the surface pick (DEC-04). With
+     material method None it is the hard biome.
+  2. The species is the rule whose cumulative interval holds Hash01(FloraSpecies); none means no plant.
+  3. The ground must allow it:
+     - the surface biome's top block is solid;
+     - the column is not clamped at Hmax;
+     - h_int + 1 − WaterLevel ≥ max(minHeightAboveWater, 0), so a plant is never below the water surface.
+  4. A multi-block candidate becomes an anchor only if no other candidate in its r_tree disc outranks it:
+     - the higher Hash32(TreePriority) wins;
+     - equal hashes go to the lower (x, z), a strict order, so two anchors are never within r_tree.
+
+  `ColumnSample.FloraSpecies` / `FloraSource` (and the region buffers of the same name) hold the result at single
+  plants and anchors, (0, −1) elsewhere (VEG-06).
+- **Chunk job** (`Jobs/Chunk/ChunkGenerationTerrain.cs`, `ChunkGenerationVegetation.cs`):
+  - `PrepareChunkMaps` fills a `FloraGrid` over chunk ± `FloraPadding`:
+    - the core sample and rule roll of every chunk column;
+    - for ring columns that pass the pre-filter, the same sample and roll, keeping only multi-block rules;
+    - the anchor flag for chunk ± reach.
+  - The `BlendCache` covers the ring too, and `WorldGenApi` extends its tile caches by `FloraPadding` in the same way.
+  - `PlaceVegetation` (re-enabled, INT-11) then writes:
+    1. single-block plants at h + 1;
+    2. every anchor in world (x, then z) order: its structure, or its stack, with height from salt FloraStackHeight.
+
+    Voxels outside the chunk are clipped.
+  - **Overwrite rule:** a flora voxel replaces only a voxel of a lower class: air < foliage < leaves (transparent with
+    collision) < solid. Ids not in the table (terrain, water) count as solid. Logs therefore beat leaves, and leaves
+    beat grass tufts. Because the order is the world order, every voxel ends up as in a whole-world stamp, whichever
+    chunk holds it (TST-03).
+  - The old stub's per-chunk random stream and its skipped edge columns are gone (D-01, D-02).
+- **Renderer** (PERF-04, TST-E21): flora adds voxel runs per column. The pre-allocated GPU chunk buffers in
+  `VoxelWorldRenderer` therefore hold eight intervals per column instead of four. Without the change, chunks met
+  during flight did not fit any free buffer, and a new `GraphicsBuffer` was created mid-flight. Measured during the
+  flight: median 4.6 and maximum 6 intervals per column; already 40 % of the chunks without flora needed more than 4.
+- **Burst**: `WorldSampler.SampleCore` is a Burst direct-call entry like `SampleColumn`. Without it, the managed
+  flora path ran the core in Mono, and Terrain-first heights differed from the jobs by 1 ulp.
+- **Tests**:
+  - `Tests/EditMode/FloraChunkTests.cs`:
+    - TST-02: `PrepareChunkMaps` columns and chunk-job voxels over 4×4 chunks equal `SampleRegion` and a test-side
+      whole-world stamp, in all 8 configurations.
+    - TST-03: border-crossing trees are complete.
+    - TST-10: repeat runs are identical.
+  - `Tests/EditMode/FloraPlacementTests.cs`: VEG-02…05 rule semantics, structure expansion and config tables.
+  - `DataImporterTests`: the shipped settings resolve every flora id through the registry, and every land biome
+    carries flora.
+  - Fixture: `Tests/EditMode/FloraFixture.cs`.
+- **Performance** (`Tests/Performance/ChunkGenerationBenchmark.cs`): new rows
+  `ChunkJob.Run <architecture> <method> flora ms/chunk`. They use the same 16 chunks as the per-method rows, with
+  the placeholder rules. See `Tests/Performance/Baselines/README.md` (Phase 4).
+
+### Ownership of native memory (D-05)
+
+- `WorldGenConfig` owns the flora tables:
+  - `FloraRules`
+  - `FloraStructures`
+  - `FloraVoxels`
+  - `FloraMultiBlockIntervals`
+  - `VoxelClasses`
+
+  They are always created by `ToConfig` (possibly empty), and `WorldGenConfig.Dispose` releases them.
+- The `FloraGrid` lives in `Allocator.Temp` inside one chunk's `Execute` and is disposed there (INT-12).
+
 # Version 1.4 (Phase 3 — Blending methods)
 
 Phase 3 of `WorldGenSpec.html` adds the four blend methods of section 9 per stage (BLD-01): the material stage in

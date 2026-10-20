@@ -1,9 +1,10 @@
-using Engine.Scripts.Jobs.Chunk;
+﻿using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.WorldGen.Settings;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Data.Internal;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
+using Engine.Scripts.WorldGen.Flora;
 using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine;
@@ -95,8 +96,12 @@ namespace Engine.Tests.Performance{
         ///     The same world with blend method <paramref name="method" /> on the material stage and, in Biome-first, on
         ///     the height stage too (PERF-02 "per architecture x method", Phase 3); strengths are the spec defaults.
         /// </summary>
+        /// <param name="flora">
+        ///     Phase 4: give the biomes the §10 placeholder flora rules (and solid top blocks, so plants can stand on
+        ///     them); the species are in-memory voxels and a tree like the shipped one, with ids from 6 upwards.
+        /// </param>
         internal static GeneratorConfig CreateSpecGeneratorConfig(GenArchitecture architecture, BlendMethod method,
-            Allocator allocator, List<Object> created){
+            Allocator allocator, List<Object> created, bool flora = false){
             GeneratorConfig config = CreateGeneratorConfig(allocator);
             config.WorldGen.Dispose(); // replaced by the six-biome world below
 
@@ -115,7 +120,11 @@ namespace Engine.Tests.Performance{
             set.Biomes.Add(PlaceholderBiome("Ocean", .50f, .80f, .08f, .50f, 0f, 100, 6, new[]{ 1f, .5f, .2f, .05f, .02f, .01f }, 0, created));
             settings.Biomes = set;
 
-            config.WorldGen = settings.ToConfig(Seed, null, allocator);
+            Dictionary<Voxel, ushort> ids = new();
+            if (flora) AddPlaceholderFlora(set, ids, created);
+            System.Func<Voxel, ushort> voxelId = null;
+            if (flora) voxelId = v => v ? ids[v] : (ushort)0;
+            config.WorldGen = settings.ToConfigWithVoxelIds(Seed, voxelId, allocator);
             for (int b = 0; b < config.WorldGen.BiomeCount; b++){
                 Biome.BiomeDef def = config.WorldGen.Biomes[b];
                 def.topBlock = b == 1 ? Dirt : Grass;
@@ -125,6 +134,67 @@ namespace Engine.Tests.Performance{
             }
 
             return config;
+        }
+
+        /// <summary>
+        ///     The §10 placeholder rules of the six §19.2 biomes (same order as in
+        ///     <see cref="CreateSpecGeneratorConfig" />), with the shipped tree: log 0…4, filled 3×3×3 leaf box at y 6.
+        /// </summary>
+        private static void AddPlaceholderFlora(BiomeSet set, Dictionary<Voxel, ushort> ids, List<Object> created){
+            Voxel V(string name, ushort id, MeshLayer layer, bool collision){
+                Voxel v = Create<Voxel>(name, created);
+                v.meshLayer = layer;
+                v.collision = collision;
+                ids.Add(v, id);
+                return v;
+            }
+
+            Voxel grass = V("Grass", Grass, MeshLayer.Solid, true), dirt = V("Dirt", Dirt, MeshLayer.Solid, true);
+            Voxel stone = V("Stone", Stone, MeshLayer.Solid, true);
+            Voxel grassF = V("GrassF", 6, MeshLayer.Foliage, false), flowers = V("Flowers", 7, MeshLayer.Foliage, false);
+            Voxel dead = V("GrassFDead", 8, MeshLayer.Foliage, false), dry = V("GrassFDry", 9, MeshLayer.Foliage, false);
+            Voxel rock = V("Rock", 10, MeshLayer.Foliage, false), mossy = V("RockMossy", 11, MeshLayer.Foliage, false);
+            Voxel brown = V("MushroomBrown", 12, MeshLayer.Foliage, false), red = V("MushroomRed", 13, MeshLayer.Foliage, false);
+            Voxel cactus = V("Cactus", 14, MeshLayer.Solid, true), log = V("LogOak", 15, MeshLayer.Solid, true);
+            Voxel leaves = V("Leaves", 16, MeshLayer.Transparent, true);
+
+            VoxelStructure tree = Create<VoxelStructure>("Tree", created);
+            tree.parts = new[]{
+                new StructurePart{
+                    voxel = log, placements = new[]{
+                        new VoxelPlacement{ shape = PlacementShape.Line, origin = Vector3Int.zero, end = new Vector3Int(0, 4, 0) }
+                    }
+                },
+                new StructurePart{
+                    voxel = leaves, placements = new[]{
+                        new VoxelPlacement{ shape = PlacementShape.Box, origin = new Vector3Int(0, 6, 0), size = new Vector3Int(3, 3, 3), filled = true }
+                    }
+                }
+            };
+
+            FloraRule R(Voxel v, float p, int maxStack = 1){
+                return new FloraRule{ SpeciesVoxel = v, Probability = p, MaxStackHeight = maxStack };
+            }
+
+            FloraRule T(float p){
+                return new FloraRule{ SpeciesStructure = tree, Probability = p };
+            }
+
+            FloraRule[][] rules ={
+                new[]{ R(grassF, .30f), R(flowers, .05f), T(.005f) }, // Plains
+                new[]{ R(dead, .03f), R(cactus, .01f, 3) }, // Desert
+                new[]{ R(dry, .05f), R(rock, .02f), R(mossy, .01f) }, // Mountain
+                new[]{ R(dead, .01f), R(rock, .01f) }, // Snow
+                new[]{ T(.04f), R(grassF, .20f), R(brown, .01f), R(red, .01f) }, // Forest
+                new FloraRule[0] // Ocean
+            };
+            for (int b = 0; b < set.Biomes.Count; b++){
+                Biome biome = set.Biomes[b];
+                biome.TopBlock = b == 1 ? dirt : grass;
+                biome.UnderBlock = dirt;
+                biome.StoneBlock = stone;
+                biome.FloraRules = new List<FloraRule>(rules[b]);
+            }
         }
 
         private static T Create<T>(string name, List<Object> created) where T : ScriptableObject{

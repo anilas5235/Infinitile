@@ -155,6 +155,11 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Tooltip("D-06: run the ice override after terrain fill.")]
         public bool EnableClimateOverrides = true;
 
+        [Header("Vegetation (§10)")]
+        [Tooltip("r_tree: anchors of multi-block flora (trees, cacti) are at least this many blocks apart (VEG-05, default 3).")]
+        [Min(0)]
+        public int TreeSpacingRadius = 3;
+
         [Header("Assets")]
         [Tooltip("Active biomes (GEN-20). Indices in jobs are indices into this set.")]
         public BiomeSet Biomes;
@@ -175,6 +180,8 @@ namespace Engine.Scripts.WorldGen.Settings{
                 Debug.LogWarning($"{name}: GlobalOctaveWeights ({GlobalOctaveWeights.Length}) and OctaveWavelengths ({OctaveWavelengths.Length}) differ in length.", this);
             if (HeightMin >= HeightMax)
                 Debug.LogWarning($"{name}: HeightMin must be below HeightMax.", this);
+            if (TreeSpacingRadius < 0)
+                Debug.LogWarning($"{name}: TreeSpacingRadius must not be negative, got {TreeSpacingRadius}.", this);
             foreach ((string field, float value) in InvalidScales())
                 Debug.LogWarning($"{name}: {field} must be positive and finite, got {value}.", this);
             foreach ((string field, float value) in InvalidBlendStrengths(HeightMethod))
@@ -243,6 +250,17 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// <param name="registry">Voxel registry for block ids; null leaves the block ids at 0 (tests, preview).</param>
         /// <param name="allocator">Allocator of the flattened arrays.</param>
         public WorldGenConfig ToConfig(int seed, VoxelRegistry registry = null, Allocator allocator = Allocator.Persistent){
+            Func<VoxelConfig.Data.Voxel.Voxel, ushort> voxelId = null;
+            if (registry != null) voxelId = v => registry.GetIdOrThrow(v.GetFullName());
+            return ToConfigWithVoxelIds(seed, voxelId, allocator);
+        }
+
+        /// <summary>
+        ///     <see cref="ToConfig(int,VoxelRegistry,Allocator)" /> with block ids from <paramref name="voxelId" />
+        ///     (the registry, or a test's own id table); null leaves every block and flora voxel id at 0.
+        /// </summary>
+        internal WorldGenConfig ToConfigWithVoxelIds(int seed, Func<VoxelConfig.Data.Voxel.Voxel, ushort> voxelId,
+            Allocator allocator = Allocator.Persistent){
             int octaveCount = OctaveCount;
             if (octaveCount == 0) throw new InvalidOperationException($"{name}: OctaveWavelengths is empty.");
             if (octaveCount > DetailOctaves.MaxOctaves)
@@ -252,6 +270,8 @@ namespace Engine.Scripts.WorldGen.Settings{
             // h = (H - Hmin)/(Hmax - Hmin) is a classification dimension (TRN-10, GEN-13): an empty range gives NaN.
             if (!(HeightMin < HeightMax) || float.IsInfinity(HeightMin) || float.IsInfinity(HeightMax))
                 throw new InvalidOperationException($"{name}: HeightMin ({HeightMin}) must be finite and below HeightMax ({HeightMax}).");
+            if (TreeSpacingRadius < 0)
+                throw new InvalidOperationException($"{name}: TreeSpacingRadius must not be negative, got {TreeSpacingRadius}.");
 
             List<Biome> active = ActiveBiomes();
 
@@ -288,6 +308,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 HeightMin = HeightMin,
                 HeightMax = HeightMax,
                 PeakWavelength = PeakWavelength,
+                WaterLevel = WaterLevel,
                 EnableClimateOverrides = EnableClimateOverrides,
                 Climate = BuildClimate(seed),
                 OctaveWavelengths = new NativeArray<float>(OctaveWavelengths, allocator),
@@ -330,13 +351,16 @@ namespace Engine.Scripts.WorldGen.Settings{
 
                 for (int b = 0; b < active.Count; b++){
                     Biome biome = active[b];
-                    cfg.Biomes[b] = registry != null ? biome.ToStruct(registry) : biome.ToStruct();
+                    cfg.Biomes[b] = voxelId != null ? biome.ToStruct(voxelId) : biome.ToStruct();
                     for (int i = 0; i < octaveCount; i++){
                         // GEN-22: a_{b,i} = HeightAmplitude_b × OctaveWeights_{b,i}; missing weights count as 0.
                         float w = biome.OctaveWeights != null && i < biome.OctaveWeights.Length ? biome.OctaveWeights[i] : 0f;
                         cfg.OctaveCoefficients[b * octaveCount + i] = biome.HeightAmplitude * w;
                     }
                 }
+
+                // §10: flora rules, species, structures (VEG-02…05).
+                FloraConfigBuilder.Build(active, voxelId, TreeSpacingRadius, allocator, ref cfg, this);
             }
             catch{
                 cfg.Dispose();
@@ -362,6 +386,18 @@ namespace Engine.Scripts.WorldGen.Settings{
                 WGain = WGain,
                 FrequencyScale = ClimateFrequencyScale
             };
+        }
+
+        /// <summary>
+        ///     VEG-06: flora species id → name; element 0 is "none", element i the species with id i (a voxel or a
+        ///     structure asset name), as <c>ColumnSample.FloraSpecies</c> reports it.
+        /// </summary>
+        public string[] FloraSpeciesNames(){
+            List<UnityEngine.Object> species = FloraConfigBuilder.CollectSpecies(ActiveBiomes());
+            string[] names = new string[species.Count + 1];
+            names[0] = "none";
+            for (int i = 0; i < species.Count; i++) names[i + 1] = species[i].name;
+            return names;
         }
 
         /// <summary>The active biomes in index order (GEN-21), at most <see cref="BiomeSet.MaxBiomes" />. Null slots throw.</summary>
@@ -428,6 +464,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["ErosionProfile"] = ProfileTree(erosionProfile),
                 ["WeirdnessProfile"] = ProfileTree(weirdnessProfile),
                 ["EnableClimateOverrides"] = EnableClimateOverrides,
+                ["TreeSpacingRadius"] = TreeSpacingRadius,
                 ["Biomes"] = BiomeSetTree(),
                 ["Splines"] = Splines ? Splines.ToTree() : null
             };
@@ -474,7 +511,9 @@ namespace Engine.Scripts.WorldGen.Settings{
                         ["SpeciesStructure"] = rule.SpeciesStructure ? rule.SpeciesStructure.name : null,
                         ["Probability"] = rule.Probability,
                         ["RequiresSurfaceFromSameBiome"] = rule.RequiresSurfaceFromSameBiome,
-                        ["MinHeightAboveWater"] = rule.MinHeightAboveWater
+                        ["MinHeightAboveWater"] = rule.MinHeightAboveWater,
+                        ["MinStackHeight"] = rule.MinStackHeight,
+                        ["MaxStackHeight"] = rule.MaxStackHeight
                     });
 
             return new Dictionary<string, object>{

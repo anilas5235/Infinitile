@@ -44,7 +44,9 @@ namespace Engine.Scripts.Jobs.Chunk{
             NativeArray<ushort> chunkVoxels = new(VoxelsPerChunk, Allocator.Temp);
             NativeArray<ChunkColumn> chunkColumns = new(surfaceArea, Allocator.Temp);
 
-            PrepareChunkMaps(RandomSeed, ref Config, ref chunkWorldPos, chunkColumns);
+            FloraGrid floraGrid = new(Config.WorldGen.FloraPadding, Allocator.Temp);
+
+            PrepareChunkMaps(RandomSeed, ref Config, ref chunkWorldPos, chunkColumns, ref floraGrid);
 
             FillTerrain(chunkVoxels, chunkColumns, ref Config);
 
@@ -54,12 +56,14 @@ namespace Engine.Scripts.Jobs.Chunk{
 
             //PlaceStructures(ref vox, ref chunkColumns, ref chunkWorldPos, RandomSeed, ref Config);
 
-            //PlaceVegetation(ref vox, ref chunkColumns, ref chunkWorldPos, RandomSeed, ref Config);
+            // INT-11: vegetation per VEG-01…05.
+            PlaceVegetation(chunkVoxels, chunkColumns, floraGrid, chunkWorldPos, ref Config);
 
             WriteToChunkData(chunkVoxels, out voxelData);
 
             chunkVoxels.Dispose();
             chunkColumns.Dispose();
+            floraGrid.Dispose();
         }
 
         /// <summary>
