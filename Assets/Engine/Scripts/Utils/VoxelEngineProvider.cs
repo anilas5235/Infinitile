@@ -54,22 +54,26 @@ namespace Engine.Scripts.Utils{
 
         /// <summary>
         ///     Creates a configured <see cref="ChunkScheduler" /> for data generation jobs. Fills missing config fields.
+        ///     <paramref name="worldGen" /> replaces <see cref="VoxelEngineSettings.WorldGen" /> for this scheduler
+        ///     (INT-30); its values are copied into the config, so the caller may destroy it afterwards.
         /// </summary>
         internal ChunkScheduler ChunkDataScheduler(
             ChunkManager chunkManager,
             GeneratorConfig generatorConfig,
-            VoxelWorld world
+            VoxelWorld world,
+            WorldGenSettings worldGen = null
         ){
+            if (!worldGen) worldGen = Settings.WorldGen;
             // INT-01/INT-40: since Phase 2 the WorldGenSettings asset is the only generation input.
-            if (!Settings.WorldGen)
+            if (!worldGen)
                 throw new System.InvalidOperationException(
                     $"{Settings.name}: a WorldGenSettings asset must be assigned (VoxelEngineSettings.WorldGen).");
 
             GeneratorConfig cfg = generatorConfig;
-            cfg.WaterLevel = Settings.WorldGen.WaterLevel;
+            cfg.WaterLevel = worldGen.WaterLevel;
             cfg.GlobalSeed = Settings.Seed;
             // INT-03: the Burst mirror of the spec settings (owned by the config, D-05).
-            cfg.WorldGen = Settings.WorldGen.ToConfig(Settings.Seed, DataImporter.Instance.VoxelRegistry);
+            cfg.WorldGen = worldGen.ToConfig(Settings.Seed, DataImporter.Instance.VoxelRegistry);
             return new ChunkScheduler(Settings, chunkManager, cfg, world);
         }
 

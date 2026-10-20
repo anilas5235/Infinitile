@@ -121,7 +121,7 @@ namespace Engine.Scripts.Jobs.ColliderBake{
         /// <summary>
         ///     F-04: waits for the running bake job; its results are still applied by <see cref="Complete" />.
         /// </summary>
-        private void CompleteJobIfRunning(){
+        internal void CompleteJobIfRunning(){
             _handle.Complete();
         }
 

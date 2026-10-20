@@ -19,3 +19,6 @@ MonoBehaviour:
   - {fileID: 11400000, guid: c036fc39d47cc9a4a965327fadd851b4, type: 2}
   - {fileID: 11400000, guid: 6c8775e42a6a84d48832716106bcda37, type: 2}
   - {fileID: 11400000, guid: 886a98ad0b541f948b98f13c79588a3f, type: 2}
+  ImplausibleNeighbours:
+  - First: {fileID: 11400000, guid: b56e988584e3a2a45bd91098ebd3fdc7, type: 2}
+    Second: {fileID: 11400000, guid: c036fc39d47cc9a4a965327fadd851b4, type: 2}

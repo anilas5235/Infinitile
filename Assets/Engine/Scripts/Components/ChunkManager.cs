@@ -165,6 +165,16 @@ namespace Engine.Scripts.Components{
         }
 
         /// <summary>
+        ///     INT-30: unloads every loaded chunk (each raises <see cref="OnChunkUnloaded" />), e.g. before the world is
+        ///     regenerated with another configuration.
+        /// </summary>
+        internal void UnloadAll(){
+            int2[] loaded = new int2[_chunks.Count];
+            _chunks.Keys.CopyTo(loaded, 0);
+            foreach (int2 position in loaded) UnloadChunk(position);
+        }
+
+        /// <summary>
         ///     F-01: completes any job that still reads <paramref name="chunkPos" /> through the current accessor
         ///     before the chunk's data is written or disposed.
         /// </summary>

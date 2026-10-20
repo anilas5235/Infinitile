@@ -12,6 +12,7 @@ namespace Player{
     public class PlayerManager : MonoBehaviour{
         private PlayerControllerManager _controllerManager;
 
+        private bool _holding;
         private bool _playerEnabled = true;
         private VoxelPostProcessHandler _postProcessHandler;
         private bool _readyForPlayer;
@@ -24,6 +25,11 @@ namespace Player{
         }
 
         private void FixedUpdate(){
+            if (_holding){
+                TryReleaseHold();
+                return;
+            }
+
             if (_playerEnabled || _readyForPlayer || !ReadyForPlayer(out int3 firstCollidableVoxel)) return;
 
             transform.position = firstCollidableVoxel.GetVector3() + new Vector3(0.5f, 4f, 0.5f);
@@ -37,6 +43,32 @@ namespace Player{
             _postProcessHandler = GetComponent<VoxelPostProcessHandler>();
             _world = VoxelWorld.Instance;
             _voxelRegistry = DataImporter.Instance.VoxelRegistry;
+        }
+
+        /// <summary>
+        ///     INT-30: disables the player until the ground under it is loaded and collidable again, e.g. after
+        ///     <see cref="VoxelWorld.Regenerate" /> or a teleport. The player keeps its pose unless the new terrain
+        ///     buries it; then it is put on top of the column.
+        /// </summary>
+        public void HoldUntilGrounded(){
+            DisablePlayer();
+            _holding = true;
+        }
+
+        private void TryReleaseHold(){
+            if (!ReadyForPlayer(out int3 below)) return;
+
+            // The first collidable voxel under the head lies inside the body: lift the player above the column and
+            // release it once the top is collidable.
+            int3 playerPos = transform.position.Int3();
+            if (below.y + 1 >= playerPos.y - 1){
+                Vector3 position = transform.position;
+                transform.position = new Vector3(position.x, VoxelConstants.ChunkHeight, position.z);
+                return;
+            }
+
+            _holding = false;
+            EnablePlayer();
         }
 
         public void DisablePlayer(){

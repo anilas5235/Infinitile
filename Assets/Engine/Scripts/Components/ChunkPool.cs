@@ -219,6 +219,19 @@ namespace Engine.Scripts.Components{
             _colliderSet.Add(position);
         }
 
+        /// <summary>
+        ///     INT-30: reclaims every active chunk with its partitions and raises the eviction events, so a regenerated
+        ///     world starts from an empty pool and listeners (renderer, chunk manager) drop their state.
+        /// </summary>
+        internal void ReclaimAll(){
+            int2[] active = new int2[_chunkMap.Count];
+            _chunkMap.Keys.CopyTo(active, 0);
+            foreach (int2 position in active){
+                if (_chunkQueue.Contains(position)) _chunkQueue.Remove(position);
+                ReclaimChunk(position);
+            }
+        }
+
         internal void Dispose(){
             _emitEvictionEvents = false;
             OnChunkEvicted = null;

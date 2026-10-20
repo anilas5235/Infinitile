@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Engine.Scripts.Settings;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Classify;
-using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Burst;
@@ -15,28 +14,54 @@ using UnityEngine;
 
 namespace Engine.Editor.WorldGen{
     /// <summary>
-    ///     World-generation preview on the spec pipeline (Phase 2, INT-40: the only pipeline). Every view is filled
-    ///     through <see cref="WorldGenApi.SampleRegion" />, so it shows exactly what <c>WorldSampler</c> computes for
-    ///     the framed region (TST-E12): hard biome class, height with the clamped share (GEN-12), climate channels,
-    ///     erosion, peaks and valleys and, in Terrain-first, the spline parameters Offset, Amp and J (TRN-06). The
-    ///     left column edits the <see cref="WorldGenSettings" /> and its biomes in place and shows the classifier's
-    ///     T x F plane at a chosen C, E, PV (and h). Edits rebuild the preview; nothing is written to assets beyond
-    ///     the inspector edits the user makes.
+    ///     World-generation preview on the spec pipeline (INT-40: the only pipeline). Every view is filled through
+    ///     <c>WorldGenApi.SampleRegion</c> (see <see cref="PreviewPass" />), so it shows exactly what
+    ///     <c>WorldSampler</c> computes for the framed region (TST-E12).
+    ///     <para>
+    ///         INT-20: architecture, per-stage method and strength controls (configuration A writes them to the
+    ///         <see cref="WorldGenSettings" /> asset with Undo), seed field, views (height with hillshade, hard biome,
+    ///         dominant material biome, max material weight, surface source, flora, climate, E, PV and in
+    ///         Terrain-first Offset/Amp/J), the clamped share (GEN-12) and the biome-pair boundary list (GEN-24).
+    ///         INT-21: an A/B compare mode — the same view and seed for A and a preview-only configuration B layered
+    ///         on the asset, plus a difference view. TRN-06: 1D plots of every spline level at the probe C/E/PV.
+    ///     </para>
     /// </summary>
     public partial class WorldGenerationPreviewWindow : EditorWindow{
         private const int ViewResolution = 512;
         private const int DistributionResolution = 256;
+        private const int PlotSamples = 96;
         private static readonly int[] ResolutionOptions ={ 128, 256, 512, 1024, 2048, 4096, 8192, 16384 };
         private static readonly string[] ResolutionLabels = Array.ConvertAll(ResolutionOptions, r => $"{r}x{r}");
 
+        private static readonly PreviewView[] BiomeFirstGrid ={
+            PreviewView.Height, PreviewView.HardBiome, PreviewView.DominantBiome,
+            PreviewView.SurfaceSource, PreviewView.Flora, PreviewView.MaxMaterialWeight,
+            PreviewView.Climate, PreviewView.Erosion, PreviewView.PeaksValleys
+        };
+
+        private static readonly PreviewView[] TerrainFirstGrid ={
+            PreviewView.Height, PreviewView.HardBiome, PreviewView.DominantBiome, PreviewView.SurfaceSource,
+            PreviewView.Flora, PreviewView.MaxMaterialWeight, PreviewView.Climate, PreviewView.Erosion,
+            PreviewView.PeaksValleys, PreviewView.Offset, PreviewView.Amp, PreviewView.Jaggedness
+        };
+
         // --- Source -------------------------------------------------------------------------------------------------
         private VoxelEngineSettings _settings;
-        private WorldGenConfig _config; // owned by the window (D-05); rebuilt for every build, disposed on close
-        private string _configError;
         private bool _autoRebuild = true;
         private bool _needsRebuild = true;
         private bool _buildInProgress;
         private JobHandle _buildHandle;
+        private WorldGenSettings _buildAsset; // the asset of the running build
+        private bool _scheduledA;
+        private bool _scheduledB;
+
+        // --- Configurations (INT-20/21) -------------------------------------------------------------------------------
+        private PreviewPass _passA;
+        private PreviewPass _passB;
+        [SerializeField] private PreviewConfiguration _configB; // preview-only, never written to the asset implicitly
+        [SerializeField] private bool _configBInitialized; // B starts as a copy of A
+        [SerializeField] private bool _compare;
+        [SerializeField] private PreviewView _compareView = PreviewView.Height;
 
         // --- Framing ------------------------------------------------------------------------------------------------
         private Vector2Int _worldOffset;
@@ -45,55 +70,43 @@ namespace Engine.Editor.WorldGen{
         private Vector2 _dragStartMouse;
         private Vector2Int _dragStartOffset;
 
-        // --- Views --------------------------------------------------------------------------------------------------
+        // --- View options -------------------------------------------------------------------------------------------
         private bool _showTemperature = true;
         private bool _showContinental = true;
         private bool _showHumidity = true;
-        private Texture2D _biomeTexture;
-        private Texture2D _surfaceTexture;
-        private Texture2D _heightTexture;
-        private Texture2D _climateTexture;
-        private Texture2D _erosionTexture;
-        private Texture2D _pvTexture;
-        private Texture2D _offsetTexture;
-        private Texture2D _ampTexture;
-        private Texture2D _jaggednessTexture;
-        private Texture2D _distributionTexture;
-        private int _viewSize;
-        private bool _terrainFirst;
-        private float _clampedShare;
-        private float2 _ampRange;
-        private float2 _jaggednessRange;
+        [SerializeField] private bool _hillshade = true;
+        [SerializeField] private float _exaggeration = 2f;
 
-        // --- Distribution plane (classifier over T x F) ---------------------------------------------------------------
+        // --- Difference view (INT-21) ---------------------------------------------------------------------------------
+        private NativeArray<Color32> _diffPixels;
+        private Texture2D _diffTexture;
+        private PreviewDiff.Stats _diffStats;
+        private bool _diffSigned;
+        private string _diffNote;
+
+        // --- Distribution plane (classifier over T x F); C/E/PV are also the TRN-06 spline probe -----------------------
         private float _planeContinental = 0.5f;
         private float _planeErosion = 0.5f;
         private float _planePV;
         private float _planeHeight = 0.5f;
+        private Texture2D _distributionTexture;
+        private NativeArray<Color32> _jobDistributionPixels;
+        private NativeArray<Color32> _jobDistributionColors;
 
-        // --- Editors ------------------------------------------------------------------------------------------------
+        // --- Spline plots (TRN-06) ------------------------------------------------------------------------------------
+        private List<SplinePlots.Plot> _plots = new();
+        private string _plotsError;
+
+        // --- Editors and foldouts -------------------------------------------------------------------------------------
         private UnityEditor.Editor _settingsEditor;
         private UnityEditor.Editor _biomeEditor;
         private int _selectedBiomeIndex;
         private bool _showSettingsEditor = true;
         private bool _showBiomeEditor = true;
+        private bool _showConfiguration = true;
+        private bool _showStatistics = true;
+        private bool _showPlots;
         private Vector2 _leftScroll;
-
-        // --- Job data (TempJob, alive for one build) ---------------------------------------------------------------
-        private NativeArray<WorldFields> _jobFields;
-        private NativeArray<int> _jobHardBiome;
-        private NativeArray<int> _jobSurfaceSource;
-        private NativeArray<float> _jobHeight;
-        private NativeArray<byte> _jobClamped;
-        private NativeArray<float3> _jobTerrainParams;
-        private NativeArray<Color32> _jobBiomeColors;
-        private NativeArray<Color32> _jobBiomePixels;
-        private NativeArray<Color32> _jobSurfacePixels;
-        private NativeArray<Color32> _jobHeightPixels;
-        private NativeArray<Color32> _jobClimatePixels;
-        private NativeArray<Color32> _jobErosionPixels;
-        private NativeArray<Color32> _jobPvPixels;
-        private NativeArray<Color32> _jobDistributionPixels;
 
         [MenuItem("Infinitile/World Generation Preview")]
         private static void OpenWindow(){
@@ -104,6 +117,8 @@ namespace Engine.Editor.WorldGen{
         }
 
         private void OnEnable(){
+            _passA ??= new PreviewPass("A");
+            _passB ??= new PreviewPass("B");
             EditorApplication.update += OnEditorUpdate;
             Undo.undoRedoPerformed += RequestRebuild;
             ReloadAssets();
@@ -112,29 +127,14 @@ namespace Engine.Editor.WorldGen{
         private void OnDisable(){
             EditorApplication.update -= OnEditorUpdate;
             Undo.undoRedoPerformed -= RequestRebuild;
-            FinalizeScheduledBuild(false); // a running build still reads the config
+            FinalizeScheduledBuild(false); // a running build still reads the configs and buffers
             DestroyEditors();
-            DestroyTexture(ref _biomeTexture);
-            DestroyTexture(ref _surfaceTexture);
-            DestroyTexture(ref _heightTexture);
-            DestroyTexture(ref _climateTexture);
-            DestroyTexture(ref _erosionTexture);
-            DestroyTexture(ref _pvTexture);
-            DestroyTexture(ref _offsetTexture);
-            DestroyTexture(ref _ampTexture);
-            DestroyTexture(ref _jaggednessTexture);
-            DestroyTexture(ref _distributionTexture);
-            DisposeConfig();
-        }
-
-        private void OnDestroy(){
-            FinalizeScheduledBuild(false);
-            DisposeConfig();
-        }
-
-        private void DisposeConfig(){
-            _config.Dispose(); // safe on a default instance
-            _config = default;
+            _passA?.Dispose();
+            _passB?.Dispose();
+            _passA = _passB = null;
+            if (_diffPixels.IsCreated) _diffPixels.Dispose();
+            PreviewPass.DestroyTexture(ref _diffTexture);
+            PreviewPass.DestroyTexture(ref _distributionTexture);
         }
 
         private void DestroyEditors(){
@@ -169,6 +169,8 @@ namespace Engine.Editor.WorldGen{
         #region GUI
 
         private void OnGUI(){
+            if (_settings && _settings.WorldGen) EnsureConfigB(_settings.WorldGen);
+
             Vector2 windowSize = position.size;
             EditorGUI.BeginChangeCheck();
             EditorGUILayout.BeginHorizontal();
@@ -177,7 +179,10 @@ namespace Engine.Editor.WorldGen{
                 {
                     _leftScroll = EditorGUILayout.BeginScrollView(_leftScroll);
                     DrawToolbar();
+                    DrawConfigurationPanel();
+                    DrawStatisticsPanel();
                     DrawDistributionPanel();
+                    DrawSplinePlotsPanel();
                     DrawSettingsPanel();
                     DrawBiomePanel();
                     DrawExtraPanels();
@@ -198,6 +203,14 @@ namespace Engine.Editor.WorldGen{
             DrawExtraPanelsImpl();
         }
 
+        /// <summary>Runs a display-only control without marking the GUI changed, so it does not rebuild the preview.</summary>
+        private static T WithoutRebuild<T>(Func<T> control){
+            bool changed = GUI.changed;
+            T value = control();
+            GUI.changed = changed;
+            return value;
+        }
+
         private void DrawToolbar(){
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             {
@@ -211,13 +224,18 @@ namespace Engine.Editor.WorldGen{
                 }
 
                 if (_settings){
+                    // INT-20: seed field (shared by A and B, INT-21 compares at the same seed).
+                    EditorGUILayout.BeginHorizontal();
                     EditorGUI.BeginChangeCheck();
                     int seed = EditorGUILayout.IntField("Seed", _settings.Seed);
+                    if (GUILayout.Button("Random", GUILayout.Width(60f))) seed = UnityEngine.Random.Range(int.MinValue, int.MaxValue);
                     if (EditorGUI.EndChangeCheck()){
                         Undo.RecordObject(_settings, "Change world seed");
                         _settings.Seed = seed;
                         EditorUtility.SetDirty(_settings);
                     }
+
+                    EditorGUILayout.EndHorizontal();
 
                     EditorGUI.BeginChangeCheck();
                     WorldGenSettings worldGen = (WorldGenSettings)EditorGUILayout.ObjectField("WorldGenSettings",
@@ -246,20 +264,161 @@ namespace Engine.Editor.WorldGen{
                 }
                 EditorGUILayout.EndHorizontal();
 
-                if (!string.IsNullOrEmpty(_configError))
-                    EditorGUILayout.HelpBox("WorldGenSettings.ToConfig failed:\n" + _configError, MessageType.Error);
+                if (_passA?.Error != null) EditorGUILayout.HelpBox("A: WorldGenSettings.ToConfig failed:\n" + _passA.Error, MessageType.Error);
+                if (_compare && _passB?.Error != null) EditorGUILayout.HelpBox("B: WorldGenSettings.ToConfig failed:\n" + _passB.Error, MessageType.Error);
             }
             EditorGUILayout.EndVertical();
         }
 
         /// <summary>
+        ///     INT-20/21: configuration A (the asset, edited with Undo) and, in compare mode, the preview-only
+        ///     configuration B with "Copy A → B" and "Apply B to asset".
+        /// </summary>
+        private void DrawConfigurationPanel(){
+            WorldGenSettings asset = WorldGenSettings;
+            if (!asset) return;
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            {
+                _showConfiguration = EditorGUILayout.Foldout(_showConfiguration, "Configuration (INT-20/21)", true, EditorStyles.foldoutHeader);
+                if (_showConfiguration){
+                    EditorGUILayout.LabelField("A — the WorldGenSettings asset", EditorStyles.boldLabel);
+                    PreviewConfiguration a = PreviewConfiguration.Capture(asset);
+                    if (DrawConfiguration(a)){
+                        Undo.RecordObject(asset, "Change preview configuration");
+                        a.ApplyTo(asset);
+                        EditorUtility.SetDirty(asset);
+                    }
+
+                    EditorGUILayout.Space(4f);
+                    _compare = EditorGUILayout.ToggleLeft("Compare with configuration B (A | B | difference)", _compare);
+                    if (_compare && _configB != null){
+                        EditorGUILayout.LabelField("B — preview only (biomes, splines and climate from the asset)", EditorStyles.boldLabel);
+                        DrawConfiguration(_configB);
+                        EditorGUILayout.BeginHorizontal();
+                        if (GUILayout.Button("Copy A → B")) _configB = PreviewConfiguration.Capture(asset);
+                        using (new EditorGUI.DisabledScope(_configB.Matches(asset))){
+                            if (GUILayout.Button("Apply B to asset")){
+                                Undo.RecordObject(asset, "Apply preview configuration B");
+                                _configB.ApplyTo(asset);
+                                EditorUtility.SetDirty(asset);
+                            }
+                        }
+
+                        EditorGUILayout.EndHorizontal();
+                    }
+                }
+            }
+            EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>Architecture, method and strength controls; only the strengths the methods use are shown.</summary>
+        private static bool DrawConfiguration(PreviewConfiguration c){
+            EditorGUI.BeginChangeCheck();
+            c.Architecture = (GenArchitecture)EditorGUILayout.EnumPopup("Architecture", c.Architecture);
+            c.MaterialMethod = (BlendMethod)EditorGUILayout.EnumPopup("Material method", c.MaterialMethod);
+            using (new EditorGUI.IndentLevelScope()){
+                if (c.MaterialMethod == BlendMethod.DistanceBlend)
+                    c.MaterialBlendWidth = EditorGUILayout.Slider("B_mat (blocks)", c.MaterialBlendWidth, 1f, 256f);
+                if (c.MaterialMethod == BlendMethod.ParameterSpaceWeighting)
+                    c.MaterialSigma = EditorGUILayout.Slider("σ_mat", c.MaterialSigma, 0.001f, 0.5f);
+            }
+
+            bool terrainFirst = c.Architecture == GenArchitecture.TerrainFirst;
+            using (new EditorGUI.DisabledScope(terrainFirst)){
+                c.HeightMethod = (BlendMethod)EditorGUILayout.EnumPopup(
+                    terrainFirst ? "Height method (ignored, TRN-21)" : "Height method", c.HeightMethod);
+                if (!terrainFirst)
+                    using (new EditorGUI.IndentLevelScope()){
+                        if (c.HeightMethod is BlendMethod.DistanceBlend or BlendMethod.DistortedBoundary)
+                            c.HeightBlendWidth = EditorGUILayout.Slider("B_h (blocks)", c.HeightBlendWidth, 1f, 256f);
+                        if (c.HeightMethod == BlendMethod.ParameterSpaceWeighting)
+                            c.HeightSigma = EditorGUILayout.Slider("σ_h", c.HeightSigma, 0.001f, 0.5f);
+                    }
+            }
+
+            bool warp = c.MaterialMethod == BlendMethod.DistortedBoundary || !terrainFirst && c.HeightMethod == BlendMethod.DistortedBoundary;
+            if (warp){
+                EditorGUILayout.LabelField("Boundary warp (shared by both stages, DEC-05)", EditorStyles.miniBoldLabel);
+                using (new EditorGUI.IndentLevelScope()){
+                    c.WarpAmplitude = EditorGUILayout.Slider("A (blocks)", c.WarpAmplitude, 0f, 128f);
+                    c.WarpWavelength = EditorGUILayout.Slider("λd (blocks)", c.WarpWavelength, 8f, 1024f);
+                    c.WarpOctaves = EditorGUILayout.IntSlider("Octaves", c.WarpOctaves, 1, 4);
+                }
+            }
+
+            return EditorGUI.EndChangeCheck();
+        }
+
+        /// <summary>GEN-12 clamped share, GEN-24 biome-pair boundaries and the flora species per pass.</summary>
+        private void DrawStatisticsPanel(){
+            if (!WorldGenSettings) return;
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            {
+                _showStatistics = EditorGUILayout.Foldout(_showStatistics, "Statistics of the view (GEN-12, GEN-24)", true, EditorStyles.foldoutHeader);
+                if (_showStatistics){
+                    DrawPassStatistics(_passA);
+                    if (_compare) DrawPassStatistics(_passB);
+                }
+            }
+            EditorGUILayout.EndVertical();
+        }
+
+        private void DrawPassStatistics(PreviewPass pass){
+            if (pass == null || !pass.HasResult) return;
+            EditorGUILayout.LabelField($"{pass.Label}: {pass.Description}", EditorStyles.miniBoldLabel);
+            using (new EditorGUI.IndentLevelScope()){
+                EditorGUILayout.LabelField("Clamped columns (GEN-12)", pass.ClampedShare.ToString("P2"));
+
+                long total = 0, implausible = 0;
+                foreach (BiomeBoundaryStats.PairLength p in pass.Boundaries){
+                    total += p.Length;
+                    if (p.Implausible) implausible += p.Length;
+                }
+
+                EditorGUILayout.LabelField("Biome boundaries (dominant material biome)", $"{total:N0} blocks");
+                if (implausible > 0){
+                    Color previous = GUI.color;
+                    GUI.color = new Color(1f, .45f, .4f);
+                    EditorGUILayout.LabelField("Implausible neighbours", $"{implausible:N0} blocks ({implausible / (float)math.max(1, total):P1})");
+                    GUI.color = previous;
+                }
+
+                foreach (BiomeBoundaryStats.PairLength p in pass.Boundaries){
+                    Color previous = GUI.color;
+                    if (p.Implausible) GUI.color = new Color(1f, .45f, .4f);
+                    EditorGUILayout.LabelField($"{p.NameA} – {p.NameB}{(p.Implausible ? "  (implausible)" : "")}",
+                        $"{p.Length:N0}  ({p.Share:P1})");
+                    GUI.color = previous;
+                }
+
+                if (pass.FloraCounts.Count > 0){
+                    string[] names = pass.FloraNames;
+                    int columns = pass.Size * pass.Size;
+                    EditorGUILayout.LabelField("Flora species (VEG-06)", EditorStyles.miniBoldLabel);
+                    for (int i = 0; i < pass.FloraCounts.Count && i < 10; i++){
+                        (ushort species, int count) = pass.FloraCounts[i];
+                        EditorGUILayout.BeginHorizontal();
+                        Rect swatch = GUILayoutUtility.GetRect(12f, 12f, GUILayout.Width(12f));
+                        swatch.x += EditorGUI.indentLevel * 15f;
+                        EditorGUI.DrawRect(swatch, PreviewPass.SpeciesColor(species));
+                        GUILayout.Space(EditorGUI.indentLevel * 15f);
+                        string name = species < names.Length ? names[species] : $"#{species}";
+                        EditorGUILayout.LabelField(name, $"{count:N0}  ({count / (float)math.max(1, columns):P2})");
+                        EditorGUILayout.EndHorizontal();
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         ///     The classifier's T x F plane (§6.4): every pixel is <see cref="BiomeClassifier.Classify" /> at
-        ///     (T, F) with the chosen C, E, PV and, in Terrain-first, the normalised height h (6D).
+        ///     (T, F) with the chosen C, E, PV and, in Terrain-first, the normalised height h (6D). C, E and PV are
+        ///     also the probe of the TRN-06 spline plots.
         /// </summary>
         private void DrawDistributionPanel(){
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             {
-                EditorGUILayout.LabelField("Biome distribution (X = Humidity F, Y = Temperature T)", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Biome distribution of A (X = Humidity F, Y = Temperature T)", EditorStyles.boldLabel);
                 _planeContinental = EditorGUILayout.Slider("Continental C", _planeContinental, 0f, 1f);
                 _planeErosion = EditorGUILayout.Slider("Erosion E", _planeErosion, 0f, 1f);
                 _planePV = EditorGUILayout.Slider("Peaks & valleys PV", _planePV, -1f, 1f);
@@ -272,6 +431,66 @@ namespace Engine.Editor.WorldGen{
                 DrawView(null, _distributionTexture, false, 220f);
             }
             EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>TRN-06: every spline level along its axis with the other axes at the probe C/E/PV.</summary>
+        private void DrawSplinePlotsPanel(){
+            WorldGenSettings asset = WorldGenSettings;
+            if (!asset) return;
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            {
+                _showPlots = EditorGUILayout.Foldout(_showPlots, "Spline levels (TRN-06)", true, EditorStyles.foldoutHeader);
+                if (_showPlots){
+                    if (!asset.Splines)
+                        EditorGUILayout.HelpBox("No TerrainSplineSet assigned (TRN-05).", MessageType.Info);
+                    else if (_plotsError != null)
+                        EditorGUILayout.HelpBox(_plotsError, MessageType.Warning);
+                    else{
+                        EditorGUILayout.LabelField($"Probe C = {_planeContinental:0.00}, E = {_planeErosion:0.00}, PV = {_planePV:0.00} " +
+                                                   "(distribution sliders) · orange = child point · line = probe", EditorStyles.miniLabel);
+                        foreach (SplinePlots.Plot plot in _plots) DrawPlot(plot);
+                    }
+                }
+            }
+            EditorGUILayout.EndVertical();
+        }
+
+        private static void DrawPlot(SplinePlots.Plot plot){
+            float indent = plot.Node.Depth * 14f;
+            EditorGUILayout.LabelField(
+                $"{new string(' ', plot.Node.Depth * 3)}{plot.Node.Tree} · {plot.Name} over {TerrainSplineSet.AxisName(plot.Axis)} " +
+                $"[{plot.ValueRange.x:0.##} … {plot.ValueRange.y:0.##}] · probe {plot.Probe.y:0.##}", EditorStyles.miniLabel);
+            Rect rect = GUILayoutUtility.GetRect(100f, 64f, GUILayout.ExpandWidth(true));
+            rect.xMin += indent;
+            EditorGUI.DrawRect(rect, new Color(0.12f, 0.12f, 0.12f, 1f));
+            if (Event.current.type != EventType.Repaint) return;
+
+            Rect inner = new(rect.x + 4f, rect.y + 4f, rect.width - 8f, rect.height - 8f);
+            float2 values = plot.ValueRange;
+            if (values.y - values.x < 1e-3f) values += new float2(-0.5f, 0.5f);
+            float2 axis = plot.AxisRange;
+
+            Vector3 Map(float x, float y){
+                return new Vector3(inner.x + (x - axis.x) / (axis.y - axis.x) * inner.width,
+                    inner.yMax - (y - values.x) / (values.y - values.x) * inner.height, 0f);
+            }
+
+            Vector3[] line = new Vector3[plot.Curve.Length];
+            for (int s = 0; s < line.Length; s++) line[s] = Map(math.lerp(axis.x, axis.y, s / (float)(line.Length - 1)), plot.Curve[s]);
+            Color previous = Handles.color;
+            Handles.color = new Color(0.45f, 0.8f, 1f);
+            Handles.DrawAAPolyLine(2f, line);
+
+            Vector3 probe = Map(plot.Probe.x, plot.Probe.y);
+            Handles.color = new Color(1f, 1f, 1f, 0.35f);
+            Handles.DrawLine(new Vector3(probe.x, inner.y), new Vector3(probe.x, inner.yMax));
+            Handles.color = previous;
+            EditorGUI.DrawRect(new Rect(probe.x - 3f, probe.y - 3f, 6f, 6f), Color.white);
+
+            for (int k = 0; k < plot.Points.Length; k++){
+                Vector3 p = Map(plot.Points[k].x, plot.Points[k].y);
+                EditorGUI.DrawRect(new Rect(p.x - 2f, p.y - 2f, 4f, 4f), plot.PointIsChild[k] ? new Color(1f, .6f, .1f) : new Color(.85f, .85f, .85f));
+            }
         }
 
         private void DrawSettingsPanel(){
@@ -354,48 +573,101 @@ namespace Engine.Editor.WorldGen{
                     _showHumidity = EditorGUILayout.ToggleLeft("F (B)", _showHumidity, GUILayout.Width(55f));
                 }
                 EditorGUILayout.EndHorizontal();
-                EditorGUILayout.LabelField(
-                    $"{(_terrainFirst ? "Terrain-first" : "Biome-first")} · drag a view to pan · 1 sample per block up to 512, then every {Mathf.Max(1, ResolutionOptions[_resolutionIndex] / ViewResolution)}th column",
-                    EditorStyles.miniLabel);
 
                 EditorGUILayout.BeginHorizontal();
                 {
-                    EditorGUILayout.BeginVertical();
-                    DrawView(_terrainFirst ? "Biome (6D hard class)" : "Biome (5D hard class)", _biomeTexture, true);
-                    DrawView($"Height (clamped {_clampedShare:P1}, red = clamped, blue = below water)", _heightTexture, true);
-                    EditorGUILayout.EndVertical();
-
-                    EditorGUILayout.BeginVertical();
-                    DrawView("Climate (T, C, F)", _climateTexture, true);
-                    DrawView("Erosion", _erosionTexture, true);
-                    EditorGUILayout.EndVertical();
-
-                    EditorGUILayout.BeginVertical();
-                    DrawView("Peaks & valleys", _pvTexture, true);
-                    if (_terrainFirst) DrawView("Offset (Hmin..Hmax, blue below water)", _offsetTexture, true);
-                    else DrawView(SurfaceTitle, _surfaceTexture, true);
-                    EditorGUILayout.EndVertical();
-
-                    if (_terrainFirst){
-                        EditorGUILayout.BeginVertical();
-                        DrawView($"Amp ({_ampRange.x:0.#}..{_ampRange.y:0.#})", _ampTexture, true);
-                        DrawView($"Jaggedness ({_jaggednessRange.x:0.#}..{_jaggednessRange.y:0.#})", _jaggednessTexture, true);
-                        EditorGUILayout.EndVertical();
-
-                        EditorGUILayout.BeginVertical();
-                        DrawView(SurfaceTitle, _surfaceTexture, true);
-                        GUILayout.FlexibleSpace();
-                        EditorGUILayout.EndVertical();
+                    _hillshade = EditorGUILayout.ToggleLeft("Hillshade", _hillshade, GUILayout.Width(80f));
+                    using (new EditorGUI.DisabledScope(!_hillshade)){
+                        EditorGUIUtility.labelWidth = 80f;
+                        _exaggeration = EditorGUILayout.Slider("Exaggeration", _exaggeration, 1f, 10f, GUILayout.Width(260f));
+                        EditorGUIUtility.labelWidth = 0f;
                     }
+
+                    GUILayout.Space(20f);
+                    _compare = EditorGUILayout.ToggleLeft("Compare A/B", _compare, GUILayout.Width(100f));
+                    if (_compare){
+                        PreviewView view = WithoutRebuild(() => (PreviewView)EditorGUILayout.EnumPopup(_compareView, GUILayout.Width(170f)));
+                        if (view != _compareView){
+                            _compareView = view;
+                            UpdateDiff();
+                        }
+                    }
+
+                    GUILayout.FlexibleSpace();
                 }
                 EditorGUILayout.EndHorizontal();
+
+                int stride = Mathf.Max(1, ResolutionOptions[_resolutionIndex] / ViewResolution);
+                EditorGUILayout.LabelField(
+                    $"A: {_passA?.Description} · drag a view to pan · 1 sample per block up to 512, then every {stride}th column",
+                    EditorStyles.miniLabel);
+
+                if (_compare) DrawCompareViews();
+                else DrawGrid();
             }
             EditorGUILayout.EndVertical();
         }
 
-        /// <summary>Title of the surface-source view: the dithered pick from the material weights (§9.6, BLD-40).</summary>
-        private string SurfaceTitle =>
-            WorldGenSettings ? $"Surface source ({WorldGenSettings.MaterialMethod})" : "Surface source";
+        private void DrawGrid(){
+            bool terrainFirst = _passA != null && _passA.TerrainFirst;
+            PreviewView[] views = terrainFirst ? TerrainFirstGrid : BiomeFirstGrid;
+            int columns = terrainFirst ? 4 : 3;
+            for (int row = 0; row * columns < views.Length; row++){
+                EditorGUILayout.BeginHorizontal();
+                for (int col = 0; col < columns && row * columns + col < views.Length; col++){
+                    PreviewView view = views[row * columns + col];
+                    DrawView(ViewTitle(_passA, view), _passA?.Texture(view), true);
+                }
+
+                EditorGUILayout.EndHorizontal();
+            }
+        }
+
+        /// <summary>INT-21: the selected view of A and B side by side and their difference.</summary>
+        private void DrawCompareViews(){
+            EditorGUILayout.BeginHorizontal();
+            {
+                DrawView("A · " + ViewTitle(_passA, _compareView), _passA?.Texture(_compareView), true);
+                DrawView("B · " + ViewTitle(_passB, _compareView), _passB != null && _passB.HasResult ? _passB.Texture(_compareView) : null, true);
+                DrawView(DiffTitle(), _diffNote == null ? _diffTexture : null, true);
+            }
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.LabelField($"B: {_passB?.Description}", EditorStyles.miniLabel);
+            if (_diffNote != null) EditorGUILayout.HelpBox(_diffNote, MessageType.Info);
+        }
+
+        private string DiffTitle(){
+            if (_diffNote != null) return "Difference";
+            if (_diffSigned)
+                return $"B − A height (red = B higher): mean |Δ| {_diffStats.MeanAbs:0.##}, max {_diffStats.MaxAbs:0.#}, " +
+                       $"≥1 block {_diffStats.Share:P1}";
+            return $"Mismatch mask: {_diffStats.Share:P2} of the columns differ";
+        }
+
+        private string ViewTitle(PreviewPass pass, PreviewView view){
+            if (pass == null || !pass.HasResult) return view.ToString();
+            int flora = 0;
+            if (view == PreviewView.Flora)
+                foreach (var (_, count) in pass.FloraCounts)
+                    flora += count;
+            return view switch{
+                PreviewView.Height => $"Height{(_hillshade ? " + hillshade" : "")} (clamped {pass.ClampedShare:P1}, red = clamped, blue = water)",
+                PreviewView.HardBiome => pass.TerrainFirst ? "Hard biome (6D)" : "Hard biome (5D)",
+                PreviewView.DominantBiome => "Dominant material biome",
+                PreviewView.MaxMaterialWeight => $"Max material weight (mean {pass.MeanMaxWeight:0.00})",
+                PreviewView.SurfaceSource => "Surface source (§9.6)",
+                PreviewView.Flora => $"Flora ({flora:N0} columns, {pass.FloraCounts.Count} species)",
+                PreviewView.Climate => "Climate (T, C, F)",
+                PreviewView.Erosion => "Erosion E",
+                PreviewView.PeaksValleys => "Peaks & valleys PV",
+                PreviewView.Offset => pass.TerrainFirst ? "Offset (Hmin..Hmax, blue below water)" : "Offset (Terrain-first only)",
+                PreviewView.Amp => pass.TerrainFirst ? $"Amp ({pass.AmpRange.x:0.#}..{pass.AmpRange.y:0.#})" : "Amp (Terrain-first only)",
+                PreviewView.Jaggedness => pass.TerrainFirst
+                    ? $"Jaggedness ({pass.JaggednessRange.x:0.#}..{pass.JaggednessRange.y:0.#})"
+                    : "Jaggedness (Terrain-first only)",
+                _ => view.ToString()
+            };
+        }
 
         private void DrawView(string title, Texture2D texture, bool allowPan, float fixedSize = 0f){
             EditorGUILayout.BeginVertical();
@@ -404,7 +676,7 @@ namespace Engine.Editor.WorldGen{
 
                 Rect rect = fixedSize > 0f
                     ? GUILayoutUtility.GetRect(fixedSize, fixedSize, GUILayout.ExpandWidth(false))
-                    : GUILayoutUtility.GetRect(200f, 200f, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                    : GUILayoutUtility.GetRect(160f, 160f, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
 
                 float size = Mathf.Min(rect.width, rect.height);
                 rect.width = size;
@@ -430,6 +702,7 @@ namespace Engine.Editor.WorldGen{
                     return;
                 case EventType.MouseDrag when _isDragging:{
                     Vector2 delta = e.mousePosition - _dragStartMouse;
+                    // One view pixel is one sample; views are drawn at most ViewResolution wide.
                     delta *= ResolutionOptions[_resolutionIndex] / (float)ViewResolution;
                     _worldOffset = _dragStartOffset - new Vector2Int(Mathf.RoundToInt(delta.x), Mathf.RoundToInt(-delta.y));
                     RequestRebuild();
@@ -466,286 +739,150 @@ namespace Engine.Editor.WorldGen{
         }
 
         /// <summary>
-        ///     Rebuilds the Burst mirror from the settings (so inspector edits take effect), samples the framed region
-        ///     through <see cref="WorldGenApi.SampleRegion" /> and converts the buffers to textures in jobs. The
-        ///     distribution plane runs the classifier directly on the same config.
+        ///     Rebuilds the Burst configs (so edits take effect) and schedules pass A and, in compare mode, pass B
+        ///     over the same region and seed, plus the distribution plane of A. The TRN-06 plots are recomputed
+        ///     synchronously (a few thousand spline evaluations).
         /// </summary>
         private void ScheduleBuild(){
             if (_buildInProgress || !_needsRebuild) return;
             _needsRebuild = false;
-            if (!_settings || !_settings.WorldGen) return;
-
-            DisposeJobData();
-            DisposeConfig(); // D-05: no build is in progress, so the previous mirror is no longer read
-            try{
-                _config = _settings.WorldGen.ToConfig(_settings.Seed);
-                _configError = null;
-            }
-            catch (Exception e){
-                _configError = e.Message;
-                Repaint();
-                return;
-            }
+            if (!_settings || !_settings.WorldGen || _passA == null) return;
+            WorldGenSettings asset = _settings.WorldGen;
+            EnsureConfigB(asset);
 
             int resolution = ResolutionOptions[Mathf.Clamp(_resolutionIndex, 0, ResolutionOptions.Length - 1)];
             int viewSize = Mathf.Min(resolution, ViewResolution);
             int stride = Mathf.Max(1, resolution / ViewResolution);
-            int count = viewSize * viewSize;
-            _viewSize = viewSize;
-            _terrainFirst = _config.Architecture == GenArchitecture.TerrainFirst;
+            (int2 origin, _) = FramedRegion(); // the world offset sits at the centre of the view
+            PreviewViewOptions options = new(){
+                ShowTemperature = _showTemperature,
+                ShowContinental = _showContinental,
+                ShowHumidity = _showHumidity,
+                Hillshade = _hillshade,
+                Exaggeration = _exaggeration
+            };
 
-            _jobFields = new NativeArray<WorldFields>(count, Allocator.TempJob);
-            _jobHardBiome = new NativeArray<int>(count, Allocator.TempJob);
-            _jobSurfaceSource = new NativeArray<int>(count, Allocator.TempJob);
-            _jobHeight = new NativeArray<float>(count, Allocator.TempJob);
-            _jobClamped = new NativeArray<byte>(count, Allocator.TempJob);
-            if (_terrainFirst) _jobTerrainParams = new NativeArray<float3>(count, Allocator.TempJob);
-            _jobBiomePixels = new NativeArray<Color32>(count, Allocator.TempJob);
-            _jobSurfacePixels = new NativeArray<Color32>(count, Allocator.TempJob);
-            _jobHeightPixels = new NativeArray<Color32>(count, Allocator.TempJob);
-            _jobClimatePixels = new NativeArray<Color32>(count, Allocator.TempJob);
-            _jobErosionPixels = new NativeArray<Color32>(count, Allocator.TempJob);
-            _jobPvPixels = new NativeArray<Color32>(count, Allocator.TempJob);
-            _jobDistributionPixels = new NativeArray<Color32>(DistributionResolution * DistributionResolution, Allocator.TempJob);
+            ComputePlots(asset);
 
-            int biomeCount = _config.BiomeCount;
-            _jobBiomeColors = new NativeArray<Color32>(Mathf.Max(1, biomeCount), Allocator.TempJob);
-            for (int i = 0; i < biomeCount; i++){
-                Biome biome = _settings.WorldGen.Biomes.Biomes[i];
-                _jobBiomeColors[i] = biome ? (Color32)biome.RepresentativeColor : new Color32(0, 0, 0, 255);
+            JobHandle handle = default;
+            _scheduledA = _passA.Schedule(asset, null, _settings.Seed, origin, viewSize, stride, options, out JobHandle a);
+            if (_scheduledA){
+                handle = JobHandle.CombineDependencies(handle, a, ScheduleDistribution(asset));
             }
 
-            // The world offset sits at the centre of the view.
-            (int2 origin, _) = FramedRegion();
-            WorldGenRequest request = new(){
-                Config = _config, Origin = origin, Size = new int2(viewSize, viewSize), Stride = stride
-            };
-            RegionBuffers buffers = new(){
-                Fields = _jobFields,
-                HardBiome = _jobHardBiome,
-                SurfaceSource = _jobSurfaceSource,
-                Height = _jobHeight,
-                Clamped = _jobClamped,
-                TerrainParams = _jobTerrainParams // unconstructed in Biome-first: SampleRegion skips it
-            };
-            JobHandle sampled = WorldGenApi.SampleRegion(request, ref buffers);
+            _scheduledB = false;
+            if (_compare && _passB.Schedule(asset, _configB, _settings.Seed, origin, viewSize, stride, options, out JobHandle b)){
+                _scheduledB = true;
+                handle = JobHandle.CombineDependencies(handle, b);
+            }
 
-            JobHandle views = new SpecViewJob{
-                Fields = _jobFields,
-                HardBiome = _jobHardBiome,
-                SurfaceSource = _jobSurfaceSource,
-                Height = _jobHeight,
-                Clamped = _jobClamped,
-                BiomeColors = _jobBiomeColors,
-                HeightMin = _config.HeightMin,
-                HeightMax = _config.HeightMax,
-                WaterLevel = _settings.WorldGen.WaterLevel,
-                ShowTemperature = _showTemperature ? (byte)1 : (byte)0,
-                ShowContinental = _showContinental ? (byte)1 : (byte)0,
-                ShowHumidity = _showHumidity ? (byte)1 : (byte)0,
-                BiomeView = _jobBiomePixels,
-                SurfaceView = _jobSurfacePixels,
-                HeightView = _jobHeightPixels,
-                ClimateView = _jobClimatePixels,
-                ErosionView = _jobErosionPixels,
-                PvView = _jobPvPixels
-            }.Schedule(count, 64, sampled);
+            if (!_scheduledA && !_scheduledB){
+                UpdateDiff();
+                Repaint();
+                return;
+            }
 
-            JobHandle distribution = new DistributionJob{
+            _buildAsset = asset;
+            _buildHandle = handle;
+            _buildInProgress = true;
+        }
+
+        private void EnsureConfigB(WorldGenSettings asset){
+            if (_configB != null && _configBInitialized) return;
+            _configB = PreviewConfiguration.Capture(asset);
+            _configBInitialized = true;
+        }
+
+        private JobHandle ScheduleDistribution(WorldGenSettings asset){
+            WorldGenConfig config = _passA.Config;
+            _jobDistributionPixels = new NativeArray<Color32>(DistributionResolution * DistributionResolution, Allocator.Persistent);
+            _jobDistributionColors = new NativeArray<Color32>(Mathf.Max(1, config.BiomeCount), Allocator.Persistent);
+            for (int i = 0; i < config.BiomeCount; i++){
+                Biome biome = asset.Biomes.Biomes[i];
+                _jobDistributionColors[i] = biome ? (Color32)biome.RepresentativeColor : new Color32(0, 0, 0, 255);
+            }
+
+            return new DistributionJob{
                 Resolution = DistributionResolution,
                 Continental = _planeContinental,
                 Erosion = _planeErosion,
                 PV = _planePV,
                 Height = _planeHeight,
-                TerrainFirst = _terrainFirst ? (byte)1 : (byte)0,
-                Config = _config,
-                BiomeColors = _jobBiomeColors,
+                TerrainFirst = config.Architecture == GenArchitecture.TerrainFirst ? (byte)1 : (byte)0,
+                Config = config,
+                BiomeColors = _jobDistributionColors,
                 Output = _jobDistributionPixels
             }.Schedule(_jobDistributionPixels.Length, 64);
+        }
 
-            _buildHandle = JobHandle.CombineDependencies(views, distribution);
-            _buildInProgress = true;
+        private void ComputePlots(WorldGenSettings asset){
+            _plots = SplinePlots.Compute(asset.Splines, new float3(_planeContinental, _planeErosion, _planePV), PlotSamples, out _plotsError);
         }
 
         private void FinalizeScheduledBuild(bool applyResult){
-            if (!_buildInProgress){
-                DisposeJobData();
-                return;
+            if (_buildInProgress){
+                _buildHandle.Complete();
+                _buildInProgress = false;
+                if (applyResult && _buildAsset){
+                    if (_scheduledA){
+                        _passA.Finish(_buildAsset);
+                        PreviewPass.EnsureTexture(ref _distributionTexture, DistributionResolution);
+                        _distributionTexture.SetPixelData(_jobDistributionPixels, 0);
+                        _distributionTexture.Apply(false);
+                    }
+
+                    if (_scheduledB) _passB.Finish(_buildAsset);
+                    UpdateDiff();
+                }
             }
 
-            _buildHandle.Complete();
-
-            if (applyResult){
-                Apply(ref _biomeTexture, _jobBiomePixels, _viewSize);
-                Apply(ref _surfaceTexture, _jobSurfacePixels, _viewSize);
-                Apply(ref _heightTexture, _jobHeightPixels, _viewSize);
-                Apply(ref _climateTexture, _jobClimatePixels, _viewSize);
-                Apply(ref _erosionTexture, _jobErosionPixels, _viewSize);
-                Apply(ref _pvTexture, _jobPvPixels, _viewSize);
-                Apply(ref _distributionTexture, _jobDistributionPixels, DistributionResolution);
-
-                // GEN-12: share of columns whose height hit the clamp.
-                int clamped = 0;
-                for (int i = 0; i < _jobClamped.Length; i++) clamped += _jobClamped[i];
-                _clampedShare = _jobClamped.Length > 0 ? clamped / (float)_jobClamped.Length : 0f;
-
-                if (_terrainFirst) ApplyTerrainParamViews();
-            }
-
-            DisposeJobData();
-            _buildInProgress = false;
+            if (_jobDistributionPixels.IsCreated) _jobDistributionPixels.Dispose();
+            if (_jobDistributionColors.IsCreated) _jobDistributionColors.Dispose();
             Repaint();
         }
 
-        private static void Apply(ref Texture2D texture, NativeArray<Color32> pixels, int size){
-            EnsureTexture(ref texture, size);
-            texture.SetPixelData(pixels, 0);
-            texture.Apply(false);
-        }
-
         /// <summary>
-        ///     TRN-06: Offset on the height scale (blue below the water level), Amp and J normalised to the range
-        ///     seen in the framed region (shown in the view titles). Main-thread conversion of at most
-        ///     ViewResolution x ViewResolution pixels.
+        ///     INT-21: the difference view of the selected view kind. Height views are signed (B − A); biome classes,
+        ///     surface source and flora are mismatch masks; the other views compare the pixels. Recomputed after
+        ///     every build and when the compare view changes (no resampling).
         /// </summary>
-        private void ApplyTerrainParamViews(){
-            int count = _jobTerrainParams.Length;
-            float waterLevel = _settings.WorldGen.WaterLevel;
-            float2 amp = new(float.MaxValue, float.MinValue), jag = new(float.MaxValue, float.MinValue);
-            for (int i = 0; i < count; i++){
-                float3 t = _jobTerrainParams[i];
-                amp = new float2(math.min(amp.x, t.y), math.max(amp.y, t.y));
-                jag = new float2(math.min(jag.x, t.z), math.max(jag.y, t.z));
+        private void UpdateDiff(){
+            _diffNote = null;
+            if (!_compare) return;
+            if (_passA == null || _passB == null || !_passA.HasResult || !_passB.HasResult){
+                _diffNote = "Waiting for both configurations (see the errors on the left if a config fails).";
+                return;
             }
 
-            if (count == 0) amp = jag = float2.zero;
-            _ampRange = amp;
-            _jaggednessRange = jag;
-
-            Color32[] offsetPixels = new Color32[count];
-            Color32[] ampPixels = new Color32[count];
-            Color32[] jagPixels = new Color32[count];
-            float heightSpan = math.max(1f, _config.HeightMax - _config.HeightMin);
-            float ampSpan = math.max(1e-6f, amp.y - amp.x);
-            float jagSpan = math.max(1e-6f, jag.y - jag.x);
-            for (int i = 0; i < count; i++){
-                float3 t = _jobTerrainParams[i];
-                byte o = (byte)math.round(math.saturate((t.x - _config.HeightMin) / heightSpan) * 255f);
-                offsetPixels[i] = t.x < waterLevel
-                    ? new Color32((byte)(o / 2), (byte)(o / 2), (byte)math.min(255, o + 80), 255)
-                    : new Color32(o, o, o, 255);
-                byte a = (byte)math.round(math.saturate((t.y - amp.x) / ampSpan) * 255f);
-                ampPixels[i] = new Color32(a, a, a, 255);
-                byte j = (byte)math.round(math.saturate((t.z - jag.x) / jagSpan) * 255f);
-                jagPixels[i] = new Color32(j, j, j, 255);
+            if (_passA.Size != _passB.Size || _passA.Stride != _passB.Stride){
+                _diffNote = "A and B were sampled at different extents; rebuilding.";
+                RequestRebuild();
+                return;
             }
 
-            EnsureTexture(ref _offsetTexture, _viewSize);
-            EnsureTexture(ref _ampTexture, _viewSize);
-            EnsureTexture(ref _jaggednessTexture, _viewSize);
-            _offsetTexture.SetPixels32(offsetPixels);
-            _ampTexture.SetPixels32(ampPixels);
-            _jaggednessTexture.SetPixels32(jagPixels);
-            _offsetTexture.Apply(false);
-            _ampTexture.Apply(false);
-            _jaggednessTexture.Apply(false);
-        }
+            int count = _passA.Size * _passA.Size;
+            if (!_diffPixels.IsCreated || _diffPixels.Length != count){
+                if (_diffPixels.IsCreated) _diffPixels.Dispose();
+                _diffPixels = new NativeArray<Color32>(count, Allocator.Persistent);
+            }
 
-        private void DisposeJobData(){
-            if (_jobFields.IsCreated) _jobFields.Dispose();
-            if (_jobHardBiome.IsCreated) _jobHardBiome.Dispose();
-            if (_jobSurfaceSource.IsCreated) _jobSurfaceSource.Dispose();
-            if (_jobHeight.IsCreated) _jobHeight.Dispose();
-            if (_jobClamped.IsCreated) _jobClamped.Dispose();
-            if (_jobTerrainParams.IsCreated) _jobTerrainParams.Dispose();
-            if (_jobBiomeColors.IsCreated) _jobBiomeColors.Dispose();
-            if (_jobBiomePixels.IsCreated) _jobBiomePixels.Dispose();
-            if (_jobSurfacePixels.IsCreated) _jobSurfacePixels.Dispose();
-            if (_jobHeightPixels.IsCreated) _jobHeightPixels.Dispose();
-            if (_jobClimatePixels.IsCreated) _jobClimatePixels.Dispose();
-            if (_jobErosionPixels.IsCreated) _jobErosionPixels.Dispose();
-            if (_jobPvPixels.IsCreated) _jobPvPixels.Dispose();
-            if (_jobDistributionPixels.IsCreated) _jobDistributionPixels.Dispose();
-        }
-
-        #endregion
-
-        #region TextureHelpers
-
-        private static void EnsureTexture(ref Texture2D texture, int size){
-            if (texture && texture.width == size && texture.height == size) return;
-
-            DestroyTexture(ref texture);
-            texture = new Texture2D(size, size, TextureFormat.RGBA32, false){
-                name = "WorldGenPreviewTexture",
-                filterMode = FilterMode.Point,
-                wrapMode = TextureWrapMode.Clamp,
-                hideFlags = HideFlags.HideAndDontSave
+            _diffSigned = _compareView == PreviewView.Height;
+            _diffStats = _compareView switch{
+                PreviewView.Height => PreviewDiff.Signed(_passA.Height, _passB.Height, _diffPixels),
+                PreviewView.HardBiome => PreviewDiff.Mismatch(_passA.HardBiome, _passB.HardBiome, _passA.Pixels(PreviewView.HardBiome), _diffPixels),
+                PreviewView.DominantBiome => PreviewDiff.Mismatch(_passA.DominantBiome, _passB.DominantBiome, _passA.Pixels(PreviewView.DominantBiome), _diffPixels),
+                PreviewView.SurfaceSource => PreviewDiff.Mismatch(_passA.SurfaceSource, _passB.SurfaceSource, _passA.Pixels(PreviewView.SurfaceSource), _diffPixels),
+                PreviewView.Flora => PreviewDiff.Mismatch(_passA.FloraSpecies, _passB.FloraSpecies, _passA.Pixels(PreviewView.Flora), _diffPixels),
+                _ => PreviewDiff.Pixels(_passA.Pixels(_compareView), _passB.Pixels(_compareView), _diffPixels)
             };
-        }
-
-        private static void DestroyTexture(ref Texture2D texture){
-            if (!texture) return;
-
-            DestroyImmediate(texture);
-            texture = null;
+            PreviewPass.EnsureTexture(ref _diffTexture, _passA.Size);
+            _diffTexture.SetPixelData(_diffPixels, 0);
+            _diffTexture.Apply(false);
         }
 
         #endregion
 
         #region Jobs
-
-        /// <summary>Converts the sampled region buffers to the view textures. Reads only; no sampler call.</summary>
-        [BurstCompile]
-        private struct SpecViewJob : IJobParallelFor{
-            [ReadOnly] public NativeArray<WorldFields> Fields;
-            [ReadOnly] public NativeArray<int> HardBiome;
-            [ReadOnly] public NativeArray<int> SurfaceSource;
-            [ReadOnly] public NativeArray<float> Height;
-            [ReadOnly] public NativeArray<byte> Clamped;
-            [ReadOnly] public NativeArray<Color32> BiomeColors;
-            public float HeightMin;
-            public float HeightMax;
-            public int WaterLevel;
-            public byte ShowTemperature;
-            public byte ShowContinental;
-            public byte ShowHumidity;
-            [WriteOnly] public NativeArray<Color32> BiomeView;
-            [WriteOnly] public NativeArray<Color32> SurfaceView;
-            [WriteOnly] public NativeArray<Color32> HeightView;
-            [WriteOnly] public NativeArray<Color32> ClimateView;
-            [WriteOnly] public NativeArray<Color32> ErosionView;
-            [WriteOnly] public NativeArray<Color32> PvView;
-
-            public void Execute(int index){
-                BiomeView[index] = BiomeColor(HardBiome[index]);
-                SurfaceView[index] = BiomeColor(SurfaceSource[index]);
-
-                float h = Height[index];
-                byte v = (byte)math.round(math.saturate((h - HeightMin) / math.max(1f, HeightMax - HeightMin)) * 255f);
-                Color32 heightColor = h < WaterLevel
-                    ? new Color32((byte)(v / 2), (byte)(v / 2), (byte)math.min(255, v + 80), 255) // below water: blue tint
-                    : new Color32(v, v, v, 255);
-                if (Clamped[index] != 0) heightColor = new Color32(255, 0, 0, 255); // GEN-12
-                HeightView[index] = heightColor;
-
-                WorldFields f = Fields[index];
-                byte t = ShowTemperature == 1 ? (byte)math.round(math.saturate(f.T) * 255f) : (byte)0;
-                byte c = ShowContinental == 1 ? (byte)math.round(math.saturate(f.C) * 255f) : (byte)0;
-                byte hum = ShowHumidity == 1 ? (byte)math.round(math.saturate(f.F) * 255f) : (byte)0;
-                ClimateView[index] = new Color32(t, c, hum, 255);
-
-                byte e = (byte)math.round(math.saturate(f.E) * 255f);
-                ErosionView[index] = new Color32(e, e, e, 255);
-
-                byte pv = (byte)math.round(math.saturate((f.PV + 1f) * 0.5f) * 255f);
-                PvView[index] = new Color32(pv, pv, pv, 255);
-            }
-
-            private Color32 BiomeColor(int biome){
-                return biome >= 0 && biome < BiomeColors.Length ? BiomeColors[biome] : new Color32(0, 0, 0, 255);
-            }
-        }
 
         /// <summary>
         ///     The classifier's T x F plane: x → F, y → T at fixed C, E, PV (and h in Terrain-first, 6D). Uses the

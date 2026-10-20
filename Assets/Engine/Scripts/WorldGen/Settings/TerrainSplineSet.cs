@@ -31,6 +31,21 @@ namespace Engine.Scripts.WorldGen.Settings{
         public List<SplinePointData> Points = new();
     }
 
+    /// <summary>One node of the flattened trees (<see cref="TerrainSplineSet.Flatten" />), for the TRN-06 plots.</summary>
+    public struct FlatSpline{
+        /// <summary>Root tree: Offset, Amp or Jaggedness.</summary>
+        public string Tree;
+
+        /// <summary>Index of the source entry in <see cref="TerrainSplineSet.Splines" />.</summary>
+        public int Source;
+
+        /// <summary>Nesting level, 0 for the root.</summary>
+        public int Depth;
+
+        /// <summary>The node and its children: evaluating it gives this spline level with its sub-splines.</summary>
+        public SplineRoot Subtree;
+    }
+
     /// <summary>
     ///     Terrain-first spline set (TRN-05): Offset, Amp and J as nested splines over (C, E, PV). The asset stores
     ///     the trees as a flat list (Unity cannot serialise recursive classes); authoring happens through the nested
@@ -180,31 +195,37 @@ namespace Engine.Scripts.WorldGen.Settings{
         ///     <see cref="NestedSpline.Evaluate" /> expects). The caller owns the arrays. Throws when
         ///     <see cref="Validate" /> reports problems.
         /// </summary>
+        /// <param name="order">
+        ///     Optional: filled with one entry per flattened node, in node order (TRN-06 plots label and evaluate
+        ///     every spline level through it).
+        /// </param>
         public void Flatten(Allocator allocator, out NativeArray<SplineNode> nodes, out NativeArray<SplinePoint> points,
-            out SplineRoot offset, out SplineRoot amp, out SplineRoot jaggedness){
+            out SplineRoot offset, out SplineRoot amp, out SplineRoot jaggedness, List<FlatSpline> order = null){
             List<string> problems = Validate();
             if (problems.Count > 0)
                 throw new InvalidOperationException($"{name}: invalid TerrainSplineSet: {string.Join(" ", problems)}");
 
             List<SplineNode> nodeList = new();
             List<SplinePoint> pointList = new();
-            offset = AddTree(OffsetRoot, nodeList, pointList);
-            amp = AddTree(AmpRoot, nodeList, pointList);
-            jaggedness = AddTree(JaggednessRoot, nodeList, pointList);
+            order?.Clear();
+            offset = AddTree("Offset", OffsetRoot, nodeList, pointList, order);
+            amp = AddTree("Amp", AmpRoot, nodeList, pointList, order);
+            jaggedness = AddTree("Jaggedness", JaggednessRoot, nodeList, pointList, order);
 
             nodes = new NativeArray<SplineNode>(nodeList.ToArray(), allocator);
             points = new NativeArray<SplinePoint>(pointList.ToArray(), allocator);
         }
 
-        private SplineRoot AddTree(int root, List<SplineNode> nodes, List<SplinePoint> points){
+        private SplineRoot AddTree(string tree, int root, List<SplineNode> nodes, List<SplinePoint> points, List<FlatSpline> order){
             int start = nodes.Count;
-            AddNode(root, nodes, points);
+            AddNode(tree, root, 0, nodes, points, order);
             return new SplineRoot{ NodeStart = start, NodeCount = nodes.Count - start };
         }
 
-        private int AddNode(int index, List<SplineNode> nodes, List<SplinePoint> points){
+        private int AddNode(string tree, int index, int depth, List<SplineNode> nodes, List<SplinePoint> points, List<FlatSpline> order){
             SplineData s = Splines[index];
             int nodeIndex = nodes.Count;
+            order?.Add(new FlatSpline{ Tree = tree, Source = index, Depth = depth });
             int pointStart = points.Count;
             nodes.Add(new SplineNode{
                 Axis = s.Axis,
@@ -216,10 +237,17 @@ namespace Engine.Scripts.WorldGen.Settings{
             for (int k = 0; k < s.Points.Count; k++){
                 SplinePointData p = s.Points[k];
                 if (p.Child < 0) continue;
-                int child = AddNode(p.Child, nodes, points);
+                int child = AddNode(tree, p.Child, depth + 1, nodes, points, order);
                 SplinePoint flat = points[pointStart + k];
                 flat.Child = child;
                 points[pointStart + k] = flat;
+            }
+
+            // A node's subtree is contiguous in pre-order, so it can be evaluated on its own (TRN-06).
+            if (order != null){
+                FlatSpline entry = order[nodeIndex];
+                entry.Subtree = new SplineRoot{ NodeStart = nodeIndex, NodeCount = nodes.Count - nodeIndex };
+                order[nodeIndex] = entry;
             }
 
             return nodeIndex;
