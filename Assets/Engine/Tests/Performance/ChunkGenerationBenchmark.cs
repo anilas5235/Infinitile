@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Diagnostics;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
@@ -102,6 +102,27 @@ namespace Engine.Tests.Performance{
             BlendMethod method){
             BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
             _config = BenchmarkFixtures.CreateSpecGeneratorConfig(architecture, method, Allocator.Persistent, _created);
+            MeasurePerChunk($"ChunkJob.Run {architecture} {method} ms/chunk");
+        }
+
+        /// <summary>
+        ///     Phase 4 (PERF-02, new feature): the same chunks and world with the §10 placeholder flora rules, so the
+        ///     difference to <see cref="ChunkJob_Run_PerMethod_MsPerChunk" /> is the cost of the flora decision (with
+        ///     its ring of r_tree + reach columns) and of stamping.
+        /// </summary>
+        [Test]
+        [Performance]
+        public void ChunkJob_Run_PerMethod_WithFlora_MsPerChunk(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,
+            [Values(BlendMethod.None, BlendMethod.DistanceBlend, BlendMethod.DistortedBoundary, BlendMethod.ParameterSpaceWeighting)]
+            BlendMethod method){
+            BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
+            _config = BenchmarkFixtures.CreateSpecGeneratorConfig(architecture, method, Allocator.Persistent, _created, true);
+            Assert.IsTrue(_config.WorldGen.HasFlora);
+            MeasurePerChunk($"ChunkJob.Run {architecture} {method} flora ms/chunk");
+        }
+
+        private void MeasurePerChunk(string sampleGroup){
             _jobs.Clear();
             Random rng = new(42);
             for (int i = 0; i < MethodChunkCount; i++) _jobs.Add(rng.NextInt2(-1000, 1000));
@@ -114,7 +135,7 @@ namespace Engine.Tests.Performance{
 
             // Measure.Method records the time of one call; one call here generates all chunks, so the per-chunk mean
             // is recorded with Measure.Custom instead.
-            SampleGroup group = new($"ChunkJob.Run {architecture} {method} ms/chunk", SampleUnit.Millisecond);
+            SampleGroup group = new(sampleGroup, SampleUnit.Millisecond);
             for (int i = 0; i < WarmupCount + MeasurementCount; i++){
                 Stopwatch watch = Stopwatch.StartNew();
                 job.Run(_jobs.Length);

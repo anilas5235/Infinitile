@@ -186,6 +186,58 @@ reuse the hard class of the columns that are lattice points (a quarter of the ch
 optimise the Terrain-first spline evaluation itself, or confirm a higher budget for Terrain-first. The
 uniform-window early-out (PERF-07) already skips the kernel sum away from boundaries.
 
+## 2026-10-20 Phase 4 baseline (`2026-10-20-phase4-editmode-baseline.json`)
+
+Same machine as above (Ryzen 7 5800X, RX 6900 XT, Windows 11). The suite ran three times back to back. The first run
+was disturbed by load (medians of untouched benchmarks up to +30 %, minima unchanged) and is not used; the recorded
+file is the second run. The third agrees with it within 3 % on every minimum, except the single-chunk Biome-first
+row (a load spike in run 3).
+
+Phase 4 (flora, §10) re-enables `PlaceVegetation` and gives `PrepareChunkMaps` a flora grid over the chunk ± `FloraPadding`
+(reach + r_tree) whose ring is sampled only for multi-block candidates (VEG-05); the `BlendCache` lattice is padded by
+the same amount. The existing rows run without flora rules (`FloraPadding` 0, no ring), so their code path is the
+Phase 3 one. The new `... flora ms/chunk` rows run the same 16 chunks per configuration with the §10 placeholder
+rules (a tree like the shipped one: reach 1, r_tree 3, `FloraPadding` 4); "flora +x %" compares their minimum with the minimum of the
+matching per-method row over runs 2 and 3.
+
+| Benchmark | Sample group | Median | Min | Max | vs 2026-10-18 (Phase 3) |
+|---|---|---|---|---|---|
+| ChunkJob.Run, Biome-first, method 1 (single chunk) | ChunkJob.Run BiomeFirst ms/chunk | 1.54 ms | 1.46 ms | 1.68 ms | -3 % |
+| ChunkJob.Run, Terrain-first, method 1 (single chunk) | ChunkJob.Run TerrainFirst ms/chunk | 2.36 ms | 2.31 ms | 2.70 ms | -2 % |
+| ChunkJob.Run, Terrain-first, None (16 chunks) | ChunkJob.Run TerrainFirst None ms/chunk | 2.30 ms | 2.26 ms | 2.43 ms | -32 % |
+| ChunkJob.Run, Terrain-first, DistanceBlend (16 chunks) | ChunkJob.Run TerrainFirst DistanceBlend ms/chunk | 4.36 ms | 4.29 ms | 9.56 ms | -11 % |
+| ChunkJob.Run, Terrain-first, DistortedBoundary (16 chunks) | ChunkJob.Run TerrainFirst DistortedBoundary ms/chunk | 3.99 ms | 3.94 ms | 4.29 ms | -8 % |
+| ChunkJob.Run, Terrain-first, ParameterSpaceWeighting (16 chunks) | ChunkJob.Run TerrainFirst ParameterSpaceWeighting ms/chunk | 2.43 ms | 2.38 ms | 3.43 ms | -8 % |
+| ChunkJob.Run, Biome-first, None (16 chunks) | ChunkJob.Run BiomeFirst None ms/chunk | 1.77 ms | 1.53 ms | 2.36 ms | -4 % |
+| ChunkJob.Run, Biome-first, DistanceBlend (16 chunks) | ChunkJob.Run BiomeFirst DistanceBlend ms/chunk | 2.59 ms | 2.55 ms | 3.31 ms | -10 % |
+| ChunkJob.Run, Biome-first, DistortedBoundary (16 chunks) | ChunkJob.Run BiomeFirst DistortedBoundary ms/chunk | 3.24 ms | 3.20 ms | 4.71 ms | -8 % |
+| ChunkJob.Run, Biome-first, ParameterSpaceWeighting (16 chunks) | ChunkJob.Run BiomeFirst ParameterSpaceWeighting ms/chunk | 1.77 ms | 1.74 ms | 2.01 ms | -12 % |
+| ChunkJob.Run, Terrain-first, None + flora (16 chunks) | ChunkJob.Run TerrainFirst None flora ms/chunk | 2.38 ms | 2.35 ms | 2.77 ms | new; +4 % (minima) |
+| ChunkJob.Run, Terrain-first, DistanceBlend + flora (16 chunks) | ChunkJob.Run TerrainFirst DistanceBlend flora ms/chunk | 4.89 ms | 4.85 ms | 5.18 ms | new; +13 % (minima) |
+| ChunkJob.Run, Terrain-first, DistortedBoundary + flora (16 chunks) | ChunkJob.Run TerrainFirst DistortedBoundary flora ms/chunk | 4.17 ms | 4.11 ms | 9.90 ms | new; +4 % (minima) |
+| ChunkJob.Run, Terrain-first, ParameterSpaceWeighting + flora (16 chunks) | ChunkJob.Run TerrainFirst ParameterSpaceWeighting flora ms/chunk | 2.50 ms | 2.48 ms | 2.81 ms | new; +4 % (minima) |
+| ChunkJob.Run, Biome-first, None + flora (16 chunks) | ChunkJob.Run BiomeFirst None flora ms/chunk | 1.62 ms | 1.60 ms | 1.68 ms | new; +4 % (minima) |
+| ChunkJob.Run, Biome-first, DistanceBlend + flora (16 chunks) | ChunkJob.Run BiomeFirst DistanceBlend flora ms/chunk | 2.87 ms | 2.83 ms | 3.16 ms | new; +11 % (minima) |
+| ChunkJob.Run, Biome-first, DistortedBoundary + flora (16 chunks) | ChunkJob.Run BiomeFirst DistortedBoundary flora ms/chunk | 3.55 ms | 3.51 ms | 3.71 ms | new; +9 % (minima) |
+| ChunkJob.Run, Biome-first, ParameterSpaceWeighting + flora (16 chunks) | ChunkJob.Run BiomeFirst ParameterSpaceWeighting flora ms/chunk | 1.88 ms | 1.84 ms | 2.10 ms | new; +6 % (minima) |
+| CMeshBuildJob.Run, fully solid partition (y=1) | CMeshBuildJob.Run solid ms/partition | 7.21 ms | 6.81 ms | 8.31 ms | -6 % |
+| CMeshBuildJob.Run, surface partition (y=3) | CMeshBuildJob.Run surface ms/partition | 4.01 ms | 3.86 ms | 4.22 ms | -2 % |
+| FrustumCulling.IsVisible, 1024 page AABBs vs 6 planes, 10 passes per sample | FrustumCulling.IsVisible 1024 pages us | 2478 us | 2399 us | 3028 us | -7 % |
+| PageAllocator, fill one buffer with 3-page partitions and release all | PageAllocator fill+release 1 buffer ms | 0.50 ms | 0.47 ms | 0.59 ms | -0 % |
+| UnsafeIntervalList.Set, 10^4 random edits, chunk-sized list | UnsafeIntervalList.Set 10k edits ms | 11.06 ms | 10.89 ms | 14.11 ms | -4 % |
+
+PERF-03: no existing row is slower than in Phase 3 (all minima −12 % … +3 %; the −32 % of the Terrain-first None
+median only shows that the Phase 3 median was load-inflated, its minimum moved −12 %).
+
+Flora cost: +4…6 % with None and ParameterSpaceWeighting, +4…9 % with DistortedBoundary and +11…13 % with
+DistanceBlend. The DistanceBlend share is most likely the padded `BlendCache`: with B = 32 the lattice around a
+32 x 32 chunk grows by 4 columns on every side, and every lattice point is a full classification (a full spline
+height in Terrain-first). Options if this is to come down: evaluate the ring columns directly instead of padding the lattice
+(they are few after the multi-block pre-filter), or pad only on the sides where candidates exist.
+
+PERF-05: Biome-first DistanceBlend stays within 3 ms with flora (2.87 ms); the configurations that already missed
+the budget in Phase 3 still miss it.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the
