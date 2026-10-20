@@ -1,13 +1,17 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
+using Engine.Scripts.WorldGen.Core;
+using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
 using Unity.Collections;
+using Unity.Mathematics;
+using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -167,6 +171,92 @@ namespace Engine.Tests.EditMode{
 
             Assert.IsNull(configError, $"GeneratorConfig.Dispose threw: {configError}");
             Assert.IsNull(registryError, $"registry Dispose threw after config.Dispose: {registryError}");
+        }
+
+        private const string ShippedSettingsPath = "Assets/EngineSettings/WorldGenSettings.asset";
+
+        private WorldGenConfig ShippedConfig(out WorldGenSettings settings){
+            settings = AssetDatabase.LoadAssetAtPath<WorldGenSettings>(ShippedSettingsPath);
+            Assert.IsNotNull(settings, ShippedSettingsPath);
+            return settings.ToConfig(TestFixtures.Seed, _importer.VoxelRegistry);
+        }
+
+        [Test]
+        public void ShippedWorldGenSettings_FloraTablesResolveThroughTheRegistry(){
+            // §10 placeholder rules on the Standard biomes: every species has a registry id and its replace class.
+            LoadPackages();
+            WorldGenConfig cfg = ShippedConfig(out WorldGenSettings settings);
+            try{
+                Assert.IsTrue(cfg.HasFlora);
+                Assert.AreEqual(1, cfg.FloraReach, "Tree: 3×3 leaf box");
+                Assert.AreEqual(3, settings.TreeSpacingRadius);
+                Assert.AreEqual(4, cfg.FloraPadding, "reach + r_tree");
+                for (int i = 0; i < cfg.FloraRules.Length; i++){
+                    FloraRuleDef d = cfg.FloraRules[i];
+                    Assert.AreNotEqual(0, d.Species);
+                    if (d.Structure < 0) Assert.AreNotEqual(0, d.Voxel, $"rule {i}: voxel id");
+                }
+
+                for (int i = 0; i < cfg.FloraVoxels.Length; i++) Assert.AreNotEqual(0, cfg.FloraVoxels[i].Voxel, $"structure voxel {i}");
+
+                Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:GrassF")));
+                Assert.AreEqual(FloraVoxelClass.Leaves, cfg.VoxelClassOf(Id("std:Leaves")));
+                Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:LogOak")));
+                Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:Cactus")));
+                Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:Water")), "water is never overwritten");
+            }
+            finally{
+                cfg.Dispose();
+            }
+        }
+
+        private ushort Id(string fullName){
+            Assert.IsTrue(_importer.VoxelRegistry.TryGetId(fullName, out ushort id), fullName);
+            return id;
+        }
+
+        [Test]
+        public void ShippedWorldGenSettings_EveryLandBiomeCarriesFlora(){
+            // Phase 4 acceptance: flora is visible for all land biomes. A 4096² area at stride 8: every biome with
+            // flora rules that supplies the surface somewhere also has planted columns.
+            LoadPackages();
+            WorldGenConfig cfg = ShippedConfig(out WorldGenSettings settings);
+            const int n = 512;
+            RegionBuffers buffers = new(){
+                SurfaceSource = new NativeArray<int>(n * n, Allocator.TempJob),
+                FloraSource = new NativeArray<int>(n * n, Allocator.TempJob)
+            };
+            try{
+                WorldGenRequest request = new(){ Config = cfg, Origin = new int2(-2048, -2048), Size = new int2(n, n), Stride = 8 };
+                WorldGenApi.SampleRegion(request, ref buffers).Complete();
+                List<Biome> biomes = settings.Biomes.Biomes;
+                int[] surface = new int[biomes.Count], planted = new int[biomes.Count];
+                for (int i = 0; i < n * n; i++){
+                    if (buffers.SurfaceSource[i] >= 0) surface[buffers.SurfaceSource[i]]++;
+                    if (buffers.FloraSource[i] >= 0) planted[buffers.FloraSource[i]]++;
+                }
+
+                string summary = string.Join(", ", biomes.Select((b, i) => $"{b.name}: surface {surface[i]}, planted {planted[i]}"));
+                TestContext.WriteLine(summary);
+                int landBiomes = 0;
+                for (int b = 0; b < biomes.Count; b++){
+                    if (biomes[b].FloraRules.Count == 0){
+                        Assert.AreEqual(0, planted[b], biomes[b].name + " has no rules");
+                        continue;
+                    }
+
+                    if (surface[b] == 0) continue;
+                    landBiomes++;
+                    Assert.Greater(planted[b], 0, $"{biomes[b].name} has no flora ({summary})");
+                }
+
+                Assert.GreaterOrEqual(landBiomes, 5, summary);
+            }
+            finally{
+                buffers.SurfaceSource.Dispose();
+                buffers.FloraSource.Dispose();
+                cfg.Dispose();
+            }
         }
     }
 }
