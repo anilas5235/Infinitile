@@ -340,8 +340,12 @@ namespace Engine.Editor.WorldGen{
             texture = null;
         }
 
-        /// <summary>Converts the sampled buffers to the view pixels. Reads only; no sampler call.</summary>
-        [BurstCompile]
+        /// <summary>
+        ///     Converts the sampled buffers to the view pixels. Reads only; no sampler call, so GEN-16's strict float
+        ///     mode is not needed, but it compiles synchronously like every other preview job: the first build after
+        ///     a script reload would otherwise run managed over the whole view.
+        /// </summary>
+        [BurstCompile(CompileSynchronously = true)]
         private struct ViewJob : IJobParallelFor{
             public int Size;
             public int Stride;
