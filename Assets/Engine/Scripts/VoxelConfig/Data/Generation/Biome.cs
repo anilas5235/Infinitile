@@ -58,10 +58,15 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
         [SerializeField] public Color RepresentativeColor = Color.magenta;
 
         public BiomeDef ToStruct(VoxelRegistry voxelRegistry){
+            return ToStruct(v => voxelRegistry.GetIdOrThrow(v.GetFullName()));
+        }
+
+        /// <summary>Conversion with block ids from <paramref name="voxelId" /> (the registry, or a test's own table).</summary>
+        public BiomeDef ToStruct(Func<Voxel.Voxel, ushort> voxelId){
             BiomeDef def = ToStruct();
-            def.topBlock = voxelRegistry.GetIdOrThrow(TopBlock.GetFullName());
-            def.underBlock = voxelRegistry.GetIdOrThrow(UnderBlock.GetFullName());
-            def.stoneBlock = voxelRegistry.GetIdOrThrow(StoneBlock.GetFullName());
+            def.topBlock = voxelId(TopBlock);
+            def.underBlock = voxelId(UnderBlock);
+            def.stoneBlock = voxelId(StoneBlock);
             return def;
         }
 
@@ -78,7 +83,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                 heightAmplitude = HeightAmplitude,
                 jaggedness = Jaggedness,
                 floraRuleStart = 0,
-                floraRuleCount = 0
+                floraRuleCount = 0,
+                // VEG-04: plants need solid ground; the mesh layer of the top block decides, no registry needed.
+                floraGround = TopBlock && TopBlock.meshLayer == Mesh.MeshLayer.Solid ? (byte)1 : (byte)0
             };
         }
 
@@ -104,6 +111,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
             public float jaggedness;
             public int floraRuleStart;
             public int floraRuleCount;
+
+            /// <summary>1 when the top block is solid ground that carries plants (VEG-04).</summary>
+            public byte floraGround;
 
             public void Dispose(){ }
         }

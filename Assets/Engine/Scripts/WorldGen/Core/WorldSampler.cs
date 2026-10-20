@@ -1,5 +1,6 @@
 using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Classify;
+using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Height;
 using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
@@ -17,7 +18,8 @@ namespace Engine.Scripts.WorldGen.Core{
     ///         Phase 1: the Terrain-first path (spline height, then 6D classification, §7). Phase 2: the
     ///         Biome-first path (5D classification, then the height composed from the biome parameters, §8,
     ///         <see cref="BiomeFirstHeight" />). Phase 3: the four blend methods per stage (<see cref="BlendMethods" />)
-    ///         and the dithered surface pick (<see cref="SurfacePick" />). Phase 4 adds flora.
+    ///         and the dithered surface pick (<see cref="SurfacePick" />). Phase 4: the flora decision
+    ///         (<see cref="FloraPlacement" />, §10).
     ///     </para>
     ///     <para>
     ///         The <c>out</c>-parameter overloads are Burst direct-call entry points (GEN-16): managed callers
@@ -61,6 +63,21 @@ namespace Engine.Scripts.WorldGen.Core{
         /// </summary>
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
         public static void SampleColumn(int x, int z, in WorldGenConfig cfg, in BlendCache cache, out ColumnSample sample){
+            SampleCore(x, z, cfg, cache, out sample);
+            // §10: the flora decision on top of the core sample (VEG-01, VEG-06).
+            FloraPlacement.Decide(x, z, cfg, cache, sample, out ushort species, out int source);
+            sample.FloraSpecies = species;
+            sample.FloraSource = source;
+        }
+
+        /// <summary>
+        ///     Everything of <see cref="SampleColumn(int,int,in WorldGenConfig,in BlendCache,out ColumnSample)" /> but the
+        ///     flora decision (FloraSpecies 0, FloraSource -1): the input of <see cref="FloraPlacement" />, which samples
+        ///     neighbouring columns with it (VEG-05), and of the chunk job's padded flora grid. Direct-call entry point
+        ///     (GEN-16), so a managed caller of <c>PrepareChunkMaps</c> gets the job's bits.
+        /// </summary>
+        [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
+        public static void SampleCore(int x, int z, in WorldGenConfig cfg, in BlendCache cache, out ColumnSample sample){
             float2 p = new(x, z);
             int2 column = new(x, z);
             int biomeCount = cfg.BiomeCount;
@@ -109,7 +126,6 @@ namespace Engine.Scripts.WorldGen.Core{
             s.Clamped = s.Height != unclamped;
             s.ColumnHeight = (int)math.floor(s.Height);
 
-            // Flora (§10) arrives in Phase 4.
             s.FloraSpecies = 0;
             s.FloraSource = -1;
             sample = s;

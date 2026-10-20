@@ -7,6 +7,13 @@ using Unity.Collections;
 using UnityEngine;
 
 namespace Engine.Scripts.VoxelConfig.Data.Generation{
+    /// <summary>
+    ///     A multi-block voxel structure such as a tree (VEG-05). Placement offsets are relative to the first voxel
+    ///     above the anchor column's top block: (0, 0, 0) sits on the ground. Shapes (expanded by
+    ///     <c>FloraConfigBuilder.Expand</c>): Single = origin; Line = origin to end inclusive; Box = <c>size</c> centred
+    ///     on origin (from origin − size/2), filled or a shell; Circle = horizontal disc of <c>radius</c> at origin.y
+    ///     (a one-block ring when not filled); Cylinder = that circle on <c>height</c> layers upwards.
+    /// </summary>
     [CreateAssetMenu(fileName = "MultiVoxelBlueprint", menuName = "Infinitile/Generation/MultiVoxelBlueprint")]
     public class VoxelStructure : ScriptableObject{
         public StructurePart[] parts;

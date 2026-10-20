@@ -218,7 +218,10 @@ namespace Engine.Scripts.WorldGen.Core{
             public void Execute(int tile){
                 int2 first = new int2(tile % TilesX, tile / TilesX) * TileSize;
                 int2 last = math.min(first + TileSize, Size) - 1;
-                BlendCache cache = BlendCache.Build(Config, Origin + first * Stride, Origin + last * Stride, Stride, Allocator.Temp);
+                // VEG-05: multi-block candidates sample neighbours up to FloraPadding beyond the tile.
+                int padding = Config.FloraPadding;
+                BlendCache cache = BlendCache.Build(Config, Origin + first * Stride - padding, Origin + last * Stride + padding,
+                    Stride, Allocator.Temp);
                 for (int j = first.y; j <= last.y; j++)
                 for (int i = first.x; i <= last.x; i++)
                     Write(j * Size.x + i, Origin.x + i * Stride, Origin.y + j * Stride, cache);

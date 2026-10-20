@@ -4,9 +4,11 @@ using Engine.Scripts.Noise;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Core;
+using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Height;
 using Engine.Scripts.WorldGen.Noise;
 using Unity.Collections;
+using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Settings{
     /// <summary>
@@ -81,6 +83,12 @@ namespace Engine.Scripts.WorldGen.Settings{
         public float HeightMax;
         public float PeakWavelength;
 
+        /// <summary>
+        ///     Water surface level in world Y (GEN-14): water fills y &lt; WaterLevel. Mirrors
+        ///     <c>WorldGenSettings.WaterLevel</c> for the flora conditions (VEG-04).
+        /// </summary>
+        public int WaterLevel;
+
         /// <summary>D-06: run the ice override after terrain fill.</summary>
         [MarshalAs(UnmanagedType.U1)] public bool EnableClimateOverrides; // blittable for the Burst direct calls
 
@@ -117,6 +125,50 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// <summary>J(C,E,PV) root (own extension, TRN-04).</summary>
         public SplineRoot JaggednessSpline;
 
+        // --- Flora (§10) -------------------------------------------------------------------------------------------
+        /// <summary>r_tree: anchors of multi-block flora are at least this far apart (VEG-05, default 3).</summary>
+        public int TreeSpacingRadius;
+
+        /// <summary>Largest horizontal reach of a multi-block species from its anchor column (max canopy radius).</summary>
+        public int FloraReach;
+
+        /// <summary>
+        ///     Columns a chunk evaluates beyond its border for multi-block flora: <see cref="FloraReach" /> +
+        ///     <see cref="TreeSpacingRadius" /> (VEG-05), 0 when no biome has a multi-block rule.
+        /// </summary>
+        public int FloraPadding;
+
+        /// <summary>Flora rules of every active biome, addressed by <c>BiomeDef.floraRuleStart/floraRuleCount</c> (VEG-03). Owned.</summary>
+        [ReadOnly] public NativeArray<FloraRuleDef> FloraRules;
+
+        /// <summary>Structure species, indexed by <see cref="FloraRuleDef.Structure" />. Owned.</summary>
+        [ReadOnly] public NativeArray<FloraStructureDef> FloraStructures;
+
+        /// <summary>Voxels of every structure in <see cref="FloraStructures" />. Owned.</summary>
+        [ReadOnly] public NativeArray<FloraVoxel> FloraVoxels;
+
+        /// <summary>
+        ///     [start, end) of every multi-block rule's species interval over all biomes: a column whose species roll
+        ///     lies in none of them cannot be a multi-block candidate, whatever its flora biome (VEG-05 pre-filter).
+        ///     Owned.
+        /// </summary>
+        [ReadOnly] public NativeArray<float2> FloraMultiBlockIntervals;
+
+        /// <summary>
+        ///     Replace class (<see cref="FloraVoxelClass" />) per voxel id for the flora voxels; id 0 is air, ids not
+        ///     covered (terrain, water) count as solid. Owned.
+        /// </summary>
+        [ReadOnly] public NativeArray<byte> VoxelClasses;
+
+        /// <summary>True when at least one active biome has a flora rule.</summary>
+        public bool HasFlora => FloraRules.IsCreated && FloraRules.Length > 0;
+
+        /// <summary>Replace class of the voxel <paramref name="id" /> for flora stamping.</summary>
+        public byte VoxelClassOf(ushort id){
+            if (id == 0) return FloraVoxelClass.Air;
+            return id < VoxelClasses.Length ? VoxelClasses[id] : FloraVoxelClass.Solid;
+        }
+
         /// <summary>Number of detail octaves K.</summary>
         public int OctaveCount => OctaveWavelengths.IsCreated ? OctaveWavelengths.Length : 0;
 
@@ -141,6 +193,11 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (SplinePoints.IsCreated) SplinePoints.Dispose();
             if (MaterialTaps.IsCreated) MaterialTaps.Dispose();
             if (HeightTaps.IsCreated) HeightTaps.Dispose();
+            if (FloraRules.IsCreated) FloraRules.Dispose();
+            if (FloraStructures.IsCreated) FloraStructures.Dispose();
+            if (FloraVoxels.IsCreated) FloraVoxels.Dispose();
+            if (FloraMultiBlockIntervals.IsCreated) FloraMultiBlockIntervals.Dispose();
+            if (VoxelClasses.IsCreated) VoxelClasses.Dispose();
         }
     }
 }

@@ -42,7 +42,10 @@ namespace Engine.Scripts.WorldGen.Core{
         /// <summary>Biome whose top/under blocks the column uses: the dithered surface pick (§9.6, BLD-40) when a material method is active, otherwise the hard class.</summary>
         public int SurfaceSource;
 
-        /// <summary>Flora species id at the column, 0 = none (VEG-06). Assigned in Phase 4.</summary>
+        /// <summary>
+        ///     Flora species id at the column, 0 = none (VEG-06): a single-block plant, or a multi-block species at its
+        ///     anchor column (VEG-05). Ids are 1-based indices into <c>WorldGenSettings.FloraSpeciesNames()</c>.
+        /// </summary>
         public ushort FloraSpecies;
 
         /// <summary>Biome whose flora rule produced <see cref="FloraSpecies" />; -1 when none (VEG-06).</summary>
