@@ -40,11 +40,13 @@ namespace Engine.Scripts.Render{
         private const int ChunkBufferGranularity = 512;
 
         /// <summary>
-        ///     PERF-04: default element count of a pre-allocated chunk buffer. Four intervals per voxel column cover
-        ///     the usual layered terrain; a longer chunk gets a larger buffer on demand.
+        ///     PERF-04: default element count of a pre-allocated chunk buffer. Eight intervals per voxel column cover
+        ///     the spec terrain with flora (measured during the TST-E21 flight: median 4.6, maximum 6 per column;
+        ///     four were too few, so new buffers were created during flight); a longer chunk gets a larger buffer on
+        ///     demand.
         /// </summary>
         private const int DefaultChunkBufferLength =
-            (ChunkWidth * ChunkDepth * 4 + 1 + ChunkBufferGranularity - 1) / ChunkBufferGranularity * ChunkBufferGranularity;
+            (ChunkWidth * ChunkDepth * 8 + 1 + ChunkBufferGranularity - 1) / ChunkBufferGranularity * ChunkBufferGranularity;
 
         private readonly List<GraphicsBuffer> _freeChunkBuffers = new();
         private int _chunkStoreSize;
