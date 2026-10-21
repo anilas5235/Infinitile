@@ -1,4 +1,5 @@
 ﻿using Engine.Scripts.Data;
+using Engine.Scripts.Utils.Collections;
 using Engine.Scripts.Utils.Extensions;
 using Unity.Burst;
 using Unity.Collections;
@@ -61,12 +62,17 @@ namespace Engine.Scripts.Jobs.Chunk{
         private const int EditSlack = 16;
 
         /// <summary>
+        ///     Initial node capacity of the Temp run list; it grows for chunks with more runs.
+        /// </summary>
+        private const int TempRunCapacity = 4096;
+
+        /// <summary>
         ///     Writes uncompressed voxel data into the chunk using run-length encoding (RLE) compaction.
-        ///     The list is sized from a counting pass: a fixed reservation would hold hundreds of KiB per loaded
-        ///     chunk, far more than the runs of a generated chunk.
+        ///     The runs go into a Temp list first and are then copied into a list of their exact size: a fixed
+        ///     reservation would hold hundreds of KiB per loaded chunk, far more than the runs of a generated chunk.
         /// </summary>
         private void WriteToChunkData(NativeArray<ushort> vox, out ChunkVoxelData data){
-            data = new ChunkVoxelData(CountRuns(vox) + EditSlack);
+            UnsafeIntervalList<ushort> runs = new(TempRunCapacity, Allocator.Temp);
             ushort last = 0;
             int run = 0;
             bool hasLast = false;
@@ -77,32 +83,24 @@ namespace Engine.Scripts.Jobs.Chunk{
                 if (hasLast && voxelId == last)
                     run++;
                 else{
-                    if (hasLast) data.AddVoxels(last, run);
+                    if (hasLast) runs.AddInterval(last, run);
                     last = voxelId;
                     run = 1;
                     hasLast = true;
                 }
             }
 
-            if (hasLast && run > 0) data.AddVoxels(last, run);
-        }
+            if (hasLast && run > 0) runs.AddInterval(last, run);
 
-        /// <summary>
-        ///     Number of runs <see cref="WriteToChunkData" /> produces, in the same x, z, y order.
-        /// </summary>
-        private static int CountRuns(NativeArray<ushort> vox){
-            int runs = 1;
-            ushort last = vox[ChunkSize.Flatten(0, 0, 0)];
-            for (int x = 0; x < ChunkSize.x; x++)
-            for (int z = 0; z < ChunkSize.z; z++)
-            for (int y = 0; y < ChunkSize.y; y++){
-                ushort voxelId = vox[ChunkSize.Flatten(x, y, z)];
-                if (voxelId == last) continue;
-                runs++;
-                last = voxelId;
+            data = new ChunkVoxelData(runs.CompressedLength + EditSlack);
+            int start = 0;
+            for (int n = 0; n < runs.CompressedLength; n++){
+                UnsafeIntervalList<ushort>.Node node = runs.NodeAt(n);
+                data.AddVoxels(node.Value, node.Count - start);
+                start = node.Count;
             }
 
-            return runs;
+            runs.Dispose();
         }
     }
 }
