@@ -1,13 +1,7 @@
 using System;
-using System.Collections.Generic;
 using Engine.Scripts.Settings;
 using Engine.Scripts.VoxelConfig.Data.Generation;
-using Engine.Scripts.WorldGen.Classify;
-using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
-using Unity.Burst;
-using Unity.Collections;
-using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEditor;
 using UnityEngine;
@@ -27,9 +21,6 @@ namespace Engine.Editor.WorldGen{
     /// </summary>
     public partial class WorldGenerationPreviewWindow : EditorWindow{
         private const int ViewResolution = 512;
-        private const int DistributionResolution = 256;
-        private const int PlotSamples = 96;
-        private const double RebuildDebounceSeconds = 0.15; // auto rebuild waits for this pause in the changes
         private static readonly int[] ResolutionOptions ={ 128, 256, 512, 1024, 2048, 4096, 8192, 16384 };
         private static readonly string[] ResolutionLabels = Array.ConvertAll(ResolutionOptions, r => $"{r}x{r}");
 
@@ -48,21 +39,7 @@ namespace Engine.Editor.WorldGen{
         // --- Source -------------------------------------------------------------------------------------------------
         private VoxelEngineSettings _settings;
         private bool _autoRebuild = true;
-        private bool _needsRebuild = true;
-        private double _lastChangeTime; // EditorApplication.timeSinceStartup of the last RequestRebuild
-        private bool _buildInProgress;
-        private JobHandle _buildHandle;
-        private WorldGenSettings _buildAsset; // the asset of the running build
-        private bool _scheduledA;
-        private bool _scheduledB;
-
-        // --- Configurations -----------------------------------------------------------------------------------------
-        private PreviewPass _passA;
-        private PreviewPass _passB;
-        [SerializeField] private PreviewConfiguration _configB; // preview-only, never written to the asset implicitly
-        [SerializeField] private bool _configBInitialized; // B starts as a copy of A
-        [SerializeField] private bool _compare;
-        [SerializeField] private PreviewView _compareView = PreviewView.Height;
+        private PreviewBuilder _builder; // build scheduling, passes A and B, distribution plane and spline plots
 
         // --- Framing ------------------------------------------------------------------------------------------------
         private Vector2Int _worldOffset;
@@ -78,25 +55,11 @@ namespace Engine.Editor.WorldGen{
         [SerializeField] private bool _hillshade = true;
         [SerializeField] private float _exaggeration = 2f;
 
-        // --- Difference view ----------------------------------------------------------------------------------------
-        private NativeArray<Color32> _diffPixels;
-        private Texture2D _diffTexture;
-        private PreviewDiff.Stats _diffStats;
-        private bool _diffSigned;
-        private string _diffNote;
-
         // --- Distribution plane (classifier over T x F); C/E/PV are also the spline-plot probe ----------------------
         private float _planeContinental = 0.5f;
         private float _planeErosion = 0.5f;
         private float _planePV;
         private float _planeHeight = 0.5f;
-        private Texture2D _distributionTexture;
-        private NativeArray<Color32> _jobDistributionPixels;
-        private NativeArray<Color32> _jobDistributionColors;
-
-        // --- Spline plots -------------------------------------------------------------------------------------------
-        private List<SplinePlots.Plot> _plots = new();
-        private string _plotsError;
 
         // --- Editors and foldouts -------------------------------------------------------------------------------------
         private UnityEditor.Editor _settingsEditor;
@@ -118,8 +81,8 @@ namespace Engine.Editor.WorldGen{
         }
 
         private void OnEnable(){
-            _passA ??= new PreviewPass("A");
-            _passB ??= new PreviewPass("B");
+            _builder = new PreviewBuilder();
+            _builder.Finished += OnBuildFinished;
             EditorApplication.update += OnEditorUpdate;
             Undo.undoRedoPerformed += OnUndoRedo;
             ReloadAssets();
@@ -128,14 +91,11 @@ namespace Engine.Editor.WorldGen{
         private void OnDisable(){
             EditorApplication.update -= OnEditorUpdate;
             Undo.undoRedoPerformed -= OnUndoRedo;
-            FinalizeScheduledBuild(false); // a running build still reads the configs and buffers
             DestroyEditors();
-            _passA?.Dispose();
-            _passB?.Dispose();
-            _passA = _passB = null;
-            if (_diffPixels.IsCreated) _diffPixels.Dispose();
-            PreviewPass.DestroyTexture(ref _diffTexture);
-            PreviewPass.DestroyTexture(ref _distributionTexture);
+            _builder.Finished -= OnBuildFinished;
+            _builder.Dispose();
+            _builder = null;
+            DisposeDiff();
         }
 
         private void DestroyEditors(){
@@ -146,20 +106,23 @@ namespace Engine.Editor.WorldGen{
         }
 
         private void OnEditorUpdate(){
-            if (_buildInProgress && _buildHandle.IsCompleted){
-                FinalizeScheduledBuild(true);
-                Repaint();
-            }
-
-            if (_autoRebuild && _needsRebuild && !_buildInProgress &&
-                EditorApplication.timeSinceStartup - _lastChangeTime >= RebuildDebounceSeconds) ScheduleBuild();
+            _builder.Update();
+            if (_autoRebuild && _builder.AutoBuildDue) ScheduleBuild();
         }
 
         /// <summary>Undo and redo rebuild at once (with auto rebuild on): they are single steps, not a drag.</summary>
         private void OnUndoRedo(){
-            _needsRebuild = true;
-            if (_autoRebuild && !_buildInProgress) ScheduleBuild();
+            _builder.MarkStale();
+            if (_autoRebuild) ScheduleBuild();
         }
+
+        private void OnBuildFinished(){
+            UpdateDiff();
+            Repaint();
+        }
+
+        private PreviewPass PassA => _builder?.PassA;
+        private PreviewPass PassB => _builder?.PassB;
 
         /// <summary>The settings asset this preview reads (null until one is assigned).</summary>
         internal WorldGenSettings WorldGenSettings => _settings ? _settings.WorldGen : null;
@@ -260,101 +223,22 @@ namespace Engine.Editor.WorldGen{
                 {
                     if (GUILayout.Button("Reload", GUILayout.Width(90f))) ReloadAssets();
 
-                    using (new EditorGUI.DisabledScope(_buildInProgress)){
+                    using (new EditorGUI.DisabledScope(_builder.InProgress)){
                         if (GUILayout.Button("Rebuild", GUILayout.Width(90f))){
-                            _needsRebuild = true;
+                            _builder.MarkStale();
                             ScheduleBuild();
                         }
                     }
 
                     _autoRebuild = EditorGUILayout.ToggleLeft("Auto rebuild", _autoRebuild, GUILayout.Width(100f));
-                    if (_buildInProgress) EditorGUILayout.LabelField("building…", GUILayout.Width(70f));
+                    if (_builder.InProgress) EditorGUILayout.LabelField("building…", GUILayout.Width(70f));
                 }
                 EditorGUILayout.EndHorizontal();
 
-                if (_passA?.Error != null) EditorGUILayout.HelpBox("A: WorldGenSettings.ToConfig failed:\n" + _passA.Error, MessageType.Error);
-                if (_compare && _passB?.Error != null) EditorGUILayout.HelpBox("B: WorldGenSettings.ToConfig failed:\n" + _passB.Error, MessageType.Error);
+                if (PassA?.Error != null) EditorGUILayout.HelpBox("A: WorldGenSettings.ToConfig failed:\n" + PassA.Error, MessageType.Error);
+                if (_compare && PassB?.Error != null) EditorGUILayout.HelpBox("B: WorldGenSettings.ToConfig failed:\n" + PassB.Error, MessageType.Error);
             }
             EditorGUILayout.EndVertical();
-        }
-
-        /// <summary>
-        ///     Configuration A (the asset, edited with Undo) and, in compare mode, the preview-only
-        ///     configuration B with "Copy A → B" and "Apply B to asset".
-        /// </summary>
-        private void DrawConfigurationPanel(){
-            WorldGenSettings asset = WorldGenSettings;
-            if (!asset) return;
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            {
-                _showConfiguration = EditorGUILayout.Foldout(_showConfiguration, "Configuration", true, EditorStyles.foldoutHeader);
-                if (_showConfiguration){
-                    EditorGUILayout.LabelField("A — the WorldGenSettings asset", EditorStyles.boldLabel);
-                    PreviewConfiguration a = PreviewConfiguration.Capture(asset);
-                    if (DrawConfiguration(a)){
-                        Undo.RecordObject(asset, "Change preview configuration");
-                        a.ApplyTo(asset);
-                        EditorUtility.SetDirty(asset);
-                    }
-
-                    EditorGUILayout.Space(4f);
-                    _compare = EditorGUILayout.ToggleLeft("Compare with configuration B (A | B | difference)", _compare);
-                    if (_compare && _configB != null){
-                        EditorGUILayout.LabelField("B — preview only (biomes, splines and climate from the asset)", EditorStyles.boldLabel);
-                        DrawConfiguration(_configB);
-                        EditorGUILayout.BeginHorizontal();
-                        if (GUILayout.Button("Copy A → B")) _configB = PreviewConfiguration.Capture(asset);
-                        using (new EditorGUI.DisabledScope(_configB.Matches(asset))){
-                            if (GUILayout.Button("Apply B to asset")){
-                                Undo.RecordObject(asset, "Apply preview configuration B");
-                                _configB.ApplyTo(asset);
-                                EditorUtility.SetDirty(asset);
-                            }
-                        }
-
-                        EditorGUILayout.EndHorizontal();
-                    }
-                }
-            }
-            EditorGUILayout.EndVertical();
-        }
-
-        /// <summary>Architecture, method and strength controls; only the strengths the methods use are shown.</summary>
-        private static bool DrawConfiguration(PreviewConfiguration c){
-            EditorGUI.BeginChangeCheck();
-            c.Architecture = (GenArchitecture)EditorGUILayout.EnumPopup("Architecture", c.Architecture);
-            c.MaterialMethod = (BlendMethod)EditorGUILayout.EnumPopup("Material method", c.MaterialMethod);
-            using (new EditorGUI.IndentLevelScope()){
-                if (c.MaterialMethod == BlendMethod.DistanceBlend)
-                    c.MaterialBlendWidth = EditorGUILayout.Slider("B_mat (blocks)", c.MaterialBlendWidth, 1f, 256f);
-                if (c.MaterialMethod == BlendMethod.ParameterSpaceWeighting)
-                    c.MaterialSigma = EditorGUILayout.Slider("σ_mat", c.MaterialSigma, 0.001f, 0.5f);
-            }
-
-            bool terrainFirst = c.Architecture == GenArchitecture.TerrainFirst;
-            using (new EditorGUI.DisabledScope(terrainFirst)){
-                c.HeightMethod = (BlendMethod)EditorGUILayout.EnumPopup(
-                    terrainFirst ? "Height method (ignored in Terrain-first)" : "Height method", c.HeightMethod);
-                if (!terrainFirst)
-                    using (new EditorGUI.IndentLevelScope()){
-                        if (c.HeightMethod is BlendMethod.DistanceBlend or BlendMethod.DistortedBoundary)
-                            c.HeightBlendWidth = EditorGUILayout.Slider("B_h (blocks)", c.HeightBlendWidth, 1f, 256f);
-                        if (c.HeightMethod == BlendMethod.ParameterSpaceWeighting)
-                            c.HeightSigma = EditorGUILayout.Slider("σ_h", c.HeightSigma, 0.001f, 0.5f);
-                    }
-            }
-
-            bool warp = c.MaterialMethod == BlendMethod.DistortedBoundary || !terrainFirst && c.HeightMethod == BlendMethod.DistortedBoundary;
-            if (warp){
-                EditorGUILayout.LabelField("Boundary warp (shared by both stages)", EditorStyles.miniBoldLabel);
-                using (new EditorGUI.IndentLevelScope()){
-                    c.WarpAmplitude = EditorGUILayout.Slider("A (blocks)", c.WarpAmplitude, 0f, 128f);
-                    c.WarpWavelength = EditorGUILayout.Slider("λd (blocks)", c.WarpWavelength, 8f, 1024f);
-                    c.WarpOctaves = EditorGUILayout.IntSlider("Octaves", c.WarpOctaves, 1, 4);
-                }
-            }
-
-            return EditorGUI.EndChangeCheck();
         }
 
         /// <summary>Clamped share, biome-pair boundaries and the flora species per pass.</summary>
@@ -364,8 +248,8 @@ namespace Engine.Editor.WorldGen{
             {
                 _showStatistics = EditorGUILayout.Foldout(_showStatistics, "Statistics of the view", true, EditorStyles.foldoutHeader);
                 if (_showStatistics){
-                    DrawPassStatistics(_passA);
-                    if (_compare) DrawPassStatistics(_passB);
+                    DrawPassStatistics(PassA);
+                    if (_compare) DrawPassStatistics(PassB);
                 }
             }
             EditorGUILayout.EndVertical();
@@ -436,7 +320,7 @@ namespace Engine.Editor.WorldGen{
                         _planeHeight, 0f, 1f);
                 }
 
-                DrawView(null, _distributionTexture, false, 220f);
+                DrawView(null, _builder.DistributionTexture, false, 220f);
             }
             EditorGUILayout.EndVertical();
         }
@@ -451,12 +335,12 @@ namespace Engine.Editor.WorldGen{
                 if (_showPlots){
                     if (!asset.Splines)
                         EditorGUILayout.HelpBox("No TerrainSplineSet assigned.", MessageType.Info);
-                    else if (_plotsError != null)
-                        EditorGUILayout.HelpBox(_plotsError, MessageType.Warning);
+                    else if (_builder.PlotsError != null)
+                        EditorGUILayout.HelpBox(_builder.PlotsError, MessageType.Warning);
                     else{
                         EditorGUILayout.LabelField($"Probe C = {_planeContinental:0.00}, E = {_planeErosion:0.00}, PV = {_planePV:0.00} " +
                                                    "(distribution sliders) · orange = child point · line = probe", EditorStyles.miniLabel);
-                        foreach (SplinePlots.Plot plot in _plots) DrawPlot(plot);
+                        foreach (SplinePlots.Plot plot in _builder.Plots) DrawPlot(plot);
                     }
                 }
             }
@@ -592,14 +476,7 @@ namespace Engine.Editor.WorldGen{
                     }
 
                     GUILayout.Space(20f);
-                    _compare = EditorGUILayout.ToggleLeft("Compare A/B", _compare, GUILayout.Width(100f));
-                    if (_compare){
-                        PreviewView view = WithoutRebuild(() => (PreviewView)EditorGUILayout.EnumPopup(_compareView, GUILayout.Width(170f)));
-                        if (view != _compareView){
-                            _compareView = view;
-                            UpdateDiff();
-                        }
-                    }
+                    DrawCompareToggle();
 
                     GUILayout.FlexibleSpace();
                 }
@@ -607,7 +484,7 @@ namespace Engine.Editor.WorldGen{
 
                 int stride = Mathf.Max(1, ResolutionOptions[_resolutionIndex] / ViewResolution);
                 EditorGUILayout.LabelField(
-                    $"A: {_passA?.Description} · drag a view to pan · 1 sample per block up to 512, then every {stride}th column",
+                    $"A: {PassA?.Description} · drag a view to pan · 1 sample per block up to 512, then every {stride}th column",
                     EditorStyles.miniLabel);
 
                 if (_compare) DrawCompareViews();
@@ -617,39 +494,18 @@ namespace Engine.Editor.WorldGen{
         }
 
         private void DrawGrid(){
-            bool terrainFirst = _passA != null && _passA.TerrainFirst;
+            bool terrainFirst = PassA != null && PassA.TerrainFirst;
             PreviewView[] views = terrainFirst ? TerrainFirstGrid : BiomeFirstGrid;
             int columns = terrainFirst ? 4 : 3;
             for (int row = 0; row * columns < views.Length; row++){
                 EditorGUILayout.BeginHorizontal();
                 for (int col = 0; col < columns && row * columns + col < views.Length; col++){
                     PreviewView view = views[row * columns + col];
-                    DrawView(ViewTitle(_passA, view), _passA?.Texture(view), true);
+                    DrawView(ViewTitle(PassA, view), PassA?.Texture(view), true);
                 }
 
                 EditorGUILayout.EndHorizontal();
             }
-        }
-
-        /// <summary>The selected view of A and B side by side and their difference.</summary>
-        private void DrawCompareViews(){
-            EditorGUILayout.BeginHorizontal();
-            {
-                DrawView("A · " + ViewTitle(_passA, _compareView), _passA?.Texture(_compareView), true);
-                DrawView("B · " + ViewTitle(_passB, _compareView), _passB != null && _passB.HasResult ? _passB.Texture(_compareView) : null, true);
-                DrawView(DiffTitle(), _diffNote == null ? _diffTexture : null, true);
-            }
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.LabelField($"B: {_passB?.Description}", EditorStyles.miniLabel);
-            if (_diffNote != null) EditorGUILayout.HelpBox(_diffNote, MessageType.Info);
-        }
-
-        private string DiffTitle(){
-            if (_diffNote != null) return "Difference";
-            if (_diffSigned)
-                return $"B − A height (red = B higher): mean |Δ| {_diffStats.MeanAbs:0.##}, max {_diffStats.MaxAbs:0.#}, " +
-                       $"≥1 block {_diffStats.Share:P1}";
-            return $"Mismatch mask: {_diffStats.Share:P2} of the columns differ";
         }
 
         private string ViewTitle(PreviewPass pass, PreviewView view){
@@ -743,194 +599,40 @@ namespace Engine.Editor.WorldGen{
 
         /// <summary>
         ///     Marks the views stale. With auto rebuild on, <see cref="OnEditorUpdate" /> builds once no change has
-        ///     come in for <see cref="RebuildDebounceSeconds" />, so dragging a slider or panning starts one build
-        ///     per pause instead of one after another. The Rebuild button and undo/redo build at once.
+        ///     come in for <see cref="PreviewBuilder.RebuildDebounceSeconds" />, so dragging a slider or panning starts
+        ///     one build per pause instead of one after another. The Rebuild button and undo/redo build at once.
         /// </summary>
         private void RequestRebuild(){
-            _needsRebuild = true;
-            _lastChangeTime = EditorApplication.timeSinceStartup;
+            _builder.MarkStale();
         }
 
         /// <summary>
-        ///     Rebuilds the Burst configs (so edits take effect) and schedules pass A and, in compare mode, pass B
-        ///     over the same region and seed, plus the distribution plane of A. The spline plots are recomputed
-        ///     synchronously (a few thousand spline evaluations).
+        ///     Hands the framed region, the seed, configuration B (in compare mode) and the view options to the
+        ///     <see cref="PreviewBuilder" />, which rebuilds the Burst configs and schedules the passes if the views
+        ///     are stale and no build is running.
         /// </summary>
         private void ScheduleBuild(){
-            if (_buildInProgress || !_needsRebuild) return;
-            _needsRebuild = false;
-            if (!_settings || !_settings.WorldGen || _passA == null) return;
-            WorldGenSettings asset = _settings.WorldGen;
-            EnsureConfigB(asset);
+            WorldGenSettings asset = WorldGenSettings;
+            if (asset) EnsureConfigB(asset);
 
-            int resolution = ResolutionOptions[Mathf.Clamp(_resolutionIndex, 0, ResolutionOptions.Length - 1)];
-            int viewSize = Mathf.Min(resolution, ViewResolution);
-            int stride = Mathf.Max(1, resolution / ViewResolution);
-            (int2 origin, _) = FramedRegion(); // the world offset sits at the centre of the view
-            PreviewViewOptions options = new(){
-                ShowTemperature = _showTemperature,
-                ShowContinental = _showContinental,
-                ShowHumidity = _showHumidity,
-                Hillshade = _hillshade,
-                Exaggeration = _exaggeration
-            };
-
-            ComputePlots(asset);
-
-            JobHandle handle = default;
-            _scheduledA = _passA.Schedule(asset, null, _settings.Seed, origin, viewSize, stride, options, out JobHandle a);
-            if (_scheduledA){
-                handle = JobHandle.CombineDependencies(handle, a, ScheduleDistribution(asset));
-            }
-
-            _scheduledB = false;
-            if (_compare && _passB.Schedule(asset, _configB, _settings.Seed, origin, viewSize, stride, options, out JobHandle b)){
-                _scheduledB = true;
-                handle = JobHandle.CombineDependencies(handle, b);
-            }
-
-            if (!_scheduledA && !_scheduledB){
-                UpdateDiff();
-                Repaint();
-                return;
-            }
-
-            _buildAsset = asset;
-            _buildHandle = handle;
-            _buildInProgress = true;
-        }
-
-        private void EnsureConfigB(WorldGenSettings asset){
-            if (_configB != null && _configBInitialized) return;
-            _configB = PreviewConfiguration.Capture(asset);
-            _configBInitialized = true;
-        }
-
-        private JobHandle ScheduleDistribution(WorldGenSettings asset){
-            WorldGenConfig config = _passA.Config;
-            _jobDistributionPixels = new NativeArray<Color32>(DistributionResolution * DistributionResolution, Allocator.Persistent);
-            _jobDistributionColors = new NativeArray<Color32>(Mathf.Max(1, config.BiomeCount), Allocator.Persistent);
-            for (int i = 0; i < config.BiomeCount; i++){
-                Biome biome = asset.Biomes.Biomes[i];
-                _jobDistributionColors[i] = biome ? (Color32)biome.RepresentativeColor : new Color32(0, 0, 0, 255);
-            }
-
-            return new DistributionJob{
-                Resolution = DistributionResolution,
-                Continental = _planeContinental,
-                Erosion = _planeErosion,
-                PV = _planePV,
-                Height = _planeHeight,
-                TerrainFirst = config.Architecture == GenArchitecture.TerrainFirst ? (byte)1 : (byte)0,
-                Config = config,
-                BiomeColors = _jobDistributionColors,
-                Output = _jobDistributionPixels
-            }.Schedule(_jobDistributionPixels.Length, 64);
-        }
-
-        private void ComputePlots(WorldGenSettings asset){
-            _plots = SplinePlots.Compute(asset.Splines, new float3(_planeContinental, _planeErosion, _planePV), PlotSamples, out _plotsError);
-        }
-
-        private void FinalizeScheduledBuild(bool applyResult){
-            if (_buildInProgress){
-                _buildHandle.Complete();
-                _buildInProgress = false;
-                if (applyResult && _buildAsset){
-                    if (_scheduledA){
-                        _passA.Finish(_buildAsset);
-                        PreviewPass.EnsureTexture(ref _distributionTexture, DistributionResolution);
-                        _distributionTexture.SetPixelData(_jobDistributionPixels, 0);
-                        _distributionTexture.Apply(false);
-                    }
-
-                    if (_scheduledB) _passB.Finish(_buildAsset);
-                    UpdateDiff();
-                }
-            }
-
-            if (_jobDistributionPixels.IsCreated) _jobDistributionPixels.Dispose();
-            if (_jobDistributionColors.IsCreated) _jobDistributionColors.Dispose();
-            Repaint();
-        }
-
-        /// <summary>
-        ///     The difference view of the selected view kind. Height views are signed (B − A); biome classes,
-        ///     surface source and flora are mismatch masks; the other views compare the pixels. Recomputed after
-        ///     every build and when the compare view changes (no resampling).
-        /// </summary>
-        private void UpdateDiff(){
-            _diffNote = null;
-            if (!_compare) return;
-            if (_passA == null || _passB == null || !_passA.HasResult || !_passB.HasResult){
-                _diffNote = "Waiting for both configurations (see the errors on the left if a config fails).";
-                return;
-            }
-
-            if (_passA.Size != _passB.Size || _passA.Stride != _passB.Stride){
-                _diffNote = "A and B were sampled at different extents; rebuilding.";
-                RequestRebuild();
-                return;
-            }
-
-            int count = _passA.Size * _passA.Size;
-            if (!_diffPixels.IsCreated || _diffPixels.Length != count){
-                if (_diffPixels.IsCreated) _diffPixels.Dispose();
-                _diffPixels = new NativeArray<Color32>(count, Allocator.Persistent);
-            }
-
-            _diffSigned = _compareView == PreviewView.Height;
-            _diffStats = _compareView switch{
-                PreviewView.Height => PreviewDiff.Signed(_passA.Height, _passB.Height, _diffPixels),
-                PreviewView.HardBiome => PreviewDiff.Mismatch(_passA.HardBiome, _passB.HardBiome, _passA.Pixels(PreviewView.HardBiome), _diffPixels),
-                PreviewView.DominantBiome => PreviewDiff.Mismatch(_passA.DominantBiome, _passB.DominantBiome, _passA.Pixels(PreviewView.DominantBiome), _diffPixels),
-                PreviewView.SurfaceSource => PreviewDiff.Mismatch(_passA.SurfaceSource, _passB.SurfaceSource, _passA.Pixels(PreviewView.SurfaceSource), _diffPixels),
-                PreviewView.Flora => PreviewDiff.Mismatch(_passA.FloraSpecies, _passB.FloraSpecies, _passA.Pixels(PreviewView.Flora), _diffPixels),
-                _ => PreviewDiff.Pixels(_passA.Pixels(_compareView), _passB.Pixels(_compareView), _diffPixels)
-            };
-            PreviewPass.EnsureTexture(ref _diffTexture, _passA.Size);
-            _diffTexture.SetPixelData(_diffPixels, 0);
-            _diffTexture.Apply(false);
-        }
-
-        #endregion
-
-        #region Jobs
-
-        /// <summary>
-        ///     The classifier's T x F plane: x → F, y → T at fixed C, E, PV (and h in Terrain-first, 6D). Uses the
-        ///     same <see cref="BiomeClassifier" /> as the sampler, so the plane is the hard class the world would get
-        ///     at those field values, tie rule included.
-        /// </summary>
-        [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
-        private struct DistributionJob : IJobParallelFor{
-            public int Resolution;
-            public float Continental;
-            public float Erosion;
-            public float PV;
-            public float Height;
-            public byte TerrainFirst;
-            [ReadOnly] public WorldGenConfig Config;
-            [ReadOnly] public NativeArray<Color32> BiomeColors;
-            [WriteOnly] public NativeArray<Color32> Output;
-
-            public void Execute(int index){
-                int x = index % Resolution;
-                int y = index / Resolution;
-                float step = 1f / Resolution;
-                WorldFields f = new(){
-                    F = (x + 0.5f) * step,
-                    T = (y + 0.5f) * step,
-                    C = Continental,
-                    E = Erosion,
-                    W = 0f,
-                    PV = PV
-                };
-                int biome = TerrainFirst == 1
-                    ? BiomeClassifier.Classify(f, Height, Config)
-                    : BiomeClassifier.Classify(f, Config);
-                Output[index] = biome >= 0 && biome < BiomeColors.Length ? BiomeColors[biome] : new Color32(0, 0, 0, 255);
-            }
+            (int2 origin, int extent) = FramedRegion(); // the world offset sits at the centre of the view
+            _builder.Schedule(new PreviewBuilder.Request{
+                Asset = asset,
+                ConfigB = _compare ? _configB : null,
+                Seed = Seed,
+                Origin = origin,
+                ViewSize = Mathf.Min(extent, ViewResolution),
+                Stride = Mathf.Max(1, extent / ViewResolution),
+                Options = new PreviewViewOptions{
+                    ShowTemperature = _showTemperature,
+                    ShowContinental = _showContinental,
+                    ShowHumidity = _showHumidity,
+                    Hillshade = _hillshade,
+                    Exaggeration = _exaggeration
+                },
+                Probe = new float3(_planeContinental, _planeErosion, _planePV),
+                ProbeHeight = _planeHeight
+            });
         }
 
         #endregion

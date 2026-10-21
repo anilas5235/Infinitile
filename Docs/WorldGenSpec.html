@@ -1081,6 +1081,28 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
   </ul></li>
 <li><b>Costs and risks:</b> many internal call sites in the tests and the preview; the JSON format must stay byte-identical (run manifests hash it, EXP-10).</li>
 <li><b>Acceptance if scheduled:</b> all EditMode and PlayMode tests pass unchanged; the canonical JSON of the shipped asset is identical before and after.</li>
+<li><b>Done (scheduled 2026-10-21):</b>
+  <ul class="tight">
+  <li><b>Settings</b> (550 → 312 lines):
+    <ul class="tight">
+    <li><code>WorldGenSettings</code> keeps the fields, <code>OnValidate</code> and the checks both paths share (<code>InvalidScales</code>, <code>InvalidBlendStrengths</code>, <code>ClimateProfiles</code>, <code>ActiveBiomes</code>, now internal).</li>
+    <li><code>WorldGenConfigBuilder</code> builds the <code>WorldGenConfig</code>, including the cleanup on failure, with the climate and the blend kernels in their own steps.</li>
+    <li><code>WorldGenSettingsJson</code> builds the canonical JSON tree.</li>
+    <li><code>ToConfig</code>, <code>ToConfigWithVoxelIds</code> and <code>ToCanonicalJson</code> stay as one-line forwarders, so no call site changed.</li>
+    </ul></li>
+  <li><b>Preview window</b> (938 → 640 lines):
+    <ul class="tight">
+    <li><code>PreviewBuilder</code> takes the build scheduling: the debounce from §20.7 (<code>RebuildDebounceSeconds</code> moved there), passes A and B, the distribution plane job and its texture, and the spline plots. It raises <code>Finished</code> when a build has been applied.</li>
+    <li><code>WorldGenerationPreviewWindow.Compare.cs</code> takes the A/B configuration panel, the compare views and the difference, like <code>.Calibration.cs</code>.</li>
+    </ul></li>
+  <li><b>Checks:</b>
+    <ul class="tight">
+    <li>The canonical JSON of the shipped asset is byte-identical (SHA-256, with and without seed).</li>
+    <li>An off-screen build in compare mode (B = DistanceBlend 48) gives identical textures before and after: all A and B views, the distribution plane and all difference views.</li>
+    <li>The open window draws without errors.</li>
+    <li>EditMode 449/449 and PlayMode 34/34 pass, with the tests unchanged.</li>
+    </ul></li>
+  </ul></li>
 </ul>
 <h3>20.7 Debounce preview rebuilds while dragging</h3>
 <p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Not measured yet.</p>
