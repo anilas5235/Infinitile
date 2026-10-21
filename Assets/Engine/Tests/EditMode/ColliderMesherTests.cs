@@ -19,7 +19,6 @@ namespace Engine.Tests.EditMode{
     /// </summary>
     public class ColliderMesherTests{
         private NativeParallelHashMap<int2, ChunkVoxelData> _chunks;
-        private NativeParallelHashMap<int2, ChunkLightData> _lights;
         private NativeArray<VertexAttributeDescriptor> _vertexParams;
         private VoxelEngineRenderGenData _renderGenData;
         private NativeList<int3> _jobs;
@@ -30,7 +29,6 @@ namespace Engine.Tests.EditMode{
         [SetUp]
         public void SetUp(){
             _chunks = new NativeParallelHashMap<int2, ChunkVoxelData>(16, Allocator.Persistent);
-            _lights = new NativeParallelHashMap<int2, ChunkLightData>(1, Allocator.Persistent);
             _vertexParams = new NativeArray<VertexAttributeDescriptor>(2, Allocator.Persistent){
                 [0] = new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float16, 4),
                 [1] = new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float16, 4)
@@ -50,7 +48,6 @@ namespace Engine.Tests.EditMode{
             _vertexParams.Dispose();
             foreach (KeyValue<int2, ChunkVoxelData> kv in _chunks) kv.Value.Dispose();
             _chunks.Dispose();
-            _lights.Dispose();
         }
 
         #region helpers
@@ -105,7 +102,7 @@ namespace Engine.Tests.EditMode{
 
             CMeshBuildJob job = new(){
                 ColliderVertexParams = _vertexParams,
-                Accessor = new ChunkAccessor(_chunks.AsReadOnly(), _lights.AsReadOnly()),
+                Accessor = new ChunkAccessor(_chunks.AsReadOnly()),
                 Jobs = _jobs,
                 RenderGenData = _renderGenData,
                 Results = _results.AsParallelWriter(),

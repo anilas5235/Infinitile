@@ -11,15 +11,12 @@ namespace Engine.Scripts.Data{
     [BurstCompile]
     internal readonly struct ChunkAccessor{
         private readonly NativeParallelHashMap<int2, ChunkVoxelData>.ReadOnly _chunks;
-        private readonly NativeParallelHashMap<int2, ChunkLightData>.ReadOnly _lightData;
 
         /// <summary>
         ///     Constructs a new accessor.
         /// </summary>
-        internal ChunkAccessor(NativeParallelHashMap<int2, ChunkVoxelData>.ReadOnly chunks,
-            NativeParallelHashMap<int2, ChunkLightData>.ReadOnly lightData){
+        internal ChunkAccessor(NativeParallelHashMap<int2, ChunkVoxelData>.ReadOnly chunks){
             _chunks = chunks;
-            _lightData = lightData;
         }
 
         /// <summary>
@@ -28,15 +25,6 @@ namespace Engine.Scripts.Data{
         internal ushort GetVoxelInPartition(in int3 partitionPos, int3 voxelPos){
             if (!ResolveChunk(partitionPos, ref voxelPos, out int2 chunkPos)) return 0;
             return TryGetChunk(chunkPos, out ChunkVoxelData chunk) ? chunk.GetVoxel(voxelPos) : (ushort)0;
-        }
-
-        /// <summary>
-        ///     Light lookup (packed, see <see cref="VoxelLight" />) with the same neighbour remapping as
-        ///     <see cref="GetVoxelInPartition" />; 0 outside the world height or for a chunk without light data.
-        /// </summary>
-        internal ushort GetLightInPartition(in int3 partitionPos, int3 voxelPos){
-            if (!ResolveChunk(partitionPos, ref voxelPos, out int2 chunkPos)) return 0;
-            return TryGetLightData(chunkPos, out ChunkLightData light) ? light.GetLight(voxelPos) : (ushort)0;
         }
 
         /// <summary>
@@ -80,13 +68,6 @@ namespace Engine.Scripts.Data{
         /// </summary>
         internal bool TryGetChunk(int2 pos, out ChunkVoxelData chunk){
             return _chunks.TryGetValue(pos, out chunk);
-        }
-
-        /// <summary>
-        ///     Attempts to get the light data of a chunk.
-        /// </summary>
-        internal bool TryGetLightData(int2 chunkPos, out ChunkLightData lightData){
-            return _lightData.TryGetValue(chunkPos, out lightData);
         }
 
         /// <summary>

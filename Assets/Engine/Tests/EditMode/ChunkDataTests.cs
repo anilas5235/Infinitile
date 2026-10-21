@@ -106,6 +106,17 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void WriteToChunkData_ReservesForTheRunsOnly(){
+            // A fixed reservation of VoxelsPerChunk / 4 nodes held 512 KiB per loaded chunk.
+            using NativeArray<ushort> vox = new(TerrainLikeBuffer(42), Allocator.Persistent);
+            _voxelData = WriteToChunkData(vox);
+            _hasVoxelData = true;
+            int runs = _voxelData.Data.CompressedLength;
+            Assert.GreaterOrEqual(_voxelData.Data.Capacity, runs);
+            Assert.LessOrEqual(_voxelData.Data.Capacity, runs * 2, "capacity follows the run count");
+        }
+
+        [Test]
         public void SetVoxel_ReturnsFalseWhenUnchanged(){
             _voxelData = TestFixtures.CreateUniformChunk(TestFixtures.Stone);
             _hasVoxelData = true;

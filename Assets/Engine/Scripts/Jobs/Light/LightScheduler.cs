@@ -130,8 +130,9 @@ namespace Engine.Scripts.Jobs.Light{
                 return;
             }
 
+            // No job reads light lists (the renderer copies them on the main thread), and SetVoxel already completed
+            // the readers of the edited chunk's voxels, so the lists are replaced without waiting for jobs.
             for (int k = 0; k < LightEditJob.ChunkCount; k++){
-                _chunkManager.CompleteReadersOf(_editChunks[k].Position); // light lists may be replaced
                 _editVoxels[k] = _editChunks[k].VoxelData;
                 _editLights[k] = _editChunks[k].LightData;
             }

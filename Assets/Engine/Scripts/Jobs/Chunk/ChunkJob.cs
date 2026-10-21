@@ -57,10 +57,17 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
+        ///     Spare nodes on top of the generated runs, so the first edits of a chunk do not grow its list.
+        /// </summary>
+        private const int EditSlack = 16;
+
+        /// <summary>
         ///     Writes uncompressed voxel data into the chunk using run-length encoding (RLE) compaction.
+        ///     The list is sized from a counting pass: a fixed reservation would hold hundreds of KiB per loaded
+        ///     chunk, far more than the runs of a generated chunk.
         /// </summary>
         private void WriteToChunkData(NativeArray<ushort> vox, out ChunkVoxelData data){
-            data = new ChunkVoxelData(VoxelsPerChunk / 4);
+            data = new ChunkVoxelData(CountRuns(vox) + EditSlack);
             ushort last = 0;
             int run = 0;
             bool hasLast = false;
@@ -79,6 +86,24 @@ namespace Engine.Scripts.Jobs.Chunk{
             }
 
             if (hasLast && run > 0) data.AddVoxels(last, run);
+        }
+
+        /// <summary>
+        ///     Number of runs <see cref="WriteToChunkData" /> produces, in the same x, z, y order.
+        /// </summary>
+        private static int CountRuns(NativeArray<ushort> vox){
+            int runs = 1;
+            ushort last = vox[ChunkSize.Flatten(0, 0, 0)];
+            for (int x = 0; x < ChunkSize.x; x++)
+            for (int z = 0; z < ChunkSize.z; z++)
+            for (int y = 0; y < ChunkSize.y; y++){
+                ushort voxelId = vox[ChunkSize.Flatten(x, y, z)];
+                if (voxelId == last) continue;
+                runs++;
+                last = voxelId;
+            }
+
+            return runs;
         }
     }
 }

@@ -26,7 +26,6 @@ namespace Engine.Tests.Performance{
 
         private GeneratorConfig _config;
         private NativeParallelHashMap<int2, ChunkVoxelData> _chunks;
-        private NativeParallelHashMap<int2, ChunkLightData> _lights;
         private ChunkAccessor _accessor;
         private NativeArray<VertexAttributeDescriptor> _vertexParams;
         private VoxelEngineRenderGenData _renderGenData;
@@ -40,9 +39,8 @@ namespace Engine.Tests.Performance{
             _config = BenchmarkFixtures.CreateGeneratorConfig(Allocator.Persistent);
 
             _chunks = new NativeParallelHashMap<int2, ChunkVoxelData>(1, Allocator.Persistent);
-            _lights = new NativeParallelHashMap<int2, ChunkLightData>(1, Allocator.Persistent);
             GenerateChunk();
-            _accessor = new ChunkAccessor(_chunks.AsReadOnly(), _lights.AsReadOnly());
+            _accessor = new ChunkAccessor(_chunks.AsReadOnly());
 
             _vertexParams = new NativeArray<VertexAttributeDescriptor>(2, Allocator.Persistent){
                 [0] = new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float16, 4),
@@ -62,7 +60,6 @@ namespace Engine.Tests.Performance{
             _vertexParams.Dispose();
             foreach (KeyValue<int2, ChunkVoxelData> kv in _chunks) kv.Value.Dispose();
             _chunks.Dispose();
-            _lights.Dispose();
             BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
         }
 

@@ -38,6 +38,11 @@ namespace Engine.Scripts.Utils.Collections{
         public int CompressedLength => _internal.Length;
 
         /// <summary>
+        ///     Number of nodes allocated.
+        /// </summary>
+        internal int Capacity => _internal.Capacity;
+
+        /// <summary>
         ///     Creates a new compressed list with the specified initial capacity.
         /// </summary>
         /// <param name="capacity">Initial number of nodes to allocate.</param>

@@ -58,7 +58,6 @@ namespace Engine.Scripts.Components{
         private NativeParallelHashMap<int2, ChunkVoxelData> _lightJobMap;
 
         private PriorityUtil.Focus _focus;
-        private NativeParallelHashMap<int2, ChunkLightData> _lightAccessorMap;
 
         /// <summary>
         ///     Creates a new manager with capacities from <paramref name="settings" />.
@@ -81,10 +80,6 @@ namespace Engine.Scripts.Components{
             for (int i = 0; i < _chunkStoreSize; i++) _chunkObjectPool.Push(new Chunk());
 
             _accessorMap = new NativeParallelHashMap<int2, ChunkVoxelData>(
-                settings.Scheduler.meshingBatchSize * 6,
-                Allocator.Domain
-            );
-            _lightAccessorMap = new NativeParallelHashMap<int2, ChunkLightData>(
                 settings.Scheduler.meshingBatchSize * 6,
                 Allocator.Domain
             );
@@ -113,7 +108,6 @@ namespace Engine.Scripts.Components{
         /// </summary>
         internal void Dispose(){
             _accessorMap.Dispose();
-            _lightAccessorMap.Dispose();
             _lightJobMap.Dispose();
             foreach ((int2 _, Chunk chunk) in _chunks) chunk.Dispose();
         }
@@ -276,7 +270,6 @@ namespace Engine.Scripts.Components{
         /// </summary>
         internal ChunkAccessor GetAccessor(HashSet<int3> positions){
             _accessorMap.Clear();
-            _lightAccessorMap.Clear();
             foreach (int3 position in positions){
                 for (int x = -1; x <= 1; x++)
                 for (int z = -1; z <= 1; z++){
@@ -284,11 +277,10 @@ namespace Engine.Scripts.Components{
                     if (!_chunks.TryGetValue(pos, out Chunk chunk))
                         throw new InvalidOperationException($"Chunk {pos} has not been generated");
                     if (!_accessorMap.ContainsKey(pos)) _accessorMap.Add(pos, chunk.VoxelData);
-                    if (!_lightAccessorMap.ContainsKey(pos)) _lightAccessorMap.Add(pos, chunk.LightData);
                 }
             }
 
-            return new ChunkAccessor(_accessorMap.AsReadOnly(), _lightAccessorMap.AsReadOnly());
+            return new ChunkAccessor(_accessorMap.AsReadOnly());
         }
 
         /// <summary>
