@@ -117,7 +117,7 @@ namespace Engine.Tests.EditMode{
             settings.Seed = Seed;
             settings.Chunk = new ChunkSettings{
                 DrawDistance = drawDistance,
-                LoadDistance = drawDistance + 2,
+                LoadDistance = drawDistance + 3, // LGT-06
                 UpdateDistance = math.max(drawDistance - 2, 2)
             };
             settings.Scheduler = new SchedulerSettings();

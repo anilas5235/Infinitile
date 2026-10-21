@@ -1,20 +1,25 @@
-using Unity.Profiling;
+﻿using Unity.Profiling;
 
 namespace Engine.Scripts.Utils{
     /// <summary>
     ///     PERF-01: one <see cref="ProfilerMarker" /> per pipeline stage. All names start with "Voxel." so the
-    ///     stages can be filtered in the Profiler. Stages that do not exist yet (light) are added together with
-    ///     their phase.
+    ///     stages can be filtered in the Profiler. Stages are added together with their phase.
     /// </summary>
     internal static class VoxelProfilerMarkers{
         // Scheduler ticks (VoxelEngineScheduler round robin)
         internal static readonly ProfilerMarker SchedulerData = new("Voxel.Scheduler.Data");
+        internal static readonly ProfilerMarker SchedulerLight = new("Voxel.Scheduler.Light"); // LGT-06
         internal static readonly ProfilerMarker SchedulerMesh = new("Voxel.Scheduler.Mesh");
         internal static readonly ProfilerMarker SchedulerCollider = new("Voxel.Scheduler.Collider");
 
         // Data generation (ChunkScheduler / ChunkJob)
         internal static readonly ProfilerMarker DataGenSchedule = new("Voxel.DataGen.Schedule");
         internal static readonly ProfilerMarker DataGenComplete = new("Voxel.DataGen.Complete");
+
+        // Light (LightScheduler / LightJob / LightEditJob), LGT-06/07
+        internal static readonly ProfilerMarker LightSchedule = new("Voxel.Light.Schedule");
+        internal static readonly ProfilerMarker LightComplete = new("Voxel.Light.Complete");
+        internal static readonly ProfilerMarker LightEdit = new("Voxel.Light.Edit");
 
         // Collider mesh build (CMeshBuildScheduler / CMeshBuildJob)
         internal static readonly ProfilerMarker MeshBuildSchedule = new("Voxel.MeshBuild.Schedule");

@@ -31,5 +31,11 @@ namespace Engine.Scripts.Settings{
         /// </summary>
         [Tooltip("Number of chunks to process per update for collider generation")]
         public int colliderBatchSize = 4;
+
+        /// <summary>
+        ///     LGT-06: number of chunks lit per light job batch.
+        /// </summary>
+        [Tooltip("Number of chunks to light per update")]
+        public int lightBatchSize = 8;
     }
 }

@@ -7,6 +7,7 @@ using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Jobs.Core;
+using Engine.Scripts.Jobs.Light;
 using Engine.Scripts.Noise;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
@@ -32,6 +33,7 @@ namespace Engine.Scripts.World{
         private ChunkPool _chunkPool;
         private ChunkScheduler _chunkScheduler;
         private ColliderBakeScheduler _colliderBakeScheduler;
+        private LightScheduler _lightScheduler;
 
         private Coroutine _focusUpdateRoutine;
 
@@ -43,6 +45,9 @@ namespace Engine.Scripts.World{
 
         internal event Action<Chunk> ChunkChanged;
         internal event Action<Chunk> ChunkDataReady;
+
+        /// <summary>LGT-06/07: a chunk's light was computed or changed (the renderer uploads it, LGT-08).</summary>
+        internal event Action<Chunk> ChunkLightChanged;
         internal event Action<int2> ChunkEvicted;
         internal event Action<int3> PartitionEvicted;
         internal event Action<HashSet<int3>> PartitionBuildRequested;
@@ -53,6 +58,10 @@ namespace Engine.Scripts.World{
 
         internal void RaiseChunkDataReady(Chunk chunk){
             ChunkDataReady?.Invoke(chunk);
+        }
+
+        internal void RaiseChunkLightChanged(Chunk chunk){
+            ChunkLightChanged?.Invoke(chunk);
         }
 
         internal void RaiseChunkEvicted(int2 chunkPos){
@@ -96,7 +105,8 @@ namespace Engine.Scripts.World{
         ///     configured draw distance.
         /// </summary>
         private void ConfigureSettings(){
-            settings.Chunk.LoadDistance = settings.Chunk.DrawDistance + 2;
+            // LGT-06: data -> light (needs 3 x 3 data) -> mesh (needs 3 x 3 light), one ring more than before
+            settings.Chunk.LoadDistance = settings.Chunk.DrawDistance + 3;
             settings.Chunk.UpdateDistance = math.max(settings.Chunk.DrawDistance - 2, 2);
         }
 
@@ -139,12 +149,19 @@ namespace Engine.Scripts.World{
                 _chunkPool
             );
 
+            _lightScheduler = VoxelEngineProvider.Current.LightScheduler(
+                ChunkManager,
+                DataImporter.Instance.VoxelRegistry,
+                this
+            );
+
             _scheduler = VoxelEngineProvider.Current.VoxelEngineScheduler(
                 _cMeshBuildScheduler,
                 _chunkScheduler,
                 _colliderBakeScheduler,
                 ChunkManager,
-                _chunkPool
+                _chunkPool,
+                _lightScheduler
             );
         }
 
@@ -163,7 +180,7 @@ namespace Engine.Scripts.World{
         }
 
         /// <summary>
-        ///     Waits for the running generation, mesh and bake jobs, e.g. before the <see cref="DataImporter" />
+        ///     Waits for the running generation, light, mesh and bake jobs, e.g. before the <see cref="DataImporter" />
         ///     releases the registries they read. Destruction order between the two is not defined.
         /// </summary>
         internal void WaitForJobs(){

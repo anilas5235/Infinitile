@@ -3,6 +3,7 @@ using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Jobs.Core;
+using Engine.Scripts.Jobs.Light;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils.Provider;
 using Engine.Scripts.VoxelConfig;
@@ -46,10 +47,18 @@ namespace Engine.Scripts.Utils{
             ChunkScheduler chunkScheduler,
             ColliderBakeScheduler colliderBakeScheduler,
             ChunkManager chunkManager,
-            ChunkPool chunkPool
+            ChunkPool chunkPool,
+            LightScheduler lightScheduler
         ){
             return new VoxelEngineScheduler(Settings, cMeshBuildScheduler, chunkScheduler, chunkManager,
-                colliderBakeScheduler, chunkPool);
+                colliderBakeScheduler, chunkPool, lightScheduler);
+        }
+
+        /// <summary>
+        ///     LGT-06: creates the <see cref="LightScheduler" /> for light jobs and incremental light edits.
+        /// </summary>
+        internal LightScheduler LightScheduler(ChunkManager chunkManager, VoxelRegistry voxelRegistry, VoxelWorld world){
+            return new LightScheduler(Settings, chunkManager, voxelRegistry, world);
         }
 
         /// <summary>
