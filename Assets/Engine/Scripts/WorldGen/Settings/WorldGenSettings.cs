@@ -2,10 +2,7 @@ using System;
 using System.Collections.Generic;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Registry;
-using Engine.Scripts.WorldGen.Blending;
-using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Flora;
-using Engine.Scripts.WorldGen.Height;
 using Engine.Scripts.WorldGen.Noise;
 using Unity.Collections;
 using UnityEngine;
@@ -15,8 +12,9 @@ namespace Engine.Scripts.WorldGen.Settings{
     ///     World-generation settings: architecture, blend methods and widths, classification
     ///     weights, height range, water level, detail octaves, the climate instances T, F, C, E, W with their
     ///     couplings, the active <see cref="BiomeSet" /> and the Terrain-first <see cref="TerrainSplineSet" />.
-    ///     This asset is the only generation input. <see cref="ToConfig" /> builds the Burst mirror,
-    ///     <see cref="ToCanonicalJson()" /> the experiment manifest.
+    ///     This asset is the only generation input. <see cref="ToConfig" /> builds the Burst mirror
+    ///     (<see cref="WorldGenConfigBuilder" />), <see cref="ToCanonicalJson()" /> the experiment manifest
+    ///     (<see cref="WorldGenSettingsJson" />).
     /// </summary>
     [CreateAssetMenu(fileName = "WorldGenSettings", menuName = "Voxel/WorldGenSettings", order = 0)]
     public class WorldGenSettings : ScriptableObject{
@@ -191,7 +189,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         ///     positive and finite, and every climate octave count below one (no octave normalises by zero, a NaN
         ///     climate). They are reported rather than clamped.
         /// </summary>
-        private IEnumerable<(string field, float value)> InvalidScales(){
+        internal IEnumerable<(string field, float value)> InvalidScales(){
             if (OctaveWavelengths != null)
                 for (int i = 0; i < OctaveWavelengths.Length; i++)
                     if (!IsPositiveFinite(OctaveWavelengths[i])) yield return ($"OctaveWavelengths[{i}]", OctaveWavelengths[i]);
@@ -207,7 +205,7 @@ namespace Engine.Scripts.WorldGen.Settings{
             }
         }
 
-        private (string field, NoiseProfileSettings profile)[] ClimateProfiles(){
+        internal (string field, NoiseProfileSettings profile)[] ClimateProfiles(){
             return new[]{
                 (nameof(temperatureProfile), temperatureProfile),
                 (nameof(humidityProfile), humidityProfile),
@@ -223,7 +221,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         ///     σ ≤ 0 divides by zero, a non-finite or negative A or fewer than one warp octave has no meaning. Unused
         ///     strengths are not checked. Reported, not clamped.
         /// </summary>
-        private IEnumerable<(string field, float value)> InvalidBlendStrengths(BlendMethod heightMethod){
+        internal IEnumerable<(string field, float value)> InvalidBlendStrengths(BlendMethod heightMethod){
             bool biomeFirst = Architecture == GenArchitecture.BiomeFirst;
             bool heightUsed = biomeFirst && heightMethod != BlendMethod.None;
             if (MaterialMethod == BlendMethod.DistanceBlend && !IsPositiveFinite(MaterialBlendWidth))
@@ -266,133 +264,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// </summary>
         internal WorldGenConfig ToConfigWithVoxelIds(int seed, Func<VoxelConfig.Data.Voxel.Voxel, ushort> voxelId,
             Allocator allocator = Allocator.Persistent){
-            int octaveCount = OctaveCount;
-            if (octaveCount == 0) throw new InvalidOperationException($"{name}: OctaveWavelengths is empty.");
-            if (octaveCount > DetailOctaves.MaxOctaves)
-                throw new InvalidOperationException($"{name}: more than {DetailOctaves.MaxOctaves} detail octaves.");
-            foreach ((string field, NoiseProfileSettings profile) in ClimateProfiles())
-                if (profile == null) throw new InvalidOperationException($"{name}: {field} is not set.");
-            foreach ((string field, float value) in InvalidScales())
-                throw new InvalidOperationException($"{name}: {field} must be positive and finite, got {value}.");
-            // h = (H - Hmin)/(Hmax - Hmin) is a classification dimension: an empty range gives NaN.
-            if (!(HeightMin < HeightMax) || float.IsInfinity(HeightMin) || float.IsInfinity(HeightMax))
-                throw new InvalidOperationException($"{name}: HeightMin ({HeightMin}) must be finite and below HeightMax ({HeightMax}).");
-            if (TreeSpacingRadius < 0)
-                throw new InvalidOperationException($"{name}: TreeSpacingRadius must not be negative, got {TreeSpacingRadius}.");
-
-            List<Biome> active = ActiveBiomes();
-
-            // The height stage does not exist in Terrain-first; a configured method is reported and ignored.
-            BlendMethod heightMethod = HeightMethod;
-            if (Architecture == GenArchitecture.TerrainFirst && heightMethod != BlendMethod.None){
-                Debug.LogWarning($"{name}: HeightMethod {heightMethod} is ignored in Terrain-first; the height is already continuous.", this);
-                heightMethod = BlendMethod.None;
-            }
-
-            if (Architecture == GenArchitecture.TerrainFirst && !Splines)
-                throw new InvalidOperationException($"{name}: Terrain-first needs a TerrainSplineSet.");
-            foreach ((string field, float value) in InvalidBlendStrengths(heightMethod))
-                throw new InvalidOperationException($"{name}: {field} is invalid for the selected blend method, got {value}.");
-
-            WorldGenConfig cfg = new(){
-                Seed = (uint)seed,
-                Architecture = Architecture,
-                MaterialMethod = MaterialMethod,
-                MaterialBlendWidth = MaterialBlendWidth,
-                MaterialSigma = MaterialSigma,
-                HeightMethod = heightMethod,
-                HeightBlendWidth = HeightBlendWidth,
-                HeightSigma = HeightSigma,
-                WarpAmplitude = WarpAmplitude,
-                WarpWavelength = WarpWavelength,
-                WarpOctaves = WarpOctaves,
-                LambdaTemperature = LambdaTemperature,
-                LambdaHumidity = LambdaHumidity,
-                LambdaContinental = LambdaContinental,
-                LambdaErosion = LambdaErosion,
-                LambdaPV = LambdaPV,
-                LambdaHeight = LambdaHeight,
-                HeightMin = HeightMin,
-                HeightMax = HeightMax,
-                PeakWavelength = PeakWavelength,
-                WaterLevel = WaterLevel,
-                EnableClimateOverrides = EnableClimateOverrides
-            };
-
-            // Biome.ToStruct and TerrainSplineSet.Flatten throw on bad data; free what was allocated so far before
-            // rethrowing. Every allocation is stored in cfg as soon as it exists, so Dispose finds it.
-            try{
-                BuildClimate(seed, ref cfg.Climate);
-                cfg.OctaveWavelengths = new NativeArray<float>(OctaveWavelengths, allocator);
-                cfg.GlobalOctaveWeights = new NativeArray<float>(octaveCount, allocator);
-                cfg.Biomes = new NativeArray<Biome.BiomeDef>(active.Count, allocator);
-                cfg.OctaveCoefficients = new NativeArray<float>(active.Count * octaveCount, allocator);
-
-                if (Splines){
-                    Splines.Flatten(allocator, out cfg.SplineNodes, out cfg.SplinePoints,
-                        out cfg.OffsetSpline, out cfg.AmpSpline, out cfg.JaggednessSpline);
-                }
-                else{
-                    cfg.SplineNodes = new NativeArray<SplineNode>(0, allocator);
-                    cfg.SplinePoints = new NativeArray<SplinePoint>(0, allocator);
-                }
-
-                // Kernel taps once per settings change; empty arrays for stages without a spatial kernel.
-                bool biomeFirst = Architecture == GenArchitecture.BiomeFirst;
-                if (MaterialMethod == BlendMethod.DistanceBlend)
-                    cfg.MaterialKernel = KernelSet.Build(MaterialBlendWidth, allocator, out cfg.MaterialTaps);
-                else cfg.MaterialTaps = new NativeArray<KernelTap>(0, allocator);
-                if (biomeFirst && heightMethod is BlendMethod.DistanceBlend or BlendMethod.DistortedBoundary)
-                    cfg.HeightKernel = KernelSet.Build(HeightBlendWidth, allocator, out cfg.HeightTaps);
-                else cfg.HeightTaps = new NativeArray<KernelTap>(0, allocator);
-                cfg.StagesShareWeights = biomeFirst && MaterialMethod == heightMethod && MaterialMethod switch{
-                    BlendMethod.None => true,
-                    BlendMethod.DistanceBlend => MaterialBlendWidth == HeightBlendWidth,
-                    BlendMethod.ParameterSpaceWeighting => MaterialSigma == HeightSigma,
-                    _ => false // DistortedBoundary: warp only (material) vs. warp + distance blend (height)
-                };
-
-                for (int i = 0; i < octaveCount; i++)
-                    cfg.GlobalOctaveWeights[i] = GlobalOctaveWeights != null && i < GlobalOctaveWeights.Length
-                        ? GlobalOctaveWeights[i]
-                        : 0f;
-
-                for (int b = 0; b < active.Count; b++){
-                    Biome biome = active[b];
-                    cfg.Biomes[b] = voxelId != null ? biome.ToStruct(voxelId) : biome.ToStruct();
-                    for (int i = 0; i < octaveCount; i++){
-                        // a_{b,i} = HeightAmplitude_b × OctaveWeights_{b,i}; missing weights count as 0.
-                        float w = biome.OctaveWeights != null && i < biome.OctaveWeights.Length ? biome.OctaveWeights[i] : 0f;
-                        cfg.OctaveCoefficients[b * octaveCount + i] = biome.HeightAmplitude * w;
-                    }
-                }
-
-                // Flora rules, species, structures.
-                FloraConfigBuilder.Build(active, voxelId, TreeSpacingRadius, allocator, ref cfg, this);
-            }
-            catch{
-                cfg.Dispose();
-                throw;
-            }
-
-            return cfg;
-        }
-
-        /// <summary>
-        ///     Climate instances T, F, C, E, W from this asset. Each instance gets its own gradient salt. Fills
-        ///     <paramref name="climate" /> one profile at a time, so a throw leaves only disposable state.
-        /// </summary>
-        private void BuildClimate(int seed, ref ClimateParams climate){
-            climate.ContinentalHumidityInfluence = ContinentalHumidityInfluence;
-            climate.ContinentalTemperatureInfluence = ContinentalTemperatureInfluence;
-            climate.WGain = WGain;
-            climate.FrequencyScale = ClimateFrequencyScale;
-            climate.Temperature = new NoiseProfile(temperatureProfile.ToStruct(seed, HashSalts.TemperatureNoise));
-            climate.Humidity = new NoiseProfile(humidityProfile.ToStruct(seed, HashSalts.HumidityNoise));
-            climate.Continental = new WarpedNoiseLayer(continentalLayer.ToStruct(seed,
-                HashSalts.ContinentalNoise, HashSalts.ContinentalWarpX, HashSalts.ContinentalWarpY));
-            climate.Erosion = new NoiseProfile(erosionProfile.ToStruct(seed, HashSalts.ErosionNoise));
-            climate.Weirdness = new NoiseProfile(weirdnessProfile.ToStruct(seed, HashSalts.WeirdnessNoise));
+            return WorldGenConfigBuilder.Build(this, seed, voxelId, allocator);
         }
 
         /// <summary>
@@ -408,7 +280,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         }
 
         /// <summary>The active biomes in index order, at most <see cref="BiomeSet.MaxBiomes" />. Null slots throw.</summary>
-        private List<Biome> ActiveBiomes(){
+        internal List<Biome> ActiveBiomes(){
             List<Biome> result = new();
             if (Biomes == null || Biomes.Biomes == null) return result;
             int count = Mathf.Min(Biomes.Count, BiomeSet.MaxBiomes);
@@ -429,122 +301,12 @@ namespace Engine.Scripts.WorldGen.Settings{
         ///     floats: identical settings give identical text.
         /// </summary>
         public string ToCanonicalJson(){
-            return CanonicalJson.Serialize(ToTree(null));
+            return WorldGenSettingsJson.Serialize(this, null);
         }
 
         /// <summary>Same as <see cref="ToCanonicalJson()" /> plus the world seed, for experiment manifests.</summary>
         public string ToCanonicalJson(int seed){
-            return CanonicalJson.Serialize(ToTree(seed));
-        }
-
-        private Dictionary<string, object> ToTree(int? seed){
-            Dictionary<string, object> tree = new(){
-                ["Architecture"] = Architecture,
-                ["MaterialMethod"] = MaterialMethod,
-                ["MaterialBlendWidth"] = MaterialBlendWidth,
-                ["MaterialSigma"] = MaterialSigma,
-                ["HeightMethod"] = HeightMethod,
-                ["HeightBlendWidth"] = HeightBlendWidth,
-                ["HeightSigma"] = HeightSigma,
-                ["WarpAmplitude"] = WarpAmplitude,
-                ["WarpWavelength"] = WarpWavelength,
-                ["WarpOctaves"] = WarpOctaves,
-                ["LambdaTemperature"] = LambdaTemperature,
-                ["LambdaHumidity"] = LambdaHumidity,
-                ["LambdaContinental"] = LambdaContinental,
-                ["LambdaErosion"] = LambdaErosion,
-                ["LambdaPV"] = LambdaPV,
-                ["LambdaHeight"] = LambdaHeight,
-                ["HeightMin"] = HeightMin,
-                ["HeightMax"] = HeightMax,
-                ["WaterLevel"] = WaterLevel,
-                ["OctaveWavelengths"] = OctaveWavelengths ?? Array.Empty<float>(),
-                ["GlobalOctaveWeights"] = GlobalOctaveWeights ?? Array.Empty<float>(),
-                ["PeakWavelength"] = PeakWavelength,
-                ["WGain"] = WGain,
-                ["ClimateFrequencyScale"] = ClimateFrequencyScale,
-                ["TemperatureProfile"] = ProfileTree(temperatureProfile),
-                ["HumidityProfile"] = ProfileTree(humidityProfile),
-                ["ContinentalLayer"] = LayerTree(continentalLayer),
-                ["ContinentalHumidityInfluence"] = ContinentalHumidityInfluence,
-                ["ContinentalTemperatureInfluence"] = ContinentalTemperatureInfluence,
-                ["ErosionProfile"] = ProfileTree(erosionProfile),
-                ["WeirdnessProfile"] = ProfileTree(weirdnessProfile),
-                ["EnableClimateOverrides"] = EnableClimateOverrides,
-                ["TreeSpacingRadius"] = TreeSpacingRadius,
-                ["Biomes"] = BiomeSetTree(),
-                ["Splines"] = Splines ? Splines.ToTree() : null
-            };
-            if (seed.HasValue) tree["Seed"] = seed.Value;
-            return tree;
-        }
-
-        private static Dictionary<string, object> ProfileTree(NoiseProfileSettings p){
-            if (p == null) return null;
-            return new Dictionary<string, object>{
-                ["Scale"] = p.scale,
-                ["Persistance"] = p.persistance,
-                ["Lacunarity"] = p.lacunarity,
-                ["Octaves"] = p.octaves
-            };
-        }
-
-        private static Dictionary<string, object> LayerTree(WarpedNoiseLayerSettings l){
-            if (l == null) return null;
-            List<object> curve = new();
-            if (l.redistributionCurve != null)
-                foreach (Keyframe k in l.redistributionCurve.keys) curve.Add(new[]{ k.time, k.value });
-            return new Dictionary<string, object>{
-                ["BaseNoise"] = ProfileTree(l.baseNoise),
-                ["WarpNoise"] = ProfileTree(l.warpNoise),
-                ["WarpStrength"] = l.warpStrength,
-                ["RedistributionCurve"] = curve
-            };
-        }
-
-        private List<object> BiomeSetTree(){
-            List<object> list = new();
-            if (Biomes == null || Biomes.Biomes == null) return list;
-            foreach (Biome biome in Biomes.Biomes) list.Add(biome ? BiomeTree(biome) : null);
-            return list;
-        }
-
-        private static Dictionary<string, object> BiomeTree(Biome b){
-            List<object> flora = new();
-            if (b.FloraRules != null)
-                foreach (FloraRule rule in b.FloraRules)
-                    flora.Add(new Dictionary<string, object>{
-                        ["SpeciesVoxel"] = VoxelName(rule.SpeciesVoxel),
-                        ["SpeciesStructure"] = rule.SpeciesStructure ? rule.SpeciesStructure.name : null,
-                        ["Probability"] = rule.Probability,
-                        ["RequiresSurfaceFromSameBiome"] = rule.RequiresSurfaceFromSameBiome,
-                        ["MinHeightAboveWater"] = rule.MinHeightAboveWater,
-                        ["MinStackHeight"] = rule.MinStackHeight,
-                        ["MaxStackHeight"] = rule.MaxStackHeight
-                    });
-
-            return new Dictionary<string, object>{
-                ["Name"] = b.name,
-                ["TopBlock"] = VoxelName(b.TopBlock),
-                ["UnderBlock"] = VoxelName(b.UnderBlock),
-                ["StoneBlock"] = VoxelName(b.StoneBlock),
-                ["TargetTemperature"] = b.TargetTemperature,
-                ["TargetHumidity"] = b.TargetHumidity,
-                ["TargetContinental"] = b.TargetContinental,
-                ["TargetErosion"] = b.TargetErosion,
-                ["TargetPV"] = b.TargetPV,
-                ["TargetHeight"] = b.TargetHeight,
-                ["HeightOffset"] = b.HeightOffset,
-                ["HeightAmplitude"] = b.HeightAmplitude,
-                ["OctaveWeights"] = b.OctaveWeights ?? Array.Empty<float>(),
-                ["Jaggedness"] = b.Jaggedness,
-                ["FloraRules"] = flora
-            };
-        }
-
-        private static string VoxelName(VoxelConfig.Data.Voxel.Voxel voxel){
-            if (!voxel) return null;
-            return voxel.package ? voxel.GetFullName().ToString() : voxel.name;
+            return WorldGenSettingsJson.Serialize(this, seed);
         }
     }
 }
