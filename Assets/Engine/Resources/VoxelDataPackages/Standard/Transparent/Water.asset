@@ -17,6 +17,8 @@ MonoBehaviour:
   alwaysRenderAllFaces: 0
   depthFadeDistance: 13
   glow: 0
+  lightAttenuation: 2
+  lightEmission: {x: 0, y: 0, z: 0}
   usePostProcess: 0
   postProcess:
     postProcessColor: {r: 0.41037738, g: 0.76299477, b: 1, a: 0}

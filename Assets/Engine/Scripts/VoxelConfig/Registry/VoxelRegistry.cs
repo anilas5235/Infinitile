@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using Engine.Scripts.Data;
 using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig.Data.Internal;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
@@ -27,6 +28,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         private readonly Registry<Voxel.VoxelDef> _voxelRenderDefRegistry = new(100);
 
         private VoxelEngineRenderGenData _voxelEngineRenderGenData;
+        private VoxelLightTable _lightTable; // LGT-02
 
         public GraphicsBuffer VoxelRenderDefBuffer{ get; private set; }
 
@@ -52,7 +54,8 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             _voxelRenderDefRegistry.Register(id, new Voxel.VoxelDef{
                 Id = id,
                 MeshLayer = MeshLayer.Air,
-                Collision = false
+                Collision = false,
+                LightAttenuation = 0 // LGT-02: air is clear
             });
             VoxelEngineLogger.Info<VoxelRegistry>($"Registered Voxel '{fullName}' with ID {id}");
         }
@@ -65,6 +68,12 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                 DepthFadeDistance = (half)so.depthFadeDistance,
                 Glow = (byte)so.glow,
                 Collision = so.collision,
+                // LGT-02
+                LightAttenuation = (byte)math.clamp(so.lightAttenuation, 0, VoxelLightLimits.MaxLevel),
+                LightEmission = VoxelLight.PackRgb(
+                    math.clamp(so.lightEmission.x, 0, VoxelLightLimits.MaxLevel),
+                    math.clamp(so.lightEmission.y, 0, VoxelLightLimits.MaxLevel),
+                    math.clamp(so.lightEmission.z, 0, VoxelLightLimits.MaxLevel)),
                 Always = RegisterFaces(so, QuadDrawCondition.Always),
                 Right = RegisterFaces(so, QuadDrawCondition.Right),
                 Left = RegisterFaces(so, QuadDrawCondition.Left),
@@ -146,10 +155,16 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                 new GraphicsBuffer(Target.Structured, voxelCount, Marshal.SizeOf<GPUVoxelDef>());
             GPUVoxelDef[] gpuVoxelDefData = new GPUVoxelDef[voxelCount];
 
+            _lightTable.Dispose();
+            _lightTable = new VoxelLightTable(voxelCount, Allocator.Domain);
+
             for (int i = 0; i < voxelCount; i++){
-                _voxelRenderDefRegistry.TryGet((ushort)i, out Voxel.VoxelDef def);
+                bool registered = _voxelRenderDefRegistry.TryGet((ushort)i, out Voxel.VoxelDef def);
                 _voxelEngineRenderGenData.VoxelRenderDefs[i] = def;
                 gpuVoxelDefData[i] = new GPUVoxelDef(def);
+                // LGT-02: an unregistered id blocks light like a solid block
+                _lightTable.Set(i, registered ? def.LightAttenuation : (byte)VoxelLightLimits.MaxLevel,
+                    registered ? def.LightEmission : (ushort)0);
             }
 
             VoxelRenderDefBuffer.SetData(gpuVoxelDefData);
@@ -170,6 +185,13 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         /// <returns>Voxel engine render generation data structure.</returns>
         public VoxelEngineRenderGenData GetVoxelGenData(){
             return _voxelEngineRenderGenData;
+        }
+
+        /// <summary>
+        ///     LGT-02: light attenuation and emission per voxel id, read by the light jobs.
+        /// </summary>
+        public VoxelLightTable GetLightTable(){
+            return _lightTable;
         }
 
         private Texture2DArray GetTextureArray(MeshLayer meshLayer){
@@ -214,6 +236,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         public override void Dispose(){
             if (_voxelEngineRenderGenData.VoxelRenderDefs.IsCreated)
                 _voxelEngineRenderGenData.VoxelRenderDefs.Dispose();
+            _lightTable.Dispose();
             VoxelRenderDefBuffer.Dispose();
             QuadBuffer.Dispose();
             QuadTexPairBuffer.Dispose();
