@@ -52,7 +52,12 @@ namespace Engine.Scripts.Render{
         /// <param name="voxelRenderDef">The GPU buffer containing voxel render definitions.</param>
         /// <param name="voxelQuadTexPair">The GPU buffer containing voxel quad texture pairs.</param>
         public PointBuilderHandler(ComputeShader pointBuilder, GraphicsBuffer voxelRenderDef,
-            GraphicsBuffer voxelQuadTexPair){
+            GraphicsBuffer voxelQuadTexPair) : this(pointBuilder, voxelRenderDef, voxelQuadTexPair,
+            DataImporter.Instance.VoxelRegistry.QuadBuffer){ }
+
+        /// <summary>Creates the handler with an explicit quad buffer instead of the importer's (tests).</summary>
+        internal PointBuilderHandler(ComputeShader pointBuilder, GraphicsBuffer voxelRenderDef,
+            GraphicsBuffer voxelQuadTexPair, GraphicsBuffer quadBuffer){
             _pointBuilder = pointBuilder;
             _voxelRenderDefBuffer = voxelRenderDef;
             _voxelQuadTexPairBuffer = voxelQuadTexPair;
@@ -74,8 +79,7 @@ namespace Engine.Scripts.Render{
             _metadata = new GraphicsBuffer(Target.Structured, 1, Marshal.SizeOf<PartitionMetadata>());
             _readBackCountBuffer = new GraphicsBuffer(Target.Raw, 3, sizeof(uint));
             _counts = new NativeArray<uint>(_readBackCountBuffer.count, Allocator.Domain);
-            pointBuilder.SetBuffer(_pointBuilderKernelID, QuadBufferNameID,
-                DataImporter.Instance.VoxelRegistry.QuadBuffer);
+            pointBuilder.SetBuffer(_pointBuilderKernelID, QuadBufferNameID, quadBuffer);
         }
 
         /// <summary>
