@@ -6,11 +6,25 @@ using UnityEngine.Rendering.Universal;
 namespace Engine.Shaders{
     /// <summary>
     ///     Full-screen distance fog for liquids, drawn after transparents and before URP post-processing.
-    ///     Driven by <see cref="RenderSettings.fog" />, <see cref="RenderSettings.fogColor" /> and
-    ///     <see cref="RenderSettings.fogDensity" />, which <see cref="VoxelPostProcessHandler" /> sets per liquid.
+    ///     <see cref="VoxelPostProcessHandler" /> sets the static fog state per liquid.
     ///     The fog is lit by the sky like an open voxel, so it follows day and night.
     /// </summary>
     public class UnderwaterFogFeature : ScriptableRendererFeature{
+        /// <summary>
+        ///     Draws the fog while true.
+        /// </summary>
+        public static bool Enabled;
+
+        /// <summary>
+        ///     Fog color before the sky lighting.
+        /// </summary>
+        public static Color FogColor;
+
+        /// <summary>
+        ///     Exp² fog density per block.
+        /// </summary>
+        public static float FogDensity;
+
         /// <summary>
         ///     Minimum fog brightness (0-1) regardless of the sky, for liquids that emit light such as lava.
         /// </summary>
@@ -30,7 +44,7 @@ namespace Engine.Shaders{
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData){
-            if (_pass == null || !RenderSettings.fog) return;
+            if (_pass == null || !Enabled) return;
             renderer.EnqueuePass(_pass);
         }
 
@@ -59,8 +73,8 @@ namespace Engine.Shaders{
                 // Only the player's view is inside the liquid; scene view and previews stay clear.
                 if (cameraData.cameraType != CameraType.Game || resources.isActiveTargetBackBuffer) return;
 
-                _material.SetColor(FogColorId, RenderSettings.fogColor);
-                _material.SetFloat(FogDensityId, RenderSettings.fogDensity);
+                _material.SetColor(FogColorId, FogColor);
+                _material.SetFloat(FogDensityId, FogDensity);
                 _material.SetFloat(FogEmissionId, SelfIllumination);
 
                 TextureHandle source = resources.activeColorTexture;

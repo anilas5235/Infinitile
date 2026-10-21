@@ -46,6 +46,12 @@ namespace Engine.Shaders{
             _postProcessManager = PostProcessManager.Instance;
         }
 
+        private void OnDisable(){
+            // The fog state is static and would outlive Play mode.
+            UnderwaterFogFeature.Enabled = false;
+            currentVoxelId = 0;
+        }
+
         /// <summary>
         ///     Updates post-processing state based on the voxel definition associated with the given ID.
         ///     Resets previous overrides and only applies effects for transparent liquid voxels.
@@ -54,7 +60,7 @@ namespace Engine.Shaders{
         private void UpdatePostProcessing(ushort voxelId){
             _postProcessManager.ResetLiftGammaGain();
             _postProcessManager.ResetColorAdjustments();
-            RenderSettings.fog = false;
+            UnderwaterFogFeature.Enabled = false;
             UnderwaterFogFeature.SelfIllumination = 0f;
 
             if (!_voxelRegistry.TryGet(voxelId, out Voxel info)) return;
@@ -64,9 +70,9 @@ namespace Engine.Shaders{
 
             _postProcessManager.SetLiftGammaGain(info.postProcess.postProcessColor);
             _postProcessManager.SetColorAdjustments(info.postProcess.contrast, info.postProcess.saturation);
-            RenderSettings.fog = info.postProcess.enableFog;
-            RenderSettings.fogColor = info.postProcess.fogColor;
-            RenderSettings.fogDensity = info.postProcess.fogDensity;
+            UnderwaterFogFeature.Enabled = info.postProcess.enableFog;
+            UnderwaterFogFeature.FogColor = info.postProcess.fogColor;
+            UnderwaterFogFeature.FogDensity = info.postProcess.fogDensity;
             Vector3Int emission = info.lightEmission;
             UnderwaterFogFeature.SelfIllumination = Mathf.Max(emission.x, emission.y, emission.z) / 15f;
         }
