@@ -31,7 +31,6 @@
             float4 positionCS : SV_POSITION;
             float2 uv : TEXCOORD0; // xy = tile UV
             uint4 packed : TEXCOORD1; // PointData.packed, layout in VoxelCommon.hlsl
-            float fogFactor : TEXCOORD2;
         };
 
         // ── Vertex shader with expansion ─────────────────────────────
@@ -43,7 +42,6 @@
             o.positionCS = TransformObjectToHClip(v.positionOS);
             o.uv = v.uv;
             o.packed = v.packed;
-            o.fogFactor = ComputeFogFactor(o.positionCS.z);
             return o;
         }
         ENDHLSL
@@ -70,7 +68,6 @@
             #pragma fragment frag
 
             #pragma multi_compile_instancing
-            #pragma multi_compile_fog
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
@@ -114,7 +111,7 @@
                 float3 light = calc_voxel_light(IN.packed, uv);
 
                 // --- Final colour ---
-                return half4(MixFog(ao_color.rgb * light, IN.fogFactor), 1);
+                return half4(ao_color.rgb * light, 1);
             }
             ENDHLSL
         }
