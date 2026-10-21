@@ -112,6 +112,9 @@ namespace Engine.Tests.PlayMode{
             }
 
             Debug.Log($"flight covered {(focus.position - start).magnitude:0} units; {allocatingFrames}/{FlightFrames} frames allocated");
+            // §20.1: how full the shared interval store got (it is sized like the former per-chunk buffer pool)
+            IntervalPages pages = PlayModeFixtures.GetPrivateField<ChunkIntervalStore>(renderer, "_intervalStore").Pages;
+            Debug.Log($"interval store: {pages.UsedPageCount} pages used, peak {pages.PeakUsedPageCount} of {pages.PageCount}");
             Assert.Greater((focus.position - start).magnitude, ChunkWidth, "the flight must cross a chunk border");
             Assert.AreEqual(0, allocatingFrames,
                 $"{allocatingFrames} of {FlightFrames} frames allocated managed memory (first at frame {firstAllocatingFrame})");

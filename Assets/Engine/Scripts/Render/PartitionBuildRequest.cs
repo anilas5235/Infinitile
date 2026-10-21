@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using Engine.Scripts.Utils.Logger;
 using Unity.Mathematics;
-using UnityEngine;
 using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.Render{
     /// <summary>
-    ///     Represents a request to build render data for a partition, including collection of neighboring chunk buffers.
+    ///     Represents a request to build render data for a partition, including collection of the neighboring chunks'
+    ///     interval lists in the <see cref="ChunkIntervalStore" /> (§20.1).
     /// </summary>
     internal class PartitionBuildRequest{
         private static readonly int2[] RequiredChunks =
@@ -18,8 +18,8 @@ namespace Engine.Scripts.Render{
         /// </summary>
         public int3 Partition{ get; private set; }
 
-        private readonly GraphicsBuffer[] _buffers = new GraphicsBuffer[RequiredChunks.Length];
-        private readonly GraphicsBuffer[] _lightBuffers = new GraphicsBuffer[RequiredChunks.Length]; // LGT-08
+        private readonly IntervalRange[] _voxelLists = new IntervalRange[RequiredChunks.Length];
+        private readonly IntervalRange[] _lightLists = new IntervalRange[RequiredChunks.Length]; // LGT-08
 
         /// <summary>
         ///     Initializes a new instance of the PartitionBuildRequest class.
@@ -31,7 +31,7 @@ namespace Engine.Scripts.Render{
 
 
         /// <summary>
-        ///     Gets a value indicating whether this build request has successfully collected all required buffers.
+        ///     Gets a value indicating whether this build request has successfully collected all required lists.
         /// </summary>
         public bool IsValid{ get; private set; }
 
@@ -41,20 +41,20 @@ namespace Engine.Scripts.Render{
         public void Reset(int3 partition){
             Partition = partition;
             IsValid = false;
-            Array.Clear(_buffers, 0, _buffers.Length);
-            Array.Clear(_lightBuffers, 0, _lightBuffers.Length);
+            Array.Clear(_voxelLists, 0, _voxelLists.Length);
+            Array.Clear(_lightLists, 0, _lightLists.Length);
         }
 
         /// <summary>
-        ///     Gets the graphics buffers for all required chunks, or null if IsValid is false.
+        ///     Gets the voxel interval lists of all required chunks, or null if IsValid is false.
         /// </summary>
-        public GraphicsBuffer[] Buffers => IsValid ? _buffers : null;
+        public IntervalRange[] VoxelLists => IsValid ? _voxelLists : null;
 
         /// <summary>
-        ///     LGT-08: gets the light buffers for all required chunks (same order as <see cref="Buffers" />), or null
-        ///     if IsValid is false.
+        ///     LGT-08: gets the light interval lists of all required chunks (same order as <see cref="VoxelLists" />),
+        ///     or null if IsValid is false.
         /// </summary>
-        public GraphicsBuffer[] LightBuffers => IsValid ? _lightBuffers : null;
+        public IntervalRange[] LightLists => IsValid ? _lightLists : null;
 
         /// <summary>
         ///     Gets the metadata for this partition.
@@ -68,27 +68,26 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     Collects the voxel data and light buffers for all required neighboring chunks.
+        ///     Collects the voxel data and light lists of all required neighboring chunks.
         /// </summary>
-        /// <param name="voxelDataBuffers">Dictionary mapping chunk positions to their voxel data buffers.</param>
-        /// <param name="lightDataBuffers">LGT-08: dictionary mapping chunk positions to their light buffers.</param>
-        public void CollectBuffers(Dictionary<int2, GraphicsBuffer> voxelDataBuffers,
-            Dictionary<int2, GraphicsBuffer> lightDataBuffers){
+        /// <param name="voxelLists">Dictionary mapping chunk positions to their voxel interval lists.</param>
+        /// <param name="lightLists">LGT-08: dictionary mapping chunk positions to their light interval lists.</param>
+        public void CollectLists(Dictionary<int2, IntervalRange> voxelLists, Dictionary<int2, IntervalRange> lightLists){
             IsValid = true;
             int2 mainChunkPos = PartitionToChunkPos(Partition);
 
             for (int i = 0; i < RequiredChunks.Length; i++){
                 int2 chunkPos = mainChunkPos + RequiredChunks[i];
-                bool success = voxelDataBuffers.TryGetValue(chunkPos, out _buffers[i]);
+                bool success = voxelLists.TryGetValue(chunkPos, out _voxelLists[i]);
                 if (!success){
                     VoxelEngineLogger.Error<PartitionBuildRequest>(
-                        $"Neighbor voxel data buffer for partition {Partition} not found at {chunkPos}.");
+                        $"Neighbor voxel data for partition {Partition} not found at {chunkPos}.");
                 }
 
-                bool lit = lightDataBuffers.TryGetValue(chunkPos, out _lightBuffers[i]);
+                bool lit = lightLists.TryGetValue(chunkPos, out _lightLists[i]);
                 if (!lit){
                     VoxelEngineLogger.Error<PartitionBuildRequest>(
-                        $"Neighbor light buffer for partition {Partition} not found at {chunkPos}.");
+                        $"Neighbor light for partition {Partition} not found at {chunkPos}.");
                 }
 
                 IsValid &= success && lit;

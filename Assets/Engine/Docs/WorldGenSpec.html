@@ -991,6 +991,14 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
   <li>A growth step copies the whole buffer on the GPU.</li>
   </ul></li>
 <li><b>Acceptance if scheduled:</b> TST-E21 at 0/300 with no per-chunk buffer objects; GPU memory for voxel data at most that of the pooled design; the mesh build and upload benchmarks not slower (PERF-03).</li>
+<li><b>Done (scheduled 2026-10-21):</b>
+  <ul class="tight">
+  <li><code>ChunkIntervalStore</code> holds all voxel and light lists (LGT-08) in one structured buffer of 512-element pages; <code>IntervalPages</code> allocates them. A list's pages need not be adjacent, so there is no fragmentation by size and no compaction. An update keeps the pages the list still needs.</li>
+  <li>Each partition build uploads the page tables of its 18 lists; <code>BuildPrep</code> / <code>BuildPrepLight</code> read through them. Growth allocates a larger buffer and copies on the GPU (<code>CopyIntervals</code>).</li>
+  <li>Start size 17 pages per list: the same memory as the pool (user decision 2026-10-21). TST-E21 flight: 0/300 allocating frames, peak 6935 of 17986 pages (39 %), no growth.</li>
+  <li>Chunk upload about 71 µs per list as before. The prep dispatch takes 21.5–22.8 µs per build instead of 19.6–20.1 µs (page-table upload); ProfilerRecorder probe, two runs each, as the performance suite has no GPU benchmarks.</li>
+  <li>Tests: <code>IntervalStoreTests</code> (allocator, and a GPU round trip through scattered pages and a growth step); F-17/F-18 tests adapted.</li>
+  </ul></li>
 </ul>
 <h3>20.2 Faster light BFS for emitter-dense regions</h3>
 <p class="small">Recorded 2026-10-21 (Phase L, from LGT-11 / PERF-02).</p>

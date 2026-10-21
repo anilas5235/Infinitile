@@ -34,6 +34,12 @@ namespace Engine.Scripts.Utils{
 
         public static readonly int CompChunkNameID = Shader.PropertyToID("_CompChunk");
         public static readonly int UnCompChunkNameID = Shader.PropertyToID("_UnCompChunk");
+        public static readonly int CompPagesNameID = Shader.PropertyToID("_CompPages"); // §20.1
+        public static readonly int CompPagesOffsetNameID = Shader.PropertyToID("_CompPagesOffset");
+        public static readonly int CopySourceNameID = Shader.PropertyToID("_CopySource");
+        public static readonly int CopyTargetNameID = Shader.PropertyToID("_CopyTarget");
+        public static readonly int CopyCountNameID = Shader.PropertyToID("_CopyCount");
+        public static readonly int CopyStrideNameID = Shader.PropertyToID("_CopyStride");
 
         public static readonly int VoxelsPerChunkNameID = Shader.PropertyToID("_VoxelsPerChunk");
         public static readonly int ChunkSizeNameID = Shader.PropertyToID("_ChunkSize");

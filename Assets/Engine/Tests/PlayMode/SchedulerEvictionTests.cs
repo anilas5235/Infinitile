@@ -40,8 +40,8 @@ namespace Engine.Tests.PlayMode{
             VoxelWorld world = VoxelWorld.Instance;
             VoxelWorldRenderer renderer = VoxelWorldRenderer.Instance;
             Assert.IsNotNull(renderer, "VoxelWorldRenderer missing in scene");
-            Dictionary<int2, GraphicsBuffer> buffers =
-                PlayModeFixtures.GetPrivateField<Dictionary<int2, GraphicsBuffer>>(renderer, "_voxelDataBuffers");
+            Dictionary<int2, IntervalRange> buffers =
+                PlayModeFixtures.GetPrivateField<Dictionary<int2, IntervalRange>>(renderer, "_voxelLists");
 
             int draw = world.Settings.Chunk.DrawDistance;
             int load = world.Settings.Chunk.LoadDistance;
