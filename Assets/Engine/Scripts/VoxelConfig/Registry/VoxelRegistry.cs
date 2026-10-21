@@ -161,10 +161,10 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             for (int i = 0; i < voxelCount; i++){
                 bool registered = _voxelRenderDefRegistry.TryGet((ushort)i, out Voxel.VoxelDef def);
                 _voxelEngineRenderGenData.VoxelRenderDefs[i] = def;
-                gpuVoxelDefData[i] = new GPUVoxelDef(def);
                 // LGT-02: an unregistered id blocks light like a solid block
-                _lightTable.Set(i, registered ? def.LightAttenuation : (byte)VoxelLightLimits.MaxLevel,
-                    registered ? def.LightEmission : (ushort)0);
+                byte attenuation = registered ? def.LightAttenuation : (byte)VoxelLightLimits.MaxLevel;
+                gpuVoxelDefData[i] = new GPUVoxelDef(def, attenuation);
+                _lightTable.Set(i, attenuation, registered ? def.LightEmission : (ushort)0);
             }
 
             VoxelRenderDefBuffer.SetData(gpuVoxelDefData);
@@ -257,8 +257,9 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             private uint2 shape_quad_indices_down;
             private uint2 shape_quad_indices_front;
             private uint2 shape_quad_indices_back;
+            private uint LightAttenuation; // LGT-09: the smooth light skips opaque (15) voxels
 
-            public GPUVoxelDef(Voxel.VoxelDef def){
+            public GPUVoxelDef(Voxel.VoxelDef def, byte lightAttenuation){
                 MeshLayer = (uint)def.MeshLayer;
                 AlwaysRenderAllFaces = def.AlwaysRenderAllFaces ? 1u : 0u;
                 DepthFadeDistance = def.DepthFadeDistance.value; // F-19: read with f16tof32 on the GPU
@@ -271,6 +272,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                 shape_quad_indices_down = def.Down;
                 shape_quad_indices_front = def.Front;
                 shape_quad_indices_back = def.Back;
+                LightAttenuation = lightAttenuation;
             }
         }
     }

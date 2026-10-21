@@ -8,7 +8,12 @@
 struct PointData
 {
     float3 position; // Voxel position in partition local space
-    uint4 packed; // quadIndex(u16) | texIndex(u16), lights(4×u4 each), ao(u8) | depthFade(f16) | glow(u8), unused
+    // x: quadIndex(u16) | texIndex(u16)
+    // y: sky (4 corners × u4) | red (4 corners × u4)      LGT-09
+    // z: ao(u8) | depthFade(f16) | glow(u8)
+    // w: green (4 corners × u4) | blue (4 corners × u4)  LGT-09
+    // Corner order inside each 16-bit channel: up-left, up-right, down-right, down-left (UV space).
+    uint4 packed;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -56,27 +61,47 @@ void set_tex_index(inout uint4 packed, uint tex_index)
     packed.x = (packed.x & 0x0000FFFF) | ((tex_index & 0xFFFF) << 16);
 }
 
-uint4 get_sun_light(in uint4 packed)
+// LGT-09: per-corner light, four 4-bit corners per channel (ul, ur, dr, dl). Voxel light is sky|R|G|B with sky in
+// bits 12-15 and B in bits 0-3 (VoxelLight on the C# side).
+uint4 unpack_corners(uint bits)
 {
-    return uint4(packed.y & 0xF, packed.y >> 4 & 0xF, packed.y >> 8 & 0xF, packed.y >> 12 & 0xF);
+    return uint4(bits & 0xF, bits >> 4 & 0xF, bits >> 8 & 0xF, bits >> 12 & 0xF);
 }
 
-void set_sun_light(inout uint4 packed, in uint4 sun_light)
+uint pack_corners(in uint4 corners)
 {
-    packed.y = (packed.y & 0xFFFF0000) | (sun_light.x & 0xF) | ((sun_light.y & 0xF) << 4) |
-        ((sun_light.z & 0xF) << 8) | ((sun_light.w & 0xF) << 12);
+    return (corners.x & 0xF) | ((corners.y & 0xF) << 4) | ((corners.z & 0xF) << 8) | ((corners.w & 0xF) << 12);
 }
 
-uint4 get_artificial_light(in uint4 packed)
+uint4 get_sky_light(in uint4 packed)
 {
-    return uint4(packed.y >> 16 & 0xF, packed.y >> 20 & 0xF, packed.y >> 24 & 0xF, packed.y >> 28 & 0xF);
+    return unpack_corners(packed.y & 0xFFFF);
 }
 
-void set_artificial_light(inout uint4 packed, in uint4 artificial_light)
+uint4 get_red_light(in uint4 packed)
 {
-    packed.y = (packed.y & 0x0000FFFF) | ((artificial_light.x & 0xF) << 16) |
-        ((artificial_light.y & 0xF) << 20) | ((artificial_light.z & 0xF) << 24) |
-        ((artificial_light.w & 0xF) << 28);
+    return unpack_corners(packed.y >> 16);
+}
+
+uint4 get_green_light(in uint4 packed)
+{
+    return unpack_corners(packed.w & 0xFFFF);
+}
+
+uint4 get_blue_light(in uint4 packed)
+{
+    return unpack_corners(packed.w >> 16);
+}
+
+// Sets all four channels from the corners' voxel light values (sky|R|G|B each, corners ul, ur, dr, dl).
+void set_corner_light(inout uint4 packed, in uint4 corner_light)
+{
+    uint4 sky = corner_light >> 12 & 0xF;
+    uint4 red = corner_light >> 8 & 0xF;
+    uint4 green = corner_light >> 4 & 0xF;
+    uint4 blue = corner_light & 0xF;
+    packed.y = pack_corners(sky) | (pack_corners(red) << 16);
+    packed.w = pack_corners(green) | (pack_corners(blue) << 16);
 }
 
 uint get_ao(in uint4 packed)

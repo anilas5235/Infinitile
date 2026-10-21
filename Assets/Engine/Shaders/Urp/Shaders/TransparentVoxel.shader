@@ -101,8 +101,8 @@
             {
                 FragExtraData data;
                 data.texture_index = get_tex_index(packed);
-                data.sun_light = get_sun_light(packed);
-                data.artificial_light = get_artificial_light(packed);
+                data.sun_light = get_sky_light(packed);
+                data.artificial_light = get_red_light(packed);
                 data.ao = get_ao(packed);
                 data.depth_fade_dist = get_depth_fade_dist(packed);
                 data.glow = get_glow(packed);
