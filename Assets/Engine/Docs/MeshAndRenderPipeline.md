@@ -438,8 +438,8 @@ re-propagate anything.
 
   Partitions whose light changed are remeshed. The result equals a full recomputation (tested over 500 random
   edits).
-- **GPU light (LGT-08).** The renderer uploads each chunk's light intervals into a buffer from the same pool as
-  the voxel data; the pool is twice as large. `PointBuilder.compute` decompresses the voxel ids (`BuildPrep`), then
+- **GPU light (LGT-08).** The renderer uploads each chunk's light intervals into the shared interval store, like the
+  voxel data (two lists per chunk, see Version 1.5). `PointBuilder.compute` decompresses the voxel ids (`BuildPrep`), then
   ORs the light into the upper 16 bits of the same uint (`BuildPrepLight`). A neighbour lookup therefore fetches
   id and light at once. A build without a light buffer for every chunk is invalid.
 - **Smooth light (LGT-09).** For each face corner, `BuildPoints` averages every channel over the front voxel,
@@ -469,7 +469,8 @@ re-propagate anything.
     exhaustive seeding, 3 × 3 vs 5 × 5 border exactness, 500 random edits vs a full recomputation.
   - `PointLightPackingTests` and `DayNightCycleTests`.
   - `LightJobBenchmark`: 0.86 ms per chunk on natural terrain, 15.7 ms in the emitter-cavity worst case (see
-    `Tests/Performance/Baselines/README.md`).
+    `Tests/Performance/Baselines/README.md`). Since spec §20.2 the BFS computes all four channels at once in byte
+    lanes: 0.73 ms and 9.0 ms.
 
 Advantages:
 
@@ -484,3 +485,65 @@ Trade-offs:
 - A chunk can be meshed only after its neighbours are lit, so the load distance is three chunks beyond the draw
   distance.
 - Light changes need a remesh of the affected partitions, because the corner values are baked into the points.
+
+# Version 1.5 (Shared Interval Store, Spec §20.1)
+
+## Chunk Data on the GPU (One Paged Buffer Instead of One Buffer per Chunk)
+
+```mermaid
+flowchart LR
+subgraph CPU["CPU (VoxelWorldRenderer)"]
+    direction LR
+    A[ChunkDataChanged /
+    ChunkLightChanged] --> B[ChunkIntervalStore.Upload
+    resize the list's pages]
+    B --> C[IntervalPages
+    free pages, page lists]
+    D[Partition build] --> E[Page tables of the
+    3 x 3 chunks' 18 lists]
+end
+
+subgraph GPU
+    direction LR
+    B --> F[Interval store
+    one uint2 buffer,
+    pages of 512]
+    E --> G[BuildPrep / BuildPrepLight
+    interval k = page k >> 9]
+    F --> G
+end
+```
+
+### Description
+
+Until version 1.4, the renderer kept one `GraphicsBuffer` per chunk list (voxel ids and light, LGT-08), taken from
+a pool created at start-up. A list longer than the pool's default length (8 intervals per column) created a new
+buffer during flight, and with it a managed object (PERF-04). Every pooled buffer was as large as that default,
+whatever its chunk needed.
+
+- **Store.** `ChunkIntervalStore` holds every list in one structured `uint2` buffer of 512-element pages (4 KB).
+  A list is the header (interval count, last end) followed by its (value, exclusive end) nodes, as before.
+- **Pages.** `IntervalPages` hands out the pages; a list's pages need not be adjacent.
+  - An update keeps the pages the list still needs and adds or frees pages only at its end.
+  - New pages are handed out lowest first, so a fresh list usually gets one run of pages and one `SetData`.
+  - The renderer keeps an `IntervalRange` (slot and length) per chunk list.
+- **Kernels.** Per partition build, `PointBuilderHandler` writes the page tables of the 18 lists back to back into a
+  small buffer. `BuildPrep` and `BuildPrepLight` read interval k at
+  `store[_CompPages[_CompPagesOffset + (k >> 9)] * 512 + (k & 511)]`.
+- **Growth.** If the free pages do not suffice, the store allocates a larger buffer, copies the old one on the GPU
+  (`CopyIntervals`) and logs it. It starts with 17 pages per list, two lists per chunk the `ChunkManager` can hold, the
+  same memory as the former pool.
+- **Measured** (TST-E21 flight in the game scene): 6935 of 17986 pages used at the peak (39 %). No growth, 0/300
+  allocating frames. Upload about 71 µs per chunk list as before. The prep dispatch takes about 22 µs per build
+  instead of 20 µs (page-table upload).
+
+Advantages:
+
+- No managed object per chunk upload, whatever the list length.
+- Memory follows the actual list lengths; a long list just takes more pages.
+- Free pages are shared by all chunks; there is no fragmentation by buffer size.
+
+Trade-offs:
+
+- One more indirection per interval read in the prep kernels, and a page-table upload per build.
+- Growth copies the whole store on the GPU and allocates once.

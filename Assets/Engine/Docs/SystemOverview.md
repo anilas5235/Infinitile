@@ -58,6 +58,7 @@ Important entry points:
 - `RenderBufferManager`
 - `RenderBuffer`
 - `GpuCuller`
+- `ChunkIntervalStore`
 - `PointBuilderHandler`
 - `CopyPointsHandler`
 
@@ -150,9 +151,15 @@ Phase C GPU page culling (`PageCulling.compute`).
 It keeps a `CameraCullState` per camera (frustum planes, visible page list and indirect args per render buffer), culls every buffer per camera and frame, and drives the optional shadow pass with light-extruded bounds.
 `FrustumCulling` is the C# reference of the GPU test used by the tests.
 
+### `ChunkIntervalStore`
+Spec §20.1: one structured GPU buffer holding the compressed interval lists (voxel ids and light, LGT-08) of every
+loaded chunk, in pages of 512 elements handed out by `IntervalPages`. The renderer keeps an `IntervalRange` per
+chunk list; the store grows (and copies on the GPU) only when the free pages run out.
+
 ### `PointBuilderHandler`
 Builds point data for a partition from voxel data using compute shaders.
-It prepares neighboring chunks, runs the point builder shader, and reads back point counts.
+It uploads the page tables of the 3 × 3 chunks' lists, decompresses them from the interval store, runs the point
+builder shader, and reads back point counts.
 
 ### `CopyPointsHandler`
 Copies built point data into the target render buffers and prepares page metadata for shader consumption.
@@ -190,6 +197,7 @@ If you are changing behavior, these are the places to inspect first:
 
 - Rendering flow:
   - `VoxelWorldRenderer`
+  - `ChunkIntervalStore`
   - `PointBuilderHandler`
   - `CopyPointsHandler`
   - `RenderBufferManager`

@@ -15,7 +15,6 @@ using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.Rendering;
 using static Engine.Scripts.Utils.VoxelConstants;
-using static UnityEngine.GraphicsBuffer;
 
 namespace Engine.Scripts.Render{
     /// <summary>
@@ -32,25 +31,20 @@ namespace Engine.Scripts.Render{
         private readonly List<int3> _pendingBuilds = new();
         private readonly HashSet<int3> _requestedPartitions = new();
 
-        private readonly Dictionary<int2, GraphicsBuffer> _voxelDataBuffers = new();
-        private readonly Dictionary<int2, GraphicsBuffer> _lightDataBuffers = new(); // LGT-08
-
-        // PERF-04: a GraphicsBuffer is a managed object; released chunk buffers are kept for reuse so that chunk
-        // uploads during flight do not allocate. Lengths are rounded up so a free buffer fits more often; the
-        // decompress kernel reads the interval count from element 0, not from the buffer length.
-        private const int ChunkBufferGranularity = 512;
+        // §20.1: each chunk's voxel and light interval lists live in one shared store
+        private readonly Dictionary<int2, IntervalRange> _voxelLists = new();
+        private readonly Dictionary<int2, IntervalRange> _lightLists = new(); // LGT-08
 
         /// <summary>
-        ///     PERF-04: default element count of a pre-allocated chunk buffer. Eight intervals per voxel column cover
-        ///     the spec terrain with flora (measured during the TST-E21 flight: median 4.6, maximum 6 per column;
-        ///     four were too few, so new buffers were created during flight); a longer chunk gets a larger buffer on
-        ///     demand.
+        ///     §20.1 / PERF-04: pages the interval store starts with per list. Eight intervals per voxel column cover
+        ///     the spec terrain with flora (measured during the TST-E21 flight: median 4.6, maximum 6 per column).
+        ///     The store is shared, so a longer list just takes more pages while the total fits; the store only grows
+        ///     (rarely, it allocates) when it does not.
         /// </summary>
-        private const int DefaultChunkBufferLength =
-            (ChunkWidth * ChunkDepth * 8 + 1 + ChunkBufferGranularity - 1) / ChunkBufferGranularity * ChunkBufferGranularity;
+        private const int InitialPagesPerList =
+            (ChunkWidth * ChunkDepth * 8 + 1 + IntervalPages.PageSize - 1) / IntervalPages.PageSize;
 
-        private readonly List<GraphicsBuffer> _freeChunkBuffers = new();
-        private int _chunkStoreSize;
+        private ChunkIntervalStore _intervalStore;
         private bool _buffersRebuildPending;
 
         private int _copyKernelID;
@@ -93,7 +87,6 @@ namespace Engine.Scripts.Render{
 
         private InFlightBuild[] _inFlightBuilds;
         private PartitionBuildRequest[] _buildRequests; // PERF-04: one reusable request per in-flight slot
-        private uint2[] _intervalUpload = Array.Empty<uint2>(); // PERF-04: reused chunk upload staging
         private bool _isDestroyed;
         private int _maxInFlight = 1;
 
@@ -122,19 +115,20 @@ namespace Engine.Scripts.Render{
             _pendingBuilds.Capacity = math.max(_pendingBuilds.Capacity, partitionPoolSize);
             AllocInfo.PrewarmPageLists(partitionPoolSize * 3); // solid, transparent and foliage per partition
 
-            // PERF-04: one GPU buffer per chunk the manager's store can hold (same formula as ChunkManager), created
-            // now instead of one managed GraphicsBuffer object per chunk upload during flight.
-            // LGT-08: two per chunk, voxel data and light share the pool (same interval format).
-            _chunkStoreSize = 2 * (_settings.Chunk.LoadDistance + 2).SquareSize();
-            _freeChunkBuffers.Capacity = _chunkStoreSize;
-            for (int i = 0; i < _chunkStoreSize; i++)
-                _freeChunkBuffers.Add(new GraphicsBuffer(Target.Structured, DefaultChunkBufferLength, Marshal.SizeOf<uint2>()));
+            RendererSettings rSettings = _settings.Renderer;
+
+            // §20.1 / PERF-04: one interval store sized for the chunks the manager's store can hold (same formula as
+            // ChunkManager), two lists per chunk (voxel data and light, LGT-08), created now instead of a managed
+            // GraphicsBuffer object per chunk upload during flight.
+            int chunkStoreSize = (_settings.Chunk.LoadDistance + 2).SquareSize();
+            int listCount = 2 * chunkStoreSize;
+            _intervalStore = new ChunkIntervalStore(listCount * InitialPagesPerList, listCount, rSettings.pointBuilder);
+            _voxelLists.EnsureCapacity(chunkStoreSize);
+            _lightLists.EnsureCapacity(chunkStoreSize);
 
             _inFlightBuilds = new InFlightBuild[_maxInFlight];
             _buildRequests = new PartitionBuildRequest[_maxInFlight];
             for (int i = 0; i < _maxInFlight; i++) _buildRequests[i] = new PartitionBuildRequest(default);
-
-            RendererSettings rSettings = _settings.Renderer;
 
             _solidBufferManager = new RenderBufferManager(rSettings.solidMaterial);
             _transparentBufferManager = new RenderBufferManager(rSettings.transparentMaterial);
@@ -236,16 +230,13 @@ namespace Engine.Scripts.Render{
             SafeDispose(_transparentBufferManager);
             SafeDispose(_foliageBufferManager);
 
-            foreach (GraphicsBuffer buffer in _voxelDataBuffers.Values) SafeDispose(buffer);
-            foreach (GraphicsBuffer buffer in _lightDataBuffers.Values) SafeDispose(buffer);
-            foreach (GraphicsBuffer buffer in _freeChunkBuffers) SafeDispose(buffer);
-            _freeChunkBuffers.Clear();
+            SafeDispose(_intervalStore);
 
             _pendingBuilds.Clear();
             _requestedPartitions.Clear();
 
-            _voxelDataBuffers.Clear();
-            _lightDataBuffers.Clear();
+            _voxelLists.Clear();
+            _lightLists.Clear();
         }
 
         private static void SafeDispose(IDisposable resource){
@@ -453,7 +444,7 @@ namespace Engine.Scripts.Render{
 
                 PartitionBuildRequest request = _buildRequests[i];
                 request.Reset(partition);
-                request.CollectBuffers(_voxelDataBuffers, _lightDataBuffers);
+                request.CollectLists(_voxelLists, _lightLists);
 
                 if (!request.IsValid){
                     VoxelEngineLogger.Error<VoxelWorldRenderer>(
@@ -464,7 +455,7 @@ namespace Engine.Scripts.Render{
                 PointBuilderHandler handler = _pointBuilderHandlers[i];
                 try{
                     // PERF-04: a plain dispatch plus a polled read-back; the async version boxed a state machine per build
-                    handler.BuildPoints(request);
+                    handler.BuildPoints(request, _intervalStore);
                 }
                 catch (Exception e){
                     VoxelEngineLogger.Error<VoxelWorldRenderer>($"Error updating partition {partition}: {e}");
@@ -518,86 +509,47 @@ namespace Engine.Scripts.Render{
 
 
         /// <summary>
-        ///     Adds or updates a chunk's voxel data in the GPU buffer.
+        ///     Adds or updates a chunk's voxel data in the interval store.
         /// </summary>
         /// <param name="chunk">The chunk position.</param>
         /// <param name="voxelData">The voxel data to store.</param>
         private void AddOrUpdateChunk(int2 chunk, UnsafeIntervalList<ushort> voxelData){
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.GpuUploadChunk.Auto(); // PERF-01
-            // F-18: validate before the old buffer is released, otherwise a rejected update leaves a disposed
-            // buffer in the map that the next partition build binds.
+            // F-18: validate before the old list is touched, otherwise a rejected update leaves a broken list in
+            // the map that the next partition build reads.
             if (voxelData.Length != VoxelsPerChunk) throw new Exception("Voxel data length mismatch!");
-            UploadIntervals(_voxelDataBuffers, chunk, voxelData);
+            UploadIntervals(_voxelLists, chunk, voxelData);
         }
 
         /// <summary>
-        ///     LGT-08: adds or updates a chunk's light in the GPU buffer (same interval format as the voxel data).
+        ///     LGT-08: adds or updates a chunk's light in the interval store (same format as the voxel data).
         /// </summary>
         /// <param name="chunk">The chunk position.</param>
         /// <param name="lightData">The light data to store.</param>
         private void AddOrUpdateLight(int2 chunk, UnsafeIntervalList<ushort> lightData){
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.GpuUploadChunk.Auto(); // PERF-01
             if (lightData.Length != VoxelsPerChunk) throw new Exception("Light data length mismatch!");
-            UploadIntervals(_lightDataBuffers, chunk, lightData);
+            UploadIntervals(_lightLists, chunk, lightData);
         }
 
         /// <summary>
-        ///     Writes an interval list to the chunk's buffer in <paramref name="buffers" />. Element 0 holds
-        ///     (interval count, last end index), followed by (value, exclusive end) per interval.
+        ///     §20.1: writes an interval list to the chunk's list in <paramref name="lists" />, keeping its pages in
+        ///     the interval store where they still fit.
         /// </summary>
-        private void UploadIntervals(Dictionary<int2, GraphicsBuffer> buffers, int2 chunk, UnsafeIntervalList<ushort> data){
-            int compLength = data.CompressedLength;
-            int uploadLength = compLength + 1;
-
-            // PERF-04: keep the chunk's buffer when it is large enough, otherwise release it for reuse
-            GraphicsBuffer dataBuffer = null;
-            if (buffers.TryGetValue(chunk, out GraphicsBuffer existingBuffer)){
-                if (existingBuffer.count >= uploadLength) dataBuffer = existingBuffer;
-                else ReleaseChunkBuffer(existingBuffer);
-            }
-            dataBuffer ??= RentChunkBuffer(uploadLength);
-            // PERF-04: staging array is kept and grown, not allocated per upload
-            if (_intervalUpload.Length < uploadLength) _intervalUpload = new uint2[math.max(uploadLength, _intervalUpload.Length * 2)];
-            uint2[] intervalData = _intervalUpload;
-            int i = 1;
-            foreach (UnsafeIntervalList<ushort>.Node n in data.Internal)
-                intervalData[i++] = new uint2(n.Value, (uint)n.Count);
-
-            intervalData[0] = new uint2((uint)compLength, intervalData[compLength].y);
-
-            dataBuffer.SetData(intervalData, 0, 0, uploadLength);
-            buffers[chunk] = dataBuffer;
-        }
-
-        /// <summary>PERF-04: first free buffer that holds <paramref name="uploadLength" /> elements, or a new one.</summary>
-        private GraphicsBuffer RentChunkBuffer(int uploadLength){
-            for (int i = 0; i < _freeChunkBuffers.Count; i++){
-                GraphicsBuffer free = _freeChunkBuffers[i];
-                if (free.count < uploadLength) continue;
-                _freeChunkBuffers.RemoveAt(i);
-                return free;
-            }
-
-            int length = (uploadLength + ChunkBufferGranularity - 1) / ChunkBufferGranularity * ChunkBufferGranularity;
-            return new GraphicsBuffer(Target.Structured, length, Marshal.SizeOf<uint2>());
-        }
-
-        private void ReleaseChunkBuffer(GraphicsBuffer buffer){
-            if (_isDestroyed || _freeChunkBuffers.Count >= _chunkStoreSize){
-                buffer.Dispose();
-                return;
-            }
-
-            _freeChunkBuffers.Add(buffer);
+        private void UploadIntervals(Dictionary<int2, IntervalRange> lists, int2 chunk, UnsafeIntervalList<ushort> data){
+            if (_isDestroyed) return;
+            lists.TryGetValue(chunk, out IntervalRange range);
+            _intervalStore.Upload(ref range, data);
+            lists[chunk] = range;
         }
 
         /// <summary>
-        ///     Removes a chunk's voxel data and light (LGT-08) from the GPU buffers when evicted.
+        ///     Removes a chunk's voxel data and light (LGT-08) from the interval store when evicted.
         /// </summary>
         /// <param name="chunk">The chunk position.</param>
         private void RemoveChunkData(int2 chunk){
-            if (_voxelDataBuffers.Remove(chunk, out GraphicsBuffer voxelBuffer)) ReleaseChunkBuffer(voxelBuffer); // PERF-04
-            if (_lightDataBuffers.Remove(chunk, out GraphicsBuffer lightBuffer)) ReleaseChunkBuffer(lightBuffer); // LGT-08
+            if (_voxelLists.Remove(chunk, out IntervalRange voxelList)) _intervalStore.Release(ref voxelList); // §20.1
+            if (_lightLists.Remove(chunk, out IntervalRange lightList)) _intervalStore.Release(ref lightList); // LGT-08
         }
 
         /// <summary>

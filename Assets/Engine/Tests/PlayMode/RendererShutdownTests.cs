@@ -1,7 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using Engine.Scripts.Utils.Collections;
 using Engine.Scripts.Render;
 using Engine.Scripts.VoxelConfig;
@@ -18,7 +17,7 @@ namespace Engine.Tests.PlayMode{
     /// <summary>
     ///     TST-E20 additions for the renderer: a point builder may be disposed while its GPU read-back is still
     ///     pending, e.g. when the renderer is destroyed mid-build (F-17), and a rejected chunk upload must keep the
-    ///     chunk's existing buffer (F-18). Needs PlayMode for the compute dispatch and the live renderer.
+    ///     chunk's existing interval list (F-18). Needs PlayMode for the compute dispatch and the live renderer.
     /// </summary>
     public class RendererShutdownTests{
         [UnitySetUp]
@@ -26,12 +25,14 @@ namespace Engine.Tests.PlayMode{
             yield return PlayModeFixtures.LoadGameScene();
         }
 
-        /// <summary>Chunk voxel buffer in the renderer's interval format: [count, lastEnd] then (value, end) nodes.</summary>
-        private static GraphicsBuffer CreateUniformChunkBuffer(ushort voxelId){
-            uint2[] intervals = { new(1u, (uint)VoxelsPerChunk), new(voxelId, (uint)VoxelsPerChunk) };
-            GraphicsBuffer buffer = new(GraphicsBuffer.Target.Structured, intervals.Length, Marshal.SizeOf<uint2>());
-            buffer.SetData(intervals);
-            return buffer;
+        /// <summary>§20.1: a chunk-wide list of <paramref name="value" /> in <paramref name="store" />.</summary>
+        private static IntervalRange UploadUniformList(ChunkIntervalStore store, ushort value){
+            UnsafeIntervalList<ushort> list = new(1, Allocator.Temp);
+            list.AddInterval(value, VoxelsPerChunk);
+            IntervalRange range = default;
+            store.Upload(ref range, list);
+            list.Dispose();
+            return range;
         }
 
         [UnityTest]
@@ -41,13 +42,14 @@ namespace Engine.Tests.PlayMode{
             // which throws from Dispose and leaks every resource released after it.
             VoxelRegistry registry = DataImporter.Instance.VoxelRegistry;
             ComputeShader pointBuilder = VoxelWorld.Instance.Settings.Renderer.pointBuilder;
-            Dictionary<int2, GraphicsBuffer> chunkBuffers = new();
-            Dictionary<int2, GraphicsBuffer> lightBuffers = new(); // LGT-08: same interval format, all dark
+            ChunkIntervalStore store = new(18, 18, pointBuilder);
+            Dictionary<int2, IntervalRange> voxelLists = new();
+            Dictionary<int2, IntervalRange> lightLists = new(); // LGT-08: same interval format, all dark
             for (int x = -1; x <= 1; x++)
             for (int z = -1; z <= 1; z++){
-                chunkBuffers[new int2(x, z)] =
-                    CreateUniformChunkBuffer(x == 0 && z == 0 ? PlayModeFixtures.Grass : PlayModeFixtures.Air);
-                lightBuffers[new int2(x, z)] = CreateUniformChunkBuffer(0);
+                voxelLists[new int2(x, z)] =
+                    UploadUniformList(store, x == 0 && z == 0 ? PlayModeFixtures.Grass : PlayModeFixtures.Air);
+                lightLists[new int2(x, z)] = UploadUniformList(store, 0);
             }
 
             // Only errors matter here; the first compute dispatch of a session may log a shader compile warning.
@@ -60,10 +62,10 @@ namespace Engine.Tests.PlayMode{
             PointBuilderHandler handler = new(pointBuilder, registry.VoxelRenderDefBuffer, registry.QuadTexPairBuffer);
             try{
                 PartitionBuildRequest request = new(new int3(0, 0, 0));
-                request.CollectBuffers(chunkBuffers, lightBuffers);
+                request.CollectLists(voxelLists, lightLists);
                 Assert.IsTrue(request.IsValid);
 
-                handler.BuildPoints(request);
+                handler.BuildPoints(request, store);
                 Assert.IsFalse(handler.IsReadBackDone, "the read-back should still be pending right after the dispatch");
 
                 PointBuilderHandler disposing = handler;
@@ -82,20 +84,19 @@ namespace Engine.Tests.PlayMode{
             finally{
                 Application.logMessageReceived -= onLog;
                 handler?.Dispose();
-                foreach (GraphicsBuffer buffer in chunkBuffers.Values) buffer.Dispose();
-                foreach (GraphicsBuffer buffer in lightBuffers.Values) buffer.Dispose();
+                store.Dispose();
             }
         }
 
         [UnityTest]
         [Timeout(60000)]
-        public IEnumerator AddOrUpdateChunk_RejectedLength_KeepsTheExistingBuffer(){
+        public IEnumerator AddOrUpdateChunk_RejectedLength_KeepsTheExistingList(){
             // F-18: the old buffer was disposed before the length check, so a rejected update left a disposed
-            // buffer in the map that the next partition build bound.
+            // buffer in the map that the next partition build bound. §20.1: the chunk's list must stay unchanged.
             VoxelWorldRenderer renderer = VoxelWorldRenderer.Instance;
             Assert.IsNotNull(renderer, "VoxelWorldRenderer missing in scene");
-            Dictionary<int2, GraphicsBuffer> buffers =
-                PlayModeFixtures.GetPrivateField<Dictionary<int2, GraphicsBuffer>>(renderer, "_voxelDataBuffers");
+            Dictionary<int2, IntervalRange> buffers =
+                PlayModeFixtures.GetPrivateField<Dictionary<int2, IntervalRange>>(renderer, "_voxelLists");
             float deadline = Time.realtimeSinceStartup + 30f;
             while (buffers.Count == 0){
                 if (Time.realtimeSinceStartup > deadline) Assert.Fail("no chunk was uploaded to the renderer");
@@ -103,8 +104,8 @@ namespace Engine.Tests.PlayMode{
             }
 
             int2 chunk = default;
-            GraphicsBuffer before = null;
-            foreach (KeyValuePair<int2, GraphicsBuffer> pair in buffers){
+            IntervalRange before = default;
+            foreach (KeyValuePair<int2, IntervalRange> pair in buffers){
                 chunk = pair.Key;
                 before = pair.Value;
                 break;
@@ -122,9 +123,9 @@ namespace Engine.Tests.PlayMode{
                 tooShort.Dispose();
             }
 
-            Assert.IsTrue(buffers.TryGetValue(chunk, out GraphicsBuffer after), "the chunk must keep a buffer");
-            Assert.AreSame(before, after, "the existing buffer must be kept");
-            Assert.IsTrue(after.IsValid(), "the kept buffer must not be disposed");
+            Assert.IsTrue(buffers.TryGetValue(chunk, out IntervalRange after), "the chunk must keep a list");
+            Assert.IsTrue(after.IsCreated, "the kept list must not be released");
+            Assert.AreEqual(before, after, "the existing list must be kept unchanged");
         }
     }
 }

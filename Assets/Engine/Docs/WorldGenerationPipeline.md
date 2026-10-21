@@ -216,6 +216,8 @@ in-chunk voxels only]
   `VoxelWorldRenderer` therefore hold eight intervals per column instead of four. Without the change, chunks met
   during flight did not fit any free buffer, and a new `GraphicsBuffer` was created mid-flight. Measured during the
   flight: median 4.6 and maximum 6 intervals per column; already 40 % of the chunks without flora needed more than 4.
+  Since spec §20.1 all chunk lists share one paged interval store, so a longer list just takes more pages
+  (`MeshAndRenderPipeline.md`, Version 1.5).
 - **Burst**: `WorldSampler.SampleCore` is a Burst direct-call entry like `SampleColumn`. Without it, the managed
   flora path ran the core in Mono, and Terrain-first heights differed from the jobs by 1 ulp.
 - **Tests**:

@@ -332,6 +332,38 @@ PERF-03, existing rows vs Phase 5 (median / min):
   - `PageAllocator` is unchanged on this branch.
   - 0.46–0.47 ms is the 2026-10-17 value (0.47 ms); the Phase 5 run (0.42 ms) was the low outlier.
 
+## 2026-10-21 §20.2 baseline (`2026-10-21-s20.2-editmode-baseline.json`)
+
+Same machine and settings as above. Spec §20.2 (faster light BFS): `LightRegion.Propagate` combines the four
+channels of a BFS step at once. The 16-bit light value is spread to one channel per byte lane; a saturating
+subtract and a lane-wise max replace the loop over channels in `Combine`, which stays as the scalar reference
+(`LightPropagationTests.Lanes`). The candidate for a clear neighbour is computed once per dequeued voxel.
+
+| Sample group | Median | Min | Max | Phase L median / min | Change (median / min) |
+|---|---|---|---|---|---|
+| LightJob.Run natural terrain ms/chunk | 0.73 ms | 0.68 ms | 0.98 ms | 0.82 / 0.78 ms | −11 % / −13 % |
+| LightJob.Run worst case ms/chunk | 9.02 ms | 8.71 ms | 11.87 ms | 15.27 / 14.94 ms | −41 % / −42 % |
+
+The §20.2 target (worst case ≤ 10 ms/chunk) is met.
+
+Tried and not kept:
+- **Queued bit** (spec §20.2, optional): a spare attenuation bit marks queued voxels, so a voxel is not queued
+  again before it is processed. Both rows measured the same with and without it (natural 0.76 / 0.75 ms,
+  worst 8.9 / 9.0 ms). In the worst case every emitter has the same light and the FIFO visits voxels in distance
+  order, so a voxel is raised only once anyway. Without a measurable gain it was not worth the extra state in `Att`
+  (which `LightEditJob` reads).
+- **Branch-free relax** (always store, always write the queue slot, advance the count only on a change):
+  worst case 17.3 ms, much slower than the branch it replaces.
+
+PERF-03, existing rows vs Phase L (median / min). No code they run was changed; three full runs:
+- Recorded run: every row between −3 % and +5 % (median) and −4 % and +3 % (min); the highest is
+  `PageAllocator fill+release` (+5 % / +3 %).
+- The other two runs: between −3 % and +8 % (median) and −2 % and +3 % (min); the +8 % is
+  `BiomeFirst DistortedBoundary` (min +2 %), +1 % in the recorded run.
+- Each run had one `ChunkJob` row with a median spike and an almost flat min (+43 % / +5 %, +22 % / −1 %,
+  +48 % / +1 %), each time a different row: a background hiccup during that row, not counted above. The JSON is
+  the run with the smallest spike (`TerrainFirst None flora`, 2.71 / 2.16 ms vs 2.23 / 2.19 ms).
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the

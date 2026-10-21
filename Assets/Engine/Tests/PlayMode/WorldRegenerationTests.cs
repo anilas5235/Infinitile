@@ -33,8 +33,8 @@ namespace Engine.Tests.PlayMode{
             VoxelWorld world = VoxelWorld.Instance;
             VoxelWorldRenderer renderer = VoxelWorldRenderer.Instance;
             Assert.IsNotNull(renderer, "VoxelWorldRenderer missing in scene");
-            Dictionary<int2, GraphicsBuffer> buffers =
-                PlayModeFixtures.GetPrivateField<Dictionary<int2, GraphicsBuffer>>(renderer, "_voxelDataBuffers");
+            Dictionary<int2, IntervalRange> buffers =
+                PlayModeFixtures.GetPrivateField<Dictionary<int2, IntervalRange>>(renderer, "_voxelLists");
             ChunkPool pool = PlayModeFixtures.GetPrivateField<ChunkPool>(world, "_chunkPool");
 
             // The player must not fall while the colliders under it are gone; its controllers stay off until the
@@ -99,7 +99,7 @@ namespace Engine.Tests.PlayMode{
             }
         }
 
-        private static IEnumerator WaitForChunk(VoxelWorld world, Dictionary<int2, GraphicsBuffer> buffers, int2 chunk){
+        private static IEnumerator WaitForChunk(VoxelWorld world, Dictionary<int2, IntervalRange> buffers, int2 chunk){
             float deadline = Time.realtimeSinceStartup + LoadTimeout;
             while (!world.ChunkManager.IsChunkLoaded(chunk) || !buffers.ContainsKey(chunk)){
                 if (Time.realtimeSinceStartup > deadline) Assert.Fail($"chunk {chunk} was not regenerated in time");
