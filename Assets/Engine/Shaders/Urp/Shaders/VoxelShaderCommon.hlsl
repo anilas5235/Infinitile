@@ -151,15 +151,15 @@ float interpolate_corners(const uint4 corners, float2 uv)
     return lerp(lerp(c.w, c.z, uv.x), lerp(c.x, c.y, uv.x), uv.y);
 }
 
-// Brightness of a light level 0-15: each level below 15 loses 20 %.
+// Brightness of a light level 0-15: each level below 15 loses 15 % (LGT-10, chosen by the user 2026-10-21).
 float light_curve(float level)
 {
-    return pow(0.8f, 15.0f - level);
+    return pow(0.85f, 15.0f - level);
 }
 
 float3 light_curve(float3 level)
 {
-    return pow(0.8f, 15.0f - level);
+    return pow(0.85f, 15.0f - level);
 }
 
 // LGT-10: light = max(skyCurve(sky) * brightness * tint, blockCurve(RGB)), never below the ambient.

@@ -454,7 +454,7 @@ re-propagate anything.
     four corners up-left, up-right, down-right, down-left (UV space, like AO). The point size is unchanged.
   - `PointLightPacking` is the C# port of the accessors and the corner average, used by the round-trip tests.
 - **Shading (LGT-10).** The solid and transparent shaders (foliage uses the transparent one) compute the light per
-  fragment. They interpolate each channel's corner levels bilinearly and apply the curve 0.8^(15 − level).
+  fragment. They interpolate each channel's corner levels bilinearly and apply the curve 0.85^(15 − level).
 
   ```
   light = max(curve(sky) × _VoxelSkyBrightness × _VoxelSkyTint, curve(RGB))
