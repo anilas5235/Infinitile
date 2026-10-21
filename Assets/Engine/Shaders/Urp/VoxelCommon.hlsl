@@ -1,6 +1,8 @@
 ﻿#ifndef VOXEL_COMMON_INCLUDED
 #define VOXEL_COMMON_INCLUDED
 
+#include "VoxelGpuConstants.hlsl"
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Structs
 // ─────────────────────────────────────────────────────────────────────────────

@@ -57,9 +57,6 @@ StructuredBuffer<uint> _CompPages;
 uint _CompPagesOffset;
 RWStructuredBuffer<uint> _UnCompChunk;
 
-#define COMP_PAGE_SHIFT 9 // IntervalPages.PageSize = 512
-#define COMP_PAGE_MASK 511
-
 uint2 CompInterval(uint k)
 {
     uint page = _CompPages[_CompPagesOffset + (k >> COMP_PAGE_SHIFT)];
@@ -68,18 +65,15 @@ uint2 CompInterval(uint k)
 
 uint _VoxelsPerChunk;
 
-#define INTERVALS_PER_THREAD 8
-
-[numthreads(64, 1, 1)]
-
+[numthreads(PREP_THREADS, 1, 1)]
 void BuildPrep(uint3 id : SV_DispatchThreadID)
 {
-    uint start_interval = 1 + id.x * INTERVALS_PER_THREAD; //+1 because interval 0 is metadata   
+    uint start_interval = 1 + id.x * PREP_INTERVALS_PER_THREAD; //+1 because interval 0 is metadata
 
     uint total_intervals = CompInterval(0).x;
     if (start_interval > total_intervals) return;
 
-    for (int i = 0; i < INTERVALS_PER_THREAD; ++i)
+    for (int i = 0; i < PREP_INTERVALS_PER_THREAD; ++i)
     {
         uint target_interval = start_interval + i;
         if (target_interval > total_intervals) break;
@@ -97,15 +91,15 @@ void BuildPrep(uint3 id : SV_DispatchThreadID)
 }
 
 // Same interval walk as BuildPrep over the chunk's light list; the ids are already in place.
-[numthreads(64, 1, 1)]
+[numthreads(PREP_THREADS, 1, 1)]
 void BuildPrepLight(uint3 id : SV_DispatchThreadID)
 {
-    uint start_interval = 1 + id.x * INTERVALS_PER_THREAD;
+    uint start_interval = 1 + id.x * PREP_INTERVALS_PER_THREAD;
 
     uint total_intervals = CompInterval(0).x;
     if (start_interval > total_intervals) return;
 
-    for (int i = 0; i < INTERVALS_PER_THREAD; ++i)
+    for (int i = 0; i < PREP_INTERVALS_PER_THREAD; ++i)
     {
         uint target_interval = start_interval + i;
         if (target_interval > total_intervals) break;
@@ -180,7 +174,7 @@ VoxelDef get_voxel_def(uint voxelId)
 
 uint get_voxel_array_index(in int3 pos)
 {
-    return ((uint)pos.x << 13) + ((uint)pos.z << 8) + (uint)pos.y; //x*32u*256u, z*256u
+    return ((uint)pos.x << CHUNK_INDEX_SHIFT_X) + ((uint)pos.z << CHUNK_INDEX_SHIFT_Z) + (uint)pos.y;
 }
 
 uint get_voxel(StructuredBuffer<uint> target, in int3 in_chunk_pos)
@@ -416,7 +410,7 @@ void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uin
     }
 }
 
-[numthreads(4, 4, 4)]
+[numthreads(BUILD_POINTS_THREADS, BUILD_POINTS_THREADS, BUILD_POINTS_THREADS)]
 void BuildPoints(uint3 id : SV_DispatchThreadID)
 {
     if (any(id >= uint3(_PartitionSize))) return;
@@ -458,7 +452,7 @@ RWStructuredBuffer<uint2> _CopyTarget;
 uint _CopyCount;
 uint _CopyStride; // threads in the dispatch; each thread copies every _CopyStride-th element
 
-[numthreads(64, 1, 1)]
+[numthreads(COPY_INTERVALS_THREADS, 1, 1)]
 void CopyIntervals(uint3 id : SV_DispatchThreadID)
 {
     for (uint i = id.x; i < _CopyCount; i += _CopyStride)

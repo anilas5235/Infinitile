@@ -15,7 +15,6 @@ namespace Engine.Scripts.Render{
     ///     memory follows the actual list lengths instead of a fixed length per chunk.
     /// </summary>
     internal sealed class ChunkIntervalStore : IDisposable{
-        private const int CopyThreads = 64;
         private const int MaxCopyGroups = 65535;
 
         private readonly ComputeShader _copyShader;
@@ -103,11 +102,11 @@ namespace Engine.Scripts.Render{
             GraphicsBuffer grown = CreateBuffer(_pages.PageCount + added);
 
             int count = _pages.PageCount * IntervalPages.PageSize;
-            int groups = math.min((count + CopyThreads - 1) / CopyThreads, MaxCopyGroups);
+            int groups = math.min((count + CopyIntervalsThreads - 1) / CopyIntervalsThreads, MaxCopyGroups);
             _copyShader.SetBuffer(_copyKernel, CopySourceNameID, Buffer);
             _copyShader.SetBuffer(_copyKernel, CopyTargetNameID, grown);
             _copyShader.SetInt(CopyCountNameID, count);
-            _copyShader.SetInt(CopyStrideNameID, groups * CopyThreads);
+            _copyShader.SetInt(CopyStrideNameID, groups * CopyIntervalsThreads);
             _copyShader.Dispatch(_copyKernel, groups, 1, 1);
 
             Buffer.Dispose();

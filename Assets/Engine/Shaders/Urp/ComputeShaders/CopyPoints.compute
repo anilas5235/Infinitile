@@ -22,7 +22,7 @@ StructuredBuffer<uint> _PageCounts;
 
 uint _PointsPerPage;
 
-[numthreads(8, 3, 1)]
+[numthreads(COPY_POINTS_THREADS, 3, 1)] // y: one row per mesh layer
 void CopyPoints(uint3 id : SV_DispatchThreadID)
 {
     uint layer = id.y % 3u;

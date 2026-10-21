@@ -1,5 +1,6 @@
 using System;
 using static Engine.Scripts.Utils.VoxelConstants;
+using static Engine.Scripts.Utils.VoxelRenderConstants;
 
 namespace Engine.Scripts.Render{
     /// <summary>
@@ -44,8 +45,8 @@ namespace Engine.Scripts.Render{
     ///     GPU resources, so it can be unit-tested without a graphics device.
     /// </summary>
     internal sealed class IntervalPages{
-        /// <summary>Elements (uint2) per page; the kernels' COMP_PAGE_SHIFT must match.</summary>
-        internal const int PageSize = 512;
+        /// <summary>Elements (uint2) per page, 512; the kernels address pages with COMP_PAGE_SHIFT.</summary>
+        internal const int PageSize = 1 << CompPageShift;
 
         /// <summary>Pages of the longest possible list: one interval per voxel plus the header.</summary>
         internal const int MaxPagesPerList = (VoxelsPerChunk + 1 + PageSize - 1) / PageSize;

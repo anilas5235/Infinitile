@@ -87,7 +87,7 @@ namespace Engine.Scripts.Render{
             int maxPageCount = math.max(solidPagesCount, math.max(transparentPagesCount, foliagePagesCount));
             if (maxPageCount <= 0) return;
 
-            _copyPoints.Dispatch(_copyKernelID, Mathf.CeilToInt(maxPageCount / 8f), 1, 1);
+            _copyPoints.Dispatch(_copyKernelID, (maxPageCount + CopyPointsThreads - 1) / CopyPointsThreads, 1, 1);
         }
 
         private void SetSolidBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo solidAlloc){

@@ -24,9 +24,6 @@ StructuredBuffer<PointData> _PointData;
 StructuredBuffer<uint> _VisiblePages;
 StructuredBuffer<uint> _CountsPerPage;
 
-// Must match Engine.Scripts.Utils.VoxelRenderConstants.PointsPerPage
-#define POINTS_PER_PAGE 256u
-
 VoxelVertexData fetch_vertex_data(uint vertexID)
 {
     // Slot = one point of one visible page; the indirect vertex count is visiblePages * POINTS_PER_PAGE * 6

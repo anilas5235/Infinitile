@@ -1,6 +1,8 @@
 #pragma kernel CullPages
 #pragma kernel WriteArgs
 
+#include "../VoxelGpuConstants.hlsl"
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Per camera and RenderBuffer, one thread per page. A page is appended to _VisiblePages when it holds points and
 // its AABB (optionally extruded along the light for the shadow list) touches the camera frustum. WriteArgs then
@@ -42,7 +44,7 @@ bool intersects_frustum(float3 boundsMin, float3 boundsMax)
     return true;
 }
 
-[numthreads(128, 1, 1)]
+[numthreads(CULL_THREADS, 1, 1)]
 void CullPages(uint3 id : SV_DispatchThreadID)
 {
     uint page = id.x;

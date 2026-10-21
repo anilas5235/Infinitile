@@ -20,7 +20,6 @@ namespace Engine.Scripts.Render{
         /// <summary>Frames a camera may stay unseen before its buffers are released (about 5 s at 60 Hz).</summary>
         internal const int MaxIdleFrames = 300;
 
-        private const int CullThreads = 128;
         private static readonly int CullGroups = (PagesPerBuffer + CullThreads - 1) / CullThreads;
 
         private readonly ComputeShader _shader;

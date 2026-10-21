@@ -17,8 +17,6 @@ namespace Engine.Scripts.Render{
     /// </summary>
     public class PointBuilderHandler : IDisposable{
         private const int PrepChunkCount = 9;
-        private const int PrepIntervalsPerThread = 8;
-        private const int PrepThreadsX = 64;
         private readonly int _buildPrepKernelID;
         private readonly int _buildPrepLightKernelID;
 
@@ -177,7 +175,8 @@ namespace Engine.Scripts.Render{
             _pointBuilder.SetInt(PartitionIndexNameID, 0);
             _pointBuilder.SetInt(PointCapacityNameID, MaxPointsPerPartition);
 
-            _pointBuilder.Dispatch(_pointBuilderKernelID, 8, 8, 8);
+            _pointBuilder.Dispatch(_pointBuilderKernelID, PartitionWidth / BuildPointsThreads,
+                PartitionHeight / BuildPointsThreads, PartitionDepth / BuildPointsThreads);
 
             CopyCount(SolidPointsOut, _readBackCountBuffer, sizeof(uint) * 0);
             CopyCount(TransparentPointsOut, _readBackCountBuffer, sizeof(uint) * 1);
@@ -297,7 +296,7 @@ namespace Engine.Scripts.Render{
             _pointBuilder.SetBuffer(kernel, UnCompChunkNameID, _preparedChunks[chunkIndex]);
 
             int intervalCount = list.IntervalCount;
-            int intervalsPerGroup = PrepThreadsX * PrepIntervalsPerThread;
+            int intervalsPerGroup = PrepThreads * PrepIntervalsPerThread;
             int groupsX = math.max(1, (intervalCount + intervalsPerGroup - 1) / intervalsPerGroup);
             _pointBuilder.Dispatch(kernel, groupsX, 1, 1);
         }
