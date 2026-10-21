@@ -77,6 +77,13 @@ namespace Engine.Tests.Performance{
             MeasurePartition(new int3(ChunkPos.x, 1, ChunkPos.y), "CMeshBuildJob.Run solid ms/partition");
         }
 
+        [Test]
+        [Performance]
+        public void CMeshBuildJob_Run_AirPartition_MsPerPartition(){
+            // World y 224..255 is above every surface: no collision voxels, no quads.
+            MeasurePartition(new int3(ChunkPos.x, 7, ChunkPos.y), "CMeshBuildJob.Run air ms/partition");
+        }
+
         private void MeasurePartition(int3 partition, string sampleGroup){
             _jobs.Clear();
             _jobs.Add(partition);
