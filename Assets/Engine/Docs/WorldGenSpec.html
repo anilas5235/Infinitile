@@ -1019,6 +1019,41 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
   <li>The queued bit was tried and dropped: both rows measured the same with it, because the FIFO already raises each voxel about once.</li>
   </ul></li>
 </ul>
+<h3>20.3 Collider meshing from a flat collision mask</h3>
+<p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Not measured yet.</p>
+<ul class="tight">
+<li><b>Today:</b> <code>CMeshBuildJob</code> reads every voxel and every face neighbour through <code>ChunkAccessor.GetVoxelInPartition</code>, which is a binary search in the chunk's interval list each time. Each partition allocates about 4 MiB of Temp memory up front: a vertex list of 4 × 32³ <code>CVertex</code> (16 B each), an index list of 6 × 32³ ints and a <code>NativeHashSet&lt;int3&gt;</code> of 32³, even for a partition that is all air.</li>
+<li><b>Idea:</b>
+  <ul class="tight">
+  <li>Decompress the partition plus a 1-voxel border once into a flat 34³ byte array of collision flags, walking the intervals in order instead of searching per voxel. Then build the face masks and the greedy quads from that array.</li>
+  <li>Return early when the partition and its border have no collision voxels; the intervals show this without decompressing.</li>
+  <li>Start the vertex and index lists small and let them grow.</li>
+  <li>Drop <code>CVertex.Normal</code>: PhysX ignores it, it doubles the vertex size, and it is wrong for negative faces (<code>-d</code> times a <code>-1</code> mask gives <code>+d</code>).</li>
+  </ul></li>
+<li><b>Costs and risks:</b> a rewrite of the mask stage of the mesher; the collider meshes must stay identical (same quads, same welding), otherwise the baked colliders change.</li>
+<li><b>Acceptance if scheduled:</b> <code>ColliderMeshBenchmark</code> clearly faster, with the all-air case close to free; <code>ColliderMesherTests</code> pass unchanged; no new allocations in flight (PERF-04).</li>
+</ul>
+<h3>20.4 Decompress only the partition's neighbourhood in the partition build</h3>
+<p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Not measured yet.</p>
+<ul class="tight">
+<li><b>Today:</b> <code>PointBuilderHandler.PrepareChunks</code> runs <code>BuildPrep</code> and then <code>BuildPrepLight</code> for all 9 chunks of the 3 × 3 neighbourhood. Each pass writes the whole 32 × 256 × 32 chunk, and the light pass is a read-modify-write of the same 1 MiB buffer. That is roughly 27 MB of GPU traffic per partition build, and the 8 partitions of a column repeat it for the same chunks. <code>BuildPoints</code> reads only the partition plus a 1-voxel border.</li>
+<li><b>Idea:</b>
+  <ul class="tight">
+  <li>Decompress only the 34 × 34 × 34 box the build reads (partition plus border) into one buffer, skipping intervals outside the box's y range and clipping the rest.</li>
+  <li>Write the id and the light in one pass, so the light step is no longer a second read-modify-write.</li>
+  <li>Or: when several partitions of a column are built in one frame, decompress the 3 × 3 chunks once and run <code>BuildPoints</code> for each of them.</li>
+  </ul></li>
+<li><b>Costs and risks:</b> changes the prep kernels and the addressing in <code>BuildPoints</code> (<code>get_voxel_safe</code> relies on the partition width equalling the chunk width today); the interval walk per y range needs the interval start of the first run in the box.</li>
+<li><b>Acceptance if scheduled:</b> identical point output (a GPU round-trip test against the current kernels); prep dispatch time per build clearly lower than today's 21.5–22.8 µs (§20.1 probe).</li>
+</ul>
+<h3>20.5 One thread per point in CopyPoints</h3>
+<p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Not measured yet.</p>
+<ul class="tight">
+<li><b>Today:</b> <code>CopyPoints.compute</code> runs one thread per page (<code>numthreads(8, 3, 1)</code>, one row per layer). Each thread copies up to 256 points in a serial loop with a <code>switch</code> on the layer inside the loop, so a build with few pages uses only a handful of GPU threads.</li>
+<li><b>Idea:</b> one thread per point, e.g. a group of 256 threads per page and layer (<code>SV_GroupID</code> = page and layer, <code>SV_GroupThreadID</code> = point in the page), with the layer chosen once per group.</li>
+<li><b>Costs and risks:</b> small kernel change; the dispatch size becomes pages × layers groups; <code>POINTS_PER_PAGE</code> is mirrored by hand between C# and HLSL, so a shared constant or a test should check it.</li>
+<li><b>Acceptance if scheduled:</b> identical render buffers (a new GPU round-trip test, as there is no CopyPoints test yet); copy dispatch time lower in a ProfilerRecorder probe.</li>
+</ul>
 </main>
 </div>
 </body>
