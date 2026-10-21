@@ -13,7 +13,7 @@ namespace Engine.Scripts.Jobs.Light{
     ///     lists. Column (x, z) of the box starts at <c>x · StrideX + z · 256</c>, y is innermost (the chunk
     ///     Flatten order), so a step in y is ±1 and a y bound check is <c>index &amp; 255</c>. The outermost ring
     ///     of columns is a sentinel with attenuation 15: the BFS never enters it and needs no x/z bound checks.
-    ///     Used by <see cref="LightJob" /> (chunk ± 15) and <see cref="LightEditJob" /> (edit ± 16).
+    ///     Used by <see cref="LightJob" /> (chunk ± 14) and <see cref="LightEditJob" /> (edit ± 16).
     /// </summary>
     internal struct LightRegion : IDisposable{
         internal const int Opaque = MaxLightLevel;

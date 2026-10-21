@@ -377,7 +377,7 @@ subgraph CPU["CPU (LightScheduler, Burst)"]
     direction LR
     A[Chunk + 8 neighbours
     have voxel data] --> B[LightJob per chunk
-    box chunk ± 15
+    box chunk ± 14
     sky scan + frontier + BFS]
     B --> C[ChunkLightData
     interval list, sky/R/G/B]
@@ -418,9 +418,9 @@ re-propagate anything.
   and `lightEmission` (RGB). `VoxelRegistry` turns them into a `VoxelLightTable` for the jobs, and the attenuation
   also goes into `GPUVoxelDef` (80 bytes).
 - **Initial light (LGT-03 to LGT-05).** `LightJob` lights one chunk from the voxel data of its 3 × 3
-  neighbourhood. It runs over a box of chunk ± 15 columns at full height (`LightRegion`), surrounded by an opaque
-  sentinel ring. Light loses at least one level per step, so the result is exact and every chunk can be lit
-  independently and in parallel.
+  neighbourhood. It runs over a box of chunk ± 14 columns at full height (`LightRegion`), surrounded by an opaque
+  sentinel ring. Light loses at least one level per step, so a source 15 columns away contributes 0: the result is
+  exact and every chunk can be lit independently and in parallel.
   - Sky without BFS: every voxel above a column's highest non-clear voxel is 15.
   - BFS seeds:
     - the first non-clear voxel under the sky part;
@@ -479,7 +479,7 @@ Advantages:
 
 Trade-offs:
 
-- Each light job processes about 3.75 times its chunk's column count (the ± 15 margin) and uses about 3 MB of
+- Each light job processes about 3.5 times its chunk's column count (the ± 14 margin) and uses about 3 MB of
   temporary memory.
 - A chunk can be meshed only after its neighbours are lit, so the load distance is three chunks beyond the draw
   distance.

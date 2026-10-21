@@ -34,7 +34,8 @@ slack the pipeline had before, so lit neighbours are usually ready by the time a
 ## Light (Phase L)
 
 - **Light job (LGT-04/05).** `LightJob` lights one chunk per index from the voxel data of its 3 x 3 neighbourhood
-  over the box chunk +-15 (full height) and writes only that chunk's light, so no job writes another chunk's light.
+  over the box chunk +-14 (full height; a source 15 columns away contributes 0) and writes only that chunk's light,
+  so no job writes another chunk's light.
   Sky columns are 15 without BFS; the BFS starts only at the frontier (under leaves and water, at overhangs and
   cliffs, at emitters). `ChunkManager.ApplyLight` sets `Chunk.LightReady`; `VoxelWorld.ChunkLightChanged` tells the
   renderer to upload the light.

@@ -8,14 +8,18 @@ using static Engine.Scripts.Utils.VoxelConstants;
 namespace Engine.Scripts.Jobs.Light{
     /// <summary>
     ///     LGT-04: initial light of chunks. Each index lights one chunk from the voxel data of its 3 × 3
-    ///     neighbourhood over the box chunk ± 15 in x and z (full height) and writes only that chunk's light.
-    ///     Light loses at least 1 per step, so nothing outside the box can reach the chunk (exact), and no job writes
-    ///     another chunk's light. Seeds: the sky column scan and the frontier (LGT-05), emitters; then a BFS.
+    ///     neighbourhood over the box chunk ± 14 in x and z (full height) and writes only that chunk's light.
+    ///     Light loses at least 1 per step, so a source 15 columns away contributes 0 and nothing outside the box
+    ///     can reach the chunk (exact), and no job writes another chunk's light. Seeds: the sky column scan and the
+    ///     frontier (LGT-05), emitters; then a BFS.
     /// </summary>
     [BurstCompile]
     internal struct LightJob : IJobParallelFor{
-        /// <summary>Box margin around the chunk: light reaches at most 14 voxels from its source.</summary>
-        internal const int Margin = MaxLightLevel;
+        /// <summary>
+        ///     Box margin around the chunk: light at horizontal distance d is at most 15 − d, so only sources within
+        ///     14 columns reach the chunk (decided 2026-10-21; was 15 with one column of slack).
+        /// </summary>
+        internal const int Margin = MaxLightLevel - 1;
 
         /// <summary>Box size per axis: chunk + 2 margins + 2 sentinel columns.</summary>
         internal const int BoxSize = ChunkWidth + 2 * Margin + 2;

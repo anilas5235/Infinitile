@@ -298,12 +298,14 @@ Neither is a simple change:
 Same machine and settings as above. Phase L (lighting) adds the light job benchmarks (LGT-11). No code that an
 existing benchmark runs was changed; the renderer changes (light buffers, `PointBuilder.compute`) are on the GPU path.
 
-New rows (`LightJobBenchmark`, `LightJob.Run` on a single worker, ms per lit chunk):
+New rows (`LightJobBenchmark`, `LightJob.Run` on a single worker, ms per lit chunk). The JSON holds the re-run
+after the Phase L review (light box chunk ± 14 instead of ± 15, see below); the first column pair is that run,
+the last the ± 15 run it replaced:
 
-| Benchmark | Sample group | Median | Min | Max |
-|---|---|---|---|---|
-| Natural terrain: Terrain-first, None + flora, 8 scattered chunks with their 3 x 3 rings | LightJob.Run natural terrain ms/chunk | 0.86 ms | 0.81 ms | 0.98 ms |
-| Worst case: air cavity y 20…235 with a Lava emitter every 8 voxels, leaf roof (box filled by BFS on all 4 channels) | LightJob.Run worst case ms/chunk | 15.73 ms | 15.57 ms | 16.49 ms |
+| Benchmark | Sample group | Median | Min | Max | ± 15 median / min |
+|---|---|---|---|---|---|
+| Natural terrain: Terrain-first, None + flora, 8 scattered chunks with their 3 x 3 rings | LightJob.Run natural terrain ms/chunk | 0.82 ms | 0.78 ms | 1.00 ms | 0.86 / 0.81 ms (−5 % / −3 %) |
+| Worst case: air cavity y 20…235 with a Lava emitter every 8 voxels, leaf roof (box filled by BFS on all 4 channels) | LightJob.Run worst case ms/chunk | 15.27 ms | 14.94 ms | 16.42 ms | 15.73 / 15.57 ms (−3 % / −4 %) |
 
 PERF-05 (light ≤ 1 ms/chunk on natural terrain) is met. The first run of the benchmark measured 3.69 ms (worst
 case 25.9 ms). A stage breakdown showed that the time went into the bulk loops, not the BFS (about 11 k dequeues
@@ -318,8 +320,11 @@ Burst keeps safety checks on in the Editor, and the checked `NativeArray` indexe
 columns instead of a binary search per column. The initial-light BFS uses a ring buffer (`LightQueue`) instead
 of `NativeQueue`.
 
-The light box is the chunk ± 15 (64 x 64 x 256 voxels), so each chunk does about 3.75 times its own column count
-of work. That is the price of lighting every chunk independently and in parallel (LGT-04).
+The light box is the chunk ± 14 (60 x 60 x 256 voxels plus the sentinel ring), so each chunk does about 3.5 times
+its own column count of work. That is the price of lighting every chunk independently and in parallel (LGT-04).
+The margin was 15 until the Phase L review (2026-10-21): light at horizontal distance d is at most 15 − d, so a
+source 15 columns away contributes 0 and the ± 14 box is exact (the 3 x 3 vs 5 x 5 border test still passes).
+The re-run with ± 14 moved every other row by −2 % … +4 % (median), within the noise of the earlier re-runs.
 
 PERF-03, existing rows vs Phase 5 (median / min):
 - Every `ChunkJob`, `CMeshBuildJob`, `FrustumCulling` and `UnsafeIntervalList` row is between −3 % and +1 %.
