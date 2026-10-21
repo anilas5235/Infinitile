@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Reflection;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
@@ -12,22 +12,19 @@ using static Engine.Scripts.Utils.VoxelConstants;
 namespace Engine.Tests.EditMode{
     /// <summary>
     ///     TST-E02: ChunkJob.WriteToChunkData packing order round-trips through ChunkVoxelData.GetVoxel.
-    ///     TST-E03: PartitionLightData / ChunkLightData round trips.
+    ///     TST-E03 / LGT-01: ChunkLightData (chunk-wide 16-bit light) round trips.
     /// </summary>
     public class ChunkDataTests{
         private bool _hasVoxelData;
         private ChunkVoxelData _voxelData;
         private bool _hasLightData;
         private ChunkLightData _lightData;
-        private bool _hasPartitionLight;
-        private PartitionLightData _partitionLight;
 
         [TearDown]
         public void TearDown(){
             if (_hasVoxelData) _voxelData.Dispose();
             if (_hasLightData) _lightData.Dispose();
-            if (_hasPartitionLight) _partitionLight.Dispose();
-            _hasVoxelData = _hasLightData = _hasPartitionLight = false;
+            _hasVoxelData = _hasLightData = false;
         }
 
         /// <summary>Runs the real (private) ChunkJob.WriteToChunkData on a voxel buffer.</summary>
@@ -126,49 +123,54 @@ namespace Engine.Tests.EditMode{
         #region TST-E03
 
         [Test]
-        public void PartitionLightData_SetLight_GetLight_RoundTrip(){
-            _partitionLight = new PartitionLightData(16);
-            _hasPartitionLight = true;
-            Assert.IsTrue(_partitionLight.IsAllZero);
-            Assert.IsFalse(_partitionLight.IsAllMax);
-            int3 pos = new(1, 2, 3);
-            Assert.AreEqual(0, _partitionLight.GetLight(pos));
-            Assert.IsTrue(_partitionLight.SetLight(pos, 9));
-            Assert.AreEqual(9, _partitionLight.GetLight(pos));
-            Assert.IsFalse(_partitionLight.SetLight(pos, 9));
-            Assert.IsFalse(_partitionLight.IsAllZero);
-            Assert.AreEqual(0, _partitionLight.GetLight(pos + new int3(1, 0, 0)));
-            Assert.AreEqual(0, _partitionLight.GetLight(pos + new int3(0, 1, 0)));
-            Assert.AreEqual(0, _partitionLight.GetLight(pos + new int3(0, 0, 1)));
-            Assert.AreEqual(0, _partitionLight.GetLight(new int3(31, 31, 31)));
-        }
-
-        [Test]
-        public void PartitionLightData_SetAllLights(){
-            _partitionLight = new PartitionLightData(16);
-            _hasPartitionLight = true;
-            _partitionLight.SetLight(new int3(4, 4, 4), 3);
-            _partitionLight.SetAllLights(MaxLightLevel);
-            Assert.IsTrue(_partitionLight.IsAllMax);
-            Assert.IsFalse(_partitionLight.IsAllZero);
-            Assert.AreEqual(MaxLightLevel, _partitionLight.GetLight(new int3(0, 0, 0)));
-            Assert.AreEqual(MaxLightLevel, _partitionLight.GetLight(new int3(4, 4, 4)));
-            Assert.AreEqual(MaxLightLevel, _partitionLight.GetLight(new int3(31, 31, 31)));
-            _partitionLight.SetAllLights(0);
-            Assert.IsTrue(_partitionLight.IsAllZero);
-        }
-
-        [Test]
-        public void ChunkLightData_TryGetPartitionLight_ValidAndInvalidIndices(){
+        public void ChunkLightData_StartsDark_CoversWholeChunk(){
             _lightData = new ChunkLightData(16);
             _hasLightData = true;
-            Assert.IsFalse(_lightData.TryGetPartitionLight(-1, out _));
-            Assert.IsFalse(_lightData.TryGetPartitionLight(PartitionsPerChunk, out _));
-            for (int i = 0; i < PartitionsPerChunk; i++){
-                Assert.IsTrue(_lightData.TryGetPartitionLight(i, out PartitionLightData partition), $"partition {i}");
-                Assert.IsTrue(partition.IsAllZero, $"partition {i} starts dark");
-                Assert.AreEqual(0, _lightData.GetLight(i, new int3(5, 5, 5)));
-            }
+            Assert.IsTrue(_lightData.IsCreated);
+            Assert.AreEqual(VoxelsPerChunk, _lightData.GetData().Length);
+            Assert.AreEqual(1, _lightData.GetData().CompressedLength);
+            Assert.AreEqual(0, _lightData.GetLight(new int3(0, 0, 0)));
+            Assert.AreEqual(0, _lightData.GetLight(new int3(31, 255, 31)));
+            Assert.IsFalse(default(ChunkLightData).IsCreated);
+        }
+
+        [Test]
+        public void ChunkLightData_SetLight_GetLight_RoundTrip(){
+            _lightData = new ChunkLightData(16);
+            _hasLightData = true;
+            int3 pos = new(1, 200, 3);
+            ushort light = VoxelLight.Pack(12, 15, 9, 3);
+            Assert.IsTrue(_lightData.SetLight(pos, light));
+            Assert.AreEqual(light, _lightData.GetLight(pos));
+            Assert.IsFalse(_lightData.SetLight(pos, light), "unchanged");
+            Assert.AreEqual(0, _lightData.GetLight(pos + new int3(1, 0, 0)));
+            Assert.AreEqual(0, _lightData.GetLight(pos + new int3(0, 1, 0)));
+            Assert.AreEqual(0, _lightData.GetLight(pos + new int3(0, 0, 1)));
+        }
+
+        [Test]
+        public void ChunkLightData_UsesVoxelFlattenOrder(){
+            // Same layout as the voxel data, so a column (x, z) is one contiguous run of 256 values.
+            _lightData = ChunkLightData.CreateEmpty(16);
+            _hasLightData = true;
+            _lightData.AddLights(VoxelLight.FullSky, ChunkHeight); // column (0, 0)
+            _lightData.AddLights(0, VoxelsPerChunk - ChunkHeight);
+            Assert.AreEqual(VoxelLight.FullSky, _lightData.GetLight(new int3(0, 0, 0)));
+            Assert.AreEqual(VoxelLight.FullSky, _lightData.GetLight(new int3(0, 255, 0)));
+            Assert.AreEqual(0, _lightData.GetLight(new int3(0, 0, 1)));
+            Assert.AreEqual(0, _lightData.GetLight(new int3(1, 0, 0)));
+        }
+
+        [Test]
+        public void VoxelLight_PackAndChannels(){
+            ushort light = VoxelLight.Pack(14, 15, 9, 3);
+            Assert.AreEqual(14, VoxelLight.GetSky(light));
+            Assert.AreEqual(15, VoxelLight.GetRed(light));
+            Assert.AreEqual(9, VoxelLight.GetGreen(light));
+            Assert.AreEqual(3, VoxelLight.GetBlue(light));
+            Assert.AreEqual((14 << 12) | (15 << 8) | (9 << 4) | 3, light, "sky(4) | R(4) | G(4) | B(4)");
+            Assert.AreEqual(VoxelLight.Pack(14, 15, 2, 3), VoxelLight.With(light, VoxelLight.Green, 2));
+            Assert.AreEqual(0xF000, VoxelLight.FullSky);
         }
 
         #endregion
