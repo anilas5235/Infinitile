@@ -6,17 +6,17 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Flora{
     /// <summary>
-    ///     The flora decision of one column (§10), a pure function of (x, z, seed, config) on top of the column's core
-    ///     sample (VEG-01, R3). <see cref="WorldSampler.SampleColumn(int,int,in WorldGenConfig,in BlendCache,out ColumnSample)" />
+    ///     The flora decision of one column, a pure function of (x, z, seed, config) on top of the column's core
+    ///     sample. <see cref="WorldSampler.SampleColumn(int,int,in WorldGenConfig,in BlendCache,out ColumnSample)" />
     ///     calls <see cref="Decide" />; the chunk job runs the same <see cref="RollRule" /> and <see cref="Outranks" />
     ///     over a padded grid instead of re-sampling neighbours, and gets the same answer.
     ///     <list type="number">
-    ///         <item>Flora source biome: dithered pick from w_mat with <see cref="HashSalts.FloraBiome" /> (VEG-02, DEC-04).</item>
+    ///         <item>Flora source biome: dithered pick from w_mat with <see cref="HashSalts.FloraBiome" />.</item>
     ///         <item>Species: the rule whose cumulative interval holds Hash01(<see cref="HashSalts.FloraSpecies" />); none → no plant.</item>
-    ///         <item>Conditions: same surface (optional), height above water, not clamped at Hmax, solid ground (VEG-03, VEG-04).</item>
+    ///         <item>Conditions: same surface (optional), height above water, not clamped at Hmax, solid ground.</item>
     ///         <item>
     ///             Multi-block species only: the column is an anchor if no other candidate within r_tree has a higher
-    ///             <see cref="HashSalts.TreePriority" /> hash (VEG-05); otherwise it carries no plant.
+    ///             <see cref="HashSalts.TreePriority" /> hash; otherwise it carries no plant.
     ///         </item>
     ///     </list>
     /// </summary>
@@ -29,7 +29,7 @@ namespace Engine.Scripts.WorldGen.Flora{
             source = -1;
             if (!cfg.HasFlora) return -1;
 
-            // VEG-02: own roll, independent of the surface pick (DEC-04). One-hot weights pick their biome (BLD-41).
+            // Own roll, independent of the surface pick. One-hot weights pick their biome.
             int biome = cfg.MaterialMethod == BlendMethod.None
                 ? s.HardBiome
                 : SurfacePick.Pick(x, z, cfg.Seed, HashSalts.FloraBiome, s.MaterialWeights, cfg.BiomeCount);
@@ -50,7 +50,7 @@ namespace Engine.Scripts.WorldGen.Flora{
 
             if (rule < 0) return -1;
             FloraRuleDef d = cfg.FloraRules[rule];
-            // VEG-03: optionally only on ground of the same biome.
+            // Optionally only on ground of the same biome.
             if (d.RequiresSurfaceFromSameBiome != 0 && s.SurfaceSource != biome) return -1;
             if (!GroundAllows(s, d.MinHeightAboveWater, cfg)) return -1;
 
@@ -59,7 +59,7 @@ namespace Engine.Scripts.WorldGen.Flora{
         }
 
         /// <summary>
-        ///     VEG-03/04: the column has solid ground (the surface source's top block), is not clamped at Hmax, and its
+        ///     The column has solid ground (the surface source's top block), is not clamped at Hmax, and its
         ///     top face lies at least <paramref name="minHeightAboveWater" /> blocks above the water surface, never below.
         /// </summary>
         public static bool GroundAllows(in ColumnSample s, int minHeightAboveWater, in WorldGenConfig cfg){
@@ -70,14 +70,14 @@ namespace Engine.Scripts.WorldGen.Flora{
             return aboveWater >= math.max(minHeightAboveWater, 0);
         }
 
-        /// <summary>True when the rule <paramref name="rule" /> exists and is a multi-block species (VEG-05).</summary>
+        /// <summary>True when the rule <paramref name="rule" /> exists and is a multi-block species.</summary>
         public static bool IsMultiBlock(int rule, in WorldGenConfig cfg){
             return rule >= 0 && cfg.FloraRules[rule].MultiBlock != 0;
         }
 
         /// <summary>
         ///     Necessary condition for a multi-block candidate that needs no sample: the species roll lies in a
-        ///     multi-block interval of some biome (VEG-05 pre-filter).
+        ///     multi-block interval of some biome (pre-filter).
         /// </summary>
         public static bool MayBeMultiBlock(int x, int z, in WorldGenConfig cfg){
             if (cfg.FloraMultiBlockIntervals.Length == 0) return false;
@@ -90,7 +90,7 @@ namespace Engine.Scripts.WorldGen.Flora{
             return false;
         }
 
-        /// <summary>Anchor priority of a column (VEG-05).</summary>
+        /// <summary>Anchor priority of a column.</summary>
         public static uint Priority(int x, int z, in WorldGenConfig cfg){
             return Hash.Hash32(x, z, cfg.Seed, HashSalts.TreePriority);
         }
@@ -110,7 +110,7 @@ namespace Engine.Scripts.WorldGen.Flora{
         }
 
         /// <summary>
-        ///     The flora decision of the column with core sample <paramref name="s" /> (VEG-06): species and source at
+        ///     The flora decision of the column with core sample <paramref name="s" />: species and source at
         ///     an anchor or a single-block plant, (0, -1) otherwise. Neighbours are sampled through
         ///     <paramref name="cache" /> only when they outrank the column and pass the pre-filter.
         /// </summary>
@@ -126,7 +126,7 @@ namespace Engine.Scripts.WorldGen.Flora{
             source = biome;
         }
 
-        /// <summary>VEG-05 for a column that is a multi-block candidate itself.</summary>
+        /// <summary>Anchor test for a column that is a multi-block candidate itself: no outranking multi-block neighbour within r_tree.</summary>
         private static bool IsAnchor(int x, int z, in WorldGenConfig cfg, in BlendCache cache){
             int r = cfg.TreeSpacingRadius;
             int2 self = new(x, z);

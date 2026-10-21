@@ -62,17 +62,17 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         [Range(0, 255)] public int glow;
 
         /// <summary>
-        ///     LGT-02: extra light loss per step into this voxel, 0–15 (air and glass 0, leaves 1, water 2;
+        ///     Extra light loss per step into this voxel, 0–15 (air and glass 0, leaves 1, water 2;
         ///     15 = opaque, the default for solid blocks). Opaque voxels hold no light unless they emit.
         /// </summary>
-        [Tooltip("LGT-02: extra light loss per step, 0 = clear, 15 = opaque")]
+        [Tooltip("Extra light loss per step, 0 = clear, 15 = opaque")]
         [Range(0, VoxelLightLimits.MaxLevel)] public int lightAttenuation = VoxelLightLimits.MaxLevel;
 
         /// <summary>
-        ///     LGT-02: emitted block light per channel (R, G, B), 0–15 each, e.g. lava (15, 9, 3). Independent of
+        ///     Emitted block light per channel (R, G, B), 0–15 each, e.g. lava (15, 9, 3). Independent of
         ///     <see cref="glow" />, which stays a render effect.
         /// </summary>
-        [Tooltip("LGT-02: emitted block light (R, G, B), 0-15 per channel")]
+        [Tooltip("Emitted block light (R, G, B), 0-15 per channel")]
         public Vector3Int lightEmission;
 
         public bool usePostProcess;
@@ -115,7 +115,6 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
 
         public Dictionary<QuadDefinition, Texture2D> allUnique;
 
-
         /// <summary>
         ///     Gets or sets the texture mapping mode for this voxel.
         /// </summary>
@@ -123,7 +122,6 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
             get => textureMode;
             set => textureMode = value;
         }
-
 
         /// <summary>
         ///     Gets the quads and textures that match the given draw condition.
@@ -156,7 +154,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
 
         private void OnValidate(){
             lightEmission = Vector3Int.Max(Vector3Int.zero,
-                Vector3Int.Min(lightEmission, Vector3Int.one * VoxelLightLimits.MaxLevel)); // LGT-02
+                Vector3Int.Min(lightEmission, Vector3Int.one * VoxelLightLimits.MaxLevel));
         }
 
         public FixedString32Bytes GetFullName(){
@@ -226,10 +224,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
             /// <summary>Whether this voxel participates in physics collision.</summary>
             public bool Collision;
 
-            /// <summary>LGT-02: extra light loss per step into this voxel (0–15, 15 = opaque).</summary>
+            /// <summary>Extra light loss per step into this voxel (0–15, 15 = opaque).</summary>
             public byte LightAttenuation;
 
-            /// <summary>LGT-02: emitted block light, packed like the voxel light with sky 0 (see VoxelLight).</summary>
+            /// <summary>Emitted block light, packed like the voxel light with sky 0 (see VoxelLight).</summary>
             public ushort LightEmission;
 
             public uint2 Always;
@@ -247,7 +245,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         }
     }
 
-    /// <summary>LGT-02: value range of the voxel light properties.</summary>
+    /// <summary>Value range of the voxel light properties.</summary>
     public static class VoxelLightLimits{
         public const int MaxLevel = 15;
     }

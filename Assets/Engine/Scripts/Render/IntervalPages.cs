@@ -3,8 +3,7 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.Render{
     /// <summary>
-    ///     §20.1: handle of one chunk's interval list in the <see cref="ChunkIntervalStore" />. The default value is
-    ///     "no list".
+    ///     Handle of one chunk's interval list in the <see cref="ChunkIntervalStore" />. The default value is "no list".
     /// </summary>
     internal readonly struct IntervalRange : IEquatable<IntervalRange>{
         private readonly int _slotPlusOne;
@@ -39,7 +38,7 @@ namespace Engine.Scripts.Render{
     }
 
     /// <summary>
-    ///     §20.1: page bookkeeping of the <see cref="ChunkIntervalStore" />. The store is split into pages of
+    ///     Page bookkeeping of the <see cref="ChunkIntervalStore" />. The store is split into pages of
     ///     <see cref="PageSize" /> elements; a list owns the pages for its length, in order, at any place in the store.
     ///     Pages never need compaction, and a list that grows or shrinks only adds or frees pages at its end. Holds no
     ///     GPU resources, so it can be unit-tested without a graphics device.

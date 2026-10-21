@@ -31,15 +31,15 @@ namespace Engine.Scripts.Render{
         private readonly List<int3> _pendingBuilds = new();
         private readonly HashSet<int3> _requestedPartitions = new();
 
-        // §20.1: each chunk's voxel and light interval lists live in one shared store
+        // each chunk's voxel and light interval lists live in one shared store
         private readonly Dictionary<int2, IntervalRange> _voxelLists = new();
-        private readonly Dictionary<int2, IntervalRange> _lightLists = new(); // LGT-08
+        private readonly Dictionary<int2, IntervalRange> _lightLists = new();
 
         /// <summary>
-        ///     §20.1 / PERF-04: pages the interval store starts with per list. Eight intervals per voxel column cover
-        ///     the spec terrain with flora (measured during the TST-E21 flight: median 4.6, maximum 6 per column).
-        ///     The store is shared, so a longer list just takes more pages while the total fits; the store only grows
-        ///     (rarely, it allocates) when it does not.
+        ///     Pages the interval store starts with per list. Eight intervals per voxel column cover the default
+        ///     terrain with flora (measured in flight: median 4.6, maximum 6 per column). The store is shared, so a
+        ///     longer list just takes more pages while the total fits; the store only grows (rarely, it allocates)
+        ///     when it does not.
         /// </summary>
         private const int InitialPagesPerList =
             (ChunkWidth * ChunkDepth * 8 + 1 + IntervalPages.PageSize - 1) / IntervalPages.PageSize;
@@ -47,16 +47,14 @@ namespace Engine.Scripts.Render{
         private ChunkIntervalStore _intervalStore;
         private bool _buffersRebuildPending;
 
-        private int _copyKernelID;
         private CopyPointsHandler _copyPointsHandler;
         private RenderBufferManager _foliageBufferManager;
 
-        // Phase C: GPU culling (§E2)
         private GpuCuller _culler;
-        private Camera _overlayCamera; // CUL-06: the game camera whose counts the overlay shows
-        private RenderBufferManager[] _layers; // PERF-04: fixed array for per-frame loops
+        private Camera _overlayCamera; // the game camera whose counts the overlay shows
+        private RenderBufferManager[] _layers; // fixed array for per-frame loops
 
-        [Header("Culling debug (CUL-06)")]
+        [Header("Culling debug")]
         [Tooltip("GPU page culling; off draws every page with points. Initialised from RendererSettings.gpuCulling.")]
         [SerializeField] private bool gpuCulling = true;
 
@@ -67,32 +65,30 @@ namespace Engine.Scripts.Render{
         [SerializeField] private bool showCullingOverlay;
 
         /// <summary>
-        ///     CUL-06: GPU frustum culling on/off at runtime (initialised from <see cref="RendererSettings.gpuCulling" />).
+        ///     GPU frustum culling on/off at runtime (initialised from <see cref="RendererSettings.gpuCulling" />).
         ///     Off falls back to "every page with points is visible"; the image must not change.
         /// </summary>
         public bool GpuCulling{ get => gpuCulling; set => gpuCulling = value; }
 
         /// <summary>
-        ///     CUL-06: keeps the last unfrozen frustum of the game camera and culls every camera with it, so you can
+        ///     Keeps the last unfrozen frustum of the game camera and culls every camera with it, so you can
         ///     fly out (Scene view, or a free game camera) and look at what was culled. The frozen frustum is drawn
         ///     as a yellow gizmo in the Scene view.
         /// </summary>
         public bool FreezeCulling{ get => freezeCulling; set => freezeCulling = value; }
 
         /// <summary>
-        ///     CUL-06: draws visible pages / total pages per buffer and layer for the game camera. Debug only: the
+        ///     Draws visible pages / total pages per buffer and layer for the game camera. Debug only: the
         ///     read-backs and the label strings allocate while it is on.
         /// </summary>
         public bool ShowCullingOverlay{ get => showCullingOverlay; set => showCullingOverlay = value; }
 
         private InFlightBuild[] _inFlightBuilds;
-        private PartitionBuildRequest[] _buildRequests; // PERF-04: one reusable request per in-flight slot
+        private PartitionBuildRequest[] _buildRequests; // one reusable request per in-flight slot
         private bool _isDestroyed;
         private int _maxInFlight = 1;
 
         private PointBuilderHandler[] _pointBuilderHandlers;
-
-        private int _pointBuilderKernelID;
 
         private VoxelEngineSettings _settings;
 
@@ -102,14 +98,14 @@ namespace Engine.Scripts.Render{
         protected override void Awake(){
             base.Awake();
 
-            // F-21: resolve the world before its settings are read; OnEnable's fallback ran too late for Awake.
+            // resolve the world before its settings are read; OnEnable's fallback runs too late for Awake
             if (world == null) world = GetComponent<VoxelWorld>();
             if (world == null) world = VoxelWorld.Instance;
             _settings = world.Settings;
-            VoxelLightingGlobals.SetDefaults(); // LGT-10: lit without a DayNightCycle, which overrides these per frame
+            VoxelLightingGlobals.SetDefaults(); // lit without a DayNightCycle, which overrides these per frame
             _maxInFlight = math.max(1, _settings.Scheduler.partitionBuildBatchSize);
 
-            // PERF-04: sized for the partition pool so the request bookkeeping does not grow during flight
+            // sized for the partition pool so the request bookkeeping does not grow during flight
             int partitionPoolSize = _settings.Chunk.DrawDistance.SquareSize() * PartitionsPerChunk;
             _requestedPartitions.EnsureCapacity(partitionPoolSize);
             _pendingBuilds.Capacity = math.max(_pendingBuilds.Capacity, partitionPoolSize);
@@ -117,9 +113,8 @@ namespace Engine.Scripts.Render{
 
             RendererSettings rSettings = _settings.Renderer;
 
-            // §20.1 / PERF-04: one interval store sized for the chunks the manager's store can hold (same formula as
-            // ChunkManager), two lists per chunk (voxel data and light, LGT-08), created now instead of a managed
-            // GraphicsBuffer object per chunk upload during flight.
+            // One interval store sized for the chunks the manager's store can hold (same formula as ChunkManager),
+            // two lists per chunk (voxel data and light).
             int chunkStoreSize = (_settings.Chunk.LoadDistance + 2).SquareSize();
             int listCount = 2 * chunkStoreSize;
             _intervalStore = new ChunkIntervalStore(listCount * InitialPagesPerList, listCount, rSettings.pointBuilder);
@@ -171,10 +166,10 @@ namespace Engine.Scripts.Render{
         /// </summary>
         private void LateUpdate(){
             if (_isDestroyed) return;
-            _culler.ReleaseStaleCameras(Time.frameCount); // CUL-04
+            _culler.ReleaseStaleCameras(Time.frameCount);
             if (!_buffersRebuildPending) return;
 
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderRebuildBuffers.Auto(); // PERF-01
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderRebuildBuffers.Auto();
             _solidBufferManager.RebuildBuffers();
             _transparentBufferManager.RebuildBuffers();
             _foliageBufferManager.RebuildBuffers();
@@ -189,7 +184,7 @@ namespace Engine.Scripts.Render{
             RenderPipelineManager.beginCameraRendering += Draw;
             world.ChunkChanged += HandleChunkChange;
             world.ChunkDataReady += HandleChunkDataReady;
-            world.ChunkLightChanged += HandleChunkLightChanged; // LGT-08
+            world.ChunkLightChanged += HandleChunkLightChanged;
             world.ChunkEvicted += RemoveChunkData;
             world.PartitionEvicted += RemovePartitionRenderData;
             world.PartitionBuildRequested += UpdatePartitions;
@@ -216,10 +211,10 @@ namespace Engine.Scripts.Render{
         protected override void OnDestroy(){
             base.OnDestroy();
             _isDestroyed = true;
-            // F-17: every resource is released on its own, so one failing Dispose does not leak the rest.
+            // every resource is released on its own, so one failing Dispose does not leak the rest
             SafeDispose(_copyPointsHandler);
 
-            // F-17: each handler waits for its pending read-back and releases its resources independently.
+            // each handler waits for its pending read-back and releases its resources independently.
             if (_pointBuilderHandlers != null){
                 foreach (PointBuilderHandler handler in _pointBuilderHandlers)
                     SafeDispose(handler);
@@ -265,7 +260,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     LGT-08: uploads a chunk's light after the light job or an edit changed it.
+        ///     Uploads a chunk's light after the light job or an edit changed it.
         /// </summary>
         /// <param name="chunk">The chunk whose light changed.</param>
         private void HandleChunkLightChanged(Chunk chunk){
@@ -273,13 +268,13 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     Culls and draws all render buffers for the given camera (CUL-02, CUL-04). Runs once per camera that
-        ///     renders, from <see cref="RenderPipelineManager.beginCameraRendering" />.
+        ///     Culls and draws all render buffers for the given camera. Runs once per camera that renders,
+        ///     from <see cref="RenderPipelineManager.beginCameraRendering" />.
         /// </summary>
         /// <param name="context">The scriptable render context.</param>
         /// <param name="cam">The camera to render with.</param>
         private void Draw(ScriptableRenderContext context, Camera cam){
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderDraw.Auto(); // PERF-01
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderDraw.Auto();
             if (_isDestroyed || _culler == null) return;
 
             CameraCullState state = _culler.BeginCamera(cam, FreezeCulling, Time.frameCount);
@@ -293,7 +288,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     CUL-05: the shadow list tests page bounds extruded along the main light by the shadow distance. Without
+        ///     The shadow list tests page bounds extruded along the main light by the shadow distance. Without
         ///     a main light or with shadows off only the main pass is drawn.
         /// </summary>
         private CullingParameters BuildCullingParameters(){
@@ -314,7 +309,7 @@ namespace Engine.Scripts.Render{
             return QualitySettings.shadowDistance;
         }
 
-        /// <summary>CUL-06: polls and re-requests the visible page counts of every buffer for the overlay.</summary>
+        /// <summary>Polls and re-requests the visible page counts of every buffer for the overlay.</summary>
         private void UpdateOverlayReadbacks(Camera cam, CameraCullState state){
             _overlayCamera = cam;
             for (int l = 0; l < _layers.Length; l++){
@@ -328,7 +323,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     CUL-06 debug overlay: visible pages / allocated pages per buffer and layer for the game camera, plus the
+        ///     Debug overlay: visible pages / allocated pages per buffer and layer for the game camera, plus the
         ///     culling and freeze switches. Allocates strings; only active while <see cref="ShowCullingOverlay" /> is on.
         /// </summary>
         private void OnGUI(){
@@ -371,7 +366,7 @@ namespace Engine.Scripts.Render{
 #if UNITY_EDITOR
         private static readonly Vector3[] FrustumCorners = new Vector3[8];
 
-        /// <summary>CUL-06: draws the frozen game-camera frustum in the Scene view while culling is frozen.</summary>
+        /// <summary>Draws the frozen game-camera frustum in the Scene view while culling is frozen.</summary>
         private void OnDrawGizmos(){
             if (!freezeCulling || _culler == null || !_culler.TryGetFrozenFrustum(out Matrix4x4 inverseViewProjection))
                 return;
@@ -429,12 +424,11 @@ namespace Engine.Scripts.Render{
         private void StartPendingPartitionBuilds(){
             if (_pointBuilderHandlers == null || _pointBuilderHandlers.Length == 0) return;
 
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.PointBuildDispatch.Auto(); // PERF-01
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.PointBuildDispatch.Auto();
             for (int i = 0; i < _maxInFlight; i++){
                 if (_pendingBuilds.Count < 1) break;
                 if (_inFlightBuilds[i].Active) continue;
 
-                // F-24 / PERF-04: plain loops; LINQ First/Any with a capturing lambda allocated every frame.
                 int3 partition = _pendingBuilds[0];
                 _pendingBuilds.RemoveAt(0);
                 if (IsBuildInFlight(partition)){
@@ -454,7 +448,6 @@ namespace Engine.Scripts.Render{
 
                 PointBuilderHandler handler = _pointBuilderHandlers[i];
                 try{
-                    // PERF-04: a plain dispatch plus a polled read-back; the async version boxed a state machine per build
                     handler.BuildPoints(request, _intervalStore);
                 }
                 catch (Exception e){
@@ -495,7 +488,7 @@ namespace Engine.Scripts.Render{
                     if (!_requestedPartitions.Contains(build.Partition) || _pendingBuilds.Contains(build.Partition))
                         continue;
 
-                    using (VoxelProfilerMarkers.PointBuildCopy.Auto()) // PERF-01
+                    using (VoxelProfilerMarkers.PointBuildCopy.Auto())
                         _copyPointsHandler.CopyJob(build.Handler, build.Partition, pointCounts);
                     updatedPartitions = true;
                 }
@@ -507,33 +500,32 @@ namespace Engine.Scripts.Render{
             if (updatedPartitions) RequestBuffersRebuild();
         }
 
-
         /// <summary>
         ///     Adds or updates a chunk's voxel data in the interval store.
         /// </summary>
         /// <param name="chunk">The chunk position.</param>
         /// <param name="voxelData">The voxel data to store.</param>
         private void AddOrUpdateChunk(int2 chunk, UnsafeIntervalList<ushort> voxelData){
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.GpuUploadChunk.Auto(); // PERF-01
-            // F-18: validate before the old list is touched, otherwise a rejected update leaves a broken list in
-            // the map that the next partition build reads.
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.GpuUploadChunk.Auto();
+            // validate before the old list is touched, otherwise a rejected update leaves a broken list in the map
+            // that the next partition build reads
             if (voxelData.Length != VoxelsPerChunk) throw new Exception("Voxel data length mismatch!");
             UploadIntervals(_voxelLists, chunk, voxelData);
         }
 
         /// <summary>
-        ///     LGT-08: adds or updates a chunk's light in the interval store (same format as the voxel data).
+        ///     Adds or updates a chunk's light in the interval store (same format as the voxel data).
         /// </summary>
         /// <param name="chunk">The chunk position.</param>
         /// <param name="lightData">The light data to store.</param>
         private void AddOrUpdateLight(int2 chunk, UnsafeIntervalList<ushort> lightData){
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.GpuUploadChunk.Auto(); // PERF-01
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.GpuUploadChunk.Auto();
             if (lightData.Length != VoxelsPerChunk) throw new Exception("Light data length mismatch!");
             UploadIntervals(_lightLists, chunk, lightData);
         }
 
         /// <summary>
-        ///     §20.1: writes an interval list to the chunk's list in <paramref name="lists" />, keeping its pages in
+        ///     Writes an interval list to the chunk's list in <paramref name="lists" />, keeping its pages in
         ///     the interval store where they still fit.
         /// </summary>
         private void UploadIntervals(Dictionary<int2, IntervalRange> lists, int2 chunk, UnsafeIntervalList<ushort> data){
@@ -544,12 +536,12 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     Removes a chunk's voxel data and light (LGT-08) from the interval store when evicted.
+        ///     Removes a chunk's voxel data and light from the interval store when evicted.
         /// </summary>
         /// <param name="chunk">The chunk position.</param>
         private void RemoveChunkData(int2 chunk){
-            if (_voxelLists.Remove(chunk, out IntervalRange voxelList)) _intervalStore.Release(ref voxelList); // §20.1
-            if (_lightLists.Remove(chunk, out IntervalRange lightList)) _intervalStore.Release(ref lightList); // LGT-08
+            if (_voxelLists.Remove(chunk, out IntervalRange voxelList)) _intervalStore.Release(ref voxelList);
+            if (_lightLists.Remove(chunk, out IntervalRange lightList)) _intervalStore.Release(ref lightList);
         }
 
         /// <summary>
@@ -575,7 +567,7 @@ namespace Engine.Scripts.Render{
         /// <summary>
         ///     Represents an in-flight partition build operation.
         /// </summary>
-        private struct InFlightBuild{ // PERF-04: a struct slot, not a class allocated per build
+        private struct InFlightBuild{
             /// <summary>
             ///     True while this slot holds a build.
             /// </summary>

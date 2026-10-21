@@ -6,7 +6,7 @@ using static Engine.Scripts.Utils.VoxelRenderConstants;
 
 namespace Engine.Tests.Performance{
     /// <summary>
-    ///     PERF-02: page allocation. Fills one buffer with three-page partitions, then releases them all.
+    ///     Page allocation. Fills one buffer with three-page partitions, then releases them all.
     /// </summary>
     [TestFixture]
     internal class PageAllocatorBenchmark{

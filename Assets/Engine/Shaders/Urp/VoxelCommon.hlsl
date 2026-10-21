@@ -9,9 +9,9 @@ struct PointData
 {
     float3 position; // Voxel position in partition local space
     // x: quadIndex(u16) | texIndex(u16)
-    // y: sky (4 corners × u4) | red (4 corners × u4)      LGT-09
+    // y: sky (4 corners × u4) | red (4 corners × u4)
     // z: ao(u8) | depthFade(f16) | glow(u8)
-    // w: green (4 corners × u4) | blue (4 corners × u4)  LGT-09
+    // w: green (4 corners × u4) | blue (4 corners × u4)
     // Corner order inside each 16-bit channel: up-left, up-right, down-right, down-left (UV space).
     uint4 packed;
 };
@@ -61,7 +61,7 @@ void set_tex_index(inout uint4 packed, uint tex_index)
     packed.x = (packed.x & 0x0000FFFF) | ((tex_index & 0xFFFF) << 16);
 }
 
-// LGT-09: per-corner light, four 4-bit corners per channel (ul, ur, dr, dl). Voxel light is sky|R|G|B with sky in
+// Per-corner light, four 4-bit corners per channel (ul, ur, dr, dl). Voxel light is sky|R|G|B with sky in
 // bits 12-15 and B in bits 0-3 (VoxelLight on the C# side).
 uint4 unpack_corners(uint bits)
 {
@@ -121,7 +121,7 @@ float get_depth_fade_dist(in uint4 packed)
 
 void set_depth_fade_dist(inout uint4 packed, in float depth_fade_dist)
 {
-    packed.z = (packed.z & 0xFF0000FF) | ((f32tof16(depth_fade_dist) & 0xFFFF) << 8); // F-19: bits 8-23
+    packed.z = (packed.z & 0xFF0000FF) | ((f32tof16(depth_fade_dist) & 0xFFFF) << 8); // bits 8-23
 }
 
 float get_glow(uint4 packed)

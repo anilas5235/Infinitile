@@ -17,8 +17,8 @@ using Object = UnityEngine.Object;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     TST-E11: the Standard package loads through the same registry calls DataImporter.Awake makes,
-    ///     every voxel gets a unique ID, every biome resolves and CreateConfig() yields usable arrays (D-05).
+    ///     The Standard package loads through the same registry calls DataImporter.Awake makes, every voxel gets a
+    ///     unique ID, every biome resolves and CreateConfig() yields usable arrays.
     /// </summary>
     public class DataImporterTests{
         private GameObject _host;
@@ -138,7 +138,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void CreateConfig_DisposingConfigAndRegistries_DoesNotThrow(){
-            // D-05: GeneratorConfig.Dispose frees only the world-gen config; the voxel map belongs to the registry,
+            // GeneratorConfig.Dispose frees only the world-gen config; the voxel map belongs to the registry,
             // which disposes it in OnDestroy. Ownership must be clear: disposing both in runtime order must not throw.
             LoadPackages();
             WorldGenSettings worldGen = ScriptableObject.CreateInstance<WorldGenSettings>();
@@ -183,7 +183,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void ShippedWorldGenSettings_FloraTablesResolveThroughTheRegistry(){
-            // §10 placeholder rules on the Standard biomes: every species has a registry id and its replace class.
+            // Placeholder flora rules on the Standard biomes: every species has a registry id and its replace class.
             LoadPackages();
             WorldGenConfig cfg = ShippedConfig(out WorldGenSettings settings);
             try{
@@ -217,7 +217,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void ShippedWorldGenSettings_EveryLandBiomeCarriesFlora(){
-            // Phase 4 acceptance: flora is visible for all land biomes. A 4096² area at stride 8: every biome with
+            // Flora is visible for all land biomes. A 4096² area at stride 8: every biome with
             // flora rules that supplies the surface somewhere also has planted columns.
             LoadPackages();
             WorldGenConfig cfg = ShippedConfig(out WorldGenSettings settings);

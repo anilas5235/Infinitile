@@ -8,7 +8,7 @@ using UnityEngine.InputSystem;
 
 namespace UI{
     /// <summary>
-    ///     INT-30 debug keys for comparing world-generation configurations in game. F10 regenerates the loaded world
+    ///     Debug keys for comparing world-generation configurations in game. F10 regenerates the loaded world
     ///     with the next configuration (Shift+F10: the previous one). The first entry uses the assigned
     ///     <see cref="WorldGenSettings" /> unchanged; the others override architecture and blend methods on a transient
     ///     copy of it, so strengths, biomes and splines stay the asset's and the asset is never written. F1–F4 jump to
@@ -92,7 +92,7 @@ namespace UI{
                 Show($"{configuration.Label}: {e.Message}");
             }
             finally{
-                if (variant) Destroy(variant); // the engine copied its values (D-05)
+                if (variant) Destroy(variant); // the engine copied its values
             }
         }
 
@@ -152,7 +152,7 @@ namespace UI{
             public GenArchitecture Architecture = GenArchitecture.BiomeFirst;
             public BlendMethod MaterialMethod = BlendMethod.None;
 
-            [Tooltip("Biome-first only; Terrain-first has no height stage (TRN-21).")]
+            [Tooltip("Biome-first only; Terrain-first has no height stage.")]
             public BlendMethod HeightMethod = BlendMethod.None;
 
             public string Label{

@@ -5,9 +5,9 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Height{
     /// <summary>
-    ///     Terrain-first height (§7.1, TRN-03): H = Offset(C,E,PV) + Amp(C,E,PV) · Σ_i g_i N_i + J(C,E,PV) · P with
-    ///     the global octave weights g and the shared detail octaves N_i and peak noise P (GEN-11). T and F never
-    ///     enter. Amp replaces Minecraft's "factor" (TRN-04); J is an own extension.
+    ///     Terrain-first height: H = Offset(C,E,PV) + Amp(C,E,PV) · Σ_i g_i N_i + J(C,E,PV) · P with
+    ///     the global octave weights g and the shared detail octaves N_i and peak noise P. T and F never
+    ///     enter. Amp replaces Minecraft's "factor"; J is an own extension.
     /// </summary>
     [BurstCompile]
     public static class TerrainFirstHeight{
@@ -21,7 +21,7 @@ namespace Engine.Scripts.WorldGen.Height{
 
         /// <summary>
         ///     H at world position <paramref name="p" /> with fields <paramref name="f" />. <paramref name="height" />
-        ///     is clamped to [Hmin, Hmax], <paramref name="unclamped" /> is H before the clamp (GEN-12).
+        ///     is clamped to [Hmin, Hmax], <paramref name="unclamped" /> is H before the clamp.
         /// </summary>
         public static void Sample(in float2 p, in WorldFields f, in WorldGenConfig cfg,
             out float3 terrainParams, out float height, out float unclamped){

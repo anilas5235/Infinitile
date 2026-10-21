@@ -6,7 +6,7 @@ using UnityEngine;
 using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>TST-E05: VoxelUtils and VoxelConstants coordinate helpers, including the D-08 check.</summary>
+    /// <summary>VoxelUtils and VoxelConstants coordinate helpers, including negative positions.</summary>
     public class VoxelUtilsTests{
         private static readonly int[] EdgeValues ={ -33, -32, -1, 0, 31, 32 };
         private static readonly int[] HeightValues ={ 0, 31, 32, 255 };
@@ -84,7 +84,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void WorldToPartitionPos_AgreesWithVoxelUtils_ForNegativePositions(){
-            // D-08: WorldToPartitionPos uses truncating division; must match the floor division of VoxelUtils.
+            // WorldToPartitionPos must floor like VoxelUtils, not truncate.
             ForEachPosition(p => {
                 if (p.x >= 0 && p.z >= 0) return;
                 Assert.AreEqual(VoxelUtils.GetPartitionCoords(p), VoxelConstants.WorldToPartitionPos(p), $"{p}");
@@ -93,7 +93,6 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void WorldToChunkPos_AgreesWithVoxelUtils_ForNegativePositions(){
-            // D-08
             ForEachPosition(p => {
                 if (p.x >= 0 && p.z >= 0) return;
                 Assert.AreEqual(VoxelUtils.GetChunkCoords(p), VoxelConstants.WorldToChunkPos(p), $"{p}");

@@ -14,10 +14,10 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Tests.Performance{
     /// <summary>
-    ///     PERF-02 / LGT-11: light job, ms per chunk on a single worker (LightJob.Run). Natural terrain is the
+    ///     Light job, ms per chunk on a single worker (LightJob.Run). Natural terrain is the
     ///     Terrain-first six-biome world with the placeholder flora (trees, leaves, water); the worst case is a
     ///     cavity full of emitters under a leaf roof, where the BFS has to visit every voxel of the region for all
-    ///     four channels. PERF-05 budget: ≤ 1 ms per chunk on natural terrain.
+    ///     four channels. Budget: ≤ 1 ms per chunk on natural terrain.
     /// </summary>
     [TestFixture]
     internal class LightJobBenchmark{
@@ -67,7 +67,7 @@ namespace Engine.Tests.Performance{
         [Test]
         [Performance]
         public void LightJob_Run_NaturalTerrain_MsPerChunk(){
-            GeneratorConfig config = BenchmarkFixtures.CreateSpecGeneratorConfig(GenArchitecture.TerrainFirst,
+            GeneratorConfig config = BenchmarkFixtures.CreatePlaceholderGeneratorConfig(GenArchitecture.TerrainFirst,
                 BlendMethod.None, Allocator.Persistent, _created, true);
             try{
                 // The same scattered chunks as the generation benchmark's per-method rows, each with its 3 × 3 ring

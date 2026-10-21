@@ -22,7 +22,7 @@ namespace Engine.Scripts.Render{
         private readonly RenderBufferManager _transparentBufferManager;
         private readonly GraphicsBuffer _transparentPagesBuffer;
 
-        // PERF-04: upload staging reused per copy instead of allocated per partition
+        // upload staging, reused per copy
         internal const int MaxPagesPerPartition = (MaxPointsPerPartition + PointsPerPage - 1) / PointsPerPage;
         private readonly uint[] _pageCounts = new uint[3];
         private readonly uint2[] _pageData = new uint2[MaxPagesPerPartition];

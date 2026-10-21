@@ -6,8 +6,8 @@ using Unity.Collections;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     TST-E01 (randomised model test + every Set branch) and TST-E13 (structural invariants, F-12/F-13)
-    ///     for <see cref="UnsafeIntervalList{T}" />.
+    ///     Randomised model test, every Set branch and the structural invariants of
+    ///     <see cref="UnsafeIntervalList{T}" />.
     /// </summary>
     public class UnsafeIntervalListTests{
         private const int ListLength = 32 * 256 * 32;
@@ -54,7 +54,7 @@ namespace Engine.Tests.EditMode{
                     Assert.Fail($"Mismatch at index {i}: model {model[i]}, list {_list.Get(i)}");
         }
 
-        /// <summary>Invariants from TST-E13: no empty node, no equal neighbours, strictly increasing end counts.</summary>
+        /// <summary>Invariants: no empty node, no equal neighbours, strictly increasing end counts.</summary>
         private void AssertInvariants(string context){
             // Runs after every random op over thousands of nodes: the message (which prints the whole list) is
             // only built on failure, otherwise the check is quadratic per op and never finishes.
@@ -99,7 +99,7 @@ namespace Engine.Tests.EditMode{
             AssertEqualsModel(model);
         }
 
-        #region TST-E01 randomised
+        #region Randomised
 
         [Test]
         public void RandomSets_GetMatchesModelAfterEveryOperation(){
@@ -139,7 +139,7 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
-        #region TST-E13 invariants
+        #region Invariants
 
         [Test]
         public void RandomSets_InvariantsHoldAfterEveryOperation(){
@@ -148,7 +148,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void AddInterval_EqualNeighbouringRuns_AreMerged(){
-            // F-13: AddInterval must merge a run that equals the previous run.
+            // AddInterval must merge a run that equals the previous run.
             Create((1, 3), (1, 2), (2, 4));
             Assert.AreEqual(9, _list.Length);
             AssertInvariants("AddInterval equal runs");
@@ -157,7 +157,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void AddInterval_CountZero_AddsNoNode(){
-            // F-13: a zero-length run must not create an empty node.
+            // A zero-length run must not create an empty node.
             Create((1, 3), (2, 0), (3, 2));
             Assert.AreEqual(5, _list.Length);
             AssertInvariants("AddInterval count 0");
@@ -166,7 +166,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void Set_MergeRightAtIndexZero_LeavesNoEmptyNode(){
-            // F-12: [A:1][B:3], Set(0, B) must give [B:3], not [A:0][B:3].
+            // [A:1][B:3], Set(0, B) must give [B:3], not [A:0][B:3].
             Create((1, 1), (2, 2));
             Assert.IsTrue(_list.Set(0, 2));
             Assert.AreEqual(2, _list.Get(0));
@@ -176,7 +176,7 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
-        #region TST-E01 targeted Set branches
+        #region Targeted Set branches
 
         [Test]
         public void Set_MergesBothSides(){
@@ -294,7 +294,7 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
-        #region TST-E01 neighbours, Clear, Length, bounds
+        #region Neighbours, Clear, Length, bounds
 
         [Test]
         public void TryLeftOf_TryRightOf_AtBothEnds(){

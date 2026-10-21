@@ -129,7 +129,7 @@
                 // --- Ambient occlusion ---
                 const float4 ao_color = calc_ao_color(_AOColor, albedo, _AOCurve, extra.ao, _AOIntensity, _AOPower, uv);
 
-                // --- Light (LGT-10) ---
+                // --- Light ---
                 const float3 light = calc_voxel_light(IN.packed, uv);
 
                 // --- Depth fade ---

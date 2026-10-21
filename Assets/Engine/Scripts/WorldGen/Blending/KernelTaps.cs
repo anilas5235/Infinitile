@@ -4,9 +4,9 @@ using Unity.Collections;
 using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Blending{
-    /// <summary>One kernel tap of the distance blend (§9.3): a lattice offset from the column and its weight k(r).</summary>
+    /// <summary>One kernel tap of the distance blend: a lattice offset from the column and its weight k(r).</summary>
     public struct KernelTap{
-        /// <summary>q − p in blocks; q lies on the world-aligned lattice of stride s (GEN-03).</summary>
+        /// <summary>q − p in blocks; q lies on the world-aligned lattice of stride s.</summary>
         public int2 Offset;
 
         /// <summary>k(|q − p|) = (1 − r²/R²)², strictly positive (taps with r ≥ R are not stored).</summary>
@@ -14,13 +14,13 @@ namespace Engine.Scripts.WorldGen.Blending{
     }
 
     /// <summary>
-    ///     Precomputed kernel of one blend stage (BLD-10, BLD-12). The column p sees the lattice points
+    ///     Precomputed kernel of one blend stage. The column p sees the lattice points
     ///     q = (s·i, s·j) with |q − p| &lt; R; which offsets those are depends only on the phase (p mod s), so the tap
     ///     list is stored once per phase (s² phases, at most 4) in a fixed order. The cached chunk path and the pure
-    ///     sampler walk the same list, so the summation order and the float result are identical (GEN-02).
+    ///     sampler walk the same list, so the summation order and the float result are identical.
     /// </summary>
     public struct KernelSet{
-        /// <summary>Lattice stride s = clamp(floor(R/4), 1, 2) (BLD-10).</summary>
+        /// <summary>Lattice stride s = clamp(floor(R/4), 1, 2).</summary>
         public int Stride;
 
         /// <summary>Kernel radius R = B/2 in blocks.</summary>
@@ -46,7 +46,7 @@ namespace Engine.Scripts.WorldGen.Blending{
             return px + s * pz;
         }
 
-        /// <summary>Lattice stride for a blend width <paramref name="blendWidth" /> (BLD-10).</summary>
+        /// <summary>Lattice stride for a blend width <paramref name="blendWidth" />.</summary>
         public static int StrideFor(float blendWidth){
             float radius = blendWidth * 0.5f;
             return math.clamp((int)math.floor(radius / 4f), 1, 2);
@@ -54,8 +54,8 @@ namespace Engine.Scripts.WorldGen.Blending{
 
         /// <summary>
         ///     Builds the taps of a kernel with transition width <paramref name="blendWidth" /> (B, R = B/2) and
-        ///     appends them to a new array (BLD-12; once per settings change, in <c>WorldGenSettings.ToConfig</c>).
-        ///     k(r) = max(0, 1 − r²/R²)² (§9.3); r² is an exact integer, so every k is reproducible.
+        ///     appends them to a new array (once per settings change, in <c>WorldGenSettings.ToConfig</c>).
+        ///     k(r) = max(0, 1 − r²/R²)²; r² is an exact integer, so every k is reproducible.
         /// </summary>
         /// <exception cref="ArgumentOutOfRangeException">B is not positive and finite.</exception>
         public static KernelSet Build(float blendWidth, Allocator allocator, out NativeArray<KernelTap> taps){
@@ -73,7 +73,7 @@ namespace Engine.Scripts.WorldGen.Blending{
                 int px = phase % stride;
                 int pz = phase / stride;
                 set.PhaseStart[phase] = list.Count;
-                // Row-major over the lattice (z outer, x inner): the fixed tap order of BLD-12.
+                // Row-major over the lattice (z outer, x inner): the fixed tap order both paths share.
                 for (int dz = -bound; dz <= bound; dz++){
                     if (((dz + pz) % stride + stride) % stride != 0) continue; // q.z = p.z + dz must be a multiple of s
                     for (int dx = -bound; dx <= bound; dx++){

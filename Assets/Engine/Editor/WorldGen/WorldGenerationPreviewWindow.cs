@@ -14,16 +14,15 @@ using UnityEngine;
 
 namespace Engine.Editor.WorldGen{
     /// <summary>
-    ///     World-generation preview on the spec pipeline (INT-40: the only pipeline). Every view is filled through
-    ///     <c>WorldGenApi.SampleRegion</c> (see <see cref="PreviewPass" />), so it shows exactly what
-    ///     <c>WorldSampler</c> computes for the framed region (TST-E12).
+    ///     World-generation preview. Every view is filled through <c>WorldGenApi.SampleRegion</c> (see
+    ///     <see cref="PreviewPass" />), so it shows exactly what <c>WorldSampler</c> computes for the framed region.
     ///     <para>
-    ///         INT-20: architecture, per-stage method and strength controls (configuration A writes them to the
+    ///         Architecture, per-stage method and strength controls (configuration A writes them to the
     ///         <see cref="WorldGenSettings" /> asset with Undo), seed field, views (height with hillshade, hard biome,
     ///         dominant material biome, max material weight, surface source, flora, climate, E, PV and in
-    ///         Terrain-first Offset/Amp/J), the clamped share (GEN-12) and the biome-pair boundary list (GEN-24).
-    ///         INT-21: an A/B compare mode — the same view and seed for A and a preview-only configuration B layered
-    ///         on the asset, plus a difference view. TRN-06: 1D plots of every spline level at the probe C/E/PV.
+    ///         Terrain-first Offset/Amp/J), the clamped share and the biome-pair boundary list. An A/B compare mode
+    ///         shows the same view and seed for A and a preview-only configuration B layered on the asset, plus a
+    ///         difference view. 1D plots show every spline level at the probe C/E/PV.
     ///     </para>
     /// </summary>
     public partial class WorldGenerationPreviewWindow : EditorWindow{
@@ -55,7 +54,7 @@ namespace Engine.Editor.WorldGen{
         private bool _scheduledA;
         private bool _scheduledB;
 
-        // --- Configurations (INT-20/21) -------------------------------------------------------------------------------
+        // --- Configurations -----------------------------------------------------------------------------------------
         private PreviewPass _passA;
         private PreviewPass _passB;
         [SerializeField] private PreviewConfiguration _configB; // preview-only, never written to the asset implicitly
@@ -77,14 +76,14 @@ namespace Engine.Editor.WorldGen{
         [SerializeField] private bool _hillshade = true;
         [SerializeField] private float _exaggeration = 2f;
 
-        // --- Difference view (INT-21) ---------------------------------------------------------------------------------
+        // --- Difference view ----------------------------------------------------------------------------------------
         private NativeArray<Color32> _diffPixels;
         private Texture2D _diffTexture;
         private PreviewDiff.Stats _diffStats;
         private bool _diffSigned;
         private string _diffNote;
 
-        // --- Distribution plane (classifier over T x F); C/E/PV are also the TRN-06 spline probe -----------------------
+        // --- Distribution plane (classifier over T x F); C/E/PV are also the spline-plot probe ----------------------
         private float _planeContinental = 0.5f;
         private float _planeErosion = 0.5f;
         private float _planePV;
@@ -93,7 +92,7 @@ namespace Engine.Editor.WorldGen{
         private NativeArray<Color32> _jobDistributionPixels;
         private NativeArray<Color32> _jobDistributionColors;
 
-        // --- Spline plots (TRN-06) ------------------------------------------------------------------------------------
+        // --- Spline plots -------------------------------------------------------------------------------------------
         private List<SplinePlots.Plot> _plots = new();
         private string _plotsError;
 
@@ -196,7 +195,7 @@ namespace Engine.Editor.WorldGen{
             if (EditorGUI.EndChangeCheck()) RequestRebuild();
         }
 
-        /// <summary>Hook for additional left-column panels (the BIO-20 calibration section).</summary>
+        /// <summary>Hook for additional left-column panels (the height calibration section).</summary>
         partial void DrawExtraPanelsImpl();
 
         private void DrawExtraPanels(){
@@ -224,7 +223,7 @@ namespace Engine.Editor.WorldGen{
                 }
 
                 if (_settings){
-                    // INT-20: seed field (shared by A and B, INT-21 compares at the same seed).
+                    // Seed field, shared by A and B so the comparison runs at the same seed.
                     EditorGUILayout.BeginHorizontal();
                     EditorGUI.BeginChangeCheck();
                     int seed = EditorGUILayout.IntField("Seed", _settings.Seed);
@@ -271,7 +270,7 @@ namespace Engine.Editor.WorldGen{
         }
 
         /// <summary>
-        ///     INT-20/21: configuration A (the asset, edited with Undo) and, in compare mode, the preview-only
+        ///     Configuration A (the asset, edited with Undo) and, in compare mode, the preview-only
         ///     configuration B with "Copy A → B" and "Apply B to asset".
         /// </summary>
         private void DrawConfigurationPanel(){
@@ -279,7 +278,7 @@ namespace Engine.Editor.WorldGen{
             if (!asset) return;
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             {
-                _showConfiguration = EditorGUILayout.Foldout(_showConfiguration, "Configuration (INT-20/21)", true, EditorStyles.foldoutHeader);
+                _showConfiguration = EditorGUILayout.Foldout(_showConfiguration, "Configuration", true, EditorStyles.foldoutHeader);
                 if (_showConfiguration){
                     EditorGUILayout.LabelField("A — the WorldGenSettings asset", EditorStyles.boldLabel);
                     PreviewConfiguration a = PreviewConfiguration.Capture(asset);
@@ -326,7 +325,7 @@ namespace Engine.Editor.WorldGen{
             bool terrainFirst = c.Architecture == GenArchitecture.TerrainFirst;
             using (new EditorGUI.DisabledScope(terrainFirst)){
                 c.HeightMethod = (BlendMethod)EditorGUILayout.EnumPopup(
-                    terrainFirst ? "Height method (ignored, TRN-21)" : "Height method", c.HeightMethod);
+                    terrainFirst ? "Height method (ignored in Terrain-first)" : "Height method", c.HeightMethod);
                 if (!terrainFirst)
                     using (new EditorGUI.IndentLevelScope()){
                         if (c.HeightMethod is BlendMethod.DistanceBlend or BlendMethod.DistortedBoundary)
@@ -338,7 +337,7 @@ namespace Engine.Editor.WorldGen{
 
             bool warp = c.MaterialMethod == BlendMethod.DistortedBoundary || !terrainFirst && c.HeightMethod == BlendMethod.DistortedBoundary;
             if (warp){
-                EditorGUILayout.LabelField("Boundary warp (shared by both stages, DEC-05)", EditorStyles.miniBoldLabel);
+                EditorGUILayout.LabelField("Boundary warp (shared by both stages)", EditorStyles.miniBoldLabel);
                 using (new EditorGUI.IndentLevelScope()){
                     c.WarpAmplitude = EditorGUILayout.Slider("A (blocks)", c.WarpAmplitude, 0f, 128f);
                     c.WarpWavelength = EditorGUILayout.Slider("λd (blocks)", c.WarpWavelength, 8f, 1024f);
@@ -349,12 +348,12 @@ namespace Engine.Editor.WorldGen{
             return EditorGUI.EndChangeCheck();
         }
 
-        /// <summary>GEN-12 clamped share, GEN-24 biome-pair boundaries and the flora species per pass.</summary>
+        /// <summary>Clamped share, biome-pair boundaries and the flora species per pass.</summary>
         private void DrawStatisticsPanel(){
             if (!WorldGenSettings) return;
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             {
-                _showStatistics = EditorGUILayout.Foldout(_showStatistics, "Statistics of the view (GEN-12, GEN-24)", true, EditorStyles.foldoutHeader);
+                _showStatistics = EditorGUILayout.Foldout(_showStatistics, "Statistics of the view", true, EditorStyles.foldoutHeader);
                 if (_showStatistics){
                     DrawPassStatistics(_passA);
                     if (_compare) DrawPassStatistics(_passB);
@@ -367,7 +366,7 @@ namespace Engine.Editor.WorldGen{
             if (pass == null || !pass.HasResult) return;
             EditorGUILayout.LabelField($"{pass.Label}: {pass.Description}", EditorStyles.miniBoldLabel);
             using (new EditorGUI.IndentLevelScope()){
-                EditorGUILayout.LabelField("Clamped columns (GEN-12)", pass.ClampedShare.ToString("P2"));
+                EditorGUILayout.LabelField("Clamped columns", pass.ClampedShare.ToString("P2"));
 
                 long total = 0, implausible = 0;
                 foreach (BiomeBoundaryStats.PairLength p in pass.Boundaries){
@@ -394,7 +393,7 @@ namespace Engine.Editor.WorldGen{
                 if (pass.FloraCounts.Count > 0){
                     string[] names = pass.FloraNames;
                     int columns = pass.Size * pass.Size;
-                    EditorGUILayout.LabelField("Flora species (VEG-06)", EditorStyles.miniBoldLabel);
+                    EditorGUILayout.LabelField("Flora species", EditorStyles.miniBoldLabel);
                     for (int i = 0; i < pass.FloraCounts.Count && i < 10; i++){
                         (ushort species, int count) = pass.FloraCounts[i];
                         EditorGUILayout.BeginHorizontal();
@@ -411,9 +410,9 @@ namespace Engine.Editor.WorldGen{
         }
 
         /// <summary>
-        ///     The classifier's T x F plane (§6.4): every pixel is <see cref="BiomeClassifier.Classify" /> at
+        ///     The classifier's T x F plane: every pixel is <see cref="BiomeClassifier.Classify" /> at
         ///     (T, F) with the chosen C, E, PV and, in Terrain-first, the normalised height h (6D). C, E and PV are
-        ///     also the probe of the TRN-06 spline plots.
+        ///     also the probe of the spline plots.
         /// </summary>
         private void DrawDistributionPanel(){
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
@@ -433,16 +432,16 @@ namespace Engine.Editor.WorldGen{
             EditorGUILayout.EndVertical();
         }
 
-        /// <summary>TRN-06: every spline level along its axis with the other axes at the probe C/E/PV.</summary>
+        /// <summary>Every spline level along its axis with the other axes at the probe C/E/PV.</summary>
         private void DrawSplinePlotsPanel(){
             WorldGenSettings asset = WorldGenSettings;
             if (!asset) return;
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             {
-                _showPlots = EditorGUILayout.Foldout(_showPlots, "Spline levels (TRN-06)", true, EditorStyles.foldoutHeader);
+                _showPlots = EditorGUILayout.Foldout(_showPlots, "Spline levels", true, EditorStyles.foldoutHeader);
                 if (_showPlots){
                     if (!asset.Splines)
-                        EditorGUILayout.HelpBox("No TerrainSplineSet assigned (TRN-05).", MessageType.Info);
+                        EditorGUILayout.HelpBox("No TerrainSplineSet assigned.", MessageType.Info);
                     else if (_plotsError != null)
                         EditorGUILayout.HelpBox(_plotsError, MessageType.Warning);
                     else{
@@ -499,7 +498,7 @@ namespace Engine.Editor.WorldGen{
                 _showSettingsEditor = EditorGUILayout.Foldout(_showSettingsEditor, "WorldGenSettings", true, EditorStyles.foldoutHeader);
                 if (_showSettingsEditor){
                     if (!WorldGenSettings){
-                        EditorGUILayout.HelpBox("Assign a WorldGenSettings asset to the VoxelEngineSettings (INT-01).", MessageType.Info);
+                        EditorGUILayout.HelpBox("Assign a WorldGenSettings asset to the VoxelEngineSettings.", MessageType.Info);
                     }
                     else{
                         UnityEditor.Editor.CreateCachedEditor(WorldGenSettings, null, ref _settingsEditor);
@@ -521,12 +520,12 @@ namespace Engine.Editor.WorldGen{
 
                 BiomeSet set = WorldGenSettings ? WorldGenSettings.Biomes : null;
                 if (!set || set.Count == 0){
-                    EditorGUILayout.HelpBox("The WorldGenSettings has no BiomeSet with biomes (GEN-21).", MessageType.Warning);
+                    EditorGUILayout.HelpBox("The WorldGenSettings has no BiomeSet with biomes.", MessageType.Warning);
                     EditorGUILayout.EndVertical();
                     return;
                 }
 
-                // Legend: index, colour swatch and name, in classification order (GEN-23 ties → lower index).
+                // Legend: index, colour swatch and name, in classification order (ties go to the lower index).
                 for (int i = 0; i < set.Count; i++){
                     Biome biome = set.Biomes[i];
                     EditorGUILayout.BeginHorizontal();
@@ -623,7 +622,7 @@ namespace Engine.Editor.WorldGen{
             }
         }
 
-        /// <summary>INT-21: the selected view of A and B side by side and their difference.</summary>
+        /// <summary>The selected view of A and B side by side and their difference.</summary>
         private void DrawCompareViews(){
             EditorGUILayout.BeginHorizontal();
             {
@@ -655,7 +654,7 @@ namespace Engine.Editor.WorldGen{
                 PreviewView.HardBiome => pass.TerrainFirst ? "Hard biome (6D)" : "Hard biome (5D)",
                 PreviewView.DominantBiome => "Dominant material biome",
                 PreviewView.MaxMaterialWeight => $"Max material weight (mean {pass.MeanMaxWeight:0.00})",
-                PreviewView.SurfaceSource => "Surface source (§9.6)",
+                PreviewView.SurfaceSource => "Surface source",
                 PreviewView.Flora => $"Flora ({flora:N0} columns, {pass.FloraCounts.Count} species)",
                 PreviewView.Climate => "Climate (T, C, F)",
                 PreviewView.Erosion => "Erosion E",
@@ -740,7 +739,7 @@ namespace Engine.Editor.WorldGen{
 
         /// <summary>
         ///     Rebuilds the Burst configs (so edits take effect) and schedules pass A and, in compare mode, pass B
-        ///     over the same region and seed, plus the distribution plane of A. The TRN-06 plots are recomputed
+        ///     over the same region and seed, plus the distribution plane of A. The spline plots are recomputed
         ///     synchronously (a few thousand spline evaluations).
         /// </summary>
         private void ScheduleBuild(){
@@ -842,7 +841,7 @@ namespace Engine.Editor.WorldGen{
         }
 
         /// <summary>
-        ///     INT-21: the difference view of the selected view kind. Height views are signed (B − A); biome classes,
+        ///     The difference view of the selected view kind. Height views are signed (B − A); biome classes,
         ///     surface source and flora are mismatch masks; the other views compare the pixels. Recomputed after
         ///     every build and when the compare view changes (no resampling).
         /// </summary>
@@ -887,7 +886,7 @@ namespace Engine.Editor.WorldGen{
         /// <summary>
         ///     The classifier's T x F plane: x → F, y → T at fixed C, E, PV (and h in Terrain-first, 6D). Uses the
         ///     same <see cref="BiomeClassifier" /> as the sampler, so the plane is the hard class the world would get
-        ///     at those field values (GEN-23 tie rule included).
+        ///     at those field values, tie rule included.
         /// </summary>
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
         private struct DistributionJob : IJobParallelFor{

@@ -13,7 +13,7 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     LGT-11: a small hand-built world for the light tests — chunks -r…r around the origin, voxel ids with
+    ///     A small hand-built world for the light tests — chunks -r…r around the origin, voxel ids with
     ///     their own light table (independent of the voxel registry), and helpers to light chunks with the Burst
     ///     <see cref="LightJob" /> and to apply edits with <see cref="LightEditJob" />.
     /// </summary>

@@ -35,7 +35,7 @@ namespace Engine.Scripts.Jobs.Core{
         /// <param name="chunkManager">The chunk manager.</param>
         /// <param name="colliderBakeScheduler">The collider bake scheduler.</param>
         /// <param name="chunkPool">The chunk pool.</param>
-        /// <param name="lightScheduler">The light scheduler (LGT-06).</param>
+        /// <param name="lightScheduler">The light scheduler.</param>
         internal VoxelEngineScheduler(VoxelEngineSettings settings,
             CMeshBuildScheduler cMeshBuildScheduler,
             ChunkScheduler chunkScheduler,
@@ -71,7 +71,7 @@ namespace Engine.Scripts.Jobs.Core{
         /// <param name="focus">The focus position (e.g., player chunk root).</param>
         internal void ScheduleUpdate(PriorityUtil.Focus focus){
             switch (_currentUpdate){
-                // PERF-01: one marker per scheduler stage
+                // One profiler marker per scheduler stage
                 case SchedulerUpdate.Data:
                     using (VoxelProfilerMarkers.SchedulerData.Auto()) _dataJobHandler.Update(focus);
                     break;
@@ -109,13 +109,13 @@ namespace Engine.Scripts.Jobs.Core{
             _meshJobHandler.WakeUp();
         }
 
-        /// <summary>LGT-06: a chunk lost its light (neighbour unloaded, edit next to unlit chunks).</summary>
+        /// <summary>A chunk lost its light (neighbour unloaded, edit next to unlit chunks).</summary>
         private void OnLightInvalidated(){
             _lightJobHandler.WakeUp();
         }
 
         /// <summary>
-        ///     INT-30: completes and applies every running batch (data, light, mesh, collider) so the scheduler can be disposed
+        ///     Completes and applies every running batch (data, light, mesh, collider) so the scheduler can be disposed
         ///     without dropping a writable mesh-data array or a job that still reads chunk data.
         /// </summary>
         internal void CompleteRunning(){
@@ -158,7 +158,7 @@ namespace Engine.Scripts.Jobs.Core{
             /// <summary>Data generation job update.</summary>
             Data,
 
-            /// <summary>Light job update (LGT-06).</summary>
+            /// <summary>Light job update.</summary>
             Light,
 
             /// <summary>Mesh building job update.</summary>
@@ -181,12 +181,12 @@ namespace Engine.Scripts.Jobs.Core{
         public float MeshAvgTiming => _cMeshBuildScheduler.AvgTime;
 
         /// <summary>
-        ///     Gets the average execution time of light jobs (LGT-06).
+        ///     Gets the average execution time of light jobs.
         /// </summary>
         public float LightAvgTiming => _lightScheduler.AvgTime;
 
         /// <summary>
-        ///     Gets the number of chunks in the light queue (LGT-06).
+        ///     Gets the number of chunks in the light queue.
         /// </summary>
         public int LightQueueCount => _lightJobHandler.QueueCount;
 

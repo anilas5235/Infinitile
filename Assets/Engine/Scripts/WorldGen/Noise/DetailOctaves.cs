@@ -5,17 +5,16 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Noise{
     /// <summary>
-    ///     The K detail octaves N_i (GEN-09): separate single-frequency simplex noises in [-1,1], zero-centred, at
-    ///     fixed wavelengths (default 512, 256, 128, 64, 32, 16 blocks). Frequencies are never blended (§8.3);
-    ///     biomes and splines only scale these octaves linearly. Both architectures sample the same instances
-    ///     (GEN-11).
+    ///     The K detail octaves N_i: separate single-frequency simplex noises in [-1,1], zero-centred, at
+    ///     fixed wavelengths (default 512, 256, 128, 64, 32, 16 blocks). Frequencies are never blended;
+    ///     biomes and splines only scale these octaves linearly. Both architectures sample the same instances.
     /// </summary>
     [BurstCompile]
     public static class DetailOctaves{
         /// <summary>Upper bound of K; the per-column octave samples are kept in a <see cref="FixedList64Bytes{T}" />.</summary>
         public const int MaxOctaves = 15;
 
-        /// <summary>Default K (§5.6).</summary>
+        /// <summary>Default K.</summary>
         public const int DefaultOctaveCount = 6;
 
         /// <summary>Default wavelength of octave <paramref name="i" /> in blocks: 512 / 2^i.</summary>

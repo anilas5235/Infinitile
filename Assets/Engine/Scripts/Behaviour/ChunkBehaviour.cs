@@ -8,11 +8,8 @@ namespace Engine.Scripts.Behaviour{
         [SerializeField] private ChunkPartition[] chunkPartitions;
 
         /// <summary>
-        ///     Initializes renderer-specific options (e.g. shadow casting) from settings.
-        /// </summary>
-        /// <summary>
-        ///     PERF-04: cached at pool creation; the first <c>transform</c> access on an instance allocates the
-        ///     managed wrapper, which otherwise happened on the first claim during flight.
+        ///     Cached at pool creation; the first <c>transform</c> access on an instance allocates the managed
+        ///     wrapper, which would otherwise happen on the first claim during flight.
         /// </summary>
         public Transform Transform{ get; private set; }
 

@@ -8,9 +8,9 @@ using static Engine.Scripts.Utils.VoxelConstants;
 using static Engine.Tests.EditMode.LightTestWorld;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>LGT-11: incremental light updates after edits (LGT-07).</summary>
+    /// <summary>Incremental light updates after edits.</summary>
     public partial class LightPropagationTests{
-        /// <summary>LGT-07: 500 random edits with incremental updates equal a full recomputation.</summary>
+        /// <summary>500 random edits with incremental updates equal a full recomputation.</summary>
         [Test]
         public void RandomEdits_Incremental_EqualsFullRecompute(){
             using LightTestWorld world = new(2, RandomTerrain(7));

@@ -19,7 +19,7 @@ using Object = UnityEngine.Object;
 
 namespace Engine.Tests.PlayMode{
     /// <summary>
-    ///     TST-E18 (F-01): the mesh build scheduler's behaviour when a chunk is edited or unloaded while a build
+    ///     The mesh build scheduler's behaviour when a chunk is edited or unloaded while a build
     ///     job is in flight. Needs PlayMode because completing a batch claims live chunk prefab instances.
     /// </summary>
     public class ColliderMeshRaceTests{
@@ -105,7 +105,7 @@ namespace Engine.Tests.PlayMode{
 
         [Test]
         public void SetVoxel_WhileBuildJobRuns_CompletesJobFirst(){
-            // F-01: editing chunk data that a scheduled build job is reading must wait for the job.
+            // Editing chunk data that a scheduled build job is reading must wait for the job.
             using SchedulerRig rig = new();
             rig.StartCentreChunkBuild();
             Assert.IsFalse(rig.Scheduler.IsReady);
@@ -121,7 +121,7 @@ namespace Engine.Tests.PlayMode{
 
         [Test]
         public void SetVoxel_InNeighbourChunk_WhileBuildJobRuns_CompletesJobFirst(){
-            // F-01: the job also reads the 3x3 neighbours of the meshed chunk through the accessor.
+            // The job also reads the 3x3 neighbours of the meshed chunk through the accessor.
             using SchedulerRig rig = new();
             rig.StartCentreChunkBuild();
             Assert.IsFalse(rig.Scheduler.IsReady);
@@ -132,7 +132,7 @@ namespace Engine.Tests.PlayMode{
 
         [Test]
         public void UnloadChunk_WhileBuildJobRuns_CompletesJobFirst(){
-            // F-01: unloading a chunk that a scheduled build job is reading must wait for the job.
+            // Unloading a chunk that a scheduled build job is reading must wait for the job.
             using SchedulerRig rig = new();
             rig.StartCentreChunkBuild();
             Assert.IsFalse(rig.Scheduler.IsReady);
@@ -147,9 +147,9 @@ namespace Engine.Tests.PlayMode{
 
         [Test]
         public void Complete_WhenClaimEvictsAnAccessorChunk_DoesNotReenter(){
-            // F-01 regression: claiming a partition in Complete can evict a pool chunk; the world then unloads that
-            // chunk, and if it is in the accessor the scheduler is asked to finish its job. Finishing the whole batch
-            // there re-entered Complete and broke the outer loop (disposed mesh data, cleared job list).
+            // Claiming a partition in Complete can evict a pool chunk; the world then unloads that chunk, and if it
+            // is in the accessor the scheduler is asked to finish its job. Finishing the whole batch there must not
+            // re-enter Complete and break the outer loop (disposed mesh data, cleared job list).
             using SchedulerRig rig = new();
             rig.Pool.OnChunkEvicted += pos => rig.Manager.UnloadChunk(pos); // what VoxelWorld does on eviction
 
@@ -170,8 +170,8 @@ namespace Engine.Tests.PlayMode{
 
         [Test]
         public void Start_BatchLargerThanMeshingBatchSize_AppliesEveryResult(){
-            // F-16: the result map was sized from the draw distance and a parallel writer cannot grow it, so a
-            // larger batch lost results. The map now starts at meshingBatchSize and grows in Start.
+            // A parallel writer cannot grow the result map, so it starts at meshingBatchSize and grows in Start;
+            // a larger batch must not lose results.
             using SchedulerRig rig = new();
             NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult> results =
                 PlayModeFixtures.GetPrivateField<NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult>>(

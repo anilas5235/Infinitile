@@ -6,7 +6,7 @@ using Unity.Mathematics;
 using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>LGT-11: edits with the incremental <see cref="LightEditJob" /> (LGT-07).</summary>
+    /// <summary>Edits with the incremental <see cref="LightEditJob" />.</summary>
     internal sealed partial class LightTestWorld{
         /// <summary>
         ///     Edits one voxel and updates <paramref name="lights" /> (must hold the 3 × 3 chunks around the edit)

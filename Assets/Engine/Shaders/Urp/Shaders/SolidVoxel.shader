@@ -99,7 +99,6 @@
             // ── Fragment shader ───────────────────────────────────────
             half4 frag(Varyings IN) : SV_Target
             {
-                //return half4(1, 0, 1, 1); // Debug magenta to verify shader is running
                 // --- Texture array sample ---
                 FragExtraData extra = unpack_frag_extra_data(IN.packed);
                 float2 uv = IN.uv;
@@ -108,7 +107,7 @@
                 // --- Ambient occlusion ---
                 float4 ao_color = calc_ao_color(_AOColor, albedo, _AOCurve, extra.ao, _AOIntensity, _AOPower, uv);
 
-                // --- Light (LGT-10) ---
+                // --- Light ---
                 float3 light = calc_voxel_light(IN.packed, uv);
 
                 // --- Final colour ---

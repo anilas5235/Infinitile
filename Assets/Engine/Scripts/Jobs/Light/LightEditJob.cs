@@ -9,13 +9,13 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.Jobs.Light{
     /// <summary>
-    ///     LGT-07: incremental light update after one voxel edit (the voxel data already holds the new id), run
+    ///     Incremental light update after one voxel edit (the voxel data already holds the new id), run
     ///     synchronously with <c>Run()</c>. Per channel the usual two-queue method: a removal BFS clears the light
     ///     that may have come through the edited voxel, then the light is re-propagated from the voxels bordering
     ///     the cleared area, from the edited voxel's neighbours and from the cleared voxels' own sources (emission,
     ///     the sky above the world). Light changes at most 14 voxels from the edited column, so the box edit ± 16
     ///     (inside the 3 × 3 chunks around the edit) holds every voxel that can change plus its sources. The
-    ///     result equals a full recomputation (LGT-11).
+    ///     result equals a full recomputation.
     /// </summary>
     [BurstCompile]
     internal struct LightEditJob : IJob{

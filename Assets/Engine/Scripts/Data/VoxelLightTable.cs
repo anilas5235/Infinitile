@@ -3,7 +3,7 @@ using Unity.Collections;
 
 namespace Engine.Scripts.Data{
     /// <summary>
-    ///     LGT-02: light properties per voxel id for the light jobs: attenuation (extra loss per step, 0–15,
+    ///     Light properties per voxel id for the light jobs: attenuation (extra loss per step, 0–15,
     ///     15 = opaque) and emission (block light packed like <see cref="VoxelLight" />, sky 0). Built by the
     ///     voxel registry; tests and benchmarks build their own.
     /// </summary>

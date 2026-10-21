@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     F-23 / DEC-14: the chunk store evicts by plain distance. A chunk behind the player but inside the load
+    ///     The chunk store evicts by plain distance. A chunk behind the player but inside the load
     ///     distance must survive a chunk in front of the player that is further away.
     /// </summary>
     public class EvictionOrderTests{
@@ -39,8 +39,8 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void ChunkStore_Full_EvictsTheFarthestChunkNotTheOneBehindThePlayer(){
-            // F-23: the unload queue used the view-weighted priority (x5 behind the player), so a chunk 3 behind
-            // (weighted 45) was evicted before a chunk 6 in front (weighted 36) although it is twice as close.
+            // With the view-weighted priority (x5 behind the player) a chunk 3 behind (weighted 45) would be evicted
+            // before a chunk 6 in front (weighted 36) although it is twice as close.
             PriorityUtil.Focus focus = new(int3.zero, new float3(1, 0, 0));
             _manager.FocusUpdate(focus);
 
@@ -61,7 +61,7 @@ namespace Engine.Tests.EditMode{
             AddChunks(new[]{ new int2(0, 1) }); // one over capacity: exactly one chunk is evicted
 
             Assert.IsTrue(_manager.IsChunkLoaded(behind), "the closer chunk behind the player must stay loaded");
-            Assert.IsFalse(_manager.IsChunkLoaded(front), "the farthest chunk must be the one evicted (DEC-14)");
+            Assert.IsFalse(_manager.IsChunkLoaded(front), "the farthest chunk must be the one evicted");
         }
     }
 }

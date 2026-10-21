@@ -5,7 +5,7 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Core{
     /// <summary>
-    ///     LGT-06: job state handler for the light step between data generation and meshing. Lights loaded chunks
+    ///     Job state handler for the light step between data generation and meshing. Lights loaded chunks
     ///     whose 3 × 3 neighbourhood has voxel data, within <c>LoadDistance - 1</c> of the focus.
     /// </summary>
     internal class LightJobStateHandler : JobStateHandler<int2>{
@@ -18,7 +18,7 @@ namespace Engine.Scripts.Jobs.Core{
             _lightScheduler = lightScheduler;
             _meshJobHandler = meshJobHandler;
             int side = 2 * LightDistance + 1;
-            Reserve(side * side, settings.Scheduler.lightBatchSize); // PERF-04
+            Reserve(side * side, settings.Scheduler.lightBatchSize);
         }
 
         /// <summary>The ring the light job can serve: each lit chunk needs its neighbours' voxel data.</summary>
@@ -26,7 +26,7 @@ namespace Engine.Scripts.Jobs.Core{
 
         public override void FocusUpdate(PriorityUtil.Focus focus){
             WakeUp();
-            // N-01 / PERF-04: static lambda with explicit state instead of a closure capturing the focus
+            // Static lambda with explicit state instead of a closure capturing the focus
             Queue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.DistPriority(ref pos, ref f));
         }
 
@@ -64,8 +64,8 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        ///     Applies the finished batch and wakes the mesh handler. A batch that F-01 already completed and applied
-        ///     (an edit or unload of a chunk it read) only clears the set.
+        ///     Applies the finished batch and wakes the mesh handler. A batch that was already completed and applied
+        ///     early (an edit or unload of a chunk it read) only clears the set.
         /// </summary>
         protected override bool CollectResultsStep(){
             if (!_lightScheduler.IsReady){

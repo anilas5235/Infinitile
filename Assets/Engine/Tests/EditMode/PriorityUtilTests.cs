@@ -5,7 +5,7 @@ using NUnit.Framework;
 using Unity.Mathematics;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>TST-E07 (priority ordering, Focus) and TST-E16 (F-09 vertical forward, F-11 AvgTime).</summary>
+    /// <summary>Priority ordering, Focus, vertical view directions and the scheduler's AvgTime window.</summary>
     public class PriorityUtilTests{
         private static PriorityUtil.Focus LookingForward(){
             return new PriorityUtil.Focus(int3.zero, new float3(0, 0, 1));
@@ -27,11 +27,11 @@ namespace Engine.Tests.EditMode{
             return PriorityUtil.ReVerseDistPriority(ref position, ref focus);
         }
 
-        #region F-23
+        #region Eviction priority
 
         [Test]
         public void EvictionPriority_IsPlainDistance_IgnoringViewDirection(){
-            // F-23 / DEC-14: eviction must not weight chunks behind the player x5.
+            // Eviction must not weight chunks behind the player x5.
             PriorityUtil.Focus focus = LookingForward();
             int3 behind = new(0, 0, -3);
             int3 front = new(0, 0, 6);
@@ -48,7 +48,7 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
-        #region TST-E07
+        #region Priority ordering
 
         [Test]
         public void DistPriority_CloserIsLowerValue(){
@@ -102,11 +102,11 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
-        #region TST-E16
+        #region Vertical forward and AvgTime
 
         [Test]
         public void DistPriority2D_VerticalForward_GivesFinitePriorities(){
-            // F-09: forward (0, ±1, 0) has xz = (0, 0); the 2D overload must not produce NaN.
+            // Forward (0, ±1, 0) has xz = (0, 0); the 2D overload must not produce NaN.
             PriorityUtil.Focus up = new(int3.zero, new float3(0, 1, 0));
             PriorityUtil.Focus down = new(int3.zero, new float3(0, -1, 0));
             int2 position = new(3, 4);
@@ -138,7 +138,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void AvgTime_OfConstantTimings_EqualsThatConstant(){
-            // F-11: AvgTime divides by a constant 10 instead of the number of samples.
+            // AvgTime divides by the number of samples, not by a constant.
             TestScheduler scheduler = new(16);
             for (int i = 0; i < 4; i++) scheduler.Record(5);
             Assert.AreEqual(5f, scheduler.AvgTime, 1e-5f, "4 samples of 5 ms");
@@ -148,7 +148,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void AvgTime_WindowIsBoundedByRecordCount(){
-            // F-11: the queue keeps records + 1 entries.
+            // The queue must not keep more than records entries.
             TestScheduler scheduler = new(16);
             for (int i = 0; i < 40; i++) scheduler.Record(1);
             Assert.LessOrEqual(scheduler.Timings.Count, 16);
@@ -156,7 +156,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void AvgTime_KeepsSubMillisecondTimings(){
-            // F-11: ElapsedMilliseconds truncated every run below 1 ms to 0.
+            // Runs below 1 ms must not be truncated to 0.
             TestScheduler scheduler = new(16);
             for (int i = 0; i < 4; i++) scheduler.Record(0.4);
             Assert.AreEqual(0.4f, scheduler.AvgTime, 1e-5f);

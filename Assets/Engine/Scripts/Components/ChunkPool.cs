@@ -31,7 +31,7 @@ namespace Engine.Scripts.Components{
         internal Action<int3> OnPartitionEvicted;
 
         /// <summary>
-        ///     F-04: raised before a partition's collider mesh is cleared or rewritten. A collider bake job may still be
+        ///     Raised before a partition's collider mesh is cleared or rewritten. A collider bake job may still be
         ///     reading that mesh, so listeners finish it first.
         /// </summary>
         internal Action PartitionMeshWriting;
@@ -50,13 +50,13 @@ namespace Engine.Scripts.Components{
             _meshMap = new Dictionary<int3, ChunkPartition>(_partitionPoolSize);
 
             _colliderPoolSize = settings.Chunk.UpdateDistance.SquareSize() * PartitionsPerChunk;
-            // PERF-04: an entry per active partition (cleared on reclaim), so the set never rehashes during flight
+            // An entry per active partition (cleared on reclaim), so the set never rehashes during flight
             _colliderSet = new HashSet<int3>(_partitionPoolSize);
 
             _chunkQueue = new SimpleFastPriorityQueue<int2, float>();
             _partitionQueue = new SimpleFastPriorityQueue<int3, float>();
             _colliderQueue = new SimpleFastPriorityQueue<int3, float>();
-            // PERF-04: the queues hold at most one entry over the pool size before a reclaim
+            // The queues hold at most one entry over the pool size before a reclaim
             _chunkQueue.Reserve(_chunkPoolSize + 1);
             _partitionQueue.Reserve(_partitionPoolSize + 1);
             _colliderQueue.Reserve(_colliderPoolSize + 1);
@@ -64,7 +64,7 @@ namespace Engine.Scripts.Components{
             _pool = new ObjectPool<ChunkBehaviour>(
                 () => {
                     GameObject go = Object.Instantiate(settings.Chunk.ChunkPrefab, transform);
-                    go.name = "Chunk"; // PERF-04: named once; renaming per claim built a string every claim
+                    go.name = "Chunk"; // named once; renaming per claim would build a string every claim
                     go.SetActive(false);
                     ChunkBehaviour chunkBehaviour = go.GetComponent<ChunkBehaviour>();
                     chunkBehaviour.Init();
@@ -75,7 +75,7 @@ namespace Engine.Scripts.Components{
                 null, false, _chunkPoolSize, _chunkPoolSize
             );
 
-            // PERF-04: instantiate the whole pool now; claiming a chunk during flight must not Instantiate.
+            // Instantiate the whole pool now; claiming a chunk during flight must not Instantiate.
             ChunkBehaviour[] warmUp = new ChunkBehaviour[_chunkPoolSize];
             for (int i = 0; i < warmUp.Length; i++) warmUp[i] = _pool.Get();
             for (int i = 0; i < warmUp.Length; i++) _pool.Release(warmUp[i]);
@@ -97,19 +97,19 @@ namespace Engine.Scripts.Components{
         /// </summary>
         internal void FocusUpdate(Focus focus){
             _focus = focus;
-            // N-01 / PERF-04: static lambdas with explicit state; instance method groups allocate a delegate per call
-            // F-23 / DEC-14: reclaim by plain distance
+            // Static lambdas with explicit state (instance method groups allocate a delegate per call);
+            // reclaim by plain distance
             _chunkQueue.UpdateAllPriorities(focus, static (f, pos) => EvictionPriority(ref pos, ref f));
             _partitionQueue.UpdateAllPriorities(focus, static (f, pos) => EvictionPriority(ref pos, ref f));
             _colliderQueue.UpdateAllPriorities(focus, static (f, pos) => EvictionPriority(ref pos, ref f));
         }
 
         private float PriorityCalc(int2 position){
-            return EvictionPriority(ref position, ref _focus); // F-23
+            return EvictionPriority(ref position, ref _focus);
         }
 
         private float PriorityCalc(int3 position){
-            return EvictionPriority(ref position, ref _focus); // F-23
+            return EvictionPriority(ref position, ref _focus);
         }
 
         /// <summary>
@@ -165,7 +165,7 @@ namespace Engine.Scripts.Components{
             ChunkBehaviour behaviour = GetOrClaimChunk(position.xz);
             ChunkPartition partition = behaviour.GetPartition(position.y);
 
-            PartitionMeshWriting?.Invoke(); // F-04
+            PartitionMeshWriting?.Invoke();
             partition.Clear();
             _meshMap.Add(position, partition);
             _partitionQueue.Enqueue(position, PriorityCalc(position));
@@ -193,7 +193,7 @@ namespace Engine.Scripts.Components{
 
         private void ReclaimPartition(int3 partitionPos){
             if (_meshMap.TryGetValue(partitionPos, out ChunkPartition reclaimPartition)){
-                PartitionMeshWriting?.Invoke(); // F-04
+                PartitionMeshWriting?.Invoke();
                 reclaimPartition.Clear();
                 _meshMap.Remove(partitionPos);
             }
@@ -206,7 +206,7 @@ namespace Engine.Scripts.Components{
         }
 
         /// <summary>
-        ///     F-04: tells listeners that collider meshes of active partitions are about to be rewritten.
+        ///     Tells listeners that collider meshes of active partitions are about to be rewritten.
         /// </summary>
         internal void NotifyPartitionMeshWriting(){
             PartitionMeshWriting?.Invoke();
@@ -220,7 +220,7 @@ namespace Engine.Scripts.Components{
         }
 
         /// <summary>
-        ///     INT-30: reclaims every active chunk with its partitions and raises the eviction events, so a regenerated
+        ///     Reclaims every active chunk with its partitions and raises the eviction events, so a regenerated
         ///     world starts from an empty pool and listeners (renderer, chunk manager) drop their state.
         /// </summary>
         internal void ReclaimAll(){

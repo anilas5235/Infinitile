@@ -31,7 +31,7 @@ namespace Engine.Scripts.Data{
         }
 
         /// <summary>
-        ///     LGT-01: light lookup (packed, see <see cref="VoxelLight" />) with the same neighbour remapping as
+        ///     Light lookup (packed, see <see cref="VoxelLight" />) with the same neighbour remapping as
         ///     <see cref="GetVoxelInPartition" />; 0 outside the world height or for a chunk without light data.
         /// </summary>
         internal ushort GetLightInPartition(in int3 partitionPos, int3 voxelPos){
@@ -83,7 +83,7 @@ namespace Engine.Scripts.Data{
         }
 
         /// <summary>
-        ///     LGT-01: attempts to get the light data of a chunk.
+        ///     Attempts to get the light data of a chunk.
         /// </summary>
         internal bool TryGetLightData(int2 chunkPos, out ChunkLightData lightData){
             return _lightData.TryGetValue(chunkPos, out lightData);

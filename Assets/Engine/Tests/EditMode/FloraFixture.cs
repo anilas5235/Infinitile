@@ -19,7 +19,7 @@ using Object = UnityEngine.Object;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     Phase 4 (§10) inputs: in-memory voxels, two tree structures and two flora biomes, resolved through the
+    ///     Flora test inputs: in-memory voxels, two tree structures and two flora biomes, resolved through the
     ///     test's own id table (no registry). Ids 0…5 match <see cref="TestFixtures" />; the flora voxels follow.
     ///     The fixture owns every ScriptableObject it creates.
     /// </summary>
@@ -38,7 +38,7 @@ namespace Engine.Tests.EditMode{
         /// <summary>Test-side id of every voxel ScriptableObject.</summary>
         internal readonly Dictionary<Voxel, ushort> Ids = new();
 
-        /// <summary>Expected replace class per id (§10 stamping); ids not listed are solid.</summary>
+        /// <summary>Expected flora replace class per id; ids not listed are solid.</summary>
         internal readonly Dictionary<ushort, byte> Classes = new(){
             [TestFixtures.Air] = FloraVoxelClass.Air,
             [Tuft] = FloraVoxelClass.Foliage,
@@ -144,7 +144,7 @@ namespace Engine.Tests.EditMode{
         }
 
         /// <summary>
-        ///     The two §10 test biomes: a meadow (grass, flowers, trees) and dunes (cactus stacks 1–3, sparse grass,
+        ///     The two flora test biomes: a meadow (grass, flowers, trees) and dunes (cactus stacks 1–3, sparse grass,
         ///     pines), both above the water level 124 in Biome-first. Probabilities are high so every chunk has flora.
         /// </summary>
         internal Biome[] DefaultBiomes(){
@@ -266,7 +266,7 @@ namespace Engine.Tests.EditMode{
     }
 
     /// <summary>
-    ///     Test-side whole-world stamp of a chunk-aligned area (TST-02, TST-03), built only from the pure region API
+    ///     Test-side whole-world stamp of a chunk-aligned area, built only from the pure region API
     ///     (<see cref="WorldGenApi.SampleRegion" />) and the fixture's own block and class tables: the FillTerrain
     ///     layering, then every single-block plant on its column, then every anchor whose structure may reach the
     ///     area, in world (x, then z) order; a voxel replaces only one of a lower class. The chunk job must produce

@@ -29,10 +29,7 @@ namespace Player{
         private void Update(){
             if (!(_lookInput.sqrMagnitude > 0.0001f)) return;
 
-            // Yaw (horizontal)
-            //targetCamera.transform.Rotate(Vector3.up, _lookInput.x * lookSpeed * Time.deltaTime, Space.World);
-
-            // Pitch (vertical) mit Clamp
+            // Pitch (vertical, clamped) turns the camera, yaw (horizontal) turns the player
             _pitch -= _lookInput.y * lookSpeed * Time.deltaTime;
             _pitch = Mathf.Clamp(_pitch, -maxLookAngle, maxLookAngle);
 
@@ -47,7 +44,7 @@ namespace Player{
         public float Pitch => _pitch;
 
         /// <summary>
-        ///     Sets the camera pitch in degrees (clamped), e.g. when a camera bookmark is restored (INT-30).
+        ///     Sets the camera pitch in degrees (clamped), e.g. when a camera bookmark is restored.
         /// </summary>
         public void SetPitch(float pitch){
             _pitch = Mathf.Clamp(pitch, -maxLookAngle, maxLookAngle);

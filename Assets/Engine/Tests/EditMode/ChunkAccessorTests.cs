@@ -6,7 +6,7 @@ using Unity.Mathematics;
 using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>TST-E06: ChunkAccessor with a hand-built 3-chunk neighbourhood around the origin.</summary>
+    /// <summary>ChunkAccessor with a hand-built 3-chunk neighbourhood around the origin.</summary>
     public class ChunkAccessorTests{
         private const ushort Marker = 77;
         private const ushort YMarker = 66;

@@ -6,9 +6,9 @@ using Unity.Burst;
 
 namespace Engine.Scripts.WorldGen.Classify{
     /// <summary>
-    ///     Parameter-space classification (§6.4): d_b² = Σ_k λ_k (v_k − t_{b,k})² over T, F, C, E, PV (both
+    ///     Parameter-space classification: d_b² = Σ_k λ_k (v_k − t_{b,k})² over T, F, C, E, PV (both
     ///     architectures) and h (Terrain-first only). PV and its target enter as (PV + 1)/2 so every dimension lives in
-    ///     [0,1]. Hard classification is argmin_b d_b; ties break to the lower biome index (GEN-23).
+    ///     [0,1]. Hard classification is argmin_b d_b; ties break to the lower biome index.
     /// </summary>
     [BurstCompile]
     public static class BiomeClassifier{
@@ -26,7 +26,7 @@ namespace Engine.Scripts.WorldGen.Classify{
                    + cfg.LambdaPV * dPV * dPV;
         }
 
-        /// <summary>6D squared distance including normalised height <paramref name="h" /> (Terrain-first, §7).</summary>
+        /// <summary>6D squared distance including normalised height <paramref name="h" /> (Terrain-first).</summary>
         public static float DistanceSquared(in WorldFields f, float h, in Biome.BiomeDef b, in WorldGenConfig cfg){
             float dH = h - b.targetElevation;
             return DistanceSquared(f, b, cfg) + cfg.LambdaHeight * dH * dH;
@@ -39,7 +39,7 @@ namespace Engine.Scripts.WorldGen.Classify{
             float bestDistance = float.MaxValue;
             for (int b = 0; b < count; b++){
                 float d = DistanceSquared(f, cfg.Biomes[b], cfg);
-                if (d < bestDistance){ // strict: equal distances keep the lower index (GEN-23)
+                if (d < bestDistance){ // strict: equal distances keep the lower index
                     bestDistance = d;
                     best = b;
                 }
@@ -52,7 +52,7 @@ namespace Engine.Scripts.WorldGen.Classify{
         ///     Every active biome's squared distance d_b² into <paramref name="distancesSq" /> (slot b; a 16-float
         ///     vector, not weights) and the hard class argmin_b d_b with the same tie rule as <see cref="Classify(in WorldFields,in WorldGenConfig)" />.
         ///     6D with <paramref name="h" /> when <paramref name="withHeight" /> (Terrain-first), else 5D. Computed once
-        ///     per column and shared by the hard class and method 4 (PERF-07).
+        ///     per column and shared by the hard class and method 4.
         /// </summary>
         public static int Distances(in WorldFields f, float h, bool withHeight, in WorldGenConfig cfg, out BlendWeights distancesSq){
             distancesSq = default;

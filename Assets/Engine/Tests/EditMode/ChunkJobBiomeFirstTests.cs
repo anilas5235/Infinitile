@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
-using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Settings;
@@ -16,9 +15,9 @@ using Object = UnityEngine.Object;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     Phase 2 (§8, BIO-01…03, INT-10…12): the chunk job on the Biome-first sampler. Every column is the
-    ///     sampler's decision for that world column; blocks come from the surface-source biome; a height step at
-    ///     a biome boundary is expected and must be the same step the sampler produces (no blend in Phase 2).
+    ///     The chunk job on the Biome-first sampler. Every column is the sampler's decision for that world column;
+    ///     blocks come from the surface-source biome; without blending a height step at a biome boundary is expected
+    ///     and must be the same step the sampler produces.
     /// </summary>
     public class ChunkJobBiomeFirstTests{
         private const ushort TopA = TestFixtures.Grass;
@@ -137,7 +136,7 @@ namespace Engine.Tests.EditMode{
                 for (int z = 0; z < ChunkDepth; z++){
                     ChunkColumn col = Column(x, z);
                     Assert.That(col.SurfaceSource, Is.InRange(0, 1));
-                    Assert.AreEqual(col.SurfaceSource, (int)col.Biome, "Phase 2: surface source is the hard biome");
+                    Assert.AreEqual(col.SurfaceSource, (int)col.Biome, "without blending the surface source is the hard biome");
                     Biome.BiomeDef def = _config.WorldGen.Biomes[col.SurfaceSource];
                     Assert.AreEqual(def.topBlock, col.TopBlock);
                     Assert.AreEqual(def.underBlock, col.UnderBlock);
@@ -151,7 +150,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void PrepareChunkMaps_BiomeFirst_CliffsAtBoundariesAreTheSamplersOwn(){
-            // Phase 2 acceptance: visible cliffs at boundaries are expected; they must still be the per-column
+            // Without blending, visible cliffs at boundaries are expected; they must still be the per-column
             // sampler result, i.e. both sides of the boundary agree with the sampler and the step size is the
             // difference of the two biome formulas, not an artefact of the chunk.
             UseBiomeFirst();
@@ -194,7 +193,7 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void PrepareChunkMaps_BiomeFirst_SpatialMethodsAreTheSamplerDecision(
             [Values(BlendMethod.DistanceBlend, BlendMethod.DistortedBoundary)] BlendMethod height){
-            // Phase 3 (BLD-11, GEN-02): the chunk's padded lattice cache gives the pure sampler's result, also at
+            // The chunk's padded lattice cache gives the pure sampler's result, also at
             // boundaries, where the blended height and the dithered surface pick differ from the hard biome.
             UseBiomeFirst(BlendMethod.DistanceBlend, height);
             int blended = 0;

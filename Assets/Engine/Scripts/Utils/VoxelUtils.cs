@@ -69,7 +69,6 @@ namespace Engine.Scripts.Utils{
             return localVoxelPos;
         }
 
-
         /// <summary>
         ///     Gets the local voxel coordinates within its chunk for a world position.
         /// </summary>

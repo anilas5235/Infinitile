@@ -9,8 +9,8 @@ namespace Engine.Scripts.Noise{
     ///     domain-warped via two secondary noise profiles, then remapped through a
     ///     piecewise-linear redistribution curve. Used for large-scale features like
     ///     continentalness, where organic shapes and precise control over the value
-    ///     distribution matter. Runs on the seeded simplex basis (GEN-15); the two warp
-    ///     channels are decorrelated by their own salts instead of a seed offset (GEN-05, F-06).
+    ///     distribution matter. Runs on the seeded simplex basis; the two warp
+    ///     channels are decorrelated by their own salts instead of a seed offset.
     /// </summary>
     [BurstCompile]
     public struct WarpedNoiseLayer : IDisposable{
@@ -21,8 +21,8 @@ namespace Engine.Scripts.Noise{
         private NativeArray<float2> _redistributionCurve;
 
         /// <summary>
-        ///     Builds the layer and allocates the redistribution curve with the given allocator.
-        ///     Caller owns the resulting NativeArray and must call <see cref="Dispose" />.
+        ///     Builds the layer and allocates its native data (<c>Allocator.Domain</c>). The caller owns it and
+        ///     must call <see cref="Dispose" />.
         /// </summary>
         public WarpedNoiseLayer(Settings settings){
             _baseNoise = new NoiseProfile(settings.BaseNoise);
@@ -80,8 +80,7 @@ namespace Engine.Scripts.Noise{
         }
 
         /// <summary>
-        ///     Releases the redistribution curve's native memory. Must be called once
-        ///     this layer is no longer needed (matching the allocator lifetime rules).
+        ///     Releases the native memory of the curve and the noise profiles.
         /// </summary>
         public void Dispose(){
             if (_redistributionCurve.IsCreated) _redistributionCurve.Dispose();
@@ -102,7 +101,7 @@ namespace Engine.Scripts.Noise{
             /// </summary>
             public NoiseProfile.Settings WarpNoise;
 
-            /// <summary>Gradient salt of the Y warp channel so X/Y don't correlate (GEN-05).</summary>
+            /// <summary>Gradient salt of the Y warp channel so X/Y don't correlate.</summary>
             public uint WarpSaltY;
 
             /// <summary>Strength of the domain warp offset, in world-space units.</summary>

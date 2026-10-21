@@ -55,7 +55,7 @@ namespace Engine.Scripts.Jobs.Core{
         public SchedulerStep CurrentStep{ get; private set; } = SchedulerStep.UpdateQueues;
 
         /// <summary>
-        ///     PERF-04: pre-sizes the queue and the in-flight set so that filling them during flight does not allocate.
+        ///     Pre-sizes the queue and the in-flight set so that filling them during flight does not allocate.
         /// </summary>
         protected void Reserve(int queueCapacity, int batchSize){
             Queue.Reserve(queueCapacity);

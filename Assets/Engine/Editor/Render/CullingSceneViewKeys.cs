@@ -4,8 +4,8 @@ using UnityEngine;
 
 namespace Engine.Editor.Render{
     /// <summary>
-    ///     CUL-06 in the Scene view: the game-side debug keys go through the Input System, which in the Editor only
-    ///     receives the keyboard while the Game view has focus. While playing, F7 (overlay), F8 (culling) and F9
+    ///     Culling debug keys in the Scene view: the game-side keys go through the Input System, which in the Editor
+    ///     only receives the keyboard while the Game view has focus. While playing, F7 (overlay), F8 (culling) and F9
     ///     (freeze) therefore also work with the Scene view focused, and a status line shows the switches.
     /// </summary>
     [InitializeOnLoad]

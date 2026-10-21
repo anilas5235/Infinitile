@@ -4,7 +4,7 @@ using Engine.Scripts.VoxelConfig.Data.Generation;
 using UnityEngine;
 
 namespace Engine.Scripts.WorldGen.Settings{
-    /// <summary>An unordered pair of biomes, e.g. an implausible neighbour pair (GEN-24).</summary>
+    /// <summary>An unordered pair of biomes, e.g. an implausible neighbour pair.</summary>
     [Serializable]
     public class BiomePair{
         public Biome First;
@@ -12,19 +12,19 @@ namespace Engine.Scripts.WorldGen.Settings{
     }
 
     /// <summary>
-    ///     The active biomes (GEN-20). The classifier only considers biomes in this list; biome indices in jobs are
-    ///     indices into it, in asset order (GEN-21). Changing the set needs no code change. Biomes that stay in a
+    ///     The active biomes. The classifier only considers biomes in this list; biome indices in jobs are
+    ///     indices into it, in asset order. Changing the set needs no code change. Biomes that stay in a
     ///     VoxelDataPackage but not in the set (e.g. Jungle, Swamp) are inactive.
     /// </summary>
     [CreateAssetMenu(fileName = "BiomeSet", menuName = "Voxel/BiomeSet", order = 1)]
     public class BiomeSet : ScriptableObject{
-        /// <summary>Upper bound of active biomes: BlendWeights holds 16 entries (BLD-02).</summary>
+        /// <summary>Upper bound of active biomes: BlendWeights holds 16 entries.</summary>
         public const int MaxBiomes = 16;
 
         [Tooltip("Active biomes in index order. At most 16.")]
         public List<Biome> Biomes = new();
 
-        [Tooltip("GEN-24: neighbour pairs the preview flags as implausible (spec default Desert–Snow). Preview only: " +
+        [Tooltip("Neighbour pairs the preview flags as implausible (default Desert–Snow). Preview only: " +
                  "it does not influence generation and is not part of the canonical JSON.")]
         public List<BiomePair> ImplausibleNeighbours = new();
 
@@ -36,14 +36,14 @@ namespace Engine.Scripts.WorldGen.Settings{
             return Biomes == null ? -1 : Biomes.IndexOf(biome);
         }
 
-        /// <summary>GEN-21: index → name. Out-of-range or null entries give a placeholder, never an exception.</summary>
+        /// <summary>Index → name. Out-of-range or null entries give a placeholder, never an exception.</summary>
         public string NameOf(int index){
             if (Biomes == null || index < 0 || index >= Biomes.Count) return $"<{index}>";
             Biome biome = Biomes[index];
             return biome ? biome.name : $"<null {index}>";
         }
 
-        /// <summary>GEN-21: the full index → name table.</summary>
+        /// <summary>The full index → name table.</summary>
         public string[] Names(){
             string[] names = new string[Count];
             for (int i = 0; i < names.Length; i++) names[i] = NameOf(i);
@@ -51,7 +51,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         }
 
         /// <summary>
-        ///     GEN-24: whether the active biomes <paramref name="a" /> and <paramref name="b" /> form a pair listed in
+        ///     Whether the active biomes <paramref name="a" /> and <paramref name="b" /> form a pair listed in
         ///     <see cref="ImplausibleNeighbours" />, in either order. Pairs with an empty slot or an inactive biome never match.
         /// </summary>
         public bool IsImplausible(int a, int b){

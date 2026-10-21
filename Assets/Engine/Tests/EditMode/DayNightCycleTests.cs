@@ -3,7 +3,7 @@ using NUnit.Framework;
 using UnityEngine;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>LGT-10: the day/night curve of the DayNightCycle.</summary>
+    /// <summary>The day/night curve of the DayNightCycle.</summary>
     public class DayNightCycleTests{
         [TestCase(0f, -1f)]
         [TestCase(6f, 0f)]

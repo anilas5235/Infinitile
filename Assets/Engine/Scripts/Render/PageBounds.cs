@@ -4,7 +4,7 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.Render{
     /// <summary>
-    ///     CUL-01: world-space AABB of one render page, taken from the partition that owns the page. Mirrors the
+    ///     World-space AABB of one render page, taken from the partition that owns the page. Mirrors the
     ///     <c>PageBounds</c> struct in <c>PageCulling.compute</c> (two float3, 24 bytes); the GPU copy lives next to
     ///     <c>_CountsPerPage</c> in every <see cref="RenderBuffer" />.
     /// </summary>
@@ -28,7 +28,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     CUL-05: the box swept along <paramref name="extrusion" /> (main light direction times shadow distance).
+        ///     The box swept along <paramref name="extrusion" /> (main light direction times shadow distance).
         ///     Everything inside it can cast a shadow onto the original box, so a page whose extruded bounds touch the
         ///     frustum may shadow visible geometry. A zero extrusion returns the bounds unchanged.
         /// </summary>

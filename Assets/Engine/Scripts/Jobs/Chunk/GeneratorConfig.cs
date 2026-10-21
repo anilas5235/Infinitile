@@ -20,13 +20,12 @@ namespace Engine.Scripts.Jobs.Chunk{
         public int GlobalSeed;
 
         /// <summary>
-        ///     D-05 ownership: a view of <c>VoxelRegistry.VoxelMap</c>. The registry owns and disposes it; the
-        ///     config never does.
+        ///     A view of <c>VoxelRegistry.VoxelMap</c>. The registry owns and disposes it; the config never does.
         /// </summary>
         [NativeDisableParallelForRestriction] public NativeHashMap<FixedString32Bytes, Voxel.VoxelDef> Voxels;
 
         /// <summary>
-        ///     Spec world-generation parameters (INT-03). D-05 ownership: built by <c>WorldGenSettings.ToConfig</c>
+        ///     World-generation parameters. Built by <c>WorldGenSettings.ToConfig</c>
         ///     for this config (see <c>VoxelEngineProvider.ChunkDataScheduler</c>) and released by
         ///     <see cref="Dispose" />, which the <c>ChunkScheduler</c> calls when it is disposed. Must be created
         ///     whenever the config is handed to a job, because the job safety system rejects unconstructed nested
@@ -34,7 +33,7 @@ namespace Engine.Scripts.Jobs.Chunk{
         /// </summary>
         public WorldGenConfig WorldGen;
 
-        /// <summary>Releases the world-gen config. <see cref="Voxels" /> belongs to its registry (D-05).</summary>
+        /// <summary>Releases the world-gen config. <see cref="Voxels" /> belongs to its registry.</summary>
         public void Dispose(){
             WorldGen.Dispose();
         }

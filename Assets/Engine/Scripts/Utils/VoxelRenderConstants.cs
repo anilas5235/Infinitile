@@ -34,7 +34,7 @@ namespace Engine.Scripts.Utils{
 
         public static readonly int CompChunkNameID = Shader.PropertyToID("_CompChunk");
         public static readonly int UnCompChunkNameID = Shader.PropertyToID("_UnCompChunk");
-        public static readonly int CompPagesNameID = Shader.PropertyToID("_CompPages"); // §20.1
+        public static readonly int CompPagesNameID = Shader.PropertyToID("_CompPages");
         public static readonly int CompPagesOffsetNameID = Shader.PropertyToID("_CompPagesOffset");
         public static readonly int CopySourceNameID = Shader.PropertyToID("_CopySource");
         public static readonly int CopyTargetNameID = Shader.PropertyToID("_CopyTarget");
@@ -51,7 +51,7 @@ namespace Engine.Scripts.Utils{
         public static readonly int PartitionIndexNameID = Shader.PropertyToID("_PartitionIndex");
         public static readonly int PointCapacityNameID = Shader.PropertyToID("_PointCapacity");
 
-        // LGT-10: lighting globals of the voxel shaders
+        // Lighting globals of the voxel shaders
         public static readonly int VoxelSkyBrightnessNameID = Shader.PropertyToID("_VoxelSkyBrightness");
         public static readonly int VoxelSkyTintNameID = Shader.PropertyToID("_VoxelSkyTint");
         public static readonly int VoxelAmbientNameID = Shader.PropertyToID("_VoxelAmbient");
@@ -76,7 +76,7 @@ namespace Engine.Scripts.Utils{
         public static readonly int PointsPerPageNameID = Shader.PropertyToID("_PointsPerPage");
         public static readonly int PagesPerBufferNameID = Shader.PropertyToID("_PagesPerBuffer");
 
-        // Phase C: GPU culling (PageCulling.compute and the vertex pulling in VoxelShaderCommon.hlsl)
+        // GPU culling (PageCulling.compute and the vertex pulling in VoxelShaderCommon.hlsl)
         public static readonly int PageBoundsNameID = Shader.PropertyToID("_PageBounds");
         public static readonly int VisiblePagesNameID = Shader.PropertyToID("_VisiblePages");
         public static readonly int FrustumPlanesNameID = Shader.PropertyToID("_FrustumPlanes");

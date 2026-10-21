@@ -5,11 +5,11 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Noise{
     /// <summary>
-    ///     Boundary warp field Ω of method 3, DistortedBoundary (§9.4): two independent simplex fBm channels
+    ///     Boundary warp field Ω of method 3, DistortedBoundary: two independent simplex fBm channels
     ///     (salts <see cref="HashSalts.BlendWarpX" />, <see cref="HashSalts.BlendWarpY" />) at wavelength λ_d with
     ///     <c>WarpOctaves</c> octaves (default 2, persistence 0.5, lacunarity 2), normalised to [−1,1]. The
-    ///     displacement d(q) = A·Ω(q) moves only the classification position (BLD-21); both blend stages use the
-    ///     same field and the same amplitude A (BLD-20, DEC-05).
+    ///     displacement d(q) = A·Ω(q) moves only the classification position; both blend stages use the
+    ///     same field and the same amplitude A.
     /// </summary>
     [BurstCompile]
     public static class WarpField{
@@ -33,8 +33,8 @@ namespace Engine.Scripts.WorldGen.Noise{
         }
 
         /// <summary>
-        ///     The warped classification position q + A·Ω(q) (§9.4). With A = 0 the warp is skipped and q returned
-        ///     unchanged (PERF-07), which is exactly what q + 0·Ω would give.
+        ///     The warped classification position q + A·Ω(q). With A = 0 the warp is skipped and q returned
+        ///     unchanged, which is exactly what q + 0·Ω would give.
         /// </summary>
         public static float2 Warp(float2 q, in WorldGenConfig cfg){
             if (cfg.WarpAmplitude == 0f) return q;

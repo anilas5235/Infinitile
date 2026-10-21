@@ -10,7 +10,7 @@ namespace Engine.Scripts.Jobs.Chunk{
     /// <summary>
     ///     Parallel job that procedurally generates chunk data (terrain, caves, ores, structures, vegetation)
     ///     for multiple chunks in parallel.
-    ///     GEN-16: the job calls <c>WorldSampler</c>, so it compiles synchronously with strict float mode; a Mono
+    ///     The job calls <c>WorldSampler</c>, so it compiles synchronously with strict float mode; a Mono
     ///     fallback during async compilation or a relaxed float mode could otherwise change the generated world.
     /// </summary>
     [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
@@ -19,9 +19,6 @@ namespace Engine.Scripts.Jobs.Chunk{
         [WriteOnly] public NativeParallelHashMap<int2, ChunkVoxelData>.ParallelWriter Results; // Result mapping
         [ReadOnly] public int RandomSeed;
         [ReadOnly] public GeneratorConfig Config;
-
-        private const float CaveScale = 0.04f; // 3D noise scale for caves (larger features)
-        private const int LavaLevel = 5;
 
         /// <summary>
         ///     Executes chunk generation for the given job index and writes the result into the hash map.
@@ -34,7 +31,7 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
-        ///     Generates all voxel data for a given chunk (terrain, ores, caves, structures, vegetation).
+        ///     Generates all voxel data for a given chunk (terrain, vegetation).
         /// </summary>
         private void GenerateChunkData(int2 chunkPos, out ChunkVoxelData voxelData){
             int surfaceArea = ChunkSize.x * ChunkSize.z;
@@ -50,13 +47,6 @@ namespace Engine.Scripts.Jobs.Chunk{
 
             FillTerrain(chunkVoxels, chunkColumns, ref Config);
 
-            //PlaceOres(vox, Config, RandomSeed);
-
-            //CarveCaves(vox, chunkWorldPos, chunkColumns, Config, RandomSeed, CaveScale, LavaLevel);
-
-            //PlaceStructures(ref vox, ref chunkColumns, ref chunkWorldPos, RandomSeed, ref Config);
-
-            // INT-11: vegetation per VEG-01…05.
             PlaceVegetation(chunkVoxels, chunkColumns, floraGrid, chunkWorldPos, ref Config);
 
             WriteToChunkData(chunkVoxels, out voxelData);

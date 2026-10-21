@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Engine.Scripts.WorldGen.Flora{
     /// <summary>
-    ///     One flora rule of a biome (VEG-03): a species (single voxel, a stack of one voxel, or a multi-block
+    ///     One flora rule of a biome: a species (single voxel, a stack of one voxel, or a multi-block
     ///     structure), its probability per column and placement conditions. The Burst mirror is
     ///     <see cref="FloraRuleDef" />; <see cref="FloraPlacement" /> evaluates it.
     /// </summary>
@@ -24,41 +24,41 @@ namespace Engine.Scripts.WorldGen.Flora{
         [Tooltip("When true, the plant is suppressed if the column's surface source biome differs from its flora source biome.")]
         public bool RequiresSurfaceFromSameBiome;
 
-        [Tooltip("Minimum height of the top block's upper face above the water surface, in blocks (VEG-03, default 1).")]
+        [Tooltip("Minimum height of the top block's upper face above the water surface, in blocks (default 1).")]
         public int MinHeightAboveWater = 1;
 
         [Tooltip("SpeciesVoxel only: the voxel is stacked this many blocks high at least (e.g. a cactus 1–3 high).")]
         [Min(1)]
         public int MinStackHeight = 1;
 
-        [Tooltip("SpeciesVoxel only: the voxel is stacked at most this many blocks high. Above 1 the species is multi-block (VEG-05 spacing).")]
+        [Tooltip("SpeciesVoxel only: the voxel is stacked at most this many blocks high. Above 1 the species is multi-block (anchor spacing applies).")]
         [Min(1)]
         public int MaxStackHeight = 1;
 
         /// <summary>True when the rule names exactly one species.</summary>
         public bool IsValid => (SpeciesVoxel != null) ^ (SpeciesStructure != null);
 
-        /// <summary>Structures and stacks higher than one block take part in the anchor spacing (VEG-05).</summary>
+        /// <summary>Structures and stacks higher than one block take part in the anchor spacing.</summary>
         public bool IsMultiBlock => SpeciesStructure != null || math.max(MinStackHeight, MaxStackHeight) > 1;
     }
 
     /// <summary>
-    ///     Burst mirror of a <see cref="FloraRule" /> (INT-03), stored flattened in <c>WorldGenConfig.FloraRules</c> and
+    ///     Burst mirror of a <see cref="FloraRule" />, stored flattened in <c>WorldGenConfig.FloraRules</c> and
     ///     addressed per biome by <c>BiomeDef.floraRuleStart/floraRuleCount</c>. The species roll picks the rule with
-    ///     <see cref="CumulativeStart" /> ≤ u &lt; <see cref="CumulativeEnd" /> (VEG-02); both bounds are computed once
+    ///     <see cref="CumulativeStart" /> ≤ u &lt; <see cref="CumulativeEnd" />; both bounds are computed once
     ///     by the config builder, so the roll and the multi-block pre-filter compare against the same floats.
     /// </summary>
     public struct FloraRuleDef{
-        /// <summary>Species id (1-based index into the config's species table; 0 = none) (VEG-06).</summary>
+        /// <summary>Species id (1-based index into the config's species table; 0 = none).</summary>
         public ushort Species;
 
         public float CumulativeStart;
         public float CumulativeEnd;
 
-        /// <summary>1 when the plant needs surface source = flora source (VEG-03).</summary>
+        /// <summary>1 when the plant needs surface source = flora source.</summary>
         public byte RequiresSurfaceFromSameBiome;
 
-        /// <summary>1 for structures and stacks above one block: anchor spacing applies (VEG-05).</summary>
+        /// <summary>1 for structures and stacks above one block: anchor spacing applies.</summary>
         public byte MultiBlock;
 
         public int MinHeightAboveWater;
@@ -98,11 +98,11 @@ namespace Engine.Scripts.WorldGen.Flora{
     }
 
     /// <summary>
-    ///     Which voxels flora may overwrite (§10, own rule): a flora voxel replaces an existing voxel only if the existing
+    ///     Which voxels flora may overwrite: a flora voxel replaces an existing voxel only if the existing
     ///     voxel's class is lower. Air &lt; foliage (grass, flowers) &lt; leaves (transparent with collision) &lt; everything
     ///     else (terrain, water, logs, cactus). So leaves never cut into terrain, logs push leaves aside, and nothing
     ///     floods water. Overlapping trees are stamped in world order (x, then z), which makes the result the same in
-    ///     every chunk that contains the voxel (VEG-05, TST-03).
+    ///     every chunk that contains the voxel.
     /// </summary>
     public static class FloraVoxelClass{
         public const byte Air = 0;

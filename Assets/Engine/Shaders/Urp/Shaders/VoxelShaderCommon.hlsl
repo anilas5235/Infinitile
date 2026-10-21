@@ -25,7 +25,7 @@ struct VoxelVertexData
 // Vertex helpers
 // ─────────────────────────────────────────────────────────────────────────────
 StructuredBuffer<PointData> _PointData;
-// Phase C (CUL-03): points are pulled through the per-camera visible page list instead of a per-point index buffer.
+// Points are pulled through the per-camera visible page list instead of a per-point index buffer.
 // Both buffers belong to the RenderBuffer being drawn; _VisiblePages is written by PageCulling.compute per frame.
 StructuredBuffer<uint> _VisiblePages;
 StructuredBuffer<uint> _CountsPerPage;
@@ -45,7 +45,7 @@ VoxelVertexData fetch_vertex_data(uint vertexID)
     if (inPage >= _CountsPerPage[page])
     {
         // Unused slot of a partly filled page: all six corners at the same position give a zero-area triangle
-        // that the rasteriser drops (CUL-03).
+        // that the rasteriser drops.
         v.positionOS = 0;
         v.uv = 0;
         v.packed = 0;
@@ -138,7 +138,7 @@ float4 calc_ao_color(const float4 ao_color, const float4 albedo, const float4 ao
     return lerp(ao_color, albedo, t);
 }
 
-// LGT-10: globals driven by the DayNightCycle component (VoxelLightingGlobals sets defaults without one).
+// Globals driven by the DayNightCycle component (VoxelLightingGlobals sets defaults without one).
 // Day/night only changes these; the propagated light levels stay as they are.
 float _VoxelSkyBrightness;
 float4 _VoxelSkyTint;
@@ -151,7 +151,7 @@ float interpolate_corners(const uint4 corners, float2 uv)
     return lerp(lerp(c.w, c.z, uv.x), lerp(c.x, c.y, uv.x), uv.y);
 }
 
-// Brightness of a light level 0-15: each level below 15 loses 15 % (LGT-10, chosen by the user 2026-10-21).
+// Brightness of a light level 0-15: each level below 15 loses 15 %.
 float light_curve(float level)
 {
     return pow(0.85f, 15.0f - level);
@@ -162,7 +162,7 @@ float3 light_curve(float3 level)
     return pow(0.85f, 15.0f - level);
 }
 
-// LGT-10: light = max(skyCurve(sky) * brightness * tint, blockCurve(RGB)), never below the ambient.
+// Light = max(skyCurve(sky) * brightness * tint, blockCurve(RGB)), never below the ambient.
 float3 calc_voxel_light(const uint4 packed, float2 uv)
 {
     float sky = interpolate_corners(get_sky_light(packed), uv);

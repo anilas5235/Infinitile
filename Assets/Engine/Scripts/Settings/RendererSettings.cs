@@ -8,10 +8,10 @@ namespace Engine.Scripts.Settings{
     /// </summary>
     [Serializable]
     public class RendererSettings{
-        [Header("Material Settings")]
         /// <summary>
-        /// The material used to render solid chunk surfaces.
+        ///     The material used to render solid chunk surfaces.
         /// </summary>
+        [Header("Material Settings")]
         public Material solidMaterial;
 
         /// <summary>
@@ -24,10 +24,10 @@ namespace Engine.Scripts.Settings{
         /// </summary>
         public Material foliageMaterial;
 
-        [Header("ComputeShader Settings")]
         /// <summary>
-        /// The compute shader used to build point data from voxel partitions.
+        ///     The compute shader used to build point data from voxel partitions.
         /// </summary>
+        [Header("ComputeShader Settings")]
         public ComputeShader pointBuilder;
 
         /// <summary>
@@ -36,21 +36,21 @@ namespace Engine.Scripts.Settings{
         public ComputeShader copyPoints;
 
         /// <summary>
-        ///     Phase C: the compute shader that culls render pages per camera and writes the indirect draw args
+        ///     The compute shader that culls render pages per camera and writes the indirect draw args
         ///     (PageCulling.compute, kernels CullPages and WriteArgs).
         /// </summary>
         public ComputeShader pageCulling;
 
-        [Header("Culling")]
         /// <summary>
-        /// CUL-06: GPU frustum culling of render pages. Off draws every page that holds points, for debugging and
-        /// before/after comparison; the image must be identical.
+        ///     GPU frustum culling of render pages. Off draws every page that holds points, for debugging and
+        ///     before/after comparison; the image must be identical.
         /// </summary>
+        [Header("Culling")]
         public bool gpuCulling = true;
 
         /// <summary>
         ///     Whether chunk meshes cast shadows. With shadows on, every buffer is drawn a second time as shadow caster
-        ///     with a list of pages whose bounds extruded along the main light reach the view (CUL-05).
+        ///     with a list of pages whose bounds extruded along the main light reach the view.
         /// </summary>
         [HideInInspector] public ShadowCastingMode shadows = ShadowCastingMode.Off;
     }

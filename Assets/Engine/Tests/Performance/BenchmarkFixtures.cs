@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace Engine.Tests.Performance{
     /// <summary>
-    ///     PERF-02: hand-built generator/render inputs so the benchmarks run without the Resources-based
+    ///     Hand-built generator/render inputs so the benchmarks run without the Resources-based
     ///     DataImporter. Voxel IDs are fixed; the world-gen config comes from WorldGenSettings built in code,
     ///     exactly like the engine does (WorldGenSettings.ToConfig).
     /// </summary>
@@ -27,9 +27,8 @@ namespace Engine.Tests.Performance{
         internal const int Seed = 1337;
 
         internal static GeneratorConfig CreateGeneratorConfig(Allocator allocator){
-            // Phase 2 (INT-40): the only generation input is a WorldGenSettings. One Biome-first biome at offset
-            // 100 with a small amplitude keeps the surface near y = 100 for the tests that fill terrain here;
-            // block ids are patched in because no registry exists in the fixture.
+            // One Biome-first biome at offset 100 with a small amplitude keeps the surface near y = 100 for the
+            // tests that fill terrain here; block ids are patched in because no registry exists in the fixture.
             WorldGenSettings settings = ScriptableObject.CreateInstance<WorldGenSettings>();
             BiomeSet set = ScriptableObject.CreateInstance<BiomeSet>();
             Biome biome = ScriptableObject.CreateInstance<Biome>();
@@ -78,29 +77,28 @@ namespace Engine.Tests.Performance{
         }
 
         /// <summary>
-        ///     PERF-02 "per architecture": the same generator config on the Terrain-first sampler (INT-10). The
-        ///     WorldGenSettings, the six section 19.2 placeholder biomes and the section 19.1 placeholder splines are
-        ///     built in code (no Resources); block ids are patched in because no registry exists here. The created
-        ///     ScriptableObjects are returned so the caller can destroy them.
+        ///     The placeholder world on the Terrain-first sampler. The WorldGenSettings, the six placeholder biomes and
+        ///     the placeholder splines are built in code (no Resources); block ids are patched in because no registry
+        ///     exists here. The created ScriptableObjects are returned so the caller can destroy them.
         /// </summary>
         internal static GeneratorConfig CreateTerrainFirstGeneratorConfig(Allocator allocator, List<Object> created){
-            return CreateSpecGeneratorConfig(GenArchitecture.TerrainFirst, BlendMethod.None, allocator, created);
+            return CreatePlaceholderGeneratorConfig(GenArchitecture.TerrainFirst, BlendMethod.None, allocator, created);
         }
 
-        /// <summary>Same world as <see cref="CreateTerrainFirstGeneratorConfig" /> on the Biome-first sampler (Phase 2).</summary>
+        /// <summary>Same world as <see cref="CreateTerrainFirstGeneratorConfig" /> on the Biome-first sampler.</summary>
         internal static GeneratorConfig CreateBiomeFirstGeneratorConfig(Allocator allocator, List<Object> created){
-            return CreateSpecGeneratorConfig(GenArchitecture.BiomeFirst, BlendMethod.None, allocator, created);
+            return CreatePlaceholderGeneratorConfig(GenArchitecture.BiomeFirst, BlendMethod.None, allocator, created);
         }
 
         /// <summary>
         ///     The same world with blend method <paramref name="method" /> on the material stage and, in Biome-first, on
-        ///     the height stage too (PERF-02 "per architecture x method", Phase 3); strengths are the spec defaults.
+        ///     the height stage too; strengths are the defaults.
         /// </summary>
         /// <param name="flora">
-        ///     Phase 4: give the biomes the §10 placeholder flora rules (and solid top blocks, so plants can stand on
+        ///     Give the biomes the placeholder flora rules (and solid top blocks, so plants can stand on
         ///     them); the species are in-memory voxels and a tree like the shipped one, with ids from 6 upwards.
         /// </param>
-        internal static GeneratorConfig CreateSpecGeneratorConfig(GenArchitecture architecture, BlendMethod method,
+        internal static GeneratorConfig CreatePlaceholderGeneratorConfig(GenArchitecture architecture, BlendMethod method,
             Allocator allocator, List<Object> created, bool flora = false){
             GeneratorConfig config = CreateGeneratorConfig(allocator);
             config.WorldGen.Dispose(); // replaced by the six-biome world below
@@ -137,8 +135,8 @@ namespace Engine.Tests.Performance{
         }
 
         /// <summary>
-        ///     The §10 placeholder rules of the six §19.2 biomes (same order as in
-        ///     <see cref="CreateSpecGeneratorConfig" />), with the shipped tree: log 0…4, filled 3×3×3 leaf box at y 6.
+        ///     The placeholder flora rules of the six placeholder biomes (same order as in
+        ///     <see cref="CreatePlaceholderGeneratorConfig" />), with the shipped tree: log 0…4, filled 3×3×3 leaf box at y 6.
         /// </summary>
         private static void AddPlaceholderFlora(BiomeSet set, Dictionary<Voxel, ushort> ids, List<Object> created){
             Voxel V(string name, ushort id, MeshLayer layer, bool collision){
@@ -220,9 +218,9 @@ namespace Engine.Tests.Performance{
         }
 
         /// <summary>
-        ///     Releases a config from <see cref="CreateGeneratorConfig" />. Since D-05, <c>GeneratorConfig.Dispose</c>
-        ///     frees only the world-gen config, because at runtime the registry owns the voxel map; here the fixture
-        ///     created it, so it frees it too.
+        ///     Releases a config from <see cref="CreateGeneratorConfig" />. <c>GeneratorConfig.Dispose</c> frees only
+        ///     the world-gen config, because at runtime the registry owns the voxel map; here the fixture created it,
+        ///     so it frees it too.
         /// </summary>
         internal static void DisposeGeneratorConfig(ref GeneratorConfig config){
             if (config.Voxels.IsCreated) config.Voxels.Dispose();

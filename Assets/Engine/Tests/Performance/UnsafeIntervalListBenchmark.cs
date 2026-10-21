@@ -7,7 +7,7 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Tests.Performance{
     /// <summary>
-    ///     PERF-02: UnsafeIntervalList.Set with 10^4 random edits on a chunk-sized, terrain-like list
+    ///     UnsafeIntervalList.Set with 10^4 random edits on a chunk-sized, terrain-like list
     ///     (one column pattern of stone/dirt/grass/air repeated for every x,z column, as ChunkJob writes it).
     /// </summary>
     [TestFixture]

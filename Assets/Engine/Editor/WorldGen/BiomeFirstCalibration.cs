@@ -11,16 +11,14 @@ using Unity.Mathematics;
 
 namespace Engine.Editor.WorldGen{
     /// <summary>
-    ///     BIO-20: "Suggest Biome-first height parameters from Terrain-first". Samples the Terrain-first pipeline of
-    ///     the same settings over a region, groups the columns by their Terrain-first (6D) biome and suggests per
-    ///     biome b: Jaggedness_b = mean J, Offset_b = mean H − Jaggedness_b · mean P and HeightAmplitude_b from the
-    ///     standard deviation of the detail residual r = H − Offset − J·P = Amp·Σ g_i N_i. The ridge term is
-    ///     non-negative (mean P ≈ 0.4…0.5), so Offset_b = mean H alone would lift every jagged biome by about
-    ///     J_b · mean P in Biome-first; subtracting it makes the Biome-first mean height match (decision 2026-10-18).
-    ///     Biome-first produces the detail term
-    ///     HeightAmplitude_b · Σ w_{b,i} N_i with the biome's own octave weights w_b, so the amplitude that matches
-    ///     the Terrain-first spread is std(r) / std(Σ w_{b,i} N_i) over the biome's columns. Clamped columns (GEN-12)
-    ///     are skipped because their H no longer follows the formula.
+    ///     Suggests Biome-first height parameters from Terrain-first. Samples the Terrain-first pipeline of the same
+    ///     settings over a region, groups the columns by their Terrain-first (6D) biome and suggests per biome b:
+    ///     Jaggedness_b = mean J, Offset_b = mean H − Jaggedness_b · mean P and HeightAmplitude_b from the standard
+    ///     deviation of the detail residual r = H − Offset − J·P = Amp·Σ g_i N_i. The ridge term is non-negative
+    ///     (mean P ≈ 0.4…0.5), so subtracting J_b · mean P keeps jagged biomes from being lifted in Biome-first.
+    ///     Biome-first produces the detail term HeightAmplitude_b · Σ w_{b,i} N_i with the biome's own octave
+    ///     weights w_b, so the matching amplitude is std(r) / std(Σ w_{b,i} N_i) over the biome's columns. Clamped
+    ///     columns are skipped because their H no longer follows the formula.
     ///     <para>Pure computation: nothing is written to any asset. Applying a suggestion is the caller's click.</para>
     /// </summary>
     public static class BiomeFirstCalibration{
@@ -66,7 +64,7 @@ namespace Engine.Editor.WorldGen{
             }
 
             if (!settings.Splines){
-                error = $"{settings.name}: the Terrain-first reference needs a TerrainSplineSet (TRN-05).";
+                error = $"{settings.name}: the Terrain-first reference needs a TerrainSplineSet.";
                 return false;
             }
 
@@ -77,12 +75,12 @@ namespace Engine.Editor.WorldGen{
 
             List<Biome> biomes = ActiveBiomes(settings);
             if (biomes.Count == 0){
-                error = $"{settings.name}: no active biomes (GEN-21).";
+                error = $"{settings.name}: no active biomes.";
                 return false;
             }
 
             // Terrain-first view of the same settings. Forced in memory only (no SetDirty, no Undo): the asset keeps
-            // its architecture and the TRN-21 warning for a configured height method is avoided.
+            // its architecture, and HeightMethod = None avoids the Terrain-first warning about a configured height method.
             GenArchitecture architecture = settings.Architecture;
             BlendMethod heightMethod = settings.HeightMethod;
             WorldGenConfig cfg;
@@ -153,7 +151,7 @@ namespace Engine.Editor.WorldGen{
             }
         }
 
-        /// <summary>Active biomes in config order (GEN-21): the first MaxBiomes non-null slots; a null slot stops the list.</summary>
+        /// <summary>Active biomes in config order: the first MaxBiomes non-null slots; a null slot stops the list.</summary>
         private static List<Biome> ActiveBiomes(WorldGenSettings settings){
             List<Biome> result = new();
             if (!settings.Biomes || settings.Biomes.Biomes == null) return result;
@@ -180,8 +178,8 @@ namespace Engine.Editor.WorldGen{
         /// <summary>
         ///     Per-biome sums over the region in double precision: n, ΣH, ΣJ, Σr, Σr², ΣD_b, ΣD_b², ΣP with
         ///     r = Amp(p) · Σ_i g_i N_i(p) (the Terrain-first detail residual) and D_b = Σ_i w_{b,i} N_i(p) (the
-        ///     biome's own detail with its current octave weights) and P the shared peak noise (BIO-03). One sampler
-        ///     call per column (INT-10).
+        ///     biome's own detail with its current octave weights) and P the shared peak noise. One sampler call per
+        ///     column.
         /// </summary>
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
         private struct CalibrationJob : IJob{

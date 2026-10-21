@@ -9,11 +9,10 @@ using static UnityEngine.GraphicsBuffer;
 
 namespace Engine.Scripts.Render{
     /// <summary>
-    ///     §20.1: one structured GPU buffer for the compressed interval lists of every loaded chunk, voxel ids and
-    ///     light (LGT-08) alike. Each list is a range of pages (<see cref="IntervalPages" />); the decompress kernels
-    ///     find the pages of a list through a page table (<see cref="WritePageTable" />). Replaces one
-    ///     <see cref="GraphicsBuffer" /> per list: no managed object per chunk upload (PERF-04), and memory follows the
-    ///     actual list lengths instead of a fixed length per chunk.
+    ///     One structured GPU buffer for the compressed interval lists of every loaded chunk, voxel ids and light
+    ///     alike. Each list is a range of pages (<see cref="IntervalPages" />); the decompress kernels find the pages
+    ///     of a list through a page table (<see cref="WritePageTable" />). Chunk uploads create no managed objects, and
+    ///     memory follows the actual list lengths instead of a fixed length per chunk.
     /// </summary>
     internal sealed class ChunkIntervalStore : IDisposable{
         private const int CopyThreads = 64;
@@ -22,7 +21,7 @@ namespace Engine.Scripts.Render{
         private readonly ComputeShader _copyShader;
         private readonly int _copyKernel;
         private readonly IntervalPages _pages;
-        private uint2[] _staging = Array.Empty<uint2>(); // PERF-04: reused upload staging
+        private uint2[] _staging = Array.Empty<uint2>(); // reused upload staging
 
         /// <summary>Creates the store with every page free.</summary>
         /// <param name="pageCount">Initial pages (<see cref="IntervalPages.PageSize" /> elements each).</param>

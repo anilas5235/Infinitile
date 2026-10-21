@@ -28,7 +28,7 @@ namespace Engine.Scripts.Jobs.Core{
             _colliderJobHandler = colliderJobHandler;
             int side = 2 * settings.Chunk.DrawDistance + 1;
             int layers = math.min(VoxelConstants.PartitionsPerChunk, side);
-            Reserve(side * side * layers, settings.Scheduler.meshingBatchSize); // PERF-04
+            Reserve(side * side * layers, settings.Scheduler.meshingBatchSize);
         }
 
         /// <summary>
@@ -37,7 +37,7 @@ namespace Engine.Scripts.Jobs.Core{
         /// <param name="focus">The new focus position.</param>
         public override void FocusUpdate(PriorityUtil.Focus focus){
             WakeUp();
-            // N-01 / PERF-04: static lambda with explicit state instead of a closure capturing the focus
+            // Static lambda with explicit state instead of a closure capturing the focus
             Queue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.DistPriority(ref pos, ref f));
         }
 
@@ -54,15 +54,15 @@ namespace Engine.Scripts.Jobs.Core{
             for (int x = -draw; x <= draw; x++)
             for (int z = -draw; z <= draw; z++){
                 if (!CanGenerateMeshForChunk(focus.Pos.xz + new int2(x, z))) continue;
-                // F-10: only the vertical draw window is queued, the same filter IsPartitionStillRelevant applies;
-                // queueing all layers made JobUpdateStep drop and re-queue the others every cycle.
+                // Only the vertical draw window is queued, the same filter IsPartitionStillRelevant applies;
+                // queueing all layers would make JobUpdateStep drop and re-queue the others every cycle.
                 int minY = math.max(0, focus.Pos.y - draw);
                 int maxY = math.min(VoxelConstants.PartitionsPerChunk - 1, focus.Pos.y + draw);
                 for (int y = minY; y <= maxY; y++){
                     int3 pos = new(x + focus.Pos.x, y, z + focus.Pos.z);
                     if (Queue.Contains(pos) || !ShouldScheduleForMeshing(pos)) continue;
 
-                    // F-23: the threshold is the pool's eviction priority, compare in the same measure
+                    // The threshold is the pool's eviction priority, compare in the same measure
                     if (PriorityUtil.EvictionPriority(ref pos, ref focus) <= prioThreshold) continue;
 
                     Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
@@ -115,8 +115,8 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        ///     Checks if the chunk and all neighboring chunks are loaded and lit (LGT-06: faces at chunk borders sample
-        ///     the neighbour's light). Required before mesh generation can proceed.
+        ///     Checks if the chunk and all neighboring chunks are loaded and lit (faces at chunk borders sample the
+        ///     neighbour's light). Required before mesh generation can proceed.
         /// </summary>
         /// <param name="position">The chunk position to check.</param>
         /// <returns>True if the chunk and all neighbors are loaded and lit.</returns>
@@ -153,7 +153,7 @@ namespace Engine.Scripts.Jobs.Core{
             return math.abs(position.x - focus.Pos.x) <= drawDistance &&
                    math.abs(position.z - focus.Pos.z) <= drawDistance &&
                    math.abs(position.y - focus.Pos.y) <= drawDistance &&
-                   PriorityUtil.EvictionPriority(ref position, ref focus) > prioThreshold; // F-23
+                   PriorityUtil.EvictionPriority(ref position, ref focus) > prioThreshold;
         }
     }
 }

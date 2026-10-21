@@ -1,14 +1,14 @@
 ﻿namespace Engine.Scripts.Jobs.Chunk{
     /// <summary>
     ///     Represents a data snapshot for a vertical column within a chunk, including height and biome attributes,
-    ///     filled from <c>WorldSampler.SampleColumn</c> (INT-10).
+    ///     filled from <c>WorldSampler.SampleColumn</c>.
     /// </summary>
     public struct ChunkColumn{
         /// <summary>Computed terrain height in voxels (h_int = floor(H)).</summary>
         public int Height;
 
         /// <summary>
-        ///     Hard biome class of the column: index into the active BiomeSet (GEN-21), 0 when no biome is active
+        ///     Hard biome class of the column: index into the active BiomeSet, 0 when no biome is active
         ///     (then <see cref="SurfaceSource" /> is -1).
         /// </summary>
         public ushort Biome;
@@ -28,19 +28,19 @@
         /// <summary>Sampled humidity factor for this column.</summary>
         public float Humidity;
 
-        /// <summary>Biome whose top/under/stone blocks the column uses (§9.6); -1 when no biome is active. INT-10.</summary>
+        /// <summary>Biome whose top/under/stone blocks the column uses; -1 when no biome is active.</summary>
         public int SurfaceSource;
 
         /// <summary>
-        ///     Flora species id at the column, 0 = none (VEG-06): a single-block plant, or a multi-block species at its
-        ///     anchor column, equal to <c>ColumnSample.FloraSpecies</c>. INT-10.
+        ///     Flora species id at the column, 0 = none: a single-block plant, or a multi-block species at its
+        ///     anchor column, equal to <c>ColumnSample.FloraSpecies</c>.
         /// </summary>
         public ushort FloraSpecies;
 
-        /// <summary>Biome whose flora rule produced <see cref="FloraSpecies" />; -1 when none. INT-10.</summary>
+        /// <summary>Biome whose flora rule produced <see cref="FloraSpecies" />; -1 when none.</summary>
         public int FloraSource;
 
-        /// <summary>Clamped height H before flooring (§5.7). INT-10.</summary>
+        /// <summary>Clamped height H before flooring.</summary>
         public float HeightF;
     }
 }

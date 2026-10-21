@@ -15,8 +15,8 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.Jobs.Light{
     /// <summary>
-    ///     LGT-06: schedules <see cref="LightJob" /> batches for chunks whose 3 × 3 neighbourhood has voxel data and
-    ///     applies the results to the chunks (<see cref="Data.Chunk.LightReady" />). LGT-07: runs the incremental
+    ///     Schedules <see cref="LightJob" /> batches for chunks whose 3 × 3 neighbourhood has voxel data and
+    ///     applies the results to the chunks (<see cref="Data.Chunk.LightReady" />). Runs the incremental
     ///     <see cref="LightEditJob" /> synchronously after each voxel edit.
     /// </summary>
     internal sealed class LightScheduler : JobScheduler{
@@ -31,7 +31,7 @@ namespace Engine.Scripts.Jobs.Light{
         private NativeList<int2> _jobs;
         private NativeParallelHashMap<int2, ChunkLightData> _results;
 
-        // LGT-07: reused per edit (PERF-04)
+        // Reused per edit
         private NativeArray<ChunkVoxelData> _editVoxels;
         private NativeArray<ChunkLightData> _editLights;
         private NativeArray<byte> _editChangedPartitions;
@@ -49,7 +49,7 @@ namespace Engine.Scripts.Jobs.Light{
             _editLights = new NativeArray<ChunkLightData>(LightEditJob.ChunkCount, Allocator.Domain);
             _editChangedPartitions = new NativeArray<byte>(LightEditJob.ChunkCount * PartitionsPerChunk, Allocator.Domain);
 
-            // F-01: the job reads the voxel data of the batch's 3 × 3 neighbourhoods
+            // The job reads the voxel data of the batch's 3 × 3 neighbourhoods
             _chunkManager.LightJobReading += CompleteIfRunning;
             _chunkManager.VoxelEdited += OnVoxelEdited;
         }
@@ -59,7 +59,7 @@ namespace Engine.Scripts.Jobs.Light{
 
         /// <summary>Starts a Burst light job for the given chunks (all 3 × 3 neighbourhoods must be loaded).</summary>
         internal void Start(HashSet<int2> jobs){
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.LightSchedule.Auto(); // PERF-01
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.LightSchedule.Auto();
             StartRecord();
             IsReady = false;
             foreach (int2 j in jobs) _jobs.Add(j);
@@ -78,13 +78,13 @@ namespace Engine.Scripts.Jobs.Light{
         /// <summary>
         ///     Waits for the batch and hands the light to the chunks (a chunk unloaded meanwhile drops its result).
         ///     Applying only assigns light data and raises <see cref="VoxelWorld.ChunkLightChanged" />, so it is safe
-        ///     to run from the F-01 callback as well.
+        ///     to run from the <see cref="CompleteIfRunning" /> callback as well.
         /// </summary>
         internal void Complete(){
             if (IsReady) return;
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.LightComplete.Auto(); // PERF-01
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.LightComplete.Auto();
             _handle.Complete();
-            IsReady = true; // before applying: listeners may trigger F-01 again
+            IsReady = true; // before applying: listeners may trigger CompleteIfRunning again
 
             for (int i = 0; i < _jobs.Length; i++){
                 int2 pos = _jobs[i];
@@ -98,20 +98,20 @@ namespace Engine.Scripts.Jobs.Light{
         }
 
         /// <summary>
-        ///     F-01: completes and applies the running batch before the chunk manager writes or disposes voxel data
+        ///     Completes and applies the running batch before the chunk manager writes or disposes voxel data
         ///     the job reads. Applying here keeps light and voxel data consistent: an edit right after this sees
-        ///     the light of the pre-edit data and updates it incrementally (LGT-07).
+        ///     the light of the pre-edit data and updates it incrementally.
         /// </summary>
         internal void CompleteIfRunning(){
             Complete();
         }
 
         /// <summary>
-        ///     LGT-07: incremental update after <see cref="ChunkManager.SetVoxel" /> changed a voxel. Needs the 3 × 3
+        ///     Incremental update after <see cref="ChunkManager.SetVoxel" /> changed a voxel. Needs the 3 × 3
         ///     chunks around the edit lit; otherwise the lit ones are invalidated and re-lit by the light job.
         /// </summary>
         private void OnVoxelEdited(int3 position, ushort oldVoxel){
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.LightEdit.Auto(); // PERF-01
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.LightEdit.Auto();
             int2 center = VoxelUtils.GetChunkCoords(position);
             bool allLit = true;
 
@@ -131,7 +131,7 @@ namespace Engine.Scripts.Jobs.Light{
             }
 
             for (int k = 0; k < LightEditJob.ChunkCount; k++){
-                _chunkManager.CompleteReadersOf(_editChunks[k].Position); // F-01: light lists may be replaced
+                _chunkManager.CompleteReadersOf(_editChunks[k].Position); // light lists may be replaced
                 _editVoxels[k] = _editChunks[k].VoxelData;
                 _editLights[k] = _editChunks[k].LightData;
             }

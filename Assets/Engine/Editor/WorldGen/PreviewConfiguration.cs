@@ -5,10 +5,10 @@ using Object = UnityEngine.Object;
 
 namespace Engine.Editor.WorldGen{
     /// <summary>
-    ///     INT-20/21: the knobs the preview switches — architecture, the per-stage blend methods and their strengths.
+    ///     The knobs the preview switches — architecture, the per-stage blend methods and their strengths.
     ///     Configuration A is these fields read from and written to the <see cref="WorldGenSettings" /> asset;
     ///     configuration B is a preview-only set layered on the same asset (biomes, splines and climate stay shared),
-    ///     so B never touches the asset unless the user applies it (decision 2026-10-20).
+    ///     so B never touches the asset unless the user applies it.
     /// </summary>
     [Serializable]
     public class PreviewConfiguration{
@@ -72,7 +72,7 @@ namespace Engine.Editor.WorldGen{
 
         /// <summary>
         ///     Builds the Burst config of <paramref name="baseSettings" /> with these knobs, through a transient clone,
-        ///     so the asset stays untouched. The caller owns and disposes the result (D-05). Throws like
+        ///     so the asset stays untouched. The caller owns and disposes the result. Throws like
         ///     <see cref="WorldGenSettings.ToConfig" /> on invalid settings.
         /// </summary>
         public WorldGenConfig BuildConfig(WorldGenSettings baseSettings, int seed){
@@ -90,7 +90,7 @@ namespace Engine.Editor.WorldGen{
 
         /// <summary>
         ///     Short label, e.g. "Biome-first · material DistanceBlend B=32 · height None". Only the strengths the
-        ///     selected methods use are shown; Terrain-first has no height stage (TRN-21).
+        ///     selected methods use are shown; Terrain-first has no height stage.
         /// </summary>
         public string Describe(){
             bool biomeFirst = Architecture == GenArchitecture.BiomeFirst;
@@ -103,7 +103,7 @@ namespace Engine.Editor.WorldGen{
             return method switch{
                 BlendMethod.DistanceBlend => $"DistanceBlend B={width:0.##}",
                 BlendMethod.ParameterSpaceWeighting => $"ParameterSpace σ={sigma:0.###}",
-                // Material-stage DistortedBoundary is a one-hot warp; the height stage also blends over B (§9.7).
+                // Material-stage DistortedBoundary is a one-hot warp; the height stage also blends over B.
                 BlendMethod.DistortedBoundary => material
                     ? $"Distorted A={WarpAmplitude:0.##} λd={WarpWavelength:0.##}"
                     : $"Distorted A={WarpAmplitude:0.##} λd={WarpWavelength:0.##} B={width:0.##}",

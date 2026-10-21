@@ -5,7 +5,7 @@ using Unity.Mathematics;
 using UnityEngine;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>TST-E04: BurstMathExtensions, MathExtension, VectorExtension.</summary>
+    /// <summary>BurstMathExtensions, MathExtension, VectorExtension.</summary>
     public class MathExtensionsTests{
         [Test]
         public void Flatten_Int3_IsBijectionOntoSize(){
@@ -66,7 +66,7 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(new int3(10, 18, 28), new int3(2, 3, 4).MemberMultiply(new int3(5, 6, 7)));
             Assert.AreEqual(new int3(10, 18, 28), new int3(2, 3, 4).MemberMultiply(5, 6, 7));
             Assert.AreEqual(new int3(2, 3, 4), new int3(10, 18, 28).MemberDivide(new int3(5, 6, 7)));
-            // Integer division truncates towards zero (documented behaviour, see D-08 for the consequence).
+            // Integer division truncates towards zero (documented behaviour).
             Assert.AreEqual(new int3(-1, 1, -3), new int3(-3, 3, -7).MemberDivide(new int3(2, 2, 2)));
         }
 

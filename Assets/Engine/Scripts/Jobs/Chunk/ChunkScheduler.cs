@@ -67,7 +67,7 @@ namespace Engine.Scripts.Jobs.Chunk{
         /// </summary>
         /// <param name="jobs">List of chunk world positions to generate.</param>
         internal void Start(HashSet<int2> jobs){
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.DataGenSchedule.Auto(); // PERF-01
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.DataGenSchedule.Auto();
             StartRecord();
             IsReady = false;
             foreach (int2 j in jobs) _jobs.Add(j);
@@ -87,14 +87,14 @@ namespace Engine.Scripts.Jobs.Chunk{
         ///     and clears temporary containers.
         /// </summary>
         internal void Complete(){
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.DataGenComplete.Auto(); // PERF-01
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.DataGenComplete.Auto();
 #if VOXEL_TIMING_LOGS
             double start = Time.realtimeSinceStartupAsDouble;
 #endif
             _handle.Complete();
             _chunkManager.AddChunks(_results);
 
-#if VOXEL_TIMING_LOGS // PERF-04: the timing string was built per batch in the hot path; the PERF-01 markers cover it
+#if VOXEL_TIMING_LOGS
             double totalTime = (Time.realtimeSinceStartupAsDouble - start) * 1000;
             if (totalTime >= 1){
                 VoxelEngineLogger.Info<ChunkScheduler>(
@@ -133,7 +133,7 @@ namespace Engine.Scripts.Jobs.Chunk{
 
             _jobs.Dispose();
             _results.Dispose();
-            _config.Dispose(); // D-05: releases the noise parameters created for this scheduler's config
+            _config.Dispose(); // Releases the noise parameters created for this scheduler's config
         }
     }
 }

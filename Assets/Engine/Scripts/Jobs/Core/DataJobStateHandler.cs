@@ -19,14 +19,14 @@ namespace Engine.Scripts.Jobs.Core{
         /// <param name="chunkManager">The chunk manager reference.</param>
         /// <param name="chunkPool">The chunk pool reference.</param>
         /// <param name="chunkScheduler">The chunk scheduler for dispatching data generation jobs.</param>
-        /// <param name="lightJobHandler">The light job handler to wake up when data generation completes (LGT-06).</param>
+        /// <param name="lightJobHandler">The light job handler to wake up when data generation completes.</param>
         public DataJobStateHandler(VoxelEngineSettings settings, ChunkManager chunkManager, ChunkPool chunkPool,
             ChunkScheduler chunkScheduler, LightJobStateHandler lightJobHandler) :
             base(settings, chunkManager, chunkPool){
             _chunkScheduler = chunkScheduler;
             _lightJobHandler = lightJobHandler;
             int side = 2 * settings.Chunk.LoadDistance + 1;
-            Reserve(side * side, settings.Scheduler.chunkGenBatchSize); // PERF-04
+            Reserve(side * side, settings.Scheduler.chunkGenBatchSize);
         }
 
         /// <summary>
@@ -35,7 +35,7 @@ namespace Engine.Scripts.Jobs.Core{
         /// <param name="focus">The new focus position.</param>
         public override void FocusUpdate(PriorityUtil.Focus focus){
             WakeUp();
-            // N-01 / PERF-04: static lambda with explicit state instead of a closure capturing the focus
+            // Static lambda with explicit state instead of a closure capturing the focus
             Queue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.DistPriority(ref pos, ref f));
         }
 
@@ -78,7 +78,7 @@ namespace Engine.Scripts.Jobs.Core{
 
             if (accepted == 0) return true;
 
-            _chunkScheduler.Start(Set); // PERF-04: no per-batch list copy
+            _chunkScheduler.Start(Set);
 
             return true;
         }

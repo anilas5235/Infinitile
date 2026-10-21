@@ -6,12 +6,11 @@ using static Engine.Scripts.Utils.VoxelConstants;
 namespace Engine.Scripts.Jobs.ColliderMeshing{
     /// <summary>
     ///     Burst-optimized greedy mesher for voxel chunks. Merges contiguous faces into maximal rectangles
-    ///     to reduce vertex/index count. Produces render and collider data plus foliage (billboard) quads.
+    ///     to reduce vertex/index count. Produces collider quads.
     /// </summary>
     internal partial struct CMeshBuildJob{
         private void MeshCollision(ref PartitionJobData jobData){
             if (jobData.HasNoCollision) return;
-            // Sweep along each principal axis (X, Y, Z)
             ColliderSliceMeshBuild(ref jobData);
         }
 
@@ -40,7 +39,6 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             }
         }
 
-
         private void BuildColliderSlice(ref PartitionJobData jobData, int3 pos, int mainAxis, int mainAxisLimit,
             int3 directionMask, AxisInfo axisInfo){
             // Temporary mask buffer for the current slice (U x V)
@@ -64,7 +62,6 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             posColMask.Dispose();
             negColMask.Dispose();
         }
-
 
         /// <summary>
         ///     Builds collider quads for one slice using greedy merging.

@@ -13,13 +13,13 @@ using Is = UnityEngine.TestTools.Constraints.Is;
 
 namespace Engine.Tests.PlayMode{
     /// <summary>
-    ///     TST-21 smoke test (scene loads, terrain around the focus becomes collidable, no errors) and
-    ///     TST-E21 (PERF-04): the per-frame engine step allocates no managed memory during flight (F-24).
+    ///     Smoke test (scene loads, terrain around the focus becomes collidable, no errors) and the allocation
+    ///     rule: the per-frame engine step allocates no managed memory during flight.
     /// </summary>
     public class AllocationTests{
         private const int FlightFrames = 300;
-        // TST-E21: a fixed distance per frame, not speed * deltaTime; headless frames are so short that 300 frames
-        // barely moved the focus. 300 * 0.5 units cross several chunk borders, so new chunks load during flight.
+        // A fixed distance per frame, not speed * deltaTime: headless frames are too short to move the focus far.
+        // 300 * 0.5 units cross several chunk borders, so new chunks load during flight.
         private const float FlightStepPerFrame = 0.5f;
 
         [UnitySetUp]
@@ -49,7 +49,7 @@ namespace Engine.Tests.PlayMode{
         [UnityTest]
         [Timeout(120000)]
         public IEnumerator SampleScene_GeneratesAndMeshesAroundFocus_WithoutErrors(){
-            // TST-21: the game scene reaches a playable state within 30 s and logs no errors on the way.
+            // The game scene reaches a playable state within 30 s and logs no errors on the way.
             VoxelWorld world = VoxelWorld.Instance;
             yield return WaitForFocusColumn(world, 30f, true);
             Assert.Greater(world.ChunkManager.ChunkCount(), 0);
@@ -57,8 +57,8 @@ namespace Engine.Tests.PlayMode{
         }
 
         private static IEnumerator WaitForSteadyState(VoxelEngineScheduler scheduler, float timeoutSeconds){
-            // PERF-04 measures the steady state: the world around the focus is generated, meshed and collided, so
-            // every handler sleeps once. One-time warm-up work (first job schedules, render buffer growth) is over.
+            // Measure the steady state: the world around the focus is generated, meshed and collided, so every
+            // handler sleeps once. One-time warm-up work (first job schedules, render buffer growth) is over.
             DataJobStateHandler data = PlayModeFixtures.GetPrivateField<DataJobStateHandler>(scheduler, "_dataJobHandler");
             MeshJobStateHandler mesh = PlayModeFixtures.GetPrivateField<MeshJobStateHandler>(scheduler, "_meshJobHandler");
             ColliderJobStateHandler collider =
@@ -74,8 +74,8 @@ namespace Engine.Tests.PlayMode{
         [UnityTest]
         [Timeout(300000)]
         public IEnumerator EngineStep_DoesNotAllocateDuringFlight(){
-            // TST-E21 / PERF-04: scheduler update, renderer update and buffer rebuild must not allocate managed
-            // memory while the focus flies through loaded and loading terrain (F-24: LINQ in the renderer).
+            // Scheduler update, renderer update and buffer rebuild must not allocate managed memory while the focus
+            // flies through loaded and loading terrain.
             VoxelWorld world = VoxelWorld.Instance;
             VoxelWorldRenderer renderer = VoxelWorldRenderer.Instance;
             Assert.IsNotNull(renderer, "VoxelWorldRenderer missing in scene");
@@ -112,7 +112,7 @@ namespace Engine.Tests.PlayMode{
             }
 
             Debug.Log($"flight covered {(focus.position - start).magnitude:0} units; {allocatingFrames}/{FlightFrames} frames allocated");
-            // §20.1: how full the shared interval store got (it is sized like the former per-chunk buffer pool)
+            // How full the shared interval store got.
             IntervalPages pages = PlayModeFixtures.GetPrivateField<ChunkIntervalStore>(renderer, "_intervalStore").Pages;
             Debug.Log($"interval store: {pages.UsedPageCount} pages used, peak {pages.PeakUsedPageCount} of {pages.PageCount}");
             Assert.Greater((focus.position - start).magnitude, ChunkWidth, "the flight must cross a chunk border");
@@ -122,7 +122,7 @@ namespace Engine.Tests.PlayMode{
 
         [UnityTest]
         public IEnumerator FocusUpdate_DoesNotAllocate(){
-            // PERF-04 for the state handlers: re-prioritising the queues on a focus change must not allocate.
+            // Allocation rule for the state handlers: re-prioritising the queues on a focus change must not allocate.
             VoxelWorld world = VoxelWorld.Instance;
             VoxelEngineScheduler scheduler = PlayModeFixtures.GetPrivateField<VoxelEngineScheduler>(world, "_scheduler");
             PriorityUtil.Focus original = world.Focus;

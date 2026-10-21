@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace Engine.Editor.WorldGen{
     /// <summary>
-    ///     BIO-20 panel of the preview: "Suggest Biome-first height parameters from Terrain-first". Runs
+    ///     Height calibration panel of the preview: suggests Biome-first height parameters from Terrain-first. Runs
     ///     <see cref="BiomeFirstCalibration" /> over the framed region (same extent and stride as the views), shows
     ///     the suggestions next to the biomes' current values and writes a biome only on its Apply click.
     /// </summary>
@@ -19,7 +19,7 @@ namespace Engine.Editor.WorldGen{
         partial void DrawExtraPanelsImpl(){
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             {
-                _calibrationFoldout = EditorGUILayout.Foldout(_calibrationFoldout, "Height calibration (BIO-20)", true, EditorStyles.foldoutHeader);
+                _calibrationFoldout = EditorGUILayout.Foldout(_calibrationFoldout, "Height calibration", true, EditorStyles.foldoutHeader);
                 if (_calibrationFoldout){
                     EditorGUILayout.LabelField(
                         "Samples the Terrain-first pipeline of the assigned settings over the framed area, groups the columns by their Terrain-first biome and suggests Jaggedness = mean J, Offset = mean H − Jaggedness · mean P (the ridge term is not counted twice) and Amplitude from the detail residual spread. Nothing is written until you click Apply.",
@@ -137,7 +137,7 @@ namespace Engine.Editor.WorldGen{
             return index >= 0 && index < settings.Biomes.Biomes.Count ? settings.Biomes.Biomes[index] : null;
         }
 
-        /// <summary>The explicit write of BIO-20: one biome, undoable, and the preview rebuilds.</summary>
+        /// <summary>Writes one suggestion into its biome, undoable, and rebuilds the preview.</summary>
         private void ApplySuggestion(int index, Biome biome){
             BiomeFirstCalibration.Suggestion s = _suggestions[index];
             Undo.RecordObject(biome, "Apply Biome-first height calibration");

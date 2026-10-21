@@ -29,25 +29,24 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                     def = kvp.Value.ToStruct(voxelRegistry);
                 }
                 catch (Exception e){
-                    // D-04: skipping a biome would leave a zero (air) entry at its id and shift nothing else, so a
-                    // broken biome is a configuration error that fails the registry instead.
-                    // Entries are placed by id (F-22), so release the converted slots, not the first n.
+                    // Skipping a biome would leave a zero (air) entry at its id, so a broken biome is a
+                    // configuration error that fails the registry instead.
+                    // Entries are placed by id, so release the converted slots, not the first n.
                     for (int i = 0; i < tempArray.Length; i++)
                         if (converted[i]) tempArray[i].Dispose();
                     throw new InvalidOperationException(
                         $"Failed to convert biome {kvp.Value.name} to struct: {e.Message}", e);
                 }
 
-                tempArray[kvp.Key] = def; // F-22: place by id, not by enumeration order
+                tempArray[kvp.Key] = def; // place by id, not by enumeration order
                 converted[kvp.Key] = true;
             }
 
             BiomeArray = new NativeArray<Biome.BiomeDef>(tempArray, Allocator.Domain);
         }
 
-
         public override void Dispose(){
-            if (!BiomeArray.IsCreated) return; // D-04: FinalizeRegistry may have thrown before creating the array
+            if (!BiomeArray.IsCreated) return; // FinalizeRegistry may have thrown before creating the array
             foreach (Biome.BiomeDef def in BiomeArray) def.Dispose();
             BiomeArray.Dispose();
         }

@@ -6,10 +6,8 @@ using static Engine.Scripts.Utils.VoxelRenderConstants;
 namespace Engine.Scripts.Render{
     /// <summary>
     ///     Pure page bookkeeping for one <see cref="RenderBuffer" />: which of the <see cref="PagesPerBuffer" /> pages
-    ///     are free, how many points each allocated page holds and, since Phase C, the world-space bounds of the
-    ///     partition that owns each page (CUL-01). Holds no GPU resources, so it can be unit-tested and benchmarked
-    ///     without a graphics device (TST-E17, PERF-02). Extracted from <see cref="RenderBuffer" /> without behaviour
-    ///     changes.
+    ///     are free, how many points each allocated page holds and the world-space bounds of the partition that owns
+    ///     each page. Holds no GPU resources, so it can be unit-tested and benchmarked without a graphics device.
     /// </summary>
     internal sealed class PageAllocator : IDisposable{
         private NativeArray<uint> _countsPerPage;
@@ -43,7 +41,7 @@ namespace Engine.Scripts.Render{
         /// <summary>Point count per page, indexed by page; 0 means the page is free.</summary>
         internal NativeArray<uint> CountsPerPage => _countsPerPage;
 
-        /// <summary>CUL-01: world-space AABB per page from the owning partition; a free page holds an empty box.</summary>
+        /// <summary>World-space AABB per page from the owning partition; a free page holds an empty box.</summary>
         internal NativeArray<PageBounds> BoundsPerPage => _boundsPerPage;
 
         public void Dispose(){
@@ -59,7 +57,7 @@ namespace Engine.Scripts.Render{
         /// <param name="pointCount">The total number of points to allocate space for.</param>
         /// <param name="numPages">The number of pages to allocate (must be at least 1).</param>
         /// <param name="bufferIndex">Buffer index stored in the resulting <see cref="AllocInfo" />.</param>
-        /// <param name="bounds">CUL-01: bounds of the partition the pages belong to, stored for every page.</param>
+        /// <param name="bounds">Bounds of the partition the pages belong to, stored for every page.</param>
         /// <param name="allocation">The allocation info if successful, an empty allocation otherwise.</param>
         /// <returns>True if allocation was successful, false if not enough free pages.</returns>
         internal bool TryAllocPages(int pointCount, int numPages, int bufferIndex, in PageBounds bounds,
@@ -69,7 +67,7 @@ namespace Engine.Scripts.Render{
                 throw new ArgumentOutOfRangeException(nameof(numPages), "Must allocate at least one page.");
             if (numPages > FreePages) return false;
 
-            // PERF-04: take a pooled page list only on success; a failed attempt never returned its list to the pool
+            // take a pooled page list only on success, a failed attempt would never return it to the pool
             allocation = new AllocInfo(bufferIndex);
 
             int remainingPoints = pointCount;
@@ -94,13 +92,13 @@ namespace Engine.Scripts.Render{
         internal void Release(in AllocInfo allocInfo){
             if (allocInfo.Count == 0) return;
 
-            for (int i = 0; i < allocInfo.Count; i++){ // PERF-04: no index array per release
+            for (int i = 0; i < allocInfo.Count; i++){
                 int index = allocInfo.GetPage(i).PageIndex;
                 ValidOrThrow(index);
                 if (IsPageFree(index)) continue;
 
                 SetPageCount(index, 0);
-                _boundsPerPage[index] = default; // CUL-01: cleared when released
+                _boundsPerPage[index] = default;
                 _freePages.Enqueue(index);
             }
         }
@@ -111,7 +109,7 @@ namespace Engine.Scripts.Render{
             return _countsPerPage[index];
         }
 
-        /// <summary>CUL-01: bounds stored for a page (an empty box when the page is free).</summary>
+        /// <summary>Bounds stored for a page (an empty box when the page is free).</summary>
         internal PageBounds GetPageBounds(int index){
             ValidOrThrow(index);
             return _boundsPerPage[index];

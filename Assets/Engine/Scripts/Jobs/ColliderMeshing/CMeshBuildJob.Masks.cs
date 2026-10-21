@@ -47,7 +47,6 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             return true;
         }
 
-
         [BurstCompile]
         private int FindColQuadWidth(NativeArray<CMask> cMasks, int n, CMask currentMask, int start, int max){
             int width;

@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Engine.Scripts.WorldGen.Settings{
     /// <summary>
-    ///     Deterministic JSON writer for settings snapshots (INT-02): object keys sorted ordinally, invariant culture,
+    ///     Deterministic JSON writer for settings snapshots: object keys sorted ordinally, invariant culture,
     ///     round-trip float formatting, two-space indentation, "\n" line ends. The same settings always produce the
     ///     same text, so the output can be hashed, diffed and used as an experiment manifest.
     /// </summary>

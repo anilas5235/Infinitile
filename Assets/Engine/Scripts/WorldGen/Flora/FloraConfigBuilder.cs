@@ -10,13 +10,13 @@ using VoxelSo = Engine.Scripts.VoxelConfig.Data.Voxel.Voxel;
 
 namespace Engine.Scripts.WorldGen.Flora{
     /// <summary>
-    ///     Builds the flora part of <see cref="WorldGenConfig" /> from the active biomes (INT-03, §10): the flattened
+    ///     Builds the flora part of <see cref="WorldGenConfig" /> from the active biomes: the flattened
     ///     rules with their cumulative intervals, the species table, the expanded structures and the voxel replace
     ///     classes. Managed, once per settings change.
     /// </summary>
     internal static class FloraConfigBuilder{
         /// <summary>
-        ///     Species in id order (id = index + 1, VEG-06): every distinct voxel or structure named by a valid rule of
+        ///     Species in id order (id = index + 1): every distinct voxel or structure named by a valid rule of
         ///     an active biome, in biome and rule order.
         /// </summary>
         internal static List<Object> CollectSpecies(IReadOnlyList<Biome> biomes){
@@ -67,7 +67,7 @@ namespace Engine.Scripts.WorldGen.Flora{
                             continue;
                         }
 
-                        // VEG-02: cumulative per-column probabilities; both bounds are stored, so every reader compares
+                        // Cumulative per-column probabilities; both bounds are stored, so every reader compares
                         // against the same floats.
                         float start = cumulative;
                         cumulative += math.max(rule.Probability, 0f);

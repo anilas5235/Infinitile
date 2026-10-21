@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 39448e70d8b984c4fa860ece129255a5, type: 3}
   m_Name: TerrainSplineSet_Default
   m_EditorClassIdentifier: Engine.Runtime::Engine.Scripts.WorldGen.Settings.TerrainSplineSet
-  Notes: "Placeholder Terrain-first splines (WorldGenSpec \xA719.1). Only to get
-    a plausible starting world; replace them."
+  Notes: Placeholder Terrain-first splines. Only to get a plausible starting world;
+    replace them.
   OffsetRoot: 0
   AmpRoot: 7
   JaggednessRoot: 9

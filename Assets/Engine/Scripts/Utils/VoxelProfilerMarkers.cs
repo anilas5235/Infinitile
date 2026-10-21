@@ -2,13 +2,13 @@
 
 namespace Engine.Scripts.Utils{
     /// <summary>
-    ///     PERF-01: one <see cref="ProfilerMarker" /> per pipeline stage. All names start with "Voxel." so the
-    ///     stages can be filtered in the Profiler. Stages are added together with their phase.
+    ///     One <see cref="ProfilerMarker" /> per pipeline stage. All names start with "Voxel." so the
+    ///     stages can be filtered in the Profiler.
     /// </summary>
     internal static class VoxelProfilerMarkers{
         // Scheduler ticks (VoxelEngineScheduler round robin)
         internal static readonly ProfilerMarker SchedulerData = new("Voxel.Scheduler.Data");
-        internal static readonly ProfilerMarker SchedulerLight = new("Voxel.Scheduler.Light"); // LGT-06
+        internal static readonly ProfilerMarker SchedulerLight = new("Voxel.Scheduler.Light");
         internal static readonly ProfilerMarker SchedulerMesh = new("Voxel.Scheduler.Mesh");
         internal static readonly ProfilerMarker SchedulerCollider = new("Voxel.Scheduler.Collider");
 
@@ -16,7 +16,7 @@ namespace Engine.Scripts.Utils{
         internal static readonly ProfilerMarker DataGenSchedule = new("Voxel.DataGen.Schedule");
         internal static readonly ProfilerMarker DataGenComplete = new("Voxel.DataGen.Complete");
 
-        // Light (LightScheduler / LightJob / LightEditJob), LGT-06/07
+        // Light (LightScheduler / LightJob / LightEditJob)
         internal static readonly ProfilerMarker LightSchedule = new("Voxel.Light.Schedule");
         internal static readonly ProfilerMarker LightComplete = new("Voxel.Light.Complete");
         internal static readonly ProfilerMarker LightEdit = new("Voxel.Light.Edit");
@@ -34,7 +34,7 @@ namespace Engine.Scripts.Utils{
         internal static readonly ProfilerMarker PointBuildDispatch = new("Voxel.PointBuild.Dispatch");
         internal static readonly ProfilerMarker PointBuildCopy = new("Voxel.PointBuild.Copy");
         internal static readonly ProfilerMarker RenderRebuildBuffers = new("Voxel.Render.RebuildBuffers");
-        internal static readonly ProfilerMarker RenderCulling = new("Voxel.Render.Culling"); // Phase C (CUL-02)
+        internal static readonly ProfilerMarker RenderCulling = new("Voxel.Render.Culling");
         internal static readonly ProfilerMarker RenderDraw = new("Voxel.Render.Draw");
     }
 }

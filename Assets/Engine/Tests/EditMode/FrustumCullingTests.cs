@@ -7,9 +7,9 @@ using FrustumPlanes = Engine.Scripts.Render.FrustumPlanes;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     CUL-08: pins the C# reference of the GPU AABB-frustum test (<see cref="FrustumCulling" />) for boxes
-    ///     inside, outside, intersecting, behind the camera and containing the camera, plus the extruded shadow
-    ///     test (CUL-05) and the per-page bounds helpers (CUL-01).
+    ///     Pins the C# reference of the GPU AABB-frustum test (<see cref="FrustumCulling" />) for boxes inside,
+    ///     outside, intersecting, behind the camera and containing the camera, plus the extruded shadow test and the
+    ///     per-page bounds helpers.
     /// </summary>
     public class FrustumCullingTests{
         private const float Near = 0.3f;
@@ -147,7 +147,7 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
-        #region shadow extrusion (CUL-05)
+        #region shadow extrusion
 
         [Test]
         public void Extruded_BoxAboveTheFrustum_BecomesVisibleWhenExtrudedAlongTheLight(){
@@ -181,7 +181,7 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
-        #region PageBounds (CUL-01)
+        #region PageBounds
 
         [Test]
         public void PageBounds_Extrude_GrowsTheBoxAlongTheExtrusionOnly(){

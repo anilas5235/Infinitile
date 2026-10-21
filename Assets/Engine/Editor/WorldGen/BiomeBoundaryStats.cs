@@ -8,13 +8,13 @@ using Unity.Mathematics;
 
 namespace Engine.Editor.WorldGen{
     /// <summary>
-    ///     GEN-24: boundary length between every biome pair of a sampled view. A boundary is a 4-neighbour edge
-    ///     between two samples with different biomes (the ANA-10 edge count); each edge stands for
+    ///     Boundary length between every biome pair of a sampled view. A boundary is a 4-neighbour edge
+    ///     between two samples with different biomes; each edge stands for
     ///     <c>stride</c> blocks of boundary, so the length is in blocks and roughly independent of the zoom.
     ///     Pairs listed in <see cref="BiomeSet.ImplausibleNeighbours" /> are flagged.
     /// </summary>
     public static class BiomeBoundaryStats{
-        /// <summary>Counts matrix side: one row/column per possible biome index (BLD-02).</summary>
+        /// <summary>Counts matrix side: one row/column per possible biome index.</summary>
         public const int Side = BiomeSet.MaxBiomes;
 
         /// <summary>Boundary between two biomes, A &lt; B.</summary>
@@ -30,7 +30,7 @@ namespace Engine.Editor.WorldGen{
             /// <summary>Share of the total boundary length of the view.</summary>
             public float Share;
 
-            /// <summary>The pair is on the implausible list (GEN-24).</summary>
+            /// <summary>The pair is on the implausible list.</summary>
             public bool Implausible;
         }
 

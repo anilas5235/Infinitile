@@ -2,7 +2,7 @@ using Engine.Scripts.Jobs.Light;
 using NUnit.Framework;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>§20.2: the byte-lane BFS step in <see cref="LightRegion.Propagate" /> equals the scalar reference.</summary>
+    /// <summary>The byte-lane BFS step in <see cref="LightRegion.Propagate" /> equals the scalar reference.</summary>
     public partial class LightPropagationTests{
         [Test]
         public void Lanes_SpreadPack_RoundTripsEveryValue(){

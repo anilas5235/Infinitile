@@ -4,7 +4,7 @@ using NUnit.Framework;
 using Unity.Mathematics;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>LGT-11: GPU light packing round trip (LGT-09) through the C# port of the shader accessors.</summary>
+    /// <summary>GPU light packing round trip through the C# port of the shader accessors.</summary>
     public class PointLightPackingTests{
         [Test]
         public void CornerLight_RoundTripsEveryChannelAndCorner([Values(1, 2, 3)] int seed){
@@ -35,7 +35,7 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void CornerLight_Layout_MatchesTheSpec(){
+        public void CornerLight_Layout_MatchesTheShaderLayout(){
             // y = sky (bits 0-15) | R (16-31); w = G (0-15) | B (16-31); corners ul, ur, dr, dl per channel.
             uint4 packed = 0;
             PointLightPacking.SetCornerLight(ref packed, new uint4(

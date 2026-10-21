@@ -25,33 +25,33 @@ namespace Engine.Scripts.Components{
 
         private readonly HashSet<int3> _reMeshPartitions;
         private readonly SimpleFastPriorityQueue<int2, float> _unloadingQueue;
-        private readonly Stack<Chunk> _chunkObjectPool; // PERF-04: unloaded chunk objects are reused
+        private readonly Stack<Chunk> _chunkObjectPool; // unloaded chunk objects are reused
         internal Action<Chunk> OnChunkChange;
 
         internal Action OnRemeshRequested;
 
         /// <summary>
-        ///     F-01: raised before a chunk that is part of the current <see cref="ChunkAccessor" /> is edited or
+        ///     Raised before a chunk that is part of the current <see cref="ChunkAccessor" /> is edited or
         ///     disposed. Schedulers whose jobs read the accessor subscribe and complete their running job first.
         /// </summary>
         internal Action AccessorChunkWriting;
 
         /// <summary>
-        ///     F-05: raised after <see cref="UnloadChunk" /> removed a loaded chunk, so the world can tell listeners
+        ///     Raised after <see cref="UnloadChunk" /> removed a loaded chunk, so the world can tell listeners
         ///     (renderer buffers, pool) that the chunk is gone regardless of who triggered the unload.
         /// </summary>
         internal Action<int2> OnChunkUnloaded;
 
         /// <summary>
-        ///     LGT-06 / F-01: raised before a chunk whose voxel data the running light job reads (see
+        ///     Raised before a chunk whose voxel data the running light job reads (see
         ///     <see cref="GetLightJobChunks" />) is edited or disposed. The light scheduler completes and applies it.
         /// </summary>
         internal Action LightJobReading;
 
-        /// <summary>LGT-07: raised after a voxel changed, with its world position and previous id.</summary>
+        /// <summary>Raised after a voxel changed, with its world position and previous id.</summary>
         internal Action<int3, ushort> VoxelEdited;
 
-        /// <summary>LGT-06: raised when a lit chunk lost its light and must be lit again.</summary>
+        /// <summary>Raised when a lit chunk lost its light and must be lit again.</summary>
         internal Action OnLightInvalidated;
 
         private NativeParallelHashMap<int2, ChunkVoxelData> _accessorMap;
@@ -66,16 +66,16 @@ namespace Engine.Scripts.Components{
         internal ChunkManager(VoxelEngineSettings settings){
             _chunkStoreSize = (settings.Chunk.LoadDistance + 2).SquareSize();
 
-            // PERF-04: sized for every loaded chunk; LGT-06 re-lit chunks flag partitions up to the load ring
+            // Sized for every loaded chunk; re-lit chunks flag partitions up to the load ring
             int reMeshCapacity = _chunkStoreSize * PartitionsPerChunk;
             _reMeshPartitions = new HashSet<int3>(reMeshCapacity);
             _reCollidePartitions = new HashSet<int3>(reMeshCapacity);
 
             _chunks = new Dictionary<int2, Chunk>(_chunkStoreSize);
             _unloadingQueue = new SimpleFastPriorityQueue<int2, float>();
-            _unloadingQueue.Reserve(_chunkStoreSize + 1); // PERF-04: queue nodes are pooled up front
+            _unloadingQueue.Reserve(_chunkStoreSize + 1); // queue nodes are pooled up front
 
-            // PERF-04: every chunk object the store can hold exists from the start, so loading a chunk never
+            // Every chunk object the store can hold exists from the start, so loading a chunk never
             // allocates a managed object, not even before the store is full for the first time.
             _chunkObjectPool = new Stack<Chunk>(_chunkStoreSize);
             for (int i = 0; i < _chunkStoreSize; i++) _chunkObjectPool.Push(new Chunk());
@@ -123,8 +123,7 @@ namespace Engine.Scripts.Components{
         /// </summary>
         internal void FocusUpdate(PriorityUtil.Focus focus){
             _focus = focus;
-            // N-01 / PERF-04: static lambda with explicit state instead of a closure capturing the focus
-            // F-23 / DEC-14: evict by plain distance
+            // Static lambda with explicit state instead of a closure capturing the focus; evict by plain distance
             _unloadingQueue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.EvictionPriority(ref pos, ref f));
         }
 
@@ -149,7 +148,7 @@ namespace Engine.Scripts.Components{
 
                 chunk.VoxelData = pair.Value;
                 _chunks.Add(position, chunk);
-                _unloadingQueue.Enqueue(position, PriorityUtil.EvictionPriority(ref position, ref _focus)); // F-23
+                _unloadingQueue.Enqueue(position, PriorityUtil.EvictionPriority(ref position, ref _focus));
             }
         }
 
@@ -168,10 +167,10 @@ namespace Engine.Scripts.Components{
             if (_unloadingQueue.Contains(position)) _unloadingQueue.Remove(position);
             if (!_chunks.TryGetValue(position, out Chunk chunk)) return false;
 
-            CompleteReadersOf(position); // F-01
+            CompleteReadersOf(position);
             chunk.Dispose();
             _chunks.Remove(position);
-            _chunkObjectPool.Push(chunk); // PERF-04
+            _chunkObjectPool.Push(chunk);
 
             for (int pId = 0; pId < PartitionsPerChunk; pId++){
                 int3 partitionPos = new(position.x, pId, position.y);
@@ -179,18 +178,18 @@ namespace Engine.Scripts.Components{
                 _reCollidePartitions.Remove(partitionPos);
             }
 
-            // LGT-06: a lit neighbour's light may hold edits of this chunk that a reload regenerates away.
+            // A lit neighbour's light may hold edits of this chunk that a reload regenerates away.
             for (int x = -1; x <= 1; x++)
             for (int z = -1; z <= 1; z++)
                 if (x != 0 || z != 0)
                     InvalidateLight(position + new int2(x, z));
 
-            OnChunkUnloaded?.Invoke(position); // F-05
+            OnChunkUnloaded?.Invoke(position);
             return true;
         }
 
         /// <summary>
-        ///     INT-30: unloads every loaded chunk (each raises <see cref="OnChunkUnloaded" />), e.g. before the world is
+        ///     Unloads every loaded chunk (each raises <see cref="OnChunkUnloaded" />), e.g. before the world is
         ///     regenerated with another configuration.
         /// </summary>
         internal void UnloadAll(){
@@ -200,16 +199,16 @@ namespace Engine.Scripts.Components{
         }
 
         /// <summary>
-        ///     F-01: completes any job that still reads <paramref name="chunkPos" /> through the current accessor
+        ///     Completes any job that still reads <paramref name="chunkPos" /> through the current accessor
         ///     before the chunk's data is written or disposed.
         /// </summary>
         internal void CompleteReadersOf(int2 chunkPos){
             if (_accessorMap.ContainsKey(chunkPos)) AccessorChunkWriting?.Invoke();
-            if (_lightJobMap.ContainsKey(chunkPos)) LightJobReading?.Invoke(); // LGT-06
+            if (_lightJobMap.ContainsKey(chunkPos)) LightJobReading?.Invoke();
         }
 
         /// <summary>
-        ///     LGT-06: voxel data of the 3 × 3 neighbourhoods of the chunks to light, for <c>LightJob</c>.
+        ///     Voxel data of the 3 × 3 neighbourhoods of the chunks to light, for <c>LightJob</c>.
         /// </summary>
         internal NativeParallelHashMap<int2, ChunkVoxelData>.ReadOnly GetLightJobChunks(HashSet<int2> positions){
             _lightJobMap.Clear();
@@ -228,7 +227,7 @@ namespace Engine.Scripts.Components{
         }
 
         /// <summary>
-        ///     LGT-06: hands the result of a light job to its chunk. A chunk that was lit before (and lost its light,
+        ///     Hands the result of a light job to its chunk. A chunk that was lit before (and lost its light,
         ///     see <see cref="InvalidateLight" />) flags its partitions and its neighbours' for remeshing, because
         ///     faces sample the light across chunk borders. Returns false (and releases the light) if the chunk is
         ///     no longer loaded or already lit.
@@ -255,7 +254,7 @@ namespace Engine.Scripts.Components{
         }
 
         /// <summary>
-        ///     LGT-06: marks a lit chunk as unlit so the light job lights it again (its meshes stay until then).
+        ///     Marks a lit chunk as unlit so the light job lights it again (its meshes stay until then).
         /// </summary>
         internal void InvalidateLight(int2 position){
             if (!_chunks.TryGetValue(position, out Chunk chunk) || !chunk.LightReady) return;
@@ -265,7 +264,7 @@ namespace Engine.Scripts.Components{
         }
 
         /// <summary>
-        ///     LGT-07: flags a partition of a loaded chunk for remeshing (light around it changed).
+        ///     Flags a partition of a loaded chunk for remeshing (light around it changed).
         /// </summary>
         internal void FlagReMesh(int3 partition){
             if (!_chunks.ContainsKey(partition.xz) || !_reMeshPartitions.Add(partition)) return;
@@ -275,7 +274,7 @@ namespace Engine.Scripts.Components{
         /// <summary>
         ///     Builds a <see cref="ChunkAccessor" /> that includes a 3x3 neighborhood for given positions.
         /// </summary>
-        internal ChunkAccessor GetAccessor(HashSet<int3> positions){ // PERF-04: no per-batch list copy
+        internal ChunkAccessor GetAccessor(HashSet<int3> positions){
             _accessorMap.Clear();
             _lightAccessorMap.Clear();
             foreach (int3 position in positions){
@@ -371,21 +370,20 @@ namespace Engine.Scripts.Components{
         internal bool SetVoxel(ushort voxelId, int3 position, bool remesh = true){
             int2 chunkPos = GetChunkCoords(position);
             int3 blockPos = GetLocalVoxelCoords(position);
-            // F-08: reject Y outside the chunk; the flat index would otherwise wrap into a neighbouring column
+            // Reject Y outside the chunk; the flat index would otherwise wrap into a neighbouring column
             if (blockPos.y < 0 || blockPos.y >= ChunkHeight) return false;
             if (!_chunks.TryGetValue(chunkPos, out Chunk chunk)){
                 VoxelEngineLogger.Warn<ChunkManager>($"Chunk : {chunkPos} not loaded");
                 return false;
             }
 
-            // A partition that is already flagged for remeshing accepts edits too (decided 2026-10-21): F-01 completes
-            // every job that reads the chunk before the write, and the partition is simply meshed once more. The
-            // earlier refusal dropped edits for a few frames, and LGT-07 flags up to 27 partitions per edit.
-            CompleteReadersOf(chunkPos); // F-01
+            // A partition that is already flagged for remeshing accepts edits too: every job that reads the chunk
+            // is completed before the write, and the partition is simply meshed once more.
+            CompleteReadersOf(chunkPos);
             ushort oldVoxel = chunk.VoxelData.GetVoxel(blockPos);
             bool result = chunk.VoxelData.SetVoxel(blockPos, voxelId);
             _chunks[chunkPos] = chunk;
-            if (result) VoxelEdited?.Invoke(position, oldVoxel); // LGT-07: light follows every edit
+            if (result) VoxelEdited?.Invoke(position, oldVoxel); // light follows every edit
             if (remesh && result){
                 ReMeshPartitions(position);
                 OnChunkChange?.Invoke(chunk);

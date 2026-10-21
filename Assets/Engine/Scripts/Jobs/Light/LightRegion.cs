@@ -9,7 +9,7 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.Jobs.Light{
     /// <summary>
-    ///     LGT-03/04: a full-height box of voxels for light propagation, decompressed from the chunks' interval
+    ///     A full-height box of voxels for light propagation, decompressed from the chunks' interval
     ///     lists. Column (x, z) of the box starts at <c>x · StrideX + z · 256</c>, y is innermost (the chunk
     ///     Flatten order), so a step in y is ±1 and a y bound check is <c>index &amp; 255</c>. The outermost ring
     ///     of columns is a sentinel with attenuation 15: the BFS never enters it and needs no x/z bound checks.
@@ -80,7 +80,7 @@ namespace Engine.Scripts.Jobs.Light{
             for (int cz = min.y; cz <= max.y; cz++){
                 int chunkStart = (cx * ChunkDepth + cz) * Height;
                 int baseIndex = ColumnBase(cx + offset.x, cz + offset.y);
-                // LGT-11: a column that follows the previous one starts in its last node or the next one
+                // A column that follows the previous one starts in its last node or the next one
                 int nodeIndex = chunkStart == nextStart
                     ? lastCount > chunkStart ? lastNode : lastNode + 1
                     : voxels.NodeIndex(chunkStart);
@@ -96,7 +96,7 @@ namespace Engine.Scripts.Jobs.Light{
                     byte att = id < table.Count ? table.Attenuation[id] : (byte)Opaque;
                     ushort emission = id < table.Count ? table.Emission[id] : (ushort)0;
 
-                    // LGT-11: raw memset, the checked indexer kept Burst from vectorising (1.75 ms/chunk)
+                    // Raw memset: the checked indexer keeps Burst from vectorising
                     UnsafeUtility.MemSet(attPtr + baseIndex + y, att, end - y);
                     if (att != 0) top = end - 1;
                     if (emission != 0)
@@ -146,7 +146,7 @@ namespace Engine.Scripts.Jobs.Light{
         }
 
         /// <summary>
-        ///     LGT-03/05: sky light of the box interior without BFS — every voxel above a column's
+        ///     Sky light of the box interior without BFS — every voxel above a column's
         ///     <see cref="Top" /> is 15 — then the frontier seeds: the first non-clear voxel under the sky part
         ///     (if light can enter it) and sky voxels beside a higher neighbour column that has non-opaque voxels at
         ///     that height. Columns without such voxels need no BFS.
@@ -158,7 +158,7 @@ namespace Engine.Scripts.Jobs.Light{
                 int column = x * SizeZ + z;
                 int baseIndex = column * Height;
                 int top = Top[column];
-                ushort* sky = lightPtr + baseIndex; // LGT-11: unchecked so Burst vectorises the fill
+                ushort* sky = lightPtr + baseIndex; // unchecked so Burst vectorises the fill
                 for (int y = top + 1; y < Height; y++) sky[y] |= VoxelLight.FullSky;
 
                 if (top == Height - 1){
@@ -193,16 +193,16 @@ namespace Engine.Scripts.Jobs.Light{
             return Top[column] >= y && Att[column * Height + y] < Opaque;
         }
 
-        /// <summary>LGT-03: queues the emitters found by <see cref="FillVoxels" /> (their light holds the emission).</summary>
+        /// <summary>Queues the emitters found by <see cref="FillVoxels" /> (their light holds the emission).</summary>
         public void SeedEmitters(ref LightQueue queue){
             for (int i = 0; i < Emitters.Length; i++) queue.Enqueue(Emitters[i]);
         }
 
         /// <summary>
-        ///     LGT-03: BFS until the queue is empty. Each channel of a neighbour n becomes
+        ///     BFS until the queue is empty. Each channel of a neighbour n becomes
         ///     max(L(n), L(v) − 1 − att(n)); opaque voxels are never entered; sky 15 goes down into a clear voxel
         ///     without loss. Light only rises, so a voxel queued more than once is still correct.
-        ///     The four channels are combined at once in byte lanes (§20.2, <see cref="Spread" />).
+        ///     The four channels are combined at once in byte lanes (<see cref="Spread" />).
         /// </summary>
         public unsafe void Propagate(ref LightQueue queue){
             byte* att = (byte*)Att.GetUnsafeReadOnlyPtr();
@@ -212,7 +212,7 @@ namespace Engine.Scripts.Jobs.Light{
                 uint from = Spread(light[index]);
                 // Candidate for a clear neighbour; most neighbours are clear, so it is computed once per voxel.
                 uint clear = SubtractSaturated(from, 1);
-                // Sky 15 steps down into a clear voxel without loss (LGT-03).
+                // Sky 15 steps down into a clear voxel without loss.
                 uint clearDown = (from & SkyLane) == SkyLane ? clear | SkyLane : clear;
                 if (clearDown == 0) continue; // every channel ≤ 1: nothing reaches a neighbour
 
@@ -233,8 +233,7 @@ namespace Engine.Scripts.Jobs.Light{
         private const uint LaneOnes = 0x01010101u;
 
         /// <summary>
-        ///     One BFS step into <paramref name="index" />; unchecked pointers (LGT-11, the sentinel ring keeps it in
-        ///     bounds). <paramref name="clear" /> is the candidate for a clear voxel (attenuation 0).
+        ///     One BFS step into <paramref name="index" />; unchecked pointers (the sentinel ring keeps it in bounds). <paramref name="clear" /> is the candidate for a clear voxel (attenuation 0).
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static unsafe void Relax(byte* attPtr, ushort* lightPtr, int index, uint from, uint clear,
@@ -250,7 +249,7 @@ namespace Engine.Scripts.Jobs.Light{
         }
 
         /// <summary>
-        ///     §20.2 SWAR: the four 4-bit channels of a light value, one per byte lane (channel c in bits 8c…8c+3),
+        ///     SWAR layout: the four 4-bit channels of a light value, one per byte lane (channel c in bits 8c…8c+3),
         ///     so bit 4 of each lane is free as a borrow guard.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

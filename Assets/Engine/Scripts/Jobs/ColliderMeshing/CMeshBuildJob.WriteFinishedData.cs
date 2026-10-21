@@ -31,7 +31,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             colliderMesh.GetVertexData<CVertex>().CopyFrom(cMeshBuffer.CVertexBuffer.AsArray());
 
             int cIndexCount = cMeshBuffer.CIndexBuffer.Length;
-            // F-15: 16-bit indices wrap above 65536 vertices (a checkerboard partition has 393216); such meshes
+            // 16-bit indices wrap above 65536 vertices (a checkerboard partition has 393216); such meshes
             // get 32-bit indices, smaller ones keep the compact 16-bit format.
             NativeArray<int> cIndices = cMeshBuffer.CIndexBuffer.AsArray();
             if (cVertexCount > ushort.MaxValue + 1){

@@ -4,17 +4,17 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Noise{
     /// <summary>
-    ///     Seeded 2D simplex noise (GEN-15, DEC-01). Lattice gradients come from
+    ///     Seeded 2D simplex noise. Lattice gradients come from
     ///     <see cref="Hash.Hash32" />(i, j, seed, salt), so there is no permutation table and therefore no period:
-    ///     Unity's <c>noise.snoise</c>/<c>cnoise</c> use a mod-289 permutation and tile every 289 noise units (D-07).
+    ///     Unity's <c>noise.snoise</c>/<c>cnoise</c> use a mod-289 permutation and tile every 289 noise units.
     ///     One <c>salt</c> per noise instance keeps the fields T, F, C, E, W, each detail octave, P and the warp
-    ///     fields decorrelated without hand-picked position offsets (GEN-05).
+    ///     fields decorrelated without hand-picked position offsets.
     ///     <para>
     ///         Skew and corner evaluation follow Stefan Gustavson, "Simplex noise demystified" (2005), with the
     ///         8-direction 2D gradient set; the gradient hash is our own extension.
     ///     </para>
     ///     <para>
-    ///         Precision (GEN-06): positions are float32. Beyond |x|, |z| ≈ 1e5–1e6 noise units the fractional part
+    ///         Precision: positions are float32. Beyond |x|, |z| ≈ 1e5–1e6 noise units the fractional part
     ///         of the sample position loses bits, so features start to stair-step. No special handling is done
     ///         for play; a world that large is not a target.
     ///     </para>

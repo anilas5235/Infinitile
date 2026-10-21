@@ -18,7 +18,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Tooltip("Number of octaves.")] public int octaves = 4;
 
         /// <param name="seed">World seed.</param>
-        /// <param name="salt">Per-instance gradient salt from <see cref="HashSalts" /> (GEN-05).</param>
+        /// <param name="salt">Per-instance gradient salt from <see cref="HashSalts" />.</param>
         public NoiseProfile.Settings ToStruct(int seed, uint salt){
             return new NoiseProfile.Settings{
                 Seed = seed,
@@ -55,7 +55,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// <param name="seed">World seed.</param>
         /// <param name="baseSalt">Gradient salt of the base noise.</param>
         /// <param name="warpSaltX">Gradient salt of the X warp channel.</param>
-        /// <param name="warpSaltY">Gradient salt of the Y warp channel (F-06: must differ from X).</param>
+        /// <param name="warpSaltY">Gradient salt of the Y warp channel (must differ from X).</param>
         public WarpedNoiseLayer.Settings ToStruct(int seed, uint baseSalt, uint warpSaltX, uint warpSaltY){
             float2[] points = new float2[redistributionCurve.length];
             for (int i = 0; i < redistributionCurve.length; i++){

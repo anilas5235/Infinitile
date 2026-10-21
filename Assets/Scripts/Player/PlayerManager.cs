@@ -46,7 +46,7 @@ namespace Player{
         }
 
         /// <summary>
-        ///     INT-30: disables the player until the ground under it is loaded and collidable again, e.g. after
+        ///     Disables the player until the ground under it is loaded and collidable again, e.g. after
         ///     <see cref="VoxelWorld.Regenerate" /> or a teleport. The player keeps its pose unless the new terrain
         ///     buries it; then it is put on top of the column.
         /// </summary>

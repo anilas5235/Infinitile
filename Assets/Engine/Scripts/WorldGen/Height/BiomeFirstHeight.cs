@@ -6,16 +6,16 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Height{
     /// <summary>
-    ///     Biome-first height (§8.2, §5.7). The height-stage weights w_b blend the per-biome constants
-    ///     (BIO-02): Offset = Σ w_b·Offset_b, a_i = Σ w_b·a_{b,i}, J = Σ w_b·J_b, with the effective octave
+    ///     Biome-first height. The height-stage weights w_b blend the per-biome constants:
+    ///     Offset = Σ w_b·Offset_b, a_i = Σ w_b·a_{b,i}, J = Σ w_b·J_b, with the effective octave
     ///     coefficients a_{b,i} = HeightAmplitude_b × OctaveWeights_{b,i} that <c>WorldGenSettings.ToConfig</c>
-    ///     flattened (GEN-22). Then H = Offset + Σ_i a_i·N_i + J·P with one evaluation of every N_i and of P per
-    ///     column (BIO-03): all biomes sample the same shared noises, only their coefficients differ. The result
-    ///     equals Σ w_b·H_b by linearity (TST-05), without evaluating any H_b. Frequencies are never blended
-    ///     (§8.3): the octave wavelengths are global.
+    ///     flattened. Then H = Offset + Σ_i a_i·N_i + J·P with one evaluation of every N_i and of P per
+    ///     column: all biomes sample the same shared noises, only their coefficients differ. The result
+    ///     equals Σ w_b·H_b by linearity, without evaluating any H_b. Frequencies are never blended:
+    ///     the octave wavelengths are global.
     ///     <para>
-    ///         With one-hot weights (method None, Phase 2) H is the hard biome's own formula and the height jumps
-    ///         at biome boundaries; the height-stage blend methods of Phase 3 turn the weights continuous.
+    ///         With one-hot weights (method None) H is the hard biome's own formula and the height jumps
+    ///         at biome boundaries; the height-stage blend methods turn the weights continuous.
     ///     </para>
     /// </summary>
     [BurstCompile]
@@ -23,7 +23,7 @@ namespace Engine.Scripts.WorldGen.Height{
         /// <summary>
         ///     H at world position <paramref name="p" /> for the height-stage <paramref name="weights" />.
         ///     <paramref name="height" /> is H clamped to [Hmin, Hmax]; <paramref name="unclamped" /> is H before the
-        ///     clamp, so the clamp engaged exactly when the two differ (GEN-12). Direct-call entry point (GEN-16).
+        ///     clamp, so the clamp engaged exactly when the two differ. Burst direct-call entry point.
         /// </summary>
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
         public static void Sample(in float2 p, in BlendWeights weights, in WorldGenConfig cfg,
@@ -31,7 +31,7 @@ namespace Engine.Scripts.WorldGen.Height{
             int biomeCount = cfg.BiomeCount;
             int octaveCount = cfg.OctaveCount;
 
-            // BIO-02: blended Offset and J.
+            // Blended Offset and J.
             float offset = 0f;
             float jaggedness = 0f;
             for (int b = 0; b < biomeCount; b++){
@@ -41,7 +41,7 @@ namespace Engine.Scripts.WorldGen.Height{
                 jaggedness += w * cfg.Biomes[b].jaggedness;
             }
 
-            // BIO-02/03: blended a_i, then exactly one N_i sample per octave for the whole column.
+            // Blended a_i, then exactly one N_i sample per octave for the whole column.
             float h = offset;
             for (int i = 0; i < octaveCount; i++){
                 float a = 0f;
@@ -61,7 +61,7 @@ namespace Engine.Scripts.WorldGen.Height{
         }
 
         /// <inheritdoc cref="Sample(in float2,in BlendWeights,in WorldGenConfig,out float,out float)" />
-        /// <param name="clamped">Whether the clamp to [Hmin, Hmax] engaged (GEN-12).</param>
+        /// <param name="clamped">Whether the clamp to [Hmin, Hmax] engaged.</param>
         public static float Sample(in float2 p, in BlendWeights weights, in WorldGenConfig cfg, out bool clamped){
             Sample(p, weights, cfg, out float height, out float unclamped);
             clamped = height != unclamped;

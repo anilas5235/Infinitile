@@ -17,7 +17,7 @@ namespace Engine.Scripts.Jobs.ColliderBake{
     public class ColliderBakeScheduler : JobScheduler{
         private readonly ChunkManager _chunkManager;
         private readonly ChunkPool _chunkPool;
-        // F-04: the mesh version at Start tells Complete whether the partition's mesh changed during the bake
+        // The mesh version at Start tells Complete whether the partition's mesh changed during the bake
         private readonly Dictionary<int3, (ChunkPartition partition, int meshVersion)> _meshes;
 
         /// <summary>
@@ -41,7 +41,7 @@ namespace Engine.Scripts.Jobs.ColliderBake{
 
             _jobs = new NativeList<int>(Allocator.Persistent);
 
-            // F-04: Physics.BakeMesh reads the collider mesh; finish it before the pool or the mesher rewrites one.
+            // Physics.BakeMesh reads the collider mesh; finish it before the pool or the mesher rewrites one.
             _chunkPool.PartitionMeshWriting += CompleteJobIfRunning;
         }
 
@@ -55,12 +55,12 @@ namespace Engine.Scripts.Jobs.ColliderBake{
         /// </summary>
         /// <param name="jobs">The list of chunk positions whose colliders should be built or updated.</param>
         internal void Start(HashSet<int3> jobs){
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.ColliderBakeSchedule.Auto(); // PERF-01
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.ColliderBakeSchedule.Auto();
             StartRecord();
 
             IsReady = false;
 
-            _meshes.EnsureCapacity(jobs.Count); // PERF-04: no growth once the batch size is reached
+            _meshes.EnsureCapacity(jobs.Count); // no growth once the batch size is reached
             foreach (int3 partitionPos in jobs){
                 ChunkPartition behaviour = _chunkPool.GetPartition(partitionPos);
                 _meshes.Add(partitionPos, (behaviour, behaviour.MeshVersion));
@@ -80,14 +80,14 @@ namespace Engine.Scripts.Jobs.ColliderBake{
         ///     Completes all scheduled collider build jobs and applies the resulting colliders to the associated chunks.
         /// </summary>
         internal void Complete(){
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.ColliderBakeComplete.Auto(); // PERF-01
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.ColliderBakeComplete.Auto();
 #if VOXEL_TIMING_LOGS
             double start = Time.realtimeSinceStartupAsDouble;
 #endif
             _handle.Complete();
 
             foreach ((int3 position, (ChunkPartition behaviour, int meshVersion)) in _meshes){
-                // F-04: the pool may have reclaimed (and possibly re-claimed, which reuses the same object) this
+                // The pool may have reclaimed (and possibly re-claimed, which reuses the same object) this
                 // partition, or the mesher may have rewritten its mesh while the bake ran; the result is stale then.
                 // A re-meshed partition keeps its re-collide flag, a reclaimed one is not collidable, so both re-bake.
                 if (!_chunkPool.IsPartitionActive(position) || _chunkPool.GetPartition(position) != behaviour ||
@@ -100,7 +100,7 @@ namespace Engine.Scripts.Jobs.ColliderBake{
                 behaviour.ApplyColliderMesh();
             }
 
-#if VOXEL_TIMING_LOGS // PERF-04: the timing string was built per batch in the hot path; the PERF-01 markers cover it
+#if VOXEL_TIMING_LOGS
             double totalTime = (Time.realtimeSinceStartupAsDouble - start) * 1000;
 
             if (totalTime >= 0.8){
@@ -119,7 +119,7 @@ namespace Engine.Scripts.Jobs.ColliderBake{
         }
 
         /// <summary>
-        ///     F-04: waits for the running bake job; its results are still applied by <see cref="Complete" />.
+        ///     Waits for the running bake job; its results are still applied by <see cref="Complete" />.
         /// </summary>
         internal void CompleteJobIfRunning(){
             _handle.Complete();

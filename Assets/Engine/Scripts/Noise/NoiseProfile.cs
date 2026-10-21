@@ -7,14 +7,14 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.Noise{
     /// <summary>
-    ///     Immutable fBm wrapper over <see cref="SeededSimplex" /> (GEN-15) for the [0,1] climate fields.
-    ///     Each instance has its own gradient salt and a hashed sample offset with |o| ≤ 10⁴ (GEN-05), so two
+    ///     Immutable fBm wrapper over <see cref="SeededSimplex" /> for the [0,1] climate fields.
+    ///     Each instance has its own gradient salt and a hashed sample offset with |o| ≤ 10⁴, so two
     ///     profiles with the same seed never show the same features and a different seed is never a plain
-    ///     translation of the same world (F-02, D-03).
+    ///     translation of the same world.
     /// </summary>
     [BurstCompile]
     public struct NoiseProfile : IDisposable{
-        /// <summary>Upper bound of the hashed per-instance sample offset in blocks (GEN-05).</summary>
+        /// <summary>Upper bound of the hashed per-instance sample offset in blocks.</summary>
         public const float MaxOffset = 10000f;
 
         [ReadOnly] private NativeArray<float2> _octaveData; // (frequency, amplitude)
@@ -54,7 +54,7 @@ namespace Engine.Scripts.Noise{
             _maxAmplitude = maxAmp;
         }
 
-        /// <summary>Per-instance sample offset in blocks, each component uniform in [-MaxOffset, MaxOffset) (GEN-05).</summary>
+        /// <summary>Per-instance sample offset in blocks, each component uniform in [-MaxOffset, MaxOffset).</summary>
         public static float2 HashedOffset(uint seed, uint salt){
             return new float2(
                 Hash.HashSigned(0, 0, seed, salt ^ HashSalts.OffsetX),
@@ -94,7 +94,7 @@ namespace Engine.Scripts.Noise{
             public uint Salt;
 
             /// <summary>
-            ///     Global scale applied to the input position; smaller values produce larger features.
+            ///     Feature size in blocks: the input position is divided by it, so larger values produce larger features.
             /// </summary>
             public float Scale;
 
@@ -115,7 +115,7 @@ namespace Engine.Scripts.Noise{
         }
 
         public void Dispose(){
-            if (!_octaveData.IsCreated) return; // D-05: a default profile (config without noise) owns nothing
+            if (!_octaveData.IsCreated) return; // a default profile (config without noise) owns nothing
             _octaveData.Dispose();
         }
     }
