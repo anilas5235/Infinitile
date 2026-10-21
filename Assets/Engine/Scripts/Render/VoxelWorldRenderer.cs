@@ -113,6 +113,7 @@ namespace Engine.Scripts.Render{
             if (world == null) world = GetComponent<VoxelWorld>();
             if (world == null) world = VoxelWorld.Instance;
             _settings = world.Settings;
+            VoxelLightingGlobals.SetDefaults(); // LGT-10: lit without a DayNightCycle, which overrides these per frame
             _maxInFlight = math.max(1, _settings.Scheduler.partitionBuildBatchSize);
 
             // PERF-04: sized for the partition pool so the request bookkeeping does not grow during flight

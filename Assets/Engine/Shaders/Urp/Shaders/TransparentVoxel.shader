@@ -90,8 +90,6 @@
             struct FragExtraData
             {
                 uint texture_index;
-                uint4 sun_light;
-                uint4 artificial_light;
                 uint ao;
                 float depth_fade_dist;
                 float glow;
@@ -101,8 +99,6 @@
             {
                 FragExtraData data;
                 data.texture_index = get_tex_index(packed);
-                data.sun_light = get_sky_light(packed);
-                data.artificial_light = get_red_light(packed);
                 data.ao = get_ao(packed);
                 data.depth_fade_dist = get_depth_fade_dist(packed);
                 data.glow = get_glow(packed);
@@ -133,8 +129,8 @@
                 // --- Ambient occlusion ---
                 const float4 ao_color = calc_ao_color(_AOColor, albedo, _AOCurve, extra.ao, _AOIntensity, _AOPower, uv);
 
-                // --- Sun light level ---
-                const float sun_light = calc_sun_light(extra.sun_light, uv);
+                // --- Light (LGT-10) ---
+                const float3 light = calc_voxel_light(IN.packed, uv);
 
                 // --- Depth fade ---
                 const float alpha = depth_fade(IN.positionSS, extra.depth_fade_dist, albedo.w);
@@ -146,7 +142,7 @@
                 clip(alpha - 0.001f);
 
                 // --- Final colour ---
-                return half4(ao_color.rgb * sun_light * glow, alpha);
+                return half4(ao_color.rgb * light * glow, alpha);
             }
             ENDHLSL
         }

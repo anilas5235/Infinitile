@@ -138,14 +138,42 @@ float4 calc_ao_color(const float4 ao_color, const float4 albedo, const float4 ao
     return lerp(ao_color, albedo, t);
 }
 
-float calc_sun_light(const uint4 light_data, float2 uv)
-{
-    float ul = lerp(0.05f, 1.0f, light_data.x / 15.0f);
-    float ur = lerp(0.05f, 1.0f, light_data.y / 15.0f);
-    float dr = lerp(0.05f, 1.0f, light_data.z / 15.0f);
-    float dl = lerp(0.05f, 1.0f, light_data.w / 15.0f);
+// LGT-10: globals driven by the DayNightCycle component (VoxelLightingGlobals sets defaults without one).
+// Day/night only changes these; the propagated light levels stay as they are.
+float _VoxelSkyBrightness;
+float4 _VoxelSkyTint;
+float _VoxelAmbient;
 
-    return lerp(lerp(dl, dr, uv.x), lerp(ul, ur, uv.x), uv.y);
+// Corner levels ul, ur, dr, dl interpolated over the face (as the AO).
+float interpolate_corners(const uint4 corners, float2 uv)
+{
+    float4 c = (float4)corners;
+    return lerp(lerp(c.w, c.z, uv.x), lerp(c.x, c.y, uv.x), uv.y);
+}
+
+// Brightness of a light level 0-15: each level below 15 loses 20 %.
+float light_curve(float level)
+{
+    return pow(0.8f, 15.0f - level);
+}
+
+float3 light_curve(float3 level)
+{
+    return pow(0.8f, 15.0f - level);
+}
+
+// LGT-10: light = max(skyCurve(sky) * brightness * tint, blockCurve(RGB)), never below the ambient.
+float3 calc_voxel_light(const uint4 packed, float2 uv)
+{
+    float sky = interpolate_corners(get_sky_light(packed), uv);
+    float3 block = float3(
+        interpolate_corners(get_red_light(packed), uv),
+        interpolate_corners(get_green_light(packed), uv),
+        interpolate_corners(get_blue_light(packed), uv));
+
+    float3 sky_light = light_curve(sky) * _VoxelSkyBrightness * _VoxelSkyTint.rgb;
+    float3 light = max(sky_light, light_curve(block));
+    return max(light, _VoxelAmbient);
 }
 
 float calc_glow(const float glow_data)

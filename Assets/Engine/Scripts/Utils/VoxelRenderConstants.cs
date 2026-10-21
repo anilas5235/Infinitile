@@ -45,6 +45,11 @@ namespace Engine.Scripts.Utils{
         public static readonly int PartitionIndexNameID = Shader.PropertyToID("_PartitionIndex");
         public static readonly int PointCapacityNameID = Shader.PropertyToID("_PointCapacity");
 
+        // LGT-10: lighting globals of the voxel shaders
+        public static readonly int VoxelSkyBrightnessNameID = Shader.PropertyToID("_VoxelSkyBrightness");
+        public static readonly int VoxelSkyTintNameID = Shader.PropertyToID("_VoxelSkyTint");
+        public static readonly int VoxelAmbientNameID = Shader.PropertyToID("_VoxelAmbient");
+
         public static readonly int SolidPointsInNameID = Shader.PropertyToID("_SolidPointsIn");
         public static readonly int SolidPointsCopyOutNameID = Shader.PropertyToID("_SolidPointsCopyOut");
         public static readonly int SolidPagesNameID = Shader.PropertyToID("_SolidPages");
