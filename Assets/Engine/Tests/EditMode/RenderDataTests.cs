@@ -50,10 +50,10 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void PartitionMetadata_Is48Bytes(){
+        public void PartitionMetadata_Is24Bytes(){
             Type type = typeof(VoxelWorldRenderer).Assembly.GetType("Engine.Scripts.Render.PartitionMetadata");
             Assert.IsNotNull(type, "PartitionMetadata not found");
-            Assert.AreEqual(48, Marshal.SizeOf(type));
+            Assert.AreEqual(24, Marshal.SizeOf(type), "HLSL PartitionMetadata stride");
         }
 
         [Test]

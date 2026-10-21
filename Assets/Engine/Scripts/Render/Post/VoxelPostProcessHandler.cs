@@ -6,7 +6,7 @@ using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using UnityEngine;
 
-namespace Engine.Shaders{
+namespace Engine.Scripts.Render.Post{
     /// <summary>
     ///     Applies voxel-specific post-processing effects based on the voxel the target camera is currently inside.
     ///     Uses voxel post-process data for liquids to adjust color grading and fog.

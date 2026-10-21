@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-namespace Engine.Shaders{
+namespace Engine.Scripts.Render.Post{
     /// <summary>
     ///     Singleton wrapper around a URP <see cref="Volume" /> that exposes simple methods
     ///     to control lift/gamma/gain and color adjustments for post-processing.

@@ -3,7 +3,7 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;
 
-namespace Engine.Scripts.Noise{
+namespace Engine.Scripts.WorldGen.Noise{
     /// <summary>
     ///     Encapsulates a single "warped, redistributed" noise layer: a base fBm noise,
     ///     domain-warped via two secondary noise profiles, then remapped through a

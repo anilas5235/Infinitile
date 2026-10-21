@@ -13,7 +13,7 @@ using static Engine.Scripts.Utils.Extensions.VectorConstants;
 using static Engine.Scripts.Utils.VoxelConstants;
 using static Engine.Scripts.Utils.VoxelUtils;
 
-namespace Engine.Scripts.Components{
+namespace Engine.Scripts.World{
     /// <summary>
     ///     Manages chunk data in memory. Maintains a limited pool of loaded chunks prioritized by focus position.
     ///     Tracks remesh / recollider flags and provides voxel access.

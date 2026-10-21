@@ -51,11 +51,6 @@ namespace Engine.Scripts.Jobs.Core{
             return dist * (3f - 2f * dot);
         }
 
-        [BurstCompile]
-        public static float ReVerseDistPriority(ref int3 position, ref Focus focus){
-            return -DistPriority(ref position, ref focus);
-        }
-
         /// <summary>
         ///     Calculates priority based on squared distance from focus position for 2D coordinates.
         ///     Lower values indicate higher priority (closer to focus).
@@ -78,11 +73,6 @@ namespace Engine.Scripts.Jobs.Core{
             float dot = math.dot(forward, dir);
 
             return dist * (3f - 2f * dot);
-        }
-
-        [BurstCompile]
-        public static float ReVerseDistPriority(ref int2 position, ref Focus focus){
-            return -DistPriority(ref position, ref focus);
         }
 
         /// <summary>

@@ -3,7 +3,7 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
 
-namespace Engine.Shaders{
+namespace Engine.Scripts.Render.Post{
     /// <summary>
     ///     Full-screen distance fog for liquids, drawn after transparents and before URP post-processing.
     ///     <see cref="VoxelPostProcessHandler" /> sets the static fog state per liquid.

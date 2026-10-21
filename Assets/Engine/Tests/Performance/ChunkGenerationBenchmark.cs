@@ -57,7 +57,6 @@ namespace Engine.Tests.Performance{
             ChunkJob job = new(){
                 Jobs = _jobs,
                 Results = _results.AsParallelWriter(),
-                RandomSeed = _config.GlobalSeed,
                 Config = _config
             };
 
@@ -78,7 +77,6 @@ namespace Engine.Tests.Performance{
             ChunkJob job = new(){
                 Jobs = _jobs,
                 Results = _results.AsParallelWriter(),
-                RandomSeed = _config.GlobalSeed,
                 Config = _config
             };
 
@@ -128,7 +126,6 @@ namespace Engine.Tests.Performance{
             ChunkJob job = new(){
                 Jobs = _jobs,
                 Results = _results.AsParallelWriter(),
-                RandomSeed = _config.GlobalSeed,
                 Config = _config
             };
 

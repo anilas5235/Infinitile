@@ -1,5 +1,4 @@
 using System;
-using Engine.Scripts.Noise;
 using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Noise;
 using NUnit.Framework;

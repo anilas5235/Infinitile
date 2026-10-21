@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Engine.Scripts.Components;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
@@ -75,7 +74,6 @@ namespace Engine.Scripts.Jobs.Chunk{
             ChunkJob job = new(){
                 Jobs = _jobs,
                 Results = _results.AsParallelWriter(),
-                RandomSeed = _config.GlobalSeed,
                 Config = _config
             };
 

@@ -1,11 +1,10 @@
 ﻿using System;
 using Engine.Scripts.WorldGen.Core;
-using Engine.Scripts.WorldGen.Noise;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;
 
-namespace Engine.Scripts.Noise{
+namespace Engine.Scripts.WorldGen.Noise{
     /// <summary>
     ///     Immutable fBm wrapper over <see cref="SeededSimplex" /> for the [0,1] climate fields.
     ///     Each instance has its own gradient salt and a hashed sample offset with |o| ≤ 10⁴, so two

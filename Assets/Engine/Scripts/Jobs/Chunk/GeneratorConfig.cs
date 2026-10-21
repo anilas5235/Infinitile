@@ -5,20 +5,10 @@ using Unity.Collections;
 
 namespace Engine.Scripts.Jobs.Chunk{
     /// <summary>
-    ///     Holds voxel IDs and global parameters used by chunk generation jobs to create terrain,
-    ///     caves, ores, vegetation and structures.
+    ///     Holds the voxel IDs and the world-generation parameters used by chunk generation jobs to create
+    ///     terrain and vegetation. The seed and the water level live in <see cref="WorldGen" />.
     /// </summary>
     public struct GeneratorConfig : IDisposable{
-        /// <summary>
-        ///     Vertical world Y level that represents the global water surface used for oceans, lakes and rivers.
-        /// </summary>
-        public int WaterLevel;
-
-        /// <summary>
-        ///     Global deterministic seed passed to generation jobs to keep world generation reproducible.
-        /// </summary>
-        public int GlobalSeed;
-
         /// <summary>
         ///     A view of <c>VoxelRegistry.VoxelMap</c>. The registry owns and disposes it; the config never does.
         /// </summary>

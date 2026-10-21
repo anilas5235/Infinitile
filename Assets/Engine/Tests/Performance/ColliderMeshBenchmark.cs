@@ -112,7 +112,6 @@ namespace Engine.Tests.Performance{
                 ChunkJob job = new(){
                     Jobs = jobs,
                     Results = results.AsParallelWriter(),
-                    RandomSeed = _config.GlobalSeed,
                     Config = _config
                 };
                 job.Run(1);

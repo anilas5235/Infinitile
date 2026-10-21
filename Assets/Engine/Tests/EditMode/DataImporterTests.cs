@@ -145,8 +145,6 @@ namespace Engine.Tests.EditMode{
             GeneratorConfig config;
             try{
                 config = _importer.CreateConfig();
-                config.WaterLevel = worldGen.WaterLevel;
-                config.GlobalSeed = TestFixtures.Seed;
                 config.WorldGen = worldGen.ToConfig(TestFixtures.Seed, _importer.VoxelRegistry);
             }
             finally{

@@ -84,7 +84,6 @@ namespace Engine.Tests.Performance{
                 new ChunkJob{
                     Jobs = generate,
                     Results = _chunks.AsParallelWriter(),
-                    RandomSeed = config.GlobalSeed,
                     Config = config
                 }.Run(generate.Length);
                 generate.Dispose();

@@ -5,14 +5,8 @@
 #include "../VoxelCommon.hlsl"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Vertex input structs (for GPU rendering - kept for compatibility)
+// Vertex data
 // ─────────────────────────────────────────────────────────────────────────────
-
-struct Attributes
-{
-    uint vertexID : SV_VertexID;
-    UNITY_VERTEX_INPUT_INSTANCE_ID
-};
 
 struct VoxelVertexData
 {

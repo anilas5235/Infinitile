@@ -182,8 +182,6 @@ namespace Engine.Tests.EditMode{
             voxels.Add("std:Water", new Voxel.VoxelDef{ Id = TestFixtures.Water, MeshLayer = MeshLayer.Transparent });
             voxels.Add("std:Ice", new Voxel.VoxelDef{ Id = TestFixtures.Ice, MeshLayer = MeshLayer.Solid, Collision = true });
             return new GeneratorConfig{
-                WaterLevel = s.WaterLevel,
-                GlobalSeed = TestFixtures.Seed,
                 Voxels = voxels,
                 WorldGen = ToConfig(s)
             };
@@ -295,7 +293,7 @@ namespace Engine.Tests.EditMode{
             _voxels = new ushort[Size.x * Size.y * ChunkHeight];
 
             List<Object> species = FloraConfigBuilder.CollectSpecies(biomes);
-            int waterLevel = config.WaterLevel;
+            int waterLevel = config.WorldGen.WaterLevel;
             bool ice = cfg.EnableClimateOverrides;
 
             for (int x = 0; x < Size.x; x++)

@@ -384,8 +384,8 @@ flowchart LR
   (precomputed in `WorldGenConfig.OctaveCoefficients`), J = Σ w_b J_b, and H is computed once from them. All biomes
   sample the same N_i and P; because every biome parameter enters H linearly, blending the parameters equals blending
   the per-biome heights. The clamp to [Hmin, Hmax] is recorded.
-- **Configuration**: `GeneratorConfig` holds `WaterLevel`, `GlobalSeed`, `Voxels` and `WorldGen` only. `WaterLevel`
-  lives on `WorldGenSettings` (default 124) and is part of the canonical JSON. `VoxelEngineSettings` requires a
+- **Configuration**: `GeneratorConfig` holds `Voxels` and `WorldGen` only; the seed and the water level are read from
+  `WorldGen` (`WorldGenConfig`). `WaterLevel` lives on `WorldGenSettings` (default 124) and is part of the canonical JSON. `VoxelEngineSettings` requires a
   `WorldGenSettings`; the chunk scheduler throws without one. `NoiseProfileSettings` and `WarpedNoiseLayerSettings`
   live in `WorldGen/Settings/`.
 - **Preview** (`Editor/WorldGen/WorldGenerationPreviewWindow.cs`, menu Infinitile → World Generation Preview):

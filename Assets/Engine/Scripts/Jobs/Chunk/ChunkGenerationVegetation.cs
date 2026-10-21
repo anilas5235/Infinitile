@@ -9,7 +9,7 @@ using static Engine.Scripts.Utils.VoxelConstants;
 namespace Engine.Scripts.Jobs.Chunk{
     /// <summary>
     ///     Flora decisions of a chunk and its border ring: the chunk columns ± <c>FloraPadding</c>
-    ///     (r_tree + max canopy radius). <see cref="ChunkJob.PrepareChunkMaps(int,ref GeneratorConfig,ref int3,NativeArray{ChunkColumn},ref FloraGrid)" />
+    ///     (r_tree + max canopy radius). <see cref="ChunkJob.PrepareChunkMaps(ref GeneratorConfig,ref int3,NativeArray{ChunkColumn},ref FloraGrid)" />
     ///     fills it, <see cref="ChunkJob.PlaceVegetation" /> stamps from it. Element [gz + gx × Size.y] holds the
     ///     column (origin.x − Padding + gx, origin.z − Padding + gz): x-major like the chunk columns, so walking the
     ///     elements in order walks the world in (x, then z) order. Temp, owned by the job.

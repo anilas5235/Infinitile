@@ -19,14 +19,6 @@ namespace Engine.Tests.EditMode{
             return PriorityUtil.DistPriority(ref position, ref focus);
         }
 
-        private static float Reverse(int3 position, PriorityUtil.Focus focus){
-            return PriorityUtil.ReVerseDistPriority(ref position, ref focus);
-        }
-
-        private static float Reverse(int2 position, PriorityUtil.Focus focus){
-            return PriorityUtil.ReVerseDistPriority(ref position, ref focus);
-        }
-
         #region Eviction priority
 
         [Test]
@@ -61,15 +53,6 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(0f, Prio(int2.zero, focus));
             Assert.Less(Prio(new int2(0, 1), focus), Prio(new int2(0, 5), focus));
             Assert.Less(Prio(new int2(1, 0), focus), Prio(new int2(3, 0), focus));
-        }
-
-        [Test]
-        public void ReverseDistPriority_InvertsOrder(){
-            PriorityUtil.Focus focus = LookingForward();
-            Assert.Greater(Reverse(new int3(0, 0, 1), focus), Reverse(new int3(0, 0, 5), focus));
-            Assert.Greater(Reverse(new int2(0, 1), focus), Reverse(new int2(0, 5), focus));
-            Assert.AreEqual(-Prio(new int3(2, 0, 3), focus), Reverse(new int3(2, 0, 3), focus));
-            Assert.AreEqual(-Prio(new int2(2, 3), focus), Reverse(new int2(2, 3), focus));
         }
 
         [Test]
@@ -112,7 +95,6 @@ namespace Engine.Tests.EditMode{
             int2 position = new(3, 4);
             Assert.IsTrue(float.IsFinite(Prio(position, up)), $"up: {Prio(position, up)}");
             Assert.IsTrue(float.IsFinite(Prio(position, down)), $"down: {Prio(position, down)}");
-            Assert.IsTrue(float.IsFinite(Reverse(position, up)));
             Assert.Less(Prio(new int2(1, 0), up), Prio(new int2(5, 0), up), "closer still ranks first");
         }
 

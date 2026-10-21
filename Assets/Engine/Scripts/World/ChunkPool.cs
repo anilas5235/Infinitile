@@ -11,7 +11,7 @@ using static Engine.Scripts.Jobs.Core.PriorityUtil;
 using static Engine.Scripts.Utils.VoxelConstants;
 using Object = UnityEngine.Object;
 
-namespace Engine.Scripts.Components{
+namespace Engine.Scripts.World{
     /// <summary>
     ///     Pool for <see cref="ChunkBehaviour" /> instances (render + collider). Handles activation & reclamation.
     ///     Uses a priority queue ordered by distance to focus for eviction.
@@ -20,8 +20,6 @@ namespace Engine.Scripts.Components{
         private readonly Dictionary<int2, ChunkBehaviour> _chunkMap;
         private readonly int _chunkPoolSize;
         private readonly SimpleFastPriorityQueue<int2, float> _chunkQueue;
-        private readonly int _colliderPoolSize;
-        private readonly SimpleFastPriorityQueue<int3, float> _colliderQueue;
         private readonly HashSet<int3> _colliderSet;
         private readonly Dictionary<int3, ChunkPartition> _meshMap;
         private readonly int _partitionPoolSize;
@@ -49,17 +47,14 @@ namespace Engine.Scripts.Components{
             _partitionPoolSize = settings.Chunk.DrawDistance.SquareSize() * PartitionsPerChunk;
             _meshMap = new Dictionary<int3, ChunkPartition>(_partitionPoolSize);
 
-            _colliderPoolSize = settings.Chunk.UpdateDistance.SquareSize() * PartitionsPerChunk;
             // An entry per active partition (cleared on reclaim), so the set never rehashes during flight
             _colliderSet = new HashSet<int3>(_partitionPoolSize);
 
             _chunkQueue = new SimpleFastPriorityQueue<int2, float>();
             _partitionQueue = new SimpleFastPriorityQueue<int3, float>();
-            _colliderQueue = new SimpleFastPriorityQueue<int3, float>();
             // The queues hold at most one entry over the pool size before a reclaim
             _chunkQueue.Reserve(_chunkPoolSize + 1);
             _partitionQueue.Reserve(_partitionPoolSize + 1);
-            _colliderQueue.Reserve(_colliderPoolSize + 1);
 
             _pool = new ObjectPool<ChunkBehaviour>(
                 () => {
@@ -101,7 +96,6 @@ namespace Engine.Scripts.Components{
             // reclaim by plain distance
             _chunkQueue.UpdateAllPriorities(focus, static (f, pos) => EvictionPriority(ref pos, ref f));
             _partitionQueue.UpdateAllPriorities(focus, static (f, pos) => EvictionPriority(ref pos, ref f));
-            _colliderQueue.UpdateAllPriorities(focus, static (f, pos) => EvictionPriority(ref pos, ref f));
         }
 
         private float PriorityCalc(int2 position){
@@ -212,7 +206,6 @@ namespace Engine.Scripts.Components{
             }
 
             if (_partitionQueue.Contains(partitionPos)) _partitionQueue.Remove(partitionPos);
-            if (_colliderQueue.Contains(partitionPos)) _colliderQueue.Remove(partitionPos);
             _colliderSet.Remove(partitionPos);
 
             if (_emitEvictionEvents) OnPartitionEvicted?.Invoke(partitionPos);

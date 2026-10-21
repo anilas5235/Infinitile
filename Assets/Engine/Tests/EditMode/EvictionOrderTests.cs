@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using Engine.Scripts.Components;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
+using Engine.Scripts.World;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Mathematics;

@@ -62,6 +62,8 @@ Important entry points:
 - `ChunkIntervalStore`
 - `PointBuilderHandler`
 - `CopyPointsHandler`
+- `Render/Post` — the underwater fog renderer feature and post-process volume switching (`UnderwaterFogFeature`,
+  `PostProcessManager`, `VoxelPostProcessHandler`)
 
 ### `VoxelConfig`
 Voxel definition assets, registries, shapes, and editor tooling for authoring voxel content.
@@ -74,7 +76,8 @@ Important entry points:
 - `QuadDefinition`
 
 ### `Data`
-Project data containers, settings assets, and imported configuration used by runtime systems.
+Chunk data containers shared by the jobs: `Chunk`, `ChunkVoxelData`, `ChunkLightData` (interval lists), the
+read-only `ChunkAccessor` of the mesh job, and the packed light format (`VoxelLight`, `VoxelLightTable`).
 
 ### `Settings`
 Global engine and renderer settings used by scheduling, rendering, and pipeline configuration.
@@ -82,16 +85,15 @@ Global engine and renderer settings used by scheduling, rendering, and pipeline 
 ### `Utils`
 Shared constants, math helpers, singleton/provider helpers, logging, and collections.
 
-### `Components`
-Unity-facing runtime components that connect the world, scheduler, and renderer.
-
-### `Noise`
-Procedural generation utilities used by chunk data jobs and world generation.
+### `Behaviour`
+The pooled chunk and partition GameObject components (`ChunkBehaviour`, `ChunkPartition`); a partition holds its
+collider mesh and `MeshCollider`.
 
 ### `WorldGen`
 The world generator (see `Docs/WorldGenerationPipeline.md`):
 - `WorldGen/Core` — hashing, salts, `WorldSampler` (pure per-column sampler), `ColumnSample`, `WorldGenApi.SampleRegion`
-- `WorldGen/Noise` — seeded simplex, climate fields, detail octaves, peak noise, warp field
+- `WorldGen/Noise` — seeded simplex, climate fields, detail octaves, peak noise, warp field, noise profiles and
+  warped noise layers (`NoiseProfile`, `WarpedNoiseLayer`)
 - `WorldGen/Classify` — 5D/6D biome classifier
 - `WorldGen/Height` — Terrain-first nested splines and Biome-first height
 - `WorldGen/Blending` — `BlendWeights`, the blend methods, blend lattice and surface pick

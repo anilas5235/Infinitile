@@ -102,7 +102,7 @@ namespace Engine.Tests.EditMode{
 
         private void Prepare(int2 chunk){
             int3 origin = new(chunk.x * ChunkWidth, 0, chunk.y * ChunkDepth);
-            ChunkJob.PrepareChunkMaps(_config.GlobalSeed, ref _config, ref origin, _columns);
+            ChunkJob.PrepareChunkMaps(ref _config, ref origin, _columns);
         }
 
         private ChunkColumn Column(int x, int z){
@@ -226,7 +226,7 @@ namespace Engine.Tests.EditMode{
             NativeParallelHashMap<int2, ChunkVoxelData> results = new(2, Allocator.TempJob);
             try{
                 new ChunkJob{
-                    Jobs = jobs, Results = results.AsParallelWriter(), RandomSeed = _config.GlobalSeed, Config = _config
+                    Jobs = jobs, Results = results.AsParallelWriter(), Config = _config
                 }.Run(jobs.Length);
 
                 Assert.IsTrue(results.TryGetValue(new int2(-1, 0), out ChunkVoxelData west));
@@ -275,7 +275,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void FillTerrain_IceOverrideFollowsEnableClimateOverrides(){
-            int surface = _config.WaterLevel - 1;
+            int surface = _config.WorldGen.WaterLevel - 1;
 
             UseTerrainFirst(climateOverrides: true);
             ColdFloodedColumns();

@@ -1,8 +1,8 @@
-using Engine.Scripts.Components;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils.Extensions;
+using Engine.Scripts.World;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -67,7 +67,7 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void FillTerrain_LayersFollowColumnHeight(){
             PrepareColumns();
-            int water = _config.WaterLevel;
+            int water = _config.WorldGen.WaterLevel;
             Assert.AreEqual(TestFixtures.Stone, VoxelAt(WarmColumn, 0));
             Assert.AreEqual(TestFixtures.Stone, VoxelAt(WarmColumn, 95));
             Assert.AreEqual(TestFixtures.Dirt, VoxelAt(WarmColumn, 96));
@@ -93,7 +93,7 @@ namespace Engine.Tests.EditMode{
         public void FillTerrain_ColdColumnFreezesWaterSurface(){
             // The water surface is the topmost water voxel at waterLevel - 1 (at waterLevel the voxel is already air).
             PrepareColumns();
-            int water = _config.WaterLevel;
+            int water = _config.WorldGen.WaterLevel;
             Assert.AreEqual(TestFixtures.Water, VoxelAt(ColdColumn, water - 2), "below the surface stays water");
             Assert.AreEqual(TestFixtures.Air, VoxelAt(ColdColumn, water), "above the surface stays air");
             Assert.AreEqual(TestFixtures.Ice, VoxelAt(ColdColumn, water - 1), "cold water surface must be ice");

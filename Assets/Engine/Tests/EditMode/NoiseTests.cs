@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Reflection;
-using Engine.Scripts.Noise;
 using Engine.Scripts.WorldGen.Core;
+using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
 using Unity.Collections;

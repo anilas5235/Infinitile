@@ -94,7 +94,7 @@ namespace Engine.Tests.EditMode{
 
         private void Prepare(int2 chunk){
             int3 origin = new(chunk.x * ChunkWidth, 0, chunk.y * ChunkDepth);
-            ChunkJob.PrepareChunkMaps(_config.GlobalSeed, ref _config, ref origin, _columns);
+            ChunkJob.PrepareChunkMaps(ref _config, ref origin, _columns);
         }
 
         private ChunkColumn Column(int x, int z){
@@ -220,7 +220,7 @@ namespace Engine.Tests.EditMode{
             NativeParallelHashMap<int2, ChunkVoxelData> results = new(1, Allocator.TempJob);
             try{
                 new ChunkJob{
-                    Jobs = jobs, Results = results.AsParallelWriter(), RandomSeed = _config.GlobalSeed, Config = _config
+                    Jobs = jobs, Results = results.AsParallelWriter(), Config = _config
                 }.Run(jobs.Length);
 
                 Assert.IsTrue(results.TryGetValue(new int2(7, -3), out ChunkVoxelData chunk));

@@ -64,8 +64,6 @@ namespace Engine.Tests.EditMode{
                 voxels.Add("std:Ice", new Voxel.VoxelDef{ Id = Ice, MeshLayer = MeshLayer.Solid, Collision = true });
 
                 return new GeneratorConfig{
-                    WaterLevel = settings.WaterLevel,
-                    GlobalSeed = Seed,
                     Voxels = voxels,
                     WorldGen = worldGen
                 };

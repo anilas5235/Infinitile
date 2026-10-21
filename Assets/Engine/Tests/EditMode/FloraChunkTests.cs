@@ -51,7 +51,7 @@ namespace Engine.Tests.EditMode{
             results = new NativeParallelHashMap<int2, ChunkVoxelData>(jobs.Length, Allocator.TempJob);
             try{
                 new ChunkJob{
-                    Jobs = jobs, Results = results.AsParallelWriter(), RandomSeed = _config.GlobalSeed, Config = _config
+                    Jobs = jobs, Results = results.AsParallelWriter(), Config = _config
                 }.Run(jobs.Length);
             }
             finally{
@@ -115,7 +115,7 @@ namespace Engine.Tests.EditMode{
                 for (int cx = 0; cx < chunks.x; cx++)
                 for (int cz = 0; cz < chunks.y; cz++){
                     int3 origin = new((originChunk.x + cx) * ChunkWidth, 0, (originChunk.y + cz) * ChunkDepth);
-                    ChunkJob.PrepareChunkMaps(_config.GlobalSeed, ref _config, ref origin, columns);
+                    ChunkJob.PrepareChunkMaps(ref _config, ref origin, columns);
                     for (int x = 0; x < ChunkWidth; x++)
                     for (int z = 0; z < ChunkDepth; z++){
                         int wx = origin.x + x, wz = origin.z + z;

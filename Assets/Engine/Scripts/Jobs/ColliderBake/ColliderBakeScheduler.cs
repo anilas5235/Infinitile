@@ -1,9 +1,9 @@
 ﻿using System.Collections.Generic;
 using Engine.Scripts.Behaviour;
-using Engine.Scripts.Components;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Logger;
+using Engine.Scripts.World;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;

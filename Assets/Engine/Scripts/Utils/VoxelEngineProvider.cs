@@ -1,5 +1,4 @@
-﻿using Engine.Scripts.Components;
-using Engine.Scripts.Jobs.Chunk;
+﻿using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Jobs.Core;
@@ -78,8 +77,6 @@ namespace Engine.Scripts.Utils{
                     $"{Settings.name}: a WorldGenSettings asset must be assigned (VoxelEngineSettings.WorldGen).");
 
             GeneratorConfig cfg = generatorConfig;
-            cfg.WaterLevel = worldGen.WaterLevel;
-            cfg.GlobalSeed = Settings.Seed;
             // Burst mirror of the world-generation settings, owned by the config.
             cfg.WorldGen = worldGen.ToConfig(Settings.Seed, DataImporter.Instance.VoxelRegistry);
             return new ChunkScheduler(Settings, chunkManager, cfg, world);

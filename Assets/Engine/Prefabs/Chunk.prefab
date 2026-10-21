@@ -73,7 +73,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3901904942143629314, guid: 7ef0037460b82c645b1f1f398da2d4e5, type: 3}
       propertyPath: m_Name
-      value: ChunkPartion (2)
+      value: ChunkPartition (2)
       objectReference: {fileID: 0}
     - target: {fileID: 8405525253320237017, guid: 7ef0037460b82c645b1f1f398da2d4e5, type: 3}
       propertyPath: m_LocalPosition.x
@@ -146,7 +146,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3901904942143629314, guid: 7ef0037460b82c645b1f1f398da2d4e5, type: 3}
       propertyPath: m_Name
-      value: ChunkPartion (7)
+      value: ChunkPartition (7)
       objectReference: {fileID: 0}
     - target: {fileID: 8405525253320237017, guid: 7ef0037460b82c645b1f1f398da2d4e5, type: 3}
       propertyPath: m_LocalPosition.x
@@ -219,7 +219,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3901904942143629314, guid: 7ef0037460b82c645b1f1f398da2d4e5, type: 3}
       propertyPath: m_Name
-      value: ChunkPartion (4)
+      value: ChunkPartition (4)
       objectReference: {fileID: 0}
     - target: {fileID: 8405525253320237017, guid: 7ef0037460b82c645b1f1f398da2d4e5, type: 3}
       propertyPath: m_LocalPosition.x
@@ -292,7 +292,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3901904942143629314, guid: 7ef0037460b82c645b1f1f398da2d4e5, type: 3}
       propertyPath: m_Name
-      value: ChunkPartion (6)
+      value: ChunkPartition (6)
       objectReference: {fileID: 0}
     - target: {fileID: 8405525253320237017, guid: 7ef0037460b82c645b1f1f398da2d4e5, type: 3}
       propertyPath: m_LocalPosition.x
@@ -365,7 +365,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3901904942143629314, guid: 7ef0037460b82c645b1f1f398da2d4e5, type: 3}
       propertyPath: m_Name
-      value: ChunkPartion (5)
+      value: ChunkPartition (5)
       objectReference: {fileID: 0}
     - target: {fileID: 8405525253320237017, guid: 7ef0037460b82c645b1f1f398da2d4e5, type: 3}
       propertyPath: m_LocalPosition.x
@@ -438,7 +438,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3901904942143629314, guid: 7ef0037460b82c645b1f1f398da2d4e5, type: 3}
       propertyPath: m_Name
-      value: ChunkPartion (1)
+      value: ChunkPartition (1)
       objectReference: {fileID: 0}
     - target: {fileID: 8405525253320237017, guid: 7ef0037460b82c645b1f1f398da2d4e5, type: 3}
       propertyPath: m_LocalPosition.x
@@ -511,7 +511,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3901904942143629314, guid: 7ef0037460b82c645b1f1f398da2d4e5, type: 3}
       propertyPath: m_Name
-      value: ChunkPartion (3)
+      value: ChunkPartition (3)
       objectReference: {fileID: 0}
     - target: {fileID: 8405525253320237017, guid: 7ef0037460b82c645b1f1f398da2d4e5, type: 3}
       propertyPath: m_LocalPosition.x
@@ -584,7 +584,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3901904942143629314, guid: 7ef0037460b82c645b1f1f398da2d4e5, type: 3}
       propertyPath: m_Name
-      value: ChunkPartion
+      value: ChunkPartition
       objectReference: {fileID: 0}
     - target: {fileID: 8405525253320237017, guid: 7ef0037460b82c645b1f1f398da2d4e5, type: 3}
       propertyPath: m_LocalPosition.x

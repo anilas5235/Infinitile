@@ -8,7 +8,7 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.Jobs.Chunk{
     /// <summary>
-    ///     Parallel job that procedurally generates chunk data (terrain, caves, ores, structures, vegetation)
+    ///     Parallel job that procedurally generates chunk data (terrain, vegetation)
     ///     for multiple chunks in parallel.
     ///     The job calls <c>WorldSampler</c>, so it compiles synchronously with strict float mode; a Mono
     ///     fallback during async compilation or a relaxed float mode could otherwise change the generated world.
@@ -17,7 +17,6 @@ namespace Engine.Scripts.Jobs.Chunk{
     internal partial struct ChunkJob : IJobParallelFor{
         [ReadOnly] public NativeList<int2> Jobs; // Chunk world positions
         [WriteOnly] public NativeParallelHashMap<int2, ChunkVoxelData>.ParallelWriter Results; // Result mapping
-        [ReadOnly] public int RandomSeed;
         [ReadOnly] public GeneratorConfig Config;
 
         /// <summary>
@@ -43,7 +42,7 @@ namespace Engine.Scripts.Jobs.Chunk{
 
             FloraGrid floraGrid = new(Config.WorldGen.FloraPadding, Allocator.Temp);
 
-            PrepareChunkMaps(RandomSeed, ref Config, ref chunkWorldPos, chunkColumns, ref floraGrid);
+            PrepareChunkMaps(ref Config, ref chunkWorldPos, chunkColumns, ref floraGrid);
 
             FillTerrain(chunkVoxels, chunkColumns, ref Config);
 

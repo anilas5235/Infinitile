@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using Engine.Scripts.Components;
 using Engine.Scripts.Settings;
 using Engine.Scripts.ThirdParty.Priority_Queue;
+using Engine.Scripts.World;
 using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Core{

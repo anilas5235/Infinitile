@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Engine.Scripts.Components;
 using Engine.Scripts.Render;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.World;

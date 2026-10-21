@@ -29,13 +29,13 @@ The engine is organized around three core layers:
 
 Owns chunk data, partition state, and world events. Provides high-level APIs for voxel queries and edits without exposing job or render complexity.
 
-**Key Classes**: `VoxelWorld`, `ChunkManager`, `ChunkPool`, `PartitionManager`
+**Key Classes**: `VoxelWorld`, `ChunkManager`, `ChunkPool`
 
 ### 2. Job Layer
 
-Turns generation requests and edit operations into background work. Schedules and manages parallel jobs for chunk data generation, mesh building, and collider baking.
+Turns generation requests and edit operations into background work. Schedules and manages parallel jobs for chunk data generation, lighting, collider mesh building, and collider baking.
 
-**Key Classes**: `VoxelEngineScheduler`, `ChunkScheduler`, `MeshBuildScheduler`, `ColliderBakeScheduler`
+**Key Classes**: `VoxelEngineScheduler`, `ChunkScheduler`, `LightScheduler`, `CMeshBuildScheduler`, `ColliderBakeScheduler`
 
 ### 3. Render Layer
 
@@ -49,21 +49,22 @@ Manages GPU-side render data, global buffers, and draw submission. Converts part
 Assets/
 ├── Engine/                    # Core engine code (production)
 │   ├── Docs/                  # Pipeline documentation (see below)
+│   ├── Editor/                # Editor tooling (world generation preview, render debugging)
 │   ├── Scripts/
-│   │   ├── Behaviour/         # MonoBehaviour-based system components
-│   │   ├── Components/        # Unity-facing MonoBehaviour components
-│   │   ├── Data/              # Data structures and serializable types
+│   │   ├── Behaviour/         # Pooled chunk and partition GameObject components
+│   │   ├── Data/              # Chunk voxel and light data, chunk accessor
 │   │   ├── Jobs/              # Schedulers and job definitions
-│   │   ├── Noise/             # Procedural generation utilities
-│   │   ├── Render/            # GPU rendering pipeline
+│   │   ├── Render/            # GPU rendering pipeline (Post/: underwater fog, post-processing)
 │   │   ├── Settings/          # Engine settings and configuration
 │   │   ├── ThirdParty/        # Third-party libraries and utilities
 │   │   ├── Utils/             # Math, logging, and shared helpers
 │   │   ├── VoxelConfig/       # Voxel definitions and registries
-│   │   └── World/             # Chunk management and world state
+│   │   ├── World/             # VoxelWorld, chunk store (ChunkManager) and pool (ChunkPool)
+│   │   └── WorldGen/          # World generator: sampler, noise, biomes, height, blending, flora
 │   ├── Prefabs/               # Engine prefabs (world manager, renderer, etc.)
 │   ├── Resources/             # Voxel data packages and runtime assets
-│   └── Shaders/               # Compute shaders and render shaders
+│   ├── Shaders/               # Compute shaders and render shaders
+│   └── Tests/                 # EditMode, PlayMode and performance tests
 ├── EngineSettings/            # Configurable engine settings (world size, generation params)
 ├── Scenes/                    # Game scenes
 ├── Scripts/                   # Game-specific scripts (not part of the engine)
@@ -88,15 +89,18 @@ The engine follows a consistent pipeline for world updates:
    - Parallel chunk jobs generate voxel data using noise and feature passes
    - Chunk data is registered in the world
 
-2. **Mesh Generation Phase**
-   - World publishes partition build requests
-   - Partition mesh jobs build render and collider meshes on the CPU
-   - Render data is queued for GPU processing
+2. **Light Phase**
+   - Light jobs compute the light of chunks whose 3 x 3 neighbourhood has voxel data
+   - Voxel edits update the light incrementally
 
-3. **Rendering Phase**
-   - Compute shaders build vertex/index buffers from partition point data
-   - Global buffers are updated with new partition data
-   - Indirect draw calls render all visible partitions in a single pass
+3. **Mesh Generation Phase**
+   - Collider mesh jobs build greedy collider meshes on the CPU; bake jobs cook them for physics
+   - World publishes partition build requests for the GPU
+
+4. **Rendering Phase**
+   - A compute shader builds each partition's points from the uploaded chunk voxel and light data
+   - The points are copied into paged global render buffers
+   - Per-camera page culling feeds indirect draw calls that pull the vertices from the buffers
 
 This decoupled design means each layer can scale independently without tight coupling.
 

@@ -610,15 +610,5 @@ namespace Engine.Scripts.Render{
         ///     The world space position of the partition.
         /// </summary>
         public int3 PartitionWorldPos;
-
-        /// <summary>
-        ///     The minimum corner of the partition's axis-aligned bounding box.
-        /// </summary>
-        public float3 BoundsMin;
-
-        /// <summary>
-        ///     The maximum corner of the partition's axis-aligned bounding box.
-        /// </summary>
-        public float3 BoundsMax;
     }
 }

@@ -1,6 +1,6 @@
-﻿using Engine.Scripts.Components;
-using Engine.Scripts.Jobs.Chunk;
+﻿using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Settings;
+using Engine.Scripts.World;
 using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Core{

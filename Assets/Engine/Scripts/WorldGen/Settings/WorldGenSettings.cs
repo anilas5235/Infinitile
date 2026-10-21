@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Engine.Scripts.Noise;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.WorldGen.Blending;
