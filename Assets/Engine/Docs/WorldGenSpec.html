@@ -992,6 +992,18 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
   </ul></li>
 <li><b>Acceptance if scheduled:</b> TST-E21 at 0/300 with no per-chunk buffer objects; GPU memory for voxel data at most that of the pooled design; the mesh build and upload benchmarks not slower (PERF-03).</li>
 </ul>
+<h3>20.2 Faster light BFS for emitter-dense regions</h3>
+<p class="small">Recorded 2026-10-21 (Phase L, from LGT-11 / PERF-02).</p>
+<ul class="tight">
+<li><b>Today:</b> <code>LightJob</code> takes 0.86 ms/chunk on natural terrain (PERF-05 met) but 15.7 ms/chunk in the benchmark worst case: an air cavity with a Lava emitter every 8 voxels under a leaf roof, so the BFS visits almost every voxel of the 64 × 64 × 256 box on all four channels. There is no budget for this case; the jobs run on worker threads.</li>
+<li><b>Idea:</b>
+  <ul class="tight">
+  <li>Compute the per-channel max of a BFS step for all four nibbles at once (SWAR on the 16-bit value, or the channels spread to bytes), instead of the loop over channels in <code>LightRegion.Combine</code>.</li>
+  <li>Optionally skip work once a voxel is queued: mark queued voxels (a spare attenuation bit) so it is not queued again before it is processed.</li>
+  </ul></li>
+<li><b>Costs and risks:</b> more intricate code in the hottest loop; the sky lossless-down rule needs a separate path; results must stay bit-identical (the border- and edit-exactness tests of LGT-11 guard this).</li>
+<li><b>Acceptance if scheduled:</b> the worst-case row of <code>LightJobBenchmark</code> clearly faster (target ≤ 10 ms/chunk); natural terrain not slower (PERF-03); all LGT-11 tests pass.</li>
+</ul>
 </main>
 </div>
 </body>
