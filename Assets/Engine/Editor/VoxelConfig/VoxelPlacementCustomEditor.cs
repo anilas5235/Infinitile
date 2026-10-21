@@ -1,7 +1,8 @@
-﻿using UnityEditor;
+﻿using Engine.Scripts.VoxelConfig.Data.Generation;
+using UnityEditor;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Data.Generation.Editor{
+namespace Engine.Editor.VoxelConfig{
     [CustomPropertyDrawer(typeof(VoxelPlacement))]
     public class VoxelPlacementCustomEditor : PropertyDrawer{
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label){

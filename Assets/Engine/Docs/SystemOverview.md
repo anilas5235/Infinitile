@@ -170,8 +170,9 @@ Copies built point data into the target render buffers and prepares page metadat
 ## Assemblies
 
 - `Engine.Runtime` (`Assets/Engine/Engine.Runtime.asmdef`) — all runtime engine code under `Assets/Engine/Scripts`.
-- `Engine.Editor` (`Assets/Engine/Editor/Engine.Editor.asmdef`) — editor tooling; the `Editor` folders under
-  `Scripts` join it through `Engine.Editor.asmref` files.
+- `Engine.Editor` (`Assets/Engine/Editor/Engine.Editor.asmdef`) — editor tooling: custom inspectors
+  (`VoxelConfig/`, `World/`), the world generation preview (`WorldGen/`) and render debugging (`Render/`). All
+  editor code lives in this folder; there are no `Editor` folders under `Scripts`.
 - `Engine.Tests.EditMode`, `Engine.Tests.PlayMode`, `Engine.Tests.Performance` (`Assets/Engine/Tests/...`) — the
   test assemblies. Runtime internals they use are exposed with `InternalsVisibleTo` in `Scripts/AssemblyInfo.cs`.
 

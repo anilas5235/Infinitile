@@ -10,6 +10,10 @@ Each entry is checked against two rules:
 - **Budgets** (initial targets per chunk and worker, to be confirmed on the target machine): generation 1.5 ms
   without blending (`None`) and 3 ms with the spatial blend methods; light 1 ms on natural terrain.
 
+The tables below keep the numbers of every baseline. Only the three latest result files stay in this folder;
+the older ones were removed on 2026-10-21 and are in the git history
+(`git log --diff-filter=D -- Assets/Engine/Tests/Performance/Baselines`).
+
 ## 2026-10-17 — first baseline (`2026-10-17-editmode-baseline.json`)
 
 Machine: AMD Ryzen 7 5800X (16 threads), 32 GB, Windows 11, Unity 6000.3.11f1, Mono, D3D11.

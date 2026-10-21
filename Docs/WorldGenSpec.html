@@ -561,7 +561,8 @@ surfaceSource(p) = smallest b such that Σ_{c ≤ b} w_c^mat(p) &gt; u · S
   Settings/    WorldGenSettings.cs (SO), BiomeSet.cs (SO), TerrainSplineSet.cs (SO)
 Assets/Engine/Editor/                 Engine.Editor.asmdef, BiomeFirstCalibration.cs, preview extensions
 Assets/Engine/Tests/EditMode/         Engine.Tests.EditMode.asmdef, *Tests.cs
-Assets/Engine/Docs/                   WorldGenSpec.html (this file), WorldGenerationPipeline.md (update)</code></pre>
+Assets/Engine/Docs/                   WorldGenerationPipeline.md (update)
+Docs/                                 WorldGenSpec.html (this file; outside Assets since the 2026-10-21 cleanup)</code></pre>
 
 <h3>11.3 Settings and config</h3>
 <div class="req"><span class="id">INT-01</span><span class="kw must">MUST</span>Add <code>WorldGenSettings</code> (ScriptableObject), referenced from <code>VoxelEngineSettings</code>: architecture, material method + B/σ, height method + B/σ, shared warp A and λ<sub>d</sub>, λ weights, Hmin/Hmax, K and octave wavelengths, global octave weights g, P wavelength, WGain, ClimateFrequencyScale, E/W noise settings, <code>EnableClimateOverrides</code>, references to <code>BiomeSet</code> and <code>TerrainSplineSet</code>.</div>
@@ -1051,8 +1052,28 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
 <ul class="tight">
 <li><b>Today:</b> <code>CopyPoints.compute</code> runs one thread per page (<code>numthreads(8, 3, 1)</code>, one row per layer). Each thread copies up to 256 points in a serial loop with a <code>switch</code> on the layer inside the loop, so a build with few pages uses only a handful of GPU threads.</li>
 <li><b>Idea:</b> one thread per point, e.g. a group of 256 threads per page and layer (<code>SV_GroupID</code> = page and layer, <code>SV_GroupThreadID</code> = point in the page), with the layer chosen once per group.</li>
-<li><b>Costs and risks:</b> small kernel change; the dispatch size becomes pages × layers groups; <code>POINTS_PER_PAGE</code> is mirrored by hand between C# and HLSL, so a shared constant or a test should check it.</li>
+<li><b>Costs and risks:</b> small kernel change; the dispatch size becomes pages × layers groups. <code>POINTS_PER_PAGE</code> and the group sizes come from <code>VoxelGpuConstants.hlsl</code>, which <code>GpuConstantsTests</code> checks against the C# side, so a new group size goes there.</li>
 <li><b>Acceptance if scheduled:</b> identical render buffers (a new GPU round-trip test, as there is no CopyPoints test yet); copy dispatch time lower in a ProfilerRecorder probe.</li>
+</ul>
+<h3>20.6 Split WorldGenSettings and the preview window</h3>
+<p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Refactoring only, no behaviour change.</p>
+<ul class="tight">
+<li><b>Today:</b> <code>WorldGenSettings</code> (about 550 lines) holds the serialized settings, their validation, the Burst mirror (<code>ToConfig</code>) and the canonical JSON in one class. <code>WorldGenerationPreviewWindow</code> is about 920 lines plus its calibration part: toolbar, settings panels, the build scheduling, compare mode, the diff and the drawing.</li>
+<li><b>Idea:</b>
+  <ul class="tight">
+  <li><code>WorldGenSettings</code> keeps the data and <code>OnValidate</code>. A <code>WorldGenConfigBuilder</code> takes the conversion to <code>WorldGenConfig</code> (with its cleanup on failure), and a <code>WorldGenSettingsJson</code> the canonical JSON tree.</li>
+  <li>The preview window keeps the layout. The build scheduling and its two passes go to a <code>PreviewBuilder</code>, and the compare and diff panel goes to its own partial or class, like <code>.Calibration.cs</code> today.</li>
+  </ul></li>
+<li><b>Costs and risks:</b> many internal call sites in the tests and the preview; the JSON format must stay byte-identical (run manifests hash it, EXP-10).</li>
+<li><b>Acceptance if scheduled:</b> all EditMode and PlayMode tests pass unchanged; the canonical JSON of the shipped asset is identical before and after.</li>
+</ul>
+<h3>20.7 Debounce preview rebuilds while dragging</h3>
+<p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Not measured yet.</p>
+<ul class="tight">
+<li><b>Today:</b> each change in the preview's settings calls <code>RequestRebuild</code>. With auto rebuild on, an idle window starts a build at once, and a change during a build queues one more, so builds do not pile up. While a slider is dragged, though, a new build starts as soon as the last one ends, and each one rebuilds the Burst configs and runs pass A (and B in compare mode) at the full resolution. At high resolutions the image lags behind the slider.</li>
+<li><b>Idea:</b> start an automatic build only when no change has come in for about 150 ms (time of the last <code>RequestRebuild</code>, checked in <code>OnEditorUpdate</code>). The Rebuild button and undo or redo still build at once. Optionally, build at a lower resolution while dragging and at full resolution once the debounce ends.</li>
+<li><b>Costs and risks:</b> small change in the window; the 150 ms delay is a matter of feel.</li>
+<li><b>Acceptance if scheduled:</b> while a slider is dragged at 4096², at most one build runs per pause; the final image equals a manual rebuild.</li>
 </ul>
 </main>
 </div>

@@ -49,7 +49,7 @@ Manages GPU-side render data, global buffers, and draw submission. Converts part
 Assets/
 ├── Engine/                    # Core engine code (production)
 │   ├── Docs/                  # Pipeline documentation (see below)
-│   ├── Editor/                # Editor tooling (world generation preview, render debugging)
+│   ├── Editor/                # Editor tooling (inspectors, world generation preview, render debugging)
 │   ├── Scripts/
 │   │   ├── Behaviour/         # Pooled chunk and partition GameObject components
 │   │   ├── Data/              # Chunk voxel and light data, chunk accessor
@@ -112,6 +112,9 @@ For detailed information on how the engine works, read the pipeline documentatio
 2. **[World Generation Pipeline](Assets/Engine/Docs/WorldGenerationPipeline.md)** — Procedural terrain generation stages
 3. **[Chunk Pipeline](Assets/Engine/Docs/ChunkPipeline.md)** — Chunk lifecycle and edit flow
 4. **[Mesh & Render Pipeline](Assets/Engine/Docs/MeshAndRenderPipeline.md)** — Mesh generation, collider baking, and GPU rendering (versions 1.0–1.2)
+
+The world generation specification, with its requirements, phases and the list of unscheduled ideas (§20), is
+[Docs/WorldGenSpec.html](Docs/WorldGenSpec.html). It lives outside `Assets` so Unity does not import it.
 
 Each document includes visual diagrams showing data flow and component interactions.
 

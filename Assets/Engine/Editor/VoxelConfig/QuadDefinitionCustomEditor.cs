@@ -1,7 +1,8 @@
-﻿using UnityEditor;
+﻿using Engine.Scripts.VoxelConfig.Data.Mesh;
+using UnityEditor;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Data.Mesh.Editor{
+namespace Engine.Editor.VoxelConfig{
     /// <summary>
     ///     Custom inspector for <see cref="QuadDefinition" /> that provides live preview rendering and basis visualization.
     /// </summary>

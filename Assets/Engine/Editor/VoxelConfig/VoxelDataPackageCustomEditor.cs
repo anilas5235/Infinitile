@@ -1,9 +1,10 @@
 ﻿using System.Collections.Generic;
 using System.IO;
+using Engine.Scripts.VoxelConfig.Data.Voxel;
 using UnityEditor;
 using UnityEngine;
 
-namespace Engine.Scripts.VoxelConfig.Data.Voxel.Editor{
+namespace Engine.Editor.VoxelConfig{
     [CustomEditor(typeof(VoxelDataPackage))]
     public class VoxelDataPackageCustomEditor : UnityEditor.Editor{
         public override void OnInspectorGUI(){
