@@ -202,37 +202,92 @@ namespace Engine.Scripts.Jobs.Light{
         ///     LGT-03: BFS until the queue is empty. Each channel of a neighbour n becomes
         ///     max(L(n), L(v) − 1 − att(n)); opaque voxels are never entered; sky 15 goes down into a clear voxel
         ///     without loss. Light only rises, so a voxel queued more than once is still correct.
+        ///     The four channels are combined at once in byte lanes (§20.2, <see cref="Spread" />).
         /// </summary>
         public unsafe void Propagate(ref LightQueue queue){
             byte* att = (byte*)Att.GetUnsafeReadOnlyPtr();
             ushort* light = (ushort*)Light.GetUnsafePtr();
             int strideX = StrideX;
             while (queue.TryDequeue(out int index)){
-                ushort from = light[index];
+                uint from = Spread(light[index]);
+                // Candidate for a clear neighbour; most neighbours are clear, so it is computed once per voxel.
+                uint clear = SubtractSaturated(from, 1);
+                // Sky 15 steps down into a clear voxel without loss (LGT-03).
+                uint clearDown = (from & SkyLane) == SkyLane ? clear | SkyLane : clear;
+                if (clearDown == 0) continue; // every channel ≤ 1: nothing reaches a neighbour
+
                 int y = index & (Height - 1);
-                Relax(att, light, index + strideX, from, 0, ref queue);
-                Relax(att, light, index - strideX, from, 0, ref queue);
-                Relax(att, light, index + Height, from, 0, ref queue);
-                Relax(att, light, index - Height, from, 0, ref queue);
-                if (y < Height - 1) Relax(att, light, index + 1, from, 0, ref queue);
-                if (y > 0) Relax(att, light, index - 1, from, 1, ref queue);
+                Relax(att, light, index + strideX, from, clear, ref queue);
+                Relax(att, light, index - strideX, from, clear, ref queue);
+                Relax(att, light, index + Height, from, clear, ref queue);
+                Relax(att, light, index - Height, from, clear, ref queue);
+                if (y < Height - 1) Relax(att, light, index + 1, from, clear, ref queue);
+                if (y > 0) Relax(att, light, index - 1, from, clearDown, ref queue);
             }
         }
 
-        /// <summary>One BFS step into <paramref name="index" />; unchecked pointers (LGT-11, the sentinel ring keeps it in bounds).</summary>
+        /// <summary>Sky channel (bits 12–15) in the byte-lane layout of <see cref="Spread" />.</summary>
+        private const uint SkyLane = 0x0Fu << (8 * VoxelLight.Sky);
+
+        private const uint LaneGuard = 0x10101010u;
+        private const uint LaneOnes = 0x01010101u;
+
+        /// <summary>
+        ///     One BFS step into <paramref name="index" />; unchecked pointers (LGT-11, the sentinel ring keeps it in
+        ///     bounds). <paramref name="clear" /> is the candidate for a clear voxel (attenuation 0).
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static unsafe void Relax(byte* attPtr, ushort* lightPtr, int index, ushort from, int downward,
+        private static unsafe void Relax(byte* attPtr, ushort* lightPtr, int index, uint from, uint clear,
             ref LightQueue queue){
             int att = attPtr[index];
             if (att >= Opaque) return;
-            ushort current = lightPtr[index];
-            ushort next = Combine(current, from, att, downward);
-            if (next == current) return;
-            lightPtr[index] = next;
+            uint candidate = att == 0 ? clear : SubtractSaturated(from, 1 + att);
+            uint current = Spread(lightPtr[index]);
+            uint higher = GreaterLanes(candidate, current);
+            if (higher == 0) return;
+            lightPtr[index] = Pack(current ^ ((candidate ^ current) & higher));
             queue.Enqueue(index);
         }
 
-        /// <summary>Per channel max(current, from − 1 − att), with the lossless sky step downward.</summary>
+        /// <summary>
+        ///     §20.2 SWAR: the four 4-bit channels of a light value, one per byte lane (channel c in bits 8c…8c+3),
+        ///     so bit 4 of each lane is free as a borrow guard.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static uint Spread(ushort light){
+            uint x = light;
+            x = (x | (x << 8)) & 0x00FF00FFu;
+            return (x | (x << 4)) & 0x0F0F0F0Fu;
+        }
+
+        /// <summary>Inverse of <see cref="Spread" />.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static ushort Pack(uint lanes){
+            uint x = (lanes | (lanes >> 4)) & 0x00FF00FFu;
+            return (ushort)(x | (x >> 8));
+        }
+
+        /// <summary>Per lane max(lane − <paramref name="loss" />, 0) for loss in [0, 16].</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static uint SubtractSaturated(uint lanes, int loss){
+            // 16 + lane − loss ≥ 0 never borrows from the next lane; bit 4 tells whether lane ≥ loss.
+            uint d = (lanes | LaneGuard) - (uint)loss * LaneOnes;
+            uint keep = ((d >> 4) & LaneOnes) * 0x0Fu;
+            return d & keep;
+        }
+
+        /// <summary>0x0F in every lane where <paramref name="a" /> is greater than <paramref name="b" />, else 0.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static uint GreaterLanes(uint a, uint b){
+            // 16 + b − a has bit 4 clear exactly when a > b.
+            uint d = (b | LaneGuard) - a;
+            return ((~d >> 4) & LaneOnes) * 0x0Fu;
+        }
+
+        /// <summary>
+        ///     Per channel max(current, from − 1 − att), with the lossless sky step downward. Scalar reference of
+        ///     the byte-lane step in <see cref="Propagate" /> (kept for the tests).
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static ushort Combine(ushort current, ushort from, int att, int downward){
             int result = current;
