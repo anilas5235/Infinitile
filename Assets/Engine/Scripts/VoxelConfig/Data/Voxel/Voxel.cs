@@ -256,7 +256,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
     [Serializable]
     public class VoxelPostProcessData{
         /// <summary>
-        ///     Color tint applied during post processing.
+        ///     Color tint (lift/gamma/gain) applied during post processing.
         /// </summary>
         public Color postProcessColor;
 
@@ -274,6 +274,11 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         ///     Enables additional fog for this voxel type.
         /// </summary>
         public bool enableFog;
+
+        /// <summary>
+        ///     Fog color when <see cref="enableFog" /> is true; lit by the sky unless the voxel emits light.
+        /// </summary>
+        public Color fogColor = Color.gray;
 
         /// <summary>
         ///     Fog density value used when <see cref="enableFog" /> is true.

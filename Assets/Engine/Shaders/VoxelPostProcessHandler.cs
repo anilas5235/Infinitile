@@ -55,6 +55,7 @@ namespace Engine.Shaders{
             _postProcessManager.ResetLiftGammaGain();
             _postProcessManager.ResetColorAdjustments();
             RenderSettings.fog = false;
+            UnderwaterFogFeature.SelfIllumination = 0f;
 
             if (!_voxelRegistry.TryGet(voxelId, out Voxel info)) return;
 
@@ -64,8 +65,10 @@ namespace Engine.Shaders{
             _postProcessManager.SetLiftGammaGain(info.postProcess.postProcessColor);
             _postProcessManager.SetColorAdjustments(info.postProcess.contrast, info.postProcess.saturation);
             RenderSettings.fog = info.postProcess.enableFog;
-            RenderSettings.fogColor = info.postProcess.postProcessColor;
+            RenderSettings.fogColor = info.postProcess.fogColor;
             RenderSettings.fogDensity = info.postProcess.fogDensity;
+            Vector3Int emission = info.lightEmission;
+            UnderwaterFogFeature.SelfIllumination = Mathf.Max(emission.x, emission.y, emission.z) / 15f;
         }
     }
 }
