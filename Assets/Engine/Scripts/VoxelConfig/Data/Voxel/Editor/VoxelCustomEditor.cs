@@ -30,10 +30,14 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel.Editor{
             EditorGUILayout.PropertyField(serializedObject.FindProperty("alwaysRenderAllFaces"));
 
             EditorGUILayout.PropertyField(serializedObject.FindProperty("glow"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("lightAttenuation"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("lightEmission"));
 
             if (voxelDef.meshLayer == MeshLayer.Transparent){
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("depthFadeDistance"));
-                if (voxelDef.usePostProcess)
+                SerializedProperty usePostProcess = serializedObject.FindProperty("usePostProcess");
+                EditorGUILayout.PropertyField(usePostProcess);
+                if (usePostProcess.boolValue)
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("postProcess"));
             }
 

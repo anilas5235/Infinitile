@@ -32,6 +32,7 @@
             float4 positionCS : SV_POSITION;
             float2 uv : TEXCOORD0;
             uint4 packed : TEXCOORD1;
+            float fogFactor : TEXCOORD2;
             float4 positionSS : TEXCOORD3;
         };
 
@@ -46,6 +47,7 @@
             o.uv = v.uv;
             o.packed = v.packed;
             o.positionSS = ComputeScreenPos(o.positionCS);
+            o.fogFactor = ComputeFogFactor(o.positionCS.z);
             return o;
         }
         ENDHLSL
@@ -72,6 +74,7 @@
             #pragma fragment frag
 
             #pragma multi_compile_instancing
+            #pragma multi_compile_fog
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
@@ -142,7 +145,7 @@
                 clip(alpha - 0.001f);
 
                 // --- Final colour ---
-                return half4(ao_color.rgb * light * glow, alpha);
+                return half4(MixFog(ao_color.rgb * light * glow, IN.fogFactor), alpha);
             }
             ENDHLSL
         }

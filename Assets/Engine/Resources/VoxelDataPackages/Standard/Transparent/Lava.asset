@@ -19,7 +19,7 @@ MonoBehaviour:
   glow: 48
   lightAttenuation: 15
   lightEmission: {x: 15, y: 9, z: 3}
-  usePostProcess: 0
+  usePostProcess: 1
   postProcess:
     postProcessColor: {r: 1, g: 0.39282325, b: 0.11792451, a: 0}
     contrast: 0
