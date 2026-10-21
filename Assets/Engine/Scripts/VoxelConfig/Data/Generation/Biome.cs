@@ -63,6 +63,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
         /// <summary>Conversion with block ids from <paramref name="voxelId" /> (the registry, or a test's own table).</summary>
         public BiomeDef ToStruct(Func<Voxel.Voxel, ushort> voxelId){
+            if (!TopBlock || !UnderBlock || !StoneBlock)
+                throw new InvalidOperationException($"Biome {name}: TopBlock, UnderBlock and StoneBlock must be set");
             BiomeDef def = ToStruct();
             def.topBlock = voxelId(TopBlock);
             def.underBlock = voxelId(UnderBlock);

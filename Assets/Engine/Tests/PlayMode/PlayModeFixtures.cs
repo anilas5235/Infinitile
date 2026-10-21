@@ -43,9 +43,7 @@ namespace Engine.Tests.PlayMode{
             settings.Seed = 1337;
             settings.Chunk = new ChunkSettings{
                 ChunkPrefab = chunkPrefab,
-                DrawDistance = drawDistance,
-                LoadDistance = drawDistance + 3, // data -> light (3 x 3 data) -> mesh (3 x 3 light)
-                UpdateDistance = math.max(drawDistance - 2, 2)
+                DrawDistance = drawDistance
             };
             settings.Scheduler = new SchedulerSettings();
             settings.Renderer = new RendererSettings();

@@ -17,8 +17,6 @@ MonoBehaviour:
   Chunk:
     ChunkPrefab: {fileID: 972016758114520785, guid: c64e56d0bf3b95d4786aca3e51faf0ed, type: 3}
     DrawDistance: 6
-    LoadDistance: 8
-    UpdateDistance: 4
   Renderer:
     solidMaterial: {fileID: 2100000, guid: b6215133664aff74dad83d56615f47d0, type: 2}
     transparentMaterial: {fileID: 2100000, guid: e8e8dbf7c2062df49bf757b4e9d3a636, type: 2}

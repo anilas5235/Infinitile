@@ -1040,9 +1040,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   world: {fileID: 1592505030}
-  voxelSolidMaterial: {fileID: 2100000, guid: b6215133664aff74dad83d56615f47d0, type: 2}
-  voxelTransparentMaterial: {fileID: 2100000, guid: e8e8dbf7c2062df49bf757b4e9d3a636, type: 2}
-  voxelFoliageMaterial: {fileID: 2100000, guid: daf19eb8c4aeb474ebe2bb4b7e1f87a6, type: 2}
 --- !u!4 &1291856481
 Transform:
   m_ObjectHideFlags: 0

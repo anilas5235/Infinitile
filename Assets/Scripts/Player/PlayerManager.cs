@@ -90,7 +90,7 @@ namespace Player{
         private bool ReadyForPlayer(out int3 firstCollidableVoxel){
             int3 playerPos = transform.position.Int3();
             firstCollidableVoxel = playerPos + new int3(0, 1, 0);
-            if (!_world.ChunkManager.IsChunkLoaded(VoxelConstants.WorldToChunkPos(playerPos))) return false;
+            if (!_world.IsChunkLoaded(playerPos)) return false;
 
             firstCollidableVoxel.y = math.min(firstCollidableVoxel.y, VoxelConstants.ChunkHeight - 1);
             for (; firstCollidableVoxel.y >= 0; firstCollidableVoxel.y--){

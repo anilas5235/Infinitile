@@ -297,6 +297,14 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void ToConfig_RejectsAnActiveBiomeWithoutBlocks(){
+            // The registry only logs a broken biome (it may be inactive); the active set must still fail loudly.
+            WorldGenSettings s = Settings(Biome("Plains", 6f, new[]{ 1f }));
+            StringAssert.Contains("Plains", Assert.Throws<System.InvalidOperationException>(
+                () => s.ToConfigWithVoxelIds(1, _ => 1, Allocator.Temp)).Message);
+        }
+
+        [Test]
         public void ToConfig_WithoutBiomeSetGivesEmptyBiomes(){
             WorldGenSettings s = Create<WorldGenSettings>("WG");
             WorldGenConfig cfg = s.ToConfig(1, allocator: Allocator.Temp);

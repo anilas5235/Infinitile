@@ -1,4 +1,5 @@
 ﻿using System;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace Engine.Scripts.Settings{
@@ -19,15 +20,16 @@ namespace Engine.Scripts.Settings{
         public int DrawDistance = 2;
 
         /// <summary>
-        ///     Extra load distance (kept in memory) beyond view distance. Computed internally.
+        ///     Chunks kept in memory in each direction: data -> light (needs 3 x 3 data) -> mesh (needs 3 x 3 light),
+        ///     so the draw distance plus one ring per stage and one for the light stage. Derived, never stored, so
+        ///     the settings asset is not changed at runtime.
         /// </summary>
-        [HideInInspector] [Tooltip("Number of chunks in memory = (draw_distance + 2)")]
-        public int LoadDistance;
+        public int LoadDistance => LoadDistanceOverride ?? DrawDistance + 3;
 
-        /// <summary>
-        ///     Distance used for updates (collider/activity). Must be &lt;= draw distance.
-        /// </summary>
-        [HideInInspector] [Tooltip("Should be less than equal to DrawDistance")]
-        public int UpdateDistance;
+        /// <summary>Distance for collider baking around the focus; at most the draw distance, at least 2.</summary>
+        public int UpdateDistance => math.max(DrawDistance - 2, 2);
+
+        /// <summary>Tests only: a load distance independent of the draw distance, e.g. for a small chunk store.</summary>
+        internal int? LoadDistanceOverride{ get; set; }
     }
 }

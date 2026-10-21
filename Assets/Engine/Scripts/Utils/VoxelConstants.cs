@@ -7,9 +7,9 @@ namespace Engine.Scripts.Utils{
     ///     Defines the core voxel and partition dimensions used throughout the engine.
     /// </summary>
     public static class VoxelConstants{
-        internal const int ChunkWidth = 32;
-        internal const int ChunkHeight = 256;
-        internal const int ChunkDepth = 32;
+        public const int ChunkWidth = 32;
+        public const int ChunkHeight = 256;
+        public const int ChunkDepth = 32;
 
         internal const int MinChunkPosXYZ = 0;
         internal const int MaxXChunkPos = ChunkWidth - 1;

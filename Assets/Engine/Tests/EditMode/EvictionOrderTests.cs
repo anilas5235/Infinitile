@@ -20,7 +20,7 @@ namespace Engine.Tests.EditMode{
         [SetUp]
         public void SetUp(){
             _settings = TestFixtures.CreateSettings(0);
-            _settings.Chunk.LoadDistance = 0; // chunk store = (0 + 2).SquareSize() = 25
+            _settings.Chunk.LoadDistanceOverride = 0; // chunk store = (0 + 2).SquareSize() = 25
             _manager = new ChunkManager(_settings);
         }
 

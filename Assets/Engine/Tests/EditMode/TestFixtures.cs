@@ -105,16 +105,14 @@ namespace Engine.Tests.EditMode{
         }
 
         /// <summary>
-        ///     Engine settings the way VoxelWorld.ConfigureSettings derives them from a draw distance; no prefab,
+        ///     Engine settings for a draw distance (load and update distance derive from it); no prefab,
         ///     no materials. Enough for ChunkManager and the job state handlers.
         /// </summary>
         internal static VoxelEngineSettings CreateSettings(int drawDistance){
             VoxelEngineSettings settings = ScriptableObject.CreateInstance<VoxelEngineSettings>();
             settings.Seed = Seed;
             settings.Chunk = new ChunkSettings{
-                DrawDistance = drawDistance,
-                LoadDistance = drawDistance + 3, // data -> light (3 x 3 data) -> mesh (3 x 3 light)
-                UpdateDistance = math.max(drawDistance - 2, 2)
+                DrawDistance = drawDistance
             };
             settings.Scheduler = new SchedulerSettings();
             settings.Renderer = new RendererSettings();

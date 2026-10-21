@@ -184,9 +184,9 @@ namespace Engine.Tests.EditMode{
         #region Failing entries
 
         [Test]
-        public void BiomeRegistry_FailingBiome_FailsFinalizationWithoutAnArray(){
-            // A biome whose conversion fails must neither shift the biomes after it nor leave a zero-initialised
-            // (air-filled) BiomeDef in the array: the whole registry is rejected.
+        public void BiomeRegistry_FailingBiome_IsSkippedAndKeepsTheOtherIds(){
+            // A package may keep biomes the active BiomeSet does not use; a broken one must not fail the import or
+            // shift the biomes after it. Generation rejects it only if it is active (WorldGenSettingsTests).
             VoxelRegistry voxels = StandardVoxels(out Voxel[] v);
             BiomeRegistry registry = new();
             _disposables.Add(registry);
@@ -198,9 +198,16 @@ namespace Engine.Tests.EditMode{
             registry.Register(RegistryTestFixtures.Prefix, broken);
             registry.Register(RegistryTestFixtures.Prefix, hills);
 
-            Assert.Throws<InvalidOperationException>(() => registry.FinalizeRegistry(voxels),
-                "the registry must reject the broken biome at finalisation");
-            Assert.IsFalse(registry.BiomeArray.IsCreated, "no partially filled (air) biome array is published");
+            LogAssert.Expect(LogType.Error, new Regex("Skipping biome Broken"));
+            registry.FinalizeRegistry(voxels);
+
+            Assert.AreEqual(3, registry.BiomeArray.Length);
+            Assert.IsFalse(registry.IsBroken(0));
+            Assert.IsTrue(registry.IsBroken(1));
+            Assert.IsFalse(registry.IsBroken(2));
+            Assert.AreEqual(voxels.GetIdOrThrow(v[0].GetFullName()), registry.BiomeArray[0].topBlock);
+            Assert.AreEqual(voxels.GetIdOrThrow(v[2].GetFullName()), registry.BiomeArray[2].topBlock,
+                "the biome after the broken one keeps its id");
         }
 
         [Test]

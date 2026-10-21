@@ -5,8 +5,21 @@ using Engine.Scripts.VoxelConfig.Data.Generation;
 using Unity.Collections;
 
 namespace Engine.Scripts.VoxelConfig.Registry{
+    /// <summary>
+    ///     Every biome of the loaded packages, by id. Generation does not read this array: it converts the biomes of
+    ///     the active <see cref="WorldGen.Settings.BiomeSet" /> itself and rejects a broken one there. A package may
+    ///     keep inactive biomes (e.g. Jungle, Swamp), so a biome that fails to convert is logged and skipped instead
+    ///     of failing the whole import.
+    /// </summary>
     public class BiomeRegistry : TopLevelRegistry<Biome>{
+        private readonly HashSet<ushort> _broken = new();
+
         public NativeArray<Biome.BiomeDef> BiomeArray{ get; private set; }
+
+        /// <summary>True if the biome at <paramref name="id" /> failed to convert; its array entry is empty.</summary>
+        public bool IsBroken(ushort id){
+            return _broken.Contains(id);
+        }
 
         public void Initialize(){
             InternalInitialize();
@@ -21,32 +34,26 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             }
 
             Biome.BiomeDef[] tempArray = new Biome.BiomeDef[NameRegistry.Count];
-            bool[] converted = new bool[tempArray.Length];
             foreach (KeyValuePair<ushort, Biome> kvp in SoRegistry.GetAllEntries()){
                 VoxelEngineLogger.Info<BiomeRegistry>($"copy biome {kvp.Value.name} to Biome array");
-                Biome.BiomeDef def;
                 try{
-                    def = kvp.Value.ToStruct(voxelRegistry);
+                    tempArray[kvp.Key] = kvp.Value.ToStruct(voxelRegistry); // place by id, not by enumeration order
                 }
                 catch (Exception e){
-                    // Skipping a biome would leave a zero (air) entry at its id, so a broken biome is a
-                    // configuration error that fails the registry instead.
-                    // Entries are placed by id, so release the converted slots, not the first n.
-                    for (int i = 0; i < tempArray.Length; i++)
-                        if (converted[i]) tempArray[i].Dispose();
-                    throw new InvalidOperationException(
-                        $"Failed to convert biome {kvp.Value.name} to struct: {e.Message}", e);
+                    // The slot stays empty and the ids of the other biomes stay as they are.
+                    _broken.Add(kvp.Key);
+                    VoxelEngineLogger.Error<BiomeRegistry>(
+                        $"Skipping biome {kvp.Value.name}, it failed to convert: {e.Message}. " +
+                        "World generation rejects it if the active BiomeSet uses it.");
                 }
-
-                tempArray[kvp.Key] = def; // place by id, not by enumeration order
-                converted[kvp.Key] = true;
             }
 
             BiomeArray = new NativeArray<Biome.BiomeDef>(tempArray, Allocator.Domain);
         }
 
         public override void Dispose(){
-            if (!BiomeArray.IsCreated) return; // FinalizeRegistry may have thrown before creating the array
+            _broken.Clear();
+            if (!BiomeArray.IsCreated) return; // never finalised
             foreach (Biome.BiomeDef def in BiomeArray) def.Dispose();
             BiomeArray.Dispose();
         }

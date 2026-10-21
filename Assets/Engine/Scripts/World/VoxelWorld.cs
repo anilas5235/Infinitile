@@ -93,18 +93,16 @@ namespace Engine.Scripts.World{
             return ChunkManager.SetVoxel(voxelId, position.Int3(), remesh);
         }
 
-        public bool IsCollidable(int3 pos){
-            return _chunkPool.IsPartitionActive(pos) && _chunkPool.IsCollidable(pos);
+        /// <summary>True once the chunk column holding the world voxel position has its data generated.</summary>
+        /// <param name="position">World voxel position; only x and z are used.</param>
+        public bool IsChunkLoaded(int3 position){
+            return ChunkManager.IsChunkLoaded(VoxelConstants.WorldToChunkPos(position));
         }
 
-        /// <summary>
-        ///     Adjusts derived chunk settings such as load and update distance based on the
-        ///     configured draw distance.
-        /// </summary>
-        private void ConfigureSettings(){
-            // data -> light (needs 3 x 3 data) -> mesh (needs 3 x 3 light): one extra ring for the light stage
-            settings.Chunk.LoadDistance = settings.Chunk.DrawDistance + 3;
-            settings.Chunk.UpdateDistance = math.max(settings.Chunk.DrawDistance - 2, 2);
+        /// <summary>True if the partition at <paramref name="pos" /> is active and has its collider baked.</summary>
+        /// <param name="pos">Partition position.</param>
+        public bool IsCollidable(int3 pos){
+            return _chunkPool.IsPartitionActive(pos) && _chunkPool.IsCollidable(pos);
         }
 
         /// <summary>
@@ -244,7 +242,7 @@ namespace Engine.Scripts.World{
         /// <summary>
         ///     Gets the chunk manager that stores and accesses chunk data.
         /// </summary>
-        public ChunkManager ChunkManager{ get; private set; }
+        internal ChunkManager ChunkManager{ get; private set; }
 
         public VoxelEngineSettings Settings => settings;
 
@@ -260,10 +258,7 @@ namespace Engine.Scripts.World{
             base.Awake();
             if (Instance != this) return; // a duplicate; base.Awake destroys it
 
-            VoxelEngineProvider.Initialize(new VoxelEngineProvider(), provider => {
-                ConfigureSettings();
-                provider.Settings = settings;
-            });
+            VoxelEngineProvider.Initialize(new VoxelEngineProvider(), provider => provider.Settings = settings);
 
             ConstructEngineComponents();
 
