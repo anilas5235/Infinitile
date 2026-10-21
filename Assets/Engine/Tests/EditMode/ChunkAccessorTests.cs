@@ -1,4 +1,4 @@
-using Engine.Scripts.Data;
+﻿using Engine.Scripts.Data;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -35,7 +35,9 @@ namespace Engine.Tests.EditMode{
             _chunks.Add(new int2(0, -1), TestFixtures.CreateUniformChunk(TestFixtures.Water));
             _chunks.Add(new int2(-1, -1), TestFixtures.CreateUniformChunk(TestFixtures.Ice));
 
-            _lights.Add(new int2(0, 0), new ChunkLightData(16));
+            ChunkLightData originLight = new(16);
+            originLight.SetLight(new int3(31, 40, 5), VoxelLight.Pack(7, 1, 2, 3));
+            _lights.Add(new int2(0, 0), originLight);
 
             _accessor = new ChunkAccessor(_chunks.AsReadOnly(), _lights.AsReadOnly());
         }
@@ -115,12 +117,17 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void Lights_ResolveAndFallBack(){
-            Assert.IsTrue(_accessor.TryGetLightData(new int3(0, 3, 0), out PartitionLightData light));
-            Assert.IsTrue(light.IsAllZero);
-            Assert.IsFalse(_accessor.TryGetLightData(new int3(0, 8, 0), out _), "partition index out of range");
-            Assert.IsFalse(_accessor.TryGetLightData(new int3(1, 0, 0), out _), "chunk without light data");
+            Assert.IsTrue(_accessor.TryGetLightData(new int2(0, 0), out ChunkLightData light));
+            Assert.AreEqual(0, light.GetLight(new int3(5, 5, 5)));
+            Assert.IsFalse(_accessor.TryGetLightData(new int2(1, 0), out _), "chunk without light data");
             Assert.AreEqual(0, _accessor.GetLightInPartition(new int3(0, 0, 0), new int3(5, 5, 5)));
-            Assert.AreEqual(0, _accessor.GetLightInPartition(new int3(0, 0, 0), new int3(-1, 40, 5)));
+            Assert.AreEqual(VoxelLight.Pack(7, 1, 2, 3), _accessor.GetLightInPartition(new int3(0, 1, 0),
+                new int3(31, 8, 5)), "partition 1 offsets y by 32");
+            Assert.AreEqual(VoxelLight.Pack(7, 1, 2, 3), _accessor.GetLightInPartition(new int3(1, 0, 0),
+                new int3(-1, 40, 5)), "x underflow into chunk (0,0)");
+            Assert.AreEqual(0, _accessor.GetLightInPartition(new int3(0, 7, 0), new int3(5, 32, 5)), "above the world");
+            Assert.AreEqual(0, _accessor.GetLightInPartition(new int3(0, 0, 0), new int3(32, 5, 5)),
+                "chunk (1,0) has no light data");
         }
 
         [Test]

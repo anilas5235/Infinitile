@@ -10,7 +10,7 @@ namespace Engine.Scripts.Jobs.Core{
     /// </summary>
     internal class DataJobStateHandler : JobStateHandler<int2>{
         private readonly ChunkScheduler _chunkScheduler;
-        private readonly MeshJobStateHandler _meshJobHandler;
+        private readonly LightJobStateHandler _lightJobHandler;
 
         /// <summary>
         ///     Initializes a new instance of the DataJobStateHandler class.
@@ -19,12 +19,12 @@ namespace Engine.Scripts.Jobs.Core{
         /// <param name="chunkManager">The chunk manager reference.</param>
         /// <param name="chunkPool">The chunk pool reference.</param>
         /// <param name="chunkScheduler">The chunk scheduler for dispatching data generation jobs.</param>
-        /// <param name="meshJobHandler">The mesh job handler to wake up when data generation completes.</param>
+        /// <param name="lightJobHandler">The light job handler to wake up when data generation completes (LGT-06).</param>
         public DataJobStateHandler(VoxelEngineSettings settings, ChunkManager chunkManager, ChunkPool chunkPool,
-            ChunkScheduler chunkScheduler, MeshJobStateHandler meshJobHandler) :
+            ChunkScheduler chunkScheduler, LightJobStateHandler lightJobHandler) :
             base(settings, chunkManager, chunkPool){
             _chunkScheduler = chunkScheduler;
-            _meshJobHandler = meshJobHandler;
+            _lightJobHandler = lightJobHandler;
             int side = 2 * settings.Chunk.LoadDistance + 1;
             Reserve(side * side, settings.Scheduler.chunkGenBatchSize); // PERF-04
         }
@@ -84,7 +84,7 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        ///     Collects results from completed chunk data generation and wakes up the mesh handler.
+        ///     Collects results from completed chunk data generation and wakes up the light handler.
         /// </summary>
         /// <returns>True if collection completed, false if scheduler is still working.</returns>
         protected override bool CollectResultsStep(){
@@ -92,7 +92,7 @@ namespace Engine.Scripts.Jobs.Core{
 
             _chunkScheduler.Complete();
             Set.Clear();
-            _meshJobHandler.WakeUp();
+            _lightJobHandler.WakeUp();
             return true;
         }
 

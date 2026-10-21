@@ -1,4 +1,5 @@
 ﻿#pragma kernel BuildPrep
+#pragma kernel BuildPrepLight
 #pragma kernel BuildPoints
 
 #include "VoxelComputeCommon.hlsl"
@@ -18,6 +19,7 @@ struct VoxelDef
     uint2 ShapeQuadIndicesDown;
     uint2 ShapeQuadIndicesFront;
     uint2 ShapeQuadIndicesBack;
+    uint LightAttenuation; // LGT-09: 15 = opaque, skipped by the smooth light
 };
 
 struct VoxelQuad
@@ -42,6 +44,8 @@ uint2 get_voxel_quad_indices(in VoxelDef def, uint dir)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BuildPrep Kernel - Expand compressed chunk data into flat arrays
+// LGT-08: each voxel's uint holds the voxel id (bits 0-15) and its light sky|R|G|B (bits 16-31). BuildPrep
+// writes the ids, BuildPrepLight then ORs the light in, so a lookup fetches id and light at once.
 // ─────────────────────────────────────────────────────────────────────────────
 
 StructuredBuffer<uint2> _CompChunk; // interval 0: (intervalCount, lastUncompressedIndex)
@@ -77,6 +81,33 @@ void BuildPrep(uint3 id : SV_DispatchThreadID)
     }
 }
 
+// LGT-08: same interval walk as BuildPrep over the chunk's light list; the ids are already in place.
+[numthreads(64, 1, 1)]
+void BuildPrepLight(uint3 id : SV_DispatchThreadID)
+{
+    uint start_interval = 1 + id.x * INTERVALS_PER_THREAD;
+
+    uint total_intervals = _CompChunk[0].x;
+    if (start_interval > total_intervals) return;
+
+    for (int i = 0; i < INTERVALS_PER_THREAD; ++i)
+    {
+        uint target_interval = start_interval + i;
+        if (target_interval > total_intervals) break;
+
+        uint start_index = 0;
+        if (target_interval > 1) start_index = _CompChunk[target_interval - 1].y;
+
+        uint2 page_data = _CompChunk[target_interval];
+        uint light = (page_data.x & 0xFFFF) << 16;
+        uint end_index = min(page_data.y, _VoxelsPerChunk);
+        for (uint t_index = start_index; t_index < end_index; ++t_index)
+        {
+            _UnCompChunk[t_index] = (_UnCompChunk[t_index] & 0xFFFF) | light;
+        }
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Build Kernel - Generate solid point data per partition
 // ─────────────────────────────────────────────────────────────────────────────
@@ -108,8 +139,24 @@ RWStructuredBuffer<PointData> _TransparentPointsOut;
 RWStructuredBuffer<PointData> _FoliagePointsOut;
 uint _PointCapacity;
 
+// LGT-08: the prepared chunks hold id | light << 16; the lookups below return the whole cell, use
+// cell_id / cell_light to split it.
+uint cell_id(uint cell)
+{
+    return cell & 0xFFFF;
+}
+
+uint cell_light(uint cell)
+{
+    return cell >> 16;
+}
+
+#define SKY_ABOVE_WORLD (0xF000u << 16) // air with sky 15, the space above the world (LGT-09)
+#define NO_INNER_LIGHT 0xFFFFFFFFu
+
 VoxelDef get_voxel_def(uint voxelId)
 {
+    voxelId = cell_id(voxelId);
     if (voxelId >= _VoxelRenderDefsCount) return (VoxelDef)0;
     return _VoxelRenderDefs[voxelId];
 }
@@ -168,7 +215,8 @@ uint get_voxel_safe(in int3 in_chunk_pos)
 {
     int3 chunk_size = _ChunkSize;
     int3 part_size = _PartitionSize;
-    if (in_chunk_pos.y < 0 || in_chunk_pos.y >= chunk_size.y) return 0;
+    if (in_chunk_pos.y < 0) return 0;
+    if (in_chunk_pos.y >= chunk_size.y) return SKY_ABOVE_WORLD; // LGT-09: air in full sky light
 
     if (in_chunk_pos.x < 0 || in_chunk_pos.x >= part_size.x || in_chunk_pos.z < 0 || in_chunk_pos.z >=
         part_size.z)
@@ -224,10 +272,81 @@ uint get_quad_tex_pair(uint index)
 
 bool is_solid(int3 in_chunk_pos)
 {
-    return _VoxelRenderDefs[get_voxel_safe(in_chunk_pos)].MeshLayer == MESH_LAYER_SOLID;
+    return get_voxel_def(get_voxel_safe(in_chunk_pos)).MeshLayer == MESH_LAYER_SOLID;
 }
 
-void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uint2 quadRange)
+// ─────────────────────────────────────────────────────────────────────────────
+// LGT-09: smooth light
+// ─────────────────────────────────────────────────────────────────────────────
+
+#define OPAQUE_ATTENUATION 15
+
+bool is_opaque(uint cell)
+{
+    return get_voxel_def(cell).LightAttenuation >= OPAQUE_ATTENUATION;
+}
+
+// Voxel light sky|R|G|B as one level per component.
+uint4 unpack_light(uint light)
+{
+    return uint4(light >> 12 & 0xF, light >> 8 & 0xF, light >> 4 & 0xF, light & 0xF);
+}
+
+uint pack_light(uint4 levels)
+{
+    return (levels.x & 0xF) << 12 | (levels.y & 0xF) << 8 | (levels.z & 0xF) << 4 | (levels.w & 0xF);
+}
+
+// Light at one face corner: per channel the rounded average over the front voxel, the two side voxels and the
+// diagonal voxel touching the corner, skipping opaque ones. The diagonal is also skipped when both sides are
+// opaque (it is hidden behind them). With every voxel skipped the front voxel's light is used.
+uint corner_light(int3 front, uint front_cell, int3 side_a, int3 side_b)
+{
+    uint cell_a = get_voxel_safe(front + side_a);
+    uint cell_b = get_voxel_safe(front + side_b);
+    uint cell_d = get_voxel_safe(front + side_a + side_b);
+    bool open_a = !is_opaque(cell_a);
+    bool open_b = !is_opaque(cell_b);
+    bool open_d = (open_a || open_b) && !is_opaque(cell_d);
+
+    uint4 sum = 0;
+    uint n = 0;
+    if (!is_opaque(front_cell)) { sum += unpack_light(cell_light(front_cell)); n++; }
+    if (open_a) { sum += unpack_light(cell_light(cell_a)); n++; }
+    if (open_b) { sum += unpack_light(cell_light(cell_b)); n++; }
+    if (open_d) { sum += unpack_light(cell_light(cell_d)); n++; }
+
+    if (n == 0) return cell_light(front_cell);
+    return pack_light((sum + n / 2) / n);
+}
+
+// Corners ul, ur, dr, dl of a face (up = +V, right = +U, as for the AO bits).
+uint4 face_corner_light(int3 front, int3 up, int3 right)
+{
+    uint front_cell = get_voxel_safe(front);
+    return uint4(
+        corner_light(front, front_cell, up, -right),
+        corner_light(front, front_cell, up, right),
+        corner_light(front, front_cell, -up, right),
+        corner_light(front, front_cell, -up, -right));
+}
+
+// Light for quads inside the voxel (always-render shapes such as foliage): the voxel's own light, or for an opaque
+// voxel the brightest of its six neighbours per channel.
+uint inner_light(int3 in_chunk_pos, uint own_cell)
+{
+    if (!is_opaque(own_cell)) return cell_light(own_cell);
+    uint4 brightest = 0;
+    for (uint dir = 0; dir < 6; dir++)
+    {
+        uint cell = get_voxel_safe(in_chunk_pos + get_direction_offset(dir));
+        if (!is_opaque(cell)) brightest = max(brightest, unpack_light(cell_light(cell)));
+    }
+    return pack_light(brightest);
+}
+
+// inner_light_value: light of quads inside the voxel, or NO_INNER_LIGHT for face quads (smooth light, LGT-09)
+void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uint2 quadRange, uint inner_light_value)
 {
     for (uint i = 0u; i < quadRange.y; i++)
     {
@@ -237,13 +356,18 @@ void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uin
         p.position = (float3)in_chunk_pos + float3(partitionPos.x, 0, partitionPos.z);
 
         uint4 packed = uint4(quad_tex_pair, 0, 0, 0);
-        set_sun_light(packed, uint4(15, 15, 15, 15));
-        set_artificial_light(packed, uint4(0, 0, 0, 0));
 
         uint quadIndex = get_quad_index(packed);
         QuadData quad = _Quad_buffer[quadIndex];
         uint ao_mask = 0;
         int3 front_in_chunk = in_chunk_pos + quad.normal;
+
+        // LGT-09
+        if (inner_light_value == NO_INNER_LIGHT)
+            set_corner_light(packed, face_corner_light(front_in_chunk, (int3)quad.up, (int3)quad.right));
+        else
+            set_corner_light(packed, inner_light_value);
+
         if (is_solid(front_in_chunk + quad.up)) ao_mask |= 1 << 0; // Up
         if (is_solid(front_in_chunk + quad.up + quad.right)) ao_mask |= 1 << 1; // UpRight
         if (is_solid(front_in_chunk + quad.right)) ao_mask |= 1 << 2; // Right
@@ -285,13 +409,15 @@ void BuildPoints(uint3 id : SV_DispatchThreadID)
     int3 pos = (int3)id;
     float3 partitionWS = (float3)metadata.partitionWS;
     int3 in_chunk_pos = pos + int3(0, partitionWS.y, 0);
-    uint voxelId = get_voxel(_MainChunk, in_chunk_pos);
+    uint cell = get_voxel(_MainChunk, in_chunk_pos);
+    uint voxelId = cell_id(cell);
 
     if (voxelId == 0) return; // Skip air
 
     VoxelDef myDef = get_voxel_def(voxelId);
 
-    add_quads(in_chunk_pos, partitionWS, myDef, myDef.ShapeQuadIndicesAlwaysRender);
+    if (myDef.ShapeQuadIndicesAlwaysRender.y > 0)
+        add_quads(in_chunk_pos, partitionWS, myDef, myDef.ShapeQuadIndicesAlwaysRender, inner_light(in_chunk_pos, cell));
 
     // Check 6 neighbors for face exposure
     for (uint dir = 0; dir < 6; dir++)
@@ -303,6 +429,6 @@ void BuildPoints(uint3 id : SV_DispatchThreadID)
         if (!should_render_face(myDef, otherDef)) continue;
 
         uint2 quadData = get_voxel_quad_indices(myDef, dir);
-        add_quads(in_chunk_pos, partitionWS, myDef, quadData);
+        add_quads(in_chunk_pos, partitionWS, myDef, quadData, NO_INNER_LIGHT);
     }
 }

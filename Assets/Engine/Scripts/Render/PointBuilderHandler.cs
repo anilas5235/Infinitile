@@ -20,6 +20,7 @@ namespace Engine.Scripts.Render{
         private const int PrepIntervalsPerThread = 8;
         private const int PrepThreadsX = 64;
         private readonly int _buildPrepKernelID;
+        private readonly int _buildPrepLightKernelID; // LGT-08
 
         private readonly GraphicsBuffer _metadata;
         private readonly ComputeShader _pointBuilder;
@@ -52,6 +53,7 @@ namespace Engine.Scripts.Render{
             _voxelRenderDefBuffer = voxelRenderDef;
             _voxelQuadTexPairBuffer = voxelQuadTexPair;
             _buildPrepKernelID = pointBuilder.FindKernel("BuildPrep");
+            _buildPrepLightKernelID = pointBuilder.FindKernel("BuildPrepLight");
             _pointBuilderKernelID = pointBuilder.FindKernel("BuildPoints");
             _preparedChunks = new GraphicsBuffer[PrepChunkCount];
             for (int i = 0; i < _preparedChunks.Length; i++)
@@ -237,28 +239,34 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     Prepares all chunks for point building by decompressing them.
+        ///     Prepares all chunks for point building by decompressing them: the voxel ids into the lower 16 bits
+        ///     of each voxel's uint, then the light into the upper 16 bits (LGT-08).
         /// </summary>
         /// <param name="data">The partition build request containing chunk buffers.</param>
         private void PrepareChunks(PartitionBuildRequest data){
+            _pointBuilder.SetInt(VoxelsPerChunkNameID, VoxelsPerChunk);
             GraphicsBuffer[] buffers = data.Buffers;
-            for (int i = 0; i < buffers.Length; i++) DispatchPrepChunk(i, buffers[i]);
+            GraphicsBuffer[] lightBuffers = data.LightBuffers;
+            for (int i = 0; i < buffers.Length; i++){
+                DispatchPrepChunk(_buildPrepKernelID, i, buffers[i]);
+                DispatchPrepChunk(_buildPrepLightKernelID, i, lightBuffers[i]); // runs after the ids are written
+            }
         }
 
         /// <summary>
-        ///     Dispatches a compute shader job to decompress a single chunk.
+        ///     Dispatches a compute shader job to decompress a single chunk's interval list.
         /// </summary>
+        /// <param name="kernel">BuildPrep (voxel ids) or BuildPrepLight (light, LGT-08).</param>
         /// <param name="chunkIndex">The index of the chunk to prepare.</param>
         /// <param name="compressedChunk">The compressed chunk data buffer.</param>
-        private void DispatchPrepChunk(int chunkIndex, GraphicsBuffer compressedChunk){
-            _pointBuilder.SetInt(VoxelsPerChunkNameID, VoxelsPerChunk);
-            _pointBuilder.SetBuffer(_buildPrepKernelID, CompChunkNameID, compressedChunk);
-            _pointBuilder.SetBuffer(_buildPrepKernelID, UnCompChunkNameID, _preparedChunks[chunkIndex]);
+        private void DispatchPrepChunk(int kernel, int chunkIndex, GraphicsBuffer compressedChunk){
+            _pointBuilder.SetBuffer(kernel, CompChunkNameID, compressedChunk);
+            _pointBuilder.SetBuffer(kernel, UnCompChunkNameID, _preparedChunks[chunkIndex]);
 
             int intervalCount = math.max(0, compressedChunk.count - 1);
             int intervalsPerGroup = PrepThreadsX * PrepIntervalsPerThread;
             int groupsX = math.max(1, (intervalCount + intervalsPerGroup - 1) / intervalsPerGroup);
-            _pointBuilder.Dispatch(_buildPrepKernelID, groupsX, 1, 1);
+            _pointBuilder.Dispatch(kernel, groupsX, 1, 1);
         }
     }
 }

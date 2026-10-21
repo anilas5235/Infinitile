@@ -760,7 +760,7 @@ Assets/Engine/Docs/                   WorldGenSpec.html (this file), WorldGenera
 <div class="req"><span class="id">LGT-02</span><span class="kw must">MUST</span>New voxel properties: <code>LightEmission</code> (RGB, 0–15 per channel; e.g. Lava (15, 9, 3)) and <code>LightAttenuation</code> (0–15 extra loss per step; defaults: solid 15 = opaque, water 2, leaves 1, glass 0, air 0). The existing <code>glow</code> stays a render effect and is independent of emission.</div>
 <h3>E3.2 Propagation</h3>
 <div class="req"><span class="id">LGT-03</span><span class="kw must">MUST</span>Each channel propagates independently: <code>L(v) = max(emission(v), max over 6 neighbours (L(n) − 1 − attenuation(v)))</code>, clamped at 0; opaque voxels hold 0. Sky light additionally travels straight down without loss through voxels with attenuation 0 (a sky column stays 15 down to the first non-clear voxel).</div>
-<div class="req"><span class="id">LGT-04</span><span class="kw must">MUST</span>Initial light of a chunk is computed by a Burst job over the region <em>chunk ± 15 blocks</em> in x and z (full height), reading the 3 × 3 chunks' voxel data and writing only the centre chunk's light. This is exact: light loses at least 1 per step, so nothing from outside that region can reach the centre chunk, and no job writes to another chunk (no cross-chunk races). Seeds: sky columns scanned top-down; emitters. Then a BFS with <code>NativeQueue</code>.</div>
+<div class="req"><span class="id">LGT-04</span><span class="kw must">MUST</span>Initial light of a chunk is computed by a Burst job over the region <em>chunk ± 14 blocks</em> in x and z (full height), reading the 3 × 3 chunks' voxel data and writing only the centre chunk's light. This is exact: light at horizontal distance d is at most 15 − d, so a source 15 blocks away contributes 0 and nothing from outside that region can reach the centre chunk (the margin was 15 until 2026-10-21), and no job writes to another chunk (no cross-chunk races). Seeds: sky columns scanned top-down; emitters. Then a BFS with <code>NativeQueue</code>.</div>
 <div class="req"><span class="id">LGT-05</span><span class="kw must">MUST</span>Fast path for natural terrain: in the 2.5D world every air column above the surface is sky 15 without BFS. The BFS starts only from <em>frontier</em> voxels (a lit voxel next to a darker non-opaque voxel: under leaves, under water, at emitters). A chunk without such voxels finishes after the column scan.</div>
 <div class="req"><span class="id">LGT-06</span><span class="kw must">MUST</span>Pipeline: chunk data ready → (3 × 3 data ready) → light job → (3 × 3 light ready) → meshing, because faces at chunk borders sample the neighbour's light. Add a <code>LightScheduler</code> in the same style as the other job schedulers and a light step in the <code>VoxelEngineScheduler</code> round robin. The load ring grows by one chunk accordingly; document it in <code>ChunkPipeline.md</code>.</div>
 <div class="req"><span class="id">LGT-07</span><span class="kw must">MUST</span>Edits: <code>SetVoxel</code> triggers an incremental update with the usual two-queue method (removal BFS for light that came through the changed voxel, then re-propagation from the remaining border and from new emitters/sky). Runs synchronously as a Burst job (<code>Run()</code>, bounded by a 15-block radius). Only after any running mesh/collider job that reads these chunks is completed (F-01). Partitions whose light changed are flagged for remesh. The result must equal a full recomputation (LGT-11).</div>
@@ -991,6 +991,18 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
   <li>A growth step copies the whole buffer on the GPU.</li>
   </ul></li>
 <li><b>Acceptance if scheduled:</b> TST-E21 at 0/300 with no per-chunk buffer objects; GPU memory for voxel data at most that of the pooled design; the mesh build and upload benchmarks not slower (PERF-03).</li>
+</ul>
+<h3>20.2 Faster light BFS for emitter-dense regions</h3>
+<p class="small">Recorded 2026-10-21 (Phase L, from LGT-11 / PERF-02).</p>
+<ul class="tight">
+<li><b>Today:</b> <code>LightJob</code> takes 0.86 ms/chunk on natural terrain (PERF-05 met) but 15.7 ms/chunk in the benchmark worst case: an air cavity with a Lava emitter every 8 voxels under a leaf roof, so the BFS visits almost every voxel of the 64 × 64 × 256 box on all four channels. There is no budget for this case; the jobs run on worker threads.</li>
+<li><b>Idea:</b>
+  <ul class="tight">
+  <li>Compute the per-channel max of a BFS step for all four nibbles at once (SWAR on the 16-bit value, or the channels spread to bytes), instead of the loop over channels in <code>LightRegion.Combine</code>.</li>
+  <li>Optionally skip work once a voxel is queued: mark queued voxels (a spare attenuation bit) so it is not queued again before it is processed.</li>
+  </ul></li>
+<li><b>Costs and risks:</b> more intricate code in the hottest loop; the sky lossless-down rule needs a separate path; results must stay bit-identical (the border- and edit-exactness tests of LGT-11 guard this).</li>
+<li><b>Acceptance if scheduled:</b> the worst-case row of <code>LightJobBenchmark</code> clearly faster (target ≤ 10 ms/chunk); natural terrain not slower (PERF-03); all LGT-11 tests pass.</li>
 </ul>
 </main>
 </div>

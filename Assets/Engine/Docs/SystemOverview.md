@@ -105,6 +105,7 @@ Most systems listen to these events instead of polling the world directly.
 ### `VoxelEngineScheduler`
 Coordinates the major job pipelines in a round-robin cycle:
 - data generation
+- light (Phase L, LGT-06)
 - mesh building
 - collider baking
 
@@ -113,6 +114,11 @@ It also tracks queue counts and average timings for diagnostics.
 ### `ChunkScheduler`
 Dispatches chunk data generation jobs.
 It is used by the data job state handler.
+
+### `LightScheduler`
+Dispatches light jobs for chunks whose 3 x 3 neighbourhood has voxel data, applies the results to the chunks and
+runs the incremental light update after each voxel edit (Phase L, see `ChunkPipeline.md`).
+It is used by the light job state handler.
 
 ### `CMeshBuildScheduler`
 Dispatches partition collider mesh generation jobs.

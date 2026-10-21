@@ -2,12 +2,13 @@
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.ColliderMeshing;
+using Engine.Scripts.Jobs.Light;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 
 namespace Engine.Scripts.Jobs.Core{
     /// <summary>
-    ///     Central scheduler that orchestrates data, mesh, and collider jobs as a round-robin state machine.
+    ///     Central scheduler that orchestrates data, light, mesh, and collider jobs as a round-robin state machine.
     ///     Manages separate priority queues and selects batches according to scheduler settings.
     /// </summary>
     public class VoxelEngineScheduler{
@@ -19,6 +20,8 @@ namespace Engine.Scripts.Jobs.Core{
         private readonly ColliderJobStateHandler _colliderJobHandler;
 
         private readonly DataJobStateHandler _dataJobHandler;
+        private readonly LightJobStateHandler _lightJobHandler;
+        private readonly LightScheduler _lightScheduler;
         private readonly MeshJobStateHandler _meshJobHandler;
 
         private SchedulerUpdate _currentUpdate;
@@ -32,13 +35,16 @@ namespace Engine.Scripts.Jobs.Core{
         /// <param name="chunkManager">The chunk manager.</param>
         /// <param name="colliderBakeScheduler">The collider bake scheduler.</param>
         /// <param name="chunkPool">The chunk pool.</param>
+        /// <param name="lightScheduler">The light scheduler (LGT-06).</param>
         internal VoxelEngineScheduler(VoxelEngineSettings settings,
             CMeshBuildScheduler cMeshBuildScheduler,
             ChunkScheduler chunkScheduler,
             ChunkManager chunkManager,
             ColliderBakeScheduler colliderBakeScheduler,
-            ChunkPool chunkPool){
+            ChunkPool chunkPool,
+            LightScheduler lightScheduler){
             _cMeshBuildScheduler = cMeshBuildScheduler;
+            _lightScheduler = lightScheduler;
             _chunkScheduler = chunkScheduler;
             _colliderBakeScheduler = colliderBakeScheduler;
             _chunkManager = chunkManager;
@@ -47,12 +53,15 @@ namespace Engine.Scripts.Jobs.Core{
             _colliderJobHandler = new ColliderJobStateHandler(settings, chunkManager, chunkPool, colliderBakeScheduler);
             _meshJobHandler = new MeshJobStateHandler(settings, chunkManager, chunkPool, cMeshBuildScheduler,
                 _colliderJobHandler);
+            _lightJobHandler = new LightJobStateHandler(settings, chunkManager, chunkPool, lightScheduler,
+                _meshJobHandler);
             _dataJobHandler =
-                new DataJobStateHandler(settings, chunkManager, chunkPool, chunkScheduler, _meshJobHandler);
+                new DataJobStateHandler(settings, chunkManager, chunkPool, chunkScheduler, _lightJobHandler);
 
             _currentUpdate = SchedulerUpdate.Data;
 
             _chunkManager.OnRemeshRequested += OnRemesh;
+            _chunkManager.OnLightInvalidated += OnLightInvalidated;
         }
 
         /// <summary>
@@ -66,6 +75,9 @@ namespace Engine.Scripts.Jobs.Core{
                 case SchedulerUpdate.Data:
                     using (VoxelProfilerMarkers.SchedulerData.Auto()) _dataJobHandler.Update(focus);
                     break;
+                case SchedulerUpdate.Light:
+                    using (VoxelProfilerMarkers.SchedulerLight.Auto()) _lightJobHandler.Update(focus);
+                    break;
                 case SchedulerUpdate.Mesh:
                     using (VoxelProfilerMarkers.SchedulerMesh.Auto()) _meshJobHandler.Update(focus);
                     break;
@@ -74,7 +86,7 @@ namespace Engine.Scripts.Jobs.Core{
                     break;
             }
 
-            _currentUpdate = (SchedulerUpdate)(((byte)_currentUpdate + 1) % 3);
+            _currentUpdate = (SchedulerUpdate)(((byte)_currentUpdate + 1) % SchedulerUpdateCount);
         }
 
         /// <summary>
@@ -83,6 +95,7 @@ namespace Engine.Scripts.Jobs.Core{
         /// <param name="focus">The new focus position.</param>
         internal void FocusUpdate(PriorityUtil.Focus focus){
             _dataJobHandler.FocusUpdate(focus);
+            _lightJobHandler.FocusUpdate(focus);
             _meshJobHandler.FocusUpdate(focus);
             _colliderJobHandler.FocusUpdate(focus);
             _chunkManager.FocusUpdate(focus);
@@ -96,12 +109,18 @@ namespace Engine.Scripts.Jobs.Core{
             _meshJobHandler.WakeUp();
         }
 
+        /// <summary>LGT-06: a chunk lost its light (neighbour unloaded, edit next to unlit chunks).</summary>
+        private void OnLightInvalidated(){
+            _lightJobHandler.WakeUp();
+        }
+
         /// <summary>
-        ///     INT-30: completes and applies every running batch (data, mesh, collider) so the scheduler can be disposed
+        ///     INT-30: completes and applies every running batch (data, light, mesh, collider) so the scheduler can be disposed
         ///     without dropping a writable mesh-data array or a job that still reads chunk data.
         /// </summary>
         internal void CompleteRunning(){
             if (!_chunkScheduler.IsReady) _chunkScheduler.Complete();
+            _lightScheduler.Complete(); // returns at once when idle
             _cMeshBuildScheduler.Complete(); // returns at once when idle
             if (!_colliderBakeScheduler.IsReady) _colliderBakeScheduler.Complete();
         }
@@ -111,6 +130,7 @@ namespace Engine.Scripts.Jobs.Core{
         /// </summary>
         internal void WaitForJobs(){
             _chunkScheduler.CompleteJob();
+            _lightScheduler.CompleteJob();
             _cMeshBuildScheduler.CompleteIfRunning();
             _colliderBakeScheduler.CompleteJobIfRunning();
         }
@@ -120,18 +140,26 @@ namespace Engine.Scripts.Jobs.Core{
         /// </summary>
         internal void Dispose(){
             _chunkScheduler.Dispose();
+            _lightScheduler.Dispose();
             _cMeshBuildScheduler.Dispose();
             _colliderBakeScheduler.Dispose();
 
-            if (_chunkManager != null) _chunkManager.OnRemeshRequested -= OnRemesh;
+            if (_chunkManager == null) return;
+            _chunkManager.OnRemeshRequested -= OnRemesh;
+            _chunkManager.OnLightInvalidated -= OnLightInvalidated;
         }
 
+        private const int SchedulerUpdateCount = 4;
+
         /// <summary>
-        ///     Enum representing the three job types in the round-robin scheduling cycle.
+        ///     Enum representing the four job types in the round-robin scheduling cycle.
         /// </summary>
         private enum SchedulerUpdate : byte{
             /// <summary>Data generation job update.</summary>
             Data,
+
+            /// <summary>Light job update (LGT-06).</summary>
+            Light,
 
             /// <summary>Mesh building job update.</summary>
             Mesh,
@@ -151,6 +179,16 @@ namespace Engine.Scripts.Jobs.Core{
         ///     Gets the average execution time of mesh building jobs.
         /// </summary>
         public float MeshAvgTiming => _cMeshBuildScheduler.AvgTime;
+
+        /// <summary>
+        ///     Gets the average execution time of light jobs (LGT-06).
+        /// </summary>
+        public float LightAvgTiming => _lightScheduler.AvgTime;
+
+        /// <summary>
+        ///     Gets the number of chunks in the light queue (LGT-06).
+        /// </summary>
+        public int LightQueueCount => _lightJobHandler.QueueCount;
 
         /// <summary>
         ///     Gets the number of chunks in the data generation queue.

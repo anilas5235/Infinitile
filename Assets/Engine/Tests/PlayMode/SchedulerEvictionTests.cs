@@ -242,6 +242,10 @@ namespace Engine.Tests.PlayMode{
                     chunks.Add(new int2(x, z), PlayModeFixtures.CreateUniformChunk(PlayModeFixtures.Air));
                 manager.AddChunks(chunks);
                 chunks.Dispose();
+                // LGT-06: meshing waits for lit 3 x 3 neighbourhoods; this rig has no light step, so light them here
+                for (int x = -3; x <= 3; x++)
+                for (int z = -3; z <= 3; z++)
+                    manager.ApplyLight(new int2(x, z), new ChunkLightData(16), out _);
 
                 PriorityUtil.Focus focus = new(new int3(0, PartitionsPerChunk - 1, 0), new float3(0, 0, 1));
                 pool.FocusUpdate(focus);

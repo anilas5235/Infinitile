@@ -115,21 +115,19 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        ///     Checks if all neighboring chunks are loaded for a given chunk position.
-        ///     Required before mesh generation can proceed.
+        ///     Checks if the chunk and all neighboring chunks are loaded and lit (LGT-06: faces at chunk borders sample
+        ///     the neighbour's light). Required before mesh generation can proceed.
         /// </summary>
         /// <param name="position">The chunk position to check.</param>
-        /// <returns>True if the chunk and all neighbors are loaded.</returns>
+        /// <returns>True if the chunk and all neighbors are loaded and lit.</returns>
         private bool CanGenerateMeshForChunk(int2 position){
-            bool result = true;
-
             for (int x = -1; x <= 1; x++)
             for (int z = -1; z <= 1; z++){
-                int2 pos = position + new int2(x, z);
-                result &= ChunkManager.IsChunkLoaded(pos);
+                if (!ChunkManager.TryGetChunk(position + new int2(x, z), out Data.Chunk chunk) || !chunk.LightReady)
+                    return false;
             }
 
-            return result;
+            return true;
         }
 
         /// <summary>

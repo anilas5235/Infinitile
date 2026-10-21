@@ -1,4 +1,4 @@
-Shader "Custom/VoxelShader"
+﻿Shader "Custom/VoxelShader"
 {
     Properties
     {
@@ -30,7 +30,7 @@ Shader "Custom/VoxelShader"
         {
             float4 positionCS : SV_POSITION;
             float2 uv : TEXCOORD0; // xy = tile UV
-            uint4 packed : TEXCOORD1; // (texArrayIndex u16, sunLightLevel u4, 4 bit unused, ao u8)
+            uint4 packed : TEXCOORD1; // PointData.packed, layout in VoxelCommon.hlsl
         };
 
         // ── Vertex shader with expansion ─────────────────────────────
@@ -85,8 +85,6 @@ Shader "Custom/VoxelShader"
             struct FragExtraData
             {
                 uint texture_index;
-                uint4 sun_light;
-                uint4 artificial_light;
                 uint ao;
             };
 
@@ -94,8 +92,6 @@ Shader "Custom/VoxelShader"
             {
                 FragExtraData data;
                 data.texture_index = get_tex_index(packed);
-                data.sun_light = get_sun_light(packed);
-                data.artificial_light = get_artificial_light(packed);
                 data.ao = get_ao(packed);
                 return data;
             }
@@ -112,11 +108,11 @@ Shader "Custom/VoxelShader"
                 // --- Ambient occlusion ---
                 float4 ao_color = calc_ao_color(_AOColor, albedo, _AOCurve, extra.ao, _AOIntensity, _AOPower, uv);
 
-                // --- Sun light level ---
-                float sun_light = calc_sun_light(extra.sun_light, uv);
+                // --- Light (LGT-10) ---
+                float3 light = calc_voxel_light(IN.packed, uv);
 
                 // --- Final colour ---
-                return half4(ao_color.rgb * sun_light, 1);
+                return half4(ao_color.rgb * light, 1);
             }
             ENDHLSL
         }

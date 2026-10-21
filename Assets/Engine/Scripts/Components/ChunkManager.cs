@@ -41,7 +41,21 @@ namespace Engine.Scripts.Components{
         ///     (renderer buffers, pool) that the chunk is gone regardless of who triggered the unload.
         /// </summary>
         internal Action<int2> OnChunkUnloaded;
+
+        /// <summary>
+        ///     LGT-06 / F-01: raised before a chunk whose voxel data the running light job reads (see
+        ///     <see cref="GetLightJobChunks" />) is edited or disposed. The light scheduler completes and applies it.
+        /// </summary>
+        internal Action LightJobReading;
+
+        /// <summary>LGT-07: raised after a voxel changed, with its world position and previous id.</summary>
+        internal Action<int3, ushort> VoxelEdited;
+
+        /// <summary>LGT-06: raised when a lit chunk lost its light and must be lit again.</summary>
+        internal Action OnLightInvalidated;
+
         private NativeParallelHashMap<int2, ChunkVoxelData> _accessorMap;
+        private NativeParallelHashMap<int2, ChunkVoxelData> _lightJobMap;
 
         private PriorityUtil.Focus _focus;
         private NativeParallelHashMap<int2, ChunkLightData> _lightAccessorMap;
@@ -52,8 +66,8 @@ namespace Engine.Scripts.Components{
         internal ChunkManager(VoxelEngineSettings settings){
             _chunkStoreSize = (settings.Chunk.LoadDistance + 2).SquareSize();
 
-            // PERF-04: sized for the draw window plus the neighbour ring the re-mesh marks reach
-            int reMeshCapacity = (settings.Chunk.DrawDistance + 1).SquareSize() * PartitionsPerChunk;
+            // PERF-04: sized for every loaded chunk; LGT-06 re-lit chunks flag partitions up to the load ring
+            int reMeshCapacity = _chunkStoreSize * PartitionsPerChunk;
             _reMeshPartitions = new HashSet<int3>(reMeshCapacity);
             _reCollidePartitions = new HashSet<int3>(reMeshCapacity);
 
@@ -72,6 +86,10 @@ namespace Engine.Scripts.Components{
             );
             _lightAccessorMap = new NativeParallelHashMap<int2, ChunkLightData>(
                 settings.Scheduler.meshingBatchSize * 6,
+                Allocator.Domain
+            );
+            _lightJobMap = new NativeParallelHashMap<int2, ChunkVoxelData>(
+                math.max(1, settings.Scheduler.lightBatchSize) * 9,
                 Allocator.Domain
             );
         }
@@ -96,6 +114,7 @@ namespace Engine.Scripts.Components{
         internal void Dispose(){
             _accessorMap.Dispose();
             _lightAccessorMap.Dispose();
+            _lightJobMap.Dispose();
             foreach ((int2 _, Chunk chunk) in _chunks) chunk.Dispose();
         }
 
@@ -160,6 +179,12 @@ namespace Engine.Scripts.Components{
                 _reCollidePartitions.Remove(partitionPos);
             }
 
+            // LGT-06: a lit neighbour's light may hold edits of this chunk that a reload regenerates away.
+            for (int x = -1; x <= 1; x++)
+            for (int z = -1; z <= 1; z++)
+                if (x != 0 || z != 0)
+                    InvalidateLight(position + new int2(x, z));
+
             OnChunkUnloaded?.Invoke(position); // F-05
             return true;
         }
@@ -178,8 +203,73 @@ namespace Engine.Scripts.Components{
         ///     F-01: completes any job that still reads <paramref name="chunkPos" /> through the current accessor
         ///     before the chunk's data is written or disposed.
         /// </summary>
-        private void CompleteReadersOf(int2 chunkPos){
+        internal void CompleteReadersOf(int2 chunkPos){
             if (_accessorMap.ContainsKey(chunkPos)) AccessorChunkWriting?.Invoke();
+            if (_lightJobMap.ContainsKey(chunkPos)) LightJobReading?.Invoke(); // LGT-06
+        }
+
+        /// <summary>
+        ///     LGT-06: voxel data of the 3 × 3 neighbourhoods of the chunks to light, for <c>LightJob</c>.
+        /// </summary>
+        internal NativeParallelHashMap<int2, ChunkVoxelData>.ReadOnly GetLightJobChunks(HashSet<int2> positions){
+            _lightJobMap.Clear();
+            int needed = positions.Count * 9;
+            if (_lightJobMap.Capacity < needed) _lightJobMap.Capacity = needed;
+            foreach (int2 position in positions)
+                for (int x = -1; x <= 1; x++)
+                for (int z = -1; z <= 1; z++){
+                    int2 pos = position + new int2(x, z);
+                    if (!_chunks.TryGetValue(pos, out Chunk chunk))
+                        throw new InvalidOperationException($"Chunk {pos} has not been generated");
+                    _lightJobMap.TryAdd(pos, chunk.VoxelData);
+                }
+
+            return _lightJobMap.AsReadOnly();
+        }
+
+        /// <summary>
+        ///     LGT-06: hands the result of a light job to its chunk. A chunk that was lit before (and lost its light,
+        ///     see <see cref="InvalidateLight" />) flags its partitions and its neighbours' for remeshing, because
+        ///     faces sample the light across chunk borders. Returns false (and releases the light) if the chunk is
+        ///     no longer loaded or already lit.
+        /// </summary>
+        internal bool ApplyLight(int2 position, ChunkLightData light, out Chunk chunk){
+            if (!_chunks.TryGetValue(position, out chunk) || chunk.LightReady){
+                light.Dispose();
+                return false;
+            }
+
+            chunk.LightData.Dispose();
+            chunk.LightData = light;
+            chunk.LightReady = true;
+
+            if (chunk.WasLit){
+                chunk.WasLit = false;
+                for (int x = -1; x <= 1; x++)
+                for (int z = -1; z <= 1; z++)
+                for (int y = 0; y < PartitionsPerChunk; y++)
+                    FlagReMesh(new int3(position.x + x, y, position.y + z));
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        ///     LGT-06: marks a lit chunk as unlit so the light job lights it again (its meshes stay until then).
+        /// </summary>
+        internal void InvalidateLight(int2 position){
+            if (!_chunks.TryGetValue(position, out Chunk chunk) || !chunk.LightReady) return;
+            chunk.LightReady = false;
+            chunk.WasLit = true;
+            OnLightInvalidated?.Invoke();
+        }
+
+        /// <summary>
+        ///     LGT-07: flags a partition of a loaded chunk for remeshing (light around it changed).
+        /// </summary>
+        internal void FlagReMesh(int3 partition){
+            if (!_chunks.ContainsKey(partition.xz) || !_reMeshPartitions.Add(partition)) return;
+            OnRemeshRequested?.Invoke();
         }
 
         /// <summary>
@@ -288,13 +378,14 @@ namespace Engine.Scripts.Components{
                 return false;
             }
 
-            int3 pCoords = GetPartitionCoords(position);
-
-            if (_reMeshPartitions.Contains(pCoords)) return false;
-
+            // A partition that is already flagged for remeshing accepts edits too (decided 2026-10-21): F-01 completes
+            // every job that reads the chunk before the write, and the partition is simply meshed once more. The
+            // earlier refusal dropped edits for a few frames, and LGT-07 flags up to 27 partitions per edit.
             CompleteReadersOf(chunkPos); // F-01
+            ushort oldVoxel = chunk.VoxelData.GetVoxel(blockPos);
             bool result = chunk.VoxelData.SetVoxel(blockPos, voxelId);
             _chunks[chunkPos] = chunk;
+            if (result) VoxelEdited?.Invoke(position, oldVoxel); // LGT-07: light follows every edit
             if (remesh && result){
                 ReMeshPartitions(position);
                 OnChunkChange?.Invoke(chunk);

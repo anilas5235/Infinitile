@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Engine.Scripts.Render;
@@ -57,10 +57,11 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void GpuVoxelDef_Is76Bytes(){
+        public void GpuVoxelDef_Is80Bytes(){
             Type type = typeof(VoxelRegistry).GetNestedType("GPUVoxelDef", BindingFlags.NonPublic);
             Assert.IsNotNull(type, "VoxelRegistry.GPUVoxelDef not found");
-            Assert.AreEqual(76, Marshal.SizeOf(type));
+            Assert.AreEqual(80, Marshal.SizeOf(type)); // LGT-09: + LightAttenuation
+            Assert.AreEqual(76, (int)Marshal.OffsetOf(type, "LightAttenuation"), "HLSL VoxelDef offset");
         }
 
         [Test]
@@ -76,7 +77,7 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(12, (int)Marshal.OffsetOf(type, "Glow"), "HLSL VoxelDef offset");
 
             Voxel.VoxelDef def = new(){ DepthFadeDistance = (half)4.5f, Glow = 200 };
-            object gpuDef = Activator.CreateInstance(type, def);
+            object gpuDef = Activator.CreateInstance(type, def, (byte)0);
             uint bits = (uint)field.GetValue(gpuDef);
             Assert.AreEqual(math.f32tof16(4.5f), bits);
             Assert.AreEqual(4.5f, math.f16tof32(bits));

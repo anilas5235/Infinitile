@@ -26,8 +26,27 @@ namespace Engine.Scripts.Data{
         ///     Voxel lookup within a chunk; remaps out-of-range coordinates to neighbor chunks.
         /// </summary>
         internal ushort GetVoxelInPartition(in int3 partitionPos, int3 voxelPos){
+            if (!ResolveChunk(partitionPos, ref voxelPos, out int2 chunkPos)) return 0;
+            return TryGetChunk(chunkPos, out ChunkVoxelData chunk) ? chunk.GetVoxel(voxelPos) : (ushort)0;
+        }
+
+        /// <summary>
+        ///     LGT-01: light lookup (packed, see <see cref="VoxelLight" />) with the same neighbour remapping as
+        ///     <see cref="GetVoxelInPartition" />; 0 outside the world height or for a chunk without light data.
+        /// </summary>
+        internal ushort GetLightInPartition(in int3 partitionPos, int3 voxelPos){
+            if (!ResolveChunk(partitionPos, ref voxelPos, out int2 chunkPos)) return 0;
+            return TryGetLightData(chunkPos, out ChunkLightData light) ? light.GetLight(voxelPos) : (ushort)0;
+        }
+
+        /// <summary>
+        ///     Converts a partition-relative voxel position into a chunk position and chunk-local voxel position.
+        ///     Returns false outside the world height.
+        /// </summary>
+        private static bool ResolveChunk(in int3 partitionPos, ref int3 voxelPos, out int2 chunkPos){
             voxelPos.y += partitionPos.y * PartitionHeight;
-            if (voxelPos.y is >= ChunkHeight or < 0) return 0;
+            chunkPos = partitionPos.xz;
+            if (voxelPos.y is >= ChunkHeight or < 0) return false;
             int2 chunkOffset = int2.zero;
 
             switch (voxelPos.x){
@@ -52,9 +71,8 @@ namespace Engine.Scripts.Data{
                     break;
             }
 
-            return TryGetChunk(partitionPos.xz + chunkOffset, out ChunkVoxelData chunk)
-                ? chunk.GetVoxel(voxelPos)
-                : (ushort)0;
+            chunkPos += chunkOffset;
+            return true;
         }
 
         /// <summary>
@@ -64,57 +82,11 @@ namespace Engine.Scripts.Data{
             return _chunks.TryGetValue(pos, out chunk);
         }
 
-        internal byte GetLightInPartition(int3 partitionPos, int3 voxelPos){
-            FindPartitionAndLocalPos(ref partitionPos, ref voxelPos);
-
-            return TryGetLightData(partitionPos, out PartitionLightData lightData)
-                ? lightData.GetLight(voxelPos)
-                : (byte)0;
-        }
-
-        private static void FindPartitionAndLocalPos(ref int3 partitionPos, ref int3 voxelPos){
-            int3 partitionOffset = int3.zero;
-
-            switch (voxelPos.x){
-                case > MaxXPartitionPos:
-                    partitionOffset.x = voxelPos.x / PartitionWidth;
-                    voxelPos.x %= PartitionWidth;
-                    break;
-                case < MinPartitionPosXYZ:
-                    partitionOffset.x = (voxelPos.x - PartitionWidth + 1) / PartitionWidth;
-                    voxelPos.x = (voxelPos.x % PartitionWidth + PartitionWidth) % PartitionWidth;
-                    break;
-            }
-
-            switch (voxelPos.y){
-                case > MaxYPartitionPos:
-                    partitionOffset.y = voxelPos.y / PartitionHeight;
-                    voxelPos.y %= PartitionHeight;
-                    break;
-                case < MinPartitionPosXYZ:
-                    partitionOffset.y = (voxelPos.y - PartitionHeight + 1) / PartitionHeight;
-                    voxelPos.y = (voxelPos.y % PartitionHeight + PartitionHeight) % PartitionHeight;
-                    break;
-            }
-
-            switch (voxelPos.z){
-                case > MaxZPartitionPos:
-                    partitionOffset.z = voxelPos.z / PartitionDepth;
-                    voxelPos.z %= PartitionDepth;
-                    break;
-                case < MinPartitionPosXYZ:
-                    partitionOffset.z = (voxelPos.z - PartitionDepth + 1) / PartitionDepth;
-                    voxelPos.z = (voxelPos.z % PartitionDepth + PartitionDepth) % PartitionDepth;
-                    break;
-            }
-
-            partitionPos += partitionOffset;
-        }
-
-        internal bool TryGetLightData(int3 partitionPos, out PartitionLightData lightData){
-            lightData = default;
-            return _lightData.TryGetValue(partitionPos.xz, out ChunkLightData chunkLightData) &&
-                   chunkLightData.TryGetPartitionLight(partitionPos.y, out lightData);
+        /// <summary>
+        ///     LGT-01: attempts to get the light data of a chunk.
+        /// </summary>
+        internal bool TryGetLightData(int2 chunkPos, out ChunkLightData lightData){
+            return _lightData.TryGetValue(chunkPos, out lightData);
         }
 
         /// <summary>

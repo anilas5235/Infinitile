@@ -6,11 +6,51 @@ flowchart LR
     B --> C[Generate Chunk Data
     World Gen]
     C --> D[Chunk Data Ready]
-    D --> E[Request Mesh Pipeline]
+    D --> L[Light Job
+    3 x 3 data ready]
+    L --> E[Request Mesh Pipeline
+    3 x 3 light ready]
 
-    X[SetVoxel Edit] --> Y[Remesh Requested]
+    X[SetVoxel Edit] --> Z[Incremental Light Update]
+    Z --> Y[Remesh Requested]
     Y --> E
 ```
+
+## Rings around the focus (Phase L)
+
+`VoxelEngineScheduler` runs the steps round robin: data, light, mesh, collider. Each step needs the one before it
+in the 3 x 3 neighbourhood of a chunk, so each step reaches one ring less than the one before:
+
+| Step | Needs | Reaches (Chebyshev chunk distance) |
+| --- | --- | --- |
+| Data (`ChunkScheduler`) | nothing | `LoadDistance` = `DrawDistance + 3` |
+| Light (`LightScheduler`, LGT-06) | 3 x 3 voxel data | `LoadDistance - 1` |
+| Mesh (`CMeshBuildScheduler` + GPU build) | 3 x 3 lit chunks | `DrawDistance` |
+
+The load ring grew by one chunk with the light step (it was `DrawDistance + 2`). Strictly, `DrawDistance + 2`
+would already be enough (light up to `DrawDistance + 1`, mesh up to `DrawDistance`); the extra ring keeps the
+slack the pipeline had before, so lit neighbours are usually ready by the time a chunk enters the draw distance.
+
+## Light (Phase L)
+
+- **Light job (LGT-04/05).** `LightJob` lights one chunk per index from the voxel data of its 3 x 3 neighbourhood
+  over the box chunk +-14 (full height; a source 15 columns away contributes 0) and writes only that chunk's light,
+  so no job writes another chunk's light.
+  Sky columns are 15 without BFS; the BFS starts only at the frontier (under leaves and water, at overhangs and
+  cliffs, at emitters). `ChunkManager.ApplyLight` sets `Chunk.LightReady`; `VoxelWorld.ChunkLightChanged` tells the
+  renderer to upload the light.
+- **Meshing waits for light (LGT-06).** `MeshJobStateHandler` only meshes a chunk whose 3 x 3 chunks are loaded and
+  lit, because faces at chunk borders sample the neighbour's light.
+- **The light job reads voxel data (F-01).** `ChunkManager.GetLightJobChunks` records the chunks the running batch
+  reads. Before `SetVoxel` or `UnloadChunk` writes one of them, `ChunkManager.LightJobReading` makes the light
+  scheduler complete *and apply* the batch. Applying only assigns light data, so it cannot re-enter an unload.
+- **Edits (LGT-07).** `SetVoxel` raises `ChunkManager.VoxelEdited`; `LightScheduler` runs `LightEditJob`
+  synchronously (`Run()`) on the 3 x 3 chunks around the edit (removal BFS, then re-propagation; box edit +-16).
+  Partitions whose light changed, or that touch a changed voxel, are flagged for remeshing. If one of the 3 x 3
+  chunks is not lit yet, the lit ones are invalidated instead and re-lit by the light job.
+- **Unloading invalidates neighbours.** A lit neighbour's light may hold edits of the unloaded chunk that a reload
+  regenerates away, so `UnloadChunk` clears `LightReady` of the 8 neighbours. A chunk that was lit before
+  (`Chunk.WasLit`) flags its and its neighbours' partitions for remeshing when it is lit again.
 
 ## Lifetime rules (Phase S)
 

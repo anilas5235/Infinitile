@@ -19,6 +19,15 @@ namespace Engine.Scripts.Data{
         public ChunkVoxelData VoxelData;
 
         /// <summary>
+        ///     LGT-06: true once <see cref="LightData" /> holds the result of a light job (or later incremental
+        ///     updates). Meshing waits until the chunk and its 8 neighbours are lit.
+        /// </summary>
+        public bool LightReady{ get; internal set; }
+
+        /// <summary>LGT-06: true if the chunk was lit before and its light was invalidated (re-light needs a remesh).</summary>
+        internal bool WasLit{ get; set; }
+
+        /// <summary>
         ///     Constructs a new chunk with position and size; initializes data structure.
         /// </summary>
         public Chunk(int2 position){
@@ -46,6 +55,8 @@ namespace Engine.Scripts.Data{
             Position = position;
             VoxelData = default;
             LightData = new ChunkLightData(128);
+            LightReady = false;
+            WasLit = false;
         }
 
         public void Dispose(){
@@ -54,87 +65,59 @@ namespace Engine.Scripts.Data{
         }
     }
 
-    public struct PartitionLightData : IDisposable{
-        private UnsafeIntervalList<byte> _data;
-        public bool IsAllZero => _data.CompressedLength == 1 && _data.Get(0) == 0;
-        public bool IsAllMax => _data.CompressedLength == 1 && _data.Get(0) == MaxLightLevel;
-
-        public PartitionLightData(int initCapacity){
-            _data = new UnsafeIntervalList<byte>(initCapacity, Allocator.Domain);
-            _data.AddInterval(0, VoxelsPerPartition);
-        }
-
-        /// <summary>
-        ///     Adds a run of identical light values (during initialization / generation).
-        /// </summary>
-        public void AddLight(byte lightValue, int count){
-            _data.AddInterval(lightValue, count);
-        }
-
-        /// <summary>
-        ///     Sets light value by int3 position. Marks dirty on change.
-        /// </summary>
-        public bool SetLight(int3 pos, byte lightValue){
-            bool result = _data.Set(GetIndex(pos), lightValue);
-            return result;
-        }
-
-        internal void SetAllLights(byte lightValue){
-            _data.Clear();
-            _data.AddInterval(lightValue, VoxelsPerPartition);
-        }
-
-        /// <summary>
-        ///     Reads light value at int3 position.
-        /// </summary>
-        public byte GetLight(int3 pos){
-            return _data.Get(GetIndex(pos));
-        }
-
-        /// <summary>
-        ///     Disposes native resources.
-        /// </summary>
-        public void Dispose(){
-            _data.Dispose();
-        }
-
-        private static int GetIndex(in int3 pos){
-            return PartitionSize.Flatten(pos);
-        }
-    }
-
+    /// <summary>
+    ///     LGT-01: light of a whole chunk, one 16-bit value per voxel (sky(4) | R(4) | G(4) | B(4), see
+    ///     <see cref="VoxelLight" />), stored as an interval list in the same Flatten order as
+    ///     <see cref="ChunkVoxelData" /> so the GPU upload reuses the voxel-data path (LGT-08). Replaces the former
+    ///     per-partition byte lists. A new chunk is dark until its light job has run (LGT-06).
+    /// </summary>
     [BurstCompile]
     public struct ChunkLightData : IDisposable{
-        private UnsafeList<PartitionLightData> _data;
+        internal UnsafeIntervalList<ushort> Data;
 
+        public bool IsCreated => Data.Length > 0;
+
+        /// <summary>Creates a dark chunk (all light 0).</summary>
         public ChunkLightData(int initCapacity){
-            _data = new UnsafeList<PartitionLightData>(PartitionsPerChunk, Allocator.Domain);
-            for (int i = 0; i < PartitionsPerChunk; i++) _data.Add(new PartitionLightData(initCapacity));
+            Data = new UnsafeIntervalList<ushort>(initCapacity, Allocator.Domain);
+            Data.AddInterval(0, VoxelsPerChunk);
+        }
+
+        /// <summary>Creates an empty list that the caller fills with <see cref="AddLights" /> (light job output).</summary>
+        internal static ChunkLightData CreateEmpty(int initCapacity){
+            return new ChunkLightData{ Data = new UnsafeIntervalList<ushort>(initCapacity, Allocator.Domain) };
+        }
+
+        public UnsafeIntervalList<ushort> GetData(){
+            return Data;
         }
 
         /// <summary>
-        ///     Reads light value at int3 position.
+        ///     Adds a run of identical light values (during the light job).
         /// </summary>
-        public byte GetLight(int partitionIndex, int3 pos){
-            return _data[partitionIndex].GetLight(pos);
+        public void AddLights(ushort light, int count){
+            Data.AddInterval(light, count);
+        }
+
+        /// <summary>
+        ///     Sets the light of a chunk-local voxel; returns true if it changed.
+        /// </summary>
+        public bool SetLight(int3 pos, ushort light){
+            return Data.Set(ChunkSize.Flatten(pos), light);
+        }
+
+        /// <summary>
+        ///     Reads the light of a chunk-local voxel.
+        /// </summary>
+        public ushort GetLight(int3 pos){
+            return Data.Get(ChunkSize.Flatten(pos));
         }
 
         /// <summary>
         ///     Disposes native resources.
         /// </summary>
         public void Dispose(){
-            for (int i = 0; i < _data.Length; i++) _data[i].Dispose();
-            _data.Dispose();
-        }
-
-        public bool TryGetPartitionLight(int index, out PartitionLightData lightData){
-            if (index < 0 || index >= _data.Length){
-                lightData = default;
-                return false;
-            }
-
-            lightData = _data[index];
-            return true;
+            Data.Dispose();
         }
     }
 

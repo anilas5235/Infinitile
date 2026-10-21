@@ -301,6 +301,13 @@ namespace Engine.Scripts.Utils.Collections{
         }
 
         /// <summary>
+        ///     LGT-04: a compressed node by index (value and exclusive end of its run), for run-wise readers.
+        /// </summary>
+        internal Node NodeAt(int nodeIndex){
+            return _internal[nodeIndex];
+        }
+
+        /// <summary>
         ///     Gets a read-only view of the internal compressed nodes.
         /// </summary>
         internal UnsafeList<Node>.ReadOnly Internal => _internal.AsReadOnly();

@@ -366,3 +366,121 @@ Trade-offs:
 - Page bounds are partition bounds, so a page is as coarse as its partition; sparse partitions are drawn whole.
 - Each camera holds its own append buffer and args per render buffer (a few KB each).
 - The conservative plane test keeps boxes that straddle a frustum corner; Hi-Z occlusion (CUL-20) is future work.
+
+# Version 1.4 (Lighting, Phase L)
+
+## Light Pipeline (Propagated Voxel Light, Smooth Corners, Day/Night)
+
+```mermaid
+flowchart LR
+subgraph CPU["CPU (LightScheduler, Burst)"]
+    direction LR
+    A[Chunk + 8 neighbours
+    have voxel data] --> B[LightJob per chunk
+    box chunk ± 14
+    sky scan + frontier + BFS]
+    B --> C[ChunkLightData
+    interval list, sky/R/G/B]
+    C --> D[LightReady: mesh once
+    3 x 3 chunks are lit]
+    E[SetVoxel] --> F[LightEditJob.Run
+    two-queue update
+    edit ± 16]
+    F --> C
+    C --> G[ChunkLightChanged
+    upload light buffer]
+end
+
+subgraph GPU
+    direction LR
+    G --> H[BuildPrep: id
+    BuildPrepLight: id or light << 16]
+    H --> I[BuildPoints: per face corner
+    average of front, sides, diagonal
+    skipping opaque]
+    I --> J[PointData.packed.y = sky or R << 16
+    packed.w = G or B << 16]
+    J --> K[Fragment: interpolate corners,
+    curve, sky x brightness x tint
+    vs block RGB, ambient, x AO]
+end
+```
+
+### Description
+
+Version 1.4 adds propagated voxel light (LGT-01 to LGT-11 in `WorldGenSpec.html`, section E3). Light is computed
+on the CPU once per chunk and on edits. On the GPU it is only unpacked and interpolated, so day and night never
+re-propagate anything.
+
+- **Data (LGT-01/02).** Every voxel has 16 bits of light: one 4-bit level each for sky, red, green and blue
+  (`VoxelLight`, channel c at bits 4c, sky is c = 3). `ChunkLightData` stores them as an interval list in the same
+  Flatten order as the voxel data. Each voxel definition has `lightAttenuation` (0 clear … 15 opaque, the default)
+  and `lightEmission` (RGB). `VoxelRegistry` turns them into a `VoxelLightTable` for the jobs, and the attenuation
+  also goes into `GPUVoxelDef` (80 bytes).
+- **Initial light (LGT-03 to LGT-05).** `LightJob` lights one chunk from the voxel data of its 3 × 3
+  neighbourhood. It runs over a box of chunk ± 14 columns at full height (`LightRegion`), surrounded by an opaque
+  sentinel ring. Light loses at least one level per step, so a source 15 columns away contributes 0: the result is
+  exact and every chunk can be lit independently and in parallel.
+  - Sky without BFS: every voxel above a column's highest non-clear voxel is 15.
+  - BFS seeds:
+    - the first non-clear voxel under the sky part;
+    - sky voxels next to a taller neighbour column that has non-opaque voxels at that height;
+    - emitters.
+  - BFS: each channel of a neighbour becomes max(current, source − 1 − attenuation). Sky 15 moves down into a clear
+    voxel without loss.
+- **Scheduling (LGT-06).** `LightScheduler` batches chunks whose 3 × 3 neighbourhood has voxel data. The load
+  distance is the draw distance + 3, so the outermost drawn chunks can be lit. A partition is meshed only when its
+  chunk and the 8 neighbours are lit. Unloading a chunk invalidates the lit neighbours that read it.
+- **Edits (LGT-07).** `SetVoxel` runs `LightEditJob` synchronously, after any job that reads those chunks has
+  completed (F-01). Per channel it uses the two-queue method in a box of edit ± 16:
+  - a removal BFS clears the light that may have come through the edited voxel;
+  - light is then re-propagated from the border, the edited voxel's neighbours and the cleared voxels' own sources.
+
+  Partitions whose light changed are remeshed. The result equals a full recomputation (tested over 500 random
+  edits).
+- **GPU light (LGT-08).** The renderer uploads each chunk's light intervals into a buffer from the same pool as
+  the voxel data; the pool is twice as large. `PointBuilder.compute` decompresses the voxel ids (`BuildPrep`), then
+  ORs the light into the upper 16 bits of the same uint (`BuildPrepLight`). A neighbour lookup therefore fetches
+  id and light at once. A build without a light buffer for every chunk is invalid.
+- **Smooth light (LGT-09).** For each face corner, `BuildPoints` averages every channel over the front voxel,
+  the two side neighbours and the diagonal, with rounding.
+  - It skips opaque voxels (attenuation 15), and the diagonal too when both sides are opaque, so light never leaks
+    through a closed corner.
+  - If every voxel is opaque, the corner gets the front voxel's light.
+  - Inner and foliage quads use the voxel's own light; for an opaque voxel, the per-channel max of its six
+    neighbours.
+  - Above the world counts as air with sky 15.
+  - The 16 corner nibbles go into `PointData.packed.y` (sky | R << 16) and `.w` (G | B << 16), each channel as the
+    four corners up-left, up-right, down-right, down-left (UV space, like AO). The point size is unchanged.
+  - `PointLightPacking` is the C# port of the accessors and the corner average, used by the round-trip tests.
+- **Shading (LGT-10).** The solid and transparent shaders (foliage uses the transparent one) compute the light per
+  fragment. They interpolate each channel's corner levels bilinearly and apply the curve 0.85^(15 − level).
+
+  ```
+  light = max(curve(sky) × _VoxelSkyBrightness × _VoxelSkyTint, curve(RGB))
+  light = max(light, _VoxelAmbient) × AO      (× glow in the transparent shader)
+  ```
+
+  `DayNightCycle` (on the main directional light in `SampleScene`) drives the three globals and the light's
+  rotation from `timeOfDay` and `speed`. The default speed is a 20-minute day. Without the component, the
+  renderer sets full daylight (`VoxelLightingGlobals.SetDefaults`).
+- **Tests and benchmarks (LGT-11).**
+  - EditMode `LightPropagationTests`: emitter falloff, walls, media, channels, sky columns, frontier vs
+    exhaustive seeding, 3 × 3 vs 5 × 5 border exactness, 500 random edits vs a full recomputation.
+  - `PointLightPackingTests` and `DayNightCycleTests`.
+  - `LightJobBenchmark`: 0.86 ms per chunk on natural terrain, 15.7 ms in the emitter-cavity worst case (see
+    `Tests/Performance/Baselines/README.md`).
+
+Advantages:
+
+- Coloured block light and sky light with soft corners at no extra point size.
+- Day/night is three shader globals; nothing is recomputed when the time changes.
+- Chunk light is exact across borders and can be computed in parallel; edits stay local and synchronous.
+
+Trade-offs:
+
+- Each light job processes about 3.5 times its chunk's column count (the ± 14 margin) and uses about 3 MB of
+  temporary memory.
+- A chunk can be meshed only after its neighbours are lit, so the load distance is three chunks beyond the draw
+  distance.
+- Light changes need a remesh of the affected partitions, because the corner values are baked into the points.

@@ -33,6 +33,7 @@ namespace Engine.Scripts.Render{
         private readonly HashSet<int3> _requestedPartitions = new();
 
         private readonly Dictionary<int2, GraphicsBuffer> _voxelDataBuffers = new();
+        private readonly Dictionary<int2, GraphicsBuffer> _lightDataBuffers = new(); // LGT-08
 
         // PERF-04: a GraphicsBuffer is a managed object; released chunk buffers are kept for reuse so that chunk
         // uploads during flight do not allocate. Lengths are rounded up so a free buffer fits more often; the
@@ -112,6 +113,7 @@ namespace Engine.Scripts.Render{
             if (world == null) world = GetComponent<VoxelWorld>();
             if (world == null) world = VoxelWorld.Instance;
             _settings = world.Settings;
+            VoxelLightingGlobals.SetDefaults(); // LGT-10: lit without a DayNightCycle, which overrides these per frame
             _maxInFlight = math.max(1, _settings.Scheduler.partitionBuildBatchSize);
 
             // PERF-04: sized for the partition pool so the request bookkeeping does not grow during flight
@@ -122,7 +124,8 @@ namespace Engine.Scripts.Render{
 
             // PERF-04: one GPU buffer per chunk the manager's store can hold (same formula as ChunkManager), created
             // now instead of one managed GraphicsBuffer object per chunk upload during flight.
-            _chunkStoreSize = (_settings.Chunk.LoadDistance + 2).SquareSize();
+            // LGT-08: two per chunk, voxel data and light share the pool (same interval format).
+            _chunkStoreSize = 2 * (_settings.Chunk.LoadDistance + 2).SquareSize();
             _freeChunkBuffers.Capacity = _chunkStoreSize;
             for (int i = 0; i < _chunkStoreSize; i++)
                 _freeChunkBuffers.Add(new GraphicsBuffer(Target.Structured, DefaultChunkBufferLength, Marshal.SizeOf<uint2>()));
@@ -192,6 +195,7 @@ namespace Engine.Scripts.Render{
             RenderPipelineManager.beginCameraRendering += Draw;
             world.ChunkChanged += HandleChunkChange;
             world.ChunkDataReady += HandleChunkDataReady;
+            world.ChunkLightChanged += HandleChunkLightChanged; // LGT-08
             world.ChunkEvicted += RemoveChunkData;
             world.PartitionEvicted += RemovePartitionRenderData;
             world.PartitionBuildRequested += UpdatePartitions;
@@ -206,6 +210,7 @@ namespace Engine.Scripts.Render{
 
             world.ChunkChanged -= HandleChunkChange;
             world.ChunkDataReady -= HandleChunkDataReady;
+            world.ChunkLightChanged -= HandleChunkLightChanged;
             world.ChunkEvicted -= RemoveChunkData;
             world.PartitionEvicted -= RemovePartitionRenderData;
             world.PartitionBuildRequested -= UpdatePartitions;
@@ -232,6 +237,7 @@ namespace Engine.Scripts.Render{
             SafeDispose(_foliageBufferManager);
 
             foreach (GraphicsBuffer buffer in _voxelDataBuffers.Values) SafeDispose(buffer);
+            foreach (GraphicsBuffer buffer in _lightDataBuffers.Values) SafeDispose(buffer);
             foreach (GraphicsBuffer buffer in _freeChunkBuffers) SafeDispose(buffer);
             _freeChunkBuffers.Clear();
 
@@ -239,6 +245,7 @@ namespace Engine.Scripts.Render{
             _requestedPartitions.Clear();
 
             _voxelDataBuffers.Clear();
+            _lightDataBuffers.Clear();
         }
 
         private static void SafeDispose(IDisposable resource){
@@ -264,6 +271,14 @@ namespace Engine.Scripts.Render{
         /// <param name="chunk">The chunk whose data is ready.</param>
         private void HandleChunkDataReady(Chunk chunk){
             AddOrUpdateChunk(chunk.Position, chunk.VoxelData.GetData());
+        }
+
+        /// <summary>
+        ///     LGT-08: uploads a chunk's light after the light job or an edit changed it.
+        /// </summary>
+        /// <param name="chunk">The chunk whose light changed.</param>
+        private void HandleChunkLightChanged(Chunk chunk){
+            AddOrUpdateLight(chunk.Position, chunk.LightData.GetData());
         }
 
         /// <summary>
@@ -438,7 +453,7 @@ namespace Engine.Scripts.Render{
 
                 PartitionBuildRequest request = _buildRequests[i];
                 request.Reset(partition);
-                request.CollectBuffers(_voxelDataBuffers);
+                request.CollectBuffers(_voxelDataBuffers, _lightDataBuffers);
 
                 if (!request.IsValid){
                     VoxelEngineLogger.Error<VoxelWorldRenderer>(
@@ -512,13 +527,31 @@ namespace Engine.Scripts.Render{
             // F-18: validate before the old buffer is released, otherwise a rejected update leaves a disposed
             // buffer in the map that the next partition build binds.
             if (voxelData.Length != VoxelsPerChunk) throw new Exception("Voxel data length mismatch!");
+            UploadIntervals(_voxelDataBuffers, chunk, voxelData);
+        }
 
-            int compLength = voxelData.CompressedLength;
+        /// <summary>
+        ///     LGT-08: adds or updates a chunk's light in the GPU buffer (same interval format as the voxel data).
+        /// </summary>
+        /// <param name="chunk">The chunk position.</param>
+        /// <param name="lightData">The light data to store.</param>
+        private void AddOrUpdateLight(int2 chunk, UnsafeIntervalList<ushort> lightData){
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.GpuUploadChunk.Auto(); // PERF-01
+            if (lightData.Length != VoxelsPerChunk) throw new Exception("Light data length mismatch!");
+            UploadIntervals(_lightDataBuffers, chunk, lightData);
+        }
+
+        /// <summary>
+        ///     Writes an interval list to the chunk's buffer in <paramref name="buffers" />. Element 0 holds
+        ///     (interval count, last end index), followed by (value, exclusive end) per interval.
+        /// </summary>
+        private void UploadIntervals(Dictionary<int2, GraphicsBuffer> buffers, int2 chunk, UnsafeIntervalList<ushort> data){
+            int compLength = data.CompressedLength;
             int uploadLength = compLength + 1;
 
             // PERF-04: keep the chunk's buffer when it is large enough, otherwise release it for reuse
             GraphicsBuffer dataBuffer = null;
-            if (_voxelDataBuffers.TryGetValue(chunk, out GraphicsBuffer existingBuffer)){
+            if (buffers.TryGetValue(chunk, out GraphicsBuffer existingBuffer)){
                 if (existingBuffer.count >= uploadLength) dataBuffer = existingBuffer;
                 else ReleaseChunkBuffer(existingBuffer);
             }
@@ -527,13 +560,13 @@ namespace Engine.Scripts.Render{
             if (_intervalUpload.Length < uploadLength) _intervalUpload = new uint2[math.max(uploadLength, _intervalUpload.Length * 2)];
             uint2[] intervalData = _intervalUpload;
             int i = 1;
-            foreach (UnsafeIntervalList<ushort>.Node n in voxelData.Internal)
+            foreach (UnsafeIntervalList<ushort>.Node n in data.Internal)
                 intervalData[i++] = new uint2(n.Value, (uint)n.Count);
 
             intervalData[0] = new uint2((uint)compLength, intervalData[compLength].y);
 
             dataBuffer.SetData(intervalData, 0, 0, uploadLength);
-            _voxelDataBuffers[chunk] = dataBuffer;
+            buffers[chunk] = dataBuffer;
         }
 
         /// <summary>PERF-04: first free buffer that holds <paramref name="uploadLength" /> elements, or a new one.</summary>
@@ -559,14 +592,12 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     Removes a chunk's voxel data from the GPU buffer when evicted.
+        ///     Removes a chunk's voxel data and light (LGT-08) from the GPU buffers when evicted.
         /// </summary>
         /// <param name="chunk">The chunk position.</param>
         private void RemoveChunkData(int2 chunk){
-            if (!_voxelDataBuffers.TryGetValue(chunk, out GraphicsBuffer existingBuffer)) return;
-
-            ReleaseChunkBuffer(existingBuffer); // PERF-04
-            _voxelDataBuffers.Remove(chunk);
+            if (_voxelDataBuffers.Remove(chunk, out GraphicsBuffer voxelBuffer)) ReleaseChunkBuffer(voxelBuffer); // PERF-04
+            if (_lightDataBuffers.Remove(chunk, out GraphicsBuffer lightBuffer)) ReleaseChunkBuffer(lightBuffer); // LGT-08
         }
 
         /// <summary>
