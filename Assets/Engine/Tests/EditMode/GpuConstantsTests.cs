@@ -69,6 +69,8 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(0, PartitionWidth % BuildPointsThreads);
             Assert.AreEqual(0, PartitionHeight % BuildPointsThreads);
             Assert.AreEqual(0, PartitionDepth % BuildPointsThreads);
+            // CopyPoints runs one group per page, one thread per point
+            Assert.AreEqual(PointsPerPage, CopyPointsThreads);
         }
     }
 }

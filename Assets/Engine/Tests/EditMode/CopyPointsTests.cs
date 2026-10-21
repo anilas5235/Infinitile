@@ -81,7 +81,6 @@ namespace Engine.Tests.EditMode{
 
                 pageCounts.SetData(counts);
                 shader.SetBuffer(kernel, PageCountsNameID, pageCounts);
-                shader.SetInt(PointsPerPageNameID, PointsPerPage);
                 CopyPointsHandler.Dispatch(shader, kernel, maxPageCount);
 
                 for (int layer = 0; layer < 3; layer++){

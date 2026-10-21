@@ -1054,6 +1054,21 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
 <li><b>Idea:</b> one thread per point, e.g. a group of 256 threads per page and layer (<code>SV_GroupID</code> = page and layer, <code>SV_GroupThreadID</code> = point in the page), with the layer chosen once per group.</li>
 <li><b>Costs and risks:</b> small kernel change; the dispatch size becomes pages × layers groups. <code>POINTS_PER_PAGE</code> and the group sizes come from <code>VoxelGpuConstants.hlsl</code>, which <code>GpuConstantsTests</code> checks against the C# side, so a new group size goes there.</li>
 <li><b>Acceptance if scheduled:</b> identical render buffers (a new GPU round-trip test, as there is no CopyPoints test yet); copy dispatch time lower in a ProfilerRecorder probe.</li>
+<li><b>Done (scheduled 2026-10-21):</b>
+  <ul class="tight">
+  <li>The kernel runs one group of 256 threads (<code>COPY_POINTS_THREADS</code> = <code>POINTS_PER_PAGE</code>, C# <code>CopyPointsThreads</code>) per page and layer. The dispatch is pages × 3 groups (<code>CopyPointsHandler.Dispatch</code>), <code>SV_GroupID</code> gives page and layer, and <code>SV_GroupIndex</code> the point in the page. The layer is chosen once per group, so the <code>switch</code> never diverges.</li>
+  <li>The kernel copies <code>min(count, POINTS_PER_PAGE)</code> points per page, as before. The <code>_PointsPerPage</code> uniform is gone from CopyPoints; the kernel uses the shared define.</li>
+  <li><code>CopyPointsTests</code> is the new GPU round trip: ten solid pages in scrambled target order (with an empty page, a 1-point page and a count above 256), two transparent pages and no foliage pages, against a C# reference over the whole target buffer, including the untouched rest. It passed against the old kernel first and fails if the kernel copies to the wrong slot.</li>
+  <li>Measured in the Editor with a temporary copy of the old kernel, timed back to back with the new one (median per dispatch, several runs):
+    <table>
+    <tr><th>Pages (solid / transparent / foliage)</th><th>Old</th><th>New</th></tr>
+    <tr><td>4 / 1 / 1</td><td>96–131 µs</td><td>4–7 µs</td></tr>
+    <tr><td>40 / 4 / 8</td><td>164–227 µs</td><td>4–6 µs</td></tr>
+    <tr><td>150 / 10 / 40</td><td>176–308 µs</td><td>4–5 µs</td></tr>
+    <tr><td>384 / 384 / 384</td><td>243–310 µs</td><td>16–33 µs</td></tr>
+    </table></li>
+  <li>EditMode 449/449 and PlayMode 34/34 pass; the play-test view at (216, 424) renders as before.</li>
+  </ul></li>
 </ul>
 <h3>20.6 Split WorldGenSettings and the preview window</h3>
 <p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Refactoring only, no behaviour change.</p>
