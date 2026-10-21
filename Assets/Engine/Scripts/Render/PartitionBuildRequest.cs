@@ -19,6 +19,7 @@ namespace Engine.Scripts.Render{
         public int3 Partition{ get; private set; }
 
         private readonly GraphicsBuffer[] _buffers = new GraphicsBuffer[RequiredChunks.Length];
+        private readonly GraphicsBuffer[] _lightBuffers = new GraphicsBuffer[RequiredChunks.Length]; // LGT-08
 
         /// <summary>
         ///     Initializes a new instance of the PartitionBuildRequest class.
@@ -41,12 +42,19 @@ namespace Engine.Scripts.Render{
             Partition = partition;
             IsValid = false;
             Array.Clear(_buffers, 0, _buffers.Length);
+            Array.Clear(_lightBuffers, 0, _lightBuffers.Length);
         }
 
         /// <summary>
         ///     Gets the graphics buffers for all required chunks, or null if IsValid is false.
         /// </summary>
         public GraphicsBuffer[] Buffers => IsValid ? _buffers : null;
+
+        /// <summary>
+        ///     LGT-08: gets the light buffers for all required chunks (same order as <see cref="Buffers" />), or null
+        ///     if IsValid is false.
+        /// </summary>
+        public GraphicsBuffer[] LightBuffers => IsValid ? _lightBuffers : null;
 
         /// <summary>
         ///     Gets the metadata for this partition.
@@ -60,10 +68,12 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     Collects graphics buffers for all required neighboring chunks from the voxel data buffer dictionary.
+        ///     Collects the voxel data and light buffers for all required neighboring chunks.
         /// </summary>
         /// <param name="voxelDataBuffers">Dictionary mapping chunk positions to their voxel data buffers.</param>
-        public void CollectBuffers(Dictionary<int2, GraphicsBuffer> voxelDataBuffers){
+        /// <param name="lightDataBuffers">LGT-08: dictionary mapping chunk positions to their light buffers.</param>
+        public void CollectBuffers(Dictionary<int2, GraphicsBuffer> voxelDataBuffers,
+            Dictionary<int2, GraphicsBuffer> lightDataBuffers){
             IsValid = true;
             int2 mainChunkPos = PartitionToChunkPos(Partition);
 
@@ -75,7 +85,13 @@ namespace Engine.Scripts.Render{
                         $"Neighbor voxel data buffer for partition {Partition} not found at {chunkPos}.");
                 }
 
-                IsValid &= success;
+                bool lit = lightDataBuffers.TryGetValue(chunkPos, out _lightBuffers[i]);
+                if (!lit){
+                    VoxelEngineLogger.Error<PartitionBuildRequest>(
+                        $"Neighbor light buffer for partition {Partition} not found at {chunkPos}.");
+                }
+
+                IsValid &= success && lit;
             }
         }
     }

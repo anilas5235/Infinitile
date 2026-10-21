@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -42,10 +42,13 @@ namespace Engine.Tests.PlayMode{
             VoxelRegistry registry = DataImporter.Instance.VoxelRegistry;
             ComputeShader pointBuilder = VoxelWorld.Instance.Settings.Renderer.pointBuilder;
             Dictionary<int2, GraphicsBuffer> chunkBuffers = new();
+            Dictionary<int2, GraphicsBuffer> lightBuffers = new(); // LGT-08: same interval format, all dark
             for (int x = -1; x <= 1; x++)
-            for (int z = -1; z <= 1; z++)
+            for (int z = -1; z <= 1; z++){
                 chunkBuffers[new int2(x, z)] =
                     CreateUniformChunkBuffer(x == 0 && z == 0 ? PlayModeFixtures.Grass : PlayModeFixtures.Air);
+                lightBuffers[new int2(x, z)] = CreateUniformChunkBuffer(0);
+            }
 
             // Only errors matter here; the first compute dispatch of a session may log a shader compile warning.
             int errors = 0;
@@ -57,7 +60,7 @@ namespace Engine.Tests.PlayMode{
             PointBuilderHandler handler = new(pointBuilder, registry.VoxelRenderDefBuffer, registry.QuadTexPairBuffer);
             try{
                 PartitionBuildRequest request = new(new int3(0, 0, 0));
-                request.CollectBuffers(chunkBuffers);
+                request.CollectBuffers(chunkBuffers, lightBuffers);
                 Assert.IsTrue(request.IsValid);
 
                 handler.BuildPoints(request);
@@ -80,6 +83,7 @@ namespace Engine.Tests.PlayMode{
                 Application.logMessageReceived -= onLog;
                 handler?.Dispose();
                 foreach (GraphicsBuffer buffer in chunkBuffers.Values) buffer.Dispose();
+                foreach (GraphicsBuffer buffer in lightBuffers.Values) buffer.Dispose();
             }
         }
 

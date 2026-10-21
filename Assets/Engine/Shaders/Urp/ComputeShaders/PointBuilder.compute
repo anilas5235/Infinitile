@@ -1,4 +1,5 @@
 ﻿#pragma kernel BuildPrep
+#pragma kernel BuildPrepLight
 #pragma kernel BuildPoints
 
 #include "VoxelComputeCommon.hlsl"
@@ -42,6 +43,8 @@ uint2 get_voxel_quad_indices(in VoxelDef def, uint dir)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BuildPrep Kernel - Expand compressed chunk data into flat arrays
+// LGT-08: each voxel's uint holds the voxel id (bits 0-15) and its light sky|R|G|B (bits 16-31). BuildPrep
+// writes the ids, BuildPrepLight then ORs the light in, so a lookup fetches id and light at once.
 // ─────────────────────────────────────────────────────────────────────────────
 
 StructuredBuffer<uint2> _CompChunk; // interval 0: (intervalCount, lastUncompressedIndex)
@@ -77,6 +80,33 @@ void BuildPrep(uint3 id : SV_DispatchThreadID)
     }
 }
 
+// LGT-08: same interval walk as BuildPrep over the chunk's light list; the ids are already in place.
+[numthreads(64, 1, 1)]
+void BuildPrepLight(uint3 id : SV_DispatchThreadID)
+{
+    uint start_interval = 1 + id.x * INTERVALS_PER_THREAD;
+
+    uint total_intervals = _CompChunk[0].x;
+    if (start_interval > total_intervals) return;
+
+    for (int i = 0; i < INTERVALS_PER_THREAD; ++i)
+    {
+        uint target_interval = start_interval + i;
+        if (target_interval > total_intervals) break;
+
+        uint start_index = 0;
+        if (target_interval > 1) start_index = _CompChunk[target_interval - 1].y;
+
+        uint2 page_data = _CompChunk[target_interval];
+        uint light = (page_data.x & 0xFFFF) << 16;
+        uint end_index = min(page_data.y, _VoxelsPerChunk);
+        for (uint t_index = start_index; t_index < end_index; ++t_index)
+        {
+            _UnCompChunk[t_index] = (_UnCompChunk[t_index] & 0xFFFF) | light;
+        }
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Build Kernel - Generate solid point data per partition
 // ─────────────────────────────────────────────────────────────────────────────
@@ -108,8 +138,21 @@ RWStructuredBuffer<PointData> _TransparentPointsOut;
 RWStructuredBuffer<PointData> _FoliagePointsOut;
 uint _PointCapacity;
 
+// LGT-08: the prepared chunks hold id | light << 16; the lookups below return the whole cell, use
+// cell_id / cell_light to split it.
+uint cell_id(uint cell)
+{
+    return cell & 0xFFFF;
+}
+
+uint cell_light(uint cell)
+{
+    return cell >> 16;
+}
+
 VoxelDef get_voxel_def(uint voxelId)
 {
+    voxelId = cell_id(voxelId);
     if (voxelId >= _VoxelRenderDefsCount) return (VoxelDef)0;
     return _VoxelRenderDefs[voxelId];
 }
@@ -224,7 +267,7 @@ uint get_quad_tex_pair(uint index)
 
 bool is_solid(int3 in_chunk_pos)
 {
-    return _VoxelRenderDefs[get_voxel_safe(in_chunk_pos)].MeshLayer == MESH_LAYER_SOLID;
+    return get_voxel_def(get_voxel_safe(in_chunk_pos)).MeshLayer == MESH_LAYER_SOLID;
 }
 
 void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uint2 quadRange)
@@ -285,7 +328,7 @@ void BuildPoints(uint3 id : SV_DispatchThreadID)
     int3 pos = (int3)id;
     float3 partitionWS = (float3)metadata.partitionWS;
     int3 in_chunk_pos = pos + int3(0, partitionWS.y, 0);
-    uint voxelId = get_voxel(_MainChunk, in_chunk_pos);
+    uint voxelId = cell_id(get_voxel(_MainChunk, in_chunk_pos));
 
     if (voxelId == 0) return; // Skip air
 
