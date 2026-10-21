@@ -364,6 +364,29 @@ Regression check, existing rows vs the previous run (median / min). No code they
   +48 % / +1 %), each time a different row: a background hiccup during that row, not counted above. The JSON is
   the run with the smallest spike (`TerrainFirst None flora`, 2.71 / 2.16 ms vs 2.23 / 2.19 ms).
 
+## 2026-10-21 — collider mask (`2026-10-21-s20.3-editmode-baseline.json`)
+
+Same machine and settings as above. `CMeshBuildJob` fills a 34 × 34 × 34 byte collision mask (partition plus border)
+once per partition by walking the interval runs of each column, and builds the face masks from it; a partition
+whose interior has no collision skips the neighbours and the meshing. `CVertex` drops its normal (8 instead of
+16 bytes). New row: an all-air partition (y = 7).
+
+| Sample group | Median | Min | Max | Previous median / min | Change (median / min) |
+|---|---|---|---|---|---|
+| CMeshBuildJob.Run solid ms/partition | 0.32 ms | 0.32 ms | 0.37 ms | 6.49 / 6.23 ms | −95 % / −95 % |
+| CMeshBuildJob.Run surface ms/partition | 0.50 ms | 0.49 ms | 0.70 ms | 3.73 / 3.66 ms | −87 % / −87 % |
+| CMeshBuildJob.Run air ms/partition | 0.018 ms | 0.017 ms | 0.025 ms | new (old mesher 0.75 / 0.43 ms) | |
+
+`ChunkJob`: the run-count pass added on 2026-10-21 (sizing the chunk lists, PR #39) read all 262,144 voxels a
+second time and cost 0.15–0.25 ms per chunk (+5 % to +18 %, never measured then). `WriteToChunkData` now writes the
+runs into a Temp list and copies them into a list of their exact size, in one pass over the voxels. Back to back
+in the same session (two rounds each), this is 3 % to 12 % faster than the counting pass. A branch-free linear
+counting pass was tried and was slower than the original (+5 % to +14 %).
+
+Regression check, existing rows vs the previous run (median / min): every row between −6 % and +5 % (median) and
+−6 % and +6 % (min). `TerrainFirst None flora` is −16 % / +4 % because the previous JSON holds that row's median
+spike.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the

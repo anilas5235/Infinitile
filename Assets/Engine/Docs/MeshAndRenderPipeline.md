@@ -393,7 +393,8 @@ end
 subgraph GPU
     direction LR
     G --> H[BuildPrep: id
-    BuildPrepLight: id or light << 16]
+    BuildPrepLight: id or light << 16
+    Version 1.6: BuildPrepBox, one pass]
     H --> I[BuildPoints: per face corner
     average of front, sides, diagonal
     skipping opaque]
@@ -439,7 +440,8 @@ only unpacked and interpolated, so day and night never re-propagate anything.
 - **GPU light.** The renderer uploads each chunk's light intervals into the shared interval store, like the
   voxel data (two lists per chunk, see Version 1.5). `PointBuilder.compute` decompresses the voxel ids (`BuildPrep`), then
   ORs the light into the upper 16 bits of the same uint (`BuildPrepLight`). A neighbour lookup therefore fetches
-  id and light at once. A build without a light buffer for every chunk is invalid.
+  id and light at once (Version 1.6: `BuildPrepBox` writes both in one pass, see below). A build without a light
+  list for every chunk is invalid.
 - **Smooth light.** For each face corner, `BuildPoints` averages every channel over the front voxel,
   the two side neighbours and the diagonal, with rounding.
   - It skips opaque voxels (attenuation 15), and the diagonal too when both sides are opaque, so light never leaks
@@ -506,6 +508,7 @@ subgraph GPU
     one uint2 buffer,
     pages of 512]
     E --> G[BuildPrep / BuildPrepLight
+    Version 1.6: BuildPrepBox
     interval k = page k >> 9]
     F --> G
 end
@@ -526,7 +529,8 @@ needed.
   - The renderer keeps an `IntervalRange` (slot and length) per chunk list.
 - **Kernels.** Per partition build, `PointBuilderHandler` writes the page tables of the 18 lists back to back into a
   small buffer. `BuildPrep` and `BuildPrepLight` read interval k at
-  `store[_CompPages[_CompPagesOffset + (k >> 9)] * 512 + (k & 511)]`.
+  `store[_CompPages[_CompPagesOffset + (k >> 9)] * 512 + (k & 511)]` (Version 1.6: `BuildPrepBox`, through a
+  header of table offsets).
 - **Growth.** If the free pages do not suffice, the store allocates a larger buffer, copies the old one on the GPU
   (`CopyIntervals`) and logs it. It starts with 17 pages per list, two lists per chunk the `ChunkManager` can hold, the
   same memory as the former pool.
@@ -544,3 +548,54 @@ Trade-offs:
 
 - One more indirection per interval read in the prep kernels, and a page-table upload per build.
 - Growth copies the whole store on the GPU and allocates once.
+
+# Version 1.6 (Partition Box Prep)
+
+## Decompressing Only What BuildPoints Reads
+
+```mermaid
+flowchart LR
+subgraph CPU["CPU (PointBuilderHandler.PrepareBox)"]
+    direction LR
+    A[Partition build] --> B[Header: start of each
+    list's page table
+    + the 18 page tables]
+end
+
+subgraph GPU
+    direction LR
+    B --> C[BuildPrepBox
+    one thread per box column:
+    binary search, then walk the runs]
+    D[Interval store] --> C
+    C --> E[34 x 34 x 34 box
+    id or light << 16]
+    E --> F[BuildPoints]
+end
+```
+
+### Description
+
+Until version 1.5, every partition build decompressed all 9 chunks of the 3 × 3 neighbourhood into 9 buffers of
+32 × 256 × 32 uints: `BuildPrep` wrote the ids, `BuildPrepLight` then read and rewrote every uint to add the light.
+`BuildPoints` reads only the partition and a 1-voxel border of it (a face corner or AO lookup is at most one voxel
+away along each axis).
+
+- **Box.** `BuildPrepBox` writes just that border box, 34 × 34 × 34 uints (`BOX_SIZE`), id and light in one pass.
+  Box position = partition-local position + 1, index `(bx * 34 + bz) * 34 + by`; `_BoxOriginY` is the world y of
+  box layer 0 (the partition's base − 1).
+- **Kernel.** One thread per box column (34 × 34). The column's chunk follows from its x and z: the partition spans
+  its chunk in x and z, so the border columns lie in the neighbours. Per list (ids, light) the thread finds the
+  interval of its first voxel by a binary search, then walks the runs up the column. Layers below the world read
+  as air, layers above it as air with sky 15.
+- **Page tables.** `_CompPages` starts with 18 entries, the start of each list's page table in the same buffer
+  (voxel lists, then light lists, in `PartitionBuildRequest` order), followed by the tables.
+- **Lookup.** `get_voxel_safe` maps a position to the box; anything outside reads as air (never reached).
+- **Memory.** One 154 KB buffer per handler instead of 9 × 1 MiB.
+- **Measured** (EditMode probe, 3 runs; GPU times are 200 back-to-back builds until the GPU is done):
+  - issuing the prep on the CPU: 10.1–10.6 µs → 2.9–3.4 µs;
+  - prep on the GPU: about 3.86 ms → 23–26 µs per build;
+  - whole build until its counts are read back: 4.23 ms → 0.42 ms.
+- **Tests.** `PointBuildTests` hashes the points of three partitions (world bottom, surface with every voxel type,
+  world top), recorded with the old kernels; they pass unchanged. `IntervalStoreTests` checks every box voxel of
+  all 8 partitions of a chunk read through scattered pages and after a growth step.

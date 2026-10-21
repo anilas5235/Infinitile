@@ -29,10 +29,7 @@ namespace Engine.Tests.EditMode{
         [SetUp]
         public void SetUp(){
             _chunks = new NativeParallelHashMap<int2, ChunkVoxelData>(16, Allocator.Persistent);
-            _vertexParams = new NativeArray<VertexAttributeDescriptor>(2, Allocator.Persistent){
-                [0] = new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float16, 4),
-                [1] = new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float16, 4)
-            };
+            _vertexParams = CVertex.CreateLayout(Allocator.Persistent);
             _renderGenData = TestFixtures.CreateRenderGenData(Allocator.Persistent);
             _jobs = new NativeList<int3>(8, Allocator.Persistent);
             _results = new NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult>(8, Allocator.Persistent);
@@ -96,6 +93,7 @@ namespace Engine.Tests.EditMode{
             _jobs.Clear();
             _results.Clear();
             foreach (int3 partition in partitions) _jobs.Add(partition);
+            if (_results.Capacity < partitions.Length) _results.Capacity = partitions.Length; // a parallel writer cannot grow
             if (_meshDataAllocated) _meshData.Dispose();
             _meshData = Mesh.AllocateWritableMeshData(partitions.Length);
             _meshDataAllocated = true;
@@ -205,6 +203,83 @@ namespace Engine.Tests.EditMode{
             Assert.IsTrue(vertices <= ushort.MaxValue + 1 || _meshData[0].indexFormat == IndexFormat.UInt32,
                 "meshes with more than 65536 vertices need 32-bit indices");
             Assert.Less(MaxIndex(), vertices, "every index must address a written vertex (no wrap-around)");
+        }
+
+        [Test]
+        public void MixedTerrain_MatchesRecordedMeshes(){
+            // Golden hash of the quads (positions and indices, in order) for 16 partitions of noisy terrain with
+            // caves, water, floating voxels at the world top and a missing neighbour chunk. Recorded from the
+            // per-voxel mesher before the flat-mask rewrite (spec 20.3); the colliders must not change.
+            int2 north = new(-1, 2);
+            int2 south = new(-1, 1);
+            for (int x = -2; x <= 0; x++)
+            for (int z = 0; z <= 3; z++){
+                int2 pos = new(x, z);
+                if (pos.Equals(new int2(0, 2))) continue; // east of the north chunk stays missing (reads as air)
+                AddChunk(pos, p => MixedTerrain(pos * new int2(ChunkWidth, ChunkDepth) + p.xz, p.y));
+            }
+
+            int3[] partitions = new int3[2 * PartitionsPerChunk];
+            for (int y = 0; y < PartitionsPerChunk; y++){
+                partitions[y] = new int3(north.x, y, north.y);
+                partitions[PartitionsPerChunk + y] = new int3(south.x, y, south.y);
+            }
+
+            RunJob(partitions);
+
+            ulong hash = 14695981039346656037UL;
+            int vertexTotal = 0;
+            for (int i = 0; i < partitions.Length; i++){
+                Mesh.MeshData mesh = _meshData[i];
+                vertexTotal += mesh.vertexCount;
+                hash = Fnv(hash, mesh.vertexCount);
+                foreach (CVertex vertex in mesh.GetVertexData<CVertex>()){
+                    float3 p = vertex.Position.xyz;
+                    hash = Fnv(hash, math.asint(p.x));
+                    hash = Fnv(hash, math.asint(p.y));
+                    hash = Fnv(hash, math.asint(p.z));
+                }
+
+                if (mesh.indexFormat == IndexFormat.UInt16)
+                    foreach (ushort index in mesh.GetIndexData<ushort>()) hash = Fnv(hash, index);
+                else
+                    foreach (uint index in mesh.GetIndexData<uint>()) hash = Fnv(hash, (int)index);
+            }
+
+            Assert.AreEqual((RecordedVertexTotal, RecordedHash), (vertexTotal, hash));
+        }
+
+        private const int RecordedVertexTotal = 311332;
+        private const ulong RecordedHash = 17997073674349874371UL;
+
+        /// <summary>Stepped plateaus with caves, water up to 124, ice spots and floating dirt up to the world top.</summary>
+        private static ushort MixedTerrain(int2 world, int y){
+            uint column = Hash((uint)world.x, 0, (uint)world.y);
+            int height = 30 + (int)(Hash((uint)(world.x >> 2), 1, (uint)(world.y >> 2)) % 200) + (int)(column % 3);
+            uint r = Hash((uint)world.x, (uint)y + 2, (uint)world.y);
+            if (y < height) return r % 23 == 0 ? TestFixtures.Air : y == height - 1 ? TestFixtures.Grass : TestFixtures.Stone;
+            if (y == 124 && column % 5 == 0) return TestFixtures.Ice;
+            if (y < 124) return TestFixtures.Water;
+            return r % 97 == 0 ? TestFixtures.Dirt : TestFixtures.Air;
+        }
+
+        private static uint Hash(uint x, uint y, uint z){
+            uint h = x * 0x9E3779B1u ^ y * 0x85EBCA77u ^ z * 0xC2B2AE3Du;
+            h ^= h >> 16;
+            h *= 0x7feb352d;
+            h ^= h >> 15;
+            h *= 0x846ca68b;
+            h ^= h >> 16;
+            return h;
+        }
+
+        private static ulong Fnv(ulong hash, int value){
+            for (int i = 0; i < 4; i++){
+                hash ^= (byte)(value >> (8 * i));
+                hash *= 1099511628211UL;
+            }
+
+            return hash;
         }
 
         private long MaxIndex(int index = 0){

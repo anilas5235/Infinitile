@@ -1033,6 +1033,17 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
   </ul></li>
 <li><b>Costs and risks:</b> a rewrite of the mask stage of the mesher; the collider meshes must stay identical (same quads, same welding), otherwise the baked colliders change.</li>
 <li><b>Acceptance if scheduled:</b> <code>ColliderMeshBenchmark</code> clearly faster, with the all-air case close to free; <code>ColliderMesherTests</code> pass unchanged; no new allocations in flight (PERF-04).</li>
+<li><b>Done (scheduled 2026-10-21):</b>
+  <ul class="tight">
+  <li><code>CMeshBuildJob.FillCollisionMask</code> fills a 34 × 34 × 34 byte mask (Temp, in the chunk's x, z, y order, so a column is contiguous) from the interval lists of the partition's chunk and its four face neighbours. It walks the runs of each column from one <code>NodeIndex</code> search and sets each collision run with one <code>MemSet</code>. Missing chunks and y outside the world read as no collision.</li>
+  <li>The interior columns are filled first; if no collision run reaches the partition's own y range, the job skips the neighbours and the meshing and writes an empty mesh.</li>
+  <li><code>BuildColliderMasks</code> reads a voxel and its neighbour along the main axis from the mask by stride. The greedy quads, their order and the winding are unchanged; the per-voxel <code>GetVoxelInPartition</code> search and the <code>NativeHashSet&lt;int3&gt;</code> are gone.</li>
+  <li>The vertex and index lists start at 1024 vertices and grow. <code>CVertex</code> keeps only the position (<code>half4</code>, 8 bytes); its layout comes from <code>CVertex.CreateLayout</code>, which the scheduler and the tests share.</li>
+  <li><code>ColliderMesherTests.MixedTerrain_MatchesRecordedMeshes</code> (added and recorded against the old mesher first) hashes the vertices and indices of 16 partitions of mixed terrain with a missing neighbour chunk; it passes unchanged. The other <code>ColliderMesherTests</code> changed only in the setup (the shared layout).</li>
+  <li><code>ColliderMeshBenchmark</code> (median per partition): solid 6.49 → 0.32 ms, surface 3.73 → 0.50 ms, all-air (new row) 0.75 → 0.018 ms. Baseline <code>2026-10-21-s20.3-editmode-baseline.json</code>.</li>
+  <li>The regression check of that baseline found the run-count pass of <code>ChunkJob.WriteToChunkData</code> (PR #39) costing 0.15–0.25 ms per chunk; the runs now go into a Temp list that is copied into the exact-size list (Baselines README).</li>
+  <li>EditMode 451/451 and PlayMode 34/34 pass, including <code>AllocationTests</code> (PERF-04) and <code>ColliderMeshRaceTests</code>.</li>
+  </ul></li>
 </ul>
 <h3>20.4 Decompress only the partition's neighbourhood in the partition build</h3>
 <p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Not measured yet.</p>
@@ -1046,6 +1057,14 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
   </ul></li>
 <li><b>Costs and risks:</b> changes the prep kernels and the addressing in <code>BuildPoints</code> (<code>get_voxel_safe</code> relies on the partition width equalling the chunk width today); the interval walk per y range needs the interval start of the first run in the box.</li>
 <li><b>Acceptance if scheduled:</b> identical point output (a GPU round-trip test against the current kernels); prep dispatch time per build clearly lower than today's 21.5–22.8 µs (§20.1 probe).</li>
+<li><b>Done (scheduled 2026-10-21):</b>
+  <ul class="tight">
+  <li><code>BuildPrepBox</code> replaces <code>BuildPrep</code> and <code>BuildPrepLight</code>. It writes the 34 × 34 × 34 box of the partition plus its border into one buffer, id and light in one pass, below the world as air and above it as air with sky 15. One thread per box column: a binary search per list for the column's first voxel, then a walk up the runs.</li>
+  <li><code>_CompPages</code> starts with a header of 18 page-table offsets, so one dispatch reads all lists; <code>PointBuilderHandler.PrepareBox</code> uploads it with the tables. <code>BuildPoints</code> reads only the box (<code>get_voxel_safe</code>; <code>_BoxOriginY</code>); the 9 chunk buffers (9 MiB per handler) are gone. New mirrored constants <code>PREP_CHUNKS</code>, <code>BOX_SIZE</code>, <code>PREP_BOX_THREADS</code>.</li>
+  <li><code>PointBuildTests</code> (added and recorded against the old kernels first) hashes the points of three partitions: world bottom, surface with water and every voxel type, world top. It passes unchanged. <code>IntervalStoreTests</code> now checks every box voxel of all 8 partitions of a chunk through scattered pages and after a growth step.</li>
+  <li>EditMode probe, 3 runs each: issuing the prep on the CPU 10.1–10.6 → 2.9–3.4 µs per build; the prep on the GPU about 3.86 ms → 23–26 µs; a whole build until its counts are read back 4.23 → 0.42 ms. (The §20.1 figure came from a ProfilerRecorder probe in play mode, so it is not directly comparable.)</li>
+  <li>EditMode 454/454; PlayMode 34/34 in two full runs. In a third, <code>SchedulerEvictionTests.UnloadChunk_RaisesEvictionAndReleasesRenderBuffer</code> failed once on an error log from <code>PartitionBuildRequest.CollectLists</code>: the test before it unloads the focus chunk, and a pending build of a neighbouring partition then finds the chunk's list missing. That is a timing-dependent test interaction, not the point output; the class passed 3/3 on its own.</li>
+  </ul></li>
 </ul>
 <h3>20.5 One thread per point in CopyPoints</h3>
 <p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Not measured yet.</p>

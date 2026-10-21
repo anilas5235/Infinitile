@@ -2,23 +2,30 @@
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;
+using UnityEngine.Rendering;
 
 namespace Engine.Scripts.Jobs.ColliderMeshing{
     /// <summary>
-    ///     Compact vertex structure for collider mesh (position + normal).
+    ///     Compact vertex structure for collider mesh (position only: PhysX bakes positions and indices and
+    ///     ignores normals). Four halves, because a vertex attribute must be a multiple of 4 bytes.
     /// </summary>
     [BurstCompile]
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct CVertex{
         public half4 Position;
-        public half4 Normal;
 
         /// <summary>
         ///     Creates a collider vertex.
         /// </summary>
-        public CVertex(float3 position, float3 normal){
+        public CVertex(float3 position){
             Position = new half4((half3)position, half.zero);
-            Normal = new half4((half3)normal, half.zero);
+        }
+
+        /// <summary>Vertex layout matching <see cref="CVertex" />, for <c>Mesh.MeshData.SetVertexBufferParams</c>.</summary>
+        internal static NativeArray<VertexAttributeDescriptor> CreateLayout(Allocator allocator){
+            return new NativeArray<VertexAttributeDescriptor>(1, allocator){
+                [0] = new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float16, 4)
+            };
         }
     }
 

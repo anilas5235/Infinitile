@@ -10,7 +10,6 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
     /// </summary>
     internal partial struct CMeshBuildJob{
         private void MeshCollision(ref PartitionJobData jobData){
-            if (jobData.HasNoCollision) return;
             ColliderSliceMeshBuild(ref jobData);
         }
 
@@ -27,7 +26,10 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
                     UAxis = uAxis,
                     VAxis = vAxis,
                     ULimit = PartitionSize[uAxis],
-                    VLimit = PartitionSize[vAxis]
+                    VLimit = PartitionSize[vAxis],
+                    MainStride = MaskStride(mainAxis),
+                    UStride = MaskStride(uAxis),
+                    VStride = MaskStride(vAxis)
                 };
 
                 int3 pos = int3.zero;
@@ -47,16 +49,15 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             NativeArray<CMask> negColMask = new(uvGridSize, Allocator.Temp);
 
             for (pos[mainAxis] = 0; pos[mainAxis] < mainAxisLimit;){
-                bool info = BuildColliderMasks(ref jobData, pos, directionMask, axisInfo, ref posColMask,
-                    ref negColMask);
+                bool info = BuildColliderMasks(ref jobData, pos[mainAxis], axisInfo, ref posColMask, ref negColMask);
 
                 // Move to the actual slice index we just built the mask for
                 ++pos[mainAxis];
 
                 if (!info) continue;
 
-                BuildColliderQuads(ref jobData, axisInfo, pos, posColMask, directionMask);
-                BuildColliderQuads(ref jobData, axisInfo, pos - directionMask, negColMask, -directionMask);
+                BuildColliderQuads(ref jobData, axisInfo, pos, posColMask);
+                BuildColliderQuads(ref jobData, axisInfo, pos - directionMask, negColMask);
             }
 
             posColMask.Dispose();
@@ -68,7 +69,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         /// </summary>
         [BurstCompile(FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Low, CompileSynchronously = true)]
         private void BuildColliderQuads(ref PartitionJobData jobData, AxisInfo axInfo, int3 pos,
-            NativeArray<CMask> colliderMask, int3 directionMask){
+            NativeArray<CMask> colliderMask){
             int3 uDelta = int3.zero;
             int3 vDelta = int3.zero;
 
@@ -99,7 +100,6 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
                     CreateColliderQuad(
                         ref jobData,
                         current,
-                        directionMask,
                         in quadVerts
                     );
 

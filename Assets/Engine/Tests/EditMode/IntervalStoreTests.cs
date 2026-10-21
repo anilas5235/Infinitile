@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using Engine.Scripts.Render;
 using Engine.Scripts.Utils.Collections;
+using Engine.Scripts.Utils.Extensions;
 using NUnit.Framework;
 using Unity.Collections;
+using Unity.Mathematics;
 using UnityEditor;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelConstants;
@@ -13,7 +15,7 @@ using Random = Unity.Mathematics.Random;
 namespace Engine.Tests.EditMode{
     /// <summary>
     ///     Page bookkeeping of the shared interval store (<see cref="IntervalPages" />) and the decompress
-    ///     kernels reading lists through the page table (<see cref="ChunkIntervalStore" />, BuildPrep / BuildPrepLight).
+    ///     kernel reading lists through the page table (<see cref="ChunkIntervalStore" />, BuildPrepBox).
     /// </summary>
     public class IntervalStoreTests{
         private const int PageSize = IntervalPages.PageSize;
@@ -126,10 +128,10 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
-        #region decompress kernels
+        #region decompress kernel
 
         [Test]
-        public void BuildPrep_ThroughPageTable_EqualsTheLists_AlsoAfterGrowing(){
+        public void BuildPrepBox_ThroughPageTable_EqualsTheLists_AlsoAfterGrowing(){
             ComputeShader shader = AssetDatabase.LoadAssetAtPath<ComputeShader>(
                 "Assets/Engine/Shaders/Urp/ComputeShaders/PointBuilder.compute");
             Assert.IsNotNull(shader, "PointBuilder.compute not found");
@@ -164,13 +166,8 @@ namespace Engine.Tests.EditMode{
                         scattered |= store.Pages.GetPage(list, p) != store.Pages.GetPage(list, p - 1) + 1;
                 Assert.IsTrue(scattered, "at least one list should span non-consecutive pages");
 
-                for (int i = 0; i < lists; i++){
-                    uint[] voxels = Decompress(shader, store, voxelLists[i], lightLists[i]);
-                    for (int v = 0; v < VoxelsPerChunk; v++){
-                        uint expected = voxelValues[i][v] | ((uint)lightValues[i][v] << 16);
-                        if (voxels[v] != expected) Assert.Fail($"list {i}, voxel {v}: expected {expected:X8} but was {voxels[v]:X8}");
-                    }
-                }
+                for (int i = 0; i < lists; i++)
+                    AssertBoxesMatch(shader, store, voxelLists[i], lightLists[i], voxelValues[i], lightValues[i], i);
             }
             finally{
                 store.Dispose();
@@ -204,34 +201,53 @@ namespace Engine.Tests.EditMode{
             list.Dispose();
         }
 
-        /// <summary>Runs BuildPrep and BuildPrepLight like <see cref="PointBuilderHandler" /> and reads the result.</summary>
-        private static uint[] Decompress(ComputeShader shader, ChunkIntervalStore store, IntervalRange voxelList,
-            IntervalRange lightList){
-            uint[] table = new uint[2 * IntervalPages.MaxPagesPerList];
-            store.WritePageTable(voxelList, table, 0);
-            store.WritePageTable(lightList, table, IntervalPages.MaxPagesPerList);
-            using GraphicsBuffer pageTable = new(GraphicsBuffer.Target.Structured, table.Length, sizeof(uint));
-            using GraphicsBuffer target = new(GraphicsBuffer.Target.Structured, VoxelsPerChunk, sizeof(uint));
-            pageTable.SetData(table);
+        /// <summary>
+        ///     Prepares the box of every partition of a chunk whose eight neighbours are the chunk itself, so the
+        ///     boxes together read every voxel of the lists, and compares each box voxel, the border included.
+        /// </summary>
+        private static void AssertBoxesMatch(ComputeShader shader, ChunkIntervalStore store, IntervalRange voxelList,
+            IntervalRange lightList, ushort[] voxelValues, ushort[] lightValues, int listIndex){
+            Dictionary<int2, IntervalRange> voxelLists = new(), lightLists = new();
+            for (int dx = -1; dx <= 1; dx++)
+            for (int dz = -1; dz <= 1; dz++){
+                voxelLists[new int2(dx, dz)] = voxelList;
+                lightLists[new int2(dx, dz)] = lightList;
+            }
 
-            shader.SetInt(VoxelsPerChunkNameID, VoxelsPerChunk);
-            Dispatch(shader, shader.FindKernel("BuildPrep"), store, pageTable, target, voxelList, 0);
-            Dispatch(shader, shader.FindKernel("BuildPrepLight"), store, pageTable, target, lightList,
-                IntervalPages.MaxPagesPerList);
+            // BuildPoints is not dispatched; its inputs only need to exist
+            using GraphicsBuffer unused = new(GraphicsBuffer.Target.Structured, 1, sizeof(uint));
+            PointBuilderHandler handler = new(shader, unused, unused, unused);
+            uint[] box = new uint[PrepBoxSize * PrepBoxSize * PrepBoxSize];
+            try{
+                for (int partitionY = 0; partitionY < ChunkHeight / PartitionHeight; partitionY++){
+                    PartitionBuildRequest request = new(new int3(0, partitionY, 0));
+                    request.CollectLists(voxelLists, lightLists);
+                    handler.PrepareBox(request, store);
+                    handler.PreparedBox.GetData(box);
 
-            uint[] result = new uint[VoxelsPerChunk];
-            target.GetData(result);
-            return result;
-        }
+                    int i = 0;
+                    for (int bx = 0; bx < PrepBoxSize; bx++)
+                    for (int bz = 0; bz < PrepBoxSize; bz++)
+                    for (int by = 0; by < PrepBoxSize; by++, i++){
+                        int y = partitionY * PartitionHeight - 1 + by;
+                        uint expected;
+                        if (y < 0) expected = 0;
+                        else if (y >= ChunkHeight) expected = 0xF000u << 16; // air in full sky light
+                        else{
+                            int v = ChunkSize.Flatten((bx + ChunkWidth - 1) % ChunkWidth, y,
+                                (bz + ChunkDepth - 1) % ChunkDepth);
+                            expected = voxelValues[v] | ((uint)lightValues[v] << 16);
+                        }
 
-        private static void Dispatch(ComputeShader shader, int kernel, ChunkIntervalStore store, GraphicsBuffer pageTable,
-            GraphicsBuffer target, IntervalRange list, int pageTableOffset){
-            shader.SetBuffer(kernel, CompChunkNameID, store.Buffer);
-            shader.SetBuffer(kernel, CompPagesNameID, pageTable);
-            shader.SetBuffer(kernel, UnCompChunkNameID, target);
-            shader.SetInt(CompPagesOffsetNameID, pageTableOffset);
-            const int intervalsPerGroup = 64 * 8;
-            shader.Dispatch(kernel, Math.Max(1, (list.IntervalCount + intervalsPerGroup - 1) / intervalsPerGroup), 1, 1);
+                        if (box[i] != expected)
+                            Assert.Fail($"list {listIndex}, partition {partitionY}, box ({bx}, {by}, {bz}): " +
+                                        $"expected {expected:X8} but was {box[i]:X8}");
+                    }
+                }
+            }
+            finally{
+                handler.Dispose();
+            }
         }
 
         #endregion

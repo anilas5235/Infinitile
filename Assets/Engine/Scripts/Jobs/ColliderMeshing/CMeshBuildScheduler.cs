@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Engine.Scripts.Behaviour;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Core;
@@ -71,11 +71,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             _voxelRegistry = voxelRegistry;
             _world = world;
 
-            // Collider uses only Position and Normal from CVertex
-            _colliderVertexParams = new NativeArray<VertexAttributeDescriptor>(2, Allocator.Domain){
-                [0] = new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float16, 4),
-                [1] = new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float16, 4)
-            };
+            _colliderVertexParams = CVertex.CreateLayout(Allocator.Domain);
 
             // One result per job of a batch; a parallel writer cannot grow the map, so it is sized from the
             // batch size (and grown in Start for a larger batch) instead of the draw distance.
