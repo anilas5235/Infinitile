@@ -85,9 +85,13 @@ namespace Engine.Scripts.Render{
             SetFoliageBuffers(pointBuilderHandler, foliageAlloc);
 
             int maxPageCount = math.max(solidPagesCount, math.max(transparentPagesCount, foliagePagesCount));
-            if (maxPageCount <= 0) return;
+            Dispatch(_copyPoints, _copyKernelID, maxPageCount);
+        }
 
-            _copyPoints.Dispatch(_copyKernelID, (maxPageCount + CopyPointsThreads - 1) / CopyPointsThreads, 1, 1);
+        /// <summary>Dispatches the CopyPoints kernel for up to <paramref name="maxPageCount" /> pages per layer.</summary>
+        internal static void Dispatch(ComputeShader copyPoints, int kernel, int maxPageCount){
+            if (maxPageCount <= 0) return;
+            copyPoints.Dispatch(kernel, (maxPageCount + CopyPointsThreads - 1) / CopyPointsThreads, 1, 1);
         }
 
         private void SetSolidBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo solidAlloc){
