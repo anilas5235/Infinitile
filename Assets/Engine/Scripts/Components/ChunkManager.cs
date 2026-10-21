@@ -378,10 +378,9 @@ namespace Engine.Scripts.Components{
                 return false;
             }
 
-            int3 pCoords = GetPartitionCoords(position);
-
-            if (_reMeshPartitions.Contains(pCoords)) return false;
-
+            // A partition that is already flagged for remeshing accepts edits too (decided 2026-10-21): F-01 completes
+            // every job that reads the chunk before the write, and the partition is simply meshed once more. The
+            // earlier refusal dropped edits for a few frames, and LGT-07 flags up to 27 partitions per edit.
             CompleteReadersOf(chunkPos); // F-01
             ushort oldVoxel = chunk.VoxelData.GetVoxel(blockPos);
             bool result = chunk.VoxelData.SetVoxel(blockPos, voxelId);
