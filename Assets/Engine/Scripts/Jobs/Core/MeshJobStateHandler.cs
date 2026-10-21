@@ -106,9 +106,12 @@ namespace Engine.Scripts.Jobs.Core{
         /// </summary>
         /// <returns>True if collection completed, false if scheduler is still working.</returns>
         protected override bool CollectResultsStep(){
-            if (!_cMeshBuildScheduler.IsComplete || _cMeshBuildScheduler.IsReady) return false;
+            // A batch that was already applied elsewhere only clears the set; waiting for it would stall the handler.
+            if (!_cMeshBuildScheduler.IsReady){
+                if (!_cMeshBuildScheduler.IsComplete) return false;
+                _cMeshBuildScheduler.Complete();
+            }
 
-            _cMeshBuildScheduler.Complete();
             Set.Clear();
             _colliderJobHandler.WakeUp();
             return true;

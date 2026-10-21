@@ -22,20 +22,47 @@ namespace Engine.Tests.EditMode{
         #region Eviction priority
 
         [Test]
-        public void EvictionPriority_IsPlainDistance_IgnoringViewDirection(){
+        public void EvictionPriority_IgnoresViewDirection(){
             // Eviction must not weight chunks behind the player x5.
             PriorityUtil.Focus focus = LookingForward();
             int3 behind = new(0, 0, -3);
-            int3 front = new(0, 0, 6);
-            Assert.AreEqual(-9f, PriorityUtil.EvictionPriority(ref behind, ref focus));
-            Assert.AreEqual(-36f, PriorityUtil.EvictionPriority(ref front, ref focus));
-            Assert.Greater(PriorityUtil.EvictionPriority(ref behind, ref focus), PriorityUtil.EvictionPriority(ref front, ref focus),
+            int3 front = new(0, 0, 3);
+            int3 far = new(0, 0, 6);
+            Assert.AreEqual(PriorityUtil.EvictionPriority(ref behind, ref focus), PriorityUtil.EvictionPriority(ref front, ref focus));
+            Assert.Greater(PriorityUtil.EvictionPriority(ref behind, ref focus), PriorityUtil.EvictionPriority(ref far, ref focus),
                 "the farther chunk must have the lower (first dequeued) priority");
 
             int2 behind2 = new(0, -3);
-            int2 front2 = new(0, 6);
-            Assert.AreEqual(-9f, PriorityUtil.EvictionPriority(ref behind2, ref focus));
-            Assert.AreEqual(-36f, PriorityUtil.EvictionPriority(ref front2, ref focus));
+            int2 front2 = new(0, 3);
+            int2 far2 = new(0, 6);
+            Assert.AreEqual(PriorityUtil.EvictionPriority(ref behind2, ref focus), PriorityUtil.EvictionPriority(ref front2, ref focus));
+            Assert.Greater(PriorityUtil.EvictionPriority(ref behind2, ref focus), PriorityUtil.EvictionPriority(ref far2, ref focus));
+        }
+
+        [Test]
+        public void EvictionPriority_RanksBySquareRing(){
+            // The loaded areas are squares: the corner of ring 8 (8·√2 ≈ 11.3 away) must stay before anything in ring 9
+            // or 10, or the corners are evicted and regenerated over and over.
+            PriorityUtil.Focus focus = LookingForward();
+            int2 corner = new(8, -8);
+            int2 axisOutside = new(0, 9);
+            int2 axisFarther = new(10, 0);
+            float cornerPrio = PriorityUtil.EvictionPriority(ref corner, ref focus);
+            Assert.Greater(cornerPrio, PriorityUtil.EvictionPriority(ref axisOutside, ref focus));
+            Assert.Greater(PriorityUtil.EvictionPriority(ref axisOutside, ref focus),
+                PriorityUtil.EvictionPriority(ref axisFarther, ref focus));
+
+            // Within a ring the straight-line distance breaks the tie: the corner goes first.
+            int2 axisSameRing = new(8, 0);
+            Assert.Greater(PriorityUtil.EvictionPriority(ref axisSameRing, ref focus), cornerPrio);
+
+            int3 corner3 = new(5, 5, -5);
+            int3 axisOutside3 = new(0, 6, 0);
+            Assert.Greater(PriorityUtil.EvictionPriority(ref corner3, ref focus),
+                PriorityUtil.EvictionPriority(ref axisOutside3, ref focus));
+
+            int3 origin = int3.zero;
+            Assert.AreEqual(0f, PriorityUtil.EvictionPriority(ref origin, ref focus));
         }
 
         #endregion

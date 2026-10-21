@@ -49,7 +49,9 @@ namespace Engine.Scripts.Jobs.Core{
             for (int z = -update; z <= update; z++)
             for (int y = 0; y < VoxelConstants.PartitionsPerChunk; y++){
                 int3 pos = new(x + focus.Pos.x, y, z + focus.Pos.z);
-                if (!Queue.Contains(pos) && ShouldScheduleForBaking(pos))
+                // Only meshed partitions: the layers outside the vertical draw window are never meshed, and queueing
+                // them would keep the handler awake re-queueing what JobUpdateStep drops. Meshing wakes the handler.
+                if (!Queue.Contains(pos) && CanBakeColliderForChunk(pos) && ShouldScheduleForBaking(pos))
                     Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
             }
 
@@ -87,9 +89,12 @@ namespace Engine.Scripts.Jobs.Core{
         /// </summary>
         /// <returns>True if collection completed, false if scheduler is still working.</returns>
         protected override bool CollectResultsStep(){
-            if (!_colliderBakeScheduler.IsComplete || _colliderBakeScheduler.IsReady) return false;
+            // A batch that was already applied elsewhere only clears the set; waiting for it would stall the handler.
+            if (!_colliderBakeScheduler.IsReady){
+                if (!_colliderBakeScheduler.IsComplete) return false;
+                _colliderBakeScheduler.Complete();
+            }
 
-            _colliderBakeScheduler.Complete();
             Set.Clear();
             return true;
         }

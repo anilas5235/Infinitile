@@ -15,7 +15,11 @@ namespace Engine.Scripts.Render{
     ///     per camera and live in <see cref="CameraCullState" />.
     /// </summary>
     internal class RenderBuffer : IDisposable{
-        /// <summary>Points are already in world space, so the draw bounds only have to be large enough to never cull.</summary>
+        /// <summary>
+        ///     Points are already in world space, so the draw bounds only have to be large enough to never cull. Every
+        ///     layer has the same bounds, so URP cannot sort the transparent layers by distance; the material render
+        ///     queues order them (foliage before liquids).
+        /// </summary>
         private static readonly Bounds DrawBounds = new(Vector3.zero, Vector3.one * 100000);
 
         private readonly PageAllocator _pages;

@@ -281,6 +281,9 @@ namespace Engine.Scripts.Render{
         private void Draw(ScriptableRenderContext context, Camera cam){
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderDraw.Auto();
             if (_isDestroyed || _culler == null) return;
+            // The draws go to layer 0; a camera that does not render it (Inspector and Project previews) never shows
+            // voxels, so it gets no cull state, buffers or dispatches.
+            if ((cam.cullingMask & 1) == 0) return;
 
             CameraCullState state = _culler.BeginCamera(cam, FreezeCulling, Time.frameCount);
             CullingParameters parameters = BuildCullingParameters();

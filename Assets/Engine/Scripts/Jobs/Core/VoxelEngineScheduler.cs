@@ -5,6 +5,7 @@ using Engine.Scripts.Jobs.Light;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.World;
+using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Core{
     /// <summary>
@@ -62,6 +63,7 @@ namespace Engine.Scripts.Jobs.Core{
 
             _chunkManager.OnRemeshRequested += OnRemesh;
             _chunkManager.OnLightInvalidated += OnLightInvalidated;
+            _chunkManager.OnChunkUnloaded += OnChunkUnloaded;
         }
 
         /// <summary>
@@ -109,6 +111,14 @@ namespace Engine.Scripts.Jobs.Core{
             _meshJobHandler.WakeUp();
         }
 
+        /// <summary>
+        ///     A chunk's data was unloaded, e.g. by the pool reclaiming it; one inside the load distance must be
+        ///     generated again even if the focus does not move.
+        /// </summary>
+        private void OnChunkUnloaded(int2 _){
+            _dataJobHandler.WakeUp();
+        }
+
         /// <summary>A chunk lost its light (neighbour unloaded, edit next to unlit chunks).</summary>
         private void OnLightInvalidated(){
             _lightJobHandler.WakeUp();
@@ -147,6 +157,7 @@ namespace Engine.Scripts.Jobs.Core{
             if (_chunkManager == null) return;
             _chunkManager.OnRemeshRequested -= OnRemesh;
             _chunkManager.OnLightInvalidated -= OnLightInvalidated;
+            _chunkManager.OnChunkUnloaded -= OnChunkUnloaded;
         }
 
         private const int SchedulerUpdateCount = 4;

@@ -76,20 +76,29 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        ///     Eviction order is plain (squared) distance from the focus, without the view weighting of
+        ///     Eviction order is the square ring around the focus (Chebyshev distance), without the view weighting of
         ///     <see cref="DistPriority(ref int3, ref Focus)" />; the farthest entry has the lowest value and is
-        ///     dequeued first. With view weighting, a chunk behind the player inside the load distance would be evicted
-        ///     before a chunk outside it and regenerated.
+        ///     dequeued first. The load, draw and update areas are squares, so a straight-line distance would rank the
+        ///     corners of an area (r·√2) behind entries outside it and evict and regenerate them over and over; with
+        ///     view weighting, a chunk behind the player inside the area would go first. Within a ring, the squared
+        ///     distance breaks the tie (the fraction stays below 1, so it never crosses a ring).
         /// </summary>
         [BurstCompile]
         public static float EvictionPriority(ref int3 position, ref Focus focus){
-            return -(position - focus.Pos).SqrMagnitude();
+            int3 d = math.abs(position - focus.Pos);
+            return RingPriority(math.cmax(d), math.dot(d, d));
         }
 
         /// <inheritdoc cref="EvictionPriority(ref int3, ref Focus)" />
         [BurstCompile]
         public static float EvictionPriority(ref int2 position, ref Focus focus){
-            return -(position - focus.Pos.xz).SqrMagnitude();
+            int2 d = math.abs(position - focus.Pos.xz);
+            return RingPriority(math.cmax(d), math.dot(d, d));
+        }
+
+        private static float RingPriority(int ring, int sqrDistance){
+            // sqrDistance <= 3 ring² in 3D (2 ring² in 2D)
+            return -(ring + sqrDistance / (3f * ring * ring + 1f));
         }
 
         public readonly struct Focus : IEquatable<Focus>{

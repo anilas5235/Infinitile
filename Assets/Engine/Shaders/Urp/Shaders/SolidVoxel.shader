@@ -26,6 +26,15 @@
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
         #include "VoxelShaderCommon.hlsl"
 
+        // ── Material properties ───────────────────────────────────
+        // Declared once for every pass: the SRP Batcher needs the same UnityPerMaterial layout in all of them.
+        CBUFFER_START(UnityPerMaterial)
+            float4 _AOColor;
+            float _AOIntensity;
+            float _AOPower;
+            float4 _AOCurve;
+        CBUFFER_END
+
         struct Varyings
         {
             float4 positionCS : SV_POSITION;
@@ -67,17 +76,7 @@
             #pragma vertex   vert
             #pragma fragment frag
 
-            #pragma multi_compile_instancing
-
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-
-            // ── Material properties ───────────────────────────────────
-            CBUFFER_START(UnityPerMaterial)
-                float4 _AOColor;
-                float _AOIntensity;
-                float _AOPower;
-                float4 _AOCurve;
-            CBUFFER_END
 
             TEXTURE2D_ARRAY(_Textures);
             SAMPLER(sampler_Textures);
@@ -136,15 +135,6 @@
             #pragma target 4.5
             #pragma vertex   vert
             #pragma fragment frag_depth
-
-            #pragma multi_compile_instancing
-
-            CBUFFER_START(UnityPerMaterial)
-                float4 _AOColor;
-                float4 _AOCurve;
-                float _AOIntensity;
-                float _AOPower;
-            CBUFFER_END
 
             half frag_depth(Varyings IN) : SV_Target
             {

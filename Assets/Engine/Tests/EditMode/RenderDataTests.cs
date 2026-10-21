@@ -2,12 +2,14 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Engine.Scripts.Render;
+using Engine.Scripts.Settings;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Mathematics;
+using UnityEditor;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
 using Object = UnityEngine.Object;
@@ -36,6 +38,26 @@ namespace Engine.Tests.EditMode{
             if (_material) Object.DestroyImmediate(_material);
             if (_counts.IsCreated) _counts.Dispose();
         }
+
+        #region materials
+
+        [Test]
+        public void FoliageMaterial_DrawsBeforeTheLiquids(){
+            // Both layers write depth and share the transparent shader, and their draw bounds are equal, so within one
+            // queue the order is undefined: liquid drawn first hides the foliage behind it.
+            VoxelEngineSettings settings =
+                AssetDatabase.LoadAssetAtPath<VoxelEngineSettings>("Assets/EngineSettings/VoxelEngineSettings.asset");
+            Assert.IsNotNull(settings, "shipped engine settings missing");
+            Material foliage = settings.Renderer.foliageMaterial;
+            Material liquid = settings.Renderer.transparentMaterial;
+            Assert.IsNotNull(foliage);
+            Assert.IsNotNull(liquid);
+            Assert.Less(foliage.renderQueue, liquid.renderQueue);
+            Assert.Greater(foliage.renderQueue, (int)UnityEngine.Rendering.RenderQueue.GeometryLast,
+                "foliage still blends over the opaque world");
+        }
+
+        #endregion
 
         #region struct sizes
 

@@ -88,9 +88,12 @@ namespace Engine.Scripts.Jobs.Core{
         /// </summary>
         /// <returns>True if collection completed, false if scheduler is still working.</returns>
         protected override bool CollectResultsStep(){
-            if (!_chunkScheduler.IsComplete || _chunkScheduler.IsReady) return false;
+            // A batch that was already applied elsewhere only clears the set; waiting for it would stall the handler.
+            if (!_chunkScheduler.IsReady){
+                if (!_chunkScheduler.IsComplete) return false;
+                _chunkScheduler.Complete();
+            }
 
-            _chunkScheduler.Complete();
             Set.Clear();
             _lightJobHandler.WakeUp();
             return true;
