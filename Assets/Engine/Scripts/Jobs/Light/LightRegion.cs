@@ -68,25 +68,36 @@ namespace Engine.Scripts.Jobs.Light{
         ///     Fills the box columns covered by one chunk: attenuation, <see cref="Top" /> and emitters from its voxel
         ///     data. Columns of the chunk outside the box interior are skipped.
         /// </summary>
-        public void FillVoxels(in UnsafeIntervalList<ushort> voxels, int2 chunkWorldOrigin, in VoxelLightTable table){
+        public unsafe void FillVoxels(in UnsafeIntervalList<ushort> voxels, int2 chunkWorldOrigin,
+            in VoxelLightTable table){
             GetColumnRange(chunkWorldOrigin, out int2 min, out int2 max, out int2 offset);
+            byte* attPtr = (byte*)Att.GetUnsafePtr();
+            int nextStart = -1;
+            int lastNode = 0;
+            int lastCount = 0;
 
             for (int cx = min.x; cx <= max.x; cx++)
             for (int cz = min.y; cz <= max.y; cz++){
                 int chunkStart = (cx * ChunkDepth + cz) * Height;
                 int baseIndex = ColumnBase(cx + offset.x, cz + offset.y);
-                int nodeIndex = voxels.NodeIndex(chunkStart);
+                // LGT-11: a column that follows the previous one starts in its last node or the next one
+                int nodeIndex = chunkStart == nextStart
+                    ? lastCount > chunkStart ? lastNode : lastNode + 1
+                    : voxels.NodeIndex(chunkStart);
                 int top = -1;
                 int y = 0;
 
                 while (y < Height){
+                    lastNode = nodeIndex;
                     UnsafeIntervalList<ushort>.Node node = voxels.NodeAt(nodeIndex++);
+                    lastCount = node.Count;
                     int end = math.min(node.Count - chunkStart, Height);
                     ushort id = node.Value;
                     byte att = id < table.Count ? table.Attenuation[id] : (byte)Opaque;
                     ushort emission = id < table.Count ? table.Emission[id] : (ushort)0;
 
-                    for (int i = y; i < end; i++) Att[baseIndex + i] = att;
+                    // LGT-11: raw memset, the checked indexer kept Burst from vectorising (1.75 ms/chunk)
+                    UnsafeUtility.MemSet(attPtr + baseIndex + y, att, end - y);
                     if (att != 0) top = end - 1;
                     if (emission != 0)
                         for (int i = y; i < end; i++){
@@ -98,12 +109,14 @@ namespace Engine.Scripts.Jobs.Light{
                 }
 
                 Top[baseIndex / Height] = (short)top;
+                nextStart = chunkStart + Height;
             }
         }
 
         /// <summary>Copies the current light of the box columns covered by one chunk (edit jobs).</summary>
-        public void FillLight(in UnsafeIntervalList<ushort> light, int2 chunkWorldOrigin){
+        public unsafe void FillLight(in UnsafeIntervalList<ushort> light, int2 chunkWorldOrigin){
             GetColumnRange(chunkWorldOrigin, out int2 min, out int2 max, out int2 offset);
+            ushort* lightPtr = (ushort*)Light.GetUnsafePtr();
 
             for (int cx = min.x; cx <= max.x; cx++)
             for (int cz = min.y; cz <= max.y; cz++){
@@ -115,7 +128,8 @@ namespace Engine.Scripts.Jobs.Light{
                 while (y < Height){
                     UnsafeIntervalList<ushort>.Node node = light.NodeAt(nodeIndex++);
                     int end = math.min(node.Count - chunkStart, Height);
-                    for (int i = y; i < end; i++) Light[baseIndex + i] = node.Value;
+                    ushort value = node.Value;
+                    UnsafeUtility.MemCpyReplicate(lightPtr + baseIndex + y, &value, sizeof(ushort), end - y);
                     y = end;
                 }
             }
@@ -137,13 +151,15 @@ namespace Engine.Scripts.Jobs.Light{
         ///     (if light can enter it) and sky voxels beside a higher neighbour column that has non-opaque voxels at
         ///     that height. Columns without such voxels need no BFS.
         /// </summary>
-        public void SeedSky(ref NativeQueue<int> queue){
+        public unsafe void SeedSky(ref LightQueue queue){
+            ushort* lightPtr = (ushort*)Light.GetUnsafePtr();
             for (int x = 1; x < SizeX - 1; x++)
             for (int z = 1; z < SizeZ - 1; z++){
                 int column = x * SizeZ + z;
                 int baseIndex = column * Height;
                 int top = Top[column];
-                for (int y = top + 1; y < Height; y++) Light[baseIndex + y] |= VoxelLight.FullSky;
+                ushort* sky = lightPtr + baseIndex; // LGT-11: unchecked so Burst vectorises the fill
+                for (int y = top + 1; y < Height; y++) sky[y] |= VoxelLight.FullSky;
 
                 if (top == Height - 1){
                     // The topmost voxel is not clear: it sees the sky above the world with one step of loss.
@@ -178,7 +194,7 @@ namespace Engine.Scripts.Jobs.Light{
         }
 
         /// <summary>LGT-03: queues the emitters found by <see cref="FillVoxels" /> (their light holds the emission).</summary>
-        public void SeedEmitters(ref NativeQueue<int> queue){
+        public void SeedEmitters(ref LightQueue queue){
             for (int i = 0; i < Emitters.Length; i++) queue.Enqueue(Emitters[i]);
         }
 
@@ -187,27 +203,32 @@ namespace Engine.Scripts.Jobs.Light{
         ///     max(L(n), L(v) − 1 − att(n)); opaque voxels are never entered; sky 15 goes down into a clear voxel
         ///     without loss. Light only rises, so a voxel queued more than once is still correct.
         /// </summary>
-        public void Propagate(ref NativeQueue<int> queue){
+        public unsafe void Propagate(ref LightQueue queue){
+            byte* att = (byte*)Att.GetUnsafeReadOnlyPtr();
+            ushort* light = (ushort*)Light.GetUnsafePtr();
+            int strideX = StrideX;
             while (queue.TryDequeue(out int index)){
-                ushort light = Light[index];
+                ushort from = light[index];
                 int y = index & (Height - 1);
-                Relax(index + StrideX, light, 0, ref queue);
-                Relax(index - StrideX, light, 0, ref queue);
-                Relax(index + Height, light, 0, ref queue);
-                Relax(index - Height, light, 0, ref queue);
-                if (y < Height - 1) Relax(index + 1, light, 0, ref queue);
-                if (y > 0) Relax(index - 1, light, 1, ref queue);
+                Relax(att, light, index + strideX, from, 0, ref queue);
+                Relax(att, light, index - strideX, from, 0, ref queue);
+                Relax(att, light, index + Height, from, 0, ref queue);
+                Relax(att, light, index - Height, from, 0, ref queue);
+                if (y < Height - 1) Relax(att, light, index + 1, from, 0, ref queue);
+                if (y > 0) Relax(att, light, index - 1, from, 1, ref queue);
             }
         }
 
+        /// <summary>One BFS step into <paramref name="index" />; unchecked pointers (LGT-11, the sentinel ring keeps it in bounds).</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void Relax(int index, ushort from, int downward, ref NativeQueue<int> queue){
-            int att = Att[index];
+        private static unsafe void Relax(byte* attPtr, ushort* lightPtr, int index, ushort from, int downward,
+            ref LightQueue queue){
+            int att = attPtr[index];
             if (att >= Opaque) return;
-            ushort current = Light[index];
+            ushort current = lightPtr[index];
             ushort next = Combine(current, from, att, downward);
             if (next == current) return;
-            Light[index] = next;
+            lightPtr[index] = next;
             queue.Enqueue(index);
         }
 
@@ -232,15 +253,16 @@ namespace Engine.Scripts.Jobs.Light{
         ///     Run-length encodes the box columns of one chunk (box x/z from <paramref name="boxMin" />, 32 × 32
         ///     columns) into <paramref name="output" /> in Flatten order.
         /// </summary>
-        public void WriteChunk(int2 boxMin, ref ChunkLightData output){
-            ushort run = Light[ColumnBase(boxMin.x, boxMin.y)];
+        public unsafe void WriteChunk(int2 boxMin, ref ChunkLightData output){
+            ushort* lightPtr = (ushort*)Light.GetUnsafeReadOnlyPtr();
+            ushort run = lightPtr[ColumnBase(boxMin.x, boxMin.y)];
             int count = 0;
 
             for (int x = 0; x < ChunkWidth; x++)
             for (int z = 0; z < ChunkDepth; z++){
-                int baseIndex = ColumnBase(boxMin.x + x, boxMin.y + z);
+                ushort* column = lightPtr + ColumnBase(boxMin.x + x, boxMin.y + z);
                 for (int y = 0; y < Height; y++){
-                    ushort value = Light[baseIndex + y];
+                    ushort value = column[y];
                     if (value == run){
                         count++;
                         continue;

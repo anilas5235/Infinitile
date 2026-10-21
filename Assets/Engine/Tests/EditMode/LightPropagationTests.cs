@@ -157,7 +157,7 @@ namespace Engine.Tests.EditMode{
 
             LightRegion region = new(LightJob.BoxSize, LightJob.BoxSize, -(LightJob.Margin + 1), Allocator.Persistent);
             Fill(ref region, world, Origin, 1);
-            NativeQueue<int> queue = new(Allocator.Persistent);
+            LightQueue queue = new(64, Allocator.Persistent);
             region.SeedSky(ref queue);
             queue.Clear();
             for (int i = 0; i < region.Light.Length; i++)
@@ -183,7 +183,7 @@ namespace Engine.Tests.EditMode{
             int size = 5 * ChunkWidth + 2;
             LightRegion region = new(size, size, -(2 * ChunkWidth + 1), Allocator.Persistent);
             Fill(ref region, world, Origin, 2);
-            NativeQueue<int> queue = new(Allocator.Persistent);
+            LightQueue queue = new(64, Allocator.Persistent);
             region.SeedSky(ref queue);
             region.SeedEmitters(ref queue);
             region.Propagate(ref queue);

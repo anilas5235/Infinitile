@@ -44,7 +44,7 @@ namespace Engine.Scripts.Jobs.Light{
                     region.FillVoxels(data.Data, neighbour * ChunkSizeXZ, table);
             }
 
-            NativeQueue<int> queue = new(Allocator.Temp);
+            LightQueue queue = new(4096, Allocator.Temp);
             region.SeedSky(ref queue);
             region.SeedEmitters(ref queue);
             region.Propagate(ref queue);
