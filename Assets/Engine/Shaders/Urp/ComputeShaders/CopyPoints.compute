@@ -20,51 +20,43 @@ StructuredBuffer<uint2> _FoliagePages;
 
 StructuredBuffer<uint> _PageCounts;
 
-uint _PointsPerPage;
-
-[numthreads(COPY_POINTS_THREADS, 3, 1)] // y: one row per mesh layer
-void CopyPoints(uint3 id : SV_DispatchThreadID)
+[numthreads(COPY_POINTS_THREADS, 1, 1)] // one group per page and mesh layer, one thread per point of the page
+void CopyPoints(uint3 group : SV_GroupID, uint inPage : SV_GroupIndex)
 {
-    uint layer = id.y % 3u;
-    uint layerPageCount = _PageCounts[layer];
-    if (id.x >= layerPageCount) return; // No more pages to process in this layer
+    uint page = group.x;
+    uint layer = group.y; // the dispatch has one row of groups per mesh layer
+    if (page >= _PageCounts[layer]) return; // No more pages to process in this layer
 
+    // The layer is the same for the whole group, so these branches never diverge
     uint2 indexAndCount;
     switch (layer)
     {
-    case 0: indexAndCount = _SolidPages[id.x];
+    case 0: indexAndCount = _SolidPages[page];
         break;
-    case 1: indexAndCount = _TransparentPages[id.x];
+    case 1: indexAndCount = _TransparentPages[page];
         break;
-    case 2: indexAndCount = _FoliagePages[id.x];
+    case 2: indexAndCount = _FoliagePages[page];
         break;
     default:
         return;
     }
 
-    if (indexAndCount.y == 0u) return;
+    if (inPage >= min(indexAndCount.y, POINTS_PER_PAGE)) return;
 
-    uint copyCount = min(indexAndCount.y, _PointsPerPage);
-    uint srcBase = id.x * _PointsPerPage;
-    uint dstBase = indexAndCount.x * _PointsPerPage;
+    uint src = page * POINTS_PER_PAGE + inPage;
+    uint dst = indexAndCount.x * POINTS_PER_PAGE + inPage;
 
-    for (uint i = 0u; i < copyCount; i++)
+    switch (layer)
     {
-        uint src = srcBase + i;
-        uint dst = dstBase + i;
-
-        switch (layer)
-        {
-        case 0: // Solid
-            _SolidPointsCopyOut[dst] = _SolidPointsIn[src];
-            break;
-        case 1: // Transparent
-            _TransparentPointsCopyOut[dst] = _TransparentPointsIn[src];
-            break;
-        case 2: // Foliage
-            _FoliagePointsCopyOut[dst] = _FoliagePointsIn[src];
-            break;
-        default: break;
-        }
+    case 0: // Solid
+        _SolidPointsCopyOut[dst] = _SolidPointsIn[src];
+        break;
+    case 1: // Transparent
+        _TransparentPointsCopyOut[dst] = _TransparentPointsIn[src];
+        break;
+    case 2: // Foliage
+        _FoliagePointsCopyOut[dst] = _FoliagePointsIn[src];
+        break;
+    default: break;
     }
 }

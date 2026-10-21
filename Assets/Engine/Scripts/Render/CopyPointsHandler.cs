@@ -78,16 +78,22 @@ namespace Engine.Scripts.Render{
             _pageCounts[2] = (uint)foliagePagesCount;
             _pageCountsBuffer.SetData(_pageCounts);
             _copyPoints.SetBuffer(_copyKernelID, PageCountsNameID, _pageCountsBuffer);
-            _copyPoints.SetInt(PointsPerPageNameID, PointsPerPage);
 
             SetSolidBuffers(pointBuilderHandler, solidAlloc);
             SetTransparentBuffers(pointBuilderHandler, transparentAlloc);
             SetFoliageBuffers(pointBuilderHandler, foliageAlloc);
 
             int maxPageCount = math.max(solidPagesCount, math.max(transparentPagesCount, foliagePagesCount));
-            if (maxPageCount <= 0) return;
+            Dispatch(_copyPoints, _copyKernelID, maxPageCount);
+        }
 
-            _copyPoints.Dispatch(_copyKernelID, (maxPageCount + CopyPointsThreads - 1) / CopyPointsThreads, 1, 1);
+        /// <summary>
+        ///     Dispatches the CopyPoints kernel for up to <paramref name="maxPageCount" /> pages per layer: one group
+        ///     of <see cref="CopyPointsThreads" /> threads per page (x) and mesh layer (y).
+        /// </summary>
+        internal static void Dispatch(ComputeShader copyPoints, int kernel, int maxPageCount){
+            if (maxPageCount <= 0) return;
+            copyPoints.Dispatch(kernel, maxPageCount, 3, 1);
         }
 
         private void SetSolidBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo solidAlloc){

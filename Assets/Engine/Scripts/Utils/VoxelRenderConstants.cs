@@ -37,8 +37,8 @@ namespace Engine.Scripts.Utils{
 
         internal const int CopyIntervalsThreads = 64;
 
-        /// <summary>Pages per group and mesh layer of CopyPoints.</summary>
-        internal const int CopyPointsThreads = 8;
+        /// <summary>Threads per group of CopyPoints: one group per page and mesh layer, one thread per point.</summary>
+        internal const int CopyPointsThreads = PointsPerPage;
 
         internal const int CullThreads = 128;
 

@@ -80,6 +80,15 @@ transient variant] --> R[VoxelWorld.Regenerate]
   - A Burst `PlotJob` per node samples the curve over its axis range, the value at every control point (a nested
     child counts as a point), and the value at the probe (C, E, PV) from the Distribution sliders.
   - The window draws each level as a 1D plot with the probe marked.
+- **Window structure** (`Editor/WorldGen/`):
+  - `WorldGenerationPreviewWindow.cs` holds the layout: toolbar, statistics, distribution plane, spline plots,
+    settings and biome panels, the view grid and panning.
+  - `.Compare.cs` holds the A/B configuration panel, the compare views and the difference.
+  - `.Calibration.cs` holds the height calibration panel.
+  - `PreviewBuilder` does the build scheduling:
+    - it waits for a pause in the change requests (`RebuildDebounceSeconds`);
+    - it owns passes A and B, the distribution plane job and the spline plots;
+    - it raises `Finished` when a build has been applied.
 - **In game** (`Scripts/UI/WorldGenDebugKeys.cs`):
   - F10 regenerates the loaded world with the next configuration and Shift+F10 with the previous one. The list holds
     the asset as assigned, Biome-first × 4 methods, and Terrain-first with None and with DistanceBlend. Strengths are
@@ -114,8 +123,9 @@ transient variant] --> R[VoxelWorld.Regenerate]
 ### Ownership of native memory
 
 - `PreviewPass` owns its persistent region buffers, pixel arrays, boundary edge counts and its `WorldGenConfig`. The
-  config is replaced at the start of the next build and released in `Dispose`. The window completes a running
-  build, then disposes both passes in `OnDisable`.
+  config is replaced at the start of the next build and released in `Dispose`.
+- `PreviewBuilder` owns both passes and the distribution plane arrays of a running build. Its `Dispose` (from the
+  window's `OnDisable`) completes a running build, then disposes both passes and the distribution texture.
 - `PreviewConfiguration.BuildConfig` returns a config the caller disposes. The transient clone is destroyed inside
   the call.
 - `PreviewDiff` and `SplinePlots` allocate only TempJob scratch, which is released before they return.
@@ -494,9 +504,12 @@ flowchart LR
   512…16) and `PeakNoise` (P = (1 − |n|)²) supply the height detail.
 - **Settings** (`WorldGen/Settings/`): `WorldGenSettings` holds architecture, blend methods and widths, λ weights,
   height range, octave tables, the T/F/C/E/W climate profiles with their couplings and references to a `BiomeSet`
-  and a `TerrainSplineSet`. `ToCanonicalJson` produces a deterministic manifest with the biome set inlined.
-  `ToConfig` builds the `WorldGenConfig` mirror: flattened NativeArrays, the per-biome octave coefficients
-  a_{b,i} = HeightAmplitude × OctaveWeights and the climate instances.
+  and a `TerrainSplineSet`, plus `OnValidate`.
+  - `ToCanonicalJson` produces a deterministic manifest with the biome set inlined. The tree is built in
+    `WorldGenSettingsJson`.
+  - `ToConfig` builds the `WorldGenConfig` mirror: flattened NativeArrays, the per-biome octave coefficients
+    a_{b,i} = HeightAmplitude × OctaveWeights and the climate instances. The conversion is in
+    `WorldGenConfigBuilder`.
 - **Biome** carries TargetErosion, TargetPV, HeightOffset, HeightAmplitude, OctaveWeights, Jaggedness and
   FloraRules. Which biomes are active is decided by the `BiomeSet` asset, in index order;
   `Assets/EngineSettings/BiomeSet_Default.asset` lists Plains, Desert, Mountain, Snow, Forest, Ocean.

@@ -26,7 +26,7 @@
 #define PREP_INTERVALS_PER_THREAD 8 // (PrepIntervalsPerThread)
 #define BUILD_POINTS_THREADS 4 // BuildPoints, per axis (BuildPointsThreads)
 #define COPY_INTERVALS_THREADS 64 // CopyIntervals (CopyIntervalsThreads)
-#define COPY_POINTS_THREADS 8 // CopyPoints, pages per group and layer (CopyPointsThreads)
+#define COPY_POINTS_THREADS 256 // CopyPoints, one point per thread, equals POINTS_PER_PAGE (CopyPointsThreads)
 #define CULL_THREADS 128 // CullPages (CullThreads)
 
 #endif
