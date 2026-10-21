@@ -279,6 +279,24 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void ToConfig_RejectsAClimateWithoutOctaves(){
+            // No octave normalises by a zero amplitude sum: a NaN climate that classifies to no biome.
+            WorldGenSettings none = Create<WorldGenSettings>("WG");
+            none.erosionProfile.octaves = 0;
+            WorldGenSettings warp = Create<WorldGenSettings>("WG");
+            warp.continentalLayer.warpNoise.octaves = -1;
+            WorldGenSettings missing = Create<WorldGenSettings>("WG");
+            missing.humidityProfile = null;
+
+            StringAssert.Contains("erosionProfile.octaves",
+                Assert.Throws<System.InvalidOperationException>(() => none.ToConfig(1, allocator: Allocator.Temp)).Message);
+            StringAssert.Contains("continentalLayer.warpNoise.octaves",
+                Assert.Throws<System.InvalidOperationException>(() => warp.ToConfig(1, allocator: Allocator.Temp)).Message);
+            StringAssert.Contains("humidityProfile",
+                Assert.Throws<System.InvalidOperationException>(() => missing.ToConfig(1, allocator: Allocator.Temp)).Message);
+        }
+
+        [Test]
         public void ToConfig_WithoutBiomeSetGivesEmptyBiomes(){
             WorldGenSettings s = Create<WorldGenSettings>("WG");
             WorldGenConfig cfg = s.ToConfig(1, allocator: Allocator.Temp);

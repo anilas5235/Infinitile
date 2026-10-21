@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Engine.Scripts.Utils.Logger;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Engine.Scripts.VoxelConfig.Registry{
     /// <summary>
@@ -68,6 +69,15 @@ namespace Engine.Scripts.VoxelConfig.Registry{
 
             textureArray.Apply();
             TextureArray = textureArray;
+        }
+
+        /// <summary>
+        ///     Destroys the texture array; the registry owns it.
+        /// </summary>
+        public void DestroyArray(){
+            if (!TextureArray) return;
+            CoreUtils.Destroy(TextureArray); // DestroyImmediate outside play mode (EditMode tests)
+            TextureArray = null;
         }
 
         protected override void PostRegister(ushort id, Texture2D item){

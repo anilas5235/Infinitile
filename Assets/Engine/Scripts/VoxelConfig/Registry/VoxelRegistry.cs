@@ -232,14 +232,20 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             return NameRegistry.GetAllEntries();
         }
 
+        /// <summary>
+        ///     Releases what was created; an import that threw part way leaves the rest unset.
+        /// </summary>
         public override void Dispose(){
             if (_voxelEngineRenderGenData.VoxelRenderDefs.IsCreated)
                 _voxelEngineRenderGenData.VoxelRenderDefs.Dispose();
             _lightTable.Dispose();
-            VoxelRenderDefBuffer.Dispose();
-            QuadBuffer.Dispose();
-            QuadTexPairBuffer.Dispose();
-            VoxelMap.Dispose();
+            VoxelRenderDefBuffer?.Dispose();
+            QuadBuffer?.Dispose();
+            QuadTexPairBuffer?.Dispose();
+            if (VoxelMap.IsCreated) VoxelMap.Dispose();
+            _solidTexRegistry.DestroyArray();
+            _transparentTexRegistry.DestroyArray();
+            _foliageTexRegistry.DestroyArray();
         }
 
         //TODO: Compacting?

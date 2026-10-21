@@ -76,7 +76,9 @@ namespace Engine.Tests.PlayMode{
                 while (!disposing.IsReadBackDone && Time.realtimeSinceStartup < deadline) yield return null;
                 Assert.IsTrue(disposing.IsReadBackDone, "the build must still finish after the handler was disposed");
                 int[] counts = null;
-                Assert.DoesNotThrow(() => counts = disposing.CompleteBuild());
+                bool built = true;
+                Assert.DoesNotThrow(() => built = disposing.TryCompleteBuild(out counts));
+                Assert.IsFalse(built, "a build of a released handler says nothing about the partition");
                 Assert.IsNotNull(counts);
                 yield return null;
                 Assert.AreEqual(0, errors, "no error may be logged while the pending read-back finishes");

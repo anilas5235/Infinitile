@@ -39,7 +39,12 @@ namespace Engine.Scripts.Render.Post{
             if (!shader) shader = Shader.Find("Hidden/Engine/UnderwaterFog");
             if (!shader) return;
 
-            _material = CoreUtils.CreateEngineMaterial(shader);
+            // URP calls Create again from OnEnable and OnValidate; reuse the material instead of leaking one per call
+            if (!_material || _material.shader != shader){
+                CoreUtils.Destroy(_material);
+                _material = CoreUtils.CreateEngineMaterial(shader);
+            }
+
             _pass = new FogPass(_material);
         }
 
@@ -71,7 +76,9 @@ namespace Engine.Scripts.Render.Post{
                 UniversalCameraData cameraData = frameData.Get<UniversalCameraData>();
                 UniversalResourceData resources = frameData.Get<UniversalResourceData>();
                 // Only the player's view is inside the liquid; scene view and previews stay clear.
-                if (cameraData.cameraType != CameraType.Game || resources.isActiveTargetBackBuffer) return;
+                // An overlay camera draws on top of the base camera's fogged image.
+                if (cameraData.cameraType != CameraType.Game || cameraData.renderType == CameraRenderType.Overlay ||
+                    resources.isActiveTargetBackBuffer) return;
 
                 _material.SetColor(FogColorId, FogColor);
                 _material.SetFloat(FogDensityId, FogDensity);

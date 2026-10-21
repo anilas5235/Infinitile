@@ -138,7 +138,7 @@ namespace Engine.Scripts.Render{
 
         /// <summary>
         ///     Dispatches the point build for the given partition and starts the read-back of the point counts.
-        ///     Poll <see cref="IsReadBackDone" /> and then call <see cref="CompleteBuild" /> for the counts.
+        ///     Poll <see cref="IsReadBackDone" /> and then call <see cref="TryCompleteBuild" /> for the counts.
         /// </summary>
         /// <param name="data">The partition build request containing chunk data.</param>
         /// <param name="store">The interval store that holds the request's lists.</param>
@@ -189,27 +189,33 @@ namespace Engine.Scripts.Render{
 
         /// <summary>
         ///     Finishes the pending build: converts the read-back counters to the solid, transparent and foliage
-        ///     point counts. Zero counts are returned when the handler was released while the read-back ran or
-        ///     the read-back failed.
+        ///     point counts.
         /// </summary>
-        /// <returns>The handler-owned counts array (valid until the next build).</returns>
-        internal int[] CompleteBuild(){
-            if (!_readBackPending) return _pointCounts;
+        /// <param name="counts">
+        ///     The handler-owned counts array (valid until the next build); all zero when the build failed.
+        /// </param>
+        /// <returns>
+        ///     False when the handler was released while the read-back ran or the read-back failed; the counts then
+        ///     say nothing about the partition.
+        /// </returns>
+        internal bool TryCompleteBuild(out int[] counts){
+            counts = _pointCounts;
+            if (!_readBackPending) return true;
             _readBackPending = false;
 
             if (_disposed){ // the handler was released while the read-back ran
                 Array.Clear(_pointCounts, 0, _pointCounts.Length);
-                return _pointCounts;
+                return false;
             }
 
             if (_readBackRequest.hasError){
                 VoxelEngineLogger.Error<PointBuilderHandler>("Error reading back point counts: the GPU read-back failed");
                 Array.Clear(_pointCounts, 0, _pointCounts.Length);
-                return _pointCounts;
+                return false;
             }
 
             ToPointCounts(_counts, _pointCounts);
-            return _pointCounts;
+            return true;
         }
 
         /// <summary>

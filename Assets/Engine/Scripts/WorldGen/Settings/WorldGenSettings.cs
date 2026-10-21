@@ -188,7 +188,8 @@ namespace Engine.Scripts.WorldGen.Settings{
 
         /// <summary>
         ///     Every wavelength (in blocks) the samplers divide by, and the climate frequency multiplier, that is not
-        ///     positive and finite. They are reported rather than clamped.
+        ///     positive and finite, and every climate octave count below one (no octave normalises by zero, a NaN
+        ///     climate). They are reported rather than clamped.
         /// </summary>
         private IEnumerable<(string field, float value)> InvalidScales(){
             if (OctaveWavelengths != null)
@@ -199,7 +200,15 @@ namespace Engine.Scripts.WorldGen.Settings{
             // Not a divisor, but 0 flattens every climate field and a negative value mirrors the world.
             if (!IsPositiveFinite(ClimateFrequencyScale)) yield return (nameof(ClimateFrequencyScale), ClimateFrequencyScale);
 
-            (string field, NoiseProfileSettings profile)[] profiles ={
+            foreach ((string field, NoiseProfileSettings profile) in ClimateProfiles()){
+                if (profile == null) continue;
+                if (!IsPositiveFinite(profile.scale)) yield return (field + ".scale", profile.scale);
+                if (profile.octaves < 1) yield return (field + ".octaves", profile.octaves);
+            }
+        }
+
+        private (string field, NoiseProfileSettings profile)[] ClimateProfiles(){
+            return new[]{
                 (nameof(temperatureProfile), temperatureProfile),
                 (nameof(humidityProfile), humidityProfile),
                 (nameof(continentalLayer) + ".baseNoise", continentalLayer?.baseNoise),
@@ -207,8 +216,6 @@ namespace Engine.Scripts.WorldGen.Settings{
                 (nameof(erosionProfile), erosionProfile),
                 (nameof(weirdnessProfile), weirdnessProfile)
             };
-            foreach ((string field, NoiseProfileSettings profile) in profiles)
-                if (profile != null && !IsPositiveFinite(profile.scale)) yield return (field + ".scale", profile.scale);
         }
 
         /// <summary>
@@ -263,6 +270,8 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (octaveCount == 0) throw new InvalidOperationException($"{name}: OctaveWavelengths is empty.");
             if (octaveCount > DetailOctaves.MaxOctaves)
                 throw new InvalidOperationException($"{name}: more than {DetailOctaves.MaxOctaves} detail octaves.");
+            foreach ((string field, NoiseProfileSettings profile) in ClimateProfiles())
+                if (profile == null) throw new InvalidOperationException($"{name}: {field} is not set.");
             foreach ((string field, float value) in InvalidScales())
                 throw new InvalidOperationException($"{name}: {field} must be positive and finite, got {value}.");
             // h = (H - Hmin)/(Hmax - Hmin) is a classification dimension: an empty range gives NaN.
@@ -307,17 +316,18 @@ namespace Engine.Scripts.WorldGen.Settings{
                 HeightMax = HeightMax,
                 PeakWavelength = PeakWavelength,
                 WaterLevel = WaterLevel,
-                EnableClimateOverrides = EnableClimateOverrides,
-                Climate = BuildClimate(seed),
-                OctaveWavelengths = new NativeArray<float>(OctaveWavelengths, allocator),
-                GlobalOctaveWeights = new NativeArray<float>(octaveCount, allocator),
-                Biomes = new NativeArray<Biome.BiomeDef>(active.Count, allocator),
-                OctaveCoefficients = new NativeArray<float>(active.Count * octaveCount, allocator)
+                EnableClimateOverrides = EnableClimateOverrides
             };
 
-            // Biome.ToStruct and TerrainSplineSet.Flatten throw on bad data; free what was allocated above before
-            // rethrowing.
+            // Biome.ToStruct and TerrainSplineSet.Flatten throw on bad data; free what was allocated so far before
+            // rethrowing. Every allocation is stored in cfg as soon as it exists, so Dispose finds it.
             try{
+                BuildClimate(seed, ref cfg.Climate);
+                cfg.OctaveWavelengths = new NativeArray<float>(OctaveWavelengths, allocator);
+                cfg.GlobalOctaveWeights = new NativeArray<float>(octaveCount, allocator);
+                cfg.Biomes = new NativeArray<Biome.BiomeDef>(active.Count, allocator);
+                cfg.OctaveCoefficients = new NativeArray<float>(active.Count * octaveCount, allocator);
+
                 if (Splines){
                     Splines.Flatten(allocator, out cfg.SplineNodes, out cfg.SplinePoints,
                         out cfg.OffsetSpline, out cfg.AmpSpline, out cfg.JaggednessSpline);
@@ -369,21 +379,20 @@ namespace Engine.Scripts.WorldGen.Settings{
         }
 
         /// <summary>
-        ///     Climate instances T, F, C, E, W from this asset. Each instance gets its own gradient salt.
+        ///     Climate instances T, F, C, E, W from this asset. Each instance gets its own gradient salt. Fills
+        ///     <paramref name="climate" /> one profile at a time, so a throw leaves only disposable state.
         /// </summary>
-        private ClimateParams BuildClimate(int seed){
-            return new ClimateParams{
-                Temperature = new NoiseProfile(temperatureProfile.ToStruct(seed, HashSalts.TemperatureNoise)),
-                Humidity = new NoiseProfile(humidityProfile.ToStruct(seed, HashSalts.HumidityNoise)),
-                Continental = new WarpedNoiseLayer(continentalLayer.ToStruct(seed,
-                    HashSalts.ContinentalNoise, HashSalts.ContinentalWarpX, HashSalts.ContinentalWarpY)),
-                Erosion = new NoiseProfile(erosionProfile.ToStruct(seed, HashSalts.ErosionNoise)),
-                Weirdness = new NoiseProfile(weirdnessProfile.ToStruct(seed, HashSalts.WeirdnessNoise)),
-                ContinentalHumidityInfluence = ContinentalHumidityInfluence,
-                ContinentalTemperatureInfluence = ContinentalTemperatureInfluence,
-                WGain = WGain,
-                FrequencyScale = ClimateFrequencyScale
-            };
+        private void BuildClimate(int seed, ref ClimateParams climate){
+            climate.ContinentalHumidityInfluence = ContinentalHumidityInfluence;
+            climate.ContinentalTemperatureInfluence = ContinentalTemperatureInfluence;
+            climate.WGain = WGain;
+            climate.FrequencyScale = ClimateFrequencyScale;
+            climate.Temperature = new NoiseProfile(temperatureProfile.ToStruct(seed, HashSalts.TemperatureNoise));
+            climate.Humidity = new NoiseProfile(humidityProfile.ToStruct(seed, HashSalts.HumidityNoise));
+            climate.Continental = new WarpedNoiseLayer(continentalLayer.ToStruct(seed,
+                HashSalts.ContinentalNoise, HashSalts.ContinentalWarpX, HashSalts.ContinentalWarpY));
+            climate.Erosion = new NoiseProfile(erosionProfile.ToStruct(seed, HashSalts.ErosionNoise));
+            climate.Weirdness = new NoiseProfile(weirdnessProfile.ToStruct(seed, HashSalts.WeirdnessNoise));
         }
 
         /// <summary>

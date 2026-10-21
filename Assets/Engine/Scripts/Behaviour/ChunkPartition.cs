@@ -1,6 +1,7 @@
 ﻿using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Utils.Extensions;
 using UnityEngine;
+using UnityEngine.Rendering;
 using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.Behaviour{
@@ -31,6 +32,10 @@ namespace Engine.Scripts.Behaviour{
 
         private void Awake(){
             ColliderMesh = new Mesh{ name = "PCollider" };
+        }
+
+        private void OnDestroy(){
+            CoreUtils.Destroy(ColliderMesh); // DestroyImmediate outside play mode (EditMode tests)
         }
 
 #if UNITY_EDITOR

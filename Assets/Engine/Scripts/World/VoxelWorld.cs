@@ -258,6 +258,8 @@ namespace Engine.Scripts.World{
         /// </summary>
         protected override void Awake(){
             base.Awake();
+            if (Instance != this) return; // a duplicate; base.Awake destroys it
+
             VoxelEngineProvider.Initialize(new VoxelEngineProvider(), provider => {
                 ConfigureSettings();
                 provider.Settings = settings;
@@ -282,12 +284,12 @@ namespace Engine.Scripts.World{
         ///     Initializes focus state once all objects are created.
         /// </summary>
         private void Start(){
-            _isFocused = focus;
+            _isFocused = focus && _scheduler != null;
             TryFocusUpdate();
         }
 
         private void Update(){
-            _scheduler.ScheduleUpdate(Focus);
+            _scheduler?.ScheduleUpdate(Focus);
         }
 
         /// <summary>
@@ -307,7 +309,7 @@ namespace Engine.Scripts.World{
             }
 
             base.OnDestroy();
-            _scheduler.Dispose();
+            _scheduler?.Dispose();
             ChunkManager?.Dispose();
         }
 

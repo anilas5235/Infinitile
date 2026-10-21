@@ -28,7 +28,10 @@ namespace Engine.Scripts.Render{
         /// </summary>
         public VoxelWorld world;
 
-        private readonly List<int3> _pendingBuilds = new();
+        // Builds in request order; the set is the truth, so a released partition leaves a stale queue entry that is
+        // skipped when it comes up.
+        private Queue<int3> _pendingBuilds = new();
+        private readonly HashSet<int3> _pendingBuildSet = new();
         private readonly HashSet<int3> _requestedPartitions = new();
 
         // each chunk's voxel and light interval lists live in one shared store
@@ -108,7 +111,8 @@ namespace Engine.Scripts.Render{
             // sized for the partition pool so the request bookkeeping does not grow during flight
             int partitionPoolSize = _settings.Chunk.DrawDistance.SquareSize() * PartitionsPerChunk;
             _requestedPartitions.EnsureCapacity(partitionPoolSize);
-            _pendingBuilds.Capacity = math.max(_pendingBuilds.Capacity, partitionPoolSize);
+            _pendingBuilds = new Queue<int3>(partitionPoolSize);
+            _pendingBuildSet.EnsureCapacity(partitionPoolSize);
             AllocInfo.PrewarmPageLists(partitionPoolSize * 3); // solid, transparent and foliage per partition
 
             RendererSettings rSettings = _settings.Renderer;
@@ -228,6 +232,7 @@ namespace Engine.Scripts.Render{
             SafeDispose(_intervalStore);
 
             _pendingBuilds.Clear();
+            _pendingBuildSet.Clear();
             _requestedPartitions.Clear();
 
             _voxelLists.Clear();
@@ -413,9 +418,9 @@ namespace Engine.Scripts.Render{
         /// <param name="partition">The partition to build.</param>
         private void EnqueuePartitionBuild(int3 partition){
             if (_isDestroyed) return;
-            if (_pendingBuilds.Contains(partition)) return;
+            if (!_pendingBuildSet.Add(partition)) return;
 
-            _pendingBuilds.Add(partition);
+            _pendingBuilds.Enqueue(partition);
         }
 
         /// <summary>
@@ -426,11 +431,9 @@ namespace Engine.Scripts.Render{
 
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.PointBuildDispatch.Auto();
             for (int i = 0; i < _maxInFlight; i++){
-                if (_pendingBuilds.Count < 1) break;
                 if (_inFlightBuilds[i].Active) continue;
+                if (!TryDequeuePendingBuild(out int3 partition)) break;
 
-                int3 partition = _pendingBuilds[0];
-                _pendingBuilds.RemoveAt(0);
                 if (IsBuildInFlight(partition)){
                     EnqueuePartitionBuild(partition);
                     continue;
@@ -459,6 +462,16 @@ namespace Engine.Scripts.Render{
             }
         }
 
+        private bool TryDequeuePendingBuild(out int3 partition){
+            while (_pendingBuilds.Count > 0){
+                partition = _pendingBuilds.Dequeue();
+                if (_pendingBuildSet.Remove(partition)) return true; // otherwise released since it was queued
+            }
+
+            partition = default;
+            return false;
+        }
+
         private bool IsBuildInFlight(int3 partition){
             for (int i = 0; i < _inFlightBuilds.Length; i++){
                 InFlightBuild build = _inFlightBuilds[i];
@@ -482,11 +495,18 @@ namespace Engine.Scripts.Render{
                 _inFlightBuilds[i] = default;
 
                 try{
-                    int[] pointCounts = build.Handler.CompleteBuild();
+                    bool built = build.Handler.TryCompleteBuild(out int[] pointCounts);
                     if (_isDestroyed) return;
+                    if (!_requestedPartitions.Contains(build.Partition)) continue;
 
-                    if (!_requestedPartitions.Contains(build.Partition) || _pendingBuilds.Contains(build.Partition))
+                    // Zero counts from a failed read-back would release the partition's pages for good: keep its
+                    // geometry and build it again.
+                    if (!built){
+                        EnqueuePartitionBuild(build.Partition);
                         continue;
+                    }
+
+                    if (_pendingBuildSet.Contains(build.Partition)) continue;
 
                     using (VoxelProfilerMarkers.PointBuildCopy.Auto())
                         _copyPointsHandler.CopyJob(build.Handler, build.Partition, pointCounts);
@@ -552,7 +572,7 @@ namespace Engine.Scripts.Render{
             if (_isDestroyed) return;
 
             _requestedPartitions.Remove(partition);
-            _pendingBuilds.Remove(partition);
+            _pendingBuildSet.Remove(partition);
 
             bool changed = false;
             changed |= _solidBufferManager.ReleasePartition(partition);
