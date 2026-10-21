@@ -1033,6 +1033,17 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
   </ul></li>
 <li><b>Costs and risks:</b> a rewrite of the mask stage of the mesher; the collider meshes must stay identical (same quads, same welding), otherwise the baked colliders change.</li>
 <li><b>Acceptance if scheduled:</b> <code>ColliderMeshBenchmark</code> clearly faster, with the all-air case close to free; <code>ColliderMesherTests</code> pass unchanged; no new allocations in flight (PERF-04).</li>
+<li><b>Done (scheduled 2026-10-21):</b>
+  <ul class="tight">
+  <li><code>CMeshBuildJob.FillCollisionMask</code> fills a 34 × 34 × 34 byte mask (Temp, in the chunk's x, z, y order, so a column is contiguous) from the interval lists of the partition's chunk and its four face neighbours. It walks the runs of each column from one <code>NodeIndex</code> search and sets each collision run with one <code>MemSet</code>. Missing chunks and y outside the world read as no collision.</li>
+  <li>The interior columns are filled first; if no collision run reaches the partition's own y range, the job skips the neighbours and the meshing and writes an empty mesh.</li>
+  <li><code>BuildColliderMasks</code> reads a voxel and its neighbour along the main axis from the mask by stride. The greedy quads, their order and the winding are unchanged; the per-voxel <code>GetVoxelInPartition</code> search and the <code>NativeHashSet&lt;int3&gt;</code> are gone.</li>
+  <li>The vertex and index lists start at 1024 vertices and grow. <code>CVertex</code> keeps only the position (<code>half4</code>, 8 bytes); its layout comes from <code>CVertex.CreateLayout</code>, which the scheduler and the tests share.</li>
+  <li><code>ColliderMesherTests.MixedTerrain_MatchesRecordedMeshes</code> (added and recorded against the old mesher first) hashes the vertices and indices of 16 partitions of mixed terrain with a missing neighbour chunk; it passes unchanged. The other <code>ColliderMesherTests</code> changed only in the setup (the shared layout).</li>
+  <li><code>ColliderMeshBenchmark</code> (median per partition): solid 6.49 → 0.32 ms, surface 3.73 → 0.50 ms, all-air (new row) 0.75 → 0.018 ms. Baseline <code>2026-10-21-s20.3-editmode-baseline.json</code>.</li>
+  <li>The regression check of that baseline found the run-count pass of <code>ChunkJob.WriteToChunkData</code> (PR #39) costing 0.15–0.25 ms per chunk; the runs now go into a Temp list that is copied into the exact-size list (Baselines README).</li>
+  <li>EditMode 451/451 and PlayMode 34/34 pass, including <code>AllocationTests</code> (PERF-04) and <code>ColliderMeshRaceTests</code>.</li>
+  </ul></li>
 </ul>
 <h3>20.4 Decompress only the partition's neighbourhood in the partition build</h3>
 <p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Not measured yet.</p>
