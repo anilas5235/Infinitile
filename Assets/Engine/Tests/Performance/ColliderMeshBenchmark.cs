@@ -42,10 +42,7 @@ namespace Engine.Tests.Performance{
             GenerateChunk();
             _accessor = new ChunkAccessor(_chunks.AsReadOnly());
 
-            _vertexParams = new NativeArray<VertexAttributeDescriptor>(2, Allocator.Persistent){
-                [0] = new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float16, 4),
-                [1] = new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float16, 4)
-            };
+            _vertexParams = CVertex.CreateLayout(Allocator.Persistent);
             _renderGenData = BenchmarkFixtures.CreateRenderGenData(Allocator.Persistent);
             _jobs = new NativeList<int3>(1, Allocator.Persistent);
             _results = new NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult>(1, Allocator.Persistent);

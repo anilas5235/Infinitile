@@ -29,10 +29,7 @@ namespace Engine.Tests.EditMode{
         [SetUp]
         public void SetUp(){
             _chunks = new NativeParallelHashMap<int2, ChunkVoxelData>(16, Allocator.Persistent);
-            _vertexParams = new NativeArray<VertexAttributeDescriptor>(2, Allocator.Persistent){
-                [0] = new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float16, 4),
-                [1] = new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float16, 4)
-            };
+            _vertexParams = CVertex.CreateLayout(Allocator.Persistent);
             _renderGenData = TestFixtures.CreateRenderGenData(Allocator.Persistent);
             _jobs = new NativeList<int3>(8, Allocator.Persistent);
             _results = new NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult>(8, Allocator.Persistent);

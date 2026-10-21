@@ -1,7 +1,5 @@
 ﻿using Engine.Scripts.Data;
-using Engine.Scripts.Utils;
 using Engine.Scripts.VoxelConfig.Data.Internal;
-using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
@@ -32,29 +30,14 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         /// </summary>
         /// <param name="index">Index of the chunk position to process within the <see cref="Jobs" /> list.</param>
         public void Execute(int index){
-            int3 position = Jobs[index];
-            Accessor.TryGetChunk(position.xz, out ChunkVoxelData chunk);
-            PartitionJobData jobData = new(ColliderMeshDataArray[index], position, chunk);
+            PartitionJobData jobData = new(ColliderMeshDataArray[index], Jobs[index]);
 
-            SortVoxels(ref jobData);
-
-            MeshCollision(ref jobData);
+            // An empty partition interior has no faces, so meshing is skipped
+            if (FillCollisionMask(ref jobData)) MeshCollision(ref jobData);
 
             WriteResults(index, ref jobData);
 
             jobData.Dispose();
-        }
-
-        private void SortVoxels(ref PartitionJobData jobData){
-            for (int y = 0; y < VoxelConstants.PartitionHeight; y++)
-            for (int z = 0; z < VoxelConstants.PartitionDepth; z++)
-            for (int x = 0; x < VoxelConstants.PartitionWidth; x++){
-                int3 localPos = new(x, y, z);
-                ushort voxelId = GetVoxel(ref jobData, localPos);
-                Voxel.VoxelDef def = RenderGenData.GetRenderDef(voxelId);
-
-                if (def.Collision) jobData.CollisionVoxels.Add(localPos);
-            }
         }
     }
 }
