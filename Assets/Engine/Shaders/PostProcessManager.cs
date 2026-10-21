@@ -18,12 +18,11 @@ namespace Engine.Shaders{
 
         private LiftGammaGain _liftGammaGain;
 
-        private VolumeProfile _profile;
-
         private void OnEnable(){
-            volume.profile = _profile;
-            volume.profile.TryGet(out _liftGammaGain);
-            volume.profile.TryGet(out _colorAdjustments);
+            // Volume.profile is a runtime copy of the shared profile, so the overrides never modify the asset.
+            VolumeProfile profile = volume.profile;
+            profile.TryGet(out _liftGammaGain);
+            profile.TryGet(out _colorAdjustments);
         }
 
         /// <summary>
