@@ -29,6 +29,7 @@ namespace Engine.Editor.WorldGen{
         private const int ViewResolution = 512;
         private const int DistributionResolution = 256;
         private const int PlotSamples = 96;
+        private const double RebuildDebounceSeconds = 0.15; // auto rebuild waits for this pause in the changes
         private static readonly int[] ResolutionOptions ={ 128, 256, 512, 1024, 2048, 4096, 8192, 16384 };
         private static readonly string[] ResolutionLabels = Array.ConvertAll(ResolutionOptions, r => $"{r}x{r}");
 
@@ -48,6 +49,7 @@ namespace Engine.Editor.WorldGen{
         private VoxelEngineSettings _settings;
         private bool _autoRebuild = true;
         private bool _needsRebuild = true;
+        private double _lastChangeTime; // EditorApplication.timeSinceStartup of the last RequestRebuild
         private bool _buildInProgress;
         private JobHandle _buildHandle;
         private WorldGenSettings _buildAsset; // the asset of the running build
@@ -119,13 +121,13 @@ namespace Engine.Editor.WorldGen{
             _passA ??= new PreviewPass("A");
             _passB ??= new PreviewPass("B");
             EditorApplication.update += OnEditorUpdate;
-            Undo.undoRedoPerformed += RequestRebuild;
+            Undo.undoRedoPerformed += OnUndoRedo;
             ReloadAssets();
         }
 
         private void OnDisable(){
             EditorApplication.update -= OnEditorUpdate;
-            Undo.undoRedoPerformed -= RequestRebuild;
+            Undo.undoRedoPerformed -= OnUndoRedo;
             FinalizeScheduledBuild(false); // a running build still reads the configs and buffers
             DestroyEditors();
             _passA?.Dispose();
@@ -149,7 +151,14 @@ namespace Engine.Editor.WorldGen{
                 Repaint();
             }
 
-            if (_autoRebuild && _needsRebuild && !_buildInProgress) ScheduleBuild();
+            if (_autoRebuild && _needsRebuild && !_buildInProgress &&
+                EditorApplication.timeSinceStartup - _lastChangeTime >= RebuildDebounceSeconds) ScheduleBuild();
+        }
+
+        /// <summary>Undo and redo rebuild at once (with auto rebuild on): they are single steps, not a drag.</summary>
+        private void OnUndoRedo(){
+            _needsRebuild = true;
+            if (_autoRebuild && !_buildInProgress) ScheduleBuild();
         }
 
         /// <summary>The settings asset this preview reads (null until one is assigned).</summary>
@@ -732,9 +741,14 @@ namespace Engine.Editor.WorldGen{
 
         #region Build
 
+        /// <summary>
+        ///     Marks the views stale. With auto rebuild on, <see cref="OnEditorUpdate" /> builds once no change has
+        ///     come in for <see cref="RebuildDebounceSeconds" />, so dragging a slider or panning starts one build
+        ///     per pause instead of one after another. The Rebuild button and undo/redo build at once.
+        /// </summary>
         private void RequestRebuild(){
             _needsRebuild = true;
-            if (_autoRebuild && !_buildInProgress) ScheduleBuild();
+            _lastChangeTime = EditorApplication.timeSinceStartup;
         }
 
         /// <summary>

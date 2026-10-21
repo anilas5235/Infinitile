@@ -1074,6 +1074,13 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
 <li><b>Idea:</b> start an automatic build only when no change has come in for about 150 ms (time of the last <code>RequestRebuild</code>, checked in <code>OnEditorUpdate</code>). The Rebuild button and undo or redo still build at once. Optionally, build at a lower resolution while dragging and at full resolution once the debounce ends.</li>
 <li><b>Costs and risks:</b> small change in the window; the 150 ms delay is a matter of feel.</li>
 <li><b>Acceptance if scheduled:</b> while a slider is dragged at 4096², at most one build runs per pause; the final image equals a manual rebuild.</li>
+<li><b>Done (scheduled 2026-10-21):</b>
+  <ul class="tight">
+  <li><code>RequestRebuild</code> only marks the views stale and records the time; <code>OnEditorUpdate</code> starts the build once 150 ms (<code>RebuildDebounceSeconds</code>) have passed without a change and no build is running. Every settings change, slider, seed edit and pan goes through it, so panning also shows the new image once the mouse pauses.</li>
+  <li>The Rebuild button and undo/redo (<code>OnUndoRedo</code>) still build at once. The build itself is unchanged, so the final image equals a manual rebuild.</li>
+  <li>The optional lower resolution while dragging was not done.</li>
+  <li>Checked in the running Editor: no build starts on a request, and exactly one starts after the pause.</li>
+  </ul></li>
 </ul>
 </main>
 </div>
