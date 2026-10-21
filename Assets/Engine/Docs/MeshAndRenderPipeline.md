@@ -393,7 +393,8 @@ end
 subgraph GPU
     direction LR
     G --> H[BuildPrep: id
-    BuildPrepLight: id or light << 16]
+    BuildPrepLight: id or light << 16
+    Version 1.6: BuildPrepBox, one pass]
     H --> I[BuildPoints: per face corner
     average of front, sides, diagonal
     skipping opaque]
@@ -439,7 +440,8 @@ only unpacked and interpolated, so day and night never re-propagate anything.
 - **GPU light.** The renderer uploads each chunk's light intervals into the shared interval store, like the
   voxel data (two lists per chunk, see Version 1.5). `PointBuilder.compute` decompresses the voxel ids (`BuildPrep`), then
   ORs the light into the upper 16 bits of the same uint (`BuildPrepLight`). A neighbour lookup therefore fetches
-  id and light at once. Version 1.6 writes both in one pass (`BuildPrepBox`). A build without a light buffer for every chunk is invalid.
+  id and light at once (Version 1.6: `BuildPrepBox` writes both in one pass, see below). A build without a light
+  list for every chunk is invalid.
 - **Smooth light.** For each face corner, `BuildPoints` averages every channel over the front voxel,
   the two side neighbours and the diagonal, with rounding.
   - It skips opaque voxels (attenuation 15), and the diagonal too when both sides are opaque, so light never leaks
@@ -506,6 +508,7 @@ subgraph GPU
     one uint2 buffer,
     pages of 512]
     E --> G[BuildPrep / BuildPrepLight
+    Version 1.6: BuildPrepBox
     interval k = page k >> 9]
     F --> G
 end
