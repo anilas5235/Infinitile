@@ -10,7 +10,7 @@ namespace Engine.Scripts.Jobs.ColliderBake{
     /// </summary>
     [BurstCompile]
     internal struct ColliderBuildJob : IJobParallelFor{
-        [ReadOnly] public NativeList<int> MeshIDs;
+        [ReadOnly] public NativeList<EntityId> MeshIDs;
 
         /// <summary>
         ///     Executes bake for each mesh.

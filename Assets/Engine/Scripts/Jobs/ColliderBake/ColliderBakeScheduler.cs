@@ -27,7 +27,7 @@ namespace Engine.Scripts.Jobs.ColliderBake{
 
         private JobHandle _handle;
 
-        private NativeList<int> _jobs;
+        private NativeList<EntityId> _jobs;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="ColliderBakeScheduler" /> class.
@@ -39,7 +39,7 @@ namespace Engine.Scripts.Jobs.ColliderBake{
             _chunkPool = chunkPool;
             _meshes = new Dictionary<int3, (ChunkPartition, int)>();
 
-            _jobs = new NativeList<int>(Allocator.Persistent);
+            _jobs = new NativeList<EntityId>(Allocator.Persistent);
 
             // Physics.BakeMesh reads the collider mesh; finish it before the pool or the mesher rewrites one.
             _chunkPool.PartitionMeshWriting += CompleteJobIfRunning;
@@ -66,7 +66,7 @@ namespace Engine.Scripts.Jobs.ColliderBake{
                 _meshes.Add(partitionPos, (behaviour, behaviour.MeshVersion));
                 if (behaviour.ColliderMesh.vertexCount > 0)
                     // Avoid colliders for empty meshes
-                    _jobs.Add(behaviour.ColliderMesh.GetInstanceID());
+                    _jobs.Add(behaviour.ColliderMesh.GetEntityId());
             }
 
             ColliderBuildJob job = new(){
