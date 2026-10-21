@@ -21,9 +21,13 @@
 // MeshLayer.Solid (MeshLayerSolid)
 #define MESH_LAYER_SOLID 0
 
+// Partition build: the chunks of a build in PartitionBuildRequest order (PrepChunks), and the decompressed box,
+// the partition plus a 1-voxel border, BOX_SIZE voxels along each axis (PrepBoxSize)
+#define PREP_CHUNKS 9
+#define BOX_SIZE 34
+
 // Thread group sizes; the C# side sizes its dispatches with them
-#define PREP_THREADS 64 // BuildPrep, BuildPrepLight (PrepThreads)
-#define PREP_INTERVALS_PER_THREAD 8 // (PrepIntervalsPerThread)
+#define PREP_BOX_THREADS 64 // BuildPrepBox, one box column per thread (PrepBoxThreads)
 #define BUILD_POINTS_THREADS 4 // BuildPoints, per axis (BuildPointsThreads)
 #define COPY_INTERVALS_THREADS 64 // CopyIntervals (CopyIntervalsThreads)
 #define COPY_POINTS_THREADS 256 // CopyPoints, one point per thread, equals POINTS_PER_PAGE (CopyPointsThreads)

@@ -27,10 +27,17 @@ namespace Engine.Scripts.Utils{
 
         internal const int MeshLayerSolid = (int)MeshLayer.Solid;
 
-        /// <summary>Threads per group of the BuildPrep kernels, each decompressing a run of intervals.</summary>
-        internal const int PrepThreads = 64;
+        /// <summary>Chunks of a partition build: the partition's chunk and its eight neighbours.</summary>
+        internal const int PrepChunks = 9;
 
-        internal const int PrepIntervalsPerThread = 8;
+        /// <summary>
+        ///     Voxels per axis of the box BuildPrepBox decompresses: the partition plus a 1-voxel border, all that
+        ///     BuildPoints reads (spec 20.4). Partitions are cubes.
+        /// </summary>
+        internal const int PrepBoxSize = PartitionWidth + 2;
+
+        /// <summary>Threads per group of BuildPrepBox, one box column per thread.</summary>
+        internal const int PrepBoxThreads = 64;
 
         /// <summary>Threads per group and axis of BuildPoints; a partition is dispatched as a cube of groups.</summary>
         internal const int BuildPointsThreads = 4;
@@ -53,30 +60,18 @@ namespace Engine.Scripts.Utils{
         public static readonly int VoxelQuadTexPairNameID = Shader.PropertyToID("_VoxelQuadTexPairs");
         public static readonly int VoxelQuadTexPairCountNameID = Shader.PropertyToID("_VoxelQuadTexPairsCount");
 
-        public static readonly int MainChunkNameID = Shader.PropertyToID("_MainChunk");
-        public static readonly int NeighborChunkUpNameID = Shader.PropertyToID("_NeighborChunk0");
-        public static readonly int NeighborChunkUpRightNameID = Shader.PropertyToID("_NeighborChunk1");
-        public static readonly int NeighborChunkRightNameID = Shader.PropertyToID("_NeighborChunk2");
-        public static readonly int NeighborChunkDownRightNameID = Shader.PropertyToID("_NeighborChunk3");
-        public static readonly int NeighborChunkDownNameID = Shader.PropertyToID("_NeighborChunk4");
-        public static readonly int NeighborChunkDownLeftNameID = Shader.PropertyToID("_NeighborChunk5");
-        public static readonly int NeighborChunkLeftNameID = Shader.PropertyToID("_NeighborChunk6");
-        public static readonly int NeighborChunkUpLeftNameID = Shader.PropertyToID("_NeighborChunk7");
+        public static readonly int PreparedBoxNameID = Shader.PropertyToID("_PreparedBox");
+        public static readonly int PreparedBoxOutNameID = Shader.PropertyToID("_PreparedBoxOut");
+        public static readonly int BoxOriginYNameID = Shader.PropertyToID("_BoxOriginY");
 
         public static readonly int MetadataNameID = Shader.PropertyToID("_Metadata");
 
         public static readonly int CompChunkNameID = Shader.PropertyToID("_CompChunk");
-        public static readonly int UnCompChunkNameID = Shader.PropertyToID("_UnCompChunk");
         public static readonly int CompPagesNameID = Shader.PropertyToID("_CompPages");
-        public static readonly int CompPagesOffsetNameID = Shader.PropertyToID("_CompPagesOffset");
         public static readonly int CopySourceNameID = Shader.PropertyToID("_CopySource");
         public static readonly int CopyTargetNameID = Shader.PropertyToID("_CopyTarget");
         public static readonly int CopyCountNameID = Shader.PropertyToID("_CopyCount");
         public static readonly int CopyStrideNameID = Shader.PropertyToID("_CopyStride");
-
-        public static readonly int VoxelsPerChunkNameID = Shader.PropertyToID("_VoxelsPerChunk");
-        public static readonly int ChunkSizeNameID = Shader.PropertyToID("_ChunkSize");
-        public static readonly int PartitionSizeNameID = Shader.PropertyToID("_PartitionSize");
 
         public static readonly int SolidPointsOutNameID = Shader.PropertyToID("_SolidPointsOut");
         public static readonly int TransparentPointsOutNameID = Shader.PropertyToID("_TransparentPointsOut");

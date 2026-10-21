@@ -1,5 +1,4 @@
-﻿#pragma kernel BuildPrep
-#pragma kernel BuildPrepLight
+﻿#pragma kernel BuildPrepBox
 #pragma kernel BuildPoints
 #pragma kernel CopyIntervals
 
@@ -44,76 +43,90 @@ uint2 get_voxel_quad_indices(in VoxelDef def, uint dir)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BuildPrep Kernel - Expand compressed chunk data into flat arrays
-// Each voxel's uint holds the voxel id (bits 0-15) and its light sky|R|G|B (bits 16-31). BuildPrep
-// writes the ids, BuildPrepLight then ORs the light in, so a lookup fetches id and light at once.
+// BuildPrepBox Kernel - Decompress the partition's neighbourhood (spec 20.4)
+// The box is the partition plus a 1-voxel border in x, y and z, BOX_SIZE voxels per axis: every voxel BuildPoints
+// reads. Box position = partition-local position + 1, index (bx * BOX_SIZE + bz) * BOX_SIZE + by. Each voxel's
+// uint holds the voxel id (bits 0-15) and its light sky|R|G|B (bits 16-31), so a lookup fetches both at once.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// _CompChunk is the shared interval store of every chunk (ChunkIntervalStore). A list is a sequence of
-// pages of 512 elements anywhere in the store; _CompPages[_CompPagesOffset + p] is the store page of its page p.
-// Element 0 of a list: (intervalCount, lastUncompressedIndex).
+#define PARTITION_SIZE (BOX_SIZE - 2)
+#define CHUNK_HEIGHT (1 << CHUNK_INDEX_SHIFT_Z) // y is the lowest field of the flat chunk index
+#define SKY_ABOVE_WORLD (0xF000u << 16) // air with sky 15, the space above the world
+
+// _CompChunk is the shared interval store of every chunk (ChunkIntervalStore). A list is a sequence of pages of
+// 512 elements anywhere in the store. _CompPages starts with 2 * PREP_CHUNKS entries, the start of each list's
+// page table in _CompPages (the voxel lists, then the light lists, both in PartitionBuildRequest order); entry p of
+// a page table is the store page of the list's page p.
+// Element 0 of a list: (intervalCount, lastUncompressedIndex); element k: (value, exclusive end index).
 StructuredBuffer<uint2> _CompChunk;
 StructuredBuffer<uint> _CompPages;
-uint _CompPagesOffset;
-RWStructuredBuffer<uint> _UnCompChunk;
+RWStructuredBuffer<uint> _PreparedBoxOut;
+int _BoxOriginY; // world y of box layer 0: the partition's base - 1
 
-uint2 CompInterval(uint k)
+uint2 CompInterval(uint table, uint k)
 {
-    uint page = _CompPages[_CompPagesOffset + (k >> COMP_PAGE_SHIFT)];
+    uint page = _CompPages[table + (k >> COMP_PAGE_SHIFT)];
     return _CompChunk[(page << COMP_PAGE_SHIFT) | (k & COMP_PAGE_MASK)];
 }
 
-uint _VoxelsPerChunk;
-
-[numthreads(PREP_THREADS, 1, 1)]
-void BuildPrep(uint3 id : SV_DispatchThreadID)
+// First interval of a list whose end lies beyond index (binary search over intervals 1..count)
+uint find_interval(uint table, uint count, uint index)
 {
-    uint start_interval = 1 + id.x * PREP_INTERVALS_PER_THREAD; //+1 because interval 0 is metadata
-
-    uint total_intervals = CompInterval(0).x;
-    if (start_interval > total_intervals) return;
-
-    for (int i = 0; i < PREP_INTERVALS_PER_THREAD; ++i)
+    uint lo = 1;
+    uint hi = count;
+    while (lo < hi)
     {
-        uint target_interval = start_interval + i;
-        if (target_interval > total_intervals) break;
-
-        uint start_index = 0;
-        if (target_interval > 1) start_index = CompInterval(target_interval - 1).y; // Previous page's end index
-
-        uint2 page_data = CompInterval(target_interval);
-        uint end_index = min(page_data.y, _VoxelsPerChunk);
-        for (uint t_index = start_index; t_index < end_index; ++t_index)
-        {
-            _UnCompChunk[t_index] = page_data.x;
-        }
+        uint mid = (lo + hi) >> 1;
+        if (CompInterval(table, mid).y > index) hi = mid;
+        else lo = mid + 1;
     }
+    return lo;
 }
 
-// Same interval walk as BuildPrep over the chunk's light list; the ids are already in place.
-[numthreads(PREP_THREADS, 1, 1)]
-void BuildPrepLight(uint3 id : SV_DispatchThreadID)
+// Slot of the chunk at offset (ox, oz) in PartitionBuildRequest order, indexed by (ox + 1) * 3 + oz + 1
+static const uint PREP_SLOTS[9] = { 6, 7, 8, 5, 0, 1, 4, 3, 2 };
+
+// One thread per box column: a binary search per list for the column's first voxel, then a walk up the runs.
+// Below the world reads as air, above it as air in full sky light.
+[numthreads(PREP_BOX_THREADS, 1, 1)]
+void BuildPrepBox(uint3 id : SV_DispatchThreadID)
 {
-    uint start_interval = 1 + id.x * PREP_INTERVALS_PER_THREAD;
+    if (id.x >= BOX_SIZE * BOX_SIZE) return;
 
-    uint total_intervals = CompInterval(0).x;
-    if (start_interval > total_intervals) return;
+    // Partition-local x, z of the column; the partition spans its chunk in x and z, so the border columns lie
+    // in the neighbour chunks
+    int x = (int)(id.x / BOX_SIZE) - 1;
+    int z = (int)(id.x % BOX_SIZE) - 1;
+    int ox = x < 0 ? -1 : x >= PARTITION_SIZE ? 1 : 0;
+    int oz = z < 0 ? -1 : z >= PARTITION_SIZE ? 1 : 0;
+    uint slot = PREP_SLOTS[(ox + 1) * 3 + oz + 1];
+    uint column_start = ((uint)(x - ox * PARTITION_SIZE) << CHUNK_INDEX_SHIFT_X)
+        + ((uint)(z - oz * PARTITION_SIZE) << CHUNK_INDEX_SHIFT_Z);
+    uint box_column = id.x * BOX_SIZE;
 
-    for (int i = 0; i < PREP_INTERVALS_PER_THREAD; ++i)
+    // Box layers [first, end) lie inside the world height
+    int first = clamp(-_BoxOriginY, 0, BOX_SIZE);
+    int end = clamp(CHUNK_HEIGHT - _BoxOriginY, first, BOX_SIZE);
+    for (int below = 0; below < first; below++) _PreparedBoxOut[box_column + below] = 0;
+    for (int above = end; above < BOX_SIZE; above++) _PreparedBoxOut[box_column + above] = SKY_ABOVE_WORLD;
+    if (first == end) return;
+
+    uint voxel_table = _CompPages[slot];
+    uint light_table = _CompPages[PREP_CHUNKS + slot];
+    uint voxel_count = CompInterval(voxel_table, 0).x;
+    uint light_count = CompInterval(light_table, 0).x;
+    uint index = column_start + (uint)(_BoxOriginY + first);
+    uint kv = find_interval(voxel_table, voxel_count, index);
+    uint kl = find_interval(light_table, light_count, index);
+    uint2 voxel = CompInterval(voxel_table, kv);
+    uint2 light = CompInterval(light_table, kl);
+
+    for (int by = first; by < end; by++, index++)
     {
-        uint target_interval = start_interval + i;
-        if (target_interval > total_intervals) break;
-
-        uint start_index = 0;
-        if (target_interval > 1) start_index = CompInterval(target_interval - 1).y;
-
-        uint2 page_data = CompInterval(target_interval);
-        uint light = (page_data.x & 0xFFFF) << 16;
-        uint end_index = min(page_data.y, _VoxelsPerChunk);
-        for (uint t_index = start_index; t_index < end_index; ++t_index)
-        {
-            _UnCompChunk[t_index] = (_UnCompChunk[t_index] & 0xFFFF) | light;
-        }
+        // The count bounds keep a list that ends early from walking off its pages
+        while (voxel.y <= index && kv < voxel_count) voxel = CompInterval(voxel_table, ++kv);
+        while (light.y <= index && kl < light_count) light = CompInterval(light_table, ++kl);
+        _PreparedBoxOut[box_column + by] = (voxel.x & 0xFFFF) | (light.x & 0xFFFF) << 16;
     }
 }
 
@@ -121,8 +134,6 @@ void BuildPrepLight(uint3 id : SV_DispatchThreadID)
 // Build Kernel - Generate solid point data per partition
 // ─────────────────────────────────────────────────────────────────────────────
 
-int3 _ChunkSize;
-int3 _PartitionSize;
 uint _PartitionIndex;
 
 StructuredBuffer<VoxelDef> _VoxelRenderDefs;
@@ -130,15 +141,7 @@ uint _VoxelRenderDefsCount;
 StructuredBuffer<uint> _VoxelQuadTexPairs;
 uint _VoxelQuadTexPairsCount;
 
-StructuredBuffer<uint> _MainChunk;
-StructuredBuffer<uint> _NeighborChunk0; //(0,1)
-StructuredBuffer<uint> _NeighborChunk1; //(1,1)
-StructuredBuffer<uint> _NeighborChunk2; //(1,0)
-StructuredBuffer<uint> _NeighborChunk3; //(1,-1)
-StructuredBuffer<uint> _NeighborChunk4; //(0,-1)
-StructuredBuffer<uint> _NeighborChunk5; //(-1,-1)
-StructuredBuffer<uint> _NeighborChunk6; //(-1,0)
-StructuredBuffer<uint> _NeighborChunk7; //(-1,1)
+StructuredBuffer<uint> _PreparedBox; // written by BuildPrepBox
 
 RWStructuredBuffer<PartitionMetadata> _Metadata;
 // Counter buffers instead of append buffers, so a write past the capacity is skipped explicitly.
@@ -148,7 +151,7 @@ RWStructuredBuffer<PointData> _TransparentPointsOut;
 RWStructuredBuffer<PointData> _FoliagePointsOut;
 uint _PointCapacity;
 
-// The prepared chunks hold id | light << 16; the lookups below return the whole cell, use
+// The prepared box holds id | light << 16; the lookups below return the whole cell, use
 // cell_id / cell_light to split it.
 uint cell_id(uint cell)
 {
@@ -160,7 +163,6 @@ uint cell_light(uint cell)
     return cell >> 16;
 }
 
-#define SKY_ABOVE_WORLD (0xF000u << 16) // air with sky 15, the space above the world
 #define NO_INNER_LIGHT 0xFFFFFFFFu
 
 VoxelDef get_voxel_def(uint voxelId)
@@ -172,85 +174,13 @@ VoxelDef get_voxel_def(uint voxelId)
     return def;
 }
 
-uint get_voxel_array_index(in int3 pos)
-{
-    return ((uint)pos.x << CHUNK_INDEX_SHIFT_X) + ((uint)pos.z << CHUNK_INDEX_SHIFT_Z) + (uint)pos.y;
-}
-
-uint get_voxel(StructuredBuffer<uint> target, in int3 in_chunk_pos)
-{
-    uint index = get_voxel_array_index(in_chunk_pos);
-    if (index >= _VoxelsPerChunk) return 0; // Out of bounds, treat as air
-    return target[index];
-}
-
-uint get_voxel_from_chunk_offset(in int2 chunk_offset, in int3 in_chunk_pos)
-{
-    if (abs(chunk_offset.x) > 1 || abs(chunk_offset.y) > 1) return 0;
-
-    int ox = clamp(chunk_offset.x, -1, 1);
-    int oy = clamp(chunk_offset.y, -1, 1);
-
-    switch (ox)
-    {
-    case 1:
-        switch (oy)
-        {
-        case 1: return get_voxel(_NeighborChunk1, in_chunk_pos);
-        case 0: return get_voxel(_NeighborChunk2, in_chunk_pos);
-        case -1: return get_voxel(_NeighborChunk3, in_chunk_pos);
-        default: return get_voxel(_MainChunk, in_chunk_pos);
-        }
-    case 0:
-        switch (oy)
-        {
-        case 1: return get_voxel(_NeighborChunk0, in_chunk_pos);
-        case -1: return get_voxel(_NeighborChunk4, in_chunk_pos);
-        default: return get_voxel(_MainChunk, in_chunk_pos);
-        }
-    case -1:
-        switch (oy)
-        {
-        case 1: return get_voxel(_NeighborChunk7, in_chunk_pos);
-        case 0: return get_voxel(_NeighborChunk6, in_chunk_pos);
-        case -1: return get_voxel(_NeighborChunk5, in_chunk_pos);
-        default: return get_voxel(_MainChunk, in_chunk_pos);
-        }
-    default:
-        return get_voxel(_MainChunk, in_chunk_pos);
-    }
-}
-
-// Helper: Get voxel from chunk-space position safely
+// Cell at a chunk-space position (partition-local x, z and world y) from the prepared box. BuildPoints reads
+// at most one voxel beyond the partition along each axis; anything further out reads as air.
 uint get_voxel_safe(in int3 in_chunk_pos)
 {
-    int3 chunk_size = _ChunkSize;
-    int3 part_size = _PartitionSize;
-    if (in_chunk_pos.y < 0) return 0;
-    if (in_chunk_pos.y >= chunk_size.y) return SKY_ABOVE_WORLD; // air in full sky light
-
-    if (in_chunk_pos.x < 0 || in_chunk_pos.x >= part_size.x || in_chunk_pos.z < 0 || in_chunk_pos.z >=
-        part_size.z)
-    {
-        if (in_chunk_pos.x < -part_size.x || in_chunk_pos.x >= 2 * part_size.x || in_chunk_pos.z < -part_size.z
-            || in_chunk_pos.z >= 2 * part_size.z)
-            return 0;
-
-        int2 chunk_offset = int2(
-            floor((float)in_chunk_pos.x / part_size.x),
-            floor((float)in_chunk_pos.z / part_size.z)
-        );
-
-        int3 neighbor_chunk_pos = int3(
-            in_chunk_pos.x - chunk_offset.x * part_size.x,
-            in_chunk_pos.y,
-            in_chunk_pos.z - chunk_offset.y * part_size.z
-        );
-
-        return get_voxel_from_chunk_offset(chunk_offset, neighbor_chunk_pos);
-    }
-
-    return get_voxel(_MainChunk, in_chunk_pos);
+    uint3 b = (uint3)(in_chunk_pos + int3(1, -_BoxOriginY, 1));
+    if (any(b >= BOX_SIZE)) return 0;
+    return _PreparedBox[(b.x * BOX_SIZE + b.z) * BOX_SIZE + b.y];
 }
 
 // Helper: Get direction offset
@@ -413,13 +343,13 @@ void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uin
 [numthreads(BUILD_POINTS_THREADS, BUILD_POINTS_THREADS, BUILD_POINTS_THREADS)]
 void BuildPoints(uint3 id : SV_DispatchThreadID)
 {
-    if (any(id >= uint3(_PartitionSize))) return;
+    if (any(id >= PARTITION_SIZE)) return;
 
     PartitionMetadata metadata = _Metadata[_PartitionIndex];
     int3 pos = (int3)id;
     float3 partitionWS = (float3)metadata.partitionWS;
     int3 in_chunk_pos = pos + int3(0, partitionWS.y, 0);
-    uint cell = get_voxel(_MainChunk, in_chunk_pos);
+    uint cell = get_voxel_safe(in_chunk_pos);
     uint voxelId = cell_id(cell);
 
     if (voxelId == 0) return; // Skip air

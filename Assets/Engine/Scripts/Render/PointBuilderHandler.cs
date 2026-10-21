@@ -3,7 +3,6 @@ using System.Runtime.InteropServices;
 using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig;
 using Unity.Collections;
-using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
@@ -16,20 +15,20 @@ namespace Engine.Scripts.Render{
     ///     Manages point preparation, building, and provides GPU buffers for solid, transparent, and foliage points.
     /// </summary>
     public class PointBuilderHandler : IDisposable{
-        private const int PrepChunkCount = 9;
-        private readonly int _buildPrepKernelID;
-        private readonly int _buildPrepLightKernelID;
+        private const int PrepBoxVoxels = PrepBoxSize * PrepBoxSize * PrepBoxSize;
+        private const int PrepBoxGroups = (PrepBoxSize * PrepBoxSize + PrepBoxThreads - 1) / PrepBoxThreads;
+        private readonly int _buildPrepBoxKernelID;
 
         private readonly GraphicsBuffer _metadata;
         private readonly ComputeShader _pointBuilder;
         private readonly int _pointBuilderKernelID;
-        private readonly GraphicsBuffer[] _preparedChunks;
+        private readonly GraphicsBuffer _preparedBox;
 
-        // page tables of the 2 x 9 interval lists of a build (voxel ids and light), packed back to back
-        private const int PageTableLists = 2 * PrepChunkCount;
+        // page tables of the 2 x 9 interval lists of a build (voxel ids, then light): a header with the start of
+        // each list's table, then the tables back to back
+        private const int PageTableLists = 2 * PrepChunks;
         private readonly GraphicsBuffer _pageTable;
-        private readonly uint[] _pageTableUpload = new uint[PageTableLists * IntervalPages.MaxPagesPerList];
-        private readonly int[] _pageTableOffsets = new int[PageTableLists];
+        private readonly uint[] _pageTableUpload = new uint[PageTableLists * (1 + IntervalPages.MaxPagesPerList)];
 
         private readonly GraphicsBuffer _readBackCountBuffer;
         private readonly GraphicsBuffer _voxelQuadTexPairBuffer;
@@ -37,9 +36,6 @@ namespace Engine.Scripts.Render{
         private readonly GraphicsBuffer _voxelRenderDefBuffer;
         private NativeArray<uint> _counts;
         private readonly PartitionMetadata[] _metadataUpload = new PartitionMetadata[1];
-        // SetInts takes a params array; these constants are passed as pre-built arrays
-        private static readonly int[] ChunkSizeInts = { ChunkSize.x, ChunkSize.y, ChunkSize.z };
-        private static readonly int[] PartitionSizeInts = { PartitionSize.x, PartitionSize.y, PartitionSize.z };
         private readonly int[] _pointCounts = new int[3]; // result array reused per handler
         private bool _disposed;
         private bool _readBackPending;
@@ -61,12 +57,9 @@ namespace Engine.Scripts.Render{
             _pointBuilder = pointBuilder;
             _voxelRenderDefBuffer = voxelRenderDef;
             _voxelQuadTexPairBuffer = voxelQuadTexPair;
-            _buildPrepKernelID = pointBuilder.FindKernel("BuildPrep");
-            _buildPrepLightKernelID = pointBuilder.FindKernel("BuildPrepLight");
+            _buildPrepBoxKernelID = pointBuilder.FindKernel("BuildPrepBox");
             _pointBuilderKernelID = pointBuilder.FindKernel("BuildPoints");
-            _preparedChunks = new GraphicsBuffer[PrepChunkCount];
-            for (int i = 0; i < _preparedChunks.Length; i++)
-                _preparedChunks[i] = new GraphicsBuffer(Target.Structured, VoxelsPerChunk, sizeof(uint));
+            _preparedBox = new GraphicsBuffer(Target.Structured, PrepBoxVoxels, sizeof(uint));
             _pageTable = new GraphicsBuffer(Target.Structured, _pageTableUpload.Length, sizeof(uint));
 
             int vSize = Marshal.SizeOf<Vertex>();
@@ -114,7 +107,7 @@ namespace Engine.Scripts.Render{
             SafeDispose(_metadata);
             SafeDispose(_readBackCountBuffer);
             SafeDispose(_pageTable);
-            foreach (GraphicsBuffer chunkBuffer in _preparedChunks) SafeDispose(chunkBuffer);
+            SafeDispose(_preparedBox);
 
             try{
                 if (_counts.IsCreated) _counts.Dispose();
@@ -149,7 +142,7 @@ namespace Engine.Scripts.Render{
             _metadataUpload[0] = data.GetMetadata();
             _metadata.SetData(_metadataUpload);
 
-            PrepareChunks(data, store);
+            PrepareBox(data, store);
 
             _pointBuilder.SetBuffer(_pointBuilderKernelID, VoxelRenderDefNameID, _voxelRenderDefBuffer);
             _pointBuilder.SetInt(VoxelRenderDefCountNameID, _voxelRenderDefBuffer.count);
@@ -157,19 +150,7 @@ namespace Engine.Scripts.Render{
             _pointBuilder.SetBuffer(_pointBuilderKernelID, VoxelQuadTexPairNameID, _voxelQuadTexPairBuffer);
             _pointBuilder.SetInt(VoxelQuadTexPairCountNameID, _voxelQuadTexPairBuffer.count);
 
-            _pointBuilder.SetInt(VoxelsPerChunkNameID, VoxelsPerChunk);
-            _pointBuilder.SetInts(ChunkSizeNameID, ChunkSizeInts);
-            _pointBuilder.SetInts(PartitionSizeNameID, PartitionSizeInts);
-
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, MainChunkNameID, _preparedChunks[0]);
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkUpNameID, _preparedChunks[1]);
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkUpRightNameID, _preparedChunks[2]);
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkRightNameID, _preparedChunks[3]);
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkDownRightNameID, _preparedChunks[4]);
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkDownNameID, _preparedChunks[5]);
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkDownLeftNameID, _preparedChunks[6]);
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkLeftNameID, _preparedChunks[7]);
-            _pointBuilder.SetBuffer(_pointBuilderKernelID, NeighborChunkUpLeftNameID, _preparedChunks[8]);
+            _pointBuilder.SetBuffer(_pointBuilderKernelID, PreparedBoxNameID, _preparedBox);
 
             _pointBuilder.SetBuffer(_pointBuilderKernelID, MetadataNameID, _metadata);
             _pointBuilder.SetBuffer(_pointBuilderKernelID, SolidPointsOutNameID, SolidPointsOut);
@@ -256,53 +237,35 @@ namespace Engine.Scripts.Render{
             FoliagePointsOut.SetCounterValue(0);
         }
 
+        /// <summary>The box <see cref="PrepareBox" /> writes (tests).</summary>
+        internal GraphicsBuffer PreparedBox => _preparedBox;
+
         /// <summary>
-        ///     Prepares all chunks for point building by decompressing them: the voxel ids into the lower 16 bits
-        ///     of each voxel's uint, then the light into the upper 16 bits.
+        ///     Decompresses the partition plus a 1-voxel border, the only voxels BuildPoints reads, from the interval
+        ///     lists of its chunk and the eight neighbours in one dispatch: each voxel's uint holds the voxel id in the
+        ///     lower 16 bits and its light in the upper 16 bits (spec 20.4).
         /// </summary>
         /// <param name="data">The partition build request containing the chunks' interval lists.</param>
         /// <param name="store">The interval store that holds the lists.</param>
-        private void PrepareChunks(PartitionBuildRequest data, ChunkIntervalStore store){
-            _pointBuilder.SetInt(VoxelsPerChunkNameID, VoxelsPerChunk);
+        internal void PrepareBox(PartitionBuildRequest data, ChunkIntervalStore store){
             IntervalRange[] voxelLists = data.VoxelLists;
             IntervalRange[] lightLists = data.LightLists;
-            // The lists' page tables are packed back to back; only the used part is uploaded.
-            int used = 0;
-            for (int i = 0; i < voxelLists.Length; i++){
-                _pageTableOffsets[i] = used;
+            // Header first, then the page tables; only the used part is uploaded.
+            int used = PageTableLists;
+            for (int i = 0; i < PrepChunks; i++){
+                _pageTableUpload[i] = (uint)used;
                 used += store.WritePageTable(voxelLists[i], _pageTableUpload, used);
-                _pageTableOffsets[PrepChunkCount + i] = used;
+                _pageTableUpload[PrepChunks + i] = (uint)used;
                 used += store.WritePageTable(lightLists[i], _pageTableUpload, used);
             }
 
             _pageTable.SetData(_pageTableUpload, 0, 0, used);
-            _pointBuilder.SetBuffer(_buildPrepKernelID, CompChunkNameID, store.Buffer);
-            _pointBuilder.SetBuffer(_buildPrepKernelID, CompPagesNameID, _pageTable);
-            _pointBuilder.SetBuffer(_buildPrepLightKernelID, CompChunkNameID, store.Buffer);
-            _pointBuilder.SetBuffer(_buildPrepLightKernelID, CompPagesNameID, _pageTable);
-
-            for (int i = 0; i < voxelLists.Length; i++){
-                DispatchPrepChunk(_buildPrepKernelID, i, voxelLists[i], _pageTableOffsets[i]);
-                // runs after the ids are written
-                DispatchPrepChunk(_buildPrepLightKernelID, i, lightLists[i], _pageTableOffsets[PrepChunkCount + i]);
-            }
-        }
-
-        /// <summary>
-        ///     Dispatches a compute shader job to decompress a single chunk's interval list.
-        /// </summary>
-        /// <param name="kernel">BuildPrep (voxel ids) or BuildPrepLight (light).</param>
-        /// <param name="chunkIndex">The index of the chunk to prepare.</param>
-        /// <param name="list">The compressed list in the interval store.</param>
-        /// <param name="pageTableOffset">Start of the list's pages in the page table.</param>
-        private void DispatchPrepChunk(int kernel, int chunkIndex, in IntervalRange list, int pageTableOffset){
-            _pointBuilder.SetInt(CompPagesOffsetNameID, pageTableOffset);
-            _pointBuilder.SetBuffer(kernel, UnCompChunkNameID, _preparedChunks[chunkIndex]);
-
-            int intervalCount = list.IntervalCount;
-            int intervalsPerGroup = PrepThreads * PrepIntervalsPerThread;
-            int groupsX = math.max(1, (intervalCount + intervalsPerGroup - 1) / intervalsPerGroup);
-            _pointBuilder.Dispatch(kernel, groupsX, 1, 1);
+            _pointBuilder.SetBuffer(_buildPrepBoxKernelID, CompChunkNameID, store.Buffer);
+            _pointBuilder.SetBuffer(_buildPrepBoxKernelID, CompPagesNameID, _pageTable);
+            _pointBuilder.SetBuffer(_buildPrepBoxKernelID, PreparedBoxOutNameID, _preparedBox);
+            // also read by BuildPoints to place positions in the box
+            _pointBuilder.SetInt(BoxOriginYNameID, data.Partition.y * PartitionHeight - 1);
+            _pointBuilder.Dispatch(_buildPrepBoxKernelID, PrepBoxGroups, 1, 1);
         }
     }
 }
