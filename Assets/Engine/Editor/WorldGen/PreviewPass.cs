@@ -14,7 +14,7 @@ using BlendWeights = Engine.Scripts.WorldGen.Blending.BlendWeights;
 using Object = UnityEngine.Object;
 
 namespace Engine.Editor.WorldGen{
-    /// <summary>The views of the preview (INT-20). Offset, Amp and Jaggedness exist in Terrain-first only (TRN-06).</summary>
+    /// <summary>The views of the preview. Offset, Amp and Jaggedness exist in Terrain-first only.</summary>
     internal enum PreviewView{
         Height,
         HardBiome,
@@ -42,17 +42,17 @@ namespace Engine.Editor.WorldGen{
     }
 
     /// <summary>
-    ///     One configuration of the preview (INT-20/21): its Burst config, the sampled region buffers, the view
-    ///     pixels and textures and the per-view statistics (clamped share GEN-12, biome-pair boundaries GEN-24, flora
-    ///     counts). Every view is filled from <see cref="WorldGenApi.SampleRegion" />, so it shows what
-    ///     <c>WorldSampler</c> computes (TST-E12). The buffers persist between builds so the A/B difference can be
+    ///     One configuration of the preview: its Burst config, the sampled region buffers, the view pixels and
+    ///     textures and the per-view statistics (clamped share, biome-pair boundaries, flora counts). Every view is
+    ///     filled from <see cref="WorldGenApi.SampleRegion" />, so it shows exactly what <c>WorldSampler</c>
+    ///     computes. The buffers persist between builds so the A/B difference can be
     ///     recomputed for another view without sampling again; they are reallocated only when the view size changes.
     /// </summary>
     internal sealed class PreviewPass : IDisposable{
         public static readonly int ViewCount = Enum.GetValues(typeof(PreviewView)).Length;
 
         public readonly string Label;
-        private WorldGenConfig _config; // owned (D-05); rebuilt per build
+        private WorldGenConfig _config; // owned; rebuilt per build
 
         // --- Sampled buffers (Persistent, Size² each) ----------------------------------------------------------------
         public NativeArray<WorldFields> Fields;
@@ -87,7 +87,7 @@ namespace Engine.Editor.WorldGen{
         public float2 JaggednessRange { get; private set; }
         public List<BiomeBoundaryStats.PairLength> Boundaries { get; private set; } = new();
 
-        /// <summary>VEG-06 species id → name of the last build (element 0 = "none").</summary>
+        /// <summary>Flora species id → name of the last build (element 0 = "none").</summary>
         public string[] FloraNames { get; private set; } = Array.Empty<string>();
 
         /// <summary>Flora species id → columns, sorted by count (id 0 = none excluded).</summary>
@@ -182,7 +182,7 @@ namespace Engine.Editor.WorldGen{
                 PvView = _pixels[(int)PreviewView.PeaksValleys]
             }.Schedule(size * size, 64, sampled);
 
-            // GEN-24 on the dominant material biome, the class the surface blocks follow (ANA-10 edge count).
+            // Boundaries of the dominant material biome, the class the surface blocks follow.
             JobHandle boundaries = BiomeBoundaryStats.Schedule(DominantBiome, size, _edges, sampled);
             handle = JobHandle.CombineDependencies(views, boundaries);
             return true;
@@ -210,7 +210,7 @@ namespace Engine.Editor.WorldGen{
                 flora[species] = n + 1;
             }
 
-            ClampedShare = count > 0 ? clamped / (float)count : 0f; // GEN-12
+            ClampedShare = count > 0 ? clamped / (float)count : 0f;
             MeanMaxWeight = count > 0 ? (float)(weight / count) : 0f;
             FloraCounts = new List<(ushort, int)>();
             foreach (KeyValuePair<ushort, int> pair in flora) FloraCounts.Add((pair.Key, pair.Value));
@@ -227,7 +227,7 @@ namespace Engine.Editor.WorldGen{
         }
 
         /// <summary>
-        ///     TRN-06: Offset on the height scale (blue below the water level), Amp and J normalised to the range seen
+        ///     Terrain-parameter views: Offset on the height scale (blue below the water level), Amp and J normalised to the range seen
         ///     in the view. Black in Biome-first. Main-thread conversion of at most 512² pixels.
         /// </summary>
         private void FillTerrainParamViews(int waterLevel){
@@ -341,9 +341,9 @@ namespace Engine.Editor.WorldGen{
         }
 
         /// <summary>
-        ///     Converts the sampled buffers to the view pixels. Reads only; no sampler call, so GEN-16's strict float
-        ///     mode is not needed, but it compiles synchronously like every other preview job: the first build after
-        ///     a script reload would otherwise run managed over the whole view.
+        ///     Converts the sampled buffers to the view pixels. Reads only; no sampler call, so the sampler's strict
+        ///     float mode is not needed, but it compiles synchronously like every other preview job: the first build
+        ///     after a script reload would otherwise run managed over the whole view.
         /// </summary>
         [BurstCompile(CompileSynchronously = true)]
         private struct ViewJob : IJobParallelFor{
@@ -388,7 +388,7 @@ namespace Engine.Editor.WorldGen{
                 byte w = (byte)math.round(math.saturate(weight) * 255f);
                 MaxWeightView[index] = new Color32(w, w, w, 255);
 
-                // VEG-06: species over the darkened surface source.
+                // Flora species over the darkened surface source.
                 ushort species = FloraSpecies[index];
                 FloraView[index] = species != 0
                     ? SpeciesColor(species)
@@ -408,8 +408,8 @@ namespace Engine.Editor.WorldGen{
             }
 
             /// <summary>
-            ///     Height on the HeightMin..HeightMax scale, blue tint below water, red where clamped (GEN-12). With
-            ///     the hillshade (INT-20) land is lit by a Lambert light from the north-west at 45° over the slope of
+            ///     Height on the HeightMin..HeightMax scale, blue tint below water, red where clamped. With the
+            ///     hillshade, land is lit by a Lambert light from the north-west at 45° over the slope of
             ///     the neighbouring samples (central differences, <c>2·Stride</c> blocks apart).
             /// </summary>
             private Color32 HeightColor(int index){

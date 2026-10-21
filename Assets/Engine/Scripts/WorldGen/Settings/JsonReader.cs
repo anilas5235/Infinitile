@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Engine.Scripts.WorldGen.Settings{
     /// <summary>
-    ///     Minimal JSON reader for settings import (TRN-05), the counterpart of <see cref="CanonicalJson" />.
+    ///     Minimal JSON reader for settings import, the counterpart of <see cref="CanonicalJson" />.
     ///     Objects become <c>Dictionary&lt;string, object&gt;</c>, arrays <c>List&lt;object&gt;</c>, numbers
     ///     <c>double</c>, plus string, bool and null. <c>JsonUtility</c> cannot read the polymorphic spline values
     ///     (number or nested object), hence this reader.

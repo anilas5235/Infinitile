@@ -1,14 +1,12 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using Engine.Scripts.Components;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Jobs.Light;
-using Engine.Scripts.Noise;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
@@ -39,14 +37,13 @@ namespace Engine.Scripts.World{
 
         private bool _isFocused;
         private bool _isShuttingDown;
-        private NoiseProfile _noiseProfile;
 
         private VoxelEngineScheduler _scheduler;
 
         internal event Action<Chunk> ChunkChanged;
         internal event Action<Chunk> ChunkDataReady;
 
-        /// <summary>LGT-06/07: a chunk's light was computed or changed (the renderer uploads it, LGT-08).</summary>
+        /// <summary>A chunk's light was computed or changed (the renderer uploads it).</summary>
         internal event Action<Chunk> ChunkLightChanged;
         internal event Action<int2> ChunkEvicted;
         internal event Action<int3> PartitionEvicted;
@@ -96,28 +93,26 @@ namespace Engine.Scripts.World{
             return ChunkManager.SetVoxel(voxelId, position.Int3(), remesh);
         }
 
+        /// <summary>True once the chunk column holding the world voxel position has its data generated.</summary>
+        /// <param name="position">World voxel position; only x and z are used.</param>
+        public bool IsChunkLoaded(int3 position){
+            return ChunkManager.IsChunkLoaded(VoxelConstants.WorldToChunkPos(position));
+        }
+
+        /// <summary>True if the partition at <paramref name="pos" /> is active and has its collider baked.</summary>
+        /// <param name="pos">Partition position.</param>
         public bool IsCollidable(int3 pos){
             return _chunkPool.IsPartitionActive(pos) && _chunkPool.IsCollidable(pos);
         }
 
         /// <summary>
-        ///     Adjusts derived chunk settings such as load and update distance based on the
-        ///     configured draw distance.
-        /// </summary>
-        private void ConfigureSettings(){
-            // LGT-06: data -> light (needs 3 x 3 data) -> mesh (needs 3 x 3 light), one ring more than before
-            settings.Chunk.LoadDistance = settings.Chunk.DrawDistance + 3;
-            settings.Chunk.UpdateDistance = math.max(settings.Chunk.DrawDistance - 2, 2);
-        }
-
-        /// <summary>
-        ///     Constructs all engine components (noise profile, chunk manager, pools and schedulers)
+        ///     Constructs all engine components (chunk manager, pool and schedulers)
         ///     via the <see cref="VoxelEngineProvider" />.
         /// </summary>
         private void ConstructEngineComponents(){
             ChunkManager = VoxelEngineProvider.Current.ChunkManager();
             ChunkManager.OnChunkChange += RaiseChunkChanged;
-            ChunkManager.OnChunkUnloaded += RaiseChunkEvicted; // F-05
+            ChunkManager.OnChunkUnloaded += HandleChunkUnloaded;
 
             _chunkPool = VoxelEngineProvider.Current.ChunkPool(transform);
             _chunkPool.OnChunkEvicted += HandleChunkEvicted;
@@ -131,8 +126,8 @@ namespace Engine.Scripts.World{
         }
 
         /// <summary>
-        ///     Constructs the job schedulers around the existing chunk manager and pool; INT-30 rebuilds them with
-        ///     another data scheduler when the world is regenerated.
+        ///     Constructs the job schedulers around the existing chunk manager and pool; <see cref="Regenerate" />
+        ///     rebuilds them with another data scheduler.
         /// </summary>
         private void ConstructSchedulers(ChunkScheduler chunkScheduler){
             _chunkScheduler = chunkScheduler;
@@ -168,9 +163,16 @@ namespace Engine.Scripts.World{
         private void HandleChunkEvicted(int2 chunkPos){
             if (_isShuttingDown) return;
 
-            // F-05: UnloadChunk raises ChunkEvicted itself (through OnChunkUnloaded); only a chunk the manager no
+            // UnloadChunk raises ChunkEvicted itself (through OnChunkUnloaded); only a chunk the manager no
             // longer holds needs the event raised here.
             if (!ChunkManager.UnloadChunk(chunkPos)) RaiseChunkEvicted(chunkPos);
+        }
+
+        private void HandleChunkUnloaded(int2 chunkPos){
+            // A pooled chunk whose data is gone keeps its partitions active, and they would never be meshed again
+            // after a reload. Reclaiming it raises ChunkEvicted through HandleChunkEvicted.
+            if (!_isShuttingDown && _chunkPool.TryReclaimChunk(chunkPos)) return;
+            RaiseChunkEvicted(chunkPos);
         }
 
         private void HandlePartitionEvicted(int3 partitionPos){
@@ -203,7 +205,7 @@ namespace Engine.Scripts.World{
         #region API
 
         /// <summary>
-        ///     INT-30: regenerates the world with <paramref name="worldGen" /> (null = the asset of the engine
+        ///     Regenerates the world with <paramref name="worldGen" /> (null = the asset of the engine
         ///     settings), e.g. to compare configurations at the same spot. Running jobs are completed, every loaded
         ///     chunk is evicted through the normal events (the renderer releases its buffers, colliders are cleared)
         ///     and the schedulers are rebuilt; loading restarts around the focus. The settings are copied into the
@@ -223,7 +225,7 @@ namespace Engine.Scripts.World{
             );
 
             _scheduler.CompleteRunning();
-            _scheduler.Dispose(); // unsubscribes the F-01 / F-04 listeners and releases the old config (D-05)
+            _scheduler.Dispose(); // unsubscribes the job-completion listeners and releases the old config
             _chunkPool.ReclaimAll(); // pool chunks: partitions, colliders and chunk data, with eviction events
             ChunkManager.UnloadAll(); // the load ring outside the draw distance
 
@@ -240,7 +242,7 @@ namespace Engine.Scripts.World{
         /// <summary>
         ///     Gets the chunk manager that stores and accesses chunk data.
         /// </summary>
-        public ChunkManager ChunkManager{ get; private set; }
+        internal ChunkManager ChunkManager{ get; private set; }
 
         public VoxelEngineSettings Settings => settings;
 
@@ -254,10 +256,9 @@ namespace Engine.Scripts.World{
         /// </summary>
         protected override void Awake(){
             base.Awake();
-            VoxelEngineProvider.Initialize(new VoxelEngineProvider(), provider => {
-                ConfigureSettings();
-                provider.Settings = settings;
-            });
+            if (Instance != this) return; // a duplicate; base.Awake destroys it
+
+            VoxelEngineProvider.Initialize(new VoxelEngineProvider(), provider => provider.Settings = settings);
 
             ConstructEngineComponents();
 
@@ -278,12 +279,12 @@ namespace Engine.Scripts.World{
         ///     Initializes focus state once all objects are created.
         /// </summary>
         private void Start(){
-            _isFocused = focus;
+            _isFocused = focus && _scheduler != null;
             TryFocusUpdate();
         }
 
         private void Update(){
-            _scheduler.ScheduleUpdate(Focus);
+            _scheduler?.ScheduleUpdate(Focus);
         }
 
         /// <summary>
@@ -293,7 +294,7 @@ namespace Engine.Scripts.World{
             _isShuttingDown = true;
             if (ChunkManager != null){
                 ChunkManager.OnChunkChange -= RaiseChunkChanged;
-                ChunkManager.OnChunkUnloaded -= RaiseChunkEvicted;
+                ChunkManager.OnChunkUnloaded -= HandleChunkUnloaded;
             }
 
             if (_chunkPool != null){
@@ -303,7 +304,7 @@ namespace Engine.Scripts.World{
             }
 
             base.OnDestroy();
-            _scheduler.Dispose();
+            _scheduler?.Dispose();
             ChunkManager?.Dispose();
         }
 

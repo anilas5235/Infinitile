@@ -3,9 +3,9 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.Data{
     /// <summary>
-    ///     LGT-01: packing of the 16-bit voxel light, sky(4) | R(4) | G(4) | B(4), levels 0–15 per channel.
+    ///     Packing of the 16-bit voxel light, sky(4) | R(4) | G(4) | B(4), levels 0–15 per channel.
     ///     Channel index <c>c</c> occupies bits <c>4c … 4c + 3</c>: 0 = blue, 1 = green, 2 = red, 3 = sky.
-    ///     The same layout is decompressed into the upper 16 bits of the per-voxel uint on the GPU (LGT-08).
+    ///     The same layout is decompressed into the upper 16 bits of the per-voxel uint on the GPU.
     /// </summary>
     public static class VoxelLight{
         public const int Blue = 0;

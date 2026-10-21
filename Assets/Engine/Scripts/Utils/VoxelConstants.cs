@@ -7,9 +7,9 @@ namespace Engine.Scripts.Utils{
     ///     Defines the core voxel and partition dimensions used throughout the engine.
     /// </summary>
     public static class VoxelConstants{
-        internal const int ChunkWidth = 32;
-        internal const int ChunkHeight = 256;
-        internal const int ChunkDepth = 32;
+        public const int ChunkWidth = 32;
+        public const int ChunkHeight = 256;
+        public const int ChunkDepth = 32;
 
         internal const int MinChunkPosXYZ = 0;
         internal const int MaxXChunkPos = ChunkWidth - 1;
@@ -26,7 +26,6 @@ namespace Engine.Scripts.Utils{
 
         /// <summary>Usable vertical span for terrain height generation.</summary>
         internal const int TerrainHeightRange = MaxTerrainHeight - MinTerrainHeight;
-
 
         internal const int PartitionWidth = 32;
         internal const int PartitionHeight = 32;
@@ -66,8 +65,8 @@ namespace Engine.Scripts.Utils{
         /// <param name="worldPos">The world-space position.</param>
         /// <returns>The partition coordinates containing the world position.</returns>
         public static int3 WorldToPartitionPos(int3 worldPos){
-            // D-08: floor division so negative world positions map to the partition that contains them
-            // (truncating division mapped -1 to partition 0).
+            // Floor division so negative world positions map to the partition that contains them
+            // (truncating division would map -1 to partition 0).
             return new int3(
                 VoxelUtils.FloorDivide(worldPos.x, PartitionWidth),
                 VoxelUtils.FloorDivide(worldPos.y, PartitionHeight),

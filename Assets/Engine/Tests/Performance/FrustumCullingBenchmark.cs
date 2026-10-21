@@ -9,7 +9,7 @@ using FrustumPlanes = Engine.Scripts.Render.FrustumPlanes;
 
 namespace Engine.Tests.Performance{
     /// <summary>
-    ///     PERF-02: the CPU frustum test reference. Tests one buffer of page bounds (1024 pages, a block of
+    ///     The CPU frustum test reference. Tests one buffer of page bounds (1024 pages, a block of
     ///     partitions around the camera, part of them in view) against six planes with
     ///     <see cref="FrustumCulling.IsVisible(in PageBounds, in FrustumPlanes)" />. The GPU kernel does the same
     ///     work per page, so this is what a CPU fallback would cost per buffer and camera. Each sample is the total

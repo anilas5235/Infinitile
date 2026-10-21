@@ -15,15 +15,14 @@ namespace Engine.Scripts.Render{
         public readonly int BufferIndex;
 
         /// <summary>
-        ///     PERF-04: initial capacity of a pooled page list. Lists that had to grow go back to the pool with their
-        ///     larger capacity. Sizing every list for <see cref="CopyPointsHandler.MaxPagesPerPartition" /> pinned about
-        ///     3 KB per list, although typical partitions need a few pages.
+        ///     Initial capacity of a pooled page list; typical partitions need a few pages. Lists that had to grow go
+        ///     back to the pool with their larger capacity.
         /// </summary>
         private const int InitialPageCapacity = 16;
 
         /// <summary>
-        ///     PERF-04: page lists are pooled, one was allocated per build. An own pool instead of
-        ///     <see cref="ListPool{T}" />, because that pool's collection check scans every pooled list on each release.
+        ///     Pool of page lists, so builds allocate none. An own pool instead of <see cref="ListPool{T}" />, because
+        ///     that pool's collection check scans every pooled list on each release.
         /// </summary>
         private static readonly ObjectPool<List<AllocPage>> PageListPool = new(
             static () => new List<AllocPage>(InitialPageCapacity), null, static list => list.Clear(), null,
@@ -66,8 +65,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     PERF-04: writes the (page index, point count) pairs into a caller-owned array instead of allocating
-        ///     one per copy; returns the number of pairs written.
+        ///     Writes the (page index, point count) pairs into a caller-owned array; returns the number of pairs written.
         /// </summary>
         public int CopyIndexAndCount(uint2[] target){
             int count = Count;
@@ -110,8 +108,8 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     PERF-04: fills the list pool with <paramref name="count" /> lists so allocations made during flight never
-        ///     create a list.
+        ///     Fills the list pool with <paramref name="count" /> lists so allocations made during flight never create
+        ///     a list.
         /// </summary>
         internal static void PrewarmPageLists(int count){
             List<AllocPage>[] lists = new List<AllocPage>[count];
@@ -120,7 +118,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     PERF-04: returns the page list to the pool. Called by the buffer manager when the allocation is
+        ///     Returns the page list to the pool. Called by the buffer manager when the allocation is
         ///     released; the struct must not be used afterwards.
         /// </summary>
         internal void Recycle(){

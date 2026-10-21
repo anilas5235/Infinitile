@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     INT-20/21: configuration B is layered on the asset without touching it, A's knobs round-trip through the
+    ///     Configuration B is layered on the asset without touching it, A's knobs round-trip through the
     ///     asset, and the difference views report what differs.
     /// </summary>
     public class PreviewCompareTests{
@@ -95,7 +95,7 @@ namespace Engine.Tests.EditMode{
             StringAssert.Contains("B=32", c.Describe());
             StringAssert.DoesNotContain("σ", c.Describe());
             c.Architecture = GenArchitecture.TerrainFirst;
-            StringAssert.DoesNotContain("height", c.Describe()); // TRN-21: no height stage
+            StringAssert.DoesNotContain("height", c.Describe()); // terrain-first has no height stage
         }
 
         [Test]

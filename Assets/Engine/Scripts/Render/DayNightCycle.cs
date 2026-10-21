@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Engine.Scripts.Render{
     /// <summary>
-    ///     LGT-10: drives the sky brightness and tint of the voxel shaders and the rotation of the URP main
+    ///     Drives the sky brightness and tint of the voxel shaders and the rotation of the URP main
     ///     directional light from a time of day. Day and night only change shader globals; the propagated light
     ///     levels are never recomputed.
     /// </summary>

@@ -14,7 +14,7 @@ using UnityEngine;
 using UnityEngine.TestTools;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>INT-01…03, GEN-20…22: settings asset, canonical JSON, Burst mirror and biome set.</summary>
+    /// <summary>Settings asset, canonical JSON, Burst mirror and biome set.</summary>
     public class WorldGenSettingsTests{
         private readonly List<Object> _created = new();
 
@@ -48,7 +48,7 @@ namespace Engine.Tests.EditMode{
             return s;
         }
 
-        // --- INT-02 ------------------------------------------------------------------------------------------------------
+        // --- Canonical JSON -----------------------------------------------------------------------------------------
 
         [Test]
         public void CanonicalJson_SortsKeysAndUsesInvariantRoundTripFloats(){
@@ -82,7 +82,7 @@ namespace Engine.Tests.EditMode{
             }
 
             StringAssert.Contains("\"Name\": \"Desert\"", first, "BiomeSet contents are inlined");
-            StringAssert.Contains("\"Architecture\": \"BiomeFirst\"", first, "class default since Phase 2");
+            StringAssert.Contains("\"Architecture\": \"BiomeFirst\"", first, "class default");
             StringAssert.Contains("\"TemperatureProfile\"", first, "own climate profiles are part of the manifest");
             StringAssert.Contains("\"RedistributionCurve\"", first);
             Assert.IsFalse(first.Contains("0,6"), "no culture-specific decimal separator");
@@ -120,7 +120,7 @@ namespace Engine.Tests.EditMode{
             Assert.AreNotEqual(withSplines, s.ToCanonicalJson(), "a control point value takes part");
         }
 
-        // --- TRN-05 / TRN-21 ------------------------------------------------------------------------------------------
+        // --- Terrain-first config -----------------------------------------------------------------------------------
 
         [Test]
         public void ToConfig_TerrainFirst_FlattensTheSplinesAndWarnsAboutAHeightMethod(){
@@ -134,9 +134,9 @@ namespace Engine.Tests.EditMode{
             WorldGenConfig cfg = s.ToConfig(1, allocator: Allocator.Temp);
             try{
                 Assert.AreEqual(GenArchitecture.TerrainFirst, cfg.Architecture);
-                Assert.AreEqual(BlendMethod.None, cfg.HeightMethod, "TRN-21: the height stage is ignored");
+                Assert.AreEqual(BlendMethod.None, cfg.HeightMethod, "the height stage is ignored");
                 Assert.AreEqual(BlendMethod.None, cfg.MaterialMethod);
-                Assert.AreEqual(12, cfg.SplineNodes.Length, "12 splines in the §19.1 placeholders");
+                Assert.AreEqual(12, cfg.SplineNodes.Length, "12 splines in the placeholders");
                 Assert.AreEqual(0, cfg.OffsetSpline.NodeStart);
                 Assert.AreEqual(7, cfg.OffsetSpline.NodeCount);
                 Assert.AreEqual(7, cfg.AmpSpline.NodeStart);
@@ -163,7 +163,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void ToConfig_BiomeFirst_IgnoresAnInvalidSplineSetOnlyWhenAbsent(){
-            // Biome-first does not need splines, but an assigned, broken set is still reported (R5: no silent repair).
+            // Biome-first does not need splines, but an assigned, broken set is still reported (no silent repair).
             WorldGenSettings s = Settings(Biome("Plains", 6f, new[]{ 1f }));
             s.Architecture = GenArchitecture.BiomeFirst;
             WorldGenConfig cfg = s.ToConfig(1, allocator: Allocator.Temp);
@@ -175,7 +175,7 @@ namespace Engine.Tests.EditMode{
             Assert.Throws<System.InvalidOperationException>(() => s.ToConfig(1, allocator: Allocator.Temp));
         }
 
-        // --- GEN-20/21 ----------------------------------------------------------------------------------------------
+        // --- Biome set ----------------------------------------------------------------------------------------------
 
         [Test]
         public void BiomeSet_MapsIndexToNameInAssetOrder(){
@@ -191,7 +191,7 @@ namespace Engine.Tests.EditMode{
             CollectionAssert.AreEqual(new[]{ "Plains", "Ocean" }, s.Biomes.Names());
         }
 
-        // --- INT-03 / GEN-22 ------------------------------------------------------------------------------------------
+        // --- Burst mirror -------------------------------------------------------------------------------------------
 
         [Test]
         public void ToConfig_FlattensBiomesAndOctaveCoefficients(){
@@ -239,7 +239,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void ToConfig_RejectsAnEmptyHeightRange(){
-            // TRN-10: h = (H - Hmin)/(Hmax - Hmin) would be NaN or infinite.
+            // h = (H - Hmin)/(Hmax - Hmin) would be NaN or infinite.
             WorldGenSettings equal = Create<WorldGenSettings>("WG");
             equal.HeightMin = equal.HeightMax = 120f;
             WorldGenSettings inverted = Create<WorldGenSettings>("WG");
@@ -279,6 +279,32 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void ToConfig_RejectsAClimateWithoutOctaves(){
+            // No octave normalises by a zero amplitude sum: a NaN climate that classifies to no biome.
+            WorldGenSettings none = Create<WorldGenSettings>("WG");
+            none.erosionProfile.octaves = 0;
+            WorldGenSettings warp = Create<WorldGenSettings>("WG");
+            warp.continentalLayer.warpNoise.octaves = -1;
+            WorldGenSettings missing = Create<WorldGenSettings>("WG");
+            missing.humidityProfile = null;
+
+            StringAssert.Contains("erosionProfile.octaves",
+                Assert.Throws<System.InvalidOperationException>(() => none.ToConfig(1, allocator: Allocator.Temp)).Message);
+            StringAssert.Contains("continentalLayer.warpNoise.octaves",
+                Assert.Throws<System.InvalidOperationException>(() => warp.ToConfig(1, allocator: Allocator.Temp)).Message);
+            StringAssert.Contains("humidityProfile",
+                Assert.Throws<System.InvalidOperationException>(() => missing.ToConfig(1, allocator: Allocator.Temp)).Message);
+        }
+
+        [Test]
+        public void ToConfig_RejectsAnActiveBiomeWithoutBlocks(){
+            // The registry only logs a broken biome (it may be inactive); the active set must still fail loudly.
+            WorldGenSettings s = Settings(Biome("Plains", 6f, new[]{ 1f }));
+            StringAssert.Contains("Plains", Assert.Throws<System.InvalidOperationException>(
+                () => s.ToConfigWithVoxelIds(1, _ => 1, Allocator.Temp)).Message);
+        }
+
+        [Test]
         public void ToConfig_WithoutBiomeSetGivesEmptyBiomes(){
             WorldGenSettings s = Create<WorldGenSettings>("WG");
             WorldGenConfig cfg = s.ToConfig(1, allocator: Allocator.Temp);
@@ -288,8 +314,8 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void DefaultClimate_MatchesTheTst08Fixture(){
-            // TST-08 runs on ClimateFieldTests.CreateClimate; it must stay the climate WorldGenSettings ships (INT-01).
+        public void DefaultClimate_MatchesTheClimateTestFixture(){
+            // The climate tests run on ClimateFieldTests.CreateClimate; it must stay the climate WorldGenSettings ships.
             WorldGenSettings s = Create<WorldGenSettings>("WG");
             WorldGenConfig cfg = s.ToConfig(1337, allocator: Allocator.Temp);
             ClimateParams fixture = ClimateFieldTests.CreateClimate(1337u);
@@ -330,7 +356,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void DefaultConfigs_DisposeSafely(){
-            // D-05: a default GeneratorConfig carries a default WorldGenConfig that owns nothing and disposes safely.
+            // A default GeneratorConfig carries a default WorldGenConfig that owns nothing and disposes safely.
             default(WorldGenConfig).Dispose();
             GeneratorConfig generator = default;
             Assert.IsFalse(generator.WorldGen.IsCreated);

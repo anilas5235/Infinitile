@@ -1,7 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Engine.Scripts.Components;
+using Engine.Scripts.Behaviour;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.ColliderMeshing;
@@ -20,9 +20,9 @@ using Object = UnityEngine.Object;
 
 namespace Engine.Tests.PlayMode{
     /// <summary>
-    ///     TST-E20: eviction and scheduler behaviour that needs a running scene (chunk prefab instances,
-    ///     GPU buffers): F-05 (UnloadChunk eviction event), F-04 (bake result for a reclaimed partition)
-    ///     and F-10 (mesh handler idles once the vertical draw window is meshed).
+    ///     Eviction and scheduler behaviour that needs a running scene (chunk prefab instances, GPU buffers):
+    ///     the UnloadChunk eviction event, bake results for a reclaimed partition, pool eviction order, and the
+    ///     mesh handler idling once the vertical draw window is meshed.
     /// </summary>
     public class SchedulerEvictionTests{
         [UnitySetUp]
@@ -30,13 +30,13 @@ namespace Engine.Tests.PlayMode{
             yield return PlayModeFixtures.LoadGameScene();
         }
 
-        #region F-05
+        #region UnloadChunk eviction event
 
         [UnityTest]
         [Timeout(120000)]
         public IEnumerator UnloadChunk_RaisesEvictionAndReleasesRenderBuffer(){
-            // F-05: ChunkManager.UnloadChunk disposes the chunk but never tells the world, so the renderer keeps
-            // the chunk's GraphicsBuffer until the pool happens to evict the same chunk.
+            // ChunkManager.UnloadChunk must tell the world, otherwise the renderer keeps the chunk's buffer until the
+            // pool happens to evict the same chunk.
             VoxelWorld world = VoxelWorld.Instance;
             VoxelWorldRenderer renderer = VoxelWorldRenderer.Instance;
             Assert.IsNotNull(renderer, "VoxelWorldRenderer missing in scene");
@@ -81,7 +81,7 @@ namespace Engine.Tests.PlayMode{
 
         #endregion
 
-        #region F-04
+        #region Bake result for a reclaimed partition
 
         private sealed class BakeRig : IDisposable{
             public readonly ChunkManager Manager;
@@ -126,8 +126,8 @@ namespace Engine.Tests.PlayMode{
 
         [UnityTest]
         public IEnumerator ColliderBake_PartitionReclaimedDuringBake_IsNotMarkedCollidable(){
-            // F-04: ColliderBakeScheduler.Complete marks every started position collidable, even one the pool
-            // reclaimed while the bake ran.
+            // ColliderBakeScheduler.Complete must not mark a position collidable that the pool reclaimed while the
+            // bake ran.
             using BakeRig rig = new();
             int3 pos = new(0, 3, 0);
             rig.Pool.GetOrClaimPartition(pos);
@@ -143,7 +143,7 @@ namespace Engine.Tests.PlayMode{
 
         [UnityTest]
         public IEnumerator ColliderBake_PartitionReclaimedAndReclaimedDuringBake_IsNotMarkedCollidable(){
-            // F-04: a re-claim at the same position hands back the same pooled ChunkPartition object, so an
+            // A re-claim at the same position hands back the same pooled ChunkPartition object, so an
             // object comparison alone lets the stale bake mark the freshly cleared partition collidable.
             using BakeRig rig = new();
             int3 pos = new(0, 3, 0);
@@ -162,7 +162,7 @@ namespace Engine.Tests.PlayMode{
 
         [UnityTest]
         public IEnumerator ColliderBake_PartitionReMeshedDuringBake_IsNotMarkedCollidable(){
-            // F-04: new mesh data applied while the bake ran makes the bake result stale.
+            // New mesh data applied while the bake ran makes the bake result stale.
             using BakeRig rig = new();
             int3 pos = new(0, 3, 0);
             rig.Pool.GetOrClaimPartition(pos);
@@ -177,14 +177,99 @@ namespace Engine.Tests.PlayMode{
             Assert.IsFalse(rig.Pool.IsCollidable(pos), "a re-meshed partition must be baked again");
         }
 
+        [UnityTest]
+        public IEnumerator ColliderBake_EmptyMesh_RemovesTheOldCollider(){
+            // Digging out the last block of a partition leaves an empty mesh; the collider built from the previous
+            // mesh must go with it.
+            using BakeRig rig = new();
+            int3 pos = new(0, 3, 0);
+            ChunkPartition partition = rig.Pool.GetOrClaimPartition(pos);
+            Mesh previous = new(){ vertices = new[]{ Vector3.zero, Vector3.right, Vector3.forward }, triangles = new[]{ 0, 1, 2 } };
+            try{
+                partition.Collider.sharedMesh = previous;
+                rig.Bake.Start(new HashSet<int3>{ pos });
+                yield return null;
+                rig.Bake.Complete();
+
+                Assert.IsTrue(rig.Pool.IsCollidable(pos));
+                Assert.IsNull(partition.Collider.sharedMesh, "an empty mesh must clear the collider");
+            }
+            finally{
+                Object.Destroy(previous);
+            }
+        }
+
+        [Test]
+        public void PoolPartitions_UseTheBakeCookingOptions(){
+            // Unity reuses a Physics.BakeMesh result only for a collider with the same cooking options.
+            using BakeRig rig = new();
+            ChunkPartition partition = rig.Pool.GetOrClaimPartition(new int3(0, 3, 0));
+            Assert.AreEqual(ColliderBuildJob.CookingOptions, partition.Collider.cookingOptions);
+        }
+
+        [Test]
+        public void ReclaimChunk_WhileBakeRuns_CompletesTheBakeFirst(){
+            // Reclaiming a chunk clears the collider meshes of all its partitions, which a bake may be reading.
+            using BakeRig rig = new();
+            int3 pos = new(0, 3, 0);
+            rig.Pool.GetOrClaimPartition(pos);
+            rig.Bake.Start(new HashSet<int3>{ pos });
+
+            Assert.IsTrue(rig.Pool.TryReclaimChunk(pos.xz));
+            Assert.IsTrue(rig.Bake.IsComplete, "the bake must finish before the pool clears the meshes it reads");
+            rig.Bake.Complete();
+            Assert.IsFalse(rig.Pool.IsCollidable(pos));
+        }
+
+        [UnityTest]
+        [Timeout(120000)]
+        public IEnumerator UnloadChunk_OfAPooledChunk_ReclaimsItsPartitions(){
+            // A pooled chunk whose data the manager unloads would keep its partitions active, so after the reload
+            // nothing meshes them again (the renderer already released their pages). VoxelWorld reclaims it.
+            VoxelWorld world = VoxelWorld.Instance;
+            ChunkPool pool = PlayModeFixtures.GetPrivateField<ChunkPool>(world, "_chunkPool");
+
+            int3 target = default;
+            bool found = false;
+            float deadline = Time.realtimeSinceStartup + 60f;
+            while (!found){
+                int3 centre = world.Focus.Pos;
+                for (int y = 0; y < PartitionsPerChunk && !found; y++){
+                    int3 candidate = new(centre.x, y, centre.z);
+                    if (!pool.IsPartitionActive(candidate)) continue;
+                    target = candidate;
+                    found = true;
+                }
+
+                if (Time.realtimeSinceStartup > deadline) Assert.Fail("no active partition at the focus chunk");
+                yield return null;
+            }
+
+            int evictions = 0;
+            Action<int2> handler = pos => {
+                if (pos.Equals(target.xz)) evictions++;
+            };
+            world.ChunkEvicted += handler;
+            try{
+                world.ChunkManager.UnloadChunk(target.xz);
+            }
+            finally{
+                world.ChunkEvicted -= handler;
+            }
+
+            for (int y = 0; y < PartitionsPerChunk; y++)
+                Assert.IsFalse(pool.IsPartitionActive(new int3(target.x, y, target.z)), $"partition {y} must be reclaimed");
+            Assert.AreEqual(1, evictions, "ChunkEvicted must be raised exactly once");
+        }
+
         #endregion
 
-        #region F-23
+        #region Pool eviction order
 
         [UnityTest]
         public IEnumerator PartitionPool_Full_EvictsTheFarthestPartitionNotTheOneBehindThePlayer(){
-            // F-23 / DEC-14: the pool queues used the view-weighted priority (x5 behind the player), so a
-            // partition 3 behind (weighted 45) was reclaimed before one 6 in front (weighted 36).
+            // The pool queues use plain distance, not the view-weighted priority (x5 behind the player), which would
+            // reclaim a partition 3 behind (weighted 45) before one 6 in front (weighted 36).
             VoxelEngineSettings settings = PlayModeFixtures.CreateSettings(0, VoxelWorld.Instance.Settings.Chunk.ChunkPrefab);
             GameObject root = new("SchedulerEvictionTests.PoolRig");
             ChunkPool pool = new(root.transform, settings); // partition pool = 1 chunk x PartitionsPerChunk = 8
@@ -203,7 +288,7 @@ namespace Engine.Tests.PlayMode{
                 pool.GetOrClaimPartition(new int3(0, 1, 0)); // one over capacity: exactly one partition is reclaimed
 
                 Assert.IsTrue(pool.IsPartitionActive(behind), "the closer partition behind the player must stay");
-                Assert.IsFalse(pool.IsPartitionActive(front), "the farthest partition must be the one reclaimed (DEC-14)");
+                Assert.IsFalse(pool.IsPartitionActive(front), "the farthest partition must be the one reclaimed");
             }
             finally{
                 pool.Dispose();
@@ -214,15 +299,15 @@ namespace Engine.Tests.PlayMode{
 
         #endregion
 
-        #region F-10
+        #region Mesh handler idling
 
         [UnityTest]
         [Timeout(120000)]
         public IEnumerator MeshHandler_IdlesOnceVerticalDrawWindowIsMeshed(){
-            // F-10: EnqueueStep queues every partition y of a chunk but JobUpdateStep drops the ones outside the
-            // vertical draw window, so with a focus near the top the handler re-queues y 0..4 forever and never sleeps.
+            // EnqueueStep queues every partition y of a chunk but JobUpdateStep drops the ones outside the vertical
+            // draw window; with a focus near the top the handler must not re-queue y 0..4 forever and never sleep.
             VoxelEngineSettings settings = PlayModeFixtures.CreateSettings(2, VoxelWorld.Instance.Settings.Chunk.ChunkPrefab);
-            settings.Chunk.LoadDistance = 6; // chunk store must hold the 7x7 air grid below
+            settings.Chunk.LoadDistanceOverride = 6; // chunk store must hold the 7x7 air grid below
             GameObject root = new("SchedulerEvictionTests.MeshRig");
             GameObject worldObject = new("SchedulerEvictionTests.World");
             worldObject.SetActive(false); // only the event hub is used; Awake must not run
@@ -242,7 +327,7 @@ namespace Engine.Tests.PlayMode{
                     chunks.Add(new int2(x, z), PlayModeFixtures.CreateUniformChunk(PlayModeFixtures.Air));
                 manager.AddChunks(chunks);
                 chunks.Dispose();
-                // LGT-06: meshing waits for lit 3 x 3 neighbourhoods; this rig has no light step, so light them here
+                // Meshing waits for lit 3 x 3 neighbourhoods; this rig has no light step, so light them here
                 for (int x = -3; x <= 3; x++)
                 for (int z = -3; z <= 3; z++)
                     manager.ApplyLight(new int2(x, z), new ChunkLightData(16), out _);

@@ -19,10 +19,9 @@ using Object = UnityEngine.Object;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     Phase 3 (§9, BLD-01/02, BLD-10…41, PERF-07): kernel taps, the four blend methods per stage, the lattice
-    ///     cache against the pure sampler (TST-01), the method-independence of the Terrain-first height (TST-04),
-    ///     Biome-first linearity (TST-05), method 4 in the hard limit (TST-06), argmax = hard class (TST-07), weight
-    ///     normalisation (TST-09) and the dithered surface pick (TST-14).
+    ///     Kernel taps, the four blend methods per stage, the lattice cache against the pure sampler, the
+    ///     method-independence of the Terrain-first height, Biome-first linearity, method 4 in the hard limit,
+    ///     argmax = hard class, weight normalisation and the dithered surface pick.
     /// </summary>
     public class BlendingTests{
         private static readonly BlendMethod[] Methods ={
@@ -61,7 +60,7 @@ namespace Engine.Tests.EditMode{
             return b;
         }
 
-        /// <summary>A settings asset with the six §19.2 placeholder biomes (and the §19.1 splines for Terrain-first).</summary>
+        /// <summary>A settings asset with the six placeholder biomes (and the placeholder splines for Terrain-first).</summary>
         private WorldGenSettings Settings(GenArchitecture architecture, BlendMethod material, BlendMethod height){
             BiomeSet set = Create<BiomeSet>("Set");
             set.Biomes.Add(Biome("Plains", .55f, .45f, .45f, .70f, -0.2f, 136, 6, new[]{ 1f, .6f, .3f, .12f, .05f, .02f }, 0));
@@ -109,7 +108,7 @@ namespace Engine.Tests.EditMode{
             return w.Max(count) < 1f;
         }
 
-        // --- Burst entry points (GEN-16) ------------------------------------------------------------------------------
+        // --- Burst entry points ---------------------------------------------------------------------------------------
 
         private delegate void SampleCachedFn(int x, int z, in WorldGenConfig cfg, in BlendCache cache, out ColumnSample sample);
 
@@ -117,7 +116,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void BlendEntryPoints_CompileWithBurst(){
-            // GEN-16 guard for the Phase 3 direct-call entry points (see WorldSamplerTests.SampleColumn_CompilesWithBurst).
+            // Burst guard for the blending direct-call entry points (see WorldSamplerTests.SampleColumn_CompilesWithBurst).
             Assert.IsTrue(BurstCompiler.IsEnabled, "Burst compilation is disabled in the Editor (Jobs > Burst)");
             FunctionPointer<SampleCachedFn> sample = BurstCompiler.CompileFunctionPointer<SampleCachedFn>(WorldSampler.SampleColumn);
             FunctionPointer<ClassifyFn> classify = BurstCompiler.CompileFunctionPointer<ClassifyFn>(WorldSampler.ClassifyAt);
@@ -141,7 +140,7 @@ namespace Engine.Tests.EditMode{
             }
         }
 
-        // --- Kernel taps (BLD-10, BLD-12) -----------------------------------------------------------------------------
+        // --- Kernel taps ----------------------------------------------------------------------------------------------
 
         [TestCase(2f, 1)]
         [TestCase(8f, 1)]
@@ -158,7 +157,7 @@ namespace Engine.Tests.EditMode{
         [TestCase(16f)]
         [TestCase(32f)]
         [TestCase(45f)]
-        public void KernelTaps_CoverExactlyTheLatticePointsInsideRWithTheSpecKernel(float blendWidth){
+        public void KernelTaps_CoverExactlyTheLatticePointsInsideRWithTheBiweightKernel(float blendWidth){
             KernelSet set = KernelSet.Build(blendWidth, Allocator.Temp, out NativeArray<KernelTap> taps);
             try{
                 float r = blendWidth * 0.5f;
@@ -167,7 +166,7 @@ namespace Engine.Tests.EditMode{
                 int reach = 0;
                 for (int phase = 0; phase < s * s; phase++){
                     int px = phase % s, pz = phase / s;
-                    // Reference: every lattice point with |q − p| < R, in row-major order (z outer, x inner, BLD-12).
+                    // Reference: every lattice point with |q − p| < R, in row-major order (z outer, x inner).
                     List<int2> expected = new();
                     int bound = (int)math.ceil(r) + 2;
                     for (int dz = -bound; dz <= bound; dz++)
@@ -213,7 +212,7 @@ namespace Engine.Tests.EditMode{
             Assert.Throws<ArgumentOutOfRangeException>(() => KernelSet.Build(blendWidth, Allocator.Temp, out _));
         }
 
-        // --- Settings (BLD-01, PERF-07) -------------------------------------------------------------------------------
+        // --- Settings -------------------------------------------------------------------------------------------------
 
         [Test]
         public void ToConfig_RejectsInvalidStrengthsOnlyWhereTheyAreUsed(){
@@ -231,7 +230,7 @@ namespace Engine.Tests.EditMode{
             s.WarpAmplitude = -2f;
             Assert.Throws<InvalidOperationException>(() => s.ToConfig(1).Dispose());
 
-            // The height stage does not exist in Terrain-first (TRN-21), so its strengths are not checked there.
+            // The height stage does not exist in Terrain-first, so its strengths are not checked there.
             s.Architecture = GenArchitecture.TerrainFirst;
             s.Splines = Create<TerrainSplineSet>("Splines");
             s.Splines.ResetToPlaceholders();
@@ -244,7 +243,7 @@ namespace Engine.Tests.EditMode{
             Assert.IsTrue(Config(1, GenArchitecture.BiomeFirst, BlendMethod.DistanceBlend, BlendMethod.DistanceBlend).StagesShareWeights);
             Assert.IsTrue(Config(1, GenArchitecture.BiomeFirst, BlendMethod.ParameterSpaceWeighting, BlendMethod.ParameterSpaceWeighting)
                 .StagesShareWeights);
-            // Method 3 differs per stage by construction (warp only vs warp + kernel, BLD-22).
+            // Method 3 differs per stage by construction (warp only vs warp + kernel).
             Assert.IsFalse(Config(1, GenArchitecture.BiomeFirst, BlendMethod.DistortedBoundary, BlendMethod.DistortedBoundary)
                 .StagesShareWeights);
             Assert.IsFalse(Config(1, GenArchitecture.BiomeFirst, BlendMethod.DistanceBlend).StagesShareWeights);
@@ -258,7 +257,7 @@ namespace Engine.Tests.EditMode{
             Assert.IsFalse(Config(1, s).StagesShareWeights);
         }
 
-        // --- Methods (§9.2…9.5) ---------------------------------------------------------------------------------------
+        // --- Methods --------------------------------------------------------------------------------------------------
 
         [Test]
         public void WarpField_IsBoundedAndTheIdentityAtZeroAmplitude(){
@@ -299,7 +298,7 @@ namespace Engine.Tests.EditMode{
         [TestCase(GenArchitecture.TerrainFirst)]
         [TestCase(GenArchitecture.BiomeFirst)]
         public void DistortedBoundary_MaterialStageIsOneHotAtTheWarpedPosition(GenArchitecture architecture){
-            // BLD-21/22: the material stage of method 3 is nn~(p), one-hot; the warp moves only the classification.
+            // The material stage of method 3 is nn~(p), one-hot; the warp moves only the classification.
             WorldGenConfig cfg = Config(33, architecture, BlendMethod.DistortedBoundary);
             WorldGenConfig hard = Config(33, architecture, BlendMethod.None);
             int moved = 0;
@@ -319,7 +318,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void DistanceBlend_WeightsAreTheKernelOverTheHardClassesOfTheLattice(){
-            // §9.3: w_b = Σ k(|q − p|)·[nn(q) = b] / Σ k over the world-aligned lattice points within R.
+            // w_b = Σ k(|q − p|)·[nn(q) = b] / Σ k over the world-aligned lattice points within R.
             WorldGenConfig cfg = Config(41, GenArchitecture.BiomeFirst, BlendMethod.DistanceBlend);
             WorldGenConfig hard = Config(41, GenArchitecture.BiomeFirst, BlendMethod.None);
             KernelSet kernel = cfg.MaterialKernel;
@@ -347,7 +346,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void ParameterSpace_IsTheShiftedGaussianOverTheParameterDistance(){
-            // §9.5: w_b ∝ exp(−(d_b² − d_min²)/(2σ²)).
+            // w_b ∝ exp(−(d_b² − d_min²)/(2σ²)).
             WorldGenConfig cfg = Config(43, GenArchitecture.BiomeFirst, BlendMethod.ParameterSpaceWeighting);
             int blended = 0;
             foreach (int2 p in Columns(8, 300, 30000)){
@@ -373,11 +372,11 @@ namespace Engine.Tests.EditMode{
             Assert.Greater(blended, 0);
         }
 
-        // --- TST-04 ---------------------------------------------------------------------------------------------------
+        // --- Terrain-first height vs material method ------------------------------------------------------------------
 
         [Test]
         public void TerrainFirst_HeightIsBitwiseIdenticalForEveryMaterialMethod(){
-            // TST-04 / TRN-20: the material method never feeds back into the Terrain-first height.
+            // The material method never feeds back into the Terrain-first height.
             WorldGenConfig[] configs = new WorldGenConfig[Methods.Length];
             for (int m = 0; m < Methods.Length; m++) configs[m] = Config(61, GenArchitecture.TerrainFirst, Methods[m]);
             foreach (int2 p in Columns(10, 500, 40000)){
@@ -387,17 +386,17 @@ namespace Engine.Tests.EditMode{
                     Assert.AreEqual(math.asuint(reference.Height), math.asuint(s.Height), $"{Methods[m]} at {p}");
                     Assert.AreEqual(reference.TerrainParams, s.TerrainParams);
                     Assert.AreEqual(reference.HardBiome, s.HardBiome);
-                    Assert.AreEqual(BlendWeights.OneHot(s.HardBiome), s.HeightWeights, "no height stage in Terrain-first (TRN-21)");
+                    Assert.AreEqual(BlendWeights.OneHot(s.HardBiome), s.HeightWeights, "no height stage in Terrain-first");
                 }
             }
         }
 
-        // --- TST-05 ---------------------------------------------------------------------------------------------------
+        // --- Biome-first linearity ------------------------------------------------------------------------------------
 
         [TestCase(BlendMethod.DistanceBlend)]
         [TestCase(BlendMethod.ParameterSpaceWeighting)]
         public void BiomeFirst_BlendedHeightIsTheWeightedSumOfTheBiomeHeights(BlendMethod method){
-            // TST-05: H from the blended parameters vs Σ w_b H_b with the sampler's own height weights, 10⁴ columns.
+            // H from the blended parameters vs Σ w_b H_b with the sampler's own height weights, 10⁴ columns.
             WorldGenConfig cfg = Config(71, GenArchitecture.BiomeFirst, BlendMethod.None, method);
             NativeArray<int2> columns = new(Columns(12, 10000, 40000), Allocator.TempJob);
             NativeArray<ColumnSample> samples = new(columns.Length, Allocator.TempJob);
@@ -429,12 +428,12 @@ namespace Engine.Tests.EditMode{
             }
         }
 
-        // --- TST-06 ---------------------------------------------------------------------------------------------------
+        // --- Method 4 in the hard limit -------------------------------------------------------------------------------
 
         [TestCase(GenArchitecture.TerrainFirst)]
         [TestCase(GenArchitecture.BiomeFirst)]
         public void ParameterSpace_InTheHardLimitIsMethodOne(GenArchitecture architecture){
-            // TST-06: σ = 1e−4 makes method 4 one-hot except at near-ties; same classification, height within 1e−3.
+            // σ = 1e−4 makes method 4 one-hot except at near-ties; same classification, height within 1e−3.
             WorldGenSettings s = Settings(architecture, BlendMethod.ParameterSpaceWeighting, BlendMethod.ParameterSpaceWeighting);
             s.MaterialSigma = 1e-4f;
             s.HeightSigma = 1e-4f;
@@ -449,13 +448,13 @@ namespace Engine.Tests.EditMode{
             }
         }
 
-        // --- TST-07 ---------------------------------------------------------------------------------------------------
+        // --- Argmax = hard class --------------------------------------------------------------------------------------
 
         [Test]
         public void ArgMaxOfTheMaterialWeightsIsTheHardClassForMethodsOneAndFour(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,
             [Values(BlendMethod.None, BlendMethod.ParameterSpaceWeighting)] BlendMethod method){
-            // TST-07 / BLD-31: the hard class gets exp(0) = 1 before normalisation and every other biome at most 1;
+            // The hard class gets exp(0) = 1 before normalisation and every other biome at most 1;
             // ties (a maximum weight shared by two biomes) are excepted.
             WorldGenConfig cfg = Config(91, architecture, method);
             int ties = 0;
@@ -477,7 +476,7 @@ namespace Engine.Tests.EditMode{
             Assert.Less(ties, 3, "ties are rare");
         }
 
-        // --- TST-09 ---------------------------------------------------------------------------------------------------
+        // --- Weight normalisation -------------------------------------------------------------------------------------
 
         /// <summary>Every stage combination: Terrain-first × 4 material methods, Biome-first × 4 × 4.</summary>
         private static IEnumerable<TestCaseData> StageCombinations(){
@@ -490,7 +489,7 @@ namespace Engine.Tests.EditMode{
 
         [TestCaseSource(nameof(StageCombinations))]
         public void WeightsAreNormalisedForEveryMethodAndStage(GenArchitecture architecture, BlendMethod material, BlendMethod height){
-            // TST-09 / BLD-02: Σ w = 1 ± 1e−5 and w ≥ 0 for both stages; inactive slots stay zero.
+            // Σ w = 1 ± 1e−5 and w ≥ 0 for both stages; inactive slots stay zero.
             WorldGenConfig cfg = Config(101, architecture, material, height);
             NativeArray<int2> columns = new(Columns(18, 2000, 40000), Allocator.TempJob);
             NativeArray<ColumnSample> samples = new(columns.Length, Allocator.TempJob);
@@ -501,7 +500,7 @@ namespace Engine.Tests.EditMode{
                     AssertNormalised(s.MaterialWeights, cfg.BiomeCount, $"material at {columns[n]}");
                     AssertNormalised(s.HeightWeights, cfg.BiomeCount, $"height at {columns[n]}");
                     Assert.That(s.SurfaceSource, Is.InRange(0, cfg.BiomeCount - 1));
-                    Assert.Greater(s.MaterialWeights[s.SurfaceSource], 0f, "the surface source has weight (BLD-40)");
+                    Assert.Greater(s.MaterialWeights[s.SurfaceSource], 0f, "the surface source has weight");
                 }
             }
             finally{
@@ -525,14 +524,14 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(1f, sum, 1e-5f, where + ": Σ w");
         }
 
-        // --- TST-01 ---------------------------------------------------------------------------------------------------
+        // --- Lattice cache vs pure sampler ----------------------------------------------------------------------------
 
         [Test]
         public void CachedLatticeIsBitIdenticalToThePureSampler(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,
             [Values(BlendMethod.DistanceBlend, BlendMethod.DistortedBoundary)] BlendMethod method){
-            // TST-01 / BLD-11 / GEN-02: 50 random chunks, sampled per chunk with the padded lattice cache (the
-            // ChunkJob path, including the uniform-window early-out of PERF-07) and per column on the pure path;
+            // 50 random chunks, sampled per chunk with the padded lattice cache (the ChunkJob path, including the
+            // uniform-window early-out) and per column on the pure path;
             // weights, surface pick and height agree bit for bit. Biome-first runs the method on the height stage and
             // DistanceBlend on the material stage, so with method 3 both lattices are built.
             BlendMethod material = architecture == GenArchitecture.BiomeFirst ? BlendMethod.DistanceBlend : method;
@@ -585,7 +584,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void ColumnsOutsideTheCacheFallBackToThePurePath(){
-            // R3: a cache that does not cover a column's window never changes the result.
+            // A cache that does not cover a column's window never changes the result.
             WorldGenConfig cfg = Config(121, GenArchitecture.BiomeFirst, BlendMethod.DistanceBlend, BlendMethod.DistortedBoundary);
             BlendCache cache = BlendCache.Build(cfg, new int2(0, 0), new int2(7, 7), 1, Allocator.Temp);
             try{
@@ -603,11 +602,11 @@ namespace Engine.Tests.EditMode{
             }
         }
 
-        // --- TST-14, BLD-40/41 ----------------------------------------------------------------------------------------
+        // --- Surface pick ---------------------------------------------------------------------------------------------
 
         [Test]
         public void SurfacePick_NeverReturnsNoneForWeightsJustBelowOne(){
-            // TST-14: Σ w = 1 − 1e−5; the fallback to the last non-zero weight covers rounding at u → 1.
+            // Σ w = 1 − 1e−5; the fallback to the last non-zero weight covers rounding at u → 1.
             Unity.Mathematics.Random rng = new(31);
             for (int n = 0; n < 20000; n++){
                 int count = rng.NextInt(1, BlendWeights.Capacity + 1);
@@ -628,7 +627,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void SurfacePick_OneHotReturnsItsBiomeAndAllZeroReturnsMinusOne(){
-            // BLD-41: method 1 weights reproduce the hard class.
+            // Method 1 weights reproduce the hard class.
             for (int b = 0; b < BlendWeights.Capacity; b++)
             for (int n = 0; n < 50; n++)
                 Assert.AreEqual(b, SurfacePick.Pick(n * 7919, -n, 11u, HashSalts.SurfacePick, BlendWeights.OneHot(b), BlendWeights.Capacity));
@@ -637,7 +636,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void SurfacePick_FrequenciesFollowTheWeights(){
-            // BLD-40: P(pick = b) = w_b, white noise per column.
+            // P(pick = b) = w_b, white noise per column.
             BlendWeights w = default;
             w[0] = 0.1f;
             w[1] = 0.6f;
@@ -653,7 +652,7 @@ namespace Engine.Tests.EditMode{
 
         // --- Jobs -----------------------------------------------------------------------------------------------------
 
-        /// <summary>The pure path: every column on its own, no cache (GEN-01).</summary>
+        /// <summary>The pure path: every column on its own, no cache.</summary>
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
         private struct PureColumnsJob : IJobParallelFor{
             [ReadOnly] public NativeArray<int2> Columns;

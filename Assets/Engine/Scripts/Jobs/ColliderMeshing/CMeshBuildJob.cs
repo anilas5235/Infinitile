@@ -22,7 +22,6 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         [ReadOnly] public NativeList<int3> Jobs;
         [ReadOnly] public VoxelEngineRenderGenData RenderGenData;
 
-
         [WriteOnly] public NativeParallelHashMap<int3, PartitionJobResult>.ParallelWriter Results;
         public Mesh.MeshDataArray ColliderMeshDataArray;
 

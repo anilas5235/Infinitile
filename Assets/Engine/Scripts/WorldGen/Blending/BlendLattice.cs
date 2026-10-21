@@ -6,19 +6,19 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Blending{
     /// <summary>
-    ///     Padded, world-aligned lattice of hard classes nn(q) (or nn~(q) for the warped kind) over a block of columns
-    ///     (BLD-11, GEN-03): points q = Origin + (i, j)·Stride, each classified once by
+    ///     Padded, world-aligned lattice of hard classes nn(q) (or nn~(q) for the warped kind) over a block of
+    ///     columns: points q = Origin + (i, j)·Stride, each classified once by
     ///     <see cref="WorldSampler.ClassifyAt" /> / <see cref="WorldSampler.ClassifyWarpedAt" />, the same functions the
-    ///     pure sampler calls per tap, so a cached tap equals the pure one bit for bit (GEN-02).
+    ///     pure sampler calls per tap, so a cached tap equals the pure one bit for bit.
     ///     <para>
-    ///         PERF-07 early-out: a lattice point is a boundary point when one of its 8 neighbours (inside the
+    ///         Early-out: a lattice point is a boundary point when one of its 8 neighbours (inside the
     ///         lattice) has another class; <see cref="BoundarySat" /> is the summed-area table of that mask. A kernel
     ///         window whose bounding box holds no boundary point is a single class (the box is connected and lies
     ///         inside the lattice, so two different classes in it would need two differing neighbours inside the
     ///         lattice, both flagged), and the kernel blend of a single class is exactly one-hot (Σk / Σk = 1). No
     ///         margin beyond the kernel reach is therefore needed.
     ///     </para>
-    ///     Lives in Allocator.Temp inside the job that builds it (INT-12).
+    ///     Lives in Allocator.Temp inside the job that builds it.
     /// </summary>
     public struct BlendLattice : IDisposable{
         /// <summary>World position of element (0, 0); a multiple of <see cref="Stride" />.</summary>
@@ -108,7 +108,7 @@ namespace Engine.Scripts.WorldGen.Blending{
 
         /// <summary>
         ///     True and the class when no boundary point lies in the bounding box of the window
-        ///     [p − reach, p + reach] (PERF-07). The window must be covered.
+        ///     [p − reach, p + reach]. The window must be covered.
         /// </summary>
         public bool IsUniform(int2 p, int reach, out int cls){
             int2 lo = FloorDiv(p - reach - Origin, Stride);
@@ -144,7 +144,7 @@ namespace Engine.Scripts.WorldGen.Blending{
     }
 
     /// <summary>
-    ///     The lattices a block of columns needs for the configured spatial methods (BLD-11, PERF-07): one unwarped
+    ///     The lattices a block of columns needs for the configured spatial methods: one unwarped
     ///     lattice of nn(q) for DistanceBlend (material and/or height stage, shared when both use it) and one warped
     ///     lattice of nn~(q) for the DistortedBoundary height stage. Built per chunk by <c>ChunkJob</c> and per tile by
     ///     <see cref="WorldGenApi" />; a default instance means "no cache", and the sampler then evaluates every tap

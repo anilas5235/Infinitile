@@ -14,8 +14,8 @@ using UnityEngine.TestTools;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     Phase 4 (§10): the per-column flora decision (VEG-01…06) on the pure sampler and the region API, the
-    ///     structure expansion and the config tables the chunk job stamps from.
+    ///     The per-column flora decision on the pure sampler and the region API, the structure expansion and the
+    ///     config tables the chunk job stamps from.
     /// </summary>
     public class FloraPlacementTests{
         private const int WaterLevel = 124;
@@ -48,11 +48,11 @@ namespace Engine.Tests.EditMode{
         private static readonly int2 Origin = new(-300, 120);
         private static readonly int2 Size = new(128, 128);
 
-        // --- VEG-02 --------------------------------------------------------------------------------------------------
+        // --- Flora biome and species ---------------------------------------------------------------------------------
 
         [Test]
         public void FloraSource_IsTheDitheredPickWithTheFloraSalt(){
-            // VEG-02, DEC-04: the flora biome is its own roll on w_mat, so at transitions it may differ from the
+            // The flora biome is its own roll on w_mat, so at transitions it may differ from the
             // surface source; it never differs from Pick(x, z, FloraBiome).
             Use(GenArchitecture.BiomeFirst, BlendMethod.DistanceBlend);
             RegionSample r = Region(new int2(-1200, -400), new int2(256, 256));
@@ -85,7 +85,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void SpeciesFrequencies_MatchTheRuleProbabilities(){
-            // VEG-02: Hash01(SALT_FLORA_SPECIES) against cumulative probabilities; past the last rule there is no plant.
+            // Hash01(SALT_FLORA_SPECIES) against cumulative probabilities; past the last rule there is no plant.
             Biome flat = _fixture.MakeBiome("Flat", .5f, 150f, 2f, _fixture.GrassSo,
                 FloraFixture.Rule(_fixture.TuftSo, .3f), FloraFixture.Rule(_fixture.FlowerSo, .1f));
             Use(GenArchitecture.BiomeFirst, BlendMethod.None, flat);
@@ -104,7 +104,7 @@ namespace Engine.Tests.EditMode{
             }
         }
 
-        // --- VEG-03 --------------------------------------------------------------------------------------------------
+        // --- Ground conditions ---------------------------------------------------------------------------------------
 
         [Test]
         public void RequiresSurfaceFromSameBiome_SuppressesPlantsOnForeignGround(){
@@ -127,7 +127,7 @@ namespace Engine.Tests.EditMode{
         [TestCase(0)]
         [TestCase(-3)]
         public void MinHeightAboveWater_PlantsExactlyWhereTheTopFaceIsHighEnough(int minHeight){
-            // VEG-03/04: heightAboveWater = h_int + 1 − WaterLevel; a negative minimum counts as 0 (never below water).
+            // heightAboveWater = h_int + 1 − WaterLevel; a negative minimum counts as 0 (never below water).
             // Probability 1: every column rolls the rule, so the ground condition alone decides.
             FloraRule rule = FloraFixture.Rule(_fixture.TuftSo, 1f);
             rule.MinHeightAboveWater = minHeight;
@@ -147,7 +147,7 @@ namespace Engine.Tests.EditMode{
             Assert.Greater(bare, 0, "the shore straddles the threshold");
         }
 
-        // --- VEG-04 --------------------------------------------------------------------------------------------------
+        // --- Columns without flora -----------------------------------------------------------------------------------
 
         [Test]
         public void NoFlora_BelowWater(){
@@ -178,13 +178,13 @@ namespace Engine.Tests.EditMode{
             Assert.IsTrue(Region(Origin, Size).FloraSpecies.All(sp => sp == 0));
         }
 
-        // --- VEG-05 --------------------------------------------------------------------------------------------------
+        // --- Tree spacing --------------------------------------------------------------------------------------------
 
         [TestCase(3)]
         [TestCase(5)]
         [TestCase(0)]
         public void Anchors_AreTheLocalPriorityMaximaWithinTreeSpacing(int radius){
-            // VEG-05: an anchor is a multi-block candidate that no candidate within r_tree outranks; so no two anchors
+            // An anchor is a multi-block candidate that no candidate within r_tree outranks; so no two anchors
             // lie within r_tree, and every other candidate has an outranking candidate within r_tree.
             Biome wood = _fixture.MakeBiome("Wood", .5f, 150f, 8f, _fixture.GrassSo, FloraFixture.Rule(_fixture.Tree, .25f),
                 FloraFixture.Rule(_fixture.CactusSo, .1f, 2, 2), FloraFixture.Rule(_fixture.TuftSo, .3f));
@@ -417,7 +417,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void SampleColumn_EqualsTheRegionApi(){
-            // VEG-06: the region API reports the sampler's flora (species and source) per column.
+            // The region API reports the sampler's flora (species and source) per column.
             Use(GenArchitecture.TerrainFirst, BlendMethod.DistanceBlend);
             RegionSample r = Region(Origin, new int2(64, 64));
             for (int i = 0; i < r.FloraSpecies.Length; i += 3){

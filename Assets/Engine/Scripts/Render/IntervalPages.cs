@@ -1,10 +1,10 @@
 using System;
 using static Engine.Scripts.Utils.VoxelConstants;
+using static Engine.Scripts.Utils.VoxelRenderConstants;
 
 namespace Engine.Scripts.Render{
     /// <summary>
-    ///     §20.1: handle of one chunk's interval list in the <see cref="ChunkIntervalStore" />. The default value is
-    ///     "no list".
+    ///     Handle of one chunk's interval list in the <see cref="ChunkIntervalStore" />. The default value is "no list".
     /// </summary>
     internal readonly struct IntervalRange : IEquatable<IntervalRange>{
         private readonly int _slotPlusOne;
@@ -39,14 +39,14 @@ namespace Engine.Scripts.Render{
     }
 
     /// <summary>
-    ///     §20.1: page bookkeeping of the <see cref="ChunkIntervalStore" />. The store is split into pages of
+    ///     Page bookkeeping of the <see cref="ChunkIntervalStore" />. The store is split into pages of
     ///     <see cref="PageSize" /> elements; a list owns the pages for its length, in order, at any place in the store.
     ///     Pages never need compaction, and a list that grows or shrinks only adds or frees pages at its end. Holds no
     ///     GPU resources, so it can be unit-tested without a graphics device.
     /// </summary>
     internal sealed class IntervalPages{
-        /// <summary>Elements (uint2) per page; the kernels' COMP_PAGE_SHIFT must match.</summary>
-        internal const int PageSize = 512;
+        /// <summary>Elements (uint2) per page, 512; the kernels address pages with COMP_PAGE_SHIFT.</summary>
+        internal const int PageSize = 1 << CompPageShift;
 
         /// <summary>Pages of the longest possible list: one interval per voxel plus the header.</summary>
         internal const int MaxPagesPerList = (VoxelsPerChunk + 1 + PageSize - 1) / PageSize;

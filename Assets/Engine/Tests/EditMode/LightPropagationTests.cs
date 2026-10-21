@@ -7,7 +7,7 @@ using static Engine.Scripts.Utils.VoxelConstants;
 using static Engine.Tests.EditMode.LightTestWorld;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>LGT-11: light propagation (LGT-03/04/05).</summary>
+    /// <summary>Light propagation: sky light, emitters, attenuation and the chunk margin.</summary>
     public partial class LightPropagationTests{
         private static readonly int2 Origin = int2.zero;
 
@@ -149,7 +149,7 @@ namespace Engine.Tests.EditMode{
             light.Dispose();
         }
 
-        /// <summary>LGT-05: the frontier seeding gives the same light as seeding every lit voxel.</summary>
+        /// <summary>The frontier seeding gives the same light as seeding every lit voxel.</summary>
         [Test]
         public void FrontierSeeding_EqualsExhaustiveSeeding([Values(1, 2, 3)] int seed){
             using LightTestWorld world = new(1, RandomTerrain(seed));
@@ -174,7 +174,7 @@ namespace Engine.Tests.EditMode{
             reference.Dispose();
         }
 
-        /// <summary>LGT-04: the centre chunk lit from its 3 × 3 region equals one computation over 5 × 5 chunks.</summary>
+        /// <summary>The centre chunk lit from its 3 × 3 region equals one computation over 5 × 5 chunks.</summary>
         [Test]
         public void BorderExactness_3x3_Equals_5x5([Values(4, 5)] int seed){
             using LightTestWorld world = new(2, RandomTerrain(seed));

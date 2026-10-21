@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7f45a94d2e634c16a6e55fc59e032951, type: 3}
   m_Name: Water
   m_EditorClassIdentifier: 
+  package: {fileID: 11400000, guid: 0b9bdcf4baaa2be4cb46a27b55161ba9, type: 2}
   textureMode: 0
   meshLayer: 1
   alwaysRenderAllFaces: 0
@@ -19,13 +20,14 @@ MonoBehaviour:
   glow: 0
   lightAttenuation: 2
   lightEmission: {x: 0, y: 0, z: 0}
-  usePostProcess: 0
+  usePostProcess: 1
   postProcess:
-    postProcessColor: {r: 0.41037738, g: 0.76299477, b: 1, a: 0}
-    contrast: 1
-    saturation: 7
+    postProcessColor: {r: 0.8, g: 0.92, b: 1, a: 0}
+    contrast: 5
+    saturation: 10
     enableFog: 1
-    fogDensity: 0.01
+    fogColor: {r: 0.08, g: 0.36, b: 0.52, a: 1}
+    fogDensity: 0.035
   shape: {fileID: 11400000, guid: 4f233acb5e735874f81d54b07e03336a, type: 2}
   top: {fileID: 0}
   bottom: {fileID: 0}

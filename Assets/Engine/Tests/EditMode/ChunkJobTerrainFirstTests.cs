@@ -17,7 +17,7 @@ using Object = UnityEngine.Object;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     INT-10…12, GEN-14, TST-03: the chunk job on the Terrain-first sampler. Every column of a chunk is the
+    ///     The chunk job on the Terrain-first sampler. Every column of a chunk is the
     ///     sampler's decision for that world column, independent of the chunk it lies in, so chunk borders carry
     ///     no seam; the blocks come from the surface-source biome and the ice override follows the climate switch.
     /// </summary>
@@ -67,9 +67,8 @@ namespace Engine.Tests.EditMode{
         }
 
         /// <summary>
-        ///     Replaces the fixture's empty (legacy) world-gen config with a Terrain-first one: two biomes with
-        ///     distinct blocks and the §19.1 placeholder splines. Block ids are patched in because the test has no
-        ///     voxel registry.
+        ///     Replaces the fixture's empty world-gen config with a Terrain-first one: two biomes with distinct blocks
+        ///     and the placeholder splines. Block ids are patched in because the test has no voxel registry.
         /// </summary>
         private void UseTerrainFirst(bool climateOverrides = true, bool withBiomes = true, BlendMethod material = BlendMethod.None){
             WorldGenSettings s = Create<WorldGenSettings>("WG");
@@ -103,7 +102,7 @@ namespace Engine.Tests.EditMode{
 
         private void Prepare(int2 chunk){
             int3 origin = new(chunk.x * ChunkWidth, 0, chunk.y * ChunkDepth);
-            ChunkJob.PrepareChunkMaps(_config.GlobalSeed, ref _config, ref origin, _columns);
+            ChunkJob.PrepareChunkMaps(ref _config, ref origin, _columns);
         }
 
         private ChunkColumn Column(int x, int z){
@@ -121,7 +120,7 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(s.FloraSource, col.FloraSource, where + " FloraSource");
         }
 
-        // --- INT-10/11 ----------------------------------------------------------------------------------------------------
+        // --- Columns and blocks -------------------------------------------------------------------------------------------
 
         [Test]
         public void PrepareChunkMaps_TerrainFirst_EveryColumnIsTheSamplerDecision(){
@@ -147,7 +146,7 @@ namespace Engine.Tests.EditMode{
                 for (int z = 0; z < ChunkDepth; z++){
                     ChunkColumn col = Column(x, z);
                     Assert.That(col.SurfaceSource, Is.InRange(0, 1));
-                    Assert.AreEqual(col.SurfaceSource, (int)col.Biome, "Phase 1: surface source is the hard biome");
+                    Assert.AreEqual(col.SurfaceSource, (int)col.Biome, "without blending the surface source is the hard biome");
                     Biome.BiomeDef def = _config.WorldGen.Biomes[col.SurfaceSource];
                     Assert.AreEqual(def.topBlock, col.TopBlock);
                     Assert.AreEqual(def.underBlock, col.UnderBlock);
@@ -169,13 +168,13 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(0, col.TopBlock);
             Assert.AreEqual(0, col.UnderBlock);
             Assert.AreEqual(0, col.StoneBlock);
-            Assert.That(col.Height, Is.InRange(0, MaxTerrainHeight), "the spline height exists without biomes (TRN-03)");
+            Assert.That(col.Height, Is.InRange(0, MaxTerrainHeight), "the spline height exists without biomes");
         }
 
         [Test]
         public void PrepareChunkMaps_TerrainFirst_SpatialMaterialMethodsAreTheSamplerDecision(
             [Values(BlendMethod.DistanceBlend, BlendMethod.DistortedBoundary)] BlendMethod material){
-            // Phase 3 (BLD-11, GEN-02): with the chunk's lattice cache the surface source is still the pure
+            // With the chunk's lattice cache the surface source is still the pure
             // sampler's pick, also where it differs from the hard biome (a transition or a warped boundary).
             UseTerrainFirst(material: material);
             int picked = 0;
@@ -188,7 +187,7 @@ namespace Engine.Tests.EditMode{
                     ColumnSample s = WorldSampler.SampleColumn(wx, wz, _config.WorldGen);
                     AssertMatchesSampler(Column(x, z), s, $"({wx},{wz})");
                     Biome.BiomeDef def = _config.WorldGen.Biomes[s.SurfaceSource];
-                    Assert.AreEqual(def.topBlock, Column(x, z).TopBlock, "blocks come from the surface source (BLD-40)");
+                    Assert.AreEqual(def.topBlock, Column(x, z).TopBlock, "blocks come from the surface source");
                     if (s.SurfaceSource != s.HardBiome) picked++;
                 }
             }
@@ -196,7 +195,7 @@ namespace Engine.Tests.EditMode{
             Assert.Greater(picked, 0, "some column takes its surface from a biome other than its hard class");
         }
 
-        // --- TST-03 -------------------------------------------------------------------------------------------------------
+        // --- Chunk borders ------------------------------------------------------------------------------------------------
 
         [Test]
         public void PrepareChunkMaps_TerrainFirst_NeighbouringChunksAgreeAtTheBorder(){
@@ -214,7 +213,7 @@ namespace Engine.Tests.EditMode{
                 AssertMatchesSampler(leftEdge[z], a, $"left edge z={z}");
                 AssertMatchesSampler(Column(0, z), b, $"right edge z={z}");
                 Assert.Less(math.abs(leftEdge[z].HeightF - Column(0, z).HeightF), 8f,
-                    $"z={z}: the height is continuous across the chunk border (TST-12)");
+                    $"z={z}: the height is continuous across the chunk border");
             }
         }
 
@@ -227,7 +226,7 @@ namespace Engine.Tests.EditMode{
             NativeParallelHashMap<int2, ChunkVoxelData> results = new(2, Allocator.TempJob);
             try{
                 new ChunkJob{
-                    Jobs = jobs, Results = results.AsParallelWriter(), RandomSeed = _config.GlobalSeed, Config = _config
+                    Jobs = jobs, Results = results.AsParallelWriter(), Config = _config
                 }.Run(jobs.Length);
 
                 Assert.IsTrue(results.TryGetValue(new int2(-1, 0), out ChunkVoxelData west));
@@ -237,7 +236,7 @@ namespace Engine.Tests.EditMode{
                     ColumnSample b = WorldSampler.SampleColumn(0, z, _config.WorldGen);
                     Biome.BiomeDef defA = _config.WorldGen.Biomes[a.SurfaceSource];
                     Biome.BiomeDef defB = _config.WorldGen.Biomes[b.SurfaceSource];
-                    ushort expectedA = defA.topBlock; // GEN-14: top block at h_int even under water
+                    ushort expectedA = defA.topBlock; // top block at h_int even under water
                     ushort expectedB = defB.topBlock;
                     Assert.AreEqual(expectedA, west.GetVoxel(new int3(ChunkWidth - 1, a.ColumnHeight, z)), $"west z={z}");
                     Assert.AreEqual(expectedB, east.GetVoxel(new int3(0, b.ColumnHeight, z)), $"east z={z}");
@@ -254,15 +253,15 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void ChunkJob_CompilesSynchronouslyWithStrictFloats(){
-            // GEN-16: every job that calls the sampler compiles synchronously with FloatMode.Strict.
+            // Every job that calls the sampler compiles synchronously with FloatMode.Strict.
             BurstCompileAttribute burst = (BurstCompileAttribute)System.Attribute.GetCustomAttribute(
                 typeof(ChunkJob), typeof(BurstCompileAttribute));
             Assert.IsNotNull(burst, "ChunkJob is Burst-compiled");
-            Assert.IsTrue(burst.CompileSynchronously, "GEN-16: CompileSynchronously");
-            Assert.AreEqual(FloatMode.Strict, burst.FloatMode, "GEN-16: FloatMode.Strict");
+            Assert.IsTrue(burst.CompileSynchronously, "CompileSynchronously");
+            Assert.AreEqual(FloatMode.Strict, burst.FloatMode, "FloatMode.Strict");
         }
 
-        // --- GEN-14 -------------------------------------------------------------------------------------------------------
+        // --- Climate overrides --------------------------------------------------------------------------------------------
 
         private void ColdFloodedColumns(){
             for (int x = 0; x < ChunkWidth; x++)
@@ -276,7 +275,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void FillTerrain_IceOverrideFollowsEnableClimateOverrides(){
-            int surface = _config.WaterLevel - 1;
+            int surface = _config.WorldGen.WaterLevel - 1;
 
             UseTerrainFirst(climateOverrides: true);
             ColdFloodedColumns();
@@ -286,7 +285,7 @@ namespace Engine.Tests.EditMode{
             UseTerrainFirst(climateOverrides: false);
             ColdFloodedColumns();
             ChunkJob.FillTerrain(_vox, _columns, ref _config);
-            Assert.AreEqual(TestFixtures.Water, _vox[ChunkSize.Flatten(3, surface, 4)], "overrides off: no ice (GEN-14)");
+            Assert.AreEqual(TestFixtures.Water, _vox[ChunkSize.Flatten(3, surface, 4)], "overrides off: no ice");
             Assert.AreEqual(TestFixtures.Air, _vox[ChunkSize.Flatten(3, surface + 1, 4)]);
         }
     }

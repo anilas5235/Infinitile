@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Engine.Scripts.Utils.Logger;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Engine.Scripts.VoxelConfig.Registry{
     /// <summary>
@@ -20,8 +21,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         public Texture2DArray TextureArray{ get; private set; }
 
         /// <summary>
-        ///     Registers a texture and assigns an index ID if its size matches the expected atlas size.
-        ///     Returns the index or -1 on failure.
+        ///     Registers a texture and assigns an index ID. Throws if its size or format does not match the atlas.
         /// </summary>
         /// <param name="tex">Texture to register.</param>
         /// <returns>Assigned texture index.</returns>
@@ -69,6 +69,15 @@ namespace Engine.Scripts.VoxelConfig.Registry{
 
             textureArray.Apply();
             TextureArray = textureArray;
+        }
+
+        /// <summary>
+        ///     Destroys the texture array; the registry owns it.
+        /// </summary>
+        public void DestroyArray(){
+            if (!TextureArray) return;
+            CoreUtils.Destroy(TextureArray); // DestroyImmediate outside play mode (EditMode tests)
+            TextureArray = null;
         }
 
         protected override void PostRegister(ushort id, Texture2D item){

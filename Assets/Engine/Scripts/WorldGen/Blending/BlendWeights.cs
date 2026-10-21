@@ -2,8 +2,8 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Blending{
     /// <summary>
-    ///     Normalised weight vector over the active biomes (BLD-02): up to 16 entries, stored as four float4 so the
-    ///     struct is blittable and Burst-friendly without unsafe code. Index = biome index in the BiomeSet (GEN-21).
+    ///     Normalised weight vector over the active biomes: up to 16 entries, stored as four float4 so the
+    ///     struct is blittable and Burst-friendly without unsafe code. Index = biome index in the BiomeSet.
     ///     Every blend method returns one of these with Σ w = 1 (± 1e−5) and w ≥ 0; method 1 returns
     ///     <see cref="OneHot" />.
     /// </summary>
@@ -43,7 +43,7 @@ namespace Engine.Scripts.WorldGen.Blending{
             }
         }
 
-        /// <summary>Weights of method 1 (§9.2): 1 at <paramref name="index" />, 0 elsewhere.</summary>
+        /// <summary>Weights of method 1: 1 at <paramref name="index" />, 0 elsewhere.</summary>
         public static BlendWeights OneHot(int index){
             BlendWeights w = default;
             if (index >= 0 && index < Capacity) w[index] = 1f;
@@ -65,7 +65,7 @@ namespace Engine.Scripts.WorldGen.Blending{
             for (int i = 0; i < count; i++) this[i] *= inv;
         }
 
-        /// <summary>Index of the largest weight among the first <paramref name="count" />; ties break to the lower index (GEN-23).</summary>
+        /// <summary>Index of the largest weight among the first <paramref name="count" />; ties break to the lower index.</summary>
         public int ArgMax(int count = Capacity){
             int best = 0;
             float bestValue = this[0];

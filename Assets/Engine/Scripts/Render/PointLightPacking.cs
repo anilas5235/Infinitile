@@ -3,8 +3,8 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.Render{
     /// <summary>
-    ///     LGT-09: C# port of the per-corner light accessors in VoxelCommon.hlsl and of the corner averaging in
-    ///     PointBuilder.compute, kept in step with the shaders so LGT-11 can test the packing round trip.
+    ///     C# port of the per-corner light accessors in VoxelCommon.hlsl and of the corner averaging in
+    ///     PointBuilder.compute, kept in step with the shaders so tests can check the packing round trip.
     ///     <c>PointData.packed.y</c> = sky | red &lt;&lt; 16, <c>packed.w</c> = green | blue &lt;&lt; 16; each 16-bit
     ///     channel holds four 4-bit corners in the order up-left, up-right, down-right, down-left.
     /// </summary>

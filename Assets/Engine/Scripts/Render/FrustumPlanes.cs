@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Engine.Scripts.Render{
     /// <summary>
-    ///     CUL-04: the six camera frustum planes as (normal, distance) with normals pointing inward, in the order
+    ///     The six camera frustum planes as (normal, distance) with normals pointing inward, in the order
     ///     <see cref="GeometryUtility.CalculateFrustumPlanes(Camera, Plane[])" /> produces them. Holds no managed
     ///     memory so it can be stored per camera, copied and used from Burst; <see cref="FrustumCulling" /> is the
     ///     C# reference of the GPU test.
@@ -53,9 +53,8 @@ namespace Engine.Scripts.Render{
     }
 
     /// <summary>
-    ///     CUL-04 / CUL-08: C# reference of the AABB-frustum test that <c>PageCulling.compute</c> runs per page. The
-    ///     PlayMode test compares the GPU visible set with this function, and the EditMode tests pin its behaviour for
-    ///     boxes inside, outside, intersecting, behind the camera and containing the camera.
+    ///     C# reference of the AABB-frustum test that <c>PageCulling.compute</c> runs per page; the tests compare the
+    ///     GPU visible set against it.
     /// </summary>
     public static class FrustumCulling{
         /// <summary>
@@ -74,7 +73,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     CUL-05: the shadow variant tests the bounds extruded along the light direction by the shadow distance.
+        ///     Shadow variant: tests the bounds extruded along the light direction by the shadow distance.
         /// </summary>
         public static bool IsVisibleExtruded(in PageBounds bounds, float3 extrusion, in FrustumPlanes planes){
             return IsVisible(bounds.Extrude(extrusion), planes);

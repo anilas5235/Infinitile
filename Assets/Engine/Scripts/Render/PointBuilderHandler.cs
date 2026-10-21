@@ -17,20 +17,18 @@ namespace Engine.Scripts.Render{
     /// </summary>
     public class PointBuilderHandler : IDisposable{
         private const int PrepChunkCount = 9;
-        private const int PrepIntervalsPerThread = 8;
-        private const int PrepThreadsX = 64;
         private readonly int _buildPrepKernelID;
-        private readonly int _buildPrepLightKernelID; // LGT-08
+        private readonly int _buildPrepLightKernelID;
 
         private readonly GraphicsBuffer _metadata;
         private readonly ComputeShader _pointBuilder;
         private readonly int _pointBuilderKernelID;
         private readonly GraphicsBuffer[] _preparedChunks;
 
-        // §20.1: page tables of the 2 x 9 interval lists of a build (voxel ids and light), packed back to back
+        // page tables of the 2 x 9 interval lists of a build (voxel ids and light), packed back to back
         private const int PageTableLists = 2 * PrepChunkCount;
         private readonly GraphicsBuffer _pageTable;
-        private readonly uint[] _pageTableUpload = new uint[PageTableLists * IntervalPages.MaxPagesPerList]; // PERF-04
+        private readonly uint[] _pageTableUpload = new uint[PageTableLists * IntervalPages.MaxPagesPerList];
         private readonly int[] _pageTableOffsets = new int[PageTableLists];
 
         private readonly GraphicsBuffer _readBackCountBuffer;
@@ -38,14 +36,14 @@ namespace Engine.Scripts.Render{
 
         private readonly GraphicsBuffer _voxelRenderDefBuffer;
         private NativeArray<uint> _counts;
-        private readonly PartitionMetadata[] _metadataUpload = new PartitionMetadata[1]; // PERF-04
-        // PERF-04: SetInts takes a params array; these constants are passed as pre-built arrays
+        private readonly PartitionMetadata[] _metadataUpload = new PartitionMetadata[1];
+        // SetInts takes a params array; these constants are passed as pre-built arrays
         private static readonly int[] ChunkSizeInts = { ChunkSize.x, ChunkSize.y, ChunkSize.z };
         private static readonly int[] PartitionSizeInts = { PartitionSize.x, PartitionSize.y, PartitionSize.z };
-        private readonly int[] _pointCounts = new int[3]; // PERF-04: result array reused per handler
+        private readonly int[] _pointCounts = new int[3]; // result array reused per handler
         private bool _disposed;
         private bool _readBackPending;
-        private AsyncGPUReadbackRequest _readBackRequest; // PERF-04: polled; the awaited version allocated per build
+        private AsyncGPUReadbackRequest _readBackRequest; // polled, not awaited, so a build allocates nothing
 
         /// <summary>
         ///     Initializes a new instance of the PointBuilderHandler class.
@@ -67,7 +65,7 @@ namespace Engine.Scripts.Render{
             _pageTable = new GraphicsBuffer(Target.Structured, _pageTableUpload.Length, sizeof(uint));
 
             int vSize = Marshal.SizeOf<Vertex>();
-            // F-03: counter buffers; the shader skips writes at or beyond MaxPointsPerPartition
+            // counter buffers; the shader skips writes at or beyond MaxPointsPerPartition
             const Target pointTarget = Target.Structured | Target.Counter;
             SolidPointsOut = new GraphicsBuffer(pointTarget, MaxPointsPerPartition, vSize);
             TransparentPointsOut = new GraphicsBuffer(pointTarget, MaxPointsPerPartition, vSize);
@@ -102,8 +100,8 @@ namespace Engine.Scripts.Render{
             if (_disposed) return;
             _disposed = true;
 
-            // F-17: a read-back into _counts may still be pending; the array cannot be released before it has
-            // completed, and every resource is released on its own so one failure does not leak the others.
+            // A read-back into _counts may still be pending; the array cannot be released before it has completed.
+            // Every resource is released on its own so one failure does not leak the others.
             if (_readBackPending) _readBackRequest.WaitForCompletion();
 
             SafeDispose(SolidPointsOut);
@@ -138,10 +136,10 @@ namespace Engine.Scripts.Render{
 
         /// <summary>
         ///     Dispatches the point build for the given partition and starts the read-back of the point counts.
-        ///     Poll <see cref="IsReadBackDone" /> and then call <see cref="CompleteBuild" /> for the counts.
+        ///     Poll <see cref="IsReadBackDone" /> and then call <see cref="TryCompleteBuild" /> for the counts.
         /// </summary>
         /// <param name="data">The partition build request containing chunk data.</param>
-        /// <param name="store">§20.1: the interval store that holds the request's lists.</param>
+        /// <param name="store">The interval store that holds the request's lists.</param>
         internal void BuildPoints(PartitionBuildRequest data, ChunkIntervalStore store){
             ResetCounters();
             _metadataUpload[0] = data.GetMetadata();
@@ -175,9 +173,10 @@ namespace Engine.Scripts.Render{
             _pointBuilder.SetBuffer(_pointBuilderKernelID, FoliagePointsOutNameID, FoliagePointsOut);
 
             _pointBuilder.SetInt(PartitionIndexNameID, 0);
-            _pointBuilder.SetInt(PointCapacityNameID, MaxPointsPerPartition); // F-03
+            _pointBuilder.SetInt(PointCapacityNameID, MaxPointsPerPartition);
 
-            _pointBuilder.Dispatch(_pointBuilderKernelID, 8, 8, 8);
+            _pointBuilder.Dispatch(_pointBuilderKernelID, PartitionWidth / BuildPointsThreads,
+                PartitionHeight / BuildPointsThreads, PartitionDepth / BuildPointsThreads);
 
             CopyCount(SolidPointsOut, _readBackCountBuffer, sizeof(uint) * 0);
             CopyCount(TransparentPointsOut, _readBackCountBuffer, sizeof(uint) * 1);
@@ -189,32 +188,38 @@ namespace Engine.Scripts.Render{
 
         /// <summary>
         ///     Finishes the pending build: converts the read-back counters to the solid, transparent and foliage
-        ///     point counts. Zero counts are returned when the handler was released while the read-back ran (F-17)
-        ///     or the read-back failed.
+        ///     point counts.
         /// </summary>
-        /// <returns>The handler-owned counts array (valid until the next build).</returns>
-        internal int[] CompleteBuild(){
-            if (!_readBackPending) return _pointCounts;
+        /// <param name="counts">
+        ///     The handler-owned counts array (valid until the next build); all zero when the build failed.
+        /// </param>
+        /// <returns>
+        ///     False when the handler was released while the read-back ran or the read-back failed; the counts then
+        ///     say nothing about the partition.
+        /// </returns>
+        internal bool TryCompleteBuild(out int[] counts){
+            counts = _pointCounts;
+            if (!_readBackPending) return true;
             _readBackPending = false;
 
-            if (_disposed){ // F-17: the handler was released while the read-back ran
+            if (_disposed){ // the handler was released while the read-back ran
                 Array.Clear(_pointCounts, 0, _pointCounts.Length);
-                return _pointCounts;
+                return false;
             }
 
             if (_readBackRequest.hasError){
                 VoxelEngineLogger.Error<PointBuilderHandler>("Error reading back point counts: the GPU read-back failed");
                 Array.Clear(_pointCounts, 0, _pointCounts.Length);
-                return _pointCounts;
+                return false;
             }
 
             ToPointCounts(_counts, _pointCounts);
-            return _pointCounts;
+            return true;
         }
 
         /// <summary>
         ///     Converts the GPU read-back counters (solid, transparent, foliage) to the point counts used for
-        ///     buffer allocation. Extracted so TST-E17 can characterise the read-back clamp (F-03).
+        ///     buffer allocation; separate so tests can check the read-back clamp.
         /// </summary>
         internal static int[] ToPointCounts(NativeArray<uint> counts){
             int[] results = new int[counts.Length];
@@ -222,10 +227,10 @@ namespace Engine.Scripts.Render{
             return results;
         }
 
-        /// <summary>PERF-04: fills a caller-owned array instead of allocating one per read-back.</summary>
+        /// <summary>Fills a caller-owned array instead of allocating one per read-back.</summary>
         internal static void ToPointCounts(NativeArray<uint> counts, int[] results){
             for (int i = 0; i < counts.Length; i++){
-                // F-03: the shader skips points beyond the buffer capacity, but the counter keeps growing
+                // The shader skips points beyond the buffer capacity, but the counter keeps growing
                 // (alwaysRenderAllFaces can emit up to 6 faces per voxel). Never request more than the buffer holds.
                 uint count = counts[i];
                 if (count > MaxPointsPerPartition){
@@ -249,10 +254,10 @@ namespace Engine.Scripts.Render{
 
         /// <summary>
         ///     Prepares all chunks for point building by decompressing them: the voxel ids into the lower 16 bits
-        ///     of each voxel's uint, then the light into the upper 16 bits (LGT-08).
+        ///     of each voxel's uint, then the light into the upper 16 bits.
         /// </summary>
         /// <param name="data">The partition build request containing the chunks' interval lists.</param>
-        /// <param name="store">§20.1: the interval store that holds the lists.</param>
+        /// <param name="store">The interval store that holds the lists.</param>
         private void PrepareChunks(PartitionBuildRequest data, ChunkIntervalStore store){
             _pointBuilder.SetInt(VoxelsPerChunkNameID, VoxelsPerChunk);
             IntervalRange[] voxelLists = data.VoxelLists;
@@ -282,7 +287,7 @@ namespace Engine.Scripts.Render{
         /// <summary>
         ///     Dispatches a compute shader job to decompress a single chunk's interval list.
         /// </summary>
-        /// <param name="kernel">BuildPrep (voxel ids) or BuildPrepLight (light, LGT-08).</param>
+        /// <param name="kernel">BuildPrep (voxel ids) or BuildPrepLight (light).</param>
         /// <param name="chunkIndex">The index of the chunk to prepare.</param>
         /// <param name="list">The compressed list in the interval store.</param>
         /// <param name="pageTableOffset">Start of the list's pages in the page table.</param>
@@ -291,7 +296,7 @@ namespace Engine.Scripts.Render{
             _pointBuilder.SetBuffer(kernel, UnCompChunkNameID, _preparedChunks[chunkIndex]);
 
             int intervalCount = list.IntervalCount;
-            int intervalsPerGroup = PrepThreadsX * PrepIntervalsPerThread;
+            int intervalsPerGroup = PrepThreads * PrepIntervalsPerThread;
             int groupsX = math.max(1, (intervalCount + intervalsPerGroup - 1) / intervalsPerGroup);
             _pointBuilder.Dispatch(kernel, groupsX, 1, 1);
         }

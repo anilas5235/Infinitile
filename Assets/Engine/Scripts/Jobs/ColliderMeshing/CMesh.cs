@@ -28,7 +28,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
     [BurstCompile]
     internal struct CMeshBuffer{
         public NativeList<CVertex> CVertexBuffer;
-        public NativeList<int> CIndexBuffer; // F-15: int so meshes above 65536 vertices can use 32-bit indices
+        public NativeList<int> CIndexBuffer; // int so meshes above 65536 vertices can use 32-bit indices
 
         /// <summary>
         ///     Disposes all native lists.

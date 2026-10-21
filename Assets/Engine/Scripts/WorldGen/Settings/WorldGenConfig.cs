@@ -1,9 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
-using Engine.Scripts.Noise;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Blending;
-using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Height;
 using Engine.Scripts.WorldGen.Noise;
@@ -12,10 +10,10 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Settings{
     /// <summary>
-    ///     Burst-side mirror of <see cref="WorldGenSettings" /> (INT-03): enums, floats and flattened NativeArrays,
+    ///     Burst-side mirror of <see cref="WorldGenSettings" />: enums, floats and flattened NativeArrays,
     ///     read-only inside jobs. Built by <see cref="WorldGenSettings.ToConfig" />.
     ///     <para>
-    ///         Ownership (D-05): every container in this struct is created by <c>ToConfig</c> for this instance and
+    ///         Ownership: every container in this struct is created by <c>ToConfig</c> for this instance and
     ///         released by <see cref="Dispose" />, which <c>GeneratorConfig.Dispose</c> calls. Nothing here is a view
     ///         of registry memory. A default instance (<see cref="IsCreated" /> false) owns nothing and may be disposed,
     ///         but it cannot travel inside a job struct (the job safety system rejects unconstructed containers), so
@@ -28,10 +26,10 @@ namespace Engine.Scripts.WorldGen.Settings{
 
         public GenArchitecture Architecture;
 
-        // --- Blending (§9) -------------------------------------------------------------------------------------------
+        // --- Blending -----------------------------------------------------------------------------------------------
         public BlendMethod MaterialMethod;
 
-        /// <summary>B_mat in blocks (DistanceBlend only; the material-stage DistortedBoundary is a one-hot warp, §9.7).</summary>
+        /// <summary>B_mat in blocks (DistanceBlend only; the material-stage DistortedBoundary is a one-hot warp).</summary>
         public float MaterialBlendWidth;
 
         /// <summary>σ_mat in normalised parameter units (method 4).</summary>
@@ -41,7 +39,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         public float HeightBlendWidth;
         public float HeightSigma;
 
-        /// <summary>Shared boundary-warp amplitude A in blocks (DEC-05).</summary>
+        /// <summary>Shared boundary-warp amplitude A in blocks, used by both stages.</summary>
         public float WarpAmplitude;
 
         /// <summary>Boundary-warp wavelength λ_d in blocks.</summary>
@@ -52,11 +50,11 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// <summary>
         ///     Biome-first with both stages on the same method and strength (None; DistanceBlend with B_mat = B_hgt;
         ///     ParameterSpaceWeighting with σ_mat = σ_hgt): the height weights are the material weights, computed
-        ///     once (PERF-07). Never set for DistortedBoundary, whose stages differ (warp only vs. warp + blend).
+        ///     once. Never set for DistortedBoundary, whose stages differ (warp only vs. warp + blend).
         /// </summary>
         [MarshalAs(UnmanagedType.U1)] public bool StagesShareWeights;
 
-        /// <summary>Material-stage kernel (DistanceBlend, B_mat); not created for other methods (BLD-12).</summary>
+        /// <summary>Material-stage kernel (DistanceBlend, B_mat); not created for other methods.</summary>
         public KernelSet MaterialKernel;
 
         /// <summary>Taps of <see cref="MaterialKernel" />; empty when unused. Owned.</summary>
@@ -68,7 +66,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// <summary>Taps of <see cref="HeightKernel" />; empty when unused. Owned.</summary>
         [ReadOnly] public NativeArray<KernelTap> HeightTaps;
 
-        // --- Classification weights λ (§6.4) -----------------------------------------------------------------------------
+        // --- Classification weights λ ------------------------------------------------------------------------------
         public float LambdaTemperature;
         public float LambdaHumidity;
         public float LambdaContinental;
@@ -78,39 +76,39 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// <summary>λ_h; Terrain-first only.</summary>
         public float LambdaHeight;
 
-        // --- Height (§5.7) --------------------------------------------------------------------------------------------
+        // --- Height -------------------------------------------------------------------------------------------------
         public float HeightMin;
         public float HeightMax;
         public float PeakWavelength;
 
         /// <summary>
-        ///     Water surface level in world Y (GEN-14): water fills y &lt; WaterLevel. Mirrors
-        ///     <c>WorldGenSettings.WaterLevel</c> for the flora conditions (VEG-04).
+        ///     Water surface level in world Y: water fills y &lt; WaterLevel. Mirrors
+        ///     <c>WorldGenSettings.WaterLevel</c> for the flora conditions.
         /// </summary>
         public int WaterLevel;
 
-        /// <summary>D-06: run the ice override after terrain fill.</summary>
+        /// <summary>Run the ice override after terrain fill.</summary>
         [MarshalAs(UnmanagedType.U1)] public bool EnableClimateOverrides; // blittable for the Burst direct calls
 
         /// <summary>Climate noise instances (T, F, C, E, W) and couplings. Owned.</summary>
         public ClimateParams Climate;
 
-        /// <summary>Wavelength of detail octave i in blocks (GEN-09); Length = K. Owned.</summary>
+        /// <summary>Wavelength of detail octave i in blocks; Length = K. Owned.</summary>
         [ReadOnly] public NativeArray<float> OctaveWavelengths;
 
-        /// <summary>Global octave weights g_i of Terrain-first (TRN-03); Length = K. Owned.</summary>
+        /// <summary>Global octave weights g_i of Terrain-first; Length = K. Owned.</summary>
         [ReadOnly] public NativeArray<float> GlobalOctaveWeights;
 
-        /// <summary>Active biomes in BiomeSet order (GEN-21). Owned.</summary>
+        /// <summary>Active biomes in BiomeSet order. Owned.</summary>
         [ReadOnly] public NativeArray<Biome.BiomeDef> Biomes;
 
         /// <summary>
-        ///     Effective Biome-first octave coefficients a_{b,i} = HeightAmplitude_b × OctaveWeights_{b,i} (GEN-22),
+        ///     Effective Biome-first octave coefficients a_{b,i} = HeightAmplitude_b × OctaveWeights_{b,i},
         ///     flattened as [b × K + i]. Owned.
         /// </summary>
         [ReadOnly] public NativeArray<float> OctaveCoefficients;
 
-        /// <summary>Flattened Terrain-first spline trees (TRN-01, TRN-05), pre-ordered per root. Owned.</summary>
+        /// <summary>Flattened Terrain-first spline trees, pre-ordered per root. Owned.</summary>
         [ReadOnly] public NativeArray<SplineNode> SplineNodes;
 
         /// <summary>Control points of <see cref="SplineNodes" />. Owned.</summary>
@@ -122,11 +120,11 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// <summary>Amp(C,E,PV) root.</summary>
         public SplineRoot AmpSpline;
 
-        /// <summary>J(C,E,PV) root (own extension, TRN-04).</summary>
+        /// <summary>J(C,E,PV) root (own extension).</summary>
         public SplineRoot JaggednessSpline;
 
-        // --- Flora (§10) -------------------------------------------------------------------------------------------
-        /// <summary>r_tree: anchors of multi-block flora are at least this far apart (VEG-05, default 3).</summary>
+        // --- Flora -------------------------------------------------------------------------------------------------
+        /// <summary>r_tree: anchors of multi-block flora are at least this far apart (default 3).</summary>
         public int TreeSpacingRadius;
 
         /// <summary>Largest horizontal reach of a multi-block species from its anchor column (max canopy radius).</summary>
@@ -134,11 +132,11 @@ namespace Engine.Scripts.WorldGen.Settings{
 
         /// <summary>
         ///     Columns a chunk evaluates beyond its border for multi-block flora: <see cref="FloraReach" /> +
-        ///     <see cref="TreeSpacingRadius" /> (VEG-05), 0 when no biome has a multi-block rule.
+        ///     <see cref="TreeSpacingRadius" />, 0 when no biome has a multi-block rule.
         /// </summary>
         public int FloraPadding;
 
-        /// <summary>Flora rules of every active biome, addressed by <c>BiomeDef.floraRuleStart/floraRuleCount</c> (VEG-03). Owned.</summary>
+        /// <summary>Flora rules of every active biome, addressed by <c>BiomeDef.floraRuleStart/floraRuleCount</c>. Owned.</summary>
         [ReadOnly] public NativeArray<FloraRuleDef> FloraRules;
 
         /// <summary>Structure species, indexed by <see cref="FloraRuleDef.Structure" />. Owned.</summary>
@@ -149,7 +147,7 @@ namespace Engine.Scripts.WorldGen.Settings{
 
         /// <summary>
         ///     [start, end) of every multi-block rule's species interval over all biomes: a column whose species roll
-        ///     lies in none of them cannot be a multi-block candidate, whatever its flora biome (VEG-05 pre-filter).
+        ///     lies in none of them cannot be a multi-block candidate, whatever its flora biome (pre-filter).
         ///     Owned.
         /// </summary>
         [ReadOnly] public NativeArray<float2> FloraMultiBlockIntervals;

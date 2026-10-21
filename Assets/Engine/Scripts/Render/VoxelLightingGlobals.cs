@@ -3,7 +3,7 @@ using static Engine.Scripts.Utils.VoxelRenderConstants;
 
 namespace Engine.Scripts.Render{
     /// <summary>
-    ///     LGT-10: the shader globals of the voxel lighting. The <see cref="DayNightCycle" /> drives them every frame;
+    ///     The shader globals of the voxel lighting. The <see cref="DayNightCycle" /> drives them every frame;
     ///     without one the renderer sets the defaults (full daylight), so a scene without the component is lit.
     /// </summary>
     public static class VoxelLightingGlobals{

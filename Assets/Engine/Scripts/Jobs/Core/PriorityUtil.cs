@@ -51,11 +51,6 @@ namespace Engine.Scripts.Jobs.Core{
             return dist * (3f - 2f * dot);
         }
 
-        [BurstCompile]
-        public static float ReVerseDistPriority(ref int3 position, ref Focus focus){
-            return -DistPriority(ref position, ref focus);
-        }
-
         /// <summary>
         ///     Calculates priority based on squared distance from focus position for 2D coordinates.
         ///     Lower values indicate higher priority (closer to focus).
@@ -68,7 +63,7 @@ namespace Engine.Scripts.Jobs.Core{
             int dist = (position - focus.Pos.xz).SqrMagnitude();
             if (dist == 0) return 0f;
 
-            // F-09: a vertical forward has no xz component; normalising it gives NaN, so skip the direction term.
+            // A vertical forward has no xz component; normalising it gives NaN, so skip the direction term.
             float2 forwardXz = focus.Forward.xz;
             if (math.lengthsq(forwardXz) < 1e-6f) return dist * 3f;
 
@@ -80,26 +75,30 @@ namespace Engine.Scripts.Jobs.Core{
             return dist * (3f - 2f * dot);
         }
 
-        [BurstCompile]
-        public static float ReVerseDistPriority(ref int2 position, ref Focus focus){
-            return -DistPriority(ref position, ref focus);
-        }
-
         /// <summary>
-        ///     F-23 / DEC-14: eviction order is plain (squared) distance from the focus, without the view weighting
-        ///     of <see cref="DistPriority(ref int3, ref Focus)" />; the farthest entry has the lowest value and is
-        ///     dequeued first. Otherwise a chunk behind the player inside the load distance was evicted before a
-        ///     chunk outside it and regenerated.
+        ///     Eviction order is the square ring around the focus (Chebyshev distance), without the view weighting of
+        ///     <see cref="DistPriority(ref int3, ref Focus)" />; the farthest entry has the lowest value and is
+        ///     dequeued first. The load, draw and update areas are squares, so a straight-line distance would rank the
+        ///     corners of an area (r·√2) behind entries outside it and evict and regenerate them over and over; with
+        ///     view weighting, a chunk behind the player inside the area would go first. Within a ring, the squared
+        ///     distance breaks the tie (the fraction stays below 1, so it never crosses a ring).
         /// </summary>
         [BurstCompile]
         public static float EvictionPriority(ref int3 position, ref Focus focus){
-            return -(position - focus.Pos).SqrMagnitude();
+            int3 d = math.abs(position - focus.Pos);
+            return RingPriority(math.cmax(d), math.dot(d, d));
         }
 
         /// <inheritdoc cref="EvictionPriority(ref int3, ref Focus)" />
         [BurstCompile]
         public static float EvictionPriority(ref int2 position, ref Focus focus){
-            return -(position - focus.Pos.xz).SqrMagnitude();
+            int2 d = math.abs(position - focus.Pos.xz);
+            return RingPriority(math.cmax(d), math.dot(d, d));
+        }
+
+        private static float RingPriority(int ring, int sqrDistance){
+            // sqrDistance <= 3 ring² in 3D (2 ring² in 2D)
+            return -(ring + sqrDistance / (3f * ring * ring + 1f));
         }
 
         public readonly struct Focus : IEquatable<Focus>{

@@ -12,7 +12,7 @@ using Random = Unity.Mathematics.Random;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     §20.1: page bookkeeping of the shared interval store (<see cref="IntervalPages" />) and the decompress
+    ///     Page bookkeeping of the shared interval store (<see cref="IntervalPages" />) and the decompress
     ///     kernels reading lists through the page table (<see cref="ChunkIntervalStore" />, BuildPrep / BuildPrepLight).
     /// </summary>
     public class IntervalStoreTests{

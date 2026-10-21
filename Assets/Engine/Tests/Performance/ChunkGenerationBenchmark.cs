@@ -12,14 +12,13 @@ using Unity.PerformanceTesting;
 
 namespace Engine.Tests.Performance{
     /// <summary>
-    ///     PERF-02: chunk data generation, ms per chunk on a single worker (ChunkJob.Run). One sample group per
-    ///     architecture: the Terrain-first sampler (Phase 1) and the Biome-first sampler (Phase 2). Both write the
-    ///     chunk through the same RLE path. The legacy "TerrainRle" row ended with the legacy generator (INT-40).
+    ///     Chunk data generation, ms per chunk on a single worker (ChunkJob.Run). One sample group per architecture
+    ///     (Terrain-first and Biome-first sampler); both write the chunk through the same RLE path.
     ///     <para>
-    ///         Phase 3 adds one row per architecture x blend method (PERF-02). The cost of the spatial methods
-    ///         depends on how many columns lie near a boundary, so these rows average over a fixed set of
-    ///         <see cref="MethodChunkCount" /> scattered chunks instead of the single chunk of the rows above, which
-    ///         stay as they are for comparison with earlier baselines (PERF-03).
+    ///         The per-method rows (architecture x blend method) average over a fixed set of
+    ///         <see cref="MethodChunkCount" /> scattered chunks, because the cost of the spatial methods depends on
+    ///         how many columns lie near a boundary; the single-chunk rows above stay comparable with earlier
+    ///         baselines.
     ///     </para>
     /// </summary>
     [TestFixture]
@@ -58,7 +57,6 @@ namespace Engine.Tests.Performance{
             ChunkJob job = new(){
                 Jobs = _jobs,
                 Results = _results.AsParallelWriter(),
-                RandomSeed = _config.GlobalSeed,
                 Config = _config
             };
 
@@ -79,7 +77,6 @@ namespace Engine.Tests.Performance{
             ChunkJob job = new(){
                 Jobs = _jobs,
                 Results = _results.AsParallelWriter(),
-                RandomSeed = _config.GlobalSeed,
                 Config = _config
             };
 
@@ -101,14 +98,14 @@ namespace Engine.Tests.Performance{
             [Values(BlendMethod.None, BlendMethod.DistanceBlend, BlendMethod.DistortedBoundary, BlendMethod.ParameterSpaceWeighting)]
             BlendMethod method){
             BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
-            _config = BenchmarkFixtures.CreateSpecGeneratorConfig(architecture, method, Allocator.Persistent, _created);
+            _config = BenchmarkFixtures.CreatePlaceholderGeneratorConfig(architecture, method, Allocator.Persistent, _created);
             MeasurePerChunk($"ChunkJob.Run {architecture} {method} ms/chunk");
         }
 
         /// <summary>
-        ///     Phase 4 (PERF-02, new feature): the same chunks and world with the §10 placeholder flora rules, so the
-        ///     difference to <see cref="ChunkJob_Run_PerMethod_MsPerChunk" /> is the cost of the flora decision (with
-        ///     its ring of r_tree + reach columns) and of stamping.
+        ///     The same chunks and world with the placeholder flora rules, so the difference to
+        ///     <see cref="ChunkJob_Run_PerMethod_MsPerChunk" /> is the cost of the flora decision (with its ring of
+        ///     r_tree + reach columns) and of stamping.
         /// </summary>
         [Test]
         [Performance]
@@ -117,7 +114,7 @@ namespace Engine.Tests.Performance{
             [Values(BlendMethod.None, BlendMethod.DistanceBlend, BlendMethod.DistortedBoundary, BlendMethod.ParameterSpaceWeighting)]
             BlendMethod method){
             BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
-            _config = BenchmarkFixtures.CreateSpecGeneratorConfig(architecture, method, Allocator.Persistent, _created, true);
+            _config = BenchmarkFixtures.CreatePlaceholderGeneratorConfig(architecture, method, Allocator.Persistent, _created, true);
             Assert.IsTrue(_config.WorldGen.HasFlora);
             MeasurePerChunk($"ChunkJob.Run {architecture} {method} flora ms/chunk");
         }
@@ -129,7 +126,6 @@ namespace Engine.Tests.Performance{
             ChunkJob job = new(){
                 Jobs = _jobs,
                 Results = _results.AsParallelWriter(),
-                RandomSeed = _config.GlobalSeed,
                 Config = _config
             };
 

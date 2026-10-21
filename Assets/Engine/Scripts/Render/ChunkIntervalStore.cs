@@ -9,20 +9,18 @@ using static UnityEngine.GraphicsBuffer;
 
 namespace Engine.Scripts.Render{
     /// <summary>
-    ///     §20.1: one structured GPU buffer for the compressed interval lists of every loaded chunk, voxel ids and
-    ///     light (LGT-08) alike. Each list is a range of pages (<see cref="IntervalPages" />); the decompress kernels
-    ///     find the pages of a list through a page table (<see cref="WritePageTable" />). Replaces one
-    ///     <see cref="GraphicsBuffer" /> per list: no managed object per chunk upload (PERF-04), and memory follows the
-    ///     actual list lengths instead of a fixed length per chunk.
+    ///     One structured GPU buffer for the compressed interval lists of every loaded chunk, voxel ids and light
+    ///     alike. Each list is a range of pages (<see cref="IntervalPages" />); the decompress kernels find the pages
+    ///     of a list through a page table (<see cref="WritePageTable" />). Chunk uploads create no managed objects, and
+    ///     memory follows the actual list lengths instead of a fixed length per chunk.
     /// </summary>
     internal sealed class ChunkIntervalStore : IDisposable{
-        private const int CopyThreads = 64;
         private const int MaxCopyGroups = 65535;
 
         private readonly ComputeShader _copyShader;
         private readonly int _copyKernel;
         private readonly IntervalPages _pages;
-        private uint2[] _staging = Array.Empty<uint2>(); // PERF-04: reused upload staging
+        private uint2[] _staging = Array.Empty<uint2>(); // reused upload staging
 
         /// <summary>Creates the store with every page free.</summary>
         /// <param name="pageCount">Initial pages (<see cref="IntervalPages.PageSize" /> elements each).</param>
@@ -104,11 +102,11 @@ namespace Engine.Scripts.Render{
             GraphicsBuffer grown = CreateBuffer(_pages.PageCount + added);
 
             int count = _pages.PageCount * IntervalPages.PageSize;
-            int groups = math.min((count + CopyThreads - 1) / CopyThreads, MaxCopyGroups);
+            int groups = math.min((count + CopyIntervalsThreads - 1) / CopyIntervalsThreads, MaxCopyGroups);
             _copyShader.SetBuffer(_copyKernel, CopySourceNameID, Buffer);
             _copyShader.SetBuffer(_copyKernel, CopyTargetNameID, grown);
             _copyShader.SetInt(CopyCountNameID, count);
-            _copyShader.SetInt(CopyStrideNameID, groups * CopyThreads);
+            _copyShader.SetInt(CopyStrideNameID, groups * CopyIntervalsThreads);
             _copyShader.Dispatch(_copyKernel, groups, 1, 1);
 
             Buffer.Dispose();

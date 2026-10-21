@@ -26,7 +26,7 @@ namespace Engine.Scripts.Render{
             for (int i = 0; i < initialBuffers; i++) AddNewBuffer();
         }
 
-        /// <summary>Name of the material, used to label this layer in the culling overlay (CUL-06).</summary>
+        /// <summary>Name of the material, used to label this layer in the culling overlay.</summary>
         public string LayerName => _material != null ? _material.name : "<no material>";
 
         /// <summary>The render buffers of this manager, in buffer-index order.</summary>
@@ -46,7 +46,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     Culls and draws all render buffers for the specified camera (CUL-02).
+        ///     Culls and draws all render buffers for the specified camera.
         /// </summary>
         /// <param name="cam">The camera to render with.</param>
         /// <param name="culler">The culler that dispatches the kernels.</param>
@@ -105,7 +105,7 @@ namespace Engine.Scripts.Render{
         /// </summary>
         /// <param name="pointCount">The total number of points.</param>
         /// <param name="numPages">The number of pages needed.</param>
-        /// <param name="bounds">CUL-01: bounds of the owning partition, stored per page.</param>
+        /// <param name="bounds">Bounds of the owning partition, stored per page.</param>
         /// <returns>The allocation info for the allocated pages.</returns>
         private AllocInfo AllocPages(int pointCount, int numPages, in PageBounds bounds){
             bool success = false;
@@ -128,7 +128,7 @@ namespace Engine.Scripts.Render{
         private void Release(in AllocInfo allocInfo, in int3 partitionPos){
             _renderBuffers[allocInfo.BufferIndex].ClearPage(allocInfo);
             _partitionAllocations.Remove(partitionPos);
-            allocInfo.Recycle(); // PERF-04
+            allocInfo.Recycle();
         }
 
         /// <summary>

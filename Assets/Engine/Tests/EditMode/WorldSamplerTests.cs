@@ -17,7 +17,7 @@ using BlendWeights = Engine.Scripts.WorldGen.Blending.BlendWeights;
 using Object = UnityEngine.Object;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>GEN-01/03/17/23, TST-09: sampler skeleton, classifier, blend weights and the region API.</summary>
+    /// <summary>Sampler skeleton, classifier, blend weights and the region API.</summary>
     public class WorldSamplerTests{
         private readonly List<Object> _created = new();
         private readonly List<IDisposable> _native = new();
@@ -51,7 +51,7 @@ namespace Engine.Tests.EditMode{
             return b;
         }
 
-        /// <summary>The six §19.2 placeholder biomes.</summary>
+        /// <summary>The six placeholder biomes.</summary>
         private Biome[] PlaceholderBiomes(){
             return new[]{
                 Biome("Plains", .55f, .45f, .45f, .70f, -0.2f, 136, 6, new[]{ 1f, .6f, .3f, .12f, .05f, .02f }, 0),
@@ -67,7 +67,7 @@ namespace Engine.Tests.EditMode{
             return Config(seed, GenArchitecture.BiomeFirst, biomes);
         }
 
-        /// <summary>Config for <paramref name="architecture" />; Terrain-first gets the §19.1 placeholder splines.</summary>
+        /// <summary>Config for <paramref name="architecture" />; Terrain-first gets the placeholder splines.</summary>
         private WorldGenConfig Config(int seed, GenArchitecture architecture, params Biome[] biomes){
             BiomeSet set = Create<BiomeSet>("Set");
             set.Biomes.AddRange(biomes);
@@ -90,10 +90,9 @@ namespace Engine.Tests.EditMode{
             out float height, out float unclamped);
 
         /// <summary>
-        ///     GEN-16 guard: a Burst compile error in a direct-call entry point (struct return, bool in the
-        ///     signature) is only logged at domain reload and disables Burst for every job in the Editor, which
-        ///     made all Phase 0.5 benchmarks run managed. Compiling the entry point as a function pointer surfaces
-        ///     such an error as a test failure.
+        ///     A Burst compile error in a direct-call entry point (struct return, bool in the signature) is only
+        ///     logged at domain reload and disables Burst for every job in the Editor. Compiling the entry point as
+        ///     a function pointer surfaces such an error as a test failure.
         /// </summary>
         [Test]
         public void SampleColumn_CompilesWithBurst(){
@@ -118,7 +117,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void BiomeFirstHeight_CompilesWithBurst(){
-            // GEN-16 guard for the second direct-call entry point (the calibration helper and tests call it).
+            // Same guard for the second direct-call entry point (the calibration helper and tests call it).
             Assert.IsTrue(BurstCompiler.IsEnabled, "Burst compilation is disabled in the Editor (Jobs > Burst)");
             FunctionPointer<BiomeHeightFn> fp = BurstCompiler.CompileFunctionPointer<BiomeHeightFn>(BiomeFirstHeight.Sample);
             Assert.IsTrue(fp.IsCreated);
@@ -140,7 +139,7 @@ namespace Engine.Tests.EditMode{
             return a;
         }
 
-        // --- BlendWeights (BLD-02) ------------------------------------------------------------------------------------
+        // --- BlendWeights ---------------------------------------------------------------------------------------------
 
         [Test]
         public void BlendWeights_IndexerCoversAllSixteenSlots(){
@@ -163,11 +162,11 @@ namespace Engine.Tests.EditMode{
             BlendWeights tie = default;
             tie[2] = 0.5f;
             tie[7] = 0.5f;
-            Assert.AreEqual(2, tie.ArgMax(), "ties break to the lower index (GEN-23)");
+            Assert.AreEqual(2, tie.ArgMax(), "ties break to the lower index");
             Assert.AreEqual(0f, BlendWeights.OneHot(-1).Sum(), "no biome → zero vector");
         }
 
-        // --- Classifier (§6.4, GEN-23) --------------------------------------------------------------------------------
+        // --- Classifier -----------------------------------------------------------------------------------------------
 
         [Test]
         public void Classifier_PicksTheBiomeAtTheFieldsAndBreaksTiesLow(){
@@ -188,7 +187,7 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void Classifier_WeightsAndPvNormalisationFollowTheSpec(){
+        public void Classifier_DistanceUsesAxisWeightsAndPvNormalisation(){
             Biome b = Biome("B", .5f, .5f, .5f, .5f, 0f, 100, 1, new[]{ 1f }, 0);
             WorldGenConfig cfg = Config(1, b);
             WorldFields f = new(){ T = .6f, F = .7f, C = .9f, E = .4f, PV = 1f };
@@ -198,7 +197,7 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(expected + 1f * .3f * .3f, BiomeClassifier.DistanceSquared(f, .8f, cfg.Biomes[0], cfg), 1e-6f, "6D adds λh (h − 0.5)²");
         }
 
-        // --- Sampler (GEN-01, TST-09) ---------------------------------------------------------------------------------
+        // --- Sampler --------------------------------------------------------------------------------------------------
 
         [Test]
         public void SampleColumn_WeightsAreOneHotAndNormalised(){
@@ -208,7 +207,7 @@ namespace Engine.Tests.EditMode{
                 int2 p = rng.NextInt2(-20000, 20000);
                 ColumnSample s = WorldSampler.SampleColumn(p.x, p.y, cfg);
                 Assert.That(s.HardBiome, Is.InRange(0, cfg.BiomeCount - 1));
-                Assert.AreEqual(1f, s.MaterialWeights.Sum(cfg.BiomeCount), 1e-5f, "TST-09 Σ w = 1");
+                Assert.AreEqual(1f, s.MaterialWeights.Sum(cfg.BiomeCount), 1e-5f, "Σ w = 1");
                 Assert.AreEqual(1f, s.HeightWeights.Sum(cfg.BiomeCount), 1e-5f);
                 for (int b = 0; b < cfg.BiomeCount; b++) Assert.GreaterOrEqual(s.MaterialWeights[b], 0f);
                 Assert.AreEqual(1f, s.MaterialWeights[s.HardBiome]);
@@ -258,7 +257,7 @@ namespace Engine.Tests.EditMode{
             Assert.Greater(differentHeights, 190, "a different seed gives different terrain");
         }
 
-        // --- Terrain-first (§7, TRN-03, TRN-10) ---------------------------------------------------------------------
+        // --- Terrain-first --------------------------------------------------------------------------------------------
 
         [Test]
         public void SampleColumn_TerrainFirst_HeightFollowsTheSplineFormula(){
@@ -323,7 +322,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void SampleColumn_TerrainFirst_HeightDoesNotDependOnBiomes(){
-            // TRN-03/TRN-10: H is a function of the fields and splines only; the biome set changes only the class.
+            // H is a function of the fields and splines only; the biome set changes only the class.
             WorldGenConfig all = Config(31, GenArchitecture.TerrainFirst, PlaceholderBiomes());
             WorldGenConfig one = Config(31, GenArchitecture.TerrainFirst, PlaceholderBiomes()[2]);
             for (int n = 0; n < 100; n++){
@@ -356,11 +355,11 @@ namespace Engine.Tests.EditMode{
             Assert.Less(maxStep, 8f, $"height jump of {maxStep} at a biome boundary");
         }
 
-        // --- Biome-first (§8, BIO-01…03, GEN-22, TST-05) -------------------------------------------------------------
+        // --- Biome-first ----------------------------------------------------------------------------------------------
 
         [Test]
         public void SampleColumn_BiomeFirst_ClassifiesInFiveDimensionsBeforeTheHeight(){
-            // BIO-01: the class is argmin over (T, F, C, E, (PV+1)/2) only; h never enters, and the one-hot weights
+            // The class is argmin over (T, F, C, E, (PV+1)/2) only; h never enters, and the one-hot weights
             // of both stages follow the hard class (method None).
             WorldGenConfig cfg = Config(4242, GenArchitecture.BiomeFirst, PlaceholderBiomes());
             Unity.Mathematics.Random rng = new(11);
@@ -380,8 +379,8 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void SampleColumn_BiomeFirst_HeightIsTheHardBiomesFormula(){
-            // With one-hot weights the blended parameters are the hard biome's own (§8.2): H = Offset_b + Σ a_{b,i} N_i + J_b P
-            // with a_{b,i} = HeightAmplitude_b · OctaveWeights_{b,i} (GEN-22).
+            // With one-hot weights the blended parameters are the hard biome's own: H = Offset_b + Σ a_{b,i} N_i + J_b P
+            // with a_{b,i} = HeightAmplitude_b · OctaveWeights_{b,i}.
             Biome[] biomes = PlaceholderBiomes();
             WorldGenConfig cfg = Config(77, GenArchitecture.BiomeFirst, biomes);
             for (int n = 0; n < 200; n++){
@@ -399,8 +398,8 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void BiomeFirstHeight_IsLinearInTheWeights(){
-            // TST-05: computing H once from blended parameters equals Σ w_b H_b, because every biome samples the
-            // same N_i and P (BIO-03) and only the coefficients differ (BIO-02).
+            // Computing H once from blended parameters equals Σ w_b H_b, because every biome samples the same N_i and
+            // P and only the coefficients differ.
             WorldGenConfig cfg = Config(2025, GenArchitecture.BiomeFirst, PlaceholderBiomes());
             Unity.Mathematics.Random rng = new(3);
             for (int n = 0; n < 200; n++){
@@ -427,7 +426,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void SampleColumn_BiomeFirst_StepsAtBiomeBoundaries(){
-            // Phase 2 acceptance: without a height blend the Offsets differ across a boundary, so cliffs appear;
+            // Without a height blend the Offsets differ across a boundary, so cliffs appear;
             // the counterpart of SampleColumn_TerrainFirst_IsContinuousAcrossBiomeBoundaries.
             WorldGenConfig cfg = Config(2024, GenArchitecture.BiomeFirst, PlaceholderBiomes());
             int boundaries = 0, steps = 0;
@@ -446,7 +445,7 @@ namespace Engine.Tests.EditMode{
             Assert.Greater(steps, 0, "at least one boundary shows a cliff (expected without blending)");
         }
 
-        // --- Region API (GEN-17) ---------------------------------------------------------------------------------------
+        // --- Region API -----------------------------------------------------------------------------------------------
 
         [Test]
         public void SampleRegion_MatchesSampleColumnForEveryBuffer(){
@@ -533,7 +532,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void SampleRegion_IsAPureFunctionOfWorldCoordinates(){
-            // GEN-03/R3: the same column gives the same result regardless of the region it is sampled in.
+            // The same column gives the same result regardless of the region it is sampled in.
             WorldGenConfig cfg = Config(4242, PlaceholderBiomes());
             WorldGenRequest a = new(){ Config = cfg, Origin = new int2(0, 0), Size = new int2(32, 32) };
             WorldGenRequest b = new(){ Config = cfg, Origin = new int2(-5, 7), Size = new int2(40, 30) };

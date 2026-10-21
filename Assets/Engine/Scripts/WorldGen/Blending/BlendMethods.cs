@@ -6,25 +6,25 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Blending{
     /// <summary>
-    ///     The four blend methods (§9), one per <see cref="BlendMethod" />, selected by an enum switch (R2). Every
-    ///     method returns a normalised weight vector over the active biomes, Σ w = 1 (± 1e−5), w ≥ 0 (BLD-02).
+    ///     The four blend methods, one per <see cref="BlendMethod" />, selected by an enum switch. Every
+    ///     method returns a normalised weight vector over the active biomes, Σ w = 1 (± 1e−5), w ≥ 0.
     ///     <list type="bullet">
-    ///         <item>1 None: one-hot hard class (§9.2).</item>
-    ///         <item>2 DistanceBlend: compact kernel k(r) = (1 − r²/R²)² over nn(q) on a world-aligned lattice (§9.3).</item>
+    ///         <item>1 None: one-hot hard class.</item>
+    ///         <item>2 DistanceBlend: compact kernel k(r) = (1 − r²/R²)² over nn(q) on a world-aligned lattice.</item>
     ///         <item>
-    ///             3 DistortedBoundary: classification at the warped position q + A·Ω(q) (§9.4). Material stage: warp
+    ///             3 DistortedBoundary: classification at the warped position q + A·Ω(q). Material stage: warp
     ///             only, one-hot nn~(p). Height stage: warp + distance blend, i.e. the kernel of method 2 over nn~ with
-    ///             the same B_hgt — a combination of two techniques after Fischer et al., "AutoBiomes" (BLD-22).
+    ///             the same B_hgt — a combination of two techniques after Fischer et al., "AutoBiomes".
     ///         </item>
-    ///         <item>4 ParameterSpaceWeighting: soft nearest neighbour, Gaussian over the parameter-space distance (§9.5).</item>
+    ///         <item>4 ParameterSpaceWeighting: soft nearest neighbour, Gaussian over the parameter-space distance.</item>
     ///     </list>
     /// </summary>
     [BurstCompile]
     public static class BlendMethods{
         /// <summary>
-        ///     Weights of one stage at column <paramref name="p" /> (BLD-02). <paramref name="hard" /> and
+        ///     Weights of one stage at column <paramref name="p" />. <paramref name="hard" /> and
         ///     <paramref name="distancesSq" /> are the column's own hard class and squared parameter-space distances
-        ///     (computed once and shared, PERF-07). <paramref name="cache" /> may be default (pure path).
+        ///     (computed once and shared). <paramref name="cache" /> may be default (pure path).
         /// </summary>
         public static BlendWeights Compute(BlendStage stage, BlendMethod method, int2 p, int hard,
             in BlendWeights distancesSq, in WorldGenConfig cfg, in BlendCache cache){
@@ -47,8 +47,8 @@ namespace Engine.Scripts.WorldGen.Blending{
         }
 
         /// <summary>
-        ///     Method 4 (§9.5, BLD-30): w_b = exp(−(d_b² − d_min²)/(2σ²)) / Σ_c exp(−(d_c² − d_min²)/(2σ²)), the shifted
-        ///     form, so the hard class always gets exp(0) = 1 and argmax w = hard class (BLD-31). No neighbourhood
+        ///     Method 4: w_b = exp(−(d_b² − d_min²)/(2σ²)) / Σ_c exp(−(d_c² − d_min²)/(2σ²)), the shifted
+        ///     form, so the hard class always gets exp(0) = 1 and argmax w = hard class. No neighbourhood
         ///     lookups.
         /// </summary>
         public static BlendWeights ParameterSpace(in BlendWeights distancesSq, int hard, float sigma, int count){
@@ -67,11 +67,11 @@ namespace Engine.Scripts.WorldGen.Blending{
         }
 
         /// <summary>
-        ///     Kernel blend (§9.3, also the method-3 height stage): w_b = Σ k·[nn(q) = b] / Σ k over the phase's taps.
-        ///     The taps are read from <paramref name="lattice" /> when it covers the window (BLD-11) and evaluated
-        ///     directly otherwise; both walk the same tap list in the same order (BLD-12), so the results are
-        ///     bit-identical (GEN-02). A window without a boundary point returns one-hot weights without the sum
-        ///     (PERF-07), which equals the full sum exactly.
+        ///     Kernel blend (also the method-3 height stage): w_b = Σ k·[nn(q) = b] / Σ k over the phase's taps.
+        ///     The taps are read from <paramref name="lattice" /> when it covers the window and evaluated
+        ///     directly otherwise; both walk the same tap list in the same order, so the results are
+        ///     bit-identical. A window without a boundary point returns one-hot weights without the sum,
+        ///     which equals the full sum exactly.
         /// </summary>
         public static BlendWeights Kernel(int2 p, in KernelSet kernel, in NativeArray<KernelTap> taps,
             in BlendLattice lattice, bool warped, in WorldGenConfig cfg){
@@ -110,7 +110,7 @@ namespace Engine.Scripts.WorldGen.Blending{
 
         /// <summary>
         ///     nn~(p) for the method-3 material stage: from the warped lattice when it holds p, otherwise evaluated;
-        ///     with A = 0 the warp is the identity, so nn~(p) is the column's own hard class (PERF-07).
+        ///     with A = 0 the warp is the identity, so nn~(p) is the column's own hard class.
         /// </summary>
         private static int WarpedClass(int2 p, int hard, in WorldGenConfig cfg, in BlendLattice lattice){
             if (cfg.WarpAmplitude == 0f) return hard;

@@ -1,7 +1,7 @@
-﻿using Engine.Scripts.Components;
-using Engine.Scripts.Jobs.ColliderBake;
+﻿using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
+using Engine.Scripts.World;
 using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Core{
@@ -24,7 +24,7 @@ namespace Engine.Scripts.Jobs.Core{
             : base(settings, chunkManager, chunkPool){
             _colliderBakeScheduler = colliderBakeScheduler;
             int side = 2 * settings.Chunk.UpdateDistance + 1;
-            Reserve(side * side * VoxelConstants.PartitionsPerChunk, settings.Scheduler.colliderBatchSize); // PERF-04
+            Reserve(side * side * VoxelConstants.PartitionsPerChunk, settings.Scheduler.colliderBatchSize);
         }
 
         /// <summary>
@@ -33,7 +33,7 @@ namespace Engine.Scripts.Jobs.Core{
         /// <param name="focus">The new focus position.</param>
         public override void FocusUpdate(PriorityUtil.Focus focus){
             WakeUp();
-            // N-01 / PERF-04: static lambda with explicit state instead of a closure capturing the focus
+            // Static lambda with explicit state instead of a closure capturing the focus
             Queue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.DistPriority(ref pos, ref f));
         }
 
@@ -49,7 +49,9 @@ namespace Engine.Scripts.Jobs.Core{
             for (int z = -update; z <= update; z++)
             for (int y = 0; y < VoxelConstants.PartitionsPerChunk; y++){
                 int3 pos = new(x + focus.Pos.x, y, z + focus.Pos.z);
-                if (!Queue.Contains(pos) && ShouldScheduleForBaking(pos))
+                // Only meshed partitions: the layers outside the vertical draw window are never meshed, and queueing
+                // them would keep the handler awake re-queueing what JobUpdateStep drops. Meshing wakes the handler.
+                if (!Queue.Contains(pos) && CanBakeColliderForChunk(pos) && ShouldScheduleForBaking(pos))
                     Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
             }
 
@@ -77,7 +79,7 @@ namespace Engine.Scripts.Jobs.Core{
 
             if (accepted == 0) return true;
 
-            _colliderBakeScheduler.Start(Set); // PERF-04: no per-batch list copy
+            _colliderBakeScheduler.Start(Set);
 
             return true;
         }
@@ -87,9 +89,12 @@ namespace Engine.Scripts.Jobs.Core{
         /// </summary>
         /// <returns>True if collection completed, false if scheduler is still working.</returns>
         protected override bool CollectResultsStep(){
-            if (!_colliderBakeScheduler.IsComplete || _colliderBakeScheduler.IsReady) return false;
+            // A batch that was already applied elsewhere only clears the set; waiting for it would stall the handler.
+            if (!_colliderBakeScheduler.IsReady){
+                if (!_colliderBakeScheduler.IsComplete) return false;
+                _colliderBakeScheduler.Complete();
+            }
 
-            _colliderBakeScheduler.Complete();
             Set.Clear();
             return true;
         }

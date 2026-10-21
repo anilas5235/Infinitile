@@ -2,17 +2,16 @@ using Unity.Burst;
 
 namespace Engine.Scripts.WorldGen.Core{
     /// <summary>
-    ///     Integer hashing for every random decision in world generation (GEN-04). Each decision passes its
+    ///     Integer hashing for every random decision in world generation. Each decision passes its
     ///     own salt from <see cref="HashSalts" />, so two decisions at the same column never correlate.
     ///     Pure function of (x, z, seed, salt): the same inputs give the same value on every thread, in Burst
-    ///     and in Mono, and independent of chunk boundaries (R3).
+    ///     and in Mono, and independent of chunk boundaries.
     /// </summary>
     [BurstCompile]
     public static class Hash{
         /// <summary>
         ///     32-bit finaliser with full avalanche (every input bit flips every output bit with p ≈ 0.5).
-        ///     Constants after "lowbias32" by Chris Wellons (nullprogram.com/blog/2018/07/31, public domain);
-        ///     the same mix the spec sketch in §5.2 uses.
+        ///     Constants after "lowbias32" by Chris Wellons (nullprogram.com/blog/2018/07/31, public domain).
         /// </summary>
         public static uint Mix(uint h){
             h ^= h >> 16;

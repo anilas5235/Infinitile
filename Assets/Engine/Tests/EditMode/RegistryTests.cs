@@ -14,7 +14,7 @@ using UnityEngine.Rendering;
 using UnityEngine.TestTools;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>TST-E08 (Registry, TopLevelRegistry), TST-E09 (D-04) and TST-E19 (array index = ID, air, F-22).</summary>
+    /// <summary>Registry, TopLevelRegistry, failing entries at finalisation, array index = ID and air.</summary>
     public class RegistryTests{
         private RegistryTestFixtures _fixtures;
         private readonly List<IDisposable> _disposables = new();
@@ -37,7 +37,7 @@ namespace Engine.Tests.EditMode{
             return registry;
         }
 
-        #region TST-E08 Registry<T>
+        #region Registry<T>
 
         [Test]
         public void Registry_IdsAreUniqueAndFollowRegistrationOrder(){
@@ -84,7 +84,7 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
-        #region TST-E08 TopLevelRegistry<T>
+        #region TopLevelRegistry<T>
 
         [Test]
         public void TopLevelRegistry_RegisterBeforeInitialize_Throws(){
@@ -181,12 +181,12 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
-        #region TST-E09 BiomeRegistry (D-04)
+        #region Failing entries
 
         [Test]
-        public void BiomeRegistry_FailingBiome_FailsFinalizationWithoutAnArray(){
-            // D-04: a biome whose conversion fails must neither shift the biomes after it nor leave a
-            // zero-initialised (air-filled) BiomeDef in the array. The fix rejects the whole registry.
+        public void BiomeRegistry_FailingBiome_IsSkippedAndKeepsTheOtherIds(){
+            // A package may keep biomes the active BiomeSet does not use; a broken one must not fail the import or
+            // shift the biomes after it. Generation rejects it only if it is active (WorldGenSettingsTests).
             VoxelRegistry voxels = StandardVoxels(out Voxel[] v);
             BiomeRegistry registry = new();
             _disposables.Add(registry);
@@ -198,15 +198,22 @@ namespace Engine.Tests.EditMode{
             registry.Register(RegistryTestFixtures.Prefix, broken);
             registry.Register(RegistryTestFixtures.Prefix, hills);
 
-            Assert.Throws<InvalidOperationException>(() => registry.FinalizeRegistry(voxels),
-                "the registry must reject the broken biome at finalisation");
-            Assert.IsFalse(registry.BiomeArray.IsCreated, "no partially filled (air) biome array is published");
+            LogAssert.Expect(LogType.Error, new Regex("Skipping biome Broken"));
+            registry.FinalizeRegistry(voxels);
+
+            Assert.AreEqual(3, registry.BiomeArray.Length);
+            Assert.IsFalse(registry.IsBroken(0));
+            Assert.IsTrue(registry.IsBroken(1));
+            Assert.IsFalse(registry.IsBroken(2));
+            Assert.AreEqual(voxels.GetIdOrThrow(v[0].GetFullName()), registry.BiomeArray[0].topBlock);
+            Assert.AreEqual(voxels.GetIdOrThrow(v[2].GetFullName()), registry.BiomeArray[2].topBlock,
+                "the biome after the broken one keeps its id");
         }
 
         [Test]
         public void VoxelStructureRegistry_FailingStructure_FailsFinalizationWithoutAnArray(){
-            // D-04 pattern: skipping a structure left a default def at its id, whose uncreated placement map made
-            // the registry's Dispose throw (and leak every later structure).
+            // Skipping a structure would leave a default def at its id, whose uncreated placement map makes the
+            // registry's Dispose throw (and leak every later structure).
             VoxelRegistry voxels = StandardVoxels(out Voxel[] v);
             VoxelStructureRegistry registry = new();
             _disposables.Add(registry);
@@ -220,7 +227,7 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
-        #region TST-E19 registries
+        #region Array index = ID
 
         [Test]
         public void QuadRegistry_ArrayIndexEqualsRegisteredId(){
@@ -342,8 +349,8 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void BiomeRegistry_SameBiomeAssetInTwoPackages_RollsBackOnTopLevelFailure(){
-            // F-22: TopLevelRegistry.Register ignored the failed SO registration for the second name,
-            // leaving a default (air) BiomeDef at the end of BiomeArray. The second name is now rolled back.
+            // A failed SO registration for the second name must be rolled back by TopLevelRegistry.Register, not
+            // leave a default (air) BiomeDef at the end of BiomeArray.
             VoxelRegistry voxels = StandardVoxels(out Voxel[] v);
             BiomeRegistry registry = new();
             _disposables.Add(registry);
@@ -370,7 +377,7 @@ namespace Engine.Tests.EditMode{
         public void VoxelRegistry_GpuVoxelDefMatchesRegisteredCount(){
             VoxelRegistry registry = StandardVoxels(out Voxel[] voxels);
             Type gpuDef = typeof(VoxelRegistry).GetNestedType("GPUVoxelDef", BindingFlags.NonPublic);
-            Assert.IsNotNull(gpuDef, "GPUVoxelDef must exist for the struct size guard (TST-E17)");
+            Assert.IsNotNull(gpuDef, "GPUVoxelDef must exist for the struct size guard");
             Assert.AreEqual(voxels.Length + 1, registry.VoxelRenderDefBuffer.count);
         }
 

@@ -10,7 +10,7 @@ using UnityEngine;
 using Object = UnityEngine.Object;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>TRN-01…05, TST-12: nested spline evaluation, JSON import/export and continuity.</summary>
+    /// <summary>Nested spline evaluation, JSON import/export and continuity.</summary>
     public class NestedSplineTests{
         private readonly List<Object> _created = new();
         private readonly List<IDisposable> _native = new();
@@ -67,7 +67,7 @@ namespace Engine.Tests.EditMode{
             return $"{{\"Axis\": \"{axis}\", {interp}\"Points\": [{string.Join(", ", items)}]}}";
         }
 
-        // --- TRN-01 / TRN-02 ----------------------------------------------------------------------------------------
+        // --- Evaluation ---------------------------------------------------------------------------------------------
 
         [Test]
         public void ConstantRoot_ReturnsTheConstantEverywhere(){
@@ -135,13 +135,13 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void Placeholders_EvaluateTheSpecValuesAtTheControlPoints(){
+        public void Placeholders_EvaluateTheExpectedValuesAtTheControlPoints(){
             TerrainSplineSet set = ScriptableObject.CreateInstance<TerrainSplineSet>();
             _created.Add(set);
             set.ResetToPlaceholders();
             Flat f = Flatten(set);
 
-            // §19.1 Offset: constants at C = 0, 0.3, 0.4; nested at 0.5 / 0.75 / 1.0.
+            // Placeholder Offset: constants at C = 0, 0.3, 0.4; nested at 0.5 / 0.75 / 1.0.
             Assert.AreEqual(70f, f.Eval(f.Offset, 0f, 0.5f, 0f), 1e-4f);
             Assert.AreEqual(110f, f.Eval(f.Offset, 0.3f, 0.9f, -1f), 1e-4f);
             Assert.AreEqual(136f, f.Eval(f.Offset, 0.5f, 0f, 0f), 1e-4f);
@@ -165,7 +165,7 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(50f, f.Eval(f.Jaggedness, 1f, 0f, 0f), 1e-4f);
         }
 
-        // --- TRN-05: JSON ------------------------------------------------------------------------------------------
+        // --- JSON ---------------------------------------------------------------------------------------------------
 
         [Test]
         public void Json_RoundTripsAndKeepsTheEvaluation(){
@@ -242,7 +242,7 @@ namespace Engine.Tests.EditMode{
             StringAssert.Contains("at most", string.Join(" ", set.Validate()));
         }
 
-        // --- TST-12: continuity ----------------------------------------------------------------------------------------
+        // --- Continuity ---------------------------------------------------------------------------------------------
 
         /// <summary>
         ///     Dense sampling of Offset, Amp and J along each axis: no jump between neighbouring samples may exceed

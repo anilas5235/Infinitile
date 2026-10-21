@@ -15,9 +15,9 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Tests.PlayMode{
     /// <summary>
-    ///     TST-E20 additions for the renderer: a point builder may be disposed while its GPU read-back is still
-    ///     pending, e.g. when the renderer is destroyed mid-build (F-17), and a rejected chunk upload must keep the
-    ///     chunk's existing interval list (F-18). Needs PlayMode for the compute dispatch and the live renderer.
+    ///     Renderer shutdown: a point builder may be disposed while its GPU read-back is still pending, e.g. when
+    ///     the renderer is destroyed mid-build, and a rejected chunk upload must keep the chunk's existing interval
+    ///     list. Needs PlayMode for the compute dispatch and the live renderer.
     /// </summary>
     public class RendererShutdownTests{
         [UnitySetUp]
@@ -25,7 +25,7 @@ namespace Engine.Tests.PlayMode{
             yield return PlayModeFixtures.LoadGameScene();
         }
 
-        /// <summary>§20.1: a chunk-wide list of <paramref name="value" /> in <paramref name="store" />.</summary>
+        /// <summary>A chunk-wide list of <paramref name="value" /> in <paramref name="store" />.</summary>
         private static IntervalRange UploadUniformList(ChunkIntervalStore store, ushort value){
             UnsafeIntervalList<ushort> list = new(1, Allocator.Temp);
             list.AddInterval(value, VoxelsPerChunk);
@@ -38,13 +38,13 @@ namespace Engine.Tests.PlayMode{
         [UnityTest]
         [Timeout(60000)]
         public IEnumerator PointBuilderHandler_DisposedWhileReadBackPending_DoesNotThrowOrLog(){
-            // F-17: Dispose released the read-back array while an AsyncGPUReadback into it was still pending,
-            // which throws from Dispose and leaks every resource released after it.
+            // Releasing the read-back array while an AsyncGPUReadback into it is still pending would throw from
+            // Dispose and leak every resource released after it.
             VoxelRegistry registry = DataImporter.Instance.VoxelRegistry;
             ComputeShader pointBuilder = VoxelWorld.Instance.Settings.Renderer.pointBuilder;
             ChunkIntervalStore store = new(18, 18, pointBuilder);
             Dictionary<int2, IntervalRange> voxelLists = new();
-            Dictionary<int2, IntervalRange> lightLists = new(); // LGT-08: same interval format, all dark
+            Dictionary<int2, IntervalRange> lightLists = new(); // same interval format, all dark
             for (int x = -1; x <= 1; x++)
             for (int z = -1; z <= 1; z++){
                 voxelLists[new int2(x, z)] =
@@ -76,7 +76,9 @@ namespace Engine.Tests.PlayMode{
                 while (!disposing.IsReadBackDone && Time.realtimeSinceStartup < deadline) yield return null;
                 Assert.IsTrue(disposing.IsReadBackDone, "the build must still finish after the handler was disposed");
                 int[] counts = null;
-                Assert.DoesNotThrow(() => counts = disposing.CompleteBuild());
+                bool built = true;
+                Assert.DoesNotThrow(() => built = disposing.TryCompleteBuild(out counts));
+                Assert.IsFalse(built, "a build of a released handler says nothing about the partition");
                 Assert.IsNotNull(counts);
                 yield return null;
                 Assert.AreEqual(0, errors, "no error may be logged while the pending read-back finishes");
@@ -91,8 +93,8 @@ namespace Engine.Tests.PlayMode{
         [UnityTest]
         [Timeout(60000)]
         public IEnumerator AddOrUpdateChunk_RejectedLength_KeepsTheExistingList(){
-            // F-18: the old buffer was disposed before the length check, so a rejected update left a disposed
-            // buffer in the map that the next partition build bound. §20.1: the chunk's list must stay unchanged.
+            // A rejected update must leave the chunk's list unchanged, not a disposed buffer the next partition
+            // build would bind.
             VoxelWorldRenderer renderer = VoxelWorldRenderer.Instance;
             Assert.IsNotNull(renderer, "VoxelWorldRenderer missing in scene");
             Dictionary<int2, IntervalRange> buffers =

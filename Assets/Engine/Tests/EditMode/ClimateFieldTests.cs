@@ -1,5 +1,4 @@
 using System;
-using Engine.Scripts.Noise;
 using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Noise;
 using NUnit.Framework;
@@ -8,7 +7,7 @@ using Unity.Mathematics;
 using UnityEngine;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>TST-08 (field sanity) and TST-13 (periodicity of octaves, P and fields) on the Phase 0 field layer.</summary>
+    /// <summary>Field sanity and periodicity of the detail octaves, P and the climate fields.</summary>
     public class ClimateFieldTests{
         private const uint Seed = 1337u;
         private ClimateParams _climate;
@@ -27,7 +26,7 @@ namespace Engine.Tests.EditMode{
             _wavelengths.Dispose();
         }
 
-        /// <summary>Spec §5.5 defaults: T 900, F 700, C 2500/warp 400, E 1200 × 4, W 500 × 3, WGain 1.6.</summary>
+        /// <summary>Default scales: T 900, F 700, C 2500/warp 400, E 1200 × 4, W 500 × 3, WGain 1.6.</summary>
         internal static ClimateParams CreateClimate(uint seed, float frequencyScale = 1f, float wGain = 1.6f){
             NoiseProfile.Settings Fbm(float scale, int octaves, uint salt){
                 return new NoiseProfile.Settings{
@@ -57,7 +56,7 @@ namespace Engine.Tests.EditMode{
             };
         }
 
-        #region TST-08
+        #region Field sanity
 
         [Test]
         public void Fields_AreInRange_NotDegenerate_AndHistogrammed(){
@@ -86,13 +85,13 @@ namespace Engine.Tests.EditMode{
             }
 
             float peakShare = peakColumns / (float)(n * n);
-            Debug.Log($"TST-08: T  {NoiseStatistics.Histogram(t, 0f, 1f)}");
-            Debug.Log($"TST-08: F  {NoiseStatistics.Histogram(f, 0f, 1f)}");
-            Debug.Log($"TST-08: C  {NoiseStatistics.Histogram(c, 0f, 1f)}");
-            Debug.Log($"TST-08: E  {NoiseStatistics.Histogram(e, 0f, 1f)}");
-            Debug.Log($"TST-08: W  {NoiseStatistics.Histogram(w, -1f, 1f)}");
-            Debug.Log($"TST-08: PV {NoiseStatistics.Histogram(pv, -1f, 1f)}");
-            Debug.Log($"TST-08: share of |W| >= 2/3 (peak columns): {peakShare:P2}");
+            Debug.Log($"Climate histogram T  {NoiseStatistics.Histogram(t, 0f, 1f)}");
+            Debug.Log($"Climate histogram F  {NoiseStatistics.Histogram(f, 0f, 1f)}");
+            Debug.Log($"Climate histogram C  {NoiseStatistics.Histogram(c, 0f, 1f)}");
+            Debug.Log($"Climate histogram E  {NoiseStatistics.Histogram(e, 0f, 1f)}");
+            Debug.Log($"Climate histogram W  {NoiseStatistics.Histogram(w, -1f, 1f)}");
+            Debug.Log($"Climate histogram PV {NoiseStatistics.Histogram(pv, -1f, 1f)}");
+            Debug.Log($"Climate fields: share of |W| >= 2/3 (peak columns): {peakShare:P2}");
 
             AssertSpread(t, "T");
             AssertSpread(f, "F");
@@ -154,7 +153,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void ClimateFrequencyScale_ScalesThePosition(){
-            // GEN-07: scale 2 at p equals scale 1 at 2p for every field.
+            // Scale 2 at p equals scale 1 at 2p for every field.
             ClimateParams doubled = CreateClimate(Seed, 2f);
             try{
                 for (int i = 0; i < 100; i++){
@@ -211,7 +210,7 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
-        #region TST-13
+        #region Periodicity
 
         [Test]
         public void DetailOctavesAndPeak_HaveNoSecondaryAutocorrelationPeak(){
@@ -228,7 +227,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void Fields_HaveNoSecondaryAutocorrelationPeak(){
-            // Base-octave scales from §5.5. Each field is evaluated through its own noise instance (the continental
+            // Base-octave scales as in CreateClimate. Each field is evaluated through its own noise instance (the continental
             // coupling of T and F only rescales values and cannot add a period), and the large-scale fields use fewer
             // features, so the whole test stays within a few seconds in Mono.
             AssertNoSecondaryPeak("T (900)", 900f, 256, p => _climate.Temperature.GetNoise(p));
@@ -242,7 +241,7 @@ namespace Engine.Tests.EditMode{
             foreach (float2 direction in NoiseStatistics.Directions){
                 float peak = NoiseStatistics.MaxAutocorrelationBeyondWavelength(sample, direction, wavelength,
                     minFeatures, out int lag);
-                Debug.Log($"TST-13: {name} dir {direction}: max |autocorr| {peak:F3} at lag {lag}");
+                Debug.Log($"Autocorrelation {name} dir {direction}: max |autocorr| {peak:F3} at lag {lag}");
                 Assert.Less(peak, 0.2f, $"{name}: secondary autocorrelation peak along {direction} at lag {lag}");
             }
         }

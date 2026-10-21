@@ -1,11 +1,9 @@
 using System.Collections.Generic;
 using Engine.Scripts.Behaviour;
-using Engine.Scripts.Components;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
-using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
@@ -47,8 +45,11 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         private NativeList<int3> _jobs;
         private NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult> _results;
 
-        // PERF-04: reused per batch instead of a new Mesh[] per Complete
+        // Reused per batch instead of a new Mesh[] per Complete
         private readonly List<Mesh> _colliderMeshes;
+
+        // Targets for results that Complete drops (chunk unloaded or partition reclaimed during the job)
+        private readonly List<Mesh> _discardMeshes = new();
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="CMeshBuildScheduler" /> class.
@@ -76,14 +77,14 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
                 [1] = new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float16, 4)
             };
 
-            // F-16: one result per job of a batch; a parallel writer cannot grow the map, so it is sized from the
+            // One result per job of a batch; a parallel writer cannot grow the map, so it is sized from the
             // batch size (and grown in Start for a larger batch) instead of the draw distance.
             _results = new NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult>(
                 math.max(1, settings.Scheduler.meshingBatchSize), Allocator.Domain);
             _jobs = new NativeList<int3>(Allocator.Domain);
             _colliderMeshes = new List<Mesh>(math.max(1, settings.Scheduler.meshingBatchSize));
 
-            // F-01: the job reads chunk data through the accessor; finish it before the manager edits or disposes a chunk.
+            // The job reads chunk data through the accessor; finish it before the manager edits or disposes a chunk.
             _chunkManager.AccessorChunkWriting += CompleteIfRunning;
         }
 
@@ -98,15 +99,19 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         /// </summary>
         /// <param name="jobs">List of chunk positions whose meshes should be generated or updated.</param>
         internal void Start(HashSet<int3> jobs){
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.MeshBuildSchedule.Auto(); // PERF-01
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.MeshBuildSchedule.Auto();
             StartRecord();
 
             IsReady = false;
 
-            _chunkAccessor = _chunkManager.GetAccessor(jobs); // PERF-04
+            _chunkAccessor = _chunkManager.GetAccessor(jobs);
 
-            foreach (int3 j in jobs) _jobs.Add(j);
-            if (_results.Capacity < _jobs.Length) _results.Capacity = _jobs.Length; // F-16
+            foreach (int3 j in jobs){
+                _jobs.Add(j);
+                _chunkManager.ReMeshStarted(j);
+            }
+
+            if (_results.Capacity < _jobs.Length) _results.Capacity = _jobs.Length;
 
             _colliderMeshDataArray = Mesh.AllocateWritableMeshData(_jobs.Length);
 
@@ -129,36 +134,53 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         /// </summary>
         internal void Complete(){
             if (IsReady) return;
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.MeshBuildComplete.Auto(); // PERF-01
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.MeshBuildComplete.Auto();
 #if VOXEL_TIMING_LOGS
             double start = Time.realtimeSinceStartupAsDouble;
 #endif
             _handle.Complete();
+            _chunkPool.NotifyPartitionMeshWriting(); // a running bake may still read the meshes written below
+
+            // Claim every partition before any mesh is assigned: a claim can reclaim a pooled chunk of this batch
+            // (the world then unloads its data), which would clear a mesh already handed out.
+            for (int index = 0; index < _jobs.Length; index++){
+                int3 pos = _jobs[index];
+                if (_chunkManager.IsChunkLoaded(pos.xz)) _chunkPool.GetOrClaimPartition(pos);
+            }
 
             _colliderMeshes.Clear();
             for (int index = 0; index < _jobs.Length; index++) _colliderMeshes.Add(null);
 
+            int discarded = 0;
             for (int index = 0; index < _jobs.Length; index++){
                 int3 pos = _jobs[index];
-                ChunkPartition partition = _chunkPool.GetOrClaimPartition(pos);
-                _chunkManager.ReMeshedPartition(pos);
-
                 CMeshBuildJob.PartitionJobResult result = _results[pos];
 
-                partition.MarkMeshChanged(); // F-04: a bake of the previous mesh is stale
+                // The chunk was unloaded or the partition reclaimed after the job started. Its result is dropped;
+                // the partition is inactive, so it is meshed again once its chunk is back.
+                if (!_chunkManager.IsChunkLoaded(pos.xz) || !_chunkPool.IsPartitionActive(pos)){
+                    _colliderMeshes[result.Index] = GetDiscardMesh(discarded++);
+                    continue;
+                }
+
+                ChunkPartition partition = _chunkPool.GetPartition(pos);
+                _chunkManager.ReMeshedPartition(pos);
+
+                partition.MarkMeshChanged(); // a bake of the previous mesh is stale
                 _colliderMeshes[result.Index] = partition.ColliderMesh;
                 partition.ColliderMesh.bounds = result.ColliderBounds;
             }
 
-            _chunkPool.NotifyPartitionMeshWriting(); // F-04: a running bake may still read these meshes
+            // Every entry of the mesh data array needs a target mesh
             Mesh.ApplyAndDisposeWritableMeshData(
                 _colliderMeshDataArray,
                 _colliderMeshes,
                 MeshFlags
             );
             _colliderMeshes.Clear();
+            for (int i = 0; i < discarded; i++) _discardMeshes[i].Clear();
 
-#if VOXEL_TIMING_LOGS // PERF-04: the timing string was built per batch in the hot path; the PERF-01 markers cover it
+#if VOXEL_TIMING_LOGS
             double totalTime = (Time.realtimeSinceStartupAsDouble - start) * 1000;
             if (totalTime >= 4){
                 VoxelEngineLogger.Warn<CMeshBuildScheduler>(
@@ -184,12 +206,20 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         }
 
         /// <summary>
-        ///     F-01: waits for the running job when the chunk manager is about to write a chunk the job may read.
+        ///     Waits for the running job when the chunk manager is about to write a chunk the job may read.
         ///     Only the job is completed, its results are applied later by <see cref="Complete" />: applying them here
-        ///     re-entered <see cref="Complete" /> when claiming a partition evicted a chunk of the running batch.
+        ///     would re-enter <see cref="Complete" /> when claiming a partition evicts a chunk of the running batch.
         /// </summary>
         internal void CompleteIfRunning(){
             _handle.Complete();
+        }
+
+        /// <summary>
+        ///     Mesh that receives a dropped result; created only when a batch actually drops one.
+        /// </summary>
+        private Mesh GetDiscardMesh(int index){
+            while (_discardMeshes.Count <= index) _discardMeshes.Add(new Mesh{ name = "PColliderDiscard" });
+            return _discardMeshes[index];
         }
 
         /// <summary>
@@ -198,6 +228,11 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         internal void Dispose(){
             _chunkManager.AccessorChunkWriting -= CompleteIfRunning;
             _handle.Complete();
+
+            // A batch that was never completed still owns its writable mesh data
+            if (!IsReady) _colliderMeshDataArray.Dispose();
+            foreach (Mesh mesh in _discardMeshes) CoreUtils.Destroy(mesh);
+            _discardMeshes.Clear();
 
             _colliderVertexParams.Dispose();
             _results.Dispose();

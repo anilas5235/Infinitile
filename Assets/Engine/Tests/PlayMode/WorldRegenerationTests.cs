@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Engine.Scripts.Components;
 using Engine.Scripts.Render;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.World;
@@ -15,9 +14,9 @@ using Object = UnityEngine.Object;
 
 namespace Engine.Tests.PlayMode{
     /// <summary>
-    ///     INT-30: <see cref="VoxelWorld.Regenerate" /> evicts every loaded chunk through the normal events (renderer
-    ///     buffers and pool partitions are released), reloads around the focus with the new configuration, and going
-    ///     back to the asset reproduces the original terrain.
+    ///     <see cref="VoxelWorld.Regenerate" /> evicts every loaded chunk through the normal events (renderer buffers
+    ///     and pool partitions are released), reloads around the focus with the new configuration, and going back to
+    ///     the asset reproduces the original terrain.
     /// </summary>
     public class WorldRegenerationTests{
         private const float LoadTimeout = 60f;
@@ -67,7 +66,7 @@ namespace Engine.Tests.PlayMode{
                 }
                 finally{
                     world.ChunkEvicted -= countEvictions;
-                    Object.Destroy(variant); // the engine copied its values (D-05)
+                    Object.Destroy(variant); // the engine copied its values
                 }
 
                 Assert.Greater(evicted, 0, "regeneration must raise ChunkEvicted for the loaded chunks");

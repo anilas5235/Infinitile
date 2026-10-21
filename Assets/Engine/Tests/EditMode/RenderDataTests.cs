@@ -2,19 +2,21 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Engine.Scripts.Render;
+using Engine.Scripts.Settings;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Mathematics;
+using UnityEditor;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
 using Object = UnityEngine.Object;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     TST-E17: GPU struct sizes, PageAllocator, RenderBufferManager spill-over, read-back clamp (F-03)
+    ///     GPU struct sizes, PageAllocator, RenderBufferManager spill-over, read-back clamp
     ///     and AllocInfo.ToIndexAndCount.
     /// </summary>
     public class RenderDataTests{
@@ -37,6 +39,26 @@ namespace Engine.Tests.EditMode{
             if (_counts.IsCreated) _counts.Dispose();
         }
 
+        #region materials
+
+        [Test]
+        public void FoliageMaterial_DrawsBeforeTheLiquids(){
+            // Both layers write depth and share the transparent shader, and their draw bounds are equal, so within one
+            // queue the order is undefined: liquid drawn first hides the foliage behind it.
+            VoxelEngineSettings settings =
+                AssetDatabase.LoadAssetAtPath<VoxelEngineSettings>("Assets/EngineSettings/VoxelEngineSettings.asset");
+            Assert.IsNotNull(settings, "shipped engine settings missing");
+            Material foliage = settings.Renderer.foliageMaterial;
+            Material liquid = settings.Renderer.transparentMaterial;
+            Assert.IsNotNull(foliage);
+            Assert.IsNotNull(liquid);
+            Assert.Less(foliage.renderQueue, liquid.renderQueue);
+            Assert.Greater(foliage.renderQueue, (int)UnityEngine.Rendering.RenderQueue.GeometryLast,
+                "foliage still blends over the opaque world");
+        }
+
+        #endregion
+
         #region struct sizes
 
         [Test]
@@ -50,24 +72,24 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void PartitionMetadata_Is48Bytes(){
+        public void PartitionMetadata_Is24Bytes(){
             Type type = typeof(VoxelWorldRenderer).Assembly.GetType("Engine.Scripts.Render.PartitionMetadata");
             Assert.IsNotNull(type, "PartitionMetadata not found");
-            Assert.AreEqual(48, Marshal.SizeOf(type));
+            Assert.AreEqual(24, Marshal.SizeOf(type), "HLSL PartitionMetadata stride");
         }
 
         [Test]
         public void GpuVoxelDef_Is80Bytes(){
             Type type = typeof(VoxelRegistry).GetNestedType("GPUVoxelDef", BindingFlags.NonPublic);
             Assert.IsNotNull(type, "VoxelRegistry.GPUVoxelDef not found");
-            Assert.AreEqual(80, Marshal.SizeOf(type)); // LGT-09: + LightAttenuation
+            Assert.AreEqual(80, Marshal.SizeOf(type));
             Assert.AreEqual(76, (int)Marshal.OffsetOf(type, "LightAttenuation"), "HLSL VoxelDef offset");
         }
 
         [Test]
         public void GpuVoxelDef_DepthFadeDistance_IsFp16BitsInA32BitSlot(){
-            // F-19: HLSL `half` in a structured buffer is a 32-bit float under fxc. The C# side wrote a 2-byte half,
-            // so the shader read the fp16 bits plus padding as a float. The slot is now a uint holding the fp16 bits.
+            // HLSL `half` in a structured buffer is a 32-bit float under fxc, so a 2-byte C# half would be misread.
+            // The slot is a uint holding the fp16 bits.
             Type type = typeof(VoxelRegistry).GetNestedType("GPUVoxelDef", BindingFlags.NonPublic);
             Assert.IsNotNull(type, "VoxelRegistry.GPUVoxelDef not found");
             FieldInfo field = type.GetField("DepthFadeDistance", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -145,7 +167,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void PageAllocator_StoresPartitionBoundsPerPage_AndClearsThemOnRelease(){
-            // CUL-01: every page carries the AABB of its partition; a released page holds an empty box again.
+            // Every page carries the AABB of its partition; a released page holds an empty box again.
             PageBounds bounds = PageBounds.FromPartition(new int3(2, 3, -1));
             Assert.AreEqual(new float3(64f, 96f, -32f), bounds.Min);
             Assert.AreEqual(new float3(96f, 128f, 0f), bounds.Max);
@@ -229,11 +251,11 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
-        #region read-back clamp (F-03)
+        #region read-back clamp
 
         [Test]
         public void PointCounts_AreClampedToMaxPointsPerPartition(){
-            // F-03: a corrupt or overflowing GPU counter must never request more than a partition can hold.
+            // A corrupt or overflowing GPU counter must never request more than a partition can hold.
             _counts = new NativeArray<uint>(3, Allocator.Persistent);
             _counts[0] = MaxPointsPerPartition + 1;
             _counts[1] = 5;

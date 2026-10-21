@@ -25,7 +25,6 @@ namespace Engine.Scripts.Jobs.Core{
 
         /// <summary>
         ///     Gets the average time in milliseconds of the last recorded runs (at most <c>records</c> of them).
-        ///     F-11: a real mean over the window instead of sum / 10.
         /// </summary>
         public float AvgTime => _timings.Count == 0 ? 0f : (float)_sum / _timings.Count;
 
@@ -43,14 +42,13 @@ namespace Engine.Scripts.Jobs.Core{
         /// <returns>The elapsed time in milliseconds for the current run.</returns>
         protected double StopRecord(){
             _watch.Stop();
-            double ms = _watch.Elapsed.TotalMilliseconds; // F-11: sub-millisecond resolution
+            double ms = _watch.Elapsed.TotalMilliseconds; // sub-millisecond resolution
             RecordTiming(ms);
             return ms;
         }
 
         /// <summary>
-        ///     Adds a measured run to the fixed window of the last <c>records</c> runs (F-11: the queue used to
-        ///     hold records + 1 entries).
+        ///     Adds a measured run to the fixed window of the last <c>records</c> runs.
         /// </summary>
         protected void RecordTiming(double milliseconds){
             if (_timings.Count >= _records) _sum -= _timings.Dequeue();

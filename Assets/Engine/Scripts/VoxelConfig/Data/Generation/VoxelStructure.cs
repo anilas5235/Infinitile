@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Engine.Scripts.VoxelConfig.Data.Generation{
     /// <summary>
-    ///     A multi-block voxel structure such as a tree (VEG-05). Placement offsets are relative to the first voxel
+    ///     A multi-block voxel structure such as a tree. Placement offsets are relative to the first voxel
     ///     above the anchor column's top block: (0, 0, 0) sits on the ground. Shapes (expanded by
     ///     <c>FloraConfigBuilder.Expand</c>): Single = origin; Line = origin to end inclusive; Box = <c>size</c> centred
     ///     on origin (from origin − size/2), filled or a shell; Circle = horizontal disc of <c>radius</c> at origin.y
@@ -39,7 +39,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                 }
             }
             catch{
-                def.Dispose(); // D-04: release the partly built maps before the registry rethrows
+                def.Dispose(); // release the partly built maps before the registry rethrows
                 throw;
             }
 

@@ -1,8 +1,6 @@
-﻿using System;
-using System.Reflection;
+﻿using System.Reflection;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
-using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
 using NUnit.Framework;
 using Unity.Collections;
@@ -11,8 +9,8 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     TST-E02: ChunkJob.WriteToChunkData packing order round-trips through ChunkVoxelData.GetVoxel.
-    ///     TST-E03 / LGT-01: ChunkLightData (chunk-wide 16-bit light) round trips.
+    ///     ChunkJob.WriteToChunkData packing order round-trips through ChunkVoxelData.GetVoxel, and ChunkLightData
+    ///     (chunk-wide 16-bit light) round trips.
     /// </summary>
     public class ChunkDataTests{
         private bool _hasVoxelData;
@@ -108,6 +106,17 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void WriteToChunkData_ReservesForTheRunsOnly(){
+            // A fixed reservation of VoxelsPerChunk / 4 nodes held 512 KiB per loaded chunk.
+            using NativeArray<ushort> vox = new(TerrainLikeBuffer(42), Allocator.Persistent);
+            _voxelData = WriteToChunkData(vox);
+            _hasVoxelData = true;
+            int runs = _voxelData.Data.CompressedLength;
+            Assert.GreaterOrEqual(_voxelData.Data.Capacity, runs);
+            Assert.LessOrEqual(_voxelData.Data.Capacity, runs * 2, "capacity follows the run count");
+        }
+
+        [Test]
         public void SetVoxel_ReturnsFalseWhenUnchanged(){
             _voxelData = TestFixtures.CreateUniformChunk(TestFixtures.Stone);
             _hasVoxelData = true;
@@ -120,7 +129,7 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(TestFixtures.Stone, _voxelData.GetVoxel(pos - new int3(0, 1, 0)));
         }
 
-        #region TST-E03
+        #region Light data
 
         [Test]
         public void ChunkLightData_StartsDark_CoversWholeChunk(){

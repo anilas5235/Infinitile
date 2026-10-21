@@ -11,26 +11,25 @@ using static UnityEngine.GraphicsBuffer;
 
 namespace Engine.Scripts.Render{
     /// <summary>
-    ///     Phase C: GPU frustum culling of render pages (§E2). Owns the <c>PageCulling.compute</c> kernels and one
-    ///     <see cref="CameraCullState" /> per camera that renders (CUL-04), created on first sight and released when
-    ///     the camera is destroyed or has not rendered for <see cref="MaxIdleFrames" /> frames. Every draw of a
-    ///     <see cref="RenderBuffer" /> first runs <see cref="Cull" /> for that buffer and camera (CUL-02).
+    ///     GPU frustum culling of render pages. Owns the <c>PageCulling.compute</c> kernels and one
+    ///     <see cref="CameraCullState" /> per camera that renders, created on first sight and released when the camera
+    ///     is destroyed or has not rendered for <see cref="MaxIdleFrames" /> frames. Every draw of a
+    ///     <see cref="RenderBuffer" /> first runs <see cref="Cull" /> for that buffer and camera.
     /// </summary>
     internal sealed class GpuCuller : IDisposable{
         /// <summary>Frames a camera may stay unseen before its buffers are released (about 5 s at 60 Hz).</summary>
         internal const int MaxIdleFrames = 300;
 
-        private const int CullThreads = 128;
         private static readonly int CullGroups = (PagesPerBuffer + CullThreads - 1) / CullThreads;
 
         private readonly ComputeShader _shader;
         private readonly int _cullKernel;
         private readonly int _argsKernel;
         private readonly Dictionary<Camera, CameraCullState> _cameras = new();
-        private readonly List<Camera> _stale = new(); // PERF-04: reused when releasing camera states
+        private readonly List<Camera> _stale = new(); // reused when releasing camera states
         private readonly Plane[] _planeScratch = new Plane[FrustumPlanes.Count];
         private readonly Vector4[] _planeUpload = new Vector4[FrustumPlanes.Count];
-        private FrustumPlanes _gamePlanes; // CUL-06: last unfrozen game-camera frustum, used by every camera while frozen
+        private FrustumPlanes _gamePlanes; // last unfrozen game-camera frustum, used by every camera while frozen
         private Matrix4x4 _gameInverseViewProjection;
         private bool _hasGamePlanes;
         private bool _isDisposed;
@@ -53,8 +52,8 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     Returns the state of <paramref name="cam" /> for this frame, creating it on first sight (CUL-04), and
-        ///     refreshes its frustum planes unless culling is frozen. CUL-06: while frozen, every camera culls with
+        ///     Returns the state of <paramref name="cam" /> for this frame, creating it on first sight, and refreshes
+        ///     its frustum planes unless culling is frozen. While frozen, every camera culls with
         ///     the last unfrozen frustum of the game camera, so the Scene view (or a detached game camera) shows
         ///     exactly the pages the game camera kept and nothing it culled.
         /// </summary>
@@ -87,7 +86,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     CUL-06: the frustum every camera uses while culling is frozen (inverse view-projection of the game
+        ///     The frustum every camera uses while culling is frozen (inverse view-projection of the game
         ///     camera at its last unfrozen frame), for drawing it as a gizmo. False until a game camera has rendered.
         /// </summary>
         internal bool TryGetFrozenFrustum(out Matrix4x4 inverseViewProjection){
@@ -96,18 +95,18 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     CUL-02: builds the visible page list and indirect args of <paramref name="list" /> for one render
+        ///     Builds the visible page list and indirect args of <paramref name="list" /> for one render
         ///     buffer: the cull kernel appends every page with points whose (extruded) AABB touches the frustum, the
         ///     counter is copied into the args and the args kernel writes the vertex count.
         /// </summary>
         /// <param name="buffer">Render buffer whose pages are tested.</param>
         /// <param name="list">Per-camera list and args for that buffer.</param>
         /// <param name="planes">Frustum planes of the camera.</param>
-        /// <param name="extrusion">CUL-05: light direction times shadow distance for the shadow list, zero otherwise.</param>
-        /// <param name="cullingEnabled">CUL-06: false appends every page with points ("all valid pages visible").</param>
+        /// <param name="extrusion">Light direction times shadow distance for the shadow list, zero otherwise.</param>
+        /// <param name="cullingEnabled">False appends every page with points ("all valid pages visible").</param>
         internal void Cull(RenderBuffer buffer, CullList list, in FrustumPlanes planes, float3 extrusion,
             bool cullingEnabled){
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderCulling.Auto(); // PERF-01
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderCulling.Auto();
 
             planes.CopyTo(_planeUpload);
             list.VisiblePages.SetCounterValue(0);
@@ -130,7 +129,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     CUL-04: releases the buffers of cameras that were destroyed or have not rendered for
+        ///     Releases the buffers of cameras that were destroyed or have not rendered for
         ///     <see cref="MaxIdleFrames" /> frames. Call once per frame from the main thread.
         /// </summary>
         internal void ReleaseStaleCameras(int frame){
@@ -154,7 +153,7 @@ namespace Engine.Scripts.Render{
     }
 
     /// <summary>
-    ///     CUL-04: everything one camera needs to cull and draw: its frustum planes (kept while culling is frozen)
+    ///     Everything one camera needs to cull and draw: its frustum planes (kept while culling is frozen)
     ///     and, per <see cref="RenderBuffer" />, a main and an optional shadow <see cref="CullList" />.
     /// </summary>
     internal sealed class CameraCullState : IDisposable{
@@ -182,7 +181,7 @@ namespace Engine.Scripts.Render{
         }
     }
 
-    /// <summary>Main-pass and shadow-pass (CUL-05, created on first use) lists of one buffer for one camera.</summary>
+    /// <summary>Main-pass and shadow-pass (created on first use) lists of one buffer for one camera.</summary>
     internal sealed class BufferCullLists : IDisposable{
         private readonly RenderBuffer _buffer;
         private CullList _shadow;
@@ -208,7 +207,7 @@ namespace Engine.Scripts.Render{
 
     /// <summary>
     ///     One visible page list with its indirect args and the property block that binds both (plus the point and
-    ///     count buffers of the owning <see cref="RenderBuffer" />) for the vertex shader (CUL-03).
+    ///     count buffers of the owning <see cref="RenderBuffer" />) for the vertex shader.
     /// </summary>
     internal sealed class CullList : IDisposable{
         /// <summary>Args layout: [0] vertex count, [1] instance count, [2] start vertex, [3] start instance, [4] visible pages.</summary>
@@ -236,11 +235,11 @@ namespace Engine.Scripts.Render{
         internal GraphicsBuffer Args{ get; }
         internal MaterialPropertyBlock PropertyBlock{ get; }
 
-        /// <summary>CUL-06: visible page count of the last completed read-back (debug overlay only).</summary>
+        /// <summary>Visible page count of the last completed read-back (debug overlay only).</summary>
         internal uint LastVisibleCount{ get; private set; }
 
         public void Dispose(){
-            if (_readbackPending) _pendingReadback.WaitForCompletion(); // F-17: never free an array a read-back targets
+            if (_readbackPending) _pendingReadback.WaitForCompletion(); // never free an array a read-back targets
             _readbackPending = false;
             VisiblePages.Dispose();
             Args.Dispose();
@@ -248,7 +247,7 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     CUL-06: polls the previous read-back of the args and starts a new one, so the overlay shows the visible
+        ///     Polls the previous read-back of the args and starts a new one, so the overlay shows the visible
         ///     page count with one frame of latency. Only called while the overlay is on.
         /// </summary>
         internal void UpdateVisibleCountReadback(){

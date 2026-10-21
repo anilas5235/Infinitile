@@ -4,13 +4,13 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Noise{
     /// <summary>
-    ///     Peak (ridge) noise P = (1 − |n|)² with simplex n at a fixed wavelength (GEN-10, default 192 blocks).
-    ///     Gives sharp ridges in [0,1]; jaggedness J multiplies it in the height formula (§5.7). Shared by both
-    ///     architectures (GEN-11).
+    ///     Peak (ridge) noise P = (1 − |n|)² with simplex n at a fixed wavelength (default 192 blocks).
+    ///     Gives sharp ridges in [0,1]; jaggedness J multiplies it in the height formula. Shared by both
+    ///     architectures.
     /// </summary>
     [BurstCompile]
     public static class PeakNoise{
-        /// <summary>Default wavelength in blocks (§5.6).</summary>
+        /// <summary>Default wavelength in blocks.</summary>
         public const float DefaultWavelength = 192f;
 
         /// <summary>P at world position <paramref name="p" /> (blocks).</summary>

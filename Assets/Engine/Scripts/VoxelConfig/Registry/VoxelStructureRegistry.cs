@@ -29,7 +29,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                     def = kvp.Value.ToStruct(voxelRegistry);
                 }
                 catch (Exception e){
-                    // D-04: a skipped structure left a default def (uncreated placement map) at its id, which made
+                    // A skipped structure would leave a default def (uncreated placement map) at its id, which makes
                     // Dispose throw. A broken structure is a configuration error that fails the registry instead.
                     for (int i = 0; i < tempArray.Length; i++)
                         if (converted[i]) tempArray[i].Dispose();
@@ -37,7 +37,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                         $"Failed to convert structure {kvp.Value.name} to struct: {e.Message}", e);
                 }
 
-                tempArray[kvp.Key] = def; // F-22: place by id, not by enumeration order
+                tempArray[kvp.Key] = def; // place by id, not by enumeration order
                 converted[kvp.Key] = true;
             }
 
@@ -45,7 +45,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         }
 
         public override void Dispose(){
-            if (!StructureArray.IsCreated) return; // D-04: FinalizeRegistry may have thrown before creating the array
+            if (!StructureArray.IsCreated) return; // FinalizeRegistry may have thrown before creating the array
             foreach (VoxelStructure.VoxelStructureDef def in StructureArray) def.Dispose();
             StructureArray.Dispose();
         }

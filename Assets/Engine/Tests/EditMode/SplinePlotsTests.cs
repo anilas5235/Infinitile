@@ -8,7 +8,7 @@ using Unity.Mathematics;
 using UnityEngine;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>TRN-06: 1D plots of every spline level evaluate the flattened subtree of each node.</summary>
+    /// <summary>1D plots of every spline level evaluate the flattened subtree of each node.</summary>
     public class SplinePlotsTests{
         private TerrainSplineSet _set;
 
@@ -63,7 +63,7 @@ namespace Engine.Tests.EditMode{
             Assert.IsNull(error);
             Assert.Greater(plots.Count, 3);
 
-            // Offset at C = 0.3 is the constant knot 110 of the §19.1 placeholders.
+            // Offset at C = 0.3 is the constant knot 110 of the placeholders.
             SplinePlots.Plot offset = plots[0];
             Assert.AreEqual(SplineAxis.Continental, offset.Axis);
             Assert.AreEqual(0.3f, offset.Probe.x, 1e-6f);

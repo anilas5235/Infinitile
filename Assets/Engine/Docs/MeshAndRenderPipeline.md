@@ -68,7 +68,7 @@ Advantages:
 
 Trade-offs:
 
-- Rendering is still tied to fully buildt meshes.
+- Rendering is still tied to fully built meshes.
 
 # Version 1.1 (Partitions)
 ## Mesh Pipeline
@@ -168,7 +168,7 @@ subgraph CPU["CPU"]
     CPU Job]
     I --> J[Collider Applied]
 
-    K[Resreve Global Buffer Space]
+    K[Reserve Global Buffer Space]
     B[Compute Shader Queue]
 end
 
@@ -272,7 +272,7 @@ Trade-offs:
 - Harder debugging and profiling compared to traditional mesh-based rendering.
 - Requires support for compute shaders and indirect rendering on target platforms.
 
-# Version 1.3 (GPU Page Culling, Phase C)
+# Version 1.3 (GPU Page Culling)
 
 ## Render Pipeline (Per-Camera Frustum Culling of Pages)
 
@@ -319,27 +319,26 @@ end
 ### Description
 
 Version 1.3 replaces the old `Culling.compute` / `ReBuildBuffers.compute` pair (one index per point, rebuilt on
-every page change) with per-page frustum culling that runs once per camera and frame (CUL-01 to CUL-08 in
-`WorldGenSpec.html`, section E2).
+every page change) with per-page frustum culling that runs once per camera and frame.
 
-- **Page bounds (CUL-01).** `PageAllocator` keeps, next to the point count, the world-space AABB of the partition
+- **Page bounds.** `PageAllocator` keeps, next to the point count, the world-space AABB of the partition
   that owns each page (`PageBounds`, 24 bytes). `RenderBuffer.RebuildBuffers` uploads both arrays only when a page
   was allocated or released.
-- **Cull kernel (CUL-02).** `PageCulling.compute` tests every page with points against the six camera planes
+- **Cull kernel.** `PageCulling.compute` tests every page with points against the six camera planes
   (positive-vertex test, conservative at edges) and appends the surviving page indices to an append buffer. The
   counter is copied into slot 4 of the indirect args and a one-thread kernel writes the vertex count, so the CPU
   never reads anything back for the draw.
-- **Vertex pulling (CUL-03).** The vertex shader maps `vertexID / 6` to a slot, the slot to a page through
+- **Vertex pulling.** The vertex shader maps `vertexID / 6` to a slot, the slot to a page through
   `_VisiblePages`, and emits a degenerate triangle for slots past the page's point count. Visible pages are drawn
   densely, empty slots cost nothing on the raster side.
-- **Per-camera state (CUL-04).** `GpuCuller` owns a `CameraCullState` per camera (planes plus a `CullList` with
+- **Per-camera state.** `GpuCuller` owns a `CameraCullState` per camera (planes plus a `CullList` with
   append buffer, args and property block per render buffer). States are created on first sight and released when
   the camera is destroyed or has not rendered for 300 frames.
-- **Shadows (CUL-05).** With `RendererSettings.shadows` not `Off` and a main light, every buffer is culled a second
+- **Shadows.** With `RendererSettings.shadows` not `Off` and a main light, every buffer is culled a second
   time with the AABB extruded along the light direction by the shadow distance and drawn `ShadowsOnly`; the main
   pass stops casting but still receives shadows. The mechanics are in place; the voxel shaders have no
   `ShadowCaster` pass yet, so this path does not produce shadows until one is added.
-- **Debugging (CUL-06).** `RendererSettings.gpuCulling` (default on) and `VoxelWorldRenderer.GpuCulling` fall back
+- **Debugging.** `RendererSettings.gpuCulling` (default on) and `VoxelWorldRenderer.GpuCulling` fall back
   to "every page with points is visible". `FreezeCulling` keeps the game camera's last unfrozen frustum and culls
   *every* camera with it, so the Scene view (or a detached game camera) shows exactly the pages the game camera
   kept; the frozen frustum is drawn as a yellow gizmo. `ShowCullingOverlay` shows visible / allocated pages per
@@ -350,10 +349,10 @@ every page change) with per-page frustum culling that runs once per camera and f
   freeze the Scene view camera culls with its own frustum, so nothing ever looks missing from it. To watch
   culling in the Editor: enter Play, let the Game view render once, press F9 (or tick *Freeze Culling*), then
   orbit the Scene view around the yellow frustum; F9 again picks up the current game frustum.
-- **Tests (CUL-08).** `FrustumCulling` is the C# reference of the GPU test (EditMode `FrustumCullingTests`); the
+- **Tests.** `FrustumCulling` is the C# reference of the GPU test (EditMode `FrustumCullingTests`); the
   PlayMode `GpuCullingTests` read the GPU set back for 50 random camera poses and compare it page by page, check
   the shadow list, the fallback, the camera life-cycle, freeze, the allocation-free draw path and log culling
-  on/off frame times at a fixed viewpoint. `FrustumCullingBenchmark` records the CPU reference cost (PERF-02).
+  on/off frame times at a fixed viewpoint. `FrustumCullingBenchmark` records the CPU reference cost.
 
 Advantages:
 
@@ -365,9 +364,9 @@ Trade-offs:
 
 - Page bounds are partition bounds, so a page is as coarse as its partition; sparse partitions are drawn whole.
 - Each camera holds its own append buffer and args per render buffer (a few KB each).
-- The conservative plane test keeps boxes that straddle a frustum corner; Hi-Z occlusion (CUL-20) is future work.
+- The conservative plane test keeps boxes that straddle a frustum corner; Hi-Z occlusion culling is future work.
 
-# Version 1.4 (Lighting, Phase L)
+# Version 1.4 (Lighting)
 
 ## Light Pipeline (Propagated Voxel Light, Smooth Corners, Day/Night)
 
@@ -408,16 +407,15 @@ end
 
 ### Description
 
-Version 1.4 adds propagated voxel light (LGT-01 to LGT-11 in `WorldGenSpec.html`, section E3). Light is computed
-on the CPU once per chunk and on edits. On the GPU it is only unpacked and interpolated, so day and night never
-re-propagate anything.
+Version 1.4 adds propagated voxel light. Light is computed on the CPU once per chunk and on edits. On the GPU it is
+only unpacked and interpolated, so day and night never re-propagate anything.
 
-- **Data (LGT-01/02).** Every voxel has 16 bits of light: one 4-bit level each for sky, red, green and blue
+- **Data.** Every voxel has 16 bits of light: one 4-bit level each for sky, red, green and blue
   (`VoxelLight`, channel c at bits 4c, sky is c = 3). `ChunkLightData` stores them as an interval list in the same
   Flatten order as the voxel data. Each voxel definition has `lightAttenuation` (0 clear … 15 opaque, the default)
   and `lightEmission` (RGB). `VoxelRegistry` turns them into a `VoxelLightTable` for the jobs, and the attenuation
   also goes into `GPUVoxelDef` (80 bytes).
-- **Initial light (LGT-03 to LGT-05).** `LightJob` lights one chunk from the voxel data of its 3 × 3
+- **Initial light.** `LightJob` lights one chunk from the voxel data of its 3 × 3
   neighbourhood. It runs over a box of chunk ± 14 columns at full height (`LightRegion`), surrounded by an opaque
   sentinel ring. Light loses at least one level per step, so a source 15 columns away contributes 0: the result is
   exact and every chunk can be lit independently and in parallel.
@@ -428,21 +426,21 @@ re-propagate anything.
     - emitters.
   - BFS: each channel of a neighbour becomes max(current, source − 1 − attenuation). Sky 15 moves down into a clear
     voxel without loss.
-- **Scheduling (LGT-06).** `LightScheduler` batches chunks whose 3 × 3 neighbourhood has voxel data. The load
+- **Scheduling.** `LightScheduler` batches chunks whose 3 × 3 neighbourhood has voxel data. The load
   distance is the draw distance + 3, so the outermost drawn chunks can be lit. A partition is meshed only when its
   chunk and the 8 neighbours are lit. Unloading a chunk invalidates the lit neighbours that read it.
-- **Edits (LGT-07).** `SetVoxel` runs `LightEditJob` synchronously, after any job that reads those chunks has
-  completed (F-01). Per channel it uses the two-queue method in a box of edit ± 16:
+- **Edits.** `SetVoxel` runs `LightEditJob` synchronously, after any job that reads those chunks has
+  completed. Per channel it uses the two-queue method in a box of edit ± 16:
   - a removal BFS clears the light that may have come through the edited voxel;
   - light is then re-propagated from the border, the edited voxel's neighbours and the cleared voxels' own sources.
 
   Partitions whose light changed are remeshed. The result equals a full recomputation (tested over 500 random
   edits).
-- **GPU light (LGT-08).** The renderer uploads each chunk's light intervals into the shared interval store, like the
+- **GPU light.** The renderer uploads each chunk's light intervals into the shared interval store, like the
   voxel data (two lists per chunk, see Version 1.5). `PointBuilder.compute` decompresses the voxel ids (`BuildPrep`), then
   ORs the light into the upper 16 bits of the same uint (`BuildPrepLight`). A neighbour lookup therefore fetches
   id and light at once. A build without a light buffer for every chunk is invalid.
-- **Smooth light (LGT-09).** For each face corner, `BuildPoints` averages every channel over the front voxel,
+- **Smooth light.** For each face corner, `BuildPoints` averages every channel over the front voxel,
   the two side neighbours and the diagonal, with rounding.
   - It skips opaque voxels (attenuation 15), and the diagonal too when both sides are opaque, so light never leaks
     through a closed corner.
@@ -453,7 +451,7 @@ re-propagate anything.
   - The 16 corner nibbles go into `PointData.packed.y` (sky | R << 16) and `.w` (G | B << 16), each channel as the
     four corners up-left, up-right, down-right, down-left (UV space, like AO). The point size is unchanged.
   - `PointLightPacking` is the C# port of the accessors and the corner average, used by the round-trip tests.
-- **Shading (LGT-10).** The solid and transparent shaders (foliage uses the transparent one) compute the light per
+- **Shading.** The solid and transparent shaders (foliage uses the transparent one) compute the light per
   fragment. They interpolate each channel's corner levels bilinearly and apply the curve 0.85^(15 − level).
 
   ```
@@ -464,13 +462,12 @@ re-propagate anything.
   `DayNightCycle` (on the main directional light in `SampleScene`) drives the three globals and the light's
   rotation from `timeOfDay` and `speed`. The default speed is a 20-minute day. Without the component, the
   renderer sets full daylight (`VoxelLightingGlobals.SetDefaults`).
-- **Tests and benchmarks (LGT-11).**
+- **Tests and benchmarks.**
   - EditMode `LightPropagationTests`: emitter falloff, walls, media, channels, sky columns, frontier vs
     exhaustive seeding, 3 × 3 vs 5 × 5 border exactness, 500 random edits vs a full recomputation.
   - `PointLightPackingTests` and `DayNightCycleTests`.
-  - `LightJobBenchmark`: 0.86 ms per chunk on natural terrain, 15.7 ms in the emitter-cavity worst case (see
-    `Tests/Performance/Baselines/README.md`). Since spec §20.2 the BFS computes all four channels at once in byte
-    lanes: 0.73 ms and 9.0 ms.
+  - `LightJobBenchmark`: 0.73 ms per chunk on natural terrain, 9.0 ms in the emitter-cavity worst case, with the
+    BFS computing all four channels at once in byte lanes (see `Tests/Performance/Baselines/README.md`).
 
 Advantages:
 
@@ -486,7 +483,7 @@ Trade-offs:
   distance.
 - Light changes need a remesh of the affected partitions, because the corner values are baked into the points.
 
-# Version 1.5 (Shared Interval Store, Spec §20.1)
+# Version 1.5 (Shared Interval Store)
 
 ## Chunk Data on the GPU (One Paged Buffer Instead of One Buffer per Chunk)
 
@@ -516,10 +513,10 @@ end
 
 ### Description
 
-Until version 1.4, the renderer kept one `GraphicsBuffer` per chunk list (voxel ids and light, LGT-08), taken from
-a pool created at start-up. A list longer than the pool's default length (8 intervals per column) created a new
-buffer during flight, and with it a managed object (PERF-04). Every pooled buffer was as large as that default,
-whatever its chunk needed.
+Until version 1.4, the renderer kept one `GraphicsBuffer` per chunk list (voxel ids and light), taken from a pool
+created at start-up. A list longer than the pool's default length (8 intervals per column) created a new buffer at
+runtime, and with it a managed allocation. Every pooled buffer was as large as that default, whatever its chunk
+needed.
 
 - **Store.** `ChunkIntervalStore` holds every list in one structured `uint2` buffer of 512-element pages (4 KB).
   A list is the header (interval count, last end) followed by its (value, exclusive end) nodes, as before.
@@ -533,7 +530,7 @@ whatever its chunk needed.
 - **Growth.** If the free pages do not suffice, the store allocates a larger buffer, copies the old one on the GPU
   (`CopyIntervals`) and logs it. It starts with 17 pages per list, two lists per chunk the `ChunkManager` can hold, the
   same memory as the former pool.
-- **Measured** (TST-E21 flight in the game scene): 6935 of 17986 pages used at the peak (39 %). No growth, 0/300
+- **Measured** (PlayMode allocation flight test in the game scene): 6935 of 17986 pages used at the peak (39 %). No growth, 0/300
   allocating frames. Upload about 71 µs per chunk list as before. The prep dispatch takes about 22 µs per build
   instead of 20 µs (page-table upload).
 

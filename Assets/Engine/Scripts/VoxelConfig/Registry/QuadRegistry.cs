@@ -35,10 +35,9 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             }
 
             QuadArray = new QuadDefinition.QuadDef[Count];
-            // Copy each texture into the texture array
             int index = 0;
             foreach (KeyValuePair<QuadDefinition, ushort> kvp in ForwardMap){
-                VoxelEngineLogger.Info<TexRegistry>($"copy quad {kvp.Key.name} to Quad array");
+                VoxelEngineLogger.Info<QuadRegistry>($"copy quad {kvp.Key.name} to Quad array");
                 QuadArray[index] = kvp.Key.ToStruct();
                 index++;
             }

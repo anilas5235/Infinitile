@@ -8,10 +8,10 @@ using Unity.Mathematics;
 
 namespace Engine.Editor.WorldGen{
     /// <summary>
-    ///     TRN-06: 1D plots of every spline level of a <see cref="TerrainSplineSet" />. Each flattened node is
+    ///     1D plots of every spline level of a <see cref="TerrainSplineSet" />. Each flattened node is
     ///     evaluated with its sub-splines (<see cref="FlatSpline.Subtree" />) along its own axis while the other two
     ///     axes stay at the probe (C, E, PV); the probe value and the control points are marked. The evaluation runs
-    ///     in a Burst job with strict float mode, like the sampler (GEN-16).
+    ///     in a Burst job with strict float mode, like the sampler.
     /// </summary>
     public static class SplinePlots{
         /// <summary>One spline level.</summary>
@@ -117,7 +117,7 @@ namespace Engine.Editor.WorldGen{
             return plots;
         }
 
-        /// <summary>Axis range of a spline axis (TRN-01).</summary>
+        /// <summary>Axis range of a spline axis.</summary>
         public static float2 AxisRange(SplineAxis axis){
             return axis == SplineAxis.PeaksValleys ? new float2(-1f, 1f) : new float2(0f, 1f);
         }

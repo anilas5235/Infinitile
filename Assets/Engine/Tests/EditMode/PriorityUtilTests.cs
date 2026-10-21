@@ -5,7 +5,7 @@ using NUnit.Framework;
 using Unity.Mathematics;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>TST-E07 (priority ordering, Focus) and TST-E16 (F-09 vertical forward, F-11 AvgTime).</summary>
+    /// <summary>Priority ordering, Focus, vertical view directions and the scheduler's AvgTime window.</summary>
     public class PriorityUtilTests{
         private static PriorityUtil.Focus LookingForward(){
             return new PriorityUtil.Focus(int3.zero, new float3(0, 0, 1));
@@ -19,36 +19,55 @@ namespace Engine.Tests.EditMode{
             return PriorityUtil.DistPriority(ref position, ref focus);
         }
 
-        private static float Reverse(int3 position, PriorityUtil.Focus focus){
-            return PriorityUtil.ReVerseDistPriority(ref position, ref focus);
-        }
-
-        private static float Reverse(int2 position, PriorityUtil.Focus focus){
-            return PriorityUtil.ReVerseDistPriority(ref position, ref focus);
-        }
-
-        #region F-23
+        #region Eviction priority
 
         [Test]
-        public void EvictionPriority_IsPlainDistance_IgnoringViewDirection(){
-            // F-23 / DEC-14: eviction must not weight chunks behind the player x5.
+        public void EvictionPriority_IgnoresViewDirection(){
+            // Eviction must not weight chunks behind the player x5.
             PriorityUtil.Focus focus = LookingForward();
             int3 behind = new(0, 0, -3);
-            int3 front = new(0, 0, 6);
-            Assert.AreEqual(-9f, PriorityUtil.EvictionPriority(ref behind, ref focus));
-            Assert.AreEqual(-36f, PriorityUtil.EvictionPriority(ref front, ref focus));
-            Assert.Greater(PriorityUtil.EvictionPriority(ref behind, ref focus), PriorityUtil.EvictionPriority(ref front, ref focus),
+            int3 front = new(0, 0, 3);
+            int3 far = new(0, 0, 6);
+            Assert.AreEqual(PriorityUtil.EvictionPriority(ref behind, ref focus), PriorityUtil.EvictionPriority(ref front, ref focus));
+            Assert.Greater(PriorityUtil.EvictionPriority(ref behind, ref focus), PriorityUtil.EvictionPriority(ref far, ref focus),
                 "the farther chunk must have the lower (first dequeued) priority");
 
             int2 behind2 = new(0, -3);
-            int2 front2 = new(0, 6);
-            Assert.AreEqual(-9f, PriorityUtil.EvictionPriority(ref behind2, ref focus));
-            Assert.AreEqual(-36f, PriorityUtil.EvictionPriority(ref front2, ref focus));
+            int2 front2 = new(0, 3);
+            int2 far2 = new(0, 6);
+            Assert.AreEqual(PriorityUtil.EvictionPriority(ref behind2, ref focus), PriorityUtil.EvictionPriority(ref front2, ref focus));
+            Assert.Greater(PriorityUtil.EvictionPriority(ref behind2, ref focus), PriorityUtil.EvictionPriority(ref far2, ref focus));
+        }
+
+        [Test]
+        public void EvictionPriority_RanksBySquareRing(){
+            // The loaded areas are squares: the corner of ring 8 (8·√2 ≈ 11.3 away) must stay before anything in ring 9
+            // or 10, or the corners are evicted and regenerated over and over.
+            PriorityUtil.Focus focus = LookingForward();
+            int2 corner = new(8, -8);
+            int2 axisOutside = new(0, 9);
+            int2 axisFarther = new(10, 0);
+            float cornerPrio = PriorityUtil.EvictionPriority(ref corner, ref focus);
+            Assert.Greater(cornerPrio, PriorityUtil.EvictionPriority(ref axisOutside, ref focus));
+            Assert.Greater(PriorityUtil.EvictionPriority(ref axisOutside, ref focus),
+                PriorityUtil.EvictionPriority(ref axisFarther, ref focus));
+
+            // Within a ring the straight-line distance breaks the tie: the corner goes first.
+            int2 axisSameRing = new(8, 0);
+            Assert.Greater(PriorityUtil.EvictionPriority(ref axisSameRing, ref focus), cornerPrio);
+
+            int3 corner3 = new(5, 5, -5);
+            int3 axisOutside3 = new(0, 6, 0);
+            Assert.Greater(PriorityUtil.EvictionPriority(ref corner3, ref focus),
+                PriorityUtil.EvictionPriority(ref axisOutside3, ref focus));
+
+            int3 origin = int3.zero;
+            Assert.AreEqual(0f, PriorityUtil.EvictionPriority(ref origin, ref focus));
         }
 
         #endregion
 
-        #region TST-E07
+        #region Priority ordering
 
         [Test]
         public void DistPriority_CloserIsLowerValue(){
@@ -61,15 +80,6 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(0f, Prio(int2.zero, focus));
             Assert.Less(Prio(new int2(0, 1), focus), Prio(new int2(0, 5), focus));
             Assert.Less(Prio(new int2(1, 0), focus), Prio(new int2(3, 0), focus));
-        }
-
-        [Test]
-        public void ReverseDistPriority_InvertsOrder(){
-            PriorityUtil.Focus focus = LookingForward();
-            Assert.Greater(Reverse(new int3(0, 0, 1), focus), Reverse(new int3(0, 0, 5), focus));
-            Assert.Greater(Reverse(new int2(0, 1), focus), Reverse(new int2(0, 5), focus));
-            Assert.AreEqual(-Prio(new int3(2, 0, 3), focus), Reverse(new int3(2, 0, 3), focus));
-            Assert.AreEqual(-Prio(new int2(2, 3), focus), Reverse(new int2(2, 3), focus));
         }
 
         [Test]
@@ -102,17 +112,16 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
-        #region TST-E16
+        #region Vertical forward and AvgTime
 
         [Test]
         public void DistPriority2D_VerticalForward_GivesFinitePriorities(){
-            // F-09: forward (0, ±1, 0) has xz = (0, 0); the 2D overload must not produce NaN.
+            // Forward (0, ±1, 0) has xz = (0, 0); the 2D overload must not produce NaN.
             PriorityUtil.Focus up = new(int3.zero, new float3(0, 1, 0));
             PriorityUtil.Focus down = new(int3.zero, new float3(0, -1, 0));
             int2 position = new(3, 4);
             Assert.IsTrue(float.IsFinite(Prio(position, up)), $"up: {Prio(position, up)}");
             Assert.IsTrue(float.IsFinite(Prio(position, down)), $"down: {Prio(position, down)}");
-            Assert.IsTrue(float.IsFinite(Reverse(position, up)));
             Assert.Less(Prio(new int2(1, 0), up), Prio(new int2(5, 0), up), "closer still ranks first");
         }
 
@@ -138,7 +147,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void AvgTime_OfConstantTimings_EqualsThatConstant(){
-            // F-11: AvgTime divides by a constant 10 instead of the number of samples.
+            // AvgTime divides by the number of samples, not by a constant.
             TestScheduler scheduler = new(16);
             for (int i = 0; i < 4; i++) scheduler.Record(5);
             Assert.AreEqual(5f, scheduler.AvgTime, 1e-5f, "4 samples of 5 ms");
@@ -148,7 +157,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void AvgTime_WindowIsBoundedByRecordCount(){
-            // F-11: the queue keeps records + 1 entries.
+            // The queue must not keep more than records entries.
             TestScheduler scheduler = new(16);
             for (int i = 0; i < 40; i++) scheduler.Record(1);
             Assert.LessOrEqual(scheduler.Timings.Count, 16);
@@ -156,7 +165,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void AvgTime_KeepsSubMillisecondTimings(){
-            // F-11: ElapsedMilliseconds truncated every run below 1 ms to 0.
+            // Runs below 1 ms must not be truncated to 0.
             TestScheduler scheduler = new(16);
             for (int i = 0; i < 4; i++) scheduler.Record(0.4);
             Assert.AreEqual(0.4f, scheduler.AvgTime, 1e-5f);

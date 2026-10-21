@@ -7,7 +7,7 @@ using static Engine.Scripts.Utils.VoxelConstants;
 namespace Engine.Scripts.Render{
     /// <summary>
     ///     Represents a request to build render data for a partition, including collection of the neighboring chunks'
-    ///     interval lists in the <see cref="ChunkIntervalStore" /> (§20.1).
+    ///     interval lists in the <see cref="ChunkIntervalStore" />.
     /// </summary>
     internal class PartitionBuildRequest{
         private static readonly int2[] RequiredChunks =
@@ -19,7 +19,7 @@ namespace Engine.Scripts.Render{
         public int3 Partition{ get; private set; }
 
         private readonly IntervalRange[] _voxelLists = new IntervalRange[RequiredChunks.Length];
-        private readonly IntervalRange[] _lightLists = new IntervalRange[RequiredChunks.Length]; // LGT-08
+        private readonly IntervalRange[] _lightLists = new IntervalRange[RequiredChunks.Length];
 
         /// <summary>
         ///     Initializes a new instance of the PartitionBuildRequest class.
@@ -29,14 +29,13 @@ namespace Engine.Scripts.Render{
             Partition = partition;
         }
 
-
         /// <summary>
         ///     Gets a value indicating whether this build request has successfully collected all required lists.
         /// </summary>
         public bool IsValid{ get; private set; }
 
         /// <summary>
-        ///     PERF-04: re-targets a pooled request so the renderer does not allocate one per build.
+        ///     Re-targets a pooled request so the renderer does not allocate one per build.
         /// </summary>
         public void Reset(int3 partition){
             Partition = partition;
@@ -51,7 +50,7 @@ namespace Engine.Scripts.Render{
         public IntervalRange[] VoxelLists => IsValid ? _voxelLists : null;
 
         /// <summary>
-        ///     LGT-08: gets the light interval lists of all required chunks (same order as <see cref="VoxelLists" />),
+        ///     Gets the light interval lists of all required chunks (same order as <see cref="VoxelLists" />),
         ///     or null if IsValid is false.
         /// </summary>
         public IntervalRange[] LightLists => IsValid ? _lightLists : null;
@@ -71,7 +70,7 @@ namespace Engine.Scripts.Render{
         ///     Collects the voxel data and light lists of all required neighboring chunks.
         /// </summary>
         /// <param name="voxelLists">Dictionary mapping chunk positions to their voxel interval lists.</param>
-        /// <param name="lightLists">LGT-08: dictionary mapping chunk positions to their light interval lists.</param>
+        /// <param name="lightLists">Dictionary mapping chunk positions to their light interval lists.</param>
         public void CollectLists(Dictionary<int2, IntervalRange> voxelLists, Dictionary<int2, IntervalRange> lightLists){
             IsValid = true;
             int2 mainChunkPos = PartitionToChunkPos(Partition);

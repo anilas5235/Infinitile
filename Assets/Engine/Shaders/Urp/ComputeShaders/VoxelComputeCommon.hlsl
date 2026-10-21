@@ -2,15 +2,6 @@
 #define VOXEL_COMPUTE_COMMON_INCLUDED
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GPU Rendering Constants
-// ─────────────────────────────────────────────────────────────────────────────
-
-#define MAX_POINTS_PER_PARTITION 98304
-#define MESH_LAYER_SOLID 0
-#define MESH_LAYER_TRANSPARENT 1
-#define MESH_LAYER_AIR 255
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Metadata Structures
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -18,8 +9,6 @@ struct PartitionMetadata
 {
     int3 partitionPS; // partition coords in partition Space 
     int3 partitionWS; // World partition coordinates
-    float3 boundsMin; // AABB min for frustum culling
-    float3 boundsMax; // AABB max
 };
 
 #endif

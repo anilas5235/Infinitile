@@ -8,20 +8,16 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.Jobs.Chunk{
     /// <summary>
-    ///     Parallel job that procedurally generates chunk data (terrain, caves, ores, structures, vegetation)
+    ///     Parallel job that procedurally generates chunk data (terrain, vegetation)
     ///     for multiple chunks in parallel.
-    ///     GEN-16: the job calls <c>WorldSampler</c>, so it compiles synchronously with strict float mode; a Mono
+    ///     The job calls <c>WorldSampler</c>, so it compiles synchronously with strict float mode; a Mono
     ///     fallback during async compilation or a relaxed float mode could otherwise change the generated world.
     /// </summary>
     [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
     internal partial struct ChunkJob : IJobParallelFor{
         [ReadOnly] public NativeList<int2> Jobs; // Chunk world positions
         [WriteOnly] public NativeParallelHashMap<int2, ChunkVoxelData>.ParallelWriter Results; // Result mapping
-        [ReadOnly] public int RandomSeed;
         [ReadOnly] public GeneratorConfig Config;
-
-        private const float CaveScale = 0.04f; // 3D noise scale for caves (larger features)
-        private const int LavaLevel = 5;
 
         /// <summary>
         ///     Executes chunk generation for the given job index and writes the result into the hash map.
@@ -34,7 +30,7 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
-        ///     Generates all voxel data for a given chunk (terrain, ores, caves, structures, vegetation).
+        ///     Generates all voxel data for a given chunk (terrain, vegetation).
         /// </summary>
         private void GenerateChunkData(int2 chunkPos, out ChunkVoxelData voxelData){
             int surfaceArea = ChunkSize.x * ChunkSize.z;
@@ -46,17 +42,10 @@ namespace Engine.Scripts.Jobs.Chunk{
 
             FloraGrid floraGrid = new(Config.WorldGen.FloraPadding, Allocator.Temp);
 
-            PrepareChunkMaps(RandomSeed, ref Config, ref chunkWorldPos, chunkColumns, ref floraGrid);
+            PrepareChunkMaps(ref Config, ref chunkWorldPos, chunkColumns, ref floraGrid);
 
             FillTerrain(chunkVoxels, chunkColumns, ref Config);
 
-            //PlaceOres(vox, Config, RandomSeed);
-
-            //CarveCaves(vox, chunkWorldPos, chunkColumns, Config, RandomSeed, CaveScale, LavaLevel);
-
-            //PlaceStructures(ref vox, ref chunkColumns, ref chunkWorldPos, RandomSeed, ref Config);
-
-            // INT-11: vegetation per VEG-01…05.
             PlaceVegetation(chunkVoxels, chunkColumns, floraGrid, chunkWorldPos, ref Config);
 
             WriteToChunkData(chunkVoxels, out voxelData);
@@ -67,10 +56,17 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
+        ///     Spare nodes on top of the generated runs, so the first edits of a chunk do not grow its list.
+        /// </summary>
+        private const int EditSlack = 16;
+
+        /// <summary>
         ///     Writes uncompressed voxel data into the chunk using run-length encoding (RLE) compaction.
+        ///     The list is sized from a counting pass: a fixed reservation would hold hundreds of KiB per loaded
+        ///     chunk, far more than the runs of a generated chunk.
         /// </summary>
         private void WriteToChunkData(NativeArray<ushort> vox, out ChunkVoxelData data){
-            data = new ChunkVoxelData(VoxelsPerChunk / 4);
+            data = new ChunkVoxelData(CountRuns(vox) + EditSlack);
             ushort last = 0;
             int run = 0;
             bool hasLast = false;
@@ -89,6 +85,24 @@ namespace Engine.Scripts.Jobs.Chunk{
             }
 
             if (hasLast && run > 0) data.AddVoxels(last, run);
+        }
+
+        /// <summary>
+        ///     Number of runs <see cref="WriteToChunkData" /> produces, in the same x, z, y order.
+        /// </summary>
+        private static int CountRuns(NativeArray<ushort> vox){
+            int runs = 1;
+            ushort last = vox[ChunkSize.Flatten(0, 0, 0)];
+            for (int x = 0; x < ChunkSize.x; x++)
+            for (int z = 0; z < ChunkSize.z; z++)
+            for (int y = 0; y < ChunkSize.y; y++){
+                ushort voxelId = vox[ChunkSize.Flatten(x, y, z)];
+                if (voxelId == last) continue;
+                runs++;
+                last = voxelId;
+            }
+
+            return runs;
         }
     }
 }

@@ -7,7 +7,7 @@ using Unity.Collections;
 using UnityEngine;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>GEN-24: boundary lengths between biome pairs and the implausible-neighbour flags.</summary>
+    /// <summary>Boundary lengths between biome pairs and the implausible-neighbour flags.</summary>
     public class BiomeBoundaryStatsTests{
         private readonly List<Object> _created = new();
         private BiomeSet _set;

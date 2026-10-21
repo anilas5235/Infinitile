@@ -6,12 +6,12 @@ using Unity.Mathematics;
 using UnityEngine;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>TST-11 (hash quality) and TST-13 (noise periodicity) for the Phase 0 noise basis.</summary>
+    /// <summary>Hash quality and simplex noise periodicity of the noise basis.</summary>
     public class HashAndSimplexTests{
         private const uint Seed = 1337u;
         private const uint Salt = HashSalts.TemperatureNoise;
 
-        #region TST-11
+        #region Hash quality
 
         [Test]
         public void Hash01_MeanIsHalf_AndUncorrelatedWithSwappedAndShiftedInputs(){
@@ -42,7 +42,7 @@ namespace Engine.Tests.EditMode{
 
             double corrSwap = Correlation(count, sum, sumSwap, sumSq, sumSqSwap, crossSwap);
             double corrShift = Correlation(count, sum, sumShift, sumSq, sumSqShift, crossShift);
-            Debug.Log($"TST-11: mean {mean:F5}, corr(x,z)/(z,x) {corrSwap:E2}, corr(x,z)/(x+1,z) {corrShift:E2}");
+            Debug.Log($"Hash01: mean {mean:F5}, corr(x,z)/(z,x) {corrSwap:E2}, corr(x,z)/(x+1,z) {corrShift:E2}");
             Assert.Less(Math.Abs(corrSwap), 0.01, "correlation between (x,z) and (z,x)");
             Assert.Less(Math.Abs(corrShift), 0.01, "correlation between (x,z) and (x+1,z)");
         }
@@ -66,7 +66,7 @@ namespace Engine.Tests.EditMode{
             }
 
             double average = flipped / trials;
-            Debug.Log($"TST-11: avalanche {average:F3} bits per flipped input bit");
+            Debug.Log($"Hash32: avalanche {average:F3} bits per flipped input bit");
             Assert.That(average, Is.InRange(15.5, 16.5));
         }
 
@@ -97,7 +97,7 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
-        #region TST-13
+        #region Simplex noise
 
         [Test]
         public void Simplex_OutputIsInRangeZeroCentredAndDeterministic(){
@@ -116,7 +116,7 @@ namespace Engine.Tests.EditMode{
                 count++;
             }
 
-            Debug.Log($"TST-13: simplex mean {sum / count:F4}, min {min:F3}, max {max:F3}");
+            Debug.Log($"Simplex: mean {sum / count:F4}, min {min:F3}, max {max:F3}");
             Assert.AreEqual(0.0, sum / count, 0.02, "simplex is zero-centred");
             Assert.Less(min, -0.6f, "simplex reaches well into the negative range");
             Assert.Greater(max, 0.6f, "simplex reaches well into the positive range");
@@ -138,7 +138,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void Simplex_IsNotATranslationUnderSeedChange(){
-            // F-02 at the basis level: a new seed must not be the same field shifted along an axis.
+            // A new seed must not be the same field shifted along an axis.
             const int shiftRange = 64;
             for (int shift = -shiftRange; shift <= shiftRange; shift++){
                 bool differsX = false, differsZ = false;
@@ -157,12 +157,12 @@ namespace Engine.Tests.EditMode{
         [TestCase(192f)]
         [TestCase(512f)]
         public void Simplex_HasNoSecondaryAutocorrelationPeak(float wavelength){
-            // TST-13: 16k blocks along x, z and both diagonals. Beyond one wavelength the autocorrelation must stay
+            // 16k blocks along x, z and both diagonals. Beyond one wavelength the autocorrelation must stay
             // below 0.2 (a permutation-table noise shows a peak near 1 at its period, e.g. 289 noise units).
             foreach (float2 direction in NoiseStatistics.Directions){
                 float peak = NoiseStatistics.MaxAutocorrelationBeyondWavelength(
                     p => SeededSimplex.Noise(p / wavelength, Seed, Salt), direction, wavelength, 1024, out int peakLag);
-                Debug.Log($"TST-13: wavelength {wavelength}, dir {direction}: max |autocorr| {peak:F3} at lag {peakLag}");
+                Debug.Log($"Simplex autocorrelation: wavelength {wavelength}, dir {direction}: max |autocorr| {peak:F3} at lag {peakLag}");
                 Assert.Less(peak, 0.2f, $"secondary autocorrelation peak along {direction} at lag {peakLag}");
             }
         }

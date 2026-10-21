@@ -3,14 +3,14 @@ using Unity.Collections;
 using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Height{
-    /// <summary>Axis a spline is defined over (TRN-01): C and E over [0,1], PV over [-1,1].</summary>
+    /// <summary>Axis a spline is defined over: C and E over [0,1], PV over [-1,1].</summary>
     public enum SplineAxis : byte{
         Continental = 0,
         Erosion = 1,
         PeaksValleys = 2
     }
 
-    /// <summary>Per-spline interpolation (TRN-02).</summary>
+    /// <summary>Per-spline interpolation.</summary>
     public enum SplineInterpolation : byte{
         /// <summary>Monotone cubic Hermite with Fritsch–Carlson tangents (default).</summary>
         MonotoneCubic = 0,
@@ -55,13 +55,13 @@ namespace Engine.Scripts.WorldGen.Height{
     }
 
     /// <summary>
-    ///     Nested spline evaluation (TRN-01, TRN-02): a spline over one axis whose control-point values are constants
+    ///     Nested spline evaluation: a spline over one axis whose control-point values are constants
     ///     or further splines over other axes, in the style of the Minecraft 1.18+ terrain shaper (offset/factor
     ///     splines documented on the Minecraft Wiki, "World generation"), reduced to the 2D case C → E → PV.
     ///     Interpolation is monotone cubic Hermite after Fritsch &amp; Carlson (1980), as described on Wikipedia,
     ///     "Monotone cubic interpolation", or piecewise linear per spline. A spline returns its end value outside the
     ///     first/last control point. Every spline is C0, so the height field is continuous by construction.
-    ///     The jaggedness spline J is an own extension (TRN-04); Minecraft has no 2D equivalent of it.
+    ///     The jaggedness spline J is an own extension; Minecraft has no 2D equivalent of it.
     /// </summary>
     [BurstCompile]
     public static class NestedSpline{
@@ -108,7 +108,7 @@ namespace Engine.Scripts.WorldGen.Height{
 
             if (n == 1) return y[0];
 
-            // TRN-02: end-value clamping outside the control range.
+            // End-value clamping outside the control range.
             if (x <= points[node.PointStart].X) return y[0];
             if (x >= points[node.PointStart + n - 1].X) return y[n - 1];
 

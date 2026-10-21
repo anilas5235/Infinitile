@@ -20,10 +20,10 @@ using RenderBuffer = Engine.Scripts.Render.RenderBuffer;
 
 namespace Engine.Tests.PlayMode{
     /// <summary>
-    ///     CUL-08 (Phase C): the GPU visible-page set of <c>PageCulling.compute</c> read back for random camera poses
-    ///     equals the C# reference <see cref="FrustumCulling" /> on the live render buffers; the "all pages visible"
-    ///     fallback, the shadow list (CUL-05), per-camera state life-cycle (CUL-04), freeze (CUL-06), the allocation
-    ///     rule for the draw path (PERF-04) and a culling on/off frame-time comparison at a fixed viewpoint.
+    ///     The GPU visible-page set of <c>PageCulling.compute</c> read back for random camera poses equals the C#
+    ///     reference <see cref="FrustumCulling" /> on the live render buffers; the "all pages visible" fallback, the
+    ///     shadow list, per-camera state life-cycle, freeze, the allocation rule for the draw path and a culling
+    ///     on/off frame-time comparison at a fixed viewpoint.
     /// </summary>
     public class GpuCullingTests{
         private const int RandomPoses = 50;
@@ -203,7 +203,7 @@ namespace Engine.Tests.PlayMode{
         [UnityTest]
         [Timeout(180000)]
         public IEnumerator GpuVisibleSet_MatchesCSharpReference_For50RandomPoses(){
-            // CUL-08: for every buffer that draws, 50 random camera poses; the GPU set must equal the reference
+            // For every buffer that draws, 50 random camera poses; the GPU set must equal the reference
             VoxelWorldRenderer renderer = Renderer();
             GpuCuller culler = Culler(renderer);
             yield return WaitForPages(renderer, MinPagesForComparison, 90f);
@@ -244,7 +244,7 @@ namespace Engine.Tests.PlayMode{
         [UnityTest]
         [Timeout(180000)]
         public IEnumerator ShadowList_MatchesExtrudedReference(){
-            // CUL-05: the shadow list tests the bounds extruded along the light; compared with IsVisibleExtruded
+            // The shadow list tests the bounds extruded along the light; compared with IsVisibleExtruded
             VoxelWorldRenderer renderer = Renderer();
             GpuCuller culler = Culler(renderer);
             yield return WaitForPages(renderer, MinPagesForComparison, 90f);
@@ -278,7 +278,7 @@ namespace Engine.Tests.PlayMode{
 
         [UnityTest]
         public IEnumerator CullingDisabled_AppendsEveryPageWithPoints(){
-            // CUL-06: the fallback draws all valid pages, so the overlay and the image match the pre-Phase-C path
+            // The fallback draws all valid pages, so the overlay and the image match the unculled path
             VoxelWorldRenderer renderer = Renderer();
             GpuCuller culler = Culler(renderer);
             yield return WaitForPages(renderer, 1, 90f);
@@ -303,7 +303,7 @@ namespace Engine.Tests.PlayMode{
 
         [UnityTest]
         public IEnumerator CameraState_IsCreatedOnFirstSight_AndReleasedWhenDestroyedOrIdle(){
-            // CUL-04: per-camera buffers appear on the first BeginCamera and go away with the camera or after
+            // Per-camera buffers appear on the first BeginCamera and go away with the camera or after
             // MaxIdleFrames frames without a draw
             VoxelWorldRenderer renderer = Renderer();
             ComputeShader shader = PlayModeFixtures.GetPrivateField<ComputeShader>(Culler(renderer), "_shader");
@@ -332,7 +332,7 @@ namespace Engine.Tests.PlayMode{
 
         [UnityTest]
         public IEnumerator FreezeCulling_KeepsThePlanesOfTheLastUnfrozenFrame(){
-            // CUL-06: with freeze on, BeginCamera must not refresh the planes although the camera moved
+            // With freeze on, BeginCamera must not refresh the planes although the camera moved
             VoxelWorldRenderer renderer = Renderer();
             ComputeShader shader = PlayModeFixtures.GetPrivateField<ComputeShader>(Culler(renderer), "_shader");
             using GpuCuller culler = new(shader);
@@ -353,7 +353,7 @@ namespace Engine.Tests.PlayMode{
 
         [UnityTest]
         public IEnumerator FreezeCulling_AppliesTheGameFrustumToEveryCamera(){
-            // CUL-06: while frozen, a Scene view camera culls with the game camera's last unfrozen frustum, so the
+            // While frozen, a Scene view camera culls with the game camera's last unfrozen frustum, so the
             // Scene view shows exactly the pages the game camera kept; once unfrozen it goes back to its own
             VoxelWorldRenderer renderer = Renderer();
             ComputeShader shader = PlayModeFixtures.GetPrivateField<ComputeShader>(Culler(renderer), "_shader");
@@ -390,7 +390,7 @@ namespace Engine.Tests.PlayMode{
 
         [UnityTest]
         public IEnumerator Draw_DoesNotAllocateAfterWarmUp(){
-            // PERF-04 for the draw callback: culling and indirect draw submission per camera must be alloc-free
+            // Allocation rule for the draw callback: culling and indirect draw submission per camera must be alloc-free
             VoxelWorldRenderer renderer = Renderer();
             yield return WaitForPages(renderer, 1, 90f);
             Camera cam = GameCamera();
@@ -407,7 +407,7 @@ namespace Engine.Tests.PlayMode{
         /// <summary>
         ///     Reloads the game scene with another draw distance; the settings asset is shared in memory. Waits for
         ///     an idle scheduler first: unloading the scene while a CMeshBuildJob runs frees the registry's
-        ///     VoxelRenderDefs under the job (shutdown order between DataImporter and VoxelWorld, not Phase C).
+        ///     VoxelRenderDefs under the job (shutdown order between DataImporter and VoxelWorld, not culling).
         /// </summary>
         private static IEnumerator ReloadWorldWithDrawDistance(int drawDistance){
             float deadline = Time.realtimeSinceStartup + 300f;
@@ -432,7 +432,7 @@ namespace Engine.Tests.PlayMode{
         [UnityTest]
         [Timeout(600000)]
         public IEnumerator CullingOnVsOff_AtFixedViewpoint_ReducesVisiblePagesAndGpuTime(){
-            // CUL-08 performance comparison: same viewpoint, culling on and off, in a world with a larger draw
+            // Performance comparison: same viewpoint, culling on and off, in a world with a larger draw
             // distance so the draw is GPU-bound. The visible page count must drop and, where FrameTimingManager
             // provides GPU times, the GPU frame time must drop too; CPU frame time is logged. The world is always
             // reloaded with the default draw distance before anything is asserted (no yield in finally).

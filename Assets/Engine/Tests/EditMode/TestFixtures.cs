@@ -13,9 +13,8 @@ using UnityEngine;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     Shared hand-built inputs for the Phase S characterisation tests (TST-E01…E20). Mirrors the
-    ///     performance BenchmarkFixtures so no test depends on the Resources-based DataImporter unless it
-    ///     explicitly tests it (TST-E11).
+    ///     Shared hand-built inputs for the characterisation tests. Mirrors the performance BenchmarkFixtures so
+    ///     no test depends on the Resources-based DataImporter unless it explicitly tests it.
     /// </summary>
     internal static class TestFixtures{
         internal const ushort Air = 0;
@@ -29,9 +28,8 @@ namespace Engine.Tests.EditMode{
         internal const int Seed = 1337;
 
         internal static GeneratorConfig CreateGeneratorConfig(Allocator allocator){
-            // Phase 2 (INT-40): the only generation input is a WorldGenSettings. One Biome-first biome at offset
-            // 100 with a small amplitude keeps the surface near y = 100 for the tests that fill terrain here;
-            // block ids are patched in because no registry exists in the fixture.
+            // One Biome-first biome at offset 100 with a small amplitude keeps the surface near y = 100 for the
+            // tests that fill terrain here; block ids are patched in because no registry exists in the fixture.
             WorldGenSettings settings = ScriptableObject.CreateInstance<WorldGenSettings>();
             BiomeSet set = ScriptableObject.CreateInstance<BiomeSet>();
             Biome biome = ScriptableObject.CreateInstance<Biome>();
@@ -66,8 +64,6 @@ namespace Engine.Tests.EditMode{
                 voxels.Add("std:Ice", new Voxel.VoxelDef{ Id = Ice, MeshLayer = MeshLayer.Solid, Collision = true });
 
                 return new GeneratorConfig{
-                    WaterLevel = settings.WaterLevel,
-                    GlobalSeed = Seed,
                     Voxels = voxels,
                     WorldGen = worldGen
                 };
@@ -80,9 +76,9 @@ namespace Engine.Tests.EditMode{
         }
 
         /// <summary>
-        ///     Releases a config from <see cref="CreateGeneratorConfig" />. Since D-05, <c>GeneratorConfig.Dispose</c>
-        ///     frees only the world-gen config, because at runtime the registry owns the voxel map; here the fixture
-        ///     created it, so it frees it too.
+        ///     Releases a config from <see cref="CreateGeneratorConfig" />. <c>GeneratorConfig.Dispose</c> frees only
+        ///     the world-gen config, because at runtime the registry owns the voxel map; here the fixture created it,
+        ///     so it frees it too.
         /// </summary>
         internal static void DisposeGeneratorConfig(ref GeneratorConfig config){
             if (config.Voxels.IsCreated) config.Voxels.Dispose();
@@ -109,16 +105,14 @@ namespace Engine.Tests.EditMode{
         }
 
         /// <summary>
-        ///     Engine settings the way VoxelWorld.ConfigureSettings derives them from a draw distance; no prefab,
+        ///     Engine settings for a draw distance (load and update distance derive from it); no prefab,
         ///     no materials. Enough for ChunkManager and the job state handlers.
         /// </summary>
         internal static VoxelEngineSettings CreateSettings(int drawDistance){
             VoxelEngineSettings settings = ScriptableObject.CreateInstance<VoxelEngineSettings>();
             settings.Seed = Seed;
             settings.Chunk = new ChunkSettings{
-                DrawDistance = drawDistance,
-                LoadDistance = drawDistance + 3, // LGT-06
-                UpdateDistance = math.max(drawDistance - 2, 2)
+                DrawDistance = drawDistance
             };
             settings.Scheduler = new SchedulerSettings();
             settings.Renderer = new RendererSettings();

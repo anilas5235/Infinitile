@@ -1,5 +1,7 @@
-﻿using Engine.Scripts.Utils.Extensions;
+﻿using Engine.Scripts.Jobs.ColliderBake;
+using Engine.Scripts.Utils.Extensions;
 using UnityEngine;
+using UnityEngine.Rendering;
 using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.Behaviour{
@@ -22,7 +24,7 @@ namespace Engine.Scripts.Behaviour{
         public short PartitionId{ get; private set; }
 
         /// <summary>
-        ///     F-04: incremented whenever <see cref="ColliderMesh" /> is cleared or rewritten, so a collider bake that
+        ///     Incremented whenever <see cref="ColliderMesh" /> is cleared or rewritten, so a collider bake that
         ///     started on an older version can tell that its result is stale. Partition objects are reused per chunk,
         ///     so comparing the object alone does not detect a reclaim followed by a re-claim.
         /// </summary>
@@ -30,6 +32,10 @@ namespace Engine.Scripts.Behaviour{
 
         private void Awake(){
             ColliderMesh = new Mesh{ name = "PCollider" };
+        }
+
+        private void OnDestroy(){
+            CoreUtils.Destroy(ColliderMesh); // DestroyImmediate outside play mode (EditMode tests)
         }
 
 #if UNITY_EDITOR
@@ -49,10 +55,14 @@ namespace Engine.Scripts.Behaviour{
         public void Init(int pId){
             PartitionId = (short)pId;
             transform.localPosition = new Vector3(0, PartitionHeight * pId, 0);
+            // Unity reuses the job's Physics.BakeMesh result only if the options match; otherwise assigning the mesh
+            // cooks it again on the main thread
+            _Collider.cookingOptions = ColliderBuildJob.CookingOptions;
         }
 
         public void ApplyColliderMesh(){
-            Collider.sharedMesh = ColliderMesh;
+            // An empty mesh has no collider; the partition may still hold the one from before its last block went
+            Collider.sharedMesh = ColliderMesh.vertexCount > 0 ? ColliderMesh : null;
         }
 
         public void Clear(){
@@ -61,7 +71,7 @@ namespace Engine.Scripts.Behaviour{
             Collider.sharedMesh = null;
         }
 
-        /// <summary>F-04: called before new collider mesh data is applied to <see cref="ColliderMesh" />.</summary>
+        /// <summary>Called before new collider mesh data is applied to <see cref="ColliderMesh" />.</summary>
         public void MarkMeshChanged(){
             MeshVersion++;
         }

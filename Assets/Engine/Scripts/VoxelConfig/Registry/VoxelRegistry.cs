@@ -28,7 +28,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         private readonly Registry<Voxel.VoxelDef> _voxelRenderDefRegistry = new(100);
 
         private VoxelEngineRenderGenData _voxelEngineRenderGenData;
-        private VoxelLightTable _lightTable; // LGT-02
+        private VoxelLightTable _lightTable;
 
         public GraphicsBuffer VoxelRenderDefBuffer{ get; private set; }
 
@@ -55,7 +55,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                 Id = id,
                 MeshLayer = MeshLayer.Air,
                 Collision = false,
-                LightAttenuation = 0 // LGT-02: air is clear
+                LightAttenuation = 0 // air is clear
             });
             VoxelEngineLogger.Info<VoxelRegistry>($"Registered Voxel '{fullName}' with ID {id}");
         }
@@ -68,7 +68,6 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                 DepthFadeDistance = (half)so.depthFadeDistance,
                 Glow = (byte)so.glow,
                 Collision = so.collision,
-                // LGT-02
                 LightAttenuation = (byte)math.clamp(so.lightAttenuation, 0, VoxelLightLimits.MaxLevel),
                 LightEmission = VoxelLight.PackRgb(
                     math.clamp(so.lightEmission.x, 0, VoxelLightLimits.MaxLevel),
@@ -161,7 +160,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             for (int i = 0; i < voxelCount; i++){
                 bool registered = _voxelRenderDefRegistry.TryGet((ushort)i, out Voxel.VoxelDef def);
                 _voxelEngineRenderGenData.VoxelRenderDefs[i] = def;
-                // LGT-02: an unregistered id blocks light like a solid block
+                // An unregistered id blocks light like a solid block
                 byte attenuation = registered ? def.LightAttenuation : (byte)VoxelLightLimits.MaxLevel;
                 gpuVoxelDefData[i] = new GPUVoxelDef(def, attenuation);
                 _lightTable.Set(i, attenuation, registered ? def.LightEmission : (ushort)0);
@@ -188,7 +187,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         }
 
         /// <summary>
-        ///     LGT-02: light attenuation and emission per voxel id, read by the light jobs.
+        ///     Light attenuation and emission per voxel id, read by the light jobs.
         /// </summary>
         public VoxelLightTable GetLightTable(){
             return _lightTable;
@@ -233,21 +232,27 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             return NameRegistry.GetAllEntries();
         }
 
+        /// <summary>
+        ///     Releases what was created; an import that threw part way leaves the rest unset.
+        /// </summary>
         public override void Dispose(){
             if (_voxelEngineRenderGenData.VoxelRenderDefs.IsCreated)
                 _voxelEngineRenderGenData.VoxelRenderDefs.Dispose();
             _lightTable.Dispose();
-            VoxelRenderDefBuffer.Dispose();
-            QuadBuffer.Dispose();
-            QuadTexPairBuffer.Dispose();
-            VoxelMap.Dispose();
+            VoxelRenderDefBuffer?.Dispose();
+            QuadBuffer?.Dispose();
+            QuadTexPairBuffer?.Dispose();
+            if (VoxelMap.IsCreated) VoxelMap.Dispose();
+            _solidTexRegistry.DestroyArray();
+            _transparentTexRegistry.DestroyArray();
+            _foliageTexRegistry.DestroyArray();
         }
 
         //TODO: Compacting?
         private struct GPUVoxelDef{
             private uint MeshLayer;
             private uint AlwaysRenderAllFaces;
-            private uint DepthFadeDistance; // F-19: fp16 bits in the low half; HLSL half is 32-bit under fxc
+            private uint DepthFadeDistance; // fp16 bits in the low half; HLSL half is 32-bit under fxc
             private uint Glow;
             private uint Collision;
             private uint2 shape_quad_indices_alwaysRender;
@@ -257,12 +262,12 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             private uint2 shape_quad_indices_down;
             private uint2 shape_quad_indices_front;
             private uint2 shape_quad_indices_back;
-            private uint LightAttenuation; // LGT-09: the smooth light skips opaque (15) voxels
+            private uint LightAttenuation; // the smooth light skips opaque (15) voxels
 
             public GPUVoxelDef(Voxel.VoxelDef def, byte lightAttenuation){
                 MeshLayer = (uint)def.MeshLayer;
                 AlwaysRenderAllFaces = def.AlwaysRenderAllFaces ? 1u : 0u;
-                DepthFadeDistance = def.DepthFadeDistance.value; // F-19: read with f16tof32 on the GPU
+                DepthFadeDistance = def.DepthFadeDistance.value; // read with f16tof32 on the GPU
                 Glow = def.Glow;
                 Collision = def.Collision ? 1u : 0u;
                 shape_quad_indices_alwaysRender = def.Always;

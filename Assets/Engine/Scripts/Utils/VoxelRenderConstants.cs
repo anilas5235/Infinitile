@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using Engine.Scripts.VoxelConfig.Data.Mesh;
+using UnityEngine;
 using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.Utils{
@@ -10,6 +11,38 @@ namespace Engine.Scripts.Utils{
         public const int RenderBufferSize = PointsPerPage * PagesPerBuffer;
         public const int PointsPerPage = 256;
         public const int PagesPerBuffer = 1024;
+
+        #region Mirrored in Shaders/Urp/VoxelGpuConstants.hlsl (GpuConstantsTests compares them)
+
+        /// <summary>Flat chunk index x * ChunkDepth * ChunkHeight + z * ChunkHeight + y, as shifts.</summary>
+        internal const int ChunkIndexShiftX = 13;
+
+        /// <inheritdoc cref="ChunkIndexShiftX" />
+        internal const int ChunkIndexShiftZ = 8;
+
+        /// <summary>Elements per interval store page as a shift (<see cref="Render.IntervalPages.PageSize" />).</summary>
+        internal const int CompPageShift = 9;
+
+        internal const int CompPageMask = (1 << CompPageShift) - 1;
+
+        internal const int MeshLayerSolid = (int)MeshLayer.Solid;
+
+        /// <summary>Threads per group of the BuildPrep kernels, each decompressing a run of intervals.</summary>
+        internal const int PrepThreads = 64;
+
+        internal const int PrepIntervalsPerThread = 8;
+
+        /// <summary>Threads per group and axis of BuildPoints; a partition is dispatched as a cube of groups.</summary>
+        internal const int BuildPointsThreads = 4;
+
+        internal const int CopyIntervalsThreads = 64;
+
+        /// <summary>Pages per group and mesh layer of CopyPoints.</summary>
+        internal const int CopyPointsThreads = 8;
+
+        internal const int CullThreads = 128;
+
+        #endregion
 
         public static readonly int TexturesNameID = Shader.PropertyToID("_Textures");
         public static readonly int QuadBufferNameID = Shader.PropertyToID("_Quad_buffer");
@@ -34,7 +67,7 @@ namespace Engine.Scripts.Utils{
 
         public static readonly int CompChunkNameID = Shader.PropertyToID("_CompChunk");
         public static readonly int UnCompChunkNameID = Shader.PropertyToID("_UnCompChunk");
-        public static readonly int CompPagesNameID = Shader.PropertyToID("_CompPages"); // §20.1
+        public static readonly int CompPagesNameID = Shader.PropertyToID("_CompPages");
         public static readonly int CompPagesOffsetNameID = Shader.PropertyToID("_CompPagesOffset");
         public static readonly int CopySourceNameID = Shader.PropertyToID("_CopySource");
         public static readonly int CopyTargetNameID = Shader.PropertyToID("_CopyTarget");
@@ -51,7 +84,7 @@ namespace Engine.Scripts.Utils{
         public static readonly int PartitionIndexNameID = Shader.PropertyToID("_PartitionIndex");
         public static readonly int PointCapacityNameID = Shader.PropertyToID("_PointCapacity");
 
-        // LGT-10: lighting globals of the voxel shaders
+        // Lighting globals of the voxel shaders
         public static readonly int VoxelSkyBrightnessNameID = Shader.PropertyToID("_VoxelSkyBrightness");
         public static readonly int VoxelSkyTintNameID = Shader.PropertyToID("_VoxelSkyTint");
         public static readonly int VoxelAmbientNameID = Shader.PropertyToID("_VoxelAmbient");
@@ -76,7 +109,7 @@ namespace Engine.Scripts.Utils{
         public static readonly int PointsPerPageNameID = Shader.PropertyToID("_PointsPerPage");
         public static readonly int PagesPerBufferNameID = Shader.PropertyToID("_PagesPerBuffer");
 
-        // Phase C: GPU culling (PageCulling.compute and the vertex pulling in VoxelShaderCommon.hlsl)
+        // GPU culling (PageCulling.compute and the vertex pulling in VoxelShaderCommon.hlsl)
         public static readonly int PageBoundsNameID = Shader.PropertyToID("_PageBounds");
         public static readonly int VisiblePagesNameID = Shader.PropertyToID("_VisiblePages");
         public static readonly int FrustumPlanesNameID = Shader.PropertyToID("_FrustumPlanes");

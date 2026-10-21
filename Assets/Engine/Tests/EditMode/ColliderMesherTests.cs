@@ -14,12 +14,11 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     TST-E18: greedy collider mesher (CMeshBuildJob) on hand-built chunks. The scheduler race tests (F-01)
-    ///     live in the PlayMode assembly because the chunk prefab needs a live Awake.
+    ///     Greedy collider mesher (CMeshBuildJob) on hand-built chunks. The scheduler race tests live in the
+    ///     PlayMode assembly because the chunk prefab needs a live Awake.
     /// </summary>
     public class ColliderMesherTests{
         private NativeParallelHashMap<int2, ChunkVoxelData> _chunks;
-        private NativeParallelHashMap<int2, ChunkLightData> _lights;
         private NativeArray<VertexAttributeDescriptor> _vertexParams;
         private VoxelEngineRenderGenData _renderGenData;
         private NativeList<int3> _jobs;
@@ -30,7 +29,6 @@ namespace Engine.Tests.EditMode{
         [SetUp]
         public void SetUp(){
             _chunks = new NativeParallelHashMap<int2, ChunkVoxelData>(16, Allocator.Persistent);
-            _lights = new NativeParallelHashMap<int2, ChunkLightData>(1, Allocator.Persistent);
             _vertexParams = new NativeArray<VertexAttributeDescriptor>(2, Allocator.Persistent){
                 [0] = new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float16, 4),
                 [1] = new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float16, 4)
@@ -50,7 +48,6 @@ namespace Engine.Tests.EditMode{
             _vertexParams.Dispose();
             foreach (KeyValue<int2, ChunkVoxelData> kv in _chunks) kv.Value.Dispose();
             _chunks.Dispose();
-            _lights.Dispose();
         }
 
         #region helpers
@@ -105,7 +102,7 @@ namespace Engine.Tests.EditMode{
 
             CMeshBuildJob job = new(){
                 ColliderVertexParams = _vertexParams,
-                Accessor = new ChunkAccessor(_chunks.AsReadOnly(), _lights.AsReadOnly()),
+                Accessor = new ChunkAccessor(_chunks.AsReadOnly()),
                 Jobs = _jobs,
                 RenderGenData = _renderGenData,
                 Results = _results.AsParallelWriter(),
@@ -175,7 +172,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void UpperPartitionInNegativeChunk_MeshesLocalVoxel(){
-            // F-14: partition-local voxel lookups must map to chunk-local coordinates for any partition y
+            // Partition-local voxel lookups must map to chunk-local coordinates for any partition y
             // and for negative chunk coordinates.
             int2 chunkPos = new(-1, -1);
             const int partitionY = 3;
@@ -196,7 +193,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void Checkerboard_DoesNotOverflow16BitIndices(){
-            // F-15: a checkerboard partition has 16384 voxels * 24 vertices; UInt16 indices wrap above 65535.
+            // A checkerboard partition has 16384 voxels * 24 vertices; UInt16 indices wrap above 65535.
             AddAirNeighbours(int2.zero);
             AddChunk(int2.zero, p => p.y < PartitionHeight && ((p.x + p.y + p.z) & 1) == 0
                 ? TestFixtures.Stone

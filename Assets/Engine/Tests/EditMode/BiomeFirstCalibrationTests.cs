@@ -13,9 +13,9 @@ using Object = UnityEngine.Object;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     BIO-20: the calibration helper suggests Jaggedness_b = mean J, Offset_b = mean H − Jaggedness_b · mean P and
-    ///     HeightAmplitude_b
-    ///     from the detail residual of the Terrain-first reference, writes nothing and restores the settings.
+    ///     The calibration helper suggests Jaggedness_b = mean J, Offset_b = mean H − Jaggedness_b · mean P and
+    ///     HeightAmplitude_b from the detail residual of the Terrain-first reference, writes nothing and restores the
+    ///     settings.
     /// </summary>
     public class BiomeFirstCalibrationTests{
         private const int Seed = 1234;
@@ -104,7 +104,7 @@ namespace Engine.Tests.EditMode{
 
             Assert.That(total, Is.GreaterThan(0).And.LessThanOrEqualTo(Size * Size));
 
-            // Writes nothing (BIO-20).
+            // Writes nothing.
             CollectionAssert.AreEqual(offsets, Snapshot(b => b.HeightOffset));
             CollectionAssert.AreEqual(amps, Snapshot(b => b.HeightAmplitude));
             CollectionAssert.AreEqual(jags, Snapshot(b => b.Jaggedness));

@@ -13,7 +13,7 @@ namespace Engine.Scripts.Utils.Collections{
     [BurstCompile]
     public struct UnsafeIntervalList<T> where T : unmanaged, IEquatable<T>{
         /// <summary>
-        ///     Internal node representing an interval with an inclusive cumulative end position.
+        ///     Internal node representing an interval with an exclusive cumulative end position.
         /// </summary>
         internal struct Node{
             public T Value;
@@ -36,6 +36,11 @@ namespace Engine.Scripts.Utils.Collections{
         ///     Current number of compressed nodes.
         /// </summary>
         public int CompressedLength => _internal.Length;
+
+        /// <summary>
+        ///     Number of nodes allocated.
+        /// </summary>
+        internal int Capacity => _internal.Capacity;
 
         /// <summary>
         ///     Creates a new compressed list with the specified initial capacity.
@@ -69,10 +74,10 @@ namespace Engine.Scripts.Utils.Collections{
         /// <param name="value">The value to store.</param>
         /// <param name="count">The number of repetitions.</param>
         public void AddInterval(T value, int count){
-            if (count <= 0) return; // F-13: an empty run would be a zero-length node
+            if (count <= 0) return; // an empty run would be a zero-length node
             Length += count;
 
-            // F-13: extend the last run instead of adding a second node with the same value
+            // Extend the last run instead of adding a second node with the same value
             if (_internal.Length > 0 && _internal[_internal.Length - 1].Value.Equals(value)){
                 Node last = _internal[_internal.Length - 1];
                 last.Count = Length;
@@ -149,7 +154,7 @@ namespace Engine.Scripts.Utils.Collections{
                 node.Count--;
                 _internal[nodeIndex] = node;
 
-                // F-12: the node is empty when its end equals the previous end (0 for the first node), not only
+                // The node is empty when its end equals the previous end (0 for the first node), not only
                 // when a left node exists. [A,Y] at index 0 -> [Y,Y]
                 int previousEnd = leftNodeIndex >= 0 ? leftNode.Count : 0;
                 if (node.Count == previousEnd) _internal.RemoveRange(nodeIndex, 1); // [X,A,Y] -> [X,Y,Y]
@@ -301,7 +306,7 @@ namespace Engine.Scripts.Utils.Collections{
         }
 
         /// <summary>
-        ///     LGT-04: a compressed node by index (value and exclusive end of its run), for run-wise readers.
+        ///     A compressed node by index (value and exclusive end of its run), for run-wise readers.
         /// </summary>
         internal Node NodeAt(int nodeIndex){
             return _internal[nodeIndex];

@@ -6,7 +6,7 @@ using Unity.Mathematics;
 using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>TST-E06: ChunkAccessor with a hand-built 3-chunk neighbourhood around the origin.</summary>
+    /// <summary>ChunkAccessor with a hand-built 3-chunk neighbourhood around the origin.</summary>
     public class ChunkAccessorTests{
         private const ushort Marker = 77;
         private const ushort YMarker = 66;
@@ -15,12 +15,10 @@ namespace Engine.Tests.EditMode{
 
         private ChunkAccessor _accessor;
         private NativeParallelHashMap<int2, ChunkVoxelData> _chunks;
-        private NativeParallelHashMap<int2, ChunkLightData> _lights;
 
         [SetUp]
         public void SetUp(){
             _chunks = new NativeParallelHashMap<int2, ChunkVoxelData>(8, Allocator.Persistent);
-            _lights = new NativeParallelHashMap<int2, ChunkLightData>(8, Allocator.Persistent);
 
             ChunkVoxelData origin = TestFixtures.CreateUniformChunk(TestFixtures.Grass);
             origin.SetVoxel(YMarkerLocal, YMarker); // modify before the copy goes into the map
@@ -35,19 +33,13 @@ namespace Engine.Tests.EditMode{
             _chunks.Add(new int2(0, -1), TestFixtures.CreateUniformChunk(TestFixtures.Water));
             _chunks.Add(new int2(-1, -1), TestFixtures.CreateUniformChunk(TestFixtures.Ice));
 
-            ChunkLightData originLight = new(16);
-            originLight.SetLight(new int3(31, 40, 5), VoxelLight.Pack(7, 1, 2, 3));
-            _lights.Add(new int2(0, 0), originLight);
-
-            _accessor = new ChunkAccessor(_chunks.AsReadOnly(), _lights.AsReadOnly());
+            _accessor = new ChunkAccessor(_chunks.AsReadOnly());
         }
 
         [TearDown]
         public void TearDown(){
             foreach (KeyValue<int2, ChunkVoxelData> kv in _chunks) kv.Value.Dispose();
-            foreach (KeyValue<int2, ChunkLightData> kv in _lights) kv.Value.Dispose();
             _chunks.Dispose();
-            _lights.Dispose();
         }
 
         private ushort Get(int3 partition, int3 voxel){
@@ -113,21 +105,6 @@ namespace Engine.Tests.EditMode{
             Assert.IsTrue(_accessor.TryGetChunk(new int2(1, 0), out ChunkVoxelData chunk));
             Assert.AreEqual(TestFixtures.Dirt, chunk.GetVoxel(new int3(1, 1, 1)));
             Assert.IsFalse(_accessor.TryGetChunk(new int2(2, 2), out _));
-        }
-
-        [Test]
-        public void Lights_ResolveAndFallBack(){
-            Assert.IsTrue(_accessor.TryGetLightData(new int2(0, 0), out ChunkLightData light));
-            Assert.AreEqual(0, light.GetLight(new int3(5, 5, 5)));
-            Assert.IsFalse(_accessor.TryGetLightData(new int2(1, 0), out _), "chunk without light data");
-            Assert.AreEqual(0, _accessor.GetLightInPartition(new int3(0, 0, 0), new int3(5, 5, 5)));
-            Assert.AreEqual(VoxelLight.Pack(7, 1, 2, 3), _accessor.GetLightInPartition(new int3(0, 1, 0),
-                new int3(31, 8, 5)), "partition 1 offsets y by 32");
-            Assert.AreEqual(VoxelLight.Pack(7, 1, 2, 3), _accessor.GetLightInPartition(new int3(1, 0, 0),
-                new int3(-1, 40, 5)), "x underflow into chunk (0,0)");
-            Assert.AreEqual(0, _accessor.GetLightInPartition(new int3(0, 7, 0), new int3(5, 32, 5)), "above the world");
-            Assert.AreEqual(0, _accessor.GetLightInPartition(new int3(0, 0, 0), new int3(32, 5, 5)),
-                "chunk (1,0) has no light data");
         }
 
         [Test]

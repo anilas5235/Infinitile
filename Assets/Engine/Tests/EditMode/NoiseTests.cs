@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Reflection;
-using Engine.Scripts.Noise;
 using Engine.Scripts.WorldGen.Core;
+using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
 using Unity.Collections;
@@ -9,7 +9,7 @@ using Unity.Mathematics;
 using UnityEngine;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>TST-E10 (NoiseProfile, WarpedNoiseLayer) and TST-E14 (warp channels F-06; seeds F-02 via GEN-05).</summary>
+    /// <summary>NoiseProfile and WarpedNoiseLayer: seeding, salts, redistribution and warp channels.</summary>
     public class NoiseTests{
         private readonly List<NoiseProfile> _profiles = new();
         private readonly List<WarpedNoiseLayer> _layers = new();
@@ -65,7 +65,7 @@ namespace Engine.Tests.EditMode{
             return (NoiseProfile)info.GetValue(layer);
         }
 
-        #region TST-E10
+        #region NoiseProfile and WarpedNoiseLayer
 
         [Test]
         public void NoiseProfile_OutputIsInUnitRange(){
@@ -156,7 +156,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void WarpedNoiseLayer_WarpChannelsDiffer(){
-            // F-06 intent at struct level: the Y channel has its own salt, decorrelating the X and Y warp channels (GEN-05).
+            // The Y channel has its own salt, decorrelating the X and Y warp channels.
             WarpedNoiseLayer layer = Layer(7, null);
             NoiseProfile warpX = WarpProfile(layer, "_warpX");
             NoiseProfile warpY = WarpProfile(layer, "_warpY");
@@ -168,7 +168,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void NoiseProfile_DifferentSaltsGiveDifferentFields(){
-            // GEN-05: two profiles with identical seed and shape but different salts are different fields.
+            // Two profiles with identical seed and shape but different salts are different fields.
             NoiseProfile a = Profile(42);
             NoiseProfile b = Profile(42, salt: HashSalts.HumidityNoise);
             int same = 0, total = 0;
@@ -182,7 +182,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void NoiseProfile_HashedOffsetIsBounded(){
-            // GEN-05: |o| <= 10^4 for every seed and salt.
+            // |o| <= 10^4 for every seed and salt.
             for (uint seed = 0; seed < 2000; seed += 7){
                 float2 offset = NoiseProfile.HashedOffset(seed, HashSalts.TemperatureNoise);
                 Assert.LessOrEqual(math.abs(offset.x), NoiseProfile.MaxOffset);
@@ -195,12 +195,12 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
-        #region TST-E14
+        #region Warp channels
 
         [Test]
         public void WorldGenSettings_ContinentalWarpChannelsDiffer(){
-            // F-06: warp X and warp Y must be different noise fields (own salts since GEN-05), built the way
-            // WorldGenSettings.ToConfig builds the continental layer.
+            // Warp X and warp Y must be different noise fields (own salts), built the way WorldGenSettings.ToConfig
+            // builds the continental layer.
             WarpedNoiseLayer layer = new(_settings.continentalLayer.ToStruct(TestFixtures.Seed,
                 HashSalts.ContinentalNoise, HashSalts.ContinentalWarpX, HashSalts.ContinentalWarpY));
             _layers.Add(layer);

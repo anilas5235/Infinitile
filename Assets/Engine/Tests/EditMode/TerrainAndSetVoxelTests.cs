@@ -1,8 +1,8 @@
-using Engine.Scripts.Components;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils.Extensions;
+using Engine.Scripts.World;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -10,7 +10,7 @@ using static Engine.Scripts.Utils.VoxelConstants;
 using Object = UnityEngine.Object;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>TST-E15: FillTerrain ice placement (F-07) and ChunkManager.SetVoxel Y bounds (F-08).</summary>
+    /// <summary>FillTerrain ice placement and ChunkManager.SetVoxel Y bounds.</summary>
     public class TerrainAndSetVoxelTests{
         private static readonly int2 WarmColumn = new(7, 9);
         private static readonly int2 ColdColumn = new(3, 4);
@@ -67,12 +67,12 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void FillTerrain_LayersFollowColumnHeight(){
             PrepareColumns();
-            int water = _config.WaterLevel;
+            int water = _config.WorldGen.WaterLevel;
             Assert.AreEqual(TestFixtures.Stone, VoxelAt(WarmColumn, 0));
             Assert.AreEqual(TestFixtures.Stone, VoxelAt(WarmColumn, 95));
             Assert.AreEqual(TestFixtures.Dirt, VoxelAt(WarmColumn, 96));
             Assert.AreEqual(TestFixtures.Dirt, VoxelAt(WarmColumn, 99));
-            Assert.AreEqual(TestFixtures.Grass, VoxelAt(WarmColumn, 100), "the top block sits at h_int even under water (GEN-14)");
+            Assert.AreEqual(TestFixtures.Grass, VoxelAt(WarmColumn, 100), "the top block sits at h_int even under water");
             Assert.AreEqual(TestFixtures.Water, VoxelAt(WarmColumn, water - 1));
             Assert.AreEqual(TestFixtures.Air, VoxelAt(WarmColumn, water));
             Assert.AreEqual(TestFixtures.Air, VoxelAt(WarmColumn, ChunkHeight - 1));
@@ -91,10 +91,9 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void FillTerrain_ColdColumnFreezesWaterSurface(){
-            // F-07: the ice check runs at y == waterLevel where the voxel is already air, so ice never appears.
-            // The water surface is the topmost water voxel at waterLevel - 1.
+            // The water surface is the topmost water voxel at waterLevel - 1 (at waterLevel the voxel is already air).
             PrepareColumns();
-            int water = _config.WaterLevel;
+            int water = _config.WorldGen.WaterLevel;
             Assert.AreEqual(TestFixtures.Water, VoxelAt(ColdColumn, water - 2), "below the surface stays water");
             Assert.AreEqual(TestFixtures.Air, VoxelAt(ColdColumn, water), "above the surface stays air");
             Assert.AreEqual(TestFixtures.Ice, VoxelAt(ColdColumn, water - 1), "cold water surface must be ice");
@@ -124,7 +123,7 @@ namespace Engine.Tests.EditMode{
         [TestCase(ChunkHeight)]
         [TestCase(-1)]
         public void SetVoxel_OutsideChunkHeight_IsRejected(int y){
-            // F-08: SetVoxel has no Y check; y = 256 wraps into the next column and y = -1 into the previous one.
+            // Without a Y check, y = 256 would wrap into the next column and y = -1 into the previous one.
             CreateManagerWithStoneChunk();
             bool result = true;
             Assert.DoesNotThrow(() => result = _manager.SetVoxel(TestFixtures.Grass, new int3(5, y, 5)));

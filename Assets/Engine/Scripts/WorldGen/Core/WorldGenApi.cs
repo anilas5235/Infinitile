@@ -8,7 +8,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Core{
-    /// <summary>A region request (GEN-17): settings snapshot with seed, origin and size in columns.</summary>
+    /// <summary>A region request: settings snapshot with seed, origin and size in columns.</summary>
     public struct WorldGenRequest{
         /// <summary>Built by <c>WorldGenSettings.ToConfig</c>; must stay alive until the returned handle completes.</summary>
         public WorldGenConfig Config;
@@ -16,17 +16,17 @@ namespace Engine.Scripts.WorldGen.Core{
         /// <summary>World column (x, z) of element 0.</summary>
         public int2 Origin;
 
-        /// <summary>Samples along x and z. Element [j × Size.x + i] = column (Origin.x + i·Stride, Origin.y + j·Stride) (EXP-01).</summary>
+        /// <summary>Samples along x and z. Element [j × Size.x + i] = column (Origin.x + i·Stride, Origin.y + j·Stride).</summary>
         public int2 Size;
 
-        /// <summary>Column step between samples; 0 or 1 = every column (EXP-01). Larger values give a zoomed-out preview.</summary>
+        /// <summary>Column step between samples; 0 or 1 = every column. Larger values give a zoomed-out preview.</summary>
         public int Stride;
 
         public int ColumnCount => Size.x * Size.y;
     }
 
     /// <summary>
-    ///     Caller-allocated outputs for <see cref="WorldGenApi.SampleRegion" /> (GEN-17). Any subset may be created;
+    ///     Caller-allocated outputs for <see cref="WorldGenApi.SampleRegion" />. Any subset may be created;
     ///     the others are left default and skipped. Every created array must hold at least
     ///     <see cref="WorldGenRequest.ColumnCount" /> elements. The caller owns and disposes them.
     /// </summary>
@@ -58,24 +58,23 @@ namespace Engine.Scripts.WorldGen.Core{
         /// <summary>Biome whose rule produced the flora, -1 = none.</summary>
         public NativeArray<int> FloraSource;
 
-        /// <summary>1 where the height clamp engaged (GEN-12), else 0.</summary>
+        /// <summary>1 where the height clamp engaged, else 0.</summary>
         public NativeArray<byte> Clamped;
 
-        /// <summary>Normalised height h (TRN-10).</summary>
+        /// <summary>Normalised height h.</summary>
         public NativeArray<float> NormalizedHeight;
 
-        /// <summary>Terrain-first (Offset, Amp, J) per column (TRN-06 preview); zero in Biome-first.</summary>
+        /// <summary>Terrain-first (Offset, Amp, J) per column; zero in Biome-first.</summary>
         public NativeArray<float3> TerrainParams;
     }
 
     /// <summary>
-    ///     Public region API of the world generator (GEN-17). Fills the requested <see cref="RegionBuffers" /> by
+    ///     Public region API of the world generator. Fills the requested <see cref="RegionBuffers" /> by
     ///     running <see cref="WorldSampler.SampleColumn" /> per column in a Burst job, tile by tile with a blend
-    ///     lattice per tile for the spatial methods. Generic engine functionality,
-    ///     used by the preview window and later by Part II; it contains no research code (R4).
+    ///     lattice per tile for the spatial methods. Generic engine functionality without research code.
     /// </summary>
     public static class WorldGenApi{
-        /// <summary>Samples per tile edge: one job index per tile, each with its own blend lattice (BLD-11).</summary>
+        /// <summary>Samples per tile edge: one job index per tile, each with its own blend lattice.</summary>
         private const int TileSize = 64;
 
         /// <summary>
@@ -173,9 +172,9 @@ namespace Engine.Scripts.WorldGen.Core{
         }
 
         /// <summary>
-        ///     One tile of TileSize² samples per index. Spatial blend methods get a padded lattice per tile (BLD-11),
-        ///     the same cache the chunk job uses, so the region equals the chunks and the pure sampler (TST-02).
-        ///     GEN-16: synchronous compile, strict float mode.
+        ///     One tile of TileSize² samples per index. Spatial blend methods get a padded lattice per tile, the same
+        ///     cache the chunk job uses, so the region equals the chunks and the pure sampler. Strict float mode keeps
+        ///     results deterministic.
         /// </summary>
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
         private struct SampleRegionJob : IJobParallelFor{
@@ -218,7 +217,7 @@ namespace Engine.Scripts.WorldGen.Core{
             public void Execute(int tile){
                 int2 first = new int2(tile % TilesX, tile / TilesX) * TileSize;
                 int2 last = math.min(first + TileSize, Size) - 1;
-                // VEG-05: multi-block candidates sample neighbours up to FloraPadding beyond the tile.
+                // Multi-block flora candidates sample neighbours up to FloraPadding beyond the tile.
                 int padding = Config.FloraPadding;
                 BlendCache cache = BlendCache.Build(Config, Origin + first * Stride - padding, Origin + last * Stride + padding,
                     Stride, Allocator.Temp);

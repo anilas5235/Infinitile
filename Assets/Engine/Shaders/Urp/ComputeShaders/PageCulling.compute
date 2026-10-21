@@ -1,12 +1,13 @@
 #pragma kernel CullPages
 #pragma kernel WriteArgs
 
+#include "../VoxelGpuConstants.hlsl"
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Phase C (CUL-02): per camera and RenderBuffer, one thread per page. A page is appended to _VisiblePages when it
-// holds points and its AABB (optionally extruded along the light for the shadow list, CUL-05) touches the camera
-// frustum. WriteArgs then turns the appended count (copied into _ArgsBuffer[4] by GraphicsBuffer.CopyCount) into the
-// indirect vertex count: visiblePages × points per page × 6 vertices. The vertex shader pulls points through the
-// visible page list (CUL-03), so no per-point index buffer exists any more.
+// Per camera and RenderBuffer, one thread per page. A page is appended to _VisiblePages when it holds points and
+// its AABB (optionally extruded along the light for the shadow list) touches the camera frustum. WriteArgs then
+// turns the appended count (copied into _ArgsBuffer[4] by GraphicsBuffer.CopyCount) into the indirect vertex count:
+// visiblePages × points per page × 6 vertices. The vertex shader pulls points through the visible page list.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Mirrors Engine.Scripts.Render.PageBounds (24 bytes)
@@ -17,17 +18,17 @@ struct PageBounds
 };
 
 StructuredBuffer<uint> _CountsPerPage; // points per page, 0 = free page
-StructuredBuffer<PageBounds> _PageBounds; // CUL-01: AABB per page from the owning partition
+StructuredBuffer<PageBounds> _PageBounds; // AABB per page from the owning partition
 AppendStructuredBuffer<uint> _VisiblePages;
 RWStructuredBuffer<uint> _ArgsBuffer; // [0] vertex count, [1] instance count, [2] start vertex, [3] start instance, [4] visible pages
 
 float4 _FrustumPlanes[6]; // (normal, distance), normals point inward (GeometryUtility.CalculateFrustumPlanes)
-float3 _ShadowExtrusion; // CUL-05: light direction × shadow distance, 0 for the main pass
+float3 _ShadowExtrusion; // light direction × shadow distance, 0 for the main pass
 uint _PagesPerBuffer;
 uint _PointsPerPage;
-uint _CullingEnabled; // CUL-06: 0 = every page with points is visible
+uint _CullingEnabled; // 0 = every page with points is visible
 
-// Positive-vertex test, same as FrustumCulling.IsVisible on the C# side (CUL-04).
+// Positive-vertex test, same as FrustumCulling.IsVisible on the C# side.
 bool intersects_frustum(float3 boundsMin, float3 boundsMax)
 {
     [unroll]
@@ -43,7 +44,7 @@ bool intersects_frustum(float3 boundsMin, float3 boundsMax)
     return true;
 }
 
-[numthreads(128, 1, 1)]
+[numthreads(CULL_THREADS, 1, 1)]
 void CullPages(uint3 id : SV_DispatchThreadID)
 {
     uint page = id.x;
@@ -53,7 +54,7 @@ void CullPages(uint3 id : SV_DispatchThreadID)
     if (_CullingEnabled != 0)
     {
         PageBounds b = _PageBounds[page];
-        // Extruded box (CUL-05): every position that can shadow the page lies inside it. Zero extrusion = the page.
+        // Extruded box: every position that can shadow the page lies inside it. Zero extrusion = the page.
         float3 boundsMin = min(b.boundsMin, b.boundsMin + _ShadowExtrusion);
         float3 boundsMax = max(b.boundsMax, b.boundsMax + _ShadowExtrusion);
         if (!intersects_frustum(boundsMin, boundsMax)) return;

@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace Engine.Editor.WorldGen{
     /// <summary>
-    ///     INT-21: difference views of two configurations sampled over the same region and seed. Height views show
+    ///     Difference views of two configurations sampled over the same region and seed. Height views show
     ///     the signed difference B − A (red = B higher, blue = B lower, scaled to the largest difference); categorical
     ///     views (biome classes, surface source, flora) show a mismatch mask over the dimmed A view; any other view
     ///     falls back to the per-channel pixel difference. Reads sampled buffers only; no sampler call.

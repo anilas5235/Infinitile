@@ -31,7 +31,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         public List<SplinePointData> Points = new();
     }
 
-    /// <summary>One node of the flattened trees (<see cref="TerrainSplineSet.Flatten" />), for the TRN-06 plots.</summary>
+    /// <summary>One node of the flattened trees (<see cref="TerrainSplineSet.Flatten" />), for the spline plots.</summary>
     public struct FlatSpline{
         /// <summary>Root tree: Offset, Amp or Jaggedness.</summary>
         public string Tree;
@@ -47,9 +47,9 @@ namespace Engine.Scripts.WorldGen.Settings{
     }
 
     /// <summary>
-    ///     Terrain-first spline set (TRN-05): Offset, Amp and J as nested splines over (C, E, PV). The asset stores
+    ///     Terrain-first spline set: Offset, Amp and J as nested splines over (C, E, PV). The asset stores
     ///     the trees as a flat list (Unity cannot serialise recursive classes); authoring happens through the nested
-    ///     JSON form (<see cref="ToJson" /> / <see cref="FromJson" />, buttons on the inspector) or the §19.1
+    ///     JSON form (<see cref="ToJson" /> / <see cref="FromJson" />, buttons on the inspector) or the
     ///     placeholders (<see cref="ResetToPlaceholders" />). <see cref="Flatten" /> builds the Burst arrays.
     ///     <para>
     ///         JSON form: each spline is an object <c>{"Axis": "C"|"E"|"PV", "Interpolation": "MonotoneCubic"|"Linear",
@@ -62,9 +62,9 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// <summary>Nesting bound of <see cref="Flatten" />; deeper trees are reported as a cycle or runaway nesting.</summary>
         public const int MaxDepth = 8;
 
-        /// <summary>The §19.1 placeholder splines in the JSON form (heights in blocks, water level 124).</summary>
+        /// <summary>The placeholder splines in the JSON form (heights in blocks, water level 124).</summary>
         public const string PlaceholderJson = @"{
-  ""Notes"": ""Placeholder Terrain-first splines (WorldGenSpec §19.1). Only to get a plausible starting world; replace them."",
+  ""Notes"": ""Placeholder Terrain-first splines. Only to get a plausible starting world; replace them."",
   ""Offset"": {""Axis"": ""C"", ""Points"": [
     {""X"": 0.0, ""Value"": 70},
     {""X"": 0.3, ""Value"": 110},
@@ -99,7 +99,7 @@ namespace Engine.Scripts.WorldGen.Settings{
 
         public int AmpRoot = -1;
 
-        [Tooltip("J: own extension of the Minecraft offset/factor splines (TRN-04).")]
+        [Tooltip("J: own extension of the Minecraft offset/factor splines.")]
         public int JaggednessRoot = -1;
 
         [Tooltip("Flat spline list; edit through JSON import/export or the placeholders button.")]
@@ -188,7 +188,7 @@ namespace Engine.Scripts.WorldGen.Settings{
             yield return ("Jaggedness", JaggednessRoot);
         }
 
-        // --- Burst mirror (INT-03) -------------------------------------------------------------------------------
+        // --- Burst mirror ------------------------------------------------------------------------------------------
 
         /// <summary>
         ///     Flattens the three trees into pre-ordered node/point arrays (children after parents, as
@@ -196,7 +196,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         ///     <see cref="Validate" /> reports problems.
         /// </summary>
         /// <param name="order">
-        ///     Optional: filled with one entry per flattened node, in node order (TRN-06 plots label and evaluate
+        ///     Optional: filled with one entry per flattened node, in node order (the spline plots label and evaluate
         ///     every spline level through it).
         /// </param>
         public void Flatten(Allocator allocator, out NativeArray<SplineNode> nodes, out NativeArray<SplinePoint> points,
@@ -243,7 +243,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 points[pointStart + k] = flat;
             }
 
-            // A node's subtree is contiguous in pre-order, so it can be evaluated on its own (TRN-06).
+            // A node's subtree is contiguous in pre-order, so it can be evaluated on its own.
             if (order != null){
                 FlatSpline entry = order[nodeIndex];
                 entry.Subtree = new SplineRoot{ NodeStart = nodeIndex, NodeCount = nodes.Count - nodeIndex };
@@ -253,9 +253,9 @@ namespace Engine.Scripts.WorldGen.Settings{
             return nodeIndex;
         }
 
-        // --- JSON (TRN-05) -----------------------------------------------------------------------------------------
+        // --- JSON --------------------------------------------------------------------------------------------------
 
-        /// <summary>Nested tree of the whole set for <see cref="CanonicalJson" /> (also inlined into the settings manifest, INT-02).</summary>
+        /// <summary>Nested tree of the whole set for <see cref="CanonicalJson" /> (also inlined into the settings manifest).</summary>
         public Dictionary<string, object> ToTree(){
             return new Dictionary<string, object>{
                 ["Name"] = name,
@@ -308,7 +308,7 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (root.TryGetValue("Notes", out object notes) && notes is string text) Notes = text;
         }
 
-        /// <summary>Loads the §19.1 placeholder splines.</summary>
+        /// <summary>Loads the placeholder splines.</summary>
         public void ResetToPlaceholders(){
             FromJson(PlaceholderJson);
         }

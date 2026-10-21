@@ -2,9 +2,9 @@ using System;
 using Unity.Mathematics;
 
 namespace Engine.Tests.EditMode{
-    /// <summary>Shared statistics for the TST-08/TST-13 noise tests.</summary>
+    /// <summary>Shared statistics for the climate histogram and noise periodicity tests.</summary>
     internal static class NoiseStatistics{
-        /// <summary>The four TST-13 directions: x, z and both diagonals.</summary>
+        /// <summary>The four test directions: x, z and both diagonals.</summary>
         internal static readonly float2[] Directions ={
             new(1f, 0f), new(0f, 1f),
             math.normalize(new float2(1f, 1f)), math.normalize(new float2(1f, -1f))
@@ -12,7 +12,7 @@ namespace Engine.Tests.EditMode{
 
         /// <summary>
         ///     Largest |autocorrelation| of <paramref name="sample" /> along <paramref name="direction" /> for lags
-        ///     from one <paramref name="wavelength" /> up to 8k blocks, estimated over 16k-block lines (TST-13).
+        ///     from one <paramref name="wavelength" /> up to 8k blocks, estimated over 16k-block lines.
         ///     One line holds only 16384 / wavelength independent features, so the estimate is averaged over parallel
         ///     lines (3 wavelengths apart, i.e. independent) until it covers at least <paramref name="minFeatures" />.
         /// </summary>

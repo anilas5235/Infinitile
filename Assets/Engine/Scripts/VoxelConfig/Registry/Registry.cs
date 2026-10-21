@@ -41,7 +41,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         protected virtual void PostRegister(ushort id, T item){ }
 
         /// <summary>
-        ///     F-22: rolls back the most recent registration so a caller can undo it when a dependent registration
+        ///     Rolls back the most recent registration so a caller can undo it when a dependent registration
         ///     failed. Only the last id can be removed; ids must stay contiguous.
         /// </summary>
         public bool Unregister(T item){

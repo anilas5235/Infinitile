@@ -6,7 +6,7 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Light{
     /// <summary>
-    ///     LGT-11: FIFO of box voxel indices for the light BFS of <see cref="LightRegion" />. A ring buffer that
+    ///     FIFO of box voxel indices for the light BFS of <see cref="LightRegion" />. A ring buffer that
     ///     doubles when full; <see cref="NativeQueue{T}" /> cost about 20 ns per element in the initial light job.
     ///     Single-threaded, for use inside one job.
     /// </summary>

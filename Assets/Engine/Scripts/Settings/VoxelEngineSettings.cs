@@ -13,8 +13,8 @@ namespace Engine.Scripts.Settings{
         public int Seed = 1337;
 
         /// <summary>
-        ///     World-generation settings (INT-01): architecture, blending, climate, biome set, octaves, water level.
-        ///     Required; the engine throws at scheduler creation when it is missing (INT-40).
+        ///     World-generation settings: architecture, blending, climate, biome set, octaves, water level.
+        ///     Required; the engine throws at scheduler creation when it is missing.
         /// </summary>
         public WorldGenSettings WorldGen;
 

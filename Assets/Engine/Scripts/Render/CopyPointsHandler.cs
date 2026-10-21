@@ -22,7 +22,7 @@ namespace Engine.Scripts.Render{
         private readonly RenderBufferManager _transparentBufferManager;
         private readonly GraphicsBuffer _transparentPagesBuffer;
 
-        // PERF-04: upload staging reused per copy instead of allocated per partition
+        // upload staging, reused per copy
         internal const int MaxPagesPerPartition = (MaxPointsPerPartition + PointsPerPage - 1) / PointsPerPage;
         private readonly uint[] _pageCounts = new uint[3];
         private readonly uint2[] _pageData = new uint2[MaxPagesPerPartition];
@@ -87,7 +87,7 @@ namespace Engine.Scripts.Render{
             int maxPageCount = math.max(solidPagesCount, math.max(transparentPagesCount, foliagePagesCount));
             if (maxPageCount <= 0) return;
 
-            _copyPoints.Dispatch(_copyKernelID, Mathf.CeilToInt(maxPageCount / 8f), 1, 1);
+            _copyPoints.Dispatch(_copyKernelID, (maxPageCount + CopyPointsThreads - 1) / CopyPointsThreads, 1, 1);
         }
 
         private void SetSolidBuffers(PointBuilderHandler pointBuilderHandler, AllocInfo solidAlloc){

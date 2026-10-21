@@ -71,8 +71,6 @@
             #pragma vertex   vert
             #pragma fragment frag
 
-            #pragma multi_compile_instancing
-
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
@@ -129,7 +127,7 @@
                 // --- Ambient occlusion ---
                 const float4 ao_color = calc_ao_color(_AOColor, albedo, _AOCurve, extra.ao, _AOIntensity, _AOPower, uv);
 
-                // --- Light (LGT-10) ---
+                // --- Light ---
                 const float3 light = calc_voxel_light(IN.packed, uv);
 
                 // --- Depth fade ---

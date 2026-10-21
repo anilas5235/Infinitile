@@ -13,10 +13,10 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     Phase 4 (§10, INT-11): the chunk job's flora against the pure region API. TST-02: heights, top block and
-    ///     flora of a 4×4-chunk area equal <see cref="Engine.Scripts.WorldGen.Core.WorldGenApi.SampleRegion" /> in all
-    ///     8 configurations (2 architectures × 4 methods; Biome-first uses the method in both stages). TST-03: trees
-    ///     that cross chunk borders are complete on both sides. TST-10: the same input gives the same output.
+    ///     The chunk job's flora against the pure region API: heights, top block and flora of a 4×4-chunk area equal
+    ///     <see cref="Engine.Scripts.WorldGen.Core.WorldGenApi.SampleRegion" /> in all 8 configurations
+    ///     (2 architectures × 4 methods; Biome-first uses the method in both stages), trees that cross chunk borders
+    ///     are complete on both sides, and the same input gives the same output.
     /// </summary>
     public class FloraChunkTests{
         private FloraFixture _fixture;
@@ -51,7 +51,7 @@ namespace Engine.Tests.EditMode{
             results = new NativeParallelHashMap<int2, ChunkVoxelData>(jobs.Length, Allocator.TempJob);
             try{
                 new ChunkJob{
-                    Jobs = jobs, Results = results.AsParallelWriter(), RandomSeed = _config.GlobalSeed, Config = _config
+                    Jobs = jobs, Results = results.AsParallelWriter(), Config = _config
                 }.Run(jobs.Length);
             }
             finally{
@@ -101,8 +101,8 @@ namespace Engine.Tests.EditMode{
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,
             [Values(BlendMethod.None, BlendMethod.DistanceBlend, BlendMethod.DistortedBoundary, BlendMethod.ParameterSpaceWeighting)]
             BlendMethod method){
-            // TST-02 for flora (VEG-01, VEG-06): per-column decisions of PrepareChunkMaps and the stamped voxels of
-            // the job equal the pure region API, chunk for chunk, over 4×4 chunks.
+            // Per-column decisions of PrepareChunkMaps and the stamped voxels of the job equal the pure region API,
+            // chunk for chunk, over 4×4 chunks.
             Use(architecture, method);
             int2 originChunk = new(1, 2), chunks = new(4, 4); // ~80 % land with shores in Terrain-first
             ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
@@ -115,7 +115,7 @@ namespace Engine.Tests.EditMode{
                 for (int cx = 0; cx < chunks.x; cx++)
                 for (int cz = 0; cz < chunks.y; cz++){
                     int3 origin = new((originChunk.x + cx) * ChunkWidth, 0, (originChunk.y + cz) * ChunkDepth);
-                    ChunkJob.PrepareChunkMaps(_config.GlobalSeed, ref _config, ref origin, columns);
+                    ChunkJob.PrepareChunkMaps(ref _config, ref origin, columns);
                     for (int x = 0; x < ChunkWidth; x++)
                     for (int z = 0; z < ChunkDepth; z++){
                         int wx = origin.x + x, wz = origin.z + z;
@@ -156,7 +156,7 @@ namespace Engine.Tests.EditMode{
         public void ChunkJob_TreesCrossingChunkBordersAreComplete(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,
             [Values(BlendMethod.None, BlendMethod.DistanceBlend)] BlendMethod method){
-            // TST-03: every voxel of a structure whose footprint spans two or more chunks is present in each chunk it
+            // Every voxel of a structure whose footprint spans two or more chunks is present in each chunk it
             // falls into (unless a voxel of a higher class from the whole-world stamp is there), identical on both sides.
             Use(architecture, method);
             int2 originChunk = new(5, -1), chunks = new(2, 2);
@@ -193,7 +193,7 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void SampleRegion_SameRegionTwice_IsIdentical(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
-            // TST-10: the flora decision is a pure function; two runs give the same hashes.
+            // The flora decision is a pure function; two runs give the same hashes.
             Use(architecture, BlendMethod.DistanceBlend);
             RegionSample a = RegionSample.Sample(_config.WorldGen, new int2(-70, 40), new int2(150, 90));
             RegionSample b = RegionSample.Sample(_config.WorldGen, new int2(-70, 40), new int2(150, 90));
@@ -206,7 +206,7 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void ChunkJob_SameChunksTwice_IsIdentical(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
-            // TST-10 for the stamped voxels.
+            // Determinism of the stamped voxels.
             Use(architecture, BlendMethod.DistanceBlend);
             int2 originChunk = new(1, 1), chunks = new(2, 1);
             Dictionary<int2, ChunkVoxelData> first = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> r1);

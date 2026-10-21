@@ -27,7 +27,7 @@ The runtime flow is roughly:
 
 The important idea is that the systems are decoupled:
 - `VoxelWorld` owns world state and events.
-- `VoxelEngineScheduler` coordinates work between data, mesh, and collider jobs.
+- `VoxelEngineScheduler` coordinates work between data, light, mesh, and collider jobs.
 - `VoxelWorldRenderer` owns GPU-side render data and draw submission.
 - `DataImporter` loads voxel definitions and builds registries used by both world generation and rendering.
 
@@ -42,11 +42,12 @@ Typical entry points:
 - `ChunkPool`
 
 ### `Jobs`
-Async and scheduled work for generation, meshing, and collider baking.
+Async and scheduled work for generation, lighting, meshing, and collider baking.
 
 Important subareas:
 - `Jobs/Core` — scheduler state machines and orchestration
 - `Jobs/Chunk` — chunk data generation jobs
+- `Jobs/Light` — initial light and edit light jobs (`LightJob`, `LightEditJob`, `LightScheduler`)
 - `Jobs/ColliderMeshing` — partition collider mesh generation (greedy meshing)
 - `Jobs/ColliderBake` — collider baking jobs
 
@@ -61,6 +62,8 @@ Important entry points:
 - `ChunkIntervalStore`
 - `PointBuilderHandler`
 - `CopyPointsHandler`
+- `Render/Post` — the underwater fog renderer feature and post-process volume switching (`UnderwaterFogFeature`,
+  `PostProcessManager`, `VoxelPostProcessHandler`)
 
 ### `VoxelConfig`
 Voxel definition assets, registries, shapes, and editor tooling for authoring voxel content.
@@ -73,7 +76,8 @@ Important entry points:
 - `QuadDefinition`
 
 ### `Data`
-Project data containers, settings assets, and imported configuration used by runtime systems.
+Chunk data containers shared by the jobs: `Chunk`, `ChunkVoxelData`, `ChunkLightData` (interval lists), the
+read-only `ChunkAccessor` of the mesh job, and the packed light format (`VoxelLight`, `VoxelLightTable`).
 
 ### `Settings`
 Global engine and renderer settings used by scheduling, rendering, and pipeline configuration.
@@ -81,20 +85,20 @@ Global engine and renderer settings used by scheduling, rendering, and pipeline 
 ### `Utils`
 Shared constants, math helpers, singleton/provider helpers, logging, and collections.
 
-### `Components`
-Unity-facing runtime components that connect the world, scheduler, and renderer.
-
-### `Noise`
-Procedural generation utilities used by chunk data jobs and world generation.
+### `Behaviour`
+The pooled chunk and partition GameObject components (`ChunkBehaviour`, `ChunkPartition`); a partition holds its
+collider mesh and `MeshCollider`.
 
 ### `WorldGen`
-The spec world generator (`WorldGenSpec.html`, see `Docs/WorldGenerationPipeline.md` version 1.1):
+The world generator (see `Docs/WorldGenerationPipeline.md`):
 - `WorldGen/Core` — hashing, salts, `WorldSampler` (pure per-column sampler), `ColumnSample`, `WorldGenApi.SampleRegion`
-- `WorldGen/Noise` — seeded simplex, climate fields, detail octaves, peak noise
+- `WorldGen/Noise` — seeded simplex, climate fields, detail octaves, peak noise, warp field, noise profiles and
+  warped noise layers (`NoiseProfile`, `WarpedNoiseLayer`)
 - `WorldGen/Classify` — 5D/6D biome classifier
-- `WorldGen/Blending` — `BlendWeights` and (from Phase 2) the blend methods
+- `WorldGen/Height` — Terrain-first nested splines and Biome-first height
+- `WorldGen/Blending` — `BlendWeights`, the blend methods, blend lattice and surface pick
 - `WorldGen/Settings` — `WorldGenSettings`, `BiomeSet`, `TerrainSplineSet`, the Burst mirror `WorldGenConfig`, canonical JSON
-- `WorldGen/Flora` — flora rules (filled in Phase 4)
+- `WorldGen/Flora` — flora rules and placement
 
 ## Core systems and what they do
 
@@ -106,7 +110,7 @@ Most systems listen to these events instead of polling the world directly.
 ### `VoxelEngineScheduler`
 Coordinates the major job pipelines in a round-robin cycle:
 - data generation
-- light (Phase L, LGT-06)
+- light
 - mesh building
 - collider baking
 
@@ -118,7 +122,7 @@ It is used by the data job state handler.
 
 ### `LightScheduler`
 Dispatches light jobs for chunks whose 3 x 3 neighbourhood has voxel data, applies the results to the chunks and
-runs the incremental light update after each voxel edit (Phase L, see `ChunkPipeline.md`).
+runs the incremental light update after each voxel edit (see `ChunkPipeline.md`).
 It is used by the light job state handler.
 
 ### `CMeshBuildScheduler`
@@ -147,13 +151,12 @@ It is responsible for page allocation, release, and buffer rebuilds.
 Each `RenderBuffer` keeps a point count and a world-space AABB per page (`PageAllocator`, `PageBounds`).
 
 ### `GpuCuller`
-Phase C GPU page culling (`PageCulling.compute`).
+GPU page culling (`PageCulling.compute`).
 It keeps a `CameraCullState` per camera (frustum planes, visible page list and indirect args per render buffer), culls every buffer per camera and frame, and drives the optional shadow pass with light-extruded bounds.
 `FrustumCulling` is the C# reference of the GPU test used by the tests.
 
 ### `ChunkIntervalStore`
-Spec §20.1: one structured GPU buffer holding the compressed interval lists (voxel ids and light, LGT-08) of every
-loaded chunk, in pages of 512 elements handed out by `IntervalPages`. The renderer keeps an `IntervalRange` per
+One structured GPU buffer holding the compressed interval lists (voxel ids and light) of every loaded chunk, in pages of 512 elements handed out by `IntervalPages`. The renderer keeps an `IntervalRange` per
 chunk list; the store grows (and copies on the GPU) only when the free pages run out.
 
 ### `PointBuilderHandler`
@@ -167,8 +170,9 @@ Copies built point data into the target render buffers and prepares page metadat
 ## Assemblies
 
 - `Engine.Runtime` (`Assets/Engine/Engine.Runtime.asmdef`) — all runtime engine code under `Assets/Engine/Scripts`.
-- `Engine.Editor` (`Assets/Engine/Editor/Engine.Editor.asmdef`) — editor tooling; the `Editor` folders under
-  `Scripts` join it through `Engine.Editor.asmref` files.
+- `Engine.Editor` (`Assets/Engine/Editor/Engine.Editor.asmdef`) — editor tooling: custom inspectors
+  (`VoxelConfig/`, `World/`), the world generation preview (`WorldGen/`) and render debugging (`Render/`). All
+  editor code lives in this folder; there are no `Editor` folders under `Scripts`.
 - `Engine.Tests.EditMode`, `Engine.Tests.PlayMode`, `Engine.Tests.Performance` (`Assets/Engine/Tests/...`) — the
   test assemblies. Runtime internals they use are exposed with `InternalsVisibleTo` in `Scripts/AssemblyInfo.cs`.
 

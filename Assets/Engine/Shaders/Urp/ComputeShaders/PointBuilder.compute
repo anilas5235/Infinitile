@@ -10,7 +10,7 @@ struct VoxelDef
 {
     uint MeshLayer;
     uint AlwaysRenderAllFaces;
-    uint DepthFadeDistance; // F-19: fp16 bits, read with f16tof32
+    uint DepthFadeDistance; // fp16 bits, read with f16tof32
     uint Glow;
     uint Collision;
     uint2 ShapeQuadIndicesAlwaysRender;
@@ -20,7 +20,7 @@ struct VoxelDef
     uint2 ShapeQuadIndicesDown;
     uint2 ShapeQuadIndicesFront;
     uint2 ShapeQuadIndicesBack;
-    uint LightAttenuation; // LGT-09: 15 = opaque, skipped by the smooth light
+    uint LightAttenuation; // 15 = opaque, skipped by the smooth light
 };
 
 struct VoxelQuad
@@ -45,20 +45,17 @@ uint2 get_voxel_quad_indices(in VoxelDef def, uint dir)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BuildPrep Kernel - Expand compressed chunk data into flat arrays
-// LGT-08: each voxel's uint holds the voxel id (bits 0-15) and its light sky|R|G|B (bits 16-31). BuildPrep
+// Each voxel's uint holds the voxel id (bits 0-15) and its light sky|R|G|B (bits 16-31). BuildPrep
 // writes the ids, BuildPrepLight then ORs the light in, so a lookup fetches id and light at once.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// §20.1: _CompChunk is the shared interval store of every chunk (ChunkIntervalStore). A list is a sequence of
+// _CompChunk is the shared interval store of every chunk (ChunkIntervalStore). A list is a sequence of
 // pages of 512 elements anywhere in the store; _CompPages[_CompPagesOffset + p] is the store page of its page p.
 // Element 0 of a list: (intervalCount, lastUncompressedIndex).
 StructuredBuffer<uint2> _CompChunk;
 StructuredBuffer<uint> _CompPages;
 uint _CompPagesOffset;
 RWStructuredBuffer<uint> _UnCompChunk;
-
-#define COMP_PAGE_SHIFT 9 // IntervalPages.PageSize = 512
-#define COMP_PAGE_MASK 511
 
 uint2 CompInterval(uint k)
 {
@@ -68,18 +65,15 @@ uint2 CompInterval(uint k)
 
 uint _VoxelsPerChunk;
 
-#define INTERVALS_PER_THREAD 8
-
-[numthreads(64, 1, 1)]
-
+[numthreads(PREP_THREADS, 1, 1)]
 void BuildPrep(uint3 id : SV_DispatchThreadID)
 {
-    uint start_interval = 1 + id.x * INTERVALS_PER_THREAD; //+1 because interval 0 is metadata   
+    uint start_interval = 1 + id.x * PREP_INTERVALS_PER_THREAD; //+1 because interval 0 is metadata
 
     uint total_intervals = CompInterval(0).x;
     if (start_interval > total_intervals) return;
 
-    for (int i = 0; i < INTERVALS_PER_THREAD; ++i)
+    for (int i = 0; i < PREP_INTERVALS_PER_THREAD; ++i)
     {
         uint target_interval = start_interval + i;
         if (target_interval > total_intervals) break;
@@ -96,16 +90,16 @@ void BuildPrep(uint3 id : SV_DispatchThreadID)
     }
 }
 
-// LGT-08: same interval walk as BuildPrep over the chunk's light list; the ids are already in place.
-[numthreads(64, 1, 1)]
+// Same interval walk as BuildPrep over the chunk's light list; the ids are already in place.
+[numthreads(PREP_THREADS, 1, 1)]
 void BuildPrepLight(uint3 id : SV_DispatchThreadID)
 {
-    uint start_interval = 1 + id.x * INTERVALS_PER_THREAD;
+    uint start_interval = 1 + id.x * PREP_INTERVALS_PER_THREAD;
 
     uint total_intervals = CompInterval(0).x;
     if (start_interval > total_intervals) return;
 
-    for (int i = 0; i < INTERVALS_PER_THREAD; ++i)
+    for (int i = 0; i < PREP_INTERVALS_PER_THREAD; ++i)
     {
         uint target_interval = start_interval + i;
         if (target_interval > total_intervals) break;
@@ -147,14 +141,14 @@ StructuredBuffer<uint> _NeighborChunk6; //(-1,0)
 StructuredBuffer<uint> _NeighborChunk7; //(-1,1)
 
 RWStructuredBuffer<PartitionMetadata> _Metadata;
-// F-03: counter buffers instead of append buffers, so a write past the capacity is skipped explicitly.
+// Counter buffers instead of append buffers, so a write past the capacity is skipped explicitly.
 // The counter keeps counting; the CPU clamps the read-back count to _PointCapacity.
 RWStructuredBuffer<PointData> _SolidPointsOut;
 RWStructuredBuffer<PointData> _TransparentPointsOut;
 RWStructuredBuffer<PointData> _FoliagePointsOut;
 uint _PointCapacity;
 
-// LGT-08: the prepared chunks hold id | light << 16; the lookups below return the whole cell, use
+// The prepared chunks hold id | light << 16; the lookups below return the whole cell, use
 // cell_id / cell_light to split it.
 uint cell_id(uint cell)
 {
@@ -166,19 +160,21 @@ uint cell_light(uint cell)
     return cell >> 16;
 }
 
-#define SKY_ABOVE_WORLD (0xF000u << 16) // air with sky 15, the space above the world (LGT-09)
+#define SKY_ABOVE_WORLD (0xF000u << 16) // air with sky 15, the space above the world
 #define NO_INNER_LIGHT 0xFFFFFFFFu
 
 VoxelDef get_voxel_def(uint voxelId)
 {
     voxelId = cell_id(voxelId);
-    if (voxelId >= _VoxelRenderDefsCount) return (VoxelDef)0;
-    return _VoxelRenderDefs[voxelId];
+    // One return; FXC flags the early-return form as potentially uninitialized.
+    VoxelDef def = (VoxelDef)0;
+    if (voxelId < _VoxelRenderDefsCount) def = _VoxelRenderDefs[voxelId];
+    return def;
 }
 
 uint get_voxel_array_index(in int3 pos)
 {
-    return ((uint)pos.x << 13) + ((uint)pos.z << 8) + (uint)pos.y; //x*32u*256u, z*256u
+    return ((uint)pos.x << CHUNK_INDEX_SHIFT_X) + ((uint)pos.z << CHUNK_INDEX_SHIFT_Z) + (uint)pos.y;
 }
 
 uint get_voxel(StructuredBuffer<uint> target, in int3 in_chunk_pos)
@@ -231,7 +227,7 @@ uint get_voxel_safe(in int3 in_chunk_pos)
     int3 chunk_size = _ChunkSize;
     int3 part_size = _PartitionSize;
     if (in_chunk_pos.y < 0) return 0;
-    if (in_chunk_pos.y >= chunk_size.y) return SKY_ABOVE_WORLD; // LGT-09: air in full sky light
+    if (in_chunk_pos.y >= chunk_size.y) return SKY_ABOVE_WORLD; // air in full sky light
 
     if (in_chunk_pos.x < 0 || in_chunk_pos.x >= part_size.x || in_chunk_pos.z < 0 || in_chunk_pos.z >=
         part_size.z)
@@ -291,7 +287,7 @@ bool is_solid(int3 in_chunk_pos)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LGT-09: smooth light
+// Smooth light
 // ─────────────────────────────────────────────────────────────────────────────
 
 #define OPAQUE_ATTENUATION 15
@@ -360,7 +356,7 @@ uint inner_light(int3 in_chunk_pos, uint own_cell)
     return pack_light(brightest);
 }
 
-// inner_light_value: light of quads inside the voxel, or NO_INNER_LIGHT for face quads (smooth light, LGT-09)
+// inner_light_value: light of quads inside the voxel, or NO_INNER_LIGHT for face quads (smooth light)
 void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uint2 quadRange, uint inner_light_value)
 {
     for (uint i = 0u; i < quadRange.y; i++)
@@ -377,7 +373,6 @@ void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uin
         uint ao_mask = 0;
         int3 front_in_chunk = in_chunk_pos + quad.normal;
 
-        // LGT-09
         if (inner_light_value == NO_INNER_LIGHT)
             set_corner_light(packed, face_corner_light(front_in_chunk, (int3)quad.up, (int3)quad.right));
         else
@@ -393,7 +388,7 @@ void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uin
         if (is_solid(front_in_chunk + quad.up - quad.right)) ao_mask |= 1 << 7; // UpLeft
 
         set_ao(packed, ao_mask);
-        set_depth_fade_dist(packed, f16tof32(myDef.DepthFadeDistance)); // F-19
+        set_depth_fade_dist(packed, f16tof32(myDef.DepthFadeDistance));
         set_glow(packed, myDef.Glow);
 
         p.packed = packed;
@@ -402,20 +397,20 @@ void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uin
         switch (myDef.MeshLayer)
         {
         case 0: idx = _SolidPointsOut.IncrementCounter();
-            if (idx < _PointCapacity) _SolidPointsOut[idx] = p; // F-03
+            if (idx < _PointCapacity) _SolidPointsOut[idx] = p;
             break;
         case 1: idx = _TransparentPointsOut.IncrementCounter();
-            if (idx < _PointCapacity) _TransparentPointsOut[idx] = p; // F-03
+            if (idx < _PointCapacity) _TransparentPointsOut[idx] = p;
             break;
         case 2: idx = _FoliagePointsOut.IncrementCounter();
-            if (idx < _PointCapacity) _FoliagePointsOut[idx] = p; // F-03
+            if (idx < _PointCapacity) _FoliagePointsOut[idx] = p;
             break;
         default: break;
         }
     }
 }
 
-[numthreads(4, 4, 4)]
+[numthreads(BUILD_POINTS_THREADS, BUILD_POINTS_THREADS, BUILD_POINTS_THREADS)]
 void BuildPoints(uint3 id : SV_DispatchThreadID)
 {
     if (any(id >= uint3(_PartitionSize))) return;
@@ -449,7 +444,7 @@ void BuildPoints(uint3 id : SV_DispatchThreadID)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CopyIntervals Kernel - §20.1: copies the interval store into its larger replacement (ChunkIntervalStore.Grow)
+// CopyIntervals Kernel - copies the interval store into its larger replacement (ChunkIntervalStore.Grow)
 // ─────────────────────────────────────────────────────────────────────────────
 
 StructuredBuffer<uint2> _CopySource;
@@ -457,7 +452,7 @@ RWStructuredBuffer<uint2> _CopyTarget;
 uint _CopyCount;
 uint _CopyStride; // threads in the dispatch; each thread copies every _CopyStride-th element
 
-[numthreads(64, 1, 1)]
+[numthreads(COPY_INTERVALS_THREADS, 1, 1)]
 void CopyIntervals(uint3 id : SV_DispatchThreadID)
 {
     for (uint i = id.x; i < _CopyCount; i += _CopyStride)
