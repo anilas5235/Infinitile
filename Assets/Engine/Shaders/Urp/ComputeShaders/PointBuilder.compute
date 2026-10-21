@@ -172,8 +172,10 @@ uint cell_light(uint cell)
 VoxelDef get_voxel_def(uint voxelId)
 {
     voxelId = cell_id(voxelId);
-    if (voxelId >= _VoxelRenderDefsCount) return (VoxelDef)0;
-    return _VoxelRenderDefs[voxelId];
+    // One return; FXC flags the early-return form as potentially uninitialized.
+    VoxelDef def = (VoxelDef)0;
+    if (voxelId < _VoxelRenderDefsCount) def = _VoxelRenderDefs[voxelId];
+    return def;
 }
 
 uint get_voxel_array_index(in int3 pos)
