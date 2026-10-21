@@ -95,6 +95,11 @@ namespace Engine.Tests.PlayMode{
             public void Dispose(){
                 if (!Scheduler.IsReady) Scheduler.Complete();
                 Scheduler.Dispose();
+                DisposeAfterScheduler();
+            }
+
+            /// <summary>Releases everything but the scheduler, for a test that disposes the scheduler itself.</summary>
+            public void DisposeAfterScheduler(){
                 Manager.Dispose();
                 Pool.Dispose();
                 Object.Destroy(_root);
@@ -117,6 +122,45 @@ namespace Engine.Tests.PlayMode{
             rig.Scheduler.Complete();
             Assert.IsTrue(rig.Scheduler.IsReady);
             Assert.IsTrue(rig.Pool.IsPartitionActive(new int3(0, 2, 0)), "batch results applied");
+        }
+
+        [Test]
+        public void SetVoxel_WhileBuildJobRuns_KeepsThePartitionFlaggedForReMesh(){
+            // The running job meshed the data from before the edit; completing the batch must not drop the edit's
+            // remesh flag, or the collider and the GPU mesh keep the old state.
+            using SchedulerRig rig = new();
+            int3 edited = new(0, 1, 0);
+            rig.StartCentreChunkBuild();
+            Assert.IsFalse(rig.Manager.ShouldReMesh(edited), "Start consumes the flags of the batch");
+
+            // An air voxel of the checkerboard (odd coordinate sum); y 40 is partition 1
+            Assert.IsTrue(rig.Manager.SetVoxel(PlayModeFixtures.Grass, new int3(5, 40, 6)), "the voxel must change");
+            rig.Scheduler.Complete();
+
+            Assert.IsTrue(rig.Manager.ShouldReMesh(edited), "the edit during the batch must be meshed again");
+            Assert.IsTrue(rig.Manager.ShouldReCollide(edited), "the applied mesh still needs a collider bake");
+        }
+
+        [Test]
+        public void UnloadChunk_OfTheMeshedChunk_WhileBuildJobRuns_DropsItsResults(){
+            // Results of a chunk that was unloaded while the job ran must not claim partitions for it.
+            using SchedulerRig rig = new();
+            rig.StartCentreChunkBuild();
+            rig.Manager.UnloadChunk(int2.zero);
+
+            Assert.DoesNotThrow(() => rig.Scheduler.Complete());
+            Assert.IsTrue(rig.Scheduler.IsReady);
+            for (int y = 0; y < PartitionsPerChunk; y++)
+                Assert.IsFalse(rig.Pool.IsPartitionActive(new int3(0, y, 0)), $"partition {y} must not be claimed");
+        }
+
+        [Test]
+        public void Dispose_WhileBuildJobRuns_DoesNotThrow(){
+            // Leaving play mode mid-batch: the scheduler releases the batch's writable mesh data itself.
+            SchedulerRig rig = new();
+            rig.StartCentreChunkBuild();
+            Assert.DoesNotThrow(() => rig.Scheduler.Dispose());
+            rig.DisposeAfterScheduler();
         }
 
         [Test]

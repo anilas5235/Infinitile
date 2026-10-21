@@ -126,11 +126,13 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
-        ///     Disposes all native containers after ensuring that the scheduled job has completed.
+        ///     Disposes all native containers after ensuring that the scheduled job has completed; chunk data of a
+        ///     batch that was never completed is released.
         /// </summary>
         internal void Dispose(){
             _handle.Complete();
 
+            foreach (KeyValue<int2, ChunkVoxelData> r in _results) r.Value.Dispose();
             _jobs.Dispose();
             _results.Dispose();
             _config.Dispose(); // Releases the noise parameters created for this scheduler's config

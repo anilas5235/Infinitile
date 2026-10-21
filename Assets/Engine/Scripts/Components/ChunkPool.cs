@@ -177,8 +177,21 @@ namespace Engine.Scripts.Components{
             return partition;
         }
 
+        /// <summary>
+        ///     Reclaims a pooled chunk with its partitions, e.g. after the chunk manager unloaded its data: the
+        ///     partitions would otherwise keep their mesh and never be meshed again once the chunk is reloaded.
+        /// </summary>
+        /// <returns>True if the chunk was active.</returns>
+        internal bool TryReclaimChunk(int2 position){
+            if (!IsChunkActive(position)) return false;
+            if (_chunkQueue.Contains(position)) _chunkQueue.Remove(position);
+            ReclaimChunk(position);
+            return true;
+        }
+
         private void ReclaimChunk(int2 reclaim){
             ChunkBehaviour reclaimBehaviour = _chunkMap[reclaim];
+            PartitionMeshWriting?.Invoke(); // ClearData clears collider meshes a running bake may read
             reclaimBehaviour.ClearData();
             _pool.Release(reclaimBehaviour);
             _chunkMap.Remove(reclaim);
@@ -226,10 +239,7 @@ namespace Engine.Scripts.Components{
         internal void ReclaimAll(){
             int2[] active = new int2[_chunkMap.Count];
             _chunkMap.Keys.CopyTo(active, 0);
-            foreach (int2 position in active){
-                if (_chunkQueue.Contains(position)) _chunkQueue.Remove(position);
-                ReclaimChunk(position);
-            }
+            foreach (int2 position in active) TryReclaimChunk(position);
         }
 
         internal void Dispose(){

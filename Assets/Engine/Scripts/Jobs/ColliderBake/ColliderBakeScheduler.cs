@@ -95,9 +95,7 @@ namespace Engine.Scripts.Jobs.ColliderBake{
 
                 _chunkPool.ColliderBaked(position);
                 _chunkManager.ReCollidedPartition(position);
-
-                if (behaviour.ColliderMesh.vertexCount <= 0) continue;
-                behaviour.ApplyColliderMesh();
+                behaviour.ApplyColliderMesh(); // an empty mesh removes the collider
             }
 
 #if VOXEL_TIMING_LOGS

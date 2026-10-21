@@ -115,7 +115,7 @@ namespace Engine.Scripts.World{
         private void ConstructEngineComponents(){
             ChunkManager = VoxelEngineProvider.Current.ChunkManager();
             ChunkManager.OnChunkChange += RaiseChunkChanged;
-            ChunkManager.OnChunkUnloaded += RaiseChunkEvicted;
+            ChunkManager.OnChunkUnloaded += HandleChunkUnloaded;
 
             _chunkPool = VoxelEngineProvider.Current.ChunkPool(transform);
             _chunkPool.OnChunkEvicted += HandleChunkEvicted;
@@ -169,6 +169,13 @@ namespace Engine.Scripts.World{
             // UnloadChunk raises ChunkEvicted itself (through OnChunkUnloaded); only a chunk the manager no
             // longer holds needs the event raised here.
             if (!ChunkManager.UnloadChunk(chunkPos)) RaiseChunkEvicted(chunkPos);
+        }
+
+        private void HandleChunkUnloaded(int2 chunkPos){
+            // A pooled chunk whose data is gone keeps its partitions active, and they would never be meshed again
+            // after a reload. Reclaiming it raises ChunkEvicted through HandleChunkEvicted.
+            if (!_isShuttingDown && _chunkPool.TryReclaimChunk(chunkPos)) return;
+            RaiseChunkEvicted(chunkPos);
         }
 
         private void HandlePartitionEvicted(int3 partitionPos){
@@ -291,7 +298,7 @@ namespace Engine.Scripts.World{
             _isShuttingDown = true;
             if (ChunkManager != null){
                 ChunkManager.OnChunkChange -= RaiseChunkChanged;
-                ChunkManager.OnChunkUnloaded -= RaiseChunkEvicted;
+                ChunkManager.OnChunkUnloaded -= HandleChunkUnloaded;
             }
 
             if (_chunkPool != null){

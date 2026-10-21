@@ -1,4 +1,5 @@
-﻿using Engine.Scripts.Utils.Extensions;
+﻿using Engine.Scripts.Jobs.ColliderBake;
+using Engine.Scripts.Utils.Extensions;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelConstants;
 
@@ -49,10 +50,14 @@ namespace Engine.Scripts.Behaviour{
         public void Init(int pId){
             PartitionId = (short)pId;
             transform.localPosition = new Vector3(0, PartitionHeight * pId, 0);
+            // Unity reuses the job's Physics.BakeMesh result only if the options match; otherwise assigning the mesh
+            // cooks it again on the main thread
+            _Collider.cookingOptions = ColliderBuildJob.CookingOptions;
         }
 
         public void ApplyColliderMesh(){
-            Collider.sharedMesh = ColliderMesh;
+            // An empty mesh has no collider; the partition may still hold the one from before its last block went
+            Collider.sharedMesh = ColliderMesh.vertexCount > 0 ? ColliderMesh : null;
         }
 
         public void Clear(){

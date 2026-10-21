@@ -49,6 +49,9 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         // Reused per batch instead of a new Mesh[] per Complete
         private readonly List<Mesh> _colliderMeshes;
 
+        // Targets for results that Complete drops (chunk unloaded or partition reclaimed during the job)
+        private readonly List<Mesh> _discardMeshes = new();
+
         /// <summary>
         ///     Initializes a new instance of the <see cref="CMeshBuildScheduler" /> class.
         /// </summary>
@@ -104,7 +107,11 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
 
             _chunkAccessor = _chunkManager.GetAccessor(jobs);
 
-            foreach (int3 j in jobs) _jobs.Add(j);
+            foreach (int3 j in jobs){
+                _jobs.Add(j);
+                _chunkManager.ReMeshStarted(j);
+            }
+
             if (_results.Capacity < _jobs.Length) _results.Capacity = _jobs.Length;
 
             _colliderMeshDataArray = Mesh.AllocateWritableMeshData(_jobs.Length);
@@ -133,29 +140,46 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             double start = Time.realtimeSinceStartupAsDouble;
 #endif
             _handle.Complete();
+            _chunkPool.NotifyPartitionMeshWriting(); // a running bake may still read the meshes written below
+
+            // Claim every partition before any mesh is assigned: a claim can reclaim a pooled chunk of this batch
+            // (the world then unloads its data), which would clear a mesh already handed out.
+            for (int index = 0; index < _jobs.Length; index++){
+                int3 pos = _jobs[index];
+                if (_chunkManager.IsChunkLoaded(pos.xz)) _chunkPool.GetOrClaimPartition(pos);
+            }
 
             _colliderMeshes.Clear();
             for (int index = 0; index < _jobs.Length; index++) _colliderMeshes.Add(null);
 
+            int discarded = 0;
             for (int index = 0; index < _jobs.Length; index++){
                 int3 pos = _jobs[index];
-                ChunkPartition partition = _chunkPool.GetOrClaimPartition(pos);
-                _chunkManager.ReMeshedPartition(pos);
-
                 CMeshBuildJob.PartitionJobResult result = _results[pos];
+
+                // The chunk was unloaded or the partition reclaimed after the job started. Its result is dropped;
+                // the partition is inactive, so it is meshed again once its chunk is back.
+                if (!_chunkManager.IsChunkLoaded(pos.xz) || !_chunkPool.IsPartitionActive(pos)){
+                    _colliderMeshes[result.Index] = GetDiscardMesh(discarded++);
+                    continue;
+                }
+
+                ChunkPartition partition = _chunkPool.GetPartition(pos);
+                _chunkManager.ReMeshedPartition(pos);
 
                 partition.MarkMeshChanged(); // a bake of the previous mesh is stale
                 _colliderMeshes[result.Index] = partition.ColliderMesh;
                 partition.ColliderMesh.bounds = result.ColliderBounds;
             }
 
-            _chunkPool.NotifyPartitionMeshWriting(); // a running bake may still read these meshes
+            // Every entry of the mesh data array needs a target mesh
             Mesh.ApplyAndDisposeWritableMeshData(
                 _colliderMeshDataArray,
                 _colliderMeshes,
                 MeshFlags
             );
             _colliderMeshes.Clear();
+            for (int i = 0; i < discarded; i++) _discardMeshes[i].Clear();
 
 #if VOXEL_TIMING_LOGS
             double totalTime = (Time.realtimeSinceStartupAsDouble - start) * 1000;
@@ -192,11 +216,24 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         }
 
         /// <summary>
+        ///     Mesh that receives a dropped result; created only when a batch actually drops one.
+        /// </summary>
+        private Mesh GetDiscardMesh(int index){
+            while (_discardMeshes.Count <= index) _discardMeshes.Add(new Mesh{ name = "PColliderDiscard" });
+            return _discardMeshes[index];
+        }
+
+        /// <summary>
         ///     Disposes all native containers and completes any running jobs before releasing resources.
         /// </summary>
         internal void Dispose(){
             _chunkManager.AccessorChunkWriting -= CompleteIfRunning;
             _handle.Complete();
+
+            // A batch that was never completed still owns its writable mesh data
+            if (!IsReady) _colliderMeshDataArray.Dispose();
+            foreach (Mesh mesh in _discardMeshes) CoreUtils.Destroy(mesh);
+            _discardMeshes.Clear();
 
             _colliderVertexParams.Dispose();
             _results.Dispose();

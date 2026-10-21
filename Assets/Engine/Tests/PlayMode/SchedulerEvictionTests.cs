@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Engine.Scripts.Behaviour;
 using Engine.Scripts.Components;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.ColliderBake;
@@ -175,6 +176,91 @@ namespace Engine.Tests.PlayMode{
 
             rig.Bake.Complete();
             Assert.IsFalse(rig.Pool.IsCollidable(pos), "a re-meshed partition must be baked again");
+        }
+
+        [UnityTest]
+        public IEnumerator ColliderBake_EmptyMesh_RemovesTheOldCollider(){
+            // Digging out the last block of a partition leaves an empty mesh; the collider built from the previous
+            // mesh must go with it.
+            using BakeRig rig = new();
+            int3 pos = new(0, 3, 0);
+            ChunkPartition partition = rig.Pool.GetOrClaimPartition(pos);
+            Mesh previous = new(){ vertices = new[]{ Vector3.zero, Vector3.right, Vector3.forward }, triangles = new[]{ 0, 1, 2 } };
+            try{
+                partition.Collider.sharedMesh = previous;
+                rig.Bake.Start(new HashSet<int3>{ pos });
+                yield return null;
+                rig.Bake.Complete();
+
+                Assert.IsTrue(rig.Pool.IsCollidable(pos));
+                Assert.IsNull(partition.Collider.sharedMesh, "an empty mesh must clear the collider");
+            }
+            finally{
+                Object.Destroy(previous);
+            }
+        }
+
+        [Test]
+        public void PoolPartitions_UseTheBakeCookingOptions(){
+            // Unity reuses a Physics.BakeMesh result only for a collider with the same cooking options.
+            using BakeRig rig = new();
+            ChunkPartition partition = rig.Pool.GetOrClaimPartition(new int3(0, 3, 0));
+            Assert.AreEqual(ColliderBuildJob.CookingOptions, partition.Collider.cookingOptions);
+        }
+
+        [Test]
+        public void ReclaimChunk_WhileBakeRuns_CompletesTheBakeFirst(){
+            // Reclaiming a chunk clears the collider meshes of all its partitions, which a bake may be reading.
+            using BakeRig rig = new();
+            int3 pos = new(0, 3, 0);
+            rig.Pool.GetOrClaimPartition(pos);
+            rig.Bake.Start(new HashSet<int3>{ pos });
+
+            Assert.IsTrue(rig.Pool.TryReclaimChunk(pos.xz));
+            Assert.IsTrue(rig.Bake.IsComplete, "the bake must finish before the pool clears the meshes it reads");
+            rig.Bake.Complete();
+            Assert.IsFalse(rig.Pool.IsCollidable(pos));
+        }
+
+        [UnityTest]
+        [Timeout(120000)]
+        public IEnumerator UnloadChunk_OfAPooledChunk_ReclaimsItsPartitions(){
+            // A pooled chunk whose data the manager unloads would keep its partitions active, so after the reload
+            // nothing meshes them again (the renderer already released their pages). VoxelWorld reclaims it.
+            VoxelWorld world = VoxelWorld.Instance;
+            ChunkPool pool = PlayModeFixtures.GetPrivateField<ChunkPool>(world, "_chunkPool");
+
+            int3 target = default;
+            bool found = false;
+            float deadline = Time.realtimeSinceStartup + 60f;
+            while (!found){
+                int3 centre = world.Focus.Pos;
+                for (int y = 0; y < PartitionsPerChunk && !found; y++){
+                    int3 candidate = new(centre.x, y, centre.z);
+                    if (!pool.IsPartitionActive(candidate)) continue;
+                    target = candidate;
+                    found = true;
+                }
+
+                if (Time.realtimeSinceStartup > deadline) Assert.Fail("no active partition at the focus chunk");
+                yield return null;
+            }
+
+            int evictions = 0;
+            Action<int2> handler = pos => {
+                if (pos.Equals(target.xz)) evictions++;
+            };
+            world.ChunkEvicted += handler;
+            try{
+                world.ChunkManager.UnloadChunk(target.xz);
+            }
+            finally{
+                world.ChunkEvicted -= handler;
+            }
+
+            for (int y = 0; y < PartitionsPerChunk; y++)
+                Assert.IsFalse(pool.IsPartitionActive(new int3(target.x, y, target.z)), $"partition {y} must be reclaimed");
+            Assert.AreEqual(1, evictions, "ChunkEvicted must be raised exactly once");
         }
 
         #endregion

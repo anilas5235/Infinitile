@@ -292,11 +292,18 @@ namespace Engine.Scripts.Components{
         }
 
         /// <summary>
-        ///     Callback after chunk remesh completes: remove flag and flag for collider rebuild.
+        ///     Called when a partition is handed to the mesh job: the job meshes the data as it is now, so the remesh
+        ///     flag is consumed here. An edit while the job runs flags the partition again and it is meshed once more;
+        ///     removing the flag when the batch completes would drop that edit.
+        /// </summary>
+        internal void ReMeshStarted(int3 position){
+            _reMeshPartitions.Remove(position);
+        }
+
+        /// <summary>
+        ///     Callback after a partition's new mesh was applied: flag it for collider rebuild.
         /// </summary>
         internal void ReMeshedPartition(int3 position){
-            if (!_reMeshPartitions.Contains(position)) return;
-            _reMeshPartitions.Remove(position);
             _reCollidePartitions.Add(position);
         }
 
