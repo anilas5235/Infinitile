@@ -293,6 +293,40 @@ Neither is a simple change:
 
 **Accepted by the user on 2026-10-20 (PERF-05, for now):** the three configurations stay over the 3 ms target.
 
+## 2026-10-21 Phase L baseline (`2026-10-21-phaseL-editmode-baseline.json`)
+
+Same machine and settings as above. Phase L (lighting) adds the light job benchmarks (LGT-11). No code that an
+existing benchmark runs was changed; the renderer changes (light buffers, `PointBuilder.compute`) are on the GPU path.
+
+New rows (`LightJobBenchmark`, `LightJob.Run` on a single worker, ms per lit chunk):
+
+| Benchmark | Sample group | Median | Min | Max |
+|---|---|---|---|---|
+| Natural terrain: Terrain-first, None + flora, 8 scattered chunks with their 3 x 3 rings | LightJob.Run natural terrain ms/chunk | 0.86 ms | 0.81 ms | 0.98 ms |
+| Worst case: air cavity y 20…235 with a Lava emitter every 8 voxels, leaf roof (box filled by BFS on all 4 channels) | LightJob.Run worst case ms/chunk | 15.73 ms | 15.57 ms | 16.49 ms |
+
+PERF-05 (light ≤ 1 ms/chunk on natural terrain) is met. The first run of the benchmark measured 3.69 ms (worst
+case 25.9 ms). A stage breakdown showed that the time went into the bulk loops, not the BFS (about 11 k dequeues
+per chunk on natural terrain):
+- `FillVoxels`: 1.75 ms;
+- sky fill in `SeedSky`: 1.15 ms;
+- BFS: 0.3 ms;
+- `WriteChunk`: 0.2 ms.
+
+Burst keeps safety checks on in the Editor, and the checked `NativeArray` indexers kept those loops from vectorising.
+`LightRegion` now uses `MemSet` and raw pointers there. `FillVoxels` walks the interval nodes across consecutive
+columns instead of a binary search per column. The initial-light BFS uses a ring buffer (`LightQueue`) instead
+of `NativeQueue`.
+
+The light box is the chunk ± 15 (64 x 64 x 256 voxels), so each chunk does about 3.75 times its own column count
+of work. That is the price of lighting every chunk independently and in parallel (LGT-04).
+
+PERF-03, existing rows vs Phase 5 (median / min):
+- Every `ChunkJob`, `CMeshBuildJob`, `FrustumCulling` and `UnsafeIntervalList` row is between −3 % and +1 %.
+- `PageAllocator fill+release` measured 0.46 ms (+11 % / +7 %); two re-runs gave 0.47 / 0.46 ms.
+  - `PageAllocator` is unchanged on this branch.
+  - 0.46–0.47 ms is the 2026-10-17 value (0.47 ms); the Phase 5 run (0.42 ms) was the low outlier.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the
