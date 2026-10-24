@@ -170,8 +170,8 @@ namespace Engine.Scripts.Render{
 
         /// <summary>
         ///     Horizon fog from the draw distance and the sky material, and the sun direction for the sun disc.
-        ///     The edge fade is full at the nearest edge of the drawn chunks; beyond it only corners of the square are
-        ///     drawn. The height haze comes from the renderer settings.
+        ///     The fog covers the outer ring of the drawn chunks, one chunk wide: it is full at the nearest edge of the
+        ///     square, wherever the camera stands in its chunk.
         /// </summary>
         private void UpdateSkyGlobals(){
             RendererSettings rSettings = _settings.Renderer;
@@ -181,9 +181,8 @@ namespace Engine.Scripts.Render{
             Color zenith = fog ? sky.GetColor(VoxelRenderConstants.SkyZenithColorNameID) : Color.white;
             float power = fog ? sky.GetFloat(VoxelRenderConstants.SkyGradientPowerNameID) : 1f;
             float end = _settings.Chunk.DrawDistance * ChunkWidth;
-            VoxelLightingGlobals.SetHorizonFog(fog, horizon, zenith, power, end * rSettings.fogStart, end);
-            VoxelLightingGlobals.SetHaze(fog ? rSettings.hazeDensity : 0f, rSettings.hazeFalloff,
-                rSettings.hazeBaseHeight);
+            VoxelLightingGlobals.SetHorizonFog(fog, horizon, zenith, power, end - ChunkWidth, end,
+                rSettings.fogSteepness);
 
             Light sun = RenderSettings.sun;
             VoxelLightingGlobals.SetSunDirection(sun ? -sun.transform.forward : Vector3.zero);
