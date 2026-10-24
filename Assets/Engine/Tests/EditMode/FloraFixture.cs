@@ -58,6 +58,9 @@ namespace Engine.Tests.EditMode{
         /// <summary>Log line 0…5, a needle cylinder r 2 on y 3…4, a needle ring r 2 at y 5, a disc r 1 at y 6 (reach 2).</summary>
         internal readonly VoxelStructure Pine;
 
+        /// <summary>A tree species with every variant of <see cref="ShapeVariants" /> at weight 1.</summary>
+        internal readonly TreeSpecies Grove;
+
         internal FloraFixture(){
             GrassSo = MakeVoxel("Grass", TestFixtures.Grass, MeshLayer.Solid, true);
             DirtSo = MakeVoxel("Dirt", TestFixtures.Dirt, MeshLayer.Solid, true);
@@ -89,6 +92,8 @@ namespace Engine.Tests.EditMode{
                     }, new VoxelPlacement{ shape = PlacementShape.Circle, origin = new Vector3Int(0, 5, 0), radius = 2 },
                     new VoxelPlacement{ shape = PlacementShape.Circle, origin = new Vector3Int(0, 6, 0), radius = 1, filled = true })
             };
+
+            Grove = MakeTree("Grove", ShapeVariants());
         }
 
         internal T Create<T>(string name) where T : ScriptableObject{
@@ -124,6 +129,56 @@ namespace Engine.Tests.EditMode{
             return new FloraRule{ SpeciesStructure = structure, Probability = p };
         }
 
+        internal static FloraRule Rule(TreeSpecies tree, float p){
+            return new FloraRule{ SpeciesTree = tree, Probability = p };
+        }
+
+        internal TreeSpecies MakeTree(string name, params TreeVariant[] variants){
+            TreeSpecies t = Create<TreeSpecies>(name);
+            t.Variants = new List<TreeVariant>(variants);
+            return t;
+        }
+
+        /// <summary>Today's tree as a variant: log trunk 4–6, round leaf crown r 2–3, 0–1 diagonal branches, spacing 3.</summary>
+        internal TreeVariant Normal(){
+            return new TreeVariant{
+                Name = "Normal", TrunkVoxel = LogSo, LeafVoxel = LeavesSo, BranchCount = new IntRange(0, 1)
+            };
+        }
+
+        /// <summary>
+        ///     One variant per crown shape and branch style, with wide, leaning and alt-leaf trunks and crowns and
+        ///     spacing radii 2…5: Normal (round), Wide (ellipsoid, 2×2 leaning trunk), Spire (cone), Tiered (arm
+        ///     branches with clusters) and Snag (no crown, diagonal branches with clusters).
+        /// </summary>
+        internal TreeVariant[] ShapeVariants(){
+            return new[]{
+                Normal(),
+                new TreeVariant{
+                    Name = "Wide", TrunkVoxel = LogSo, LeafVoxel = LeavesSo, AltLeafVoxel = NeedlesSo, AltLeafChance = .3f,
+                    TrunkHeight = new IntRange(6, 8), TrunkWidth = 2, MaxLean = .2f, CrownShape = CrownShape.Ellipsoid,
+                    CrownRadius = new IntRange(3, 4), CrownHeight = new IntRange(4, 5), SpacingRadius = 5
+                },
+                new TreeVariant{
+                    Name = "Spire", TrunkVoxel = LogSo, LeafVoxel = NeedlesSo, TrunkHeight = new IntRange(8, 10),
+                    CrownShape = CrownShape.Cone, CrownRadius = new IntRange(3, 3), CrownTopRadius = new IntRange(0, 0),
+                    CrownTop = 1, CrownMinBase = 3, SpacingRadius = 2
+                },
+                new TreeVariant{
+                    Name = "Tiered", TrunkVoxel = LogSo, LeafVoxel = NeedlesSo, TrunkHeight = new IntRange(7, 9),
+                    CrownShape = CrownShape.Tiered, CrownRadius = new IntRange(3, 4), CrownTopRadius = new IntRange(1, 1),
+                    CrownMinBase = 2, BranchCount = new IntRange(2, 3), BranchStyle = BranchStyle.Arm,
+                    BranchLength = new IntRange(1, 2), BranchBandMin = .2f, BranchBandMax = .6f, BranchLeafRadius = new IntRange(1, 1),
+                    SpacingRadius = 4
+                },
+                new TreeVariant{
+                    Name = "Snag", TrunkVoxel = LogSo, LeafVoxel = LeavesSo, TrunkHeight = new IntRange(3, 5), MaxLean = .25f,
+                    CrownShape = CrownShape.None, BranchCount = new IntRange(2, 4), BranchLength = new IntRange(2, 3),
+                    BranchLeafRadius = new IntRange(1, 2), SpacingRadius = 3
+                }
+            };
+        }
+
         /// <summary>
         ///     A biome usable by both architectures: Biome-first reads the height parameters, Terrain-first the climate
         ///     targets (h = .5). The flora biomes differ only in temperature, so both occur within a few chunks.
@@ -149,14 +204,22 @@ namespace Engine.Tests.EditMode{
         }
 
         /// <summary>
-        ///     The two flora test biomes: a meadow (grass, flowers, trees) and dunes (cactus stacks 1–3, sparse grass,
-        ///     pines), both above the water level 124 in Biome-first. Probabilities are high so every chunk has flora.
+        ///     The two flora test biomes: a meadow (grass, flowers, <see cref="Grove" /> trees) and dunes (cactus stacks
+        ///     1–3, sparse grass, pine structures), both above the water level 124 in Biome-first. Probabilities are
+        ///     high so every chunk has flora.
         /// </summary>
         internal Biome[] DefaultBiomes(){
             return new[]{
-                MakeBiome("Meadow", .25f, 150f, 10f, GrassSo, Rule(TuftSo, .3f), Rule(FlowerSo, .05f), Rule(Tree, .06f)),
+                MakeBiome("Meadow", .25f, 150f, 10f, GrassSo, Rule(TuftSo, .3f), Rule(FlowerSo, .05f), Rule(Grove, .06f)),
                 MakeBiome("Dunes", .75f, 138f, 6f, SandSo, Rule(CactusSo, .03f, 1, 3), Rule(TuftSo, .05f), Rule(Pine, .03f))
             };
+        }
+
+        /// <summary>The default biomes with the <see cref="Tree" /> structure in the meadow instead of <see cref="Grove" />.</summary>
+        internal Biome[] StructureBiomes(){
+            Biome[] biomes = DefaultBiomes();
+            biomes[0].FloraRules[2] = Rule(Tree, .06f);
+            return biomes;
         }
 
         /// <summary>Settings with <paramref name="method" /> on the material stage (and, in Biome-first, the height stage).</summary>
@@ -286,6 +349,12 @@ namespace Engine.Tests.EditMode{
         /// <summary>Anchors (world column) of multi-block species whose footprint touches the area.</summary>
         internal readonly List<(int2 column, List<int3> footprint)> Anchors = new();
 
+        /// <summary>Tree variant (index into the config's variants) of every tree anchor in <see cref="Anchors" />.</summary>
+        internal readonly Dictionary<int2, int> TreeVariants = new();
+
+        /// <summary>Tree anchors in <see cref="Anchors" /> whose wide or leaning trunk fell back to a narrow, upright one.</summary>
+        internal readonly HashSet<int2> Narrowed = new();
+
         private readonly ushort[] _voxels;
 
         internal ReferenceWorld(FloraFixture fixture, IReadOnlyList<Biome> biomes, in GeneratorConfig config,
@@ -294,7 +363,8 @@ namespace Engine.Tests.EditMode{
             Origin = originChunk * new int2(ChunkWidth, ChunkDepth);
             Size = chunks * new int2(ChunkWidth, ChunkDepth);
             int reach = cfg.FloraReach;
-            Region = RegionSample.Sample(cfg, Origin - reach, Size + 2 * reach);
+            // Anchors up to reach outside the area may stamp into it; their trunk footprint lies within reach of them.
+            Region = RegionSample.Sample(cfg, Origin - 2 * reach, Size + 4 * reach);
             _voxels = new ushort[Size.x * Size.y * ChunkHeight];
 
             List<Object> species = FloraConfigBuilder.CollectSpecies(biomes);
@@ -337,13 +407,35 @@ namespace Engine.Tests.EditMode{
             }
 
             // Anchors in world order: x, then z.
-            for (int wx = Region.Origin.x; wx < Region.Origin.x + Region.Size.x; wx++)
-            for (int wz = Region.Origin.y; wz < Region.Origin.y + Region.Size.y; wz++){
+            NativeList<FloraVoxel> tree = new(256, Allocator.Temp);
+            for (int wx = Origin.x - reach; wx < Origin.x + Size.x + reach; wx++)
+            for (int wz = Origin.y - reach; wz < Origin.y + Size.y + reach; wz++){
                 FloraRule rule = RuleAt(biomes, species, wx, wz, out int i);
                 if (rule == null || !rule.IsMultiBlock) continue;
                 int3 basePos = new(wx, ColumnTop(i) + 1, wz);
                 List<int3> footprint = new();
-                if (rule.SpeciesStructure){
+                if (rule.SpeciesTree){
+                    // Variant and shape from the shared tree code; the flat-footprint fallback from the region heights.
+                    int speciesId = Region.FloraSpecies[i];
+                    int treeIndex = Enumerable.Range(0, cfg.FloraRules.Length).Select(k => cfg.FloraRules[k]).First(d => d.Species == speciesId).Tree;
+                    int variant = TreeShape.PickVariant(wx, wz, cfg, treeIndex);
+                    TreeVariantDef v = cfg.TreeVariants[variant];
+                    TreeRoll roll = TreeShape.Roll(wx, wz, cfg.Seed, variant, v);
+                    if (roll.NeedsFlatFootprint && !FlatFootprint(wx, wz, TreeShape.Footprint(roll))){
+                        roll.Narrow();
+                        Narrowed.Add(new int2(wx, wz));
+                    }
+
+                    tree.Clear();
+                    TreeShape.Build(basePos, roll, v, cfg.Seed, ref tree);
+                    foreach (FloraVoxel fv in tree){
+                        footprint.Add(basePos + fv.Offset);
+                        Put(fixture, basePos + fv.Offset, fv.Voxel);
+                    }
+
+                    TreeVariants[new int2(wx, wz)] = variant;
+                }
+                else if (rule.SpeciesStructure){
                     foreach (StructurePart part in rule.SpeciesStructure.parts)
                     foreach (VoxelPlacement placement in part.placements)
                     foreach (int3 offset in FloraConfigBuilder.Expand(placement)){
@@ -361,7 +453,26 @@ namespace Engine.Tests.EditMode{
                 }
 
                 if (footprint.Any(InArea)) Anchors.Add((new int2(wx, wz), footprint));
+                else{
+                    TreeVariants.Remove(new int2(wx, wz));
+                    Narrowed.Remove(new int2(wx, wz));
+                }
             }
+
+            tree.Dispose();
+        }
+
+        /// <summary>True if the clamped terrain heights under the trunk footprint (relative box) differ by at most 1.</summary>
+        private bool FlatFootprint(int x, int z, int4 box){
+            int min = int.MaxValue, max = int.MinValue;
+            for (int fx = x + box.x; fx <= x + box.z; fx++)
+            for (int fz = z + box.y; fz <= z + box.w; fz++){
+                int h = ColumnTop(Region.Index(fx, fz));
+                min = math.min(min, h);
+                max = math.max(max, h);
+            }
+
+            return max - min <= 1;
         }
 
         private int ColumnTop(int regionIndex){
@@ -374,7 +485,7 @@ namespace Engine.Tests.EditMode{
             ushort id = Region.FloraSpecies[i];
             if (id == 0) return null;
             Object so = species[id - 1];
-            return biomes[Region.FloraSource[i]].FloraRules.First(r => r.SpeciesVoxel == so || r.SpeciesStructure == so);
+            return biomes[Region.FloraSource[i]].FloraRules.First(r => r.SpeciesVoxel == so || r.SpeciesStructure == so || r.SpeciesTree == so);
         }
 
         internal bool InArea(int3 p){

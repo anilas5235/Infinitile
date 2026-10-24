@@ -236,7 +236,7 @@ namespace Engine.Scripts.WorldGen.Flora{
 
         private static int2 Range(IntRange range){
             int min = math.max(0, math.min(range.Min, range.Max));
-            return new int2(min, math.max(min, range.Max));
+            return new int2(min, math.max(min, math.max(range.Min, range.Max)));
         }
 
         private static int PerMille(float fraction){
