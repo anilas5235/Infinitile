@@ -193,13 +193,21 @@ namespace Engine.Tests.EditMode{
             WorldGenConfig cfg = ShippedConfig(out WorldGenSettings settings);
             try{
                 Assert.IsTrue(cfg.HasFlora);
-                Assert.AreEqual(1, cfg.FloraReach, "Tree: 3×3 leaf box");
+                Assert.AreEqual(4, cfg.FloraReach, "Oak Normal: crown r 3 + bump");
                 Assert.AreEqual(3, settings.TreeSpacingRadius);
-                Assert.AreEqual(4, cfg.FloraPadding, "reach + r_tree");
+                Assert.AreEqual(3, cfg.FloraSpacingMax, "Oak Normal spacing");
+                Assert.AreEqual(7, cfg.FloraPadding, "reach + largest spacing radius");
                 for (int i = 0; i < cfg.FloraRules.Length; i++){
                     FloraRuleDef d = cfg.FloraRules[i];
                     Assert.AreNotEqual(0, d.Species);
-                    if (d.Structure < 0) Assert.AreNotEqual(0, d.Voxel, $"rule {i}: voxel id");
+                    if (d.Structure < 0 && d.Tree < 0) Assert.AreNotEqual(0, d.Voxel, $"rule {i}: voxel id");
+                }
+
+                Assert.Greater(cfg.TreeVariants.Length, 0, "Oak");
+                for (int i = 0; i < cfg.TreeVariants.Length; i++){
+                    Assert.AreNotEqual(0, cfg.TreeVariants[i].TrunkVoxel, $"variant {i}: trunk voxel");
+                    Assert.AreNotEqual(0, cfg.TreeVariants[i].LeafVoxel, $"variant {i}: leaf voxel");
+                    Assert.AreEqual(FloraVoxelClass.Leaves, cfg.TreeVariants[i].LeafClass, $"variant {i}: leaf class");
                 }
 
                 for (int i = 0; i < cfg.FloraVoxels.Length; i++) Assert.AreNotEqual(0, cfg.FloraVoxels[i].Voxel, $"structure voxel {i}");

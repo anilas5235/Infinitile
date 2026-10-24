@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 25ad9f33b593d7e44aa899d24d1f01f5, type: 3}
+  m_Name: Oak
+  m_EditorClassIdentifier: Engine.Runtime::Engine.Scripts.VoxelConfig.Data.Generation.TreeSpecies
+  Variants:
+  - Name: Normal
+    Weight: 1
+    TrunkVoxel: {fileID: 11400000, guid: 717e752d88b00d64eb6f6f5e6622a136, type: 2}
+    TrunkHeight:
+      Min: 4
+      Max: 6
+    TrunkWidth: 1
+    MaxLean: 0
+    CrownShape: 1
+    LeafVoxel: {fileID: 11400000, guid: f40ca8ec657e32349900f989d0ebd529, type: 2}
+    AltLeafVoxel: {fileID: 0}
+    CrownRadius:
+      Min: 2
+      Max: 3
+    CrownTopRadius:
+      Min: 0
+      Max: 1
+    CrownHeight:
+      Min: 0
+      Max: 0
+    CrownTop: 2
+    CrownMinBase: 0
+    BranchCount:
+      Min: 0
+      Max: 1
+    BranchStyle: 0
+    BranchLength:
+      Min: 1
+      Max: 2
+    BranchBandMin: 0.5
+    BranchBandMax: 0.9
+    BranchLeafRadius:
+      Min: 0
+      Max: 0
+    HoleChance: 0.2
+    BumpChance: 0.1
+    HangChance: 0.05
+    AltLeafChance: 0
+    SpacingRadius: 3
