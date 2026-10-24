@@ -172,8 +172,8 @@ float3 calc_voxel_light(const uint4 packed, float2 uv)
 float4 _VoxelHorizonColor;
 float4 _VoxelZenithColor;
 float4 _VoxelFogParams;
-// Height haze: x = density per block at the base height, y = 1 / falloff height, z = base height.
-float4 _VoxelHazeParams;
+// Exponential rise of the edge fade: x = steepness k, y = 1 / (exp(k) - 1).
+float4 _VoxelFogCurve;
 
 // The sky colour in the view direction, as VoxelSky.shader draws it without the sun, so fully fogged
 // terrain disappears into the sky behind it.
@@ -184,25 +184,15 @@ float3 horizon_fog_color(const float3 viewDirWS)
     return sky * max(_VoxelSkyBrightness * _VoxelSkyTint.rgb, _VoxelAmbient);
 }
 
-// Height haze along the view ray (aerial perspective): the density thins out exponentially with height, and its
-// integral over the ray has a closed form (Quilez, "better fog"). Below the base height it stays at the base
-// density, so the ray counts only down to there.
-float haze_amount(const float3 to_point)
-{
-    const float k = _VoxelHazeParams.y;
-    const float above = max(_WorldSpaceCameraPos.y - _VoxelHazeParams.z, 0.0f);
-    const float rise = max(to_point.y, -above) * k; // height change along the ray, in falloff heights
-    const float mean = abs(rise) > 1e-3f ? (1.0f - exp(-rise)) / rise : 1.0f; // mean density over the ray
-    return 1.0f - exp(-_VoxelHazeParams.x * length(to_point) * exp(-above * k) * mean);
-}
-
-// Blends color into the horizon fog: the height haze, and the edge fade from its start to full at the edge of the
-// drawn chunks.
+// Blends color into the horizon fog. Only the horizontal distance counts, measured as a square like the drawn
+// chunks (the larger of |x| and |z|), so height and the view's pitch never add fog. The fade rises exponentially
+// from 0 at its start to 1 at the edge of the drawn chunks.
 float3 apply_horizon_fog(const float3 color, const float3 positionWS)
 {
     const float3 to_point = positionWS - _WorldSpaceCameraPos;
-    const float edge = smoothstep(0.0f, 1.0f, saturate((length(to_point.xz) - _VoxelFogParams.x) * _VoxelFogParams.y));
-    const float fog = (1.0f - (1.0f - haze_amount(to_point)) * (1.0f - edge)) * _VoxelFogParams.z;
+    const float2 d = abs(to_point.xz);
+    const float t = saturate((max(d.x, d.y) - _VoxelFogParams.x) * _VoxelFogParams.y);
+    const float fog = (exp(_VoxelFogCurve.x * t) - 1.0f) * _VoxelFogCurve.y * _VoxelFogParams.z;
     return lerp(color, horizon_fog_color(normalize(to_point)), fog);
 }
 

@@ -49,22 +49,16 @@ namespace Engine.Scripts.Settings{
         public Material skyMaterial;
 
         /// <summary>
-        ///     Horizon fog in the voxel shaders: a thin height haze (aerial perspective) and an edge fade, full at
-        ///     the edge of the drawn chunks so they fade into the sky.
+        ///     Horizon fog in the voxel shaders: an edge fade over the outer chunk ring of the drawn square, full at
+        ///     its edge so the drawn chunks fade into the sky. Nearer terrain has no fog.
         /// </summary>
         public bool horizonFog = true;
 
-        /// <summary>Where the edge fade starts, as a fraction of the draw distance.</summary>
-        [Range(0f, 1f)] public float fogStart = 0.85f;
-
-        /// <summary>Haze density per block at <see cref="hazeBaseHeight" />; 0 leaves only the edge fade.</summary>
-        [Min(0f)] public float hazeDensity = 0.002f;
-
-        /// <summary>Blocks of height over which the haze thins out by a factor of e.</summary>
-        [Min(1f)] public float hazeFalloff = 48f;
-
-        /// <summary>World height of the haze's base density, the sea level.</summary>
-        public float hazeBaseHeight = 124f;
+        /// <summary>
+        ///     How sharply the fog rises over the outer chunk ring, (exp(k t) − 1) / (exp(k) − 1); higher keeps the
+        ///     ring clear for longer, near 0 is a straight ramp.
+        /// </summary>
+        [Min(0.01f)] public float fogSteepness = 3f;
 
         /// <summary>
         ///     GPU frustum culling of render pages. Off draws every page that holds points, for debugging and
