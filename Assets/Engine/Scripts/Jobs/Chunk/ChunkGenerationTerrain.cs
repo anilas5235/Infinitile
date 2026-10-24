@@ -65,10 +65,16 @@ namespace Engine.Scripts.Jobs.Chunk{
                 };
                 if (s.SurfaceSource >= 0 && s.SurfaceSource < cfg.BiomeCount){
                     Biome.BiomeDef def = cfg.Biomes[s.SurfaceSource];
-                    col.TopBlock = TopBlockOf(def, col.Height, cfg.WaterLevel);
+                    col.TopBlock = SurfaceCover.IsSnowCovered(wx, wz, s.Fields.T, col.Height, def, cfg)
+                        ? def.snowTopBlock
+                        : TopBlockOf(def, col.Height, cfg.WaterLevel);
                     col.UnderBlock = def.underBlock;
                     col.StoneBlock = def.stoneBlock;
+                    col.StrataBlock = def.strataBlock;
+                    if (def.strataBlock != 0) col.StrataShift = SurfaceCover.StrataShift(wx, wz, cfg);
                 }
+
+                col.Frozen = SurfaceCover.WaterFreezes(wx, wz, s.Fields.T, cfg) ? (byte)1 : (byte)0;
 
                 int g = grid.Index(x, z);
                 grid.Rule[g] = FloraPlacement.RollRule(wx, wz, cfg, s, out col.FloraSource);
@@ -164,8 +170,8 @@ namespace Engine.Scripts.Jobs.Chunk{
             ushort waterBlock = config.Voxels["std:Water"].Id;
             ushort ice = config.Voxels["std:Ice"].Id;
             int waterLevel = config.WorldGen.WaterLevel;
-            // The ice override is a climate override that the settings can switch off.
-            bool iceOverride = config.WorldGen.EnableClimateOverrides;
+            int strataPeriod = config.WorldGen.StrataPeriod;
+            int strataThickness = config.WorldGen.StrataThickness;
 
             for (int x = 0; x < ChunkWidth; x++)
             for (int z = 0; z < ChunkDepth; z++){
@@ -187,8 +193,11 @@ namespace Engine.Scripts.Jobs.Chunk{
                     else if (y == gy) v = top;
                     else v = y < waterLevel ? waterBlock : air;
 
+                    // Strata bands replace the stone block wherever it lies, top and under included.
+                    if (v == st && col.StrataBlock != 0 && SurfaceCover.InStrataBand(y, col.StrataShift, strataPeriod, strataThickness))
+                        v = col.StrataBlock;
                     // The water surface is the topmost water voxel at waterLevel - 1 (y == waterLevel is air).
-                    if (iceOverride && y == waterLevel - 1 && v == waterBlock && col.Temperature < .2f) v = ice;
+                    if (col.Frozen != 0 && y == waterLevel - 1 && v == waterBlock) v = ice;
 
                     vox[ChunkSize.Flatten(x, y, z)] = v;
                 }

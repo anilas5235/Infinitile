@@ -22,6 +22,13 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
         [SerializeField] public Voxel.Voxel StoneBlock;
 
+        [Tooltip("Top block of dry columns colder than the freeze temperature (snow caps, snowy shores). "
+                 + "Empty: the biome never takes snow.")]
+        [SerializeField] public Voxel.Voxel SnowTopBlock;
+
+        [Tooltip("Replaces the stone block in horizontal bands (WorldGenSettings strata). Empty: uniform stone.")]
+        [SerializeField] public Voxel.Voxel StrataBlock;
+
         // --- Classification target ------------------------------------------------------------------------------------
 
         [Range(0f, 1f)] [SerializeField] public float TargetHumidity = 0.5f;
@@ -74,6 +81,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
             def.underwaterTopBlock = voxelId(UnderwaterTopBlock ? UnderwaterTopBlock : UnderBlock);
             def.underBlock = voxelId(UnderBlock);
             def.stoneBlock = voxelId(StoneBlock);
+            def.snowTopBlock = SnowTopBlock ? voxelId(SnowTopBlock) : (ushort)0;
+            def.strataBlock = StrataBlock ? voxelId(StrataBlock) : (ushort)0;
             return def;
         }
 
@@ -108,6 +117,13 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
             public ushort underBlock;
             public ushort stoneBlock;
+
+            /// <summary>Top block of a snow-covered dry column; 0 = the biome takes no snow.</summary>
+            public ushort snowTopBlock;
+
+            /// <summary>Block of the strata bands in the stone; 0 = uniform stone.</summary>
+            public ushort strataBlock;
+
             public float targetHumidity;
             public float targetTemperature;
             public float targetContinental;

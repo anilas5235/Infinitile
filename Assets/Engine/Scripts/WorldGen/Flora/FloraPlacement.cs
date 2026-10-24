@@ -13,7 +13,10 @@ namespace Engine.Scripts.WorldGen.Flora{
     ///     <list type="number">
     ///         <item>Flora source biome: dithered pick from w_mat with <see cref="HashSalts.FloraBiome" />.</item>
     ///         <item>Species: the rule whose cumulative interval holds Hash01(<see cref="HashSalts.FloraSpecies" />); none → no plant.</item>
-    ///         <item>Conditions: same surface (optional), height above water, not clamped at Hmax, solid ground.</item>
+    ///         <item>
+    ///             Conditions: same surface (optional), height above water, not clamped at Hmax, solid ground, and no
+    ///             snow cover for single-block plants.
+    ///         </item>
     ///         <item>
     ///             Multi-block species only: the column is an anchor if no other candidate within r_tree has a higher
     ///             <see cref="HashSalts.TreePriority" /> hash; otherwise it carries no plant.
@@ -53,6 +56,9 @@ namespace Engine.Scripts.WorldGen.Flora{
             // Optionally only on ground of the same biome.
             if (d.RequiresSurfaceFromSameBiome != 0 && s.SurfaceSource != biome) return -1;
             if (!GroundAllows(s, d.MinHeightAboveWater, cfg)) return -1;
+            // Snow keeps trees and cacti but carries no ground plants.
+            if (d.MultiBlock == 0 &&
+                SurfaceCover.IsSnowCovered(x, z, s.Fields.T, s.ColumnHeight, cfg.Biomes[s.SurfaceSource], cfg)) return -1;
 
             source = biome;
             return rule;

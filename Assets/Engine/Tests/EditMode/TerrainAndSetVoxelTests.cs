@@ -51,7 +51,9 @@ namespace Engine.Tests.EditMode{
                     UnderBlock = TestFixtures.Dirt,
                     StoneBlock = TestFixtures.Stone,
                     Temperature = column.Equals(ColdColumn) ? 0.1f : 0.5f,
-                    Humidity = 0.5f
+                    Humidity = 0.5f,
+                    // PrepareChunkMaps decides the freeze from the effective temperature; FillTerrain follows the flag.
+                    Frozen = column.Equals(ColdColumn) ? (byte)1 : (byte)0
                 };
             }
 

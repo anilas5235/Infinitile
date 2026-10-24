@@ -269,7 +269,8 @@ namespace Engine.Tests.EditMode{
                 _columns[ChunkJob.GetColumnIdx(x, z, ChunkDepth)] = new ChunkColumn{
                     Height = 100, HeightF = 100f, Biome = 0, SurfaceSource = 0, FloraSource = -1,
                     TopBlock = TopA, UnderBlock = UnderA, StoneBlock = TestFixtures.Stone,
-                    Temperature = 0.1f, Humidity = 0.5f
+                    Temperature = 0.1f, Humidity = 0.5f,
+                    Frozen = SurfaceCover.WaterFreezes(x, z, 0.1f, _config.WorldGen) ? (byte)1 : (byte)0
                 };
         }
 

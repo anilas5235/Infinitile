@@ -13,7 +13,10 @@
         /// </summary>
         public ushort Biome;
 
-        /// <summary>Surface block voxel ID: the biome's top block, or its underwater top block when water covers it.</summary>
+        /// <summary>
+        ///     Surface block voxel ID: the biome's top block, its underwater top block when water covers it, or its snow
+        ///     block when the column is snow-covered.
+        /// </summary>
         public ushort TopBlock;
 
         /// <summary>Sub-surface block voxel ID (just below the top block).</summary>
@@ -21,6 +24,15 @@
 
         /// <summary>Stone layer block voxel ID.</summary>
         public ushort StoneBlock;
+
+        /// <summary>Block of the strata bands that replace the stone block; 0 = none.</summary>
+        public ushort StrataBlock;
+
+        /// <summary>Vertical shift of the strata bands at this column.</summary>
+        public int StrataShift;
+
+        /// <summary>1 when the water surface above the column freezes to ice.</summary>
+        public byte Frozen;
 
         /// <summary>Sampled temperature factor for this column.</summary>
         public float Temperature;

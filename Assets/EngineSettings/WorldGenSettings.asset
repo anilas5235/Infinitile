@@ -152,5 +152,13 @@ MonoBehaviour:
     lacunarity: 2
     octaves: 3
   EnableClimateOverrides: 1
+  FreezeTemperature: 0.2
+  SnowLapse: 0.6
+  FreezeNoiseAmplitude: 0.04
+  FreezeNoiseWavelength: 24
+  StrataPeriod: 7
+  StrataThickness: 2
+  StrataWarpAmplitude: 4
+  StrataWarpWavelength: 64
   Biomes: {fileID: 11400000, guid: f0ebb416c9f7eb0ebd760b80683faf16, type: 2}
   Splines: {fileID: 11400000, guid: 0514b19bf2060874fa278a044246d671, type: 2}

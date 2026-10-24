@@ -16,6 +16,8 @@ MonoBehaviour:
   UnderwaterTopBlock: {fileID: 11400000, guid: b5df436b2cc46cf419e666fccd2d96b3, type: 2}
   UnderBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
+  SnowTopBlock: {fileID: 0}
+  StrataBlock: {fileID: 0}
   TargetHumidity: 0.8
   TargetTemperature: 0.5
   TargetContinental: 0.08
