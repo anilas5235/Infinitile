@@ -106,6 +106,8 @@ namespace Engine.Scripts.Render{
             if (world == null) world = VoxelWorld.Instance;
             _settings = world.Settings;
             VoxelLightingGlobals.SetDefaults(); // lit without a DayNightCycle, which overrides these per frame
+            if (_settings.Renderer.skyMaterial) RenderSettings.skybox = _settings.Renderer.skyMaterial;
+            UpdateSkyGlobals();
             _maxInFlight = math.max(1, _settings.Scheduler.partitionBuildBatchSize);
 
             // sized for the partition pool so the request bookkeeping does not grow during flight
@@ -163,6 +165,25 @@ namespace Engine.Scripts.Render{
 
             CompleteFinishedPartitionBuilds();
             StartPendingPartitionBuilds();
+            UpdateSkyGlobals();
+        }
+
+        /// <summary>
+        ///     Horizon fog from the draw distance and the sky material, and the sun direction for the sun disc.
+        ///     Full fog at the nearest edge of the drawn chunks; beyond it only corners of the square are drawn.
+        /// </summary>
+        private void UpdateSkyGlobals(){
+            RendererSettings rSettings = _settings.Renderer;
+            Material sky = rSettings.skyMaterial;
+            bool fog = rSettings.horizonFog && sky && sky.HasProperty(VoxelRenderConstants.SkyHorizonColorNameID);
+            Color horizon = fog ? sky.GetColor(VoxelRenderConstants.SkyHorizonColorNameID) : Color.white;
+            Color zenith = fog ? sky.GetColor(VoxelRenderConstants.SkyZenithColorNameID) : Color.white;
+            float power = fog ? sky.GetFloat(VoxelRenderConstants.SkyGradientPowerNameID) : 1f;
+            float end = _settings.Chunk.DrawDistance * ChunkWidth;
+            VoxelLightingGlobals.SetHorizonFog(fog, horizon, zenith, power, end * rSettings.fogStart, end);
+
+            Light sun = RenderSettings.sun;
+            VoxelLightingGlobals.SetSunDirection(sun ? -sun.transform.forward : Vector3.zero);
         }
 
         /// <summary>

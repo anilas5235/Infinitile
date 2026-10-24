@@ -24,6 +24,9 @@ MonoBehaviour:
     pointBuilder: {fileID: 7200000, guid: b253108f447042e389630ea3cd8affd1, type: 3}
     copyPoints: {fileID: 7200000, guid: d6821e19a578d8a468410694549d56e8, type: 3}
     pageCulling: {fileID: 7200000, guid: 7c3e1a9f5b2d4e8a9f0c6d1b2a3e4f50, type: 3}
+    skyMaterial: {fileID: 2100000, guid: 55b32681e862f0d45b961d65ad529abc, type: 2}
+    horizonFog: 1
+    fogStart: 0.6
     gpuCulling: 1
     shadows: 0
   Scheduler:
@@ -31,3 +34,4 @@ MonoBehaviour:
     meshingBatchSize: 8
     partitionBuildBatchSize: 4
     colliderBatchSize: 6
+    lightBatchSize: 8

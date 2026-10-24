@@ -167,6 +167,30 @@ float3 calc_voxel_light(const uint4 packed, float2 uv)
     return max(light, _VoxelAmbient);
 }
 
+// Horizon fog (GEN-37), set by VoxelWorldRenderer from the sky material: its horizon and zenith colours, and
+// x = start, y = 1 / (end - start), z = 1 when on, w = the sky's gradient power. Distances are horizontal.
+float4 _VoxelHorizonColor;
+float4 _VoxelZenithColor;
+float4 _VoxelFogParams;
+
+// The sky colour in the view direction, as VoxelSky.shader draws it without the sun, so fully fogged
+// terrain disappears into the sky behind it.
+float3 horizon_fog_color(const float3 viewDirWS)
+{
+    const float t = pow(saturate(viewDirWS.y), _VoxelFogParams.w);
+    const float3 sky = lerp(_VoxelHorizonColor.rgb, _VoxelZenithColor.rgb, t);
+    return sky * max(_VoxelSkyBrightness * _VoxelSkyTint.rgb, _VoxelAmbient);
+}
+
+// Blends color into the horizon fog: none before the start, full at the edge of the drawn chunks.
+float3 apply_horizon_fog(const float3 color, const float3 positionWS)
+{
+    const float3 toPoint = positionWS - _WorldSpaceCameraPos;
+    const float d = length(toPoint.xz);
+    const float fog = smoothstep(0.0f, 1.0f, saturate((d - _VoxelFogParams.x) * _VoxelFogParams.y)) * _VoxelFogParams.z;
+    return lerp(color, horizon_fog_color(normalize(toPoint)), fog);
+}
+
 float calc_glow(const float glow_data)
 {
     return 1.0f + glow_data / 8.0f;

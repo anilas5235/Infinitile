@@ -32,6 +32,7 @@
             float4 positionCS : SV_POSITION;
             float2 uv : TEXCOORD0;
             uint4 packed : TEXCOORD1;
+            float3 positionWS : TEXCOORD2; // horizon fog
             float4 positionSS : TEXCOORD3;
         };
 
@@ -46,6 +47,7 @@
             o.uv = v.uv;
             o.packed = v.packed;
             o.positionSS = ComputeScreenPos(o.positionCS);
+            o.positionWS = TransformObjectToWorld(v.positionOS);
             return o;
         }
         ENDHLSL
@@ -140,7 +142,7 @@
                 clip(alpha - 0.001f);
 
                 // --- Final colour ---
-                return half4(ao_color.rgb * light * glow, alpha);
+                return half4(apply_horizon_fog(ao_color.rgb * light * glow, IN.positionWS), alpha);
             }
             ENDHLSL
         }

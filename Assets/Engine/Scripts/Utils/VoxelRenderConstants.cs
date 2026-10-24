@@ -84,6 +84,17 @@ namespace Engine.Scripts.Utils{
         public static readonly int VoxelSkyTintNameID = Shader.PropertyToID("_VoxelSkyTint");
         public static readonly int VoxelAmbientNameID = Shader.PropertyToID("_VoxelAmbient");
 
+        // Sky and horizon fog globals (VoxelSky.shader, VoxelShaderCommon.hlsl)
+        public static readonly int VoxelHorizonColorNameID = Shader.PropertyToID("_VoxelHorizonColor");
+        public static readonly int VoxelZenithColorNameID = Shader.PropertyToID("_VoxelZenithColor");
+        public static readonly int VoxelFogParamsNameID = Shader.PropertyToID("_VoxelFogParams");
+        public static readonly int VoxelSunDirectionNameID = Shader.PropertyToID("_VoxelSunDirection");
+
+        // Sky material properties the horizon fog copies, so fogged terrain matches the sky behind it
+        public static readonly int SkyHorizonColorNameID = Shader.PropertyToID("_HorizonColor");
+        public static readonly int SkyZenithColorNameID = Shader.PropertyToID("_ZenithColor");
+        public static readonly int SkyGradientPowerNameID = Shader.PropertyToID("_GradientPower");
+
         public static readonly int SolidPointsInNameID = Shader.PropertyToID("_SolidPointsIn");
         public static readonly int SolidPointsCopyOutNameID = Shader.PropertyToID("_SolidPointsCopyOut");
         public static readonly int SolidPagesNameID = Shader.PropertyToID("_SolidPages");
