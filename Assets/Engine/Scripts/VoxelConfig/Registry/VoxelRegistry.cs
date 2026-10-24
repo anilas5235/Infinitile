@@ -196,12 +196,14 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         }
 
         /// <summary>
-        ///     Gives a transparent voxel with post-process fog a volume fog slot: the scene seen through its surface
-        ///     then gets the underwater fog and colour grading (GEN-38). 0 for every other voxel. The grading values
-        ///     are prepared as URP prepares them for the underwater view (VoxelPostProcessHandler).
+        ///     Gives a transparent voxel with post-process fog or a depth fade a volume slot. With fog, the scene seen
+        ///     through its surface gets the underwater fog and colour grading (GEN-38); the grading values are prepared
+        ///     as URP prepares them for the underwater view (VoxelPostProcessHandler). 0 for every other voxel.
         /// </summary>
         private byte RegisterVolumeFog(Voxel so){
-            if (so.meshLayer != MeshLayer.Transparent || !so.usePostProcess || !so.postProcess.enableFog) return 0;
+            if (so.meshLayer != MeshLayer.Transparent) return 0;
+            bool fogged = so.usePostProcess && so.postProcess.enableFog;
+            if (!fogged && so.depthFadeDistance <= 0f) return 0;
             if (_volumeFogs.Count > byte.MaxValue){
                 VoxelEngineLogger.Warn<VoxelRegistry>($"No volume fog slot left for '{so.name}'");
                 return 0;
@@ -219,7 +221,10 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                 Gain = ((float4)gain).xyz,
                 Contrast = post.contrast / 100f + 1f,
                 InvGamma = ((float4)invGamma).xyz,
-                Saturation = post.saturation / 100f + 1f
+                Saturation = post.saturation / 100f + 1f,
+                DepthFade = math.max(so.depthFadeDistance, 0f),
+                DepthDarkening = fogged ? math.max(post.depthDarkening, 0f) : 0f,
+                Fogged = fogged ? 1f : 0f
             });
             return (byte)(_volumeFogs.Count - 1);
         }
@@ -305,6 +310,10 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             public float Contrast; // ColorAdjustments contrast as a factor, contrast / 100 + 1
             public float3 InvGamma;
             public float Saturation; // ColorAdjustments saturation as a factor, saturation / 100 + 1
+            public float DepthFade; // blocks over which the alpha rises to 1, 0 = off
+            public float DepthDarkening; // fraction of the fog's light lost per block below the surface (exp)
+            public float Fogged; // 1 = the scene behind is fogged and graded, 0 = depth fade only
+            public float Pad; // keeps the stride a multiple of 16 bytes
         }
 
         //TODO: Compacting?

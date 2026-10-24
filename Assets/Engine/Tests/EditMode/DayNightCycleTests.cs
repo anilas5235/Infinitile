@@ -48,5 +48,15 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(0f, VoxelLightingGlobals.FogParams(false, 0f, 10f, 1f).z, "off");
             Assert.IsTrue(float.IsFinite(VoxelLightingGlobals.FogParams(true, 50f, 50f, 1f).y), "empty range");
         }
+
+        [Test]
+        public void HazeParams_EncodeDensityFalloffAndBase(){
+            Vector4 p = VoxelLightingGlobals.HazeParams(0.002f, 48f, 124f);
+            Assert.AreEqual(0.002f, p.x, 1e-7f);
+            Assert.AreEqual(1f / 48f, p.y, 1e-7f);
+            Assert.AreEqual(124f, p.z);
+            Assert.AreEqual(0f, VoxelLightingGlobals.HazeParams(-1f, 48f, 0f).x, "no negative density");
+            Assert.IsTrue(float.IsFinite(VoxelLightingGlobals.HazeParams(0f, 0f, 0f).y), "zero falloff");
+        }
     }
 }

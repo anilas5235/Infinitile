@@ -35,6 +35,7 @@ namespace Engine.Editor.VoxelConfig{
             EditorGUILayout.PropertyField(serializedObject.FindProperty("lightEmission"));
 
             if (voxelDef.meshLayer == MeshLayer.Transparent){
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("depthFadeDistance"));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("surfaceAlpha"));
                 SerializedProperty usePostProcess = serializedObject.FindProperty("usePostProcess");
                 EditorGUILayout.PropertyField(usePostProcess);

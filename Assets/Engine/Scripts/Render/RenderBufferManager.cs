@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Engine.Scripts.Utils.Logger;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Rendering;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
 
 namespace Engine.Scripts.Render{
@@ -12,6 +13,7 @@ namespace Engine.Scripts.Render{
     /// </summary>
     public class RenderBufferManager : IDisposable{
         private readonly Material _material;
+        private readonly Material[] _passes; // drawn in order from the same culled pages; clones are owned
         private readonly Dictionary<int3, AllocInfo> _partitionAllocations = new();
         private readonly List<RenderBuffer> _renderBuffers = new();
         private bool _isDisposed;
@@ -23,7 +25,32 @@ namespace Engine.Scripts.Render{
         /// <param name="initialBuffers">The initial number of buffers to create. Defaults to 1.</param>
         public RenderBufferManager(Material mat, int initialBuffers = 1){
             _material = mat;
+            _passes = new[]{ mat };
             for (int i = 0; i < initialBuffers; i++) AddNewBuffer();
+        }
+
+        private RenderBufferManager(Material mat, Material[] passes){
+            _material = mat;
+            _passes = passes;
+            AddNewBuffer();
+        }
+
+        /// <summary>
+        ///     A manager for the transparent layer that draws its pages twice, from runtime clones of
+        ///     <paramref name="mat" /> (TransparentVoxel.shader): plain transparents such as leaves first, then the
+        ///     voxels with a volume slot (liquids). Inside one draw the order of the points follows the culled page
+        ///     list, so a depth-writing liquid surface would hide the leaves behind it in some frames and not in
+        ///     others.
+        /// </summary>
+        /// <param name="mat">The transparent material; it is not modified.</param>
+        public static RenderBufferManager WithVolumePass(Material mat){
+            if (mat == null || !mat.HasProperty(VoxelPassNameID)) return new RenderBufferManager(mat);
+
+            Material plain = new(mat){ name = mat.name, renderQueue = mat.renderQueue - 2 };
+            plain.SetFloat(VoxelPassNameID, 1f);
+            Material volume = new(mat){ name = mat.name + " (volume)", renderQueue = mat.renderQueue };
+            volume.SetFloat(VoxelPassNameID, 2f);
+            return new RenderBufferManager(plain, new[]{ plain, volume });
         }
 
         /// <summary>Name of the material, used to label this layer in the culling overlay.</summary>
@@ -39,6 +66,8 @@ namespace Engine.Scripts.Render{
             if (_isDisposed) return;
 
             foreach (RenderBuffer buffer in _renderBuffers) buffer.Dispose();
+            if (_passes.Length > 1)
+                foreach (Material pass in _passes) CoreUtils.Destroy(pass); // DestroyImmediate outside play mode
 
             _renderBuffers.Clear();
             _partitionAllocations.Clear();
@@ -54,7 +83,7 @@ namespace Engine.Scripts.Render{
         /// <param name="parameters">Culling switches and the shadow extrusion for this frame.</param>
         internal void Draw(Camera cam, GpuCuller culler, CameraCullState state, in CullingParameters parameters){
             foreach (RenderBuffer renderBuffer in _renderBuffers)
-                renderBuffer.Draw(_material, cam, culler, state, parameters);
+                renderBuffer.Draw(_passes, cam, culler, state, parameters);
         }
 
         /// <summary>

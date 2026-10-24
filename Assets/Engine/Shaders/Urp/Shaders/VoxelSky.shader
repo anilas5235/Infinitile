@@ -2,8 +2,8 @@ Shader "Engine/VoxelSky"
 {
     Properties
     {
-        _HorizonColor ("Horizon (also the horizon fog colour)", Color) = (0.78, 0.85, 0.93, 1)
-        _ZenithColor ("Zenith", Color) = (0.36, 0.56, 0.87, 1)
+        _HorizonColor ("Horizon (also the horizon fog colour)", Color) = (0.66, 0.78, 0.92, 1)
+        _ZenithColor ("Zenith", Color) = (0.24, 0.46, 0.84, 1)
         _GradientPower ("Gradient power", Range(0.1, 4)) = 0.6
         _SunColor ("Sun", Color) = (1, 0.96, 0.85, 1)
         _SunSize ("Sun radius (radians)", Range(0.005, 0.2)) = 0.04

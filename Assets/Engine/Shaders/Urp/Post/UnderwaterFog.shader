@@ -27,6 +27,7 @@ Shader "Hidden/Engine/UnderwaterFog"
             float4 _UnderwaterFogColor;
             float _UnderwaterFogDensity;
             float _UnderwaterFogEmission;
+            float4 _UnderwaterFogSurface; // x = height of the liquid's surface, y = depth darkening per block
 
             // Voxel lighting globals (VoxelShaderCommon.hlsl)
             float _VoxelSkyBrightness;
@@ -49,11 +50,19 @@ Shader "Hidden/Engine/UnderwaterFog"
                 const bool sky = depth >= 1.0;
                 #endif
                 const float3 positionWS = ComputeWorldSpacePosition(uv, depth, UNITY_MATRIX_I_VP);
-                const float d = distance(positionWS, _WorldSpaceCameraPos) * _UnderwaterFogDensity;
+                const float3 to_point = positionWS - _WorldSpaceCameraPos;
+                const float dist = length(to_point);
+                const float d = dist * _UnderwaterFogDensity;
+
+                // --- Depth darkening: the fog is as dark as the liquid where it has mostly built up, at the hit
+                // or one fog length (1 / density) down the ray, whichever is nearer ---
+                const float reach = min(sky ? 1e6 : dist, 1.0 / max(_UnderwaterFogDensity, 1e-4));
+                const float y = _WorldSpaceCameraPos.y + to_point.y / max(dist, 1e-4) * reach;
+                const float darken = exp(-_UnderwaterFogSurface.y * max(_UnderwaterFogSurface.x - y, 0.0));
 
                 // --- Fog colour lit like an open-sky voxel, never below the ambient or the liquid's own light ---
                 const float3 light = max(_VoxelSkyBrightness * _VoxelSkyTint.rgb, max(_VoxelAmbient, _UnderwaterFogEmission));
-                const float3 fog_color = _UnderwaterFogColor.rgb * light;
+                const float3 fog_color = _UnderwaterFogColor.rgb * light * darken;
 
                 // --- Exp² fog ---
                 const float fog = sky ? 1.0 : 1.0 - exp(-d * d);

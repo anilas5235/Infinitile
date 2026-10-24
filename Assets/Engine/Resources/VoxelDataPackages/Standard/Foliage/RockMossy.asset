@@ -15,6 +15,7 @@ MonoBehaviour:
   textureMode: 0
   meshLayer: 2
   alwaysRenderAllFaces: 0
+  depthFadeDistance: -1
   glow: 0
   lightAttenuation: 0
   lightEmission: {x: 0, y: 0, z: 0}

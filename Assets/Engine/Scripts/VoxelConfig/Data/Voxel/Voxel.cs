@@ -55,10 +55,17 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         public bool alwaysRenderAllFaces;
 
         /// <summary>
+        ///     Depth (blocks behind the surface) over which a transparent voxel's alpha rises from the surface alpha to
+        ///     1, so deep liquid turns opaque; zero or negative disables the depth fade.
+        /// </summary>
+        [Tooltip("Blocks behind the surface over which the alpha rises from the surface alpha to 1; <= 0 disables it")]
+        public float depthFadeDistance = -1f;
+
+        /// <summary>
         ///     Scale of the texture alpha (see-through water); 1 keeps the texture alpha. A transparent voxel with
         ///     post-process fog draws its surface with this alpha over the scene behind it, fogged and colour graded as from inside.
         /// </summary>
-        [Tooltip("Scale of the texture alpha; with post-process fog the scene behind is fogged and graded as seen from inside")]
+        [Tooltip("Scale of the texture alpha at the surface; with post-process fog the scene behind is fogged and graded as seen from inside")]
         [Range(0f, 1f)] public float surfaceAlpha = 1f;
 
         [Range(0, 255)] public int glow;
@@ -289,5 +296,11 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         ///     Fog density value used when <see cref="enableFog" /> is true.
         /// </summary>
         public float fogDensity = .01f;
+
+        /// <summary>
+        ///     Fraction of the fog's light lost per block of depth below the liquid's surface (exponential), so deep
+        ///     water gets darker; 0 keeps the fog equally bright at every depth.
+        /// </summary>
+        [Min(0f)] public float depthDarkening;
     }
 }

@@ -105,14 +105,17 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void VolumeFogDef_Is64Bytes(){
+        public void VolumeFogDef_Is80Bytes(){
             Type type = typeof(VoxelRegistry).GetNestedType("VolumeFogDef", BindingFlags.NonPublic);
             Assert.IsNotNull(type, "VoxelRegistry.VolumeFogDef not found");
-            Assert.AreEqual(64, Marshal.SizeOf(type), "HLSL VolumeFog stride");
+            Assert.AreEqual(80, Marshal.SizeOf(type), "HLSL VolumeFog stride");
             Assert.AreEqual(12, (int)Marshal.OffsetOf(type, "Density"), "HLSL VolumeFog offset");
             Assert.AreEqual(28, (int)Marshal.OffsetOf(type, "SelfIllumination"), "HLSL VolumeFog offset");
             Assert.AreEqual(44, (int)Marshal.OffsetOf(type, "Contrast"), "HLSL VolumeFog offset");
             Assert.AreEqual(60, (int)Marshal.OffsetOf(type, "Saturation"), "HLSL VolumeFog offset");
+            Assert.AreEqual(64, (int)Marshal.OffsetOf(type, "DepthFade"), "HLSL VolumeFog offset");
+            Assert.AreEqual(68, (int)Marshal.OffsetOf(type, "DepthDarkening"), "HLSL VolumeFog offset");
+            Assert.AreEqual(72, (int)Marshal.OffsetOf(type, "Fogged"), "HLSL VolumeFog offset");
         }
 
         #endregion

@@ -132,7 +132,7 @@ namespace Engine.Scripts.Render{
             for (int i = 0; i < _maxInFlight; i++) _buildRequests[i] = new PartitionBuildRequest(default);
 
             _solidBufferManager = new RenderBufferManager(rSettings.solidMaterial);
-            _transparentBufferManager = new RenderBufferManager(rSettings.transparentMaterial);
+            _transparentBufferManager = RenderBufferManager.WithVolumePass(rSettings.transparentMaterial);
             _foliageBufferManager = new RenderBufferManager(rSettings.foliageMaterial);
             _layers = new[]{ _solidBufferManager, _transparentBufferManager, _foliageBufferManager };
 
@@ -170,7 +170,8 @@ namespace Engine.Scripts.Render{
 
         /// <summary>
         ///     Horizon fog from the draw distance and the sky material, and the sun direction for the sun disc.
-        ///     Full fog at the nearest edge of the drawn chunks; beyond it only corners of the square are drawn.
+        ///     The edge fade is full at the nearest edge of the drawn chunks; beyond it only corners of the square are
+        ///     drawn. The height haze comes from the renderer settings.
         /// </summary>
         private void UpdateSkyGlobals(){
             RendererSettings rSettings = _settings.Renderer;
@@ -181,6 +182,8 @@ namespace Engine.Scripts.Render{
             float power = fog ? sky.GetFloat(VoxelRenderConstants.SkyGradientPowerNameID) : 1f;
             float end = _settings.Chunk.DrawDistance * ChunkWidth;
             VoxelLightingGlobals.SetHorizonFog(fog, horizon, zenith, power, end * rSettings.fogStart, end);
+            VoxelLightingGlobals.SetHaze(fog ? rSettings.hazeDensity : 0f, rSettings.hazeFalloff,
+                rSettings.hazeBaseHeight);
 
             Light sun = RenderSettings.sun;
             VoxelLightingGlobals.SetSunDirection(sun ? -sun.transform.forward : Vector3.zero);

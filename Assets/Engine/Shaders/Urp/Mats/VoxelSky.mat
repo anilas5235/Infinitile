@@ -28,8 +28,8 @@ Material:
     - _GradientPower: 0.6
     - _SunSize: 0.04
     m_Colors:
-    - _HorizonColor: {r: 0.78, g: 0.85, b: 0.93, a: 1}
+    - _HorizonColor: {r: 0.66, g: 0.78, b: 0.92, a: 1}
     - _SunColor: {r: 1, g: 0.96, b: 0.85, a: 1}
-    - _ZenithColor: {r: 0.35999998, g: 0.56, b: 0.87, a: 1}
+    - _ZenithColor: {r: 0.24, g: 0.46, b: 0.84, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

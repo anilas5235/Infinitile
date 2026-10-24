@@ -26,7 +26,10 @@ MonoBehaviour:
     pageCulling: {fileID: 7200000, guid: 7c3e1a9f5b2d4e8a9f0c6d1b2a3e4f50, type: 3}
     skyMaterial: {fileID: 2100000, guid: 55b32681e862f0d45b961d65ad529abc, type: 2}
     horizonFog: 1
-    fogStart: 0.6
+    fogStart: 0.85
+    hazeDensity: 0.002
+    hazeFalloff: 48
+    hazeBaseHeight: 124
     gpuCulling: 1
     shadows: 0
   Scheduler:
