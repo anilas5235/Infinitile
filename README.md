@@ -114,7 +114,7 @@ For detailed information on how the engine works, read the pipeline documentatio
 4. **[Mesh & Render Pipeline](Assets/Engine/Docs/MeshAndRenderPipeline.md)** — Mesh generation, collider baking, and GPU rendering (versions 1.0–1.2)
 
 The world generation specification is [Docs/WorldGenSpec.html](Docs/WorldGenSpec.html): world generation (Part I),
-engine rules (Part E), the engine cleanup and implemented ideas (Part II, §15–16) and the research tooling (Part III). It
+engine rules (Part E), the engine cleanup, implemented ideas and planned generation improvements (Part II, §15–17) and the research tooling (Part III). It
 lives outside `Assets` so Unity does not import it.
 
 Each document includes visual diagrams showing data flow and component interactions.
