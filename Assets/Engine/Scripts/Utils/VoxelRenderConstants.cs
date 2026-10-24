@@ -32,7 +32,7 @@ namespace Engine.Scripts.Utils{
 
         /// <summary>
         ///     Voxels per axis of the box BuildPrepBox decompresses: the partition plus a 1-voxel border, all that
-        ///     BuildPoints reads (spec 20.4). Partitions are cubes.
+        ///     BuildPoints reads. Partitions are cubes.
         /// </summary>
         internal const int PrepBoxSize = PartitionWidth + 2;
 

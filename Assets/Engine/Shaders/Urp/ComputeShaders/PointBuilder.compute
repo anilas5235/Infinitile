@@ -43,7 +43,7 @@ uint2 get_voxel_quad_indices(in VoxelDef def, uint dir)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BuildPrepBox Kernel - Decompress the partition's neighbourhood (spec 20.4)
+// BuildPrepBox Kernel - Decompress the partition's neighbourhood
 // The box is the partition plus a 1-voxel border in x, y and z, BOX_SIZE voxels per axis: every voxel BuildPoints
 // reads. Box position = partition-local position + 1, index (bx * BOX_SIZE + bz) * BOX_SIZE + by. Each voxel's
 // uint holds the voxel id (bits 0-15) and its light sky|R|G|B (bits 16-31), so a lookup fetches both at once.

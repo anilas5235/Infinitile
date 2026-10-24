@@ -243,7 +243,7 @@ namespace Engine.Scripts.Render{
         /// <summary>
         ///     Decompresses the partition plus a 1-voxel border, the only voxels BuildPoints reads, from the interval
         ///     lists of its chunk and the eight neighbours in one dispatch: each voxel's uint holds the voxel id in the
-        ///     lower 16 bits and its light in the upper 16 bits (spec 20.4).
+        ///     lower 16 bits and its light in the upper 16 bits.
         /// </summary>
         /// <param name="data">The partition build request containing the chunks' interval lists.</param>
         /// <param name="store">The interval store that holds the lists.</param>

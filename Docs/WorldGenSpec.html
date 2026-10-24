@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>World Generation Spec</title>
-<meta name="description" content="Implementation spec for terrain-first and biome-first voxel world generation with four biome-blending methods and vegetation (Part I), plus separate research-data tooling (Part II).">
+<meta name="description" content="Implementation spec for terrain-first and biome-first voxel world generation with four biome-blending methods and vegetation (Part I), engine-wide rules for performance, culling and lighting (Part E), the engine cleanup, implemented improvement ideas and planned generation improvements (Part II), plus separate research-data tooling (Part III).">
 <style>
 :root{
   --bg:#fbfaf7; --surface:#ffffff; --surface-2:#f2f0ea; --text:#1d1f22; --muted:#5d636b;
@@ -99,7 +99,7 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 <div class="layout">
 <nav class="toc" aria-label="Contents">
   <div class="brand">World Generation Spec</div>
-  <div class="ver">v1.5 · 2026-10-17 · Terrain-first &amp; Biome-first</div>
+  <div class="ver">v1.6 · 2026-10-24 · Terrain-first &amp; Biome-first</div>
   <ol>
     <li><a href="#s0">0 · How to use this spec</a></li>
     <li class="toc-part">Part I · World generation</li>
@@ -122,36 +122,40 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
     <li><a href="#sE1">E1 · Performance</a></li>
     <li><a href="#sE2">E2 · GPU culling</a></li>
     <li><a href="#sE3">E3 · Lighting</a></li>
-    <li class="toc-part">Part II · Research tooling</li>
-    <li><a href="#s15">15 · Separation rules</a></li>
-    <li><a href="#s16">16 · Export &amp; runner</a></li>
-    <li><a href="#s17">17 · Analysis pipeline</a></li>
-    <li><a href="#s18">18 · Phases (Part II)</a></li>
+    <li class="toc-part">Part II · Cleanup, ideas &amp; generation</li>
+    <li><a href="#s15">15 · Engine cleanup</a></li>
+    <li><a href="#s16">16 · Improvement ideas</a></li>
+    <li><a href="#s17">17 · Generation improvements</a></li>
+    <li class="toc-part">Part III · Research tooling</li>
+    <li><a href="#s18">18 · Separation rules</a></li>
+    <li><a href="#s19">19 · Export &amp; runner</a></li>
+    <li><a href="#s20">20 · Analysis pipeline</a></li>
+    <li><a href="#s21">21 · Phases (Part III)</a></li>
     <li class="toc-part">Appendix</li>
-    <li><a href="#s19">19 · Defaults &amp; schemas</a></li>
-    <li><a href="#s20">20 · Ideas (not scheduled)</a></li>
+    <li><a href="#s22">22 · Defaults &amp; schemas</a></li>
   </ol>
 </nav>
 
 <main>
 <h1>World Generation Spec — Terrain-first &amp; Biome-first</h1>
-<p class="sub">Implementation specification for the voxel engine in <code>Assets/Engine</code>, written for a coding agent. Part I builds the world generation. Part II, which comes later and stays separate, builds the tooling that collects research data from it.</p>
+<p class="sub">Implementation specification for the voxel engine in <code>Assets/Engine</code>, written for a coding agent. Part I builds the world generation; Part E holds the engine-wide rules for performance, culling and lighting. Part II records the engine cleanup and the improvement ideas that were implemented after Part I, and plans the next generation improvements (Phase G). Part III, which comes later and stays separate, builds the tooling that collects research data from it.</p>
 <div class="meta">
   <span class="chip">Unity · Burst · Jobs · C#</span>
   <span class="chip">Part I: priority 1</span>
   <span class="chip">Part E: performance, culling, lighting</span>
-  <span class="chip">Part II: priority 2, separate assembly</span>
-  <span class="chip">Decisions recorded 2026-10-17</span>
+  <span class="chip">Part II: cleanup &amp; ideas done 2026-10-21; Phase G planned</span>
+  <span class="chip">Part III: priority 2, separate assembly</span>
+  <span class="chip">Decisions recorded 2026-10-17 (§14), 2026-10-21 (§15.4) and 2026-10-24 (§17.8)</span>
 </div>
 
 <!-- ============================================================ -->
 <h2 id="s0">0 · How to use this spec</h2>
 <ul>
-  <li><strong>Order of work:</strong> <strong>Phase S</strong> (test and fix existing code) → <strong>Phase C</strong> (GPU culling, §E2) → Part I phases 0–5 (world generation) → <strong>Phase L</strong> (lighting, §E3) → Part II only when the user asks. All phases are listed in §13. Performance rules (§E1) apply throughout.</li>
+  <li><strong>Order of work:</strong> <strong>Phase S</strong> (test and fix existing code) → <strong>Phase C</strong> (GPU culling, §E2) → Part I phases 0–5 (world generation) → <strong>Phase L</strong> (lighting, §E3) → <strong>Part II</strong> (engine cleanup and the scheduled ideas, §15–16, done 2026-10-21; then <strong>Phase G</strong>, generation improvements, §17) → Part III only when the user asks. The Part I phases are listed in §13, Phase G in §17.10, the Part III phases in §21. Performance rules (§E1) apply throughout.</li>
   <li><strong>Read order:</strong> §2 (rules) → §3 (what exists, known defects and review findings) → §11.7 (Unity CLI workflow) → §11.1 and §12 for Phase S → afterwards §5 (shared foundations) and the section of the current phase (§13 points to it).</li>
   <li><strong>Requirement keywords:</strong> <span class="kw must">MUST</span> is mandatory; <span class="kw should">SHOULD</span> is strongly recommended (deviate only with a stated reason in the commit/PR); <span class="kw may">MAY</span> is optional.</li>
-  <li><strong>Requirement IDs</strong> are stable. Part E: <code>PERF-</code>, <code>CUL-</code>, <code>LGT-</code>. Part I: <code>GEN-</code>, <code>TRN-</code> (Terrain-first), <code>BIO-</code> (Biome-first), <code>BLD-</code>, <code>VEG-</code>, <code>INT-</code>, <code>TST-</code>, <code>TOOL-</code>. Part II: <code>RES-</code>, <code>EXP-</code>, <code>ANA-</code>. Reference them in commit messages and in a short comment at the implementation site.</li>
-  <li><strong>Decisions</strong> taken by the user are recorded in §14 and are binding. If the agent hits a new design question, it asks the user instead of choosing silently.</li>
+  <li><strong>Requirement IDs</strong> are stable. Part E: <code>PERF-</code>, <code>CUL-</code>, <code>LGT-</code>. Part I: <code>GEN-</code>, <code>TRN-</code> (Terrain-first), <code>BIO-</code> (Biome-first), <code>BLD-</code>, <code>VEG-</code>, <code>INT-</code>, <code>TST-</code>, <code>TOOL-</code>. Part III: <code>RES-</code>, <code>EXP-</code>, <code>ANA-</code>. In Part II, §15–16 record finished work and have no requirement IDs; §17 continues the Part I prefixes (<code>GEN-30</code>…, <code>VEG-10</code>…, <code>TST-30</code>…, <code>PERF-10</code>, <code>INT-31</code>). Reference IDs in commit messages and PR descriptions only. Since the cleanup (§15, R8) the code and everything the Editor shows carry <strong>no</strong> spec references.</li>
+  <li><strong>Decisions</strong> taken by the user are recorded in §14 (2026-10-17), §15.4 (2026-10-21) and §17.8 (2026-10-24) and are binding. If the agent hits a new design question, it asks the user instead of choosing silently.</li>
   <li><strong>Placeholders.</strong> Numeric defaults (spline points, biome positions, biome height parameters, flora rules) are starting values so the world looks plausible. The user tunes them; the agent must not "optimise" them on its own (R5).</li>
 </ul>
 
@@ -173,7 +177,7 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 
 <h3>Non-goals for Part I</h3>
 <ul class="tight">
-  <li>No data export, experiment runner, metrics or analysis. That is Part II and lives outside the engine (§15).</li>
+  <li>No data export, experiment runner, metrics or analysis. That is Part III and lives outside the engine (§18).</li>
   <li>No 3D density fields, overhangs or caves. The world is heightmap-based (2.5D): exactly one surface height per column.</li>
   <li>No changes to meshing, rendering, colliders or the scheduler beyond what integration needs — except the Phase S fixes and Part E (culling, lighting). Performance is a goal throughout (§E1).</li>
   <li>Ores, caves and structures (currently commented out in <code>ChunkJob</code>) stay disabled.</li>
@@ -184,10 +188,11 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 <div class="req"><span class="id">R1</span><span class="kw must">MUST</span>Follow <code>Assets/Engine/Docs/SystemOverview.md</code>: keep responsibilities in their layers, hook into existing events, make minimal changes, check disposal of every native container you create.</div>
 <div class="req"><span class="id">R2</span><span class="kw must">MUST</span>Keep all per-column generation code Burst-compatible: no managed types, no virtual dispatch, no allocations inside hot loops. Select architecture and method with <code>enum</code> switches, not interfaces.</div>
 <div class="req"><span class="id">R3</span><span class="kw must">MUST</span>Every generated per-column quantity is a <strong>pure function</strong> of <code>(worldX, worldZ, seed, config)</code> (§5.1). Never derive randomness or neighbourhoods from the chunk origin or chunk-local indices.</div>
-<div class="req"><span class="id">R4</span><span class="kw must">MUST</span>World generation must not contain research code: no exporters, metric code, experiment plans or file output for analysis. It offers a clean public sampling API (GEN-17); everything research-related is built on top of it in Part II.</div>
+<div class="req"><span class="id">R4</span><span class="kw must">MUST</span>World generation must not contain research code: no exporters, metric code, experiment plans or file output for analysis. It offers a clean public sampling API (GEN-17); everything research-related is built on top of it in Part III.</div>
 <div class="req"><span class="id">R5</span><span class="kw must">MUST NOT</span>silently tune design parameters (spline points, biome positions, biome height parameters, flora rules). Provide tooling, previews and calibration suggestions; the user sets the values.</div>
 <div class="req"><span class="id">R6</span><span class="kw should">SHOULD</span>Where code follows a known source, say so in a short comment (e.g. <code>// PV formula after Minecraft Wiki, "World generation"</code>). Where something is an own extension (e.g. the jaggedness spline), say that too. Never invent sources.</div>
 <div class="req"><span class="id">R7</span><span class="kw should">SHOULD</span>Update <code>Docs/WorldGenerationPipeline.md</code> at the end of each phase in the existing style (mermaid flowchart + description), and fix doc paths that no longer match (§3.3).</div>
+<div class="req"><span class="id">R8</span><span class="kw must">MUST NOT</span>put spec references into code or anything the Unity Editor shows: no § sections, requirement, decision or review IDs, phase names, dates or project history in comments, tooltips, headers, labels, HelpBoxes, log, warning, exception or assert messages, <code>#region</code> names, shader comments or asset notes. Comments state purpose, units, invariants and the non-obvious why. Spec IDs belong in commit messages, PR descriptions and this document (established by the 2026-10-21 cleanup, §15).</div>
 
 <!-- ============================================================ -->
 <h2 id="s3">3 · Current state &amp; gaps</h2>
@@ -304,7 +309,7 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 <div class="req"><span class="id">GEN-01</span><span class="kw must">MUST</span>Implement a static, Burst-compiled sampler (<code>WorldSampler</code>) with one entry point per quantity, all taking world coordinates and a read-only config: <code>SampleFields(x,z)</code>, <code>SampleColumn(x,z) → ColumnSample</code> (fields, height, material weights, height weights, surface source biome, flora decision). The chunk job and the preview window both call it.</div>
 <div class="req"><span class="id">GEN-02</span><span class="kw must">MUST</span>Caching (e.g. a padded per-chunk lattice for spatial methods, §9.3) is allowed only if the cached result is bit-identical to the uncached pure function (TST-01).</div>
 <div class="req"><span class="id">GEN-03</span><span class="kw must">MUST</span>Neighbourhood lookups use a <strong>world-aligned</strong> lattice (points at integer multiples of the stride), never chunk-relative offsets.</div>
-<div class="req"><span class="id">GEN-17</span><span class="kw must">MUST</span>Expose a <strong>public</strong> region API in the engine assembly, used by the preview and later by Part II: <code>WorldGenApi.SampleRegion(in WorldGenRequest req, ref RegionBuffers outBuffers) → JobHandle</code>. <code>WorldGenRequest</code> = settings snapshot, seed, origin, size; <code>RegionBuffers</code> = caller-allocated <code>NativeArray</code>s for any subset of: height (float), column height (int), biome hard class, dominant material biome, material weights, height weights, surface source biome, flora species, flora source biome, fields T F C E W PV. Unrequested buffers are left unallocated and skipped. Also expose <code>WorldGenSettings.ToCanonicalJson()</code> (INT-02). This API is generic world-gen functionality, not research code.</div>
+<div class="req"><span class="id">GEN-17</span><span class="kw must">MUST</span>Expose a <strong>public</strong> region API in the engine assembly, used by the preview and later by Part III: <code>WorldGenApi.SampleRegion(in WorldGenRequest req, ref RegionBuffers outBuffers) → JobHandle</code>. <code>WorldGenRequest</code> = settings snapshot, seed, origin, size; <code>RegionBuffers</code> = caller-allocated <code>NativeArray</code>s for any subset of: height (float), column height (int), biome hard class, dominant material biome, material weights, height weights, surface source biome, flora species, flora source biome, fields T F C E W PV. Unrequested buffers are left unallocated and skipped. Also expose <code>WorldGenSettings.ToCanonicalJson()</code> (INT-02). This API is generic world-gen functionality, not research code.</div>
 
 <h3>5.2 Hashing</h3>
 <div class="req"><span class="id">GEN-04</span><span class="kw must">MUST</span>Provide <code>Hash32(int x, int z, uint seed, uint salt)</code> with good avalanche behaviour and <code>Hash01(...) → float in [0,1)</code> from the top 24 bits. Every random decision has its own <code>salt</code> constant (surface pick, flora biome, flora species, tree priority, noise gradients, …), declared in one file <code>HashSalts.cs</code>.</div>
@@ -427,7 +432,7 @@ Normalisation: PV enters as (PV + 1)/2 so that all dimensions live in [0,1]</pre
 <div class="req"><span class="id">TRN-02</span><span class="kw must">MUST</span>Interpolation is monotone cubic Hermite (Fritsch–Carlson) by default, piecewise linear as a per-spline option. Splines are C<sup>0</sup> everywhere, so the height field is continuous by construction. Outside the first/last control point a spline returns the end value. PV splines are defined over [−1,1], C and E splines over [0,1].</div>
 <div class="req"><span class="id">TRN-03</span><span class="kw must">MUST</span>Height: <code>H = Offset + Amp · Σ_i g_i · N_i + J · P</code>, i.e. <code>a_i = Amp · g_i</code> with a <strong>global</strong> octave-weight vector <code>g</code> (default <code>[1, .5, .25, .125, .0625, .03125]</code>). T and F never influence height.</div>
 <div class="req"><span class="id">TRN-04</span><span class="kw should">SHOULD</span>Comment the jaggedness spline as an own extension (the Minecraft Wiki documents splines for offset and factor). <em>Amp</em> replaces Minecraft's "factor", which has no 2D equivalent.</div>
-<div class="req"><span class="id">TRN-05</span><span class="kw must">MUST</span>Splines are authored in a ScriptableObject (<code>TerrainSplineSet</code>) with JSON import/export. Placeholder control points: §19.1.</div>
+<div class="req"><span class="id">TRN-05</span><span class="kw must">MUST</span>Splines are authored in a ScriptableObject (<code>TerrainSplineSet</code>) with JSON import/export. Placeholder control points: §22.1.</div>
 <div class="req"><span class="id">TRN-06</span><span class="kw should">SHOULD</span>Spline preview in the editor window: Offset/Amp/J as images over the view, and 1D plots of each spline level.</div>
 
 <h3>7.2 Classification</h3>
@@ -540,14 +545,14 @@ surfaceSource(p) = smallest b such that Σ_{c ≤ b} w_c^mat(p) &gt; u · S
 <tr><td>Forest</td><td>Tree 0.04, GrassF 0.20, MushroomBrown 0.01, MushroomRed 0.01</td></tr>
 <tr><td>Ocean</td><td>none</td></tr>
 </table>
-<p class="small">All species exist in <code>Resources/VoxelDataPackages/Standard</code>. Neighbouring biomes should differ in species and density, so transitions are visible.</p>
+<p class="small">All species exist in <code>Resources/VoxelDataPackages/Standard</code>. Neighbouring biomes should differ in species and density, so transitions are visible. Phase G replaces the Tree and Cactus entries with the species set of §17.6.</p>
 
 <!-- ============================================================ -->
 <h2 id="s11">11 · Engine integration</h2>
-<h3>11.1 Assembly definitions (needed for tests and for Part II)</h3>
+<h3>11.1 Assembly definitions (needed for tests and for Part III)</h3>
 <div class="req"><span class="id">INT-50</span><span class="kw must">MUST</span>(Phase S1) Create <code>Assets/Engine/Engine.Runtime.asmdef</code> (covers <code>Engine/Scripts</code> and <code>Engine/Shaders/*.cs</code>), references: <code>Unity.Burst</code>, <code>Unity.Collections</code>, <code>Unity.Mathematics</code>, <code>Unity.RenderPipelines.Core.Runtime</code>, <code>Unity.RenderPipelines.Universal.Runtime</code>; <code>allowUnsafeCode: true</code>; <code>autoReferenced: true</code> so <code>Assembly-CSharp</code> (game scripts in <code>Assets/Scripts</code>) keeps seeing it. Do this first, in its own commit, before any world-gen change.</div>
 <div class="req"><span class="id">INT-51</span><span class="kw must">MUST</span>Inside an asmdef, <code>Editor</code> folders are no longer separated automatically. Create <code>Assets/Engine/Editor/Engine.Editor.asmdef</code> (Editor platform only, references <code>Engine.Runtime</code> and the same packages) and add an <code>.asmref</code> pointing to it in each existing Editor folder: <code>VoxelConfig/Data/Generation/Editor</code>, <code>VoxelConfig/Data/Mesh/Editor</code>, <code>VoxelConfig/Data/Voxel/Editor</code>, <code>World/Editor</code>.</div>
-<div class="req"><span class="id">INT-52</span><span class="kw must">MUST</span>Add <code>Engine/Scripts/AssemblyInfo.cs</code> with <code>[assembly: InternalsVisibleTo("Engine.Editor")]</code>, <code>("Engine.Tests.EditMode")</code> and <code>("Assembly-CSharp")</code>, because much of the engine is <code>internal</code> and game scripts use it. Part II gets <strong>no</strong> internals access; it uses the public API only.</div>
+<div class="req"><span class="id">INT-52</span><span class="kw must">MUST</span>Add <code>Engine/Scripts/AssemblyInfo.cs</code> with <code>[assembly: InternalsVisibleTo("Engine.Editor")]</code>, <code>("Engine.Tests.EditMode")</code> and <code>("Assembly-CSharp")</code>, because much of the engine is <code>internal</code> and game scripts use it. Part III gets <strong>no</strong> internals access; it uses the public API only.</div>
 <div class="req"><span class="id">INT-53</span><span class="kw must">MUST</span>Acceptance for the migration: project compiles with zero errors, the game scene plays as before, existing ScriptableObject assets still load (they reference scripts by GUID, so they should). Asset files show <code>m_EditorClassIdentifier: Assembly-CSharp::…</code>; that is informational and may be left as is.</div>
 
 <h3>11.2 Folder layout (new code)</h3>
@@ -695,20 +700,21 @@ Docs/                                 WorldGenSpec.html (this file; outside Asse
 <div class="phase"><h4>Phase L — Lighting (after Part I)</h4>
 <p>Sections: §E3. Requirements: LGT-01…11, PERF-03.</p>
 <p><strong>Accept:</strong> shadows under trees and in water, lava glows coloured, light seamless across chunk borders, edits update light correctly; day/night cycle runs without re-propagation; LGT-11 tests and light benchmarks pass the budget.</p></div>
+<p class="small">After Phase L the work continued with Part II: the engine cleanup (§15) and the scheduled ideas (§16), all merged on 2026-10-21. Next is Phase G (§17); Part III follows when the user asks.</p>
 
 <!-- ============================================================ -->
 <h2 id="s14">14 · Decisions</h2>
-<p>Taken by the user on 2026-10-17. Binding for the agent.</p>
+<p>Taken by the user on 2026-10-17. Binding for the agent. The decisions of 2026-10-21 (engine cleanup and scheduled ideas) continue the numbering in §15.4.</p>
 <table>
 <tr><th>ID</th><th>Question</th><th>Decision</th><th>Consequence</th></tr>
 <tr><td>DEC-01</td><td>Noise basis</td><td>Own seeded simplex with hash gradients</td><td>GEN-15; no grid bias, no tiling. The existing world will look different.</td></tr>
 <tr><td>DEC-02</td><td>Water / ocean</td><td>Ocean is a regular biome in <strong>every</strong> biome set (game and research); water level stays 124</td><td>GEN-20, GEN-25, RES-05; 6 biomes in the game.</td></tr>
-<tr><td>DEC-03</td><td>5th biome (later extensibility test)</td><td>Forest</td><td>Part of the default world set; Part II can run with and without it.</td></tr>
+<tr><td>DEC-03</td><td>5th biome (later extensibility test)</td><td>Forest</td><td>Part of the default world set; Part III can run with and without it.</td></tr>
 <tr><td>DEC-04</td><td>Flora biome pick</td><td>Independent of the surface pick (same weights, own random roll)</td><td>VEG-02; occasional plant of the neighbour biome on the "wrong" ground inside blend zones.</td></tr>
 <tr><td>DEC-05</td><td>Warp amplitude in method 3</td><td>One shared amplitude for both stages</td><td>BLD-01, BLD-20; material edge always sits on the height ramp. Its strength cannot be varied per stage.</td></tr>
 <tr><td>DEC-06</td><td>Continental → humidity/temperature coupling</td><td>Keep</td><td>Identical in both architectures.</td></tr>
 <tr><td>DEC-07</td><td>Testing</td><td>Unity Test Framework</td><td>Requires the asmdef migration first (INT-50…53, TST-00).</td></tr>
-<tr><td>DEC-08</td><td>Research tooling</td><td>Second priority, not integrated into world generation</td><td>R4, Part II.</td></tr>
+<tr><td>DEC-08</td><td>Research tooling</td><td>Second priority, not integrated into world generation</td><td>R4, Part III.</td></tr>
 <tr><td>DEC-09</td><td>Tests</td><td>Unit tests also for existing engine code wherever possible</td><td>§12.3, Phase 0.</td></tr>
 <tr><td>DEC-10</td><td>Seeds</td><td>Drawn once at random on 2026-10-17, fixed for all experiments. Main: <code>617800548, 1035220005, 38752999, 2073214123, 827781431</code>. Pilot: <code>1135345306, 93056379</code>.</td><td>5 main seeds match the thesis decision rule (4 of 5). Stored in <code>Experiments/seeds.json</code>; plans reference that file instead of repeating numbers (RES-04).</td></tr>
 <tr><td>DEC-11</td><td>Order of work</td><td>Test and fix the existing code before implementing anything new</td><td>Phase S (§13), findings in §3.5.</td></tr>
@@ -723,7 +729,7 @@ Docs/                                 WorldGenSpec.html (this file; outside Asse
 
 <!-- ============================================================ -->
 <div class="part" id="partE"><span>Part E</span> Engine: performance, culling, lighting</div>
-<div class="box note"><p><strong>Order of work</strong> (DEC-16): Phase S → <strong>Phase C (culling)</strong> → Part I phases 0–5 (world generation) → <strong>Phase L (lighting)</strong> → Part II. The performance rules in §E1 apply from Phase S on, to every phase.</p></div>
+<div class="box note"><p><strong>Order of work</strong> (DEC-16): Phase S → <strong>Phase C (culling)</strong> → Part I phases 0–5 (world generation) → <strong>Phase L (lighting)</strong> → Part II (cleanup and scheduled ideas, §15–16; Phase G, §17) → Part III. The performance rules in §E1 apply from Phase S on, to every phase.</p></div>
 
 <h2 id="sE1">E1 · Performance</h2>
 <p>High performance is a goal for the whole engine (DEC-15). Every phase measures before and after.</p>
@@ -773,207 +779,72 @@ Docs/                                 WorldGenSpec.html (this file; outside Asse
 <div class="req"><span class="id">LGT-11</span><span class="kw must">MUST</span>EditMode tests: single emitter in open air gives <code>15 − Manhattan distance</code>; an opaque wall blocks; leaves/water attenuate by their value; channels are independent (red emitter leaves G and B at 0); sky column stays 15 down to the ground; <strong>border exactness</strong>: light of the centre chunk computed from its 3 × 3 region equals the light from one large computation over 5 × 5 chunks; <strong>edit exactness</strong>: 500 random edits with incremental updates equal a full recomputation; GPU packing round trip (C# port of the accessors). Benchmarks per PERF-02.</div>
 
 <!-- ============================================================ -->
-<div class="part" id="part2"><span>Part II</span> Research data tooling — priority 2, separate</div>
-<div class="box note"><p><strong>Do not start Part II until Part I is complete and the user asks for it.</strong> Part II only reads from the world generator through its public API. It is described here so that Part I's API (GEN-17) is shaped right.</p></div>
+<div class="part" id="part2"><span>Part II</span> Engine cleanup, implemented ideas and generation improvements</div>
+<div class="box note"><p><strong>§15 and §16 are a record; §17 is planned work.</strong> §15 documents the engine cleanup and §16 the improvement ideas the user scheduled after Phase L, all merged on 2026-10-21 in PRs #38–#41. What keeps applying from them: rule R8, the decisions in §15.4 and the acceptance criteria of §16 as regression targets. §17 plans Phase G, the next round of generation improvements (2026-10-24). New ideas go to §16 and stay unscheduled until the user picks them.</p></div>
 
-<h2 id="s15">15 · Separation rules</h2>
-<div class="req"><span class="id">RES-01</span><span class="kw must">MUST</span>All Part II Unity code lives in <code>Assets/Research/</code> with its own <code>Research.Editor.asmdef</code> (Editor platform) referencing <code>Engine.Runtime</code>. The engine never references Research. Deleting <code>Assets/Research/</code> must leave the game and all Part I tests working.</div>
-<div class="req"><span class="id">RES-02</span><span class="kw must">MUST</span>Part II uses only public engine API (<code>WorldGenApi</code>, <code>WorldGenSettings</code>, <code>BiomeSet</code>, <code>TerrainSplineSet</code>). If something is missing, add a small, generic public API to the engine as a separate change — never research-specific code in the engine.</div>
-<div class="req"><span class="id">RES-03</span><span class="kw must">MUST</span>Python analysis lives in <code>&lt;ProjectRoot&gt;/Analysis/</code>; outputs in <code>&lt;ProjectRoot&gt;/Exports/</code> (outside <code>Assets/</code>, git-ignored).</div>
-<div class="req"><span class="id">RES-04</span><span class="kw must">MUST NOT</span>change hypothesis thresholds, analysis parameters marked <code>frozen</code>, or the fixed seeds (DEC-10, <code>Experiments/seeds.json</code>). If a result looks wrong, report it; don't tune code or thresholds towards a hypothesis.</div>
-<div class="req"><span class="id">RES-05</span><span class="kw must">MUST</span>Research biome sets are separate <code>BiomeSet</code> assets in <code>Assets/Research/</code>, all containing Ocean (DEC-02): <em>main</em> = Plains, Desert, Mountain, Snow, Ocean; <em>extended</em> = main + Forest, i.e. the same 6 biomes as the game. The extensibility test (H7) measures adding Forest to the main set. Boundaries with Ocean are measured but are not test pairs.</div>
+<h2 id="s15">15 · Engine cleanup</h2>
+<p>Branch <code>phase/cleanup</code>, merged as PR #39 on 2026-10-21, after §16.1–16.2 (PR #38) and before §16.3–16.7 (PRs #40, #41). Goal: an engine whose code and Editor-visible text stand on their own, without references to this spec, plus the fixes of an engine review done on the same branch. Tests at merge: EditMode 448/448, PlayMode 34/34; compute and voxel shaders compile with only the known <code>fetch_vertex_data</code> warning.</p>
 
-<h2 id="s16">16 · Export &amp; experiment runner</h2>
-<h3>16.1 Region and orientation</h3>
-<div class="req"><span class="id">EXP-01</span><span class="kw must">MUST</span>An export covers <code>[originX, originX + size) × [originZ, originZ + size)</code> at 1 sample per block, via <code>WorldGenApi.SampleRegion</code> in tiles (e.g. 512 × 512). Arrays have shape <code>(size, size)</code>, C order, element <code>[j, i]</code> = column <code>(originX + i, originZ + j)</code>. Default region: origin (−2048, −2048), size 4096.</div>
-<div class="req"><span class="id">EXP-02</span><span class="kw must">MUST</span>The runner asserts that Burst compilation is enabled and runs the Part I EditMode tests before a plan; abort on failure.</div>
+<h3>15.1 Spec references and comments</h3>
+<ul class="tight">
+<li><b>Removed everywhere</b> in <code>Assets/Engine</code> and <code>Assets/Scripts</code>: § sections, requirement and decision IDs (GEN/TRN/LGT/TST/…), review IDs (F-/D-), "spec default" wording and project-history notes (phases, dates, "legacy … removed"). This covers Inspector tooltips and headers, preview-window foldouts, labels and HelpBoxes, warning, exception, log and assert messages, <code>#region</code> names, shader comments and the notes of <code>TerrainSplineSet_Default.asset</code> with its placeholder JSON. The rule is now R8.</li>
+<li><b>Comments compacted</b> to purpose, units, invariants and the non-obvious why. Summaries that no longer matched the code were corrected, e.g. the exclusive interval end and <code>TexRegistry.Register</code>, which throws instead of returning −1.</li>
+<li><b>Dead code removed:</b> unused usings, <code>_copyKernelID</code> / <code>_pointBuilderKernelID</code> in <code>VoxelWorldRenderer</code>, <code>VoxelWorld._noiseProfile</code>, <code>ChunkJob.CaveScale</code> / <code>LavaLevel</code> (only used by the commented-out cave call), commented-out code, the empty cave, ore and structure passes.</li>
+<li><b>Renamed</b> tests and helpers whose names referred to the spec, e.g. <code>…WithTheBiweightKernel</code>, <code>Placeholders_EvaluateTheExpectedValuesAtTheControlPoints</code>, <code>CornerLight_Layout_MatchesTheShaderLayout</code>, <code>BenchmarkFixtures.CreatePlaceholderGeneratorConfig</code>.</li>
+<li><b>Docs:</b> <code>Assets/Engine/Docs/*.md</code> lost their spec IDs, phase labels and legacy-path history; the ownership table and folder list match the code. The baselines README names entries by date and change and defines the regression check and budgets once; all numbers and baseline file names are unchanged.</li>
+<li><b>Check:</b> the comment cleanup changed no logic, serialized field or public API (comment-stripped diff: only strings and the removals above differ).</li>
+</ul>
 
-<h3>16.2 Layers</h3>
+<h3>15.2 Fixes found on the way</h3>
+<ul class="tight">
+<li><b>Bugs:</b> <code>PostProcessManager.OnEnable</code> assigned a never-set <code>_profile</code> (null) to <code>volume.profile</code> and only worked because the getter then cloned the shared profile; it now reads <code>volume.profile</code> once and the field is gone. <code>QuadRegistry.PrepareArray</code> logged under the <code>TexRegistry</code> tag.</li>
+<li><b>Liquid post-processing never ran:</b> <code>VoxelPostProcessHandler</code> requires <code>Voxel.usePostProcess</code>, but the custom voxel inspector never drew that toggle, so Water and Lava were stuck at <code>false</code>. The toggle and the missing <code>lightAttenuation</code> / <code>lightEmission</code> fields are drawn now and enabled for Water and Lava.</li>
+<li><b>Underwater fog:</b> <code>RenderSettings.fog</code> had no consumer, so liquid fog never showed. <code>UnderwaterFogFeature</code> (URP renderer feature, both renderers) draws exp² fog after transparents and before post-processing. Its state (enabled, colour, density, self-illumination) is static on the feature and set by <code>VoxelPostProcessHandler</code>; <code>RenderSettings</code> fog is no longer used. It measures distance against the depth attachment, which includes the liquid's faces, so the fog covers only the path through the liquid and the surface stays visible from below. The colour is lit by the sky globals; light-emitting liquids such as lava light their own fog. <code>VoxelPostProcessData</code> gets a separate <code>fogColor</code>; Water and Lava are retuned. The voxel shaders are unchanged: fog stays a post-processing concern.</li>
+<li><b>Warnings:</b> the collider bake job passes <code>Mesh.GetEntityId()</code> to the <code>EntityId</code> overload of <code>Physics.BakeMesh</code> (the <code>int</code> overload is obsolete in Unity 6.3). <code>get_voxel_def</code> in <code>PointBuilder.compute</code> has a single return, which silences the d3d11 "potentially uninitialized variable" warning. No other compiler, deprecation or shader warnings are left; the remaining runtime warnings come from tests that feed in invalid settings on purpose.</li>
+</ul>
+
+<h3>15.3 Engine review fixes</h3>
+<ul class="tight">
+<li><b>Collider and remesh races:</b> an edit made while a partition's mesh job runs is meshed again instead of dropped; results for unloaded chunks or reclaimed partitions are discarded; a pooled chunk is reclaimed when its data unloads, so it is meshed again after a reload; bakes are notified before a collider mesh is rewritten or cleared; colliders use the bake's cooking options, so Unity does not cook again on the main thread.</li>
+<li><b>Memory:</b> generated chunks size their voxel list from the run count instead of reserving 512 KiB each; the unused light accessor map is gone. (The run-count pass was later measured at 0.15–0.25 ms per chunk and moved to a Temp list, see §16.3.)</li>
+<li><b>Robustness:</b> a failed point-count read-back re-queues the partition instead of losing its pages; the player ground check no longer looks one block too low; <code>WorldGenSettings</code> rejects climate profiles without octaves instead of producing a NaN climate, and no longer leaks on a throw; duplicate <code>VoxelWorld</code> singletons, partial imports and shutdown are handled.</li>
+<li><b>Scheduling and draw order:</b> eviction ranks by square ring, so the corners of the load area are no longer evicted and regenerated over and over; a reclaimed chunk inside the load distance is generated again without moving; job handlers no longer wait forever on a batch applied elsewhere; foliage draws before the liquids (queue 2999), which was undefined before.</li>
+<li><b>API and data sources (DEC-19…22):</b> game scripts use the public engine API only (<code>VoxelWorld.IsChunkLoaded</code>, public chunk dimensions) and <code>InternalsVisibleTo("Assembly-CSharp")</code> is gone, which narrows INT-52. <code>LoadDistance</code> and <code>UpdateDistance</code> are derived from <code>DrawDistance</code> instead of being written into the settings asset at runtime. <code>DataImporter</code> uses the materials from <code>RendererSettings</code>; its duplicate material fields are removed from the class and the scene. A broken biome outside the active <code>BiomeSet</code> is logged and skipped; an active one still fails world generation, now with a clear message.</li>
+<li><b>Shared GPU constants (DEC-23):</b> <code>VoxelGpuConstants.hlsl</code> holds the points per page, chunk index shifts, interval page shift and mask, solid mesh layer and all thread group sizes; the kernels and voxel shaders include it instead of literals. <code>VoxelRenderConstants</code> mirrors the values, the dispatches are sized from them, and <code>GpuConstantsTests</code> parses the include and compares every define with C#.</li>
+<li><b>Structure (DEC-25):</b> custom inspectors moved from the <code>Scripts/**/Editor</code> folders into <code>Engine/Editor</code> (GUIDs kept) and the <code>.asmref</code> files are gone; post-processing scripts, noise and the chunk manager and pool moved to matching folders; 19 unused built-in modules and six unused template packages removed from the manifest (modules used by assets or required by packages stay); <code>WorldGenSpec.html</code> moved to <code>Docs/</code> so Unity stops importing it; the performance baselines keep the three latest result files while the README tables keep every number.</li>
+</ul>
+
+<h3>15.4 Decisions (2026-10-21)</h3>
+<p>Taken by the user in the review of <code>phase/cleanup</code> and when scheduling the §16 ideas. Binding for the agent; they continue the numbering of §14. Anything the review raised that is not listed here stays as it is.</p>
 <table>
-<tr><th>Layer</th><th>dtype</th><th>Set</th><th>Content</th></tr>
-<tr><td><code>h_f32</code></td><td>float32</td><td>lean, full</td><td>H before floor</td></tr>
-<tr><td><code>h_int</code></td><td>int16</td><td>lean, full</td><td>column height</td></tr>
-<tr><td><code>biome_nn</code></td><td>uint8</td><td>lean, full</td><td>hard classification, unwarped</td></tr>
-<tr><td><code>biome_dom</code></td><td>uint8</td><td>lean, full</td><td>argmax of w<sup>mat</sup> (effective boundary; warped for method 3)</td></tr>
-<tr><td><code>wmat_max</code>, <code>whgt_max</code></td><td>uint8</td><td>lean, full</td><td>round(255 · max weight); height weights in Biome-first only</td></tr>
-<tr><td><code>surf_src</code></td><td>uint8</td><td>lean, full</td><td>biome whose blocks were placed</td></tr>
-<tr><td><code>flora_species</code>, <code>flora_src</code></td><td>uint8</td><td>lean, full</td><td>anchor columns only</td></tr>
-<tr><td><code>wmat</code>, <code>whgt</code></td><td>float16 [nB, size, size]</td><td>full</td><td>all weights</td></tr>
-<tr><td><code>T, F, C, E, W, PV</code></td><td>float32</td><td>full</td><td>fields</td></tr>
-<tr><td><code>preview_*.png</code></td><td>PNG</td><td>both</td><td>for humans only</td></tr>
-</table>
-<div class="req"><span class="id">EXP-03</span><span class="kw must">MUST</span>Arrays are written as <code>.npy</code> (format 1.0: magic <code>\x93NUMPY</code>, version, little-endian header length, dict <code>{'descr': '&lt;f4', 'fortran_order': False, 'shape': (4096, 4096), }</code> padded with spaces to a multiple of 64 bytes, ending in <code>\n</code>). A small <code>NpyWriter</code> suffices.</div>
-<div class="req"><span class="id">EXP-04</span><span class="kw must">MUST</span>Size per 4096² run: full ≈ 0.9 GB, lean ≈ 0.25 GB. Sweep plans set <code>keep_raw: false</code>: analysed in batches right after export, raw layers then deleted, metrics/manifests/previews kept. If disk is short, run sweeps at 2048² after checking ≥ 30 transects per test pair and seed.</div>
-
-<h3>16.3 Manifest and resume</h3>
-<div class="req"><span class="id">EXP-10</span><span class="kw must">MUST</span>Each run folder has <code>manifest.json</code>: spec version, run id, UTC timestamp, git commit, Unity version, config hash (SHA-256 of <code>ToCanonicalJson()</code>), full canonical config, architecture, methods and strengths, effective lattice stride, seed, region, biome table (targets, height parameters, flora), water level, Hmin/Hmax, stats (clamped share, underwater share, seconds), and per layer file, dtype and SHA-256.</div>
-<div class="req"><span class="id">EXP-11</span><span class="kw must">MUST</span>A run is skipped on resume only if its <em>run key</em> matches: SHA-256 of config hash + seed + region + layer set + git commit + spec version.</div>
-
-<h3>16.4 Plans and runner</h3>
-<pre><code>// Experiments/seeds.json – drawn once, never changed (DEC-10)
-{ "drawn_on": "2026-10-17",
-  "main":  [617800548, 1035220005, 38752999, 2073214123, 827781431],
-  "pilot": [1135345306, 93056379] }</code></pre>
-<div class="req"><span class="id">EXP-20</span><span class="kw must">MUST</span>Plans are JSON in <code>&lt;ProjectRoot&gt;/Experiments/</code> (schema §19.3), expanded into runs written to <code>Exports/&lt;plan&gt;/&lt;Architecture&gt;_&lt;Method&gt;[/&lt;param&gt;=&lt;value&gt;]/seed_&lt;s&gt;/</code>. Runnable from a menu, as a registered Editor command on a running Editor (<code>unity command …</code>), and headless (<code>unity run --command …</code>, TOOL-06); exit code ≠ 0 on failure. Exact command syntax from <code>unity run --help</code>.</div>
-<table>
-<tr><th>Plan</th><th>Content</th><th>Runs</th></tr>
-<tr><td><code>pilot.json</code></td><td>8 configurations × the 2 pilot seeds, full layers; used to set thresholds</td><td>16</td></tr>
-<tr><td><code>main.json</code></td><td>8 configurations × 5 main seeds, default strengths, full layers</td><td>40</td></tr>
-<tr><td><code>sweep_frequency.json</code></td><td><code>ClimateFrequencyScale</code> ∈ {0.5, 0.71, 1, 1.41, 2, 2.83}</td><td>240</td></tr>
-<tr><td><code>sweep_positions.json</code></td><td>target spread κ ∈ {0.6, 0.8, 1.0, 1.2, 1.4}: <code>t_b ← t̄ + κ(t_b − t̄)</code>, applied in normalised space (PV as (PV+1)/2) on the dimensions the architecture uses, then clamped to [0,1]</td><td>200</td></tr>
-<tr><td><code>sweep_strength.json</code></td><td>B ∈ {8, 11, 16, 23, 32, 45, 64}; A ∈ {6, 8.5, 12, 17, 24, 34, 48}; σ ∈ {0.01, 0.02, 0.04, 0.08, 0.16}. Stages varied separately: Terrain-first material only; Biome-first a material-only and a height-only sweep with the other stage at default. Because A is shared (DEC-05), the A sweep always affects both stages; the height-only sweep of method 3 varies B<sub>hgt</sub>. (3 + 6 stage sweeps, 19 levels per architecture-stage, × 5 seeds)</td><td>285</td></tr>
-<tr><td><code>extend_forest.json</code></td><td>main configurations with the extended biome set, same seeds, full layers</td><td>40</td></tr>
-<tr><td><code>e1_kernel.json</code></td><td>Biome-first, height method 4, σ<sub>hgt</sub> ∈ {0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64}, material method 4 at default; plus Terrain-first reference (method 1)</td><td>40</td></tr>
-</table>
-<p class="small">Sweeps vary one parameter at a time. For frequency and position sweeps, paired comparisons use the baseline at the same sweep level.</p>
-
-<h2 id="s17">17 · Analysis pipeline (Python)</h2>
-<h3>17.1 Package</h3>
-<pre><code>Analysis/
-  pyproject.toml            numpy, scipy, scikit-image, pandas, matplotlib, pyyaml, pyarrow
-  config/analysis.yaml      transect + metric parameters (frozen after pilot)
-  config/hypotheses.yaml    thresholds (frozen after pilot)
-  worldgen_analysis/        io, boundaries, transects, metrics_height, metrics_surface, metrics_flora,
-                            fidelity, geometry, validation, hypotheses, report, cli
-  tests/                    synthetic-map tests (ANA-60)</code></pre>
-<div class="req"><span class="id">ANA-01</span><span class="kw must">MUST</span>Every output records the hashes of <code>analysis.yaml</code> and <code>hypotheses.yaml</code> and whether they were frozen; unfrozen reports are stamped <strong>PRELIMINARY</strong>.</div>
-
-<h3>17.2 Boundaries and transects</h3>
-<div class="req"><span class="id">ANA-10</span><span class="kw must">MUST</span>Boundary pixels: cells whose 4-neighbour has a different <code>biome_dom</code>, assigned to the unordered pair {a, b}.</div>
-<div class="req"><span class="id">ANA-11</span><span class="kw must">MUST</span>Transect centres: boundary pixels of a pair, Poisson-disk subsampled (spacing ≥ 48, fixed analysis seed). Normal: gradient of the Gaussian-blurred (σ = 4) indicator <code>[biome_dom = a]</code>, oriented a → b with a &lt; b.</div>
-<div class="req"><span class="id">ANA-12</span><span class="kw must">MUST</span>Half-length L = 96 (≥ A<sub>max</sub>·√2 + B<sub>max</sub>/2 + margin), step 1, band of 5 parallel lines (averaged) plus the centre line on its own; bilinear for float layers, nearest for categorical. Core metrics use |s| ≤ 32 after re-centring on the observed crossing.</div>
-<div class="req"><span class="id">ANA-13</span><span class="kw must">MUST</span>Reject a transect if a third biome covers &gt; 10 % of its samples, it crosses the a/b boundary more than once within ±L/2, &gt; 20 % of samples are underwater, or it leaves the region. Evaluated on the run's own map; counts reported per reason.</div>
-<div class="req"><span class="id">ANA-14</span><span class="kw must">MUST</span>Primary analysis: each run uses transects on its <strong>own</strong> effective boundary. Method 3 moves boundaries by up to A·√2 and makes them oblique; baseline transects would smear a hard warped edge into an artificial width. Methods are compared on aggregates per (pair, seed).</div>
-<div class="req"><span class="id">ANA-15</span><span class="kw should">SHOULD</span>Secondary analysis for methods 1, 2, 4: paired transects from the baseline <code>biome_nn</code> of the same architecture, seed and sweep level.</div>
-
-<h3>17.3 Metrics</h3>
-<table>
-<tr><th>Dimension</th><th>Metric</th><th>Definition</th></tr>
-<tr><td rowspan="5">Height</td><td><code>max_step</code></td><td>max |h_int(s+1) − h_int(s)| in the core, centre line</td></tr>
-<tr><td><code>max_grad</code>, <code>mean_grad</code></td><td>same on h_f32</td></tr>
-<tr><td><code>cliffs</code></td><td>steps &gt; n blocks in the core (n in <code>analysis.yaml</code>, placeholder 4)</td></tr>
-<tr><td><code>excess_grad</code></td><td><code>max_grad</code> minus the p95 of |∇H| in the cores of a and b (cells &gt; 64 blocks from any boundary)</td></tr>
-<tr><td><code>cv_max_grad</code>, <code>field_speed</code></td><td>CV of <code>max_grad</code> over a pair's transects; |dv/ds| at the crossing</td></tr>
-<tr><td rowspan="4">Surface</td><td><code>width_10_90</code></td><td>logistic fit of band-averaged share of <code>surf_src = b</code>, τ bounded to [0.05, L], width = 2·ln 9·τ ≈ 4.39τ; if the fit hits a bound or fails, isotonic s<sub>90</sub> − s<sub>10</sub>; both stored</td></tr>
-<tr><td><code>islands</code></td><td>4-connected components of <code>surf_src</code> within 32 blocks of the boundary not connected to their biome's main region; per km of boundary and area share</td></tr>
-<tr><td><code>axis_alignment</code></td><td>share of boundary normals within ±5° of the axes minus the isotropic expectation (40°/360°)</td></tr>
-<tr><td><code>straightness</code></td><td>mean chord/path ratio over boundary arcs of 64 blocks</td></tr>
-<tr><td rowspan="3">Flora</td><td><code>density_profile</code>, <code>density_jump</code></td><td>plants per column along s, pooled over all transects of a pair and seed; max step of the smoothed (σ = 4) profile relative to the core-density difference</td></tr>
-<tr><td><code>flora_width_10_90</code></td><td>as surface width on <code>flora_src</code> composition, pooled profile</td></tr>
-<tr><td><code>mixed_zone</code></td><td>pooled profile: length of s where plants of a and of b each make up ≥ 10 % (flora measure for H4)</td></tr>
-<tr><td rowspan="4">Fidelity / robustness</td><td><code>core_share_b</code></td><td>(cells with <code>biome_dom = b</code> and <code>wmat_max ≥ round(0.95·255)</code>) ÷ (cells with <code>biome_dom = b</code>); Biome-first also with <code>whgt_max</code></td></tr>
-<tr><td><code>vanished_b</code></td><td>b below 0.1 % area or without core cells, while present in the baseline of the same seed</td></tr>
-<tr><td><code>implausible_len</code></td><td>boundary length of implausible pairs per km²</td></tr>
-<tr><td>tipping point</td><td>first level (moving away from the default) where the median over seeds leaves median ± 2·MAD of the per-seed values at the default level</td></tr>
+<tr><th>ID</th><th>Question</th><th>Decision</th><th>Consequence</th></tr>
+<tr><td>DEC-19</td><td>Game scripts and engine internals</td><td>Public <code>VoxelWorld</code> API instead of <code>InternalsVisibleTo("Assembly-CSharp")</code></td><td>§15.3; INT-52 keeps internals access for the Editor and the EditMode tests only.</td></tr>
+<tr><td>DEC-20</td><td>Load and update distance</td><td>Derived from <code>DrawDistance</code>, never written into the <code>VoxelEngineSettings</code> asset at runtime</td><td>§15.3; the asset stays clean under version control.</td></tr>
+<tr><td>DEC-21</td><td>Voxel materials</td><td>Referenced once, in <code>RendererSettings</code></td><td>§15.3; <code>DataImporter</code> duplicates removed from class and scene.</td></tr>
+<tr><td>DEC-22</td><td>Broken biome assets</td><td>Outside the active <code>BiomeSet</code>: log and skip; inside: fail with a clear message</td><td>§15.3.</td></tr>
+<tr><td>DEC-23</td><td>C# / HLSL constants</td><td>Shared named constants on both sides plus an EditMode test (chosen over a test-only check)</td><td><code>VoxelGpuConstants.hlsl</code>, <code>VoxelRenderConstants</code>, <code>GpuConstantsTests</code>.</td></tr>
+<tr><td>DEC-24</td><td><code>LookController</code> mouse delta × <code>deltaTime</code></td><td>Leave as is</td><td>Do not raise it again.</td></tr>
+<tr><td>DEC-25</td><td>Project structure</td><td>Editor code only in <code>Engine/Editor</code>; prune unused built-in modules; spec out of <code>Assets</code> into <code>Docs/</code>; baselines pruned to the three latest files; <code>Resources/Artwork</code> stays</td><td>§15.3; the Docs tree in §11.</td></tr>
+<tr><td>DEC-26</td><td>Improvement ideas before Part III</td><td>§16.1–16.2 done first; the oversized classes, the preview debounce and the other review ideas recorded as §16.3–16.7 instead of being done in the cleanup, then all scheduled the same day (16.3–16.4, then 16.5–16.7)</td><td>PRs #38, #40, #41.</td></tr>
+<tr><td>DEC-27</td><td>Interval store start size (§16.1)</td><td>17 pages per list, the same memory as the old pool (over 10 or 8)</td><td>TST-E21 peak 39 %; do not shrink it without asking.</td></tr>
+<tr><td>DEC-28</td><td>OD-R3 region size (Part III)</td><td>4096² everywhere</td><td>§21 open points.</td></tr>
+<tr><td>DEC-29</td><td>Flaky PlayMode test <code>SchedulerEvictionTests.UnloadChunk_RaisesEvictionAndReleasesRenderBuffer</code></td><td>Deferred ("can be fixed later"), not part of PR #41</td><td>§15.5.</td></tr>
 </table>
 
-<h3>17.4 Validation checks</h3>
-<table>
-<tr><th>ID</th><th>Check</th><th>Pass criterion</th></tr>
-<tr><td>V1</td><td>Terrain-first height independent of method</td><td>identical SHA-256 of <code>h_f32</code> across the 4 Terrain-first runs per seed</td></tr>
-<tr><td>V2</td><td>Baseline has hard edges</td><td>median <code>width_10_90</code> ≤ 1.5 blocks for surface and flora composition</td></tr>
-<tr><td>V3</td><td>Biome-first baseline jump matches parameters</td><td>(a) max step ≤ |ΔOffset| + Σ|Δa<sub>i</sub>| + |ΔJ| + p99.9 of 4-neighbour |ΔH| in the cores; (b) median jump (mean H over s ∈ [1,4] minus over s ∈ [−4,−1]) within [tolerance] of |ΔOffset + ΔJ·mean(P)|</td></tr>
-<tr><td>V4</td><td>Comparable height distributions</td><td>histograms + Wasserstein-1 distance between architectures per seed; threshold set after pilot</td></tr>
-<tr><td>V5</td><td>Biome-map difference</td><td>agreement share of <code>biome_nn</code> between architectures per seed (reported)</td></tr>
-</table>
-<div class="req"><span class="id">ANA-40</span><span class="kw must">MUST</span>A failed V1–V3 means an implementation bug: reported at the top, and hypothesis evaluation is skipped for the affected configurations.</div>
-
-<h3>17.5 Hypothesis evaluation</h3>
-<table>
-<tr><th>H</th><th>Computation</th><th>Plan</th></tr>
-<tr><td>H1</td><td>Biome-first height: per seed, relative |Δ| of median <code>max_step</code>, <code>max_grad</code>, <code>cliffs</code> between methods 3 and 2 ≤ [x %] (this per-seed equivalence is the "right direction" for the decision rule); both reduce median <code>max_step</code> vs baseline by ≥ [y %]. Focus pair Plains–Mountain.</td><td>main</td></tr>
-<tr><td>H2</td><td>Biome-first method 4: <code>cliffs</code> = 0 in ≥ 95 % of transects; <code>cv_max_grad</code>(M4) exceeds <code>cv_max_grad</code>(M2) by ≥ [z %]; Spearman ρ(field_speed, max_grad) with cluster-bootstrap CI</td><td>main</td></tr>
-<tr><td>H3</td><td>Material: <code>axis_alignment</code>/<code>straightness</code> of M3 improved vs M1 by ≥ [x %]; <code>width_10_90</code>(M3) ≤ [1–2]; M2 and M4 wider</td><td>main</td></tr>
-<tr><td>H4</td><td>Spearman correlation of method rankings by flora <code>mixed_zone</code> and by surface <code>width_10_90</code> ≥ [0.8], per architecture and seed</td><td>main</td></tr>
-<tr><td>H5</td><td>Terrain-first M4: r(width_10_90, |∇H| at crossing) ≤ [−0.3]; Biome-first M4: 95 % CI of r contains 0. M2/M3: architecture differences recomputed on transects with identical <code>biome_nn</code> in both architectures stay within [tolerance]</td><td>main</td></tr>
-<tr><td>H6</td><td>Typical biome extent = median equivalent diameter √(4·area/π) of <code>biome_nn</code> components. M2 core share drops by &gt; [x %] once the extent falls below ≈ 2·B<sub>mat</sub>; M4 core share stays within [± x %]; M4 width ∝ 1/frequency (log-log slope ≈ −1). The pilot must confirm the frequency range crosses 2·B.</td><td>sweep_frequency</td></tr>
-<tr><td>H7</td><td>Extensibility log (config entries, code changes, pairwise rules, spline changes) for adding Forest; share of area outside Forest with changed <code>h_int</code> or <code>biome_dom</code></td><td>extend_forest</td></tr>
-<tr><td>E1</td><td>Exploratory: Biome-first vs Terrain-first height metrics over σ<sub>hgt</sub>; core-share loss</td><td>e1_kernel</td></tr>
-</table>
-<div class="req"><span class="id">ANA-50</span><span class="kw must">MUST</span>Decision rule: <em>supported</em> if the effect points the predicted way in ≥ 4 of 5 seeds and the median over seeds reaches the threshold; <em>not supported</em> if the direction holds in ≤ 2 seeds; otherwise <em>inconclusive</em>. CIs by cluster bootstrap (resample seeds, then transects within each seed; 2000 replicates).</div>
-<div class="req"><span class="id">ANA-51</span><span class="kw must">MUST</span><code>results/</code>: <code>profile_table.csv</code> (8 configurations × continuity, gradation, artefact freedom, fidelity, robustness, effort), <code>hypotheses.md</code>, <code>validation.md</code>, figures.</div>
-<div class="req"><span class="id">ANA-60</span><span class="kw must">MUST</span>Metric tests on synthetic maps before real analysis: straight step (width ≤ 1, 0 islands, straightness ≈ 1); logistic τ = 4 (width 17.6 ± 5 %); axis-aligned square vs circle (axis_alignment positive vs ≈ 0); known ramp (max_grad = slope) and inserted 6-block step (1 cliff at n = 4); white-noise dither with known weights (island count in expected range); three-biome junction and double crossing rejected.</div>
-
-<h2 id="s18">18 · Phases (Part II) and open points</h2>
-<div class="phase"><h4>Phase R1 — Export &amp; runner</h4><p>§15, §16. Accept: <code>pilot.json</code> runs headless; manifests complete; deleting <code>Assets/Research</code> leaves Part I intact.</p></div>
-<div class="phase"><h4>Phase R2 — Analysis</h4><p>§17. Accept: synthetic tests pass; pilot analysed; V1–V3 pass. Then the user sets thresholds and freezes the YAML files; only then <code>main.json</code>.</p></div>
-<div class="phase"><h4>Phase R3 — Sweeps &amp; extensibility</h4><p>Sweep plans, extensibility protocol (record config entries, code changes, pairwise rules, spline changes for adding Forest), H6, H7, E1. Accept: report with hypothesis table.</p></div>
-<table>
-<tr><th>Open (decide before Part II)</th><th>Default</th></tr>
-<tr><td>OD-R3: Region size</td><td>4096²; 2048² for sweeps if disk is short</td></tr>
-</table>
+<h3>15.5 Open point: eviction-test flake</h3>
+<ul class="tight">
+<li><b>Symptom:</b> about one failure in four full PlayMode runs, on an unexpected error log from <code>PartitionBuildRequest.CollectLists</code> ("Neighbor voxel data … not found").</li>
+<li><b>Cause:</b> the test before it unloads the focus chunk; a queued build of a neighbouring partition then finds the chunk's list missing. It is a timing-dependent test interaction, not wrong point output; the class passes 3/3 on its own.</li>
+<li><b>Fix found and verified on 2026-10-21, then discarded on request:</b> remove the error logs from <code>CollectLists</code> and drop an <code>!IsValid</code> build quietly in <code>VoxelWorldRenderer.StartPendingPartitionBuilds</code>. This is safe because <code>UnloadChunk</code> invalidates the neighbours' light and <code>ApplyLight</code> (WasLit) re-requests the builds.</li>
+<li><b>Regression test idea:</b> in one frame, unload the focus chunk, call <code>UpdatePartitions</code> for the partition at +x, then loop <code>WaitAllRequests</code>, <code>CompleteFinishedPartitionBuilds</code> and <code>StartPendingPartitionBuilds</code> via reflection. Do not use <code>LogAssert.NoUnexpectedReceived</code>: it also fails on the "Chunk not loaded" warnings from <code>GetVoxel</code> under the player.</li>
+</ul>
 
 <!-- ============================================================ -->
-<h2 id="s19">19 · Appendix: defaults &amp; schemas</h2>
-<h3>19.1 Placeholder Terrain-first splines</h3>
-<p>Only to get a plausible starting world; the user replaces them. Heights in blocks, water level 124.</p>
-<pre><code>Offset(C, E, PV):
-  C:  0.00 → 70        (deep ocean)
-      0.30 → 110       (ocean)
-      0.40 → 122       (coast)
-      0.50 → spline over E:
-              E 0.0 → spline over PV: [-1 → 128, 0 → 136, 1 → 150]
-              E 0.6 → 132
-              E 1.0 → 128
-      0.75 → spline over E:
-              E 0.0 → spline over PV: [-1 → 135, 0 → 160, 1 → 195]
-              E 0.5 → spline over PV: [-1 → 132, 0 → 145, 1 → 165]
-              E 1.0 → 138
-      1.00 → spline over E: [0.0 → 175, 1.0 → 145]
-Amp(C, E, PV):   C [0 → 4, 0.4 → 6, 0.75 → spline over E: [0 → 22, 1 → 8], 1 → 26]
-J(C, E, PV):     C [0 → 0, 0.6 → 0, 0.8 → spline over E: [0 → spline over PV: [0 → 0, 1 → 40], 0.5 → 0], 1 → 50]</code></pre>
+<h2 id="s16">16 · Improvement ideas</h2>
+<p>Improvements found during the phases and the engine review. An idea is not a requirement and belongs to no phase until the user schedules it. Once done, its entry keeps the original idea and gains a <b>Done</b> list with what was built and measured; the acceptance criteria then stay in force as regression targets (PERF-03).</p>
+<p>§16.1–16.7 were scheduled by the user on 2026-10-21 (DEC-26) and merged the same day: §16.2 then §16.1 in PR #38 (<code>phase/20</code>), §16.5–16.7 in PR #40 (<code>phase/20.5-20.7</code>), §16.3–16.4 in PR #41 (<code>phase/20.3-20.4</code>). The branch and baseline names keep the old section number 20.</p>
 
-<h3>19.2 Placeholder biome table</h3>
-<table>
-<tr><th>Biome</th><th>T</th><th>F</th><th>C</th><th>E</th><th>PV</th><th>h (Terrain-first)</th><th>Offset</th><th>Amp</th><th>OctaveWeights (512…16)</th><th>J</th></tr>
-<tr><td>Plains</td><td>0.55</td><td>0.45</td><td>0.45</td><td>0.70</td><td>−0.2</td><td>0.45</td><td>136</td><td>6</td><td>1, .6, .3, .12, .05, .02</td><td>0</td></tr>
-<tr><td>Desert</td><td>0.90</td><td>0.10</td><td>0.45</td><td>0.60</td><td>0.0</td><td>0.45</td><td>134</td><td>8</td><td>1, .8, .2, .05, .02, .01</td><td>0</td></tr>
-<tr><td>Mountain</td><td>0.35</td><td>0.40</td><td>0.80</td><td>0.15</td><td>0.6</td><td>0.75</td><td>165</td><td>22</td><td>.7, .7, .6, .45, .3, .15</td><td>35</td></tr>
-<tr><td>Snow</td><td>0.15</td><td>0.50</td><td>0.70</td><td>0.35</td><td>0.3</td><td>0.85</td><td>158</td><td>14</td><td>.8, .6, .45, .3, .15, .08</td><td>15</td></tr>
-<tr><td>Forest</td><td>0.50</td><td>0.70</td><td>0.50</td><td>0.55</td><td>0.0</td><td>0.50</td><td>140</td><td>9</td><td>1, .6, .35, .15, .06, .03</td><td>0</td></tr>
-<tr><td>Ocean</td><td>0.50</td><td>0.80</td><td>0.08</td><td>0.50</td><td>0.0</td><td>0.20</td><td>100</td><td>6</td><td>1, .5, .2, .05, .02, .01</td><td>0</td></tr>
-</table>
-<p class="small">T, F, C, E, h ∈ [0,1]; PV ∈ [−1,1]. Existing assets use different targets (e.g. Snow TargetHeight 1.0); migrate them deliberately, not automatically.</p>
-
-<h3>19.3 Experiment plan schema (Part II)</h3>
-<pre><code>{
-  "name": "sweep_frequency",
-  "seeds": "main",                          // "main" | "pilot" → resolved from Experiments/seeds.json
-  "region": {"originX": -2048, "originZ": -2048, "size": 4096},
-  "layers": "lean",                         // "lean" | "full"
-  "keep_raw": false,                        // false: analyse in batches, then delete .npy
-  "biome_set": "Assets/Research/BiomeSet_Main.asset",
-  "base_settings": "Assets/Research/WorldGen_Experiment.asset",
-  "configs": [
-    {"architecture": "TerrainFirst", "material": "None"},
-    {"architecture": "TerrainFirst", "material": "DistanceBlend"},
-    {"architecture": "TerrainFirst", "material": "DistortedBoundary"},
-    {"architecture": "TerrainFirst", "material": "ParameterSpaceWeighting"},
-    {"architecture": "BiomeFirst",   "material": "None",                    "height": "None"},
-    {"architecture": "BiomeFirst",   "material": "DistanceBlend",           "height": "DistanceBlend"},
-    {"architecture": "BiomeFirst",   "material": "DistortedBoundary",       "height": "DistortedBoundary"},
-    {"architecture": "BiomeFirst",   "material": "ParameterSpaceWeighting", "height": "ParameterSpaceWeighting"}
-  ],
-  "sweep": {"parameter": "ClimateFrequencyScale", "values": [0.5, 0.71, 1.0, 1.41, 2.0, 2.83]},
-  "overrides": {"EnableClimateOverrides": false}
-}</code></pre>
-
-<h3>19.4 analysis.yaml (excerpt, Part II)</h3>
-<pre><code>frozen: false            # set true + date after pilot
-frozen_on: null
-transect: {half_length: 96, band: 5, spacing: 48, normal_sigma: 4, core: 32}
-reject:   {third_biome_share: 0.10, underwater_share: 0.20}
-zone_distance: 32
-cliff_threshold: 4
-core_weight: 0.95
-bootstrap: {replicates: 2000, cluster: seed, seed: 12345}
-test_pairs: [[Plains, Desert], [Plains, Mountain], [Mountain, Snow]]
-implausible_pairs: [[Desert, Snow]]</code></pre>
-
-<h2 id="s20">20 · Ideas (not scheduled)</h2>
-<p>Possible improvements found during the phases. They are not requirements and belong to no phase until the user schedules them.</p>
-
-<h3>20.1 Shared GPU buffer for chunk voxel data</h3>
+<h3>16.1 Shared GPU buffer for chunk voxel data</h3>
 <p class="small">Recorded 2026-10-20 (Phase 4, from the TST-E21 investigation).</p>
 <ul class="tight">
 <li><b>Today:</b> <code>VoxelWorldRenderer</code> keeps one <code>GraphicsBuffer</code> per chunk for the compressed voxel intervals. A pool pre-allocated at start-up keeps flight allocation-free (PERF-04) only while every chunk fits the default buffer length. Since Phase 4 that length is 8 intervals per voxel column, about 31 MB with LoadDistance 8. A chunk that needs more still creates a new buffer, and with it a managed object, during flight.</li>
@@ -1001,7 +872,7 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
   <li>Tests: <code>IntervalStoreTests</code> (allocator, and a GPU round trip through scattered pages and a growth step); F-17/F-18 tests adapted.</li>
   </ul></li>
 </ul>
-<h3>20.2 Faster light BFS for emitter-dense regions</h3>
+<h3>16.2 Faster light BFS for emitter-dense regions</h3>
 <p class="small">Recorded 2026-10-21 (Phase L, from LGT-11 / PERF-02).</p>
 <ul class="tight">
 <li><b>Today:</b> <code>LightJob</code> takes 0.86 ms/chunk on natural terrain (PERF-05 met) but 15.7 ms/chunk in the benchmark worst case: an air cavity with a Lava emitter every 8 voxels under a leaf roof, so the BFS visits almost every voxel of the 64 × 64 × 256 box on all four channels. There is no budget for this case; the jobs run on worker threads.</li>
@@ -1020,8 +891,8 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
   <li>The queued bit was tried and dropped: both rows measured the same with it, because the FIFO already raises each voxel about once.</li>
   </ul></li>
 </ul>
-<h3>20.3 Collider meshing from a flat collision mask</h3>
-<p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Not measured yet.</p>
+<h3>16.3 Collider meshing from a flat collision mask</h3>
+<p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Measurements in the Done list.</p>
 <ul class="tight">
 <li><b>Today:</b> <code>CMeshBuildJob</code> reads every voxel and every face neighbour through <code>ChunkAccessor.GetVoxelInPartition</code>, which is a binary search in the chunk's interval list each time. Each partition allocates about 4 MiB of Temp memory up front: a vertex list of 4 × 32³ <code>CVertex</code> (16 B each), an index list of 6 × 32³ ints and a <code>NativeHashSet&lt;int3&gt;</code> of 32³, even for a partition that is all air.</li>
 <li><b>Idea:</b>
@@ -1045,8 +916,8 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
   <li>EditMode 451/451 and PlayMode 34/34 pass, including <code>AllocationTests</code> (PERF-04) and <code>ColliderMeshRaceTests</code>.</li>
   </ul></li>
 </ul>
-<h3>20.4 Decompress only the partition's neighbourhood in the partition build</h3>
-<p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Not measured yet.</p>
+<h3>16.4 Decompress only the partition's neighbourhood in the partition build</h3>
+<p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Measurements in the Done list.</p>
 <ul class="tight">
 <li><b>Today:</b> <code>PointBuilderHandler.PrepareChunks</code> runs <code>BuildPrep</code> and then <code>BuildPrepLight</code> for all 9 chunks of the 3 × 3 neighbourhood. Each pass writes the whole 32 × 256 × 32 chunk, and the light pass is a read-modify-write of the same 1 MiB buffer. That is roughly 27 MB of GPU traffic per partition build, and the 8 partitions of a column repeat it for the same chunks. <code>BuildPoints</code> reads only the partition plus a 1-voxel border.</li>
 <li><b>Idea:</b>
@@ -1056,18 +927,18 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
   <li>Or: when several partitions of a column are built in one frame, decompress the 3 × 3 chunks once and run <code>BuildPoints</code> for each of them.</li>
   </ul></li>
 <li><b>Costs and risks:</b> changes the prep kernels and the addressing in <code>BuildPoints</code> (<code>get_voxel_safe</code> relies on the partition width equalling the chunk width today); the interval walk per y range needs the interval start of the first run in the box.</li>
-<li><b>Acceptance if scheduled:</b> identical point output (a GPU round-trip test against the current kernels); prep dispatch time per build clearly lower than today's 21.5–22.8 µs (§20.1 probe).</li>
+<li><b>Acceptance if scheduled:</b> identical point output (a GPU round-trip test against the current kernels); prep dispatch time per build clearly lower than today's 21.5–22.8 µs (§16.1 probe).</li>
 <li><b>Done (scheduled 2026-10-21):</b>
   <ul class="tight">
   <li><code>BuildPrepBox</code> replaces <code>BuildPrep</code> and <code>BuildPrepLight</code>. It writes the 34 × 34 × 34 box of the partition plus its border into one buffer, id and light in one pass, below the world as air and above it as air with sky 15. One thread per box column: a binary search per list for the column's first voxel, then a walk up the runs.</li>
   <li><code>_CompPages</code> starts with a header of 18 page-table offsets, so one dispatch reads all lists; <code>PointBuilderHandler.PrepareBox</code> uploads it with the tables. <code>BuildPoints</code> reads only the box (<code>get_voxel_safe</code>; <code>_BoxOriginY</code>); the 9 chunk buffers (9 MiB per handler) are gone. New mirrored constants <code>PREP_CHUNKS</code>, <code>BOX_SIZE</code>, <code>PREP_BOX_THREADS</code>.</li>
   <li><code>PointBuildTests</code> (added and recorded against the old kernels first) hashes the points of three partitions: world bottom, surface with water and every voxel type, world top. It passes unchanged. <code>IntervalStoreTests</code> now checks every box voxel of all 8 partitions of a chunk through scattered pages and after a growth step.</li>
-  <li>EditMode probe, 3 runs each: issuing the prep on the CPU 10.1–10.6 → 2.9–3.4 µs per build; the prep on the GPU about 3.86 ms → 23–26 µs; a whole build until its counts are read back 4.23 → 0.42 ms. (The §20.1 figure came from a ProfilerRecorder probe in play mode, so it is not directly comparable.)</li>
+  <li>EditMode probe, 3 runs each: issuing the prep on the CPU 10.1–10.6 → 2.9–3.4 µs per build; the prep on the GPU about 3.86 ms → 23–26 µs; a whole build until its counts are read back 4.23 → 0.42 ms. (The §16.1 figure came from a ProfilerRecorder probe in play mode, so it is not directly comparable.)</li>
   <li>EditMode 454/454; PlayMode 34/34 in two full runs. In a third, <code>SchedulerEvictionTests.UnloadChunk_RaisesEvictionAndReleasesRenderBuffer</code> failed once on an error log from <code>PartitionBuildRequest.CollectLists</code>: the test before it unloads the focus chunk, and a pending build of a neighbouring partition then finds the chunk's list missing. That is a timing-dependent test interaction, not the point output; the class passed 3/3 on its own.</li>
   </ul></li>
 </ul>
-<h3>20.5 One thread per point in CopyPoints</h3>
-<p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Not measured yet.</p>
+<h3>16.5 One thread per point in CopyPoints</h3>
+<p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Measurements in the Done list.</p>
 <ul class="tight">
 <li><b>Today:</b> <code>CopyPoints.compute</code> runs one thread per page (<code>numthreads(8, 3, 1)</code>, one row per layer). Each thread copies up to 256 points in a serial loop with a <code>switch</code> on the layer inside the loop, so a build with few pages uses only a handful of GPU threads.</li>
 <li><b>Idea:</b> one thread per point, e.g. a group of 256 threads per page and layer (<code>SV_GroupID</code> = page and layer, <code>SV_GroupThreadID</code> = point in the page), with the layer chosen once per group.</li>
@@ -1089,7 +960,7 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
   <li>EditMode 449/449 and PlayMode 34/34 pass; the play-test view at (216, 424) renders as before.</li>
   </ul></li>
 </ul>
-<h3>20.6 Split WorldGenSettings and the preview window</h3>
+<h3>16.6 Split WorldGenSettings and the preview window</h3>
 <p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Refactoring only, no behaviour change.</p>
 <ul class="tight">
 <li><b>Today:</b> <code>WorldGenSettings</code> (about 550 lines) holds the serialized settings, their validation, the Burst mirror (<code>ToConfig</code>) and the canonical JSON in one class. <code>WorldGenerationPreviewWindow</code> is about 920 lines plus its calibration part: toolbar, settings panels, the build scheduling, compare mode, the diff and the drawing.</li>
@@ -1111,7 +982,7 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
     </ul></li>
   <li><b>Preview window</b> (938 → 640 lines):
     <ul class="tight">
-    <li><code>PreviewBuilder</code> takes the build scheduling: the debounce from §20.7 (<code>RebuildDebounceSeconds</code> moved there), passes A and B, the distribution plane job and its texture, and the spline plots. It raises <code>Finished</code> when a build has been applied.</li>
+    <li><code>PreviewBuilder</code> takes the build scheduling: the debounce from §16.7 (<code>RebuildDebounceSeconds</code> moved there), passes A and B, the distribution plane job and its texture, and the spline plots. It raises <code>Finished</code> when a build has been applied.</li>
     <li><code>WorldGenerationPreviewWindow.Compare.cs</code> takes the A/B configuration panel, the compare views and the difference, like <code>.Calibration.cs</code>.</li>
     </ul></li>
   <li><b>Checks:</b>
@@ -1123,8 +994,8 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
     </ul></li>
   </ul></li>
 </ul>
-<h3>20.7 Debounce preview rebuilds while dragging</h3>
-<p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Not measured yet.</p>
+<h3>16.7 Debounce preview rebuilds while dragging</h3>
+<p class="small">Recorded 2026-10-21 (engine review on <code>phase/cleanup</code>). Measurements in the Done list.</p>
 <ul class="tight">
 <li><b>Today:</b> each change in the preview's settings calls <code>RequestRebuild</code>. With auto rebuild on, an idle window starts a build at once, and a change during a build queues one more, so builds do not pile up. While a slider is dragged, though, a new build starts as soon as the last one ends, and each one rebuilds the Burst configs and runs pass A (and B in compare mode) at the full resolution. At high resolutions the image lags behind the slider.</li>
 <li><b>Idea:</b> start an automatic build only when no change has come in for about 150 ms (time of the last <code>RequestRebuild</code>, checked in <code>OnEditorUpdate</code>). The Rebuild button and undo or redo still build at once. Optionally, build at a lower resolution while dragging and at full resolution once the debounce ends.</li>
@@ -1138,6 +1009,312 @@ implausible_pairs: [[Desert, Snow]]</code></pre>
   <li>Checked in the running Editor: no build starts on a request, and exactly one starts after the pause.</li>
   </ul></li>
 </ul>
+<h3>16.8 Climate tints on trees</h3>
+<p class="small">Recorded 2026-10-24 (Phase G planning, not chosen for §17: DEC-33). Not scheduled.</p>
+<ul class="tight">
+<li><b>Idea:</b> pick a tree's leaf voxel from the climate fields at its anchor: autumn leaves (LeavesOrange) in cooler forests, snow on crowns (a new snowy-leaves voxel) in the Snow biome. It would be a per-variant rule on <code>TreeSpecies</code> (§17.2), rolled per tree like the other values, so it stays a pure function (R3).</li>
+<li><b>Costs and risks:</b> small once §17 exists; a snowy-leaves voxel needs a texture from the user.</li>
+<li><b>Acceptance if scheduled:</b> tints follow the climate smoothly across biome borders; TST-30 still passes.</li>
+</ul>
+<!-- ============================================================ -->
+<h2 id="s17">17 · Generation improvements (Phase G)</h2>
+<p>Planned on 2026-10-24, not started. Goal: a world that looks less uniform. There will be more tree kinds, several variants of each kind, crowns that differ voxel by voxel, groves and clearings, ground details and patchy beaches. Generation defects such as grass under water are fixed as well. The decisions behind this section are DEC-30…36 (§17.8). All rules of Part I keep applying, in particular R3 (pure functions of world position), R5 (the user sets the design values), VEG-01…06 (flora pick and anchor spacing), PERF-03 / PERF-04 and the seam test TST-03.</p>
+<div class="box note"><p><strong>Placeholders.</strong> Every number, shape range, probability and voxel choice in this section is a starting value so the agent can build and test. The user tunes them in the preview (R5). The agent must not "optimise" them, and once Phase G lands, the §10 placeholder table gives way to §17.6.</p></div>
+
+<h3>17.1 Fixes</h3>
+<div class="req"><span class="id">GEN-30</span><span class="kw must">MUST</span>Underwater top block. Each <code>Biome</code> gets an optional <code>UnderwaterTopBlock</code>. When the voxel above a column's top block is water (<code>h_int + 1 &lt; WaterLevel</code>), <code>FillTerrain</code> writes that block instead of <code>TopBlock</code>. When the field is empty it writes <code>UnderBlock</code>. A top block whose upper face touches the water surface (<code>h_int = WaterLevel − 1</code>) keeps <code>TopBlock</code>. Placeholders: Plains and Forest → Dirt, Mountain → StoneGravel, Snow → DirtGravel, Desert and Ocean → Sand, so the Ocean floor stays sand (GEN-25). The ice override is unchanged.</div>
+<div class="req"><span class="id">GEN-31</span><span class="kw must">MUST</span>Play-test review at the start of the phase (DEC-35). The agent flies the world in both architectures with the shipped settings. It collects generation defect candidates, each with world coordinates, a screenshot from <code>capture_game_view</code> and a suspected cause, and asks the user which ones to fix. The chosen ones are added to this section as GEN-32…39 before any other Phase G work. Defects outside world generation go to §16 as ideas.</div>
+
+<h3>17.2 Tree species</h3>
+<div class="req"><span class="id">VEG-10</span><span class="kw must">MUST</span>A new asset type <code>TreeSpecies</code> (ScriptableObject) describes a parametric tree kind. A <code>FloraRule</code> names a <code>SpeciesVoxel</code>, a <code>SpeciesStructure</code> or a <code>SpeciesTree</code>, exactly one of them (DEC-30). Hand-made <code>VoxelStructure</code> species stay supported. The Burst mirror is a flattened table in <code>WorldGenConfig</code> like <code>FloraStructures</code>, without managed types (R2).</div>
+<div class="req"><span class="id">VEG-11</span><span class="kw must">MUST</span>A species holds one or more <strong>variants</strong>, each with a weight. A variant has:
+<ul class="tight">
+<li><b>Trunk:</b> voxel, height range, width 1 or 2, an optional lean of up to 1 block per 4 blocks of height, and an optional lying mode for fallen logs (§17.5).</li>
+<li><b>Crown:</b> shape <code>None</code>, <code>Round</code>, <code>Ellipsoid</code>, <code>Cone</code> or <code>Tiered</code>, a radius range, a height range, the leaf voxel, and how far the crown sits above or below the trunk top.</li>
+<li><b>Branches:</b> a count range, the style <code>Diagonal</code> (up and out, as on oaks and dead trees) or <code>Arm</code> (out one block, then up, as on cacti), a length range, the height band on the trunk, and an optional leaf cluster with its radius range at the tip.</li>
+<li><b>Crown noise:</b> the parameters of §17.3.</li>
+<li><b>Spacing radius:</b> replaces the global r<sub>tree</sub> for this variant (VEG-13).</li>
+</ul></div>
+<div class="req"><span class="id">VEG-12</span><span class="kw must">MUST</span>Every value of a tree is a pure function of its anchor column and the config (R3). The variant is the weighted pick with <code>Hash01(x, z, seed, SALT_TREE_VARIANT)</code>. Each range is rolled with its own salt from <code>SALT_TREE_SHAPE</code> + i. The branch directions are rolled the same way. A tree therefore comes out identical in every chunk that holds part of it, and only the clipping to the chunk differs.</div>
+<div class="req"><span class="id">VEG-13</span><span class="kw must">MUST</span>Spacing per variant. The variant is rolled before the anchor test, so every candidate's spacing radius r is known. Candidate a suppresses candidate b when their distance is at most <code>max(r_a, r_b)</code> and a outranks b (<code>FloraPlacement.Outranks</code>). This keeps a strict order, so at most one of any two conflicting candidates becomes an anchor. <code>FloraReach</code> becomes the largest horizontal reach of any variant (crown radius plus branch length plus lean, from the range maxima). <code>FloraPadding</code> becomes <code>FloraReach</code> + the largest spacing radius. The global <code>TreeSpacingRadius</code> stays the default for structure and stack species.</div>
+<div class="req"><span class="id">VEG-14</span><span class="kw must">MUST</span>Stamping keeps today's rules. A flora voxel replaces only a voxel of a lower <code>FloraVoxelClass</code>, and anchors are stamped in world (x, then z) order. A trunk always reaches its crown, and branches start on the trunk. Trunks start at the anchor's top block + 1. A width-2 trunk and a lean are checked against the terrain heights in their footprint, and the variant falls back to width 1 without lean when that footprint is not flat within 1 block.</div>
+<div class="req"><span class="id">VEG-15</span><span class="kw may">MAY</span>The region API (GEN-17) gets an optional <code>FloraVariant</code> buffer next to <code>FloraSpecies</code>. Species ids stay stable and variants never get their own species id, so the Part III flora metrics count species, not shapes.</div>
+
+<h3>17.3 Crown variety</h3>
+<div class="req"><span class="id">VEG-20</span><span class="kw must">MUST</span>Crowns differ voxel by voxel. For every crown voxel at world position p, a 3D hash <code>Hash01(p, seed, SALT_CROWN)</code> decides three things:
+<ul class="tight">
+<li><b>Holes:</b> an outer-shell voxel is dropped with p<sub>hole</sub> (placeholder 0.2). Interior voxels stay, so the crown never becomes see-through.</li>
+<li><b>Bumps:</b> with p<sub>bump</sub> (placeholder 0.1), an outer voxel gets one extra voxel outward along its outward axis. A voxel on the crown's lower edge can instead hang one block down with p<sub>hang</sub> (placeholder 0.05).</li>
+<li><b>Mix:</b> with p<sub>alt</sub> (placeholder 0), the voxel takes the variant's alternative leaf voxel instead of the main one.</li>
+</ul>
+Add <code>Hash32(int x, int y, int z, uint seed, uint salt)</code> and its <code>Hash01</code> to <code>Hash</code>, with the same avalanche quality as the 2D hash (GEN-04). Because the decision depends on world position only, two overlapping trees agree on every shared voxel, and chunk borders stay seamless. The extra voxels count towards <code>FloraReach</code>.</div>
+
+<h3>17.4 Groves and clearings</h3>
+<div class="req"><span class="id">VEG-30</span><span class="kw must">MUST</span>Flora density follows low-frequency noise instead of white noise. <code>WorldGenSettings</code> gets up to four density noises: Trees, Undergrowth, Flowers and Ground details. Each has its own salt, scale (placeholders 96, 48, 24 and 64 blocks) and contrast. A <code>FloraRule</code> names one of them and an influence k ∈ [0, 1], with a placeholder of 0 so existing rules are unchanged. The column's probability becomes <code>p' = p · lerp(1, m(D), k)</code>, where <code>m</code> maps the noise D to [0, 2] with mean 1. The long-run density thus stays p, but plants cluster into groves and patches with clearings between them.</div>
+<div class="req"><span class="id">VEG-31</span><span class="kw must">MUST</span>The cumulative intervals of a biome's rules are computed per column from p'. When their sum exceeds 1, all p' are scaled down to a sum of 1. The multi-block pre-filter (<code>MayBeMultiBlock</code>) must stay a necessary condition, so its intervals are built from the largest possible p' (factor 2 at k = 1). Each density noise is evaluated once per column, as PERF-07 requires for the fields.</div>
+<div class="req"><span class="id">VEG-32</span><span class="kw must">MUST</span>A switch <code>FloraDensityNoise</code> on <code>WorldGenSettings</code> (on by default) turns all density noises off. It is part of <code>ToCanonicalJson()</code>, so Part III runs can be made with even density and their manifests show which way they ran (EXP-10).</div>
+
+<h3>17.5 Ground details and beaches</h3>
+<div class="req"><span class="id">VEG-40</span><span class="kw must">MUST</span>Boulders are a <code>TreeSpecies</code> with crown <code>Round</code>, no trunk and stone voxels (placeholders Stone, StoneGrey and StoneGrassy as variants, radius 1–2). The boulder sits 0–1 blocks into the ground. Crown noise applies, so boulders are not perfect spheres. They follow the anchor spacing like trees.</div>
+<div class="req"><span class="id">VEG-41</span><span class="kw must">MUST</span>Fallen logs are a <code>TreeSpecies</code> with a lying trunk: a horizontal line of 3–6 log voxels along x or z, picked by hash, starting at the anchor. The log is placed only when the terrain height of every column under it equals the anchor's height. Those heights come from <code>WorldSampler</code> (pure), so all chunks agree. Otherwise the variant falls back to a log 2 blocks long, or to no log. Its reach is the maximum length. Placeholders: Forest LogOak and LogBirch, Plains LogOak.</div>
+<div class="req"><span class="id">GEN-40</span><span class="kw must">MUST</span>Beaches are patchy, not along every shore (DEC-33). Each <code>Biome</code> gets an optional <code>BeachBlock</code> (placeholder Sand, empty for Snow and Mountain) and a beach height h<sub>b,max</sub> (placeholder 3). A noise B (own salt, placeholder scale 128 blocks) gives each column a beach height <code>h_b = round(h_b,max · s(B))</code>, where s is 0 below a threshold (placeholder 0.45, which leaves about half of the shores without a beach) and rises smoothly to 1. A column whose top block lies 0 … h<sub>b</sub> − 1 blocks above the water surface takes the <code>BeachBlock</code> as its top block and its under block for 2 blocks. GEN-30 still applies below the water. Flora rules see beach columns as ground of the beach block: a rule with <code>RequiresBeachGround</code> grows only there and other rules skip them.</div>
+<div class="req"><span class="id">GEN-41</span><span class="kw should">SHOULD</span>The height-band test of GEN-40 can also turn low flats away from any water into sand. The agent measures how often this happens in the preview at 4096² for both architectures and reports it. If the user finds it too frequent, a water-distance test such as a distance field built on the padded lattice, becomes a follow-up decision.</div>
+
+<h3>17.6 Species set (placeholders)</h3>
+<p>Kinds chosen by the user (DEC-32). Probabilities are per column and replace the Tree entries of the §10 table.</p>
+<table>
+<tr><th>Species</th><th>Variants (weight)</th><th>Shape (placeholder ranges)</th><th>Voxels</th><th>Biomes (p)</th></tr>
+<tr><td>Oak</td><td>Normal (0.85), Big (0.15)</td><td>Normal: trunk 4–6, Round r 2–3, 0–1 branches, spacing 3. Big: trunk 6–9, Round r 3–4, 2–4 Diagonal branches with clusters r 1–2, spacing 5.</td><td>LogOak, Leaves</td><td>Plains 0.004, Forest 0.015</td></tr>
+<tr><td>Birch</td><td>Slim (0.6), Tall (0.4)</td><td>Slim: trunk 5–7, Ellipsoid r 1–2, height 4–5. Tall: trunk 7–10, Ellipsoid r 2, height 5–7, 0–2 short branches. Spacing 2–3.</td><td>LogBirch, Leaves</td><td>Forest 0.015, Plains 0.001</td></tr>
+<tr><td>Spruce</td><td>Cone (0.5), Tiered (0.5)</td><td>Trunk 6–11, crown from 2 blocks above the ground up to the top, radius 2–3 at the bottom and 0–1 at the top. Spacing 3.</td><td>LogSpruce, LeavesSpruce (new, §17.7)</td><td>Mountain 0.01, Snow 0.004</td></tr>
+<tr><td>Bush</td><td>Low (0.6), Round (0.4)</td><td>Low: no trunk, Round r 1, height 1–2. Round: trunk 1, Round r 1–2. Spacing 2.</td><td>LogOak, Leaves</td><td>Plains 0.006, Forest 0.005, Mountain 0.002</td></tr>
+<tr><td>Dead tree</td><td>Bare (0.5), Branched (0.5)</td><td>Crown None. Bare: trunk 3–5. Branched: trunk 4–7, 1–3 Diagonal branches without leaves. Spacing 3.</td><td>LogOak</td><td>Snow 0.002, Desert 0.001</td></tr>
+<tr><td>Cactus</td><td>Pillar (0.7), Arms (0.3)</td><td>Pillar: trunk 1–3, as today's stacked cactus. Arms: trunk 3–5, 1–2 Arm branches of length 1–2. Spacing 2.</td><td>Cactus</td><td>Desert 0.01</td></tr>
+<tr><td>Boulder</td><td>Stone, Grey, Grassy (1/3 each)</td><td>No trunk, Round r 1–2, sunk 0–1. Spacing 3.</td><td>Stone, StoneGrey, StoneGrassy</td><td>Mountain 0.004, Snow 0.002, Plains 0.001</td></tr>
+<tr><td>Fallen log</td><td>Oak (0.6), Birch (0.4)</td><td>Lying trunk 3–6 (VEG-41). Spacing 3.</td><td>LogOak, LogBirch</td><td>Forest 0.003, Plains 0.0005</td></tr>
+</table>
+<p class="small">Today's <code>Tree.asset</code> becomes the Normal variant of Oak. The single-voxel rules of §10 (grass, flowers, mushrooms, rocks) stay and get density noises (VEG-30): Undergrowth for grass, Flowers for flowers, Ground details for rocks.</p>
+
+<h3>17.7 New voxels</h3>
+<p>Allowed by DEC-34. The agent creates the assets with placeholder textures copied from the nearest existing voxel. The user makes or approves the final textures. Light values follow LGT-02.</p>
+<table>
+<tr><th>Voxel</th><th>Kind</th><th>Placeholder until textured</th></tr>
+<tr><td>LeavesSpruce</td><td>Transparent with collision, attenuation 1, like Leaves</td><td>Leaves, tinted darker</td></tr>
+<tr><td>LogSpruce</td><td>Solid, like LogOak</td><td>LogOak, tinted darker</td></tr>
+<tr><td>DeadBush</td><td>Foliage, cross shape, like GrassFDead</td><td>GrassFDead</td></tr>
+</table>
+<p class="small">Gravel already exists as StoneGravel and DirtGravel. New voxels are registered in <code>Standart.asset</code>, so the registry ids of existing voxels must not change.</p>
+
+<h3>17.8 Decisions (2026-10-24)</h3>
+<table>
+<tr><th>ID</th><th>Question</th><th>Decision</th><th>Consequence</th></tr>
+<tr><td>DEC-30</td><td>How tree variants are defined</td><td>Parametric <code>TreeSpecies</code> with ranges, and hand-made structures stay possible</td><td>VEG-10…14.</td></tr>
+<tr><td>DEC-31</td><td>Top block under water</td><td>Per-biome <code>UnderwaterTopBlock</code></td><td>GEN-30.</td></tr>
+<tr><td>DEC-32</td><td>New tree kinds</td><td>Birch and big oak, spruce or pine, bushes, dead trees and cacti with arms</td><td>§17.6.</td></tr>
+<tr><td>DEC-33</td><td>Related ideas</td><td>Groves and clearings, boulders and fallen logs, beaches that are patchy instead of along every shore. Climate tints on trees were not chosen.</td><td>§17.4, §17.5; tints recorded as §16.8.</td></tr>
+<tr><td>DEC-34</td><td>New voxel assets</td><td>Allowed, with the textures made or approved by the user</td><td>§17.7.</td></tr>
+<tr><td>DEC-35</td><td>Further fixes</td><td>None known besides the underwater top block; the agent runs a play-test review and the user picks</td><td>GEN-31.</td></tr>
+<tr><td>DEC-36</td><td>Place in the order of work</td><td>Part II, before Part III</td><td>§0.</td></tr>
+</table>
+
+<h3>17.9 Tests, performance and tooling</h3>
+<div class="req"><span class="id">TST-30</span><span class="kw must">MUST</span>Tree determinism and seams. Every variant of §17.6 is stamped once into a whole-world buffer and once chunk by chunk, with an anchor near a chunk corner. The results must be identical. TST-02 and TST-03 run with the new species set, including the variant with the largest reach.</div>
+<div class="req"><span class="id">TST-31</span><span class="kw must">MUST</span>Shape tests per crown shape and branch style, for 200 seeds each. They check that the trunk connects to the crown, that branches start on the trunk, that no voxel lies beyond the declared reach, and that the voxel counts stay within the bounds the ranges allow. Crown noise must give a different voxel set for different anchors with the same parameters.</div>
+<div class="req"><span class="id">TST-32</span><span class="kw must">MUST</span>Spacing. With mixed variant radii, two anchors never lie closer than <code>max(r_a, r_b)</code>, and the result does not depend on the order in which chunks are generated.</div>
+<div class="req"><span class="id">TST-33</span><span class="kw must">MUST</span>Surface fixes. A column with <code>h_int + 1 &lt; WaterLevel</code> gets the underwater top block. A column with <code>h_int = WaterLevel − 1</code> keeps its top block. The Ocean floor stays sand. Beach columns lie only within the band and the noise mask. The chunk job and <code>SampleRegion</code> agree on all of this.</div>
+<div class="req"><span class="id">TST-34</span><span class="kw must">MUST</span>Density noise. Over 4096² columns, the mean density of a rule with k = 1 equals p within ±5 %, and with <code>FloraDensityNoise</code> off the placement equals today's.</div>
+<div class="req"><span class="id">PERF-10</span><span class="kw must">MUST</span>Density noises, spacing per variant and the larger <code>FloraPadding</code> make chunk generation more expensive. Two new benchmark rows measure it: Forest with the full species set, and a worst case with the largest reach everywhere. The existing rows stay within PERF-03. The TST-E21 flight keeps 0/300 allocating frames, and its interval-store peak is reported against the 17 pages per list of DEC-27. If the store has to grow during the flight, or the pool size changes, the user decides. The light-job and collider benchmarks are rerun on terrain with the new crowns (PERF-05).</div>
+<div class="req"><span class="id">INT-31</span><span class="kw should">SHOULD</span>A species gallery in the preview window. It stamps the variants of the selected species for a row of seeds into a small voxel buffer, draws a side view and a top view, and redraws on every change of the asset, so the user can tune the ranges by eye (R5). The flora view of the preview shows the density noises as an overlay.</div>
+
+<h3>17.10 Phase G steps</h3>
+<div class="phase"><h4>Phase G — Generation improvements</h4>
+<ol class="tight">
+  <li><strong>G1 Fixes.</strong> GEN-30, the play-test review GEN-31 and the fixes the user picks from it (GEN-32…39), and TST-33 (without beaches).</li>
+  <li><strong>G2 Tree system.</strong> <code>TreeSpecies</code>, variants, spacing per variant, the 3D hash and crown variety (VEG-10…14, VEG-20), with today's tree as the Oak Normal variant. TST-30…32 and the species gallery (INT-31).</li>
+  <li><strong>G3 Species set.</strong> The kinds of §17.6 and the voxels of §17.7, with the user tuning them in the gallery.</li>
+  <li><strong>G4 Groves, ground details and beaches.</strong> VEG-30…32, VEG-40, VEG-41, GEN-40, the GEN-41 measurement, and TST-34.</li>
+  <li><strong>G5 Performance.</strong> PERF-10. Baselines go into the baselines README as usual.</li>
+</ol>
+<p><strong>Accept:</strong> no grass or snow top blocks under water; every species of §17.6 grows in its biomes with visibly different variants and no two identical crowns side by side; groves, clearings and patchy beaches show in the preview and in play; all tests above, the existing EditMode and PlayMode suites and the TST-E21 flight pass; benchmarks within PERF-03 or with an explanation the user accepts.</p></div>
+
+<!-- ============================================================ -->
+<div class="part" id="part3"><span>Part III</span> Research data tooling — priority 2, separate</div>
+<div class="box note"><p><strong>Do not start Part III until the user asks for it.</strong> Part I and §15–16 of Part II are complete (2026-10-21); Phase G (§17) comes first. Part III only reads from the world generator through its public API. It is described here so that Part I's API (GEN-17) is shaped right.</p></div>
+
+<h2 id="s18">18 · Separation rules</h2>
+<div class="req"><span class="id">RES-01</span><span class="kw must">MUST</span>All Part III Unity code lives in <code>Assets/Research/</code> with its own <code>Research.Editor.asmdef</code> (Editor platform) referencing <code>Engine.Runtime</code>. The engine never references Research. Deleting <code>Assets/Research/</code> must leave the game and all Part I tests working.</div>
+<div class="req"><span class="id">RES-02</span><span class="kw must">MUST</span>Part III uses only public engine API (<code>WorldGenApi</code>, <code>WorldGenSettings</code>, <code>BiomeSet</code>, <code>TerrainSplineSet</code>). If something is missing, add a small, generic public API to the engine as a separate change — never research-specific code in the engine.</div>
+<div class="req"><span class="id">RES-03</span><span class="kw must">MUST</span>Python analysis lives in <code>&lt;ProjectRoot&gt;/Analysis/</code>; outputs in <code>&lt;ProjectRoot&gt;/Exports/</code> (outside <code>Assets/</code>, git-ignored).</div>
+<div class="req"><span class="id">RES-04</span><span class="kw must">MUST NOT</span>change hypothesis thresholds, analysis parameters marked <code>frozen</code>, or the fixed seeds (DEC-10, <code>Experiments/seeds.json</code>). If a result looks wrong, report it; don't tune code or thresholds towards a hypothesis.</div>
+<div class="req"><span class="id">RES-05</span><span class="kw must">MUST</span>Research biome sets are separate <code>BiomeSet</code> assets in <code>Assets/Research/</code>, all containing Ocean (DEC-02): <em>main</em> = Plains, Desert, Mountain, Snow, Ocean; <em>extended</em> = main + Forest, i.e. the same 6 biomes as the game. The extensibility test (H7) measures adding Forest to the main set. Boundaries with Ocean are measured but are not test pairs.</div>
+
+<h2 id="s19">19 · Export &amp; experiment runner</h2>
+<h3>19.1 Region and orientation</h3>
+<div class="req"><span class="id">EXP-01</span><span class="kw must">MUST</span>An export covers <code>[originX, originX + size) × [originZ, originZ + size)</code> at 1 sample per block, via <code>WorldGenApi.SampleRegion</code> in tiles (e.g. 512 × 512). Arrays have shape <code>(size, size)</code>, C order, element <code>[j, i]</code> = column <code>(originX + i, originZ + j)</code>. Default region: origin (−2048, −2048), size 4096.</div>
+<div class="req"><span class="id">EXP-02</span><span class="kw must">MUST</span>The runner asserts that Burst compilation is enabled and runs the Part I EditMode tests before a plan; abort on failure.</div>
+
+<h3>19.2 Layers</h3>
+<table>
+<tr><th>Layer</th><th>dtype</th><th>Set</th><th>Content</th></tr>
+<tr><td><code>h_f32</code></td><td>float32</td><td>lean, full</td><td>H before floor</td></tr>
+<tr><td><code>h_int</code></td><td>int16</td><td>lean, full</td><td>column height</td></tr>
+<tr><td><code>biome_nn</code></td><td>uint8</td><td>lean, full</td><td>hard classification, unwarped</td></tr>
+<tr><td><code>biome_dom</code></td><td>uint8</td><td>lean, full</td><td>argmax of w<sup>mat</sup> (effective boundary; warped for method 3)</td></tr>
+<tr><td><code>wmat_max</code>, <code>whgt_max</code></td><td>uint8</td><td>lean, full</td><td>round(255 · max weight); height weights in Biome-first only</td></tr>
+<tr><td><code>surf_src</code></td><td>uint8</td><td>lean, full</td><td>biome whose blocks were placed</td></tr>
+<tr><td><code>flora_species</code>, <code>flora_src</code></td><td>uint8</td><td>lean, full</td><td>anchor columns only</td></tr>
+<tr><td><code>wmat</code>, <code>whgt</code></td><td>float16 [nB, size, size]</td><td>full</td><td>all weights</td></tr>
+<tr><td><code>T, F, C, E, W, PV</code></td><td>float32</td><td>full</td><td>fields</td></tr>
+<tr><td><code>preview_*.png</code></td><td>PNG</td><td>both</td><td>for humans only</td></tr>
+</table>
+<div class="req"><span class="id">EXP-03</span><span class="kw must">MUST</span>Arrays are written as <code>.npy</code> (format 1.0: magic <code>\x93NUMPY</code>, version, little-endian header length, dict <code>{'descr': '&lt;f4', 'fortran_order': False, 'shape': (4096, 4096), }</code> padded with spaces to a multiple of 64 bytes, ending in <code>\n</code>). A small <code>NpyWriter</code> suffices.</div>
+<div class="req"><span class="id">EXP-04</span><span class="kw must">MUST</span>Size per 4096² run: full ≈ 0.9 GB, lean ≈ 0.25 GB. Sweep plans set <code>keep_raw: false</code>: analysed in batches right after export, raw layers then deleted, metrics/manifests/previews kept. If disk is short, run sweeps at 2048² after checking ≥ 30 transects per test pair and seed.</div>
+
+<h3>19.3 Manifest and resume</h3>
+<div class="req"><span class="id">EXP-10</span><span class="kw must">MUST</span>Each run folder has <code>manifest.json</code>: spec version, run id, UTC timestamp, git commit, Unity version, config hash (SHA-256 of <code>ToCanonicalJson()</code>), full canonical config, architecture, methods and strengths, effective lattice stride, seed, region, biome table (targets, height parameters, flora), water level, Hmin/Hmax, stats (clamped share, underwater share, seconds), and per layer file, dtype and SHA-256.</div>
+<div class="req"><span class="id">EXP-11</span><span class="kw must">MUST</span>A run is skipped on resume only if its <em>run key</em> matches: SHA-256 of config hash + seed + region + layer set + git commit + spec version.</div>
+
+<h3>19.4 Plans and runner</h3>
+<pre><code>// Experiments/seeds.json – drawn once, never changed (DEC-10)
+{ "drawn_on": "2026-10-17",
+  "main":  [617800548, 1035220005, 38752999, 2073214123, 827781431],
+  "pilot": [1135345306, 93056379] }</code></pre>
+<div class="req"><span class="id">EXP-20</span><span class="kw must">MUST</span>Plans are JSON in <code>&lt;ProjectRoot&gt;/Experiments/</code> (schema §22.3), expanded into runs written to <code>Exports/&lt;plan&gt;/&lt;Architecture&gt;_&lt;Method&gt;[/&lt;param&gt;=&lt;value&gt;]/seed_&lt;s&gt;/</code>. Runnable from a menu, as a registered Editor command on a running Editor (<code>unity command …</code>), and headless (<code>unity run --command …</code>, TOOL-06); exit code ≠ 0 on failure. Exact command syntax from <code>unity run --help</code>.</div>
+<table>
+<tr><th>Plan</th><th>Content</th><th>Runs</th></tr>
+<tr><td><code>pilot.json</code></td><td>8 configurations × the 2 pilot seeds, full layers; used to set thresholds</td><td>16</td></tr>
+<tr><td><code>main.json</code></td><td>8 configurations × 5 main seeds, default strengths, full layers</td><td>40</td></tr>
+<tr><td><code>sweep_frequency.json</code></td><td><code>ClimateFrequencyScale</code> ∈ {0.5, 0.71, 1, 1.41, 2, 2.83}</td><td>240</td></tr>
+<tr><td><code>sweep_positions.json</code></td><td>target spread κ ∈ {0.6, 0.8, 1.0, 1.2, 1.4}: <code>t_b ← t̄ + κ(t_b − t̄)</code>, applied in normalised space (PV as (PV+1)/2) on the dimensions the architecture uses, then clamped to [0,1]</td><td>200</td></tr>
+<tr><td><code>sweep_strength.json</code></td><td>B ∈ {8, 11, 16, 23, 32, 45, 64}; A ∈ {6, 8.5, 12, 17, 24, 34, 48}; σ ∈ {0.01, 0.02, 0.04, 0.08, 0.16}. Stages varied separately: Terrain-first material only; Biome-first a material-only and a height-only sweep with the other stage at default. Because A is shared (DEC-05), the A sweep always affects both stages; the height-only sweep of method 3 varies B<sub>hgt</sub>. (3 + 6 stage sweeps, 19 levels per architecture-stage, × 5 seeds)</td><td>285</td></tr>
+<tr><td><code>extend_forest.json</code></td><td>main configurations with the extended biome set, same seeds, full layers</td><td>40</td></tr>
+<tr><td><code>e1_kernel.json</code></td><td>Biome-first, height method 4, σ<sub>hgt</sub> ∈ {0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64}, material method 4 at default; plus Terrain-first reference (method 1)</td><td>40</td></tr>
+</table>
+<p class="small">Sweeps vary one parameter at a time. For frequency and position sweeps, paired comparisons use the baseline at the same sweep level.</p>
+
+<h2 id="s20">20 · Analysis pipeline (Python)</h2>
+<h3>20.1 Package</h3>
+<pre><code>Analysis/
+  pyproject.toml            numpy, scipy, scikit-image, pandas, matplotlib, pyyaml, pyarrow
+  config/analysis.yaml      transect + metric parameters (frozen after pilot)
+  config/hypotheses.yaml    thresholds (frozen after pilot)
+  worldgen_analysis/        io, boundaries, transects, metrics_height, metrics_surface, metrics_flora,
+                            fidelity, geometry, validation, hypotheses, report, cli
+  tests/                    synthetic-map tests (ANA-60)</code></pre>
+<div class="req"><span class="id">ANA-01</span><span class="kw must">MUST</span>Every output records the hashes of <code>analysis.yaml</code> and <code>hypotheses.yaml</code> and whether they were frozen; unfrozen reports are stamped <strong>PRELIMINARY</strong>.</div>
+
+<h3>20.2 Boundaries and transects</h3>
+<div class="req"><span class="id">ANA-10</span><span class="kw must">MUST</span>Boundary pixels: cells whose 4-neighbour has a different <code>biome_dom</code>, assigned to the unordered pair {a, b}.</div>
+<div class="req"><span class="id">ANA-11</span><span class="kw must">MUST</span>Transect centres: boundary pixels of a pair, Poisson-disk subsampled (spacing ≥ 48, fixed analysis seed). Normal: gradient of the Gaussian-blurred (σ = 4) indicator <code>[biome_dom = a]</code>, oriented a → b with a &lt; b.</div>
+<div class="req"><span class="id">ANA-12</span><span class="kw must">MUST</span>Half-length L = 96 (≥ A<sub>max</sub>·√2 + B<sub>max</sub>/2 + margin), step 1, band of 5 parallel lines (averaged) plus the centre line on its own; bilinear for float layers, nearest for categorical. Core metrics use |s| ≤ 32 after re-centring on the observed crossing.</div>
+<div class="req"><span class="id">ANA-13</span><span class="kw must">MUST</span>Reject a transect if a third biome covers &gt; 10 % of its samples, it crosses the a/b boundary more than once within ±L/2, &gt; 20 % of samples are underwater, or it leaves the region. Evaluated on the run's own map; counts reported per reason.</div>
+<div class="req"><span class="id">ANA-14</span><span class="kw must">MUST</span>Primary analysis: each run uses transects on its <strong>own</strong> effective boundary. Method 3 moves boundaries by up to A·√2 and makes them oblique; baseline transects would smear a hard warped edge into an artificial width. Methods are compared on aggregates per (pair, seed).</div>
+<div class="req"><span class="id">ANA-15</span><span class="kw should">SHOULD</span>Secondary analysis for methods 1, 2, 4: paired transects from the baseline <code>biome_nn</code> of the same architecture, seed and sweep level.</div>
+
+<h3>20.3 Metrics</h3>
+<table>
+<tr><th>Dimension</th><th>Metric</th><th>Definition</th></tr>
+<tr><td rowspan="5">Height</td><td><code>max_step</code></td><td>max |h_int(s+1) − h_int(s)| in the core, centre line</td></tr>
+<tr><td><code>max_grad</code>, <code>mean_grad</code></td><td>same on h_f32</td></tr>
+<tr><td><code>cliffs</code></td><td>steps &gt; n blocks in the core (n in <code>analysis.yaml</code>, placeholder 4)</td></tr>
+<tr><td><code>excess_grad</code></td><td><code>max_grad</code> minus the p95 of |∇H| in the cores of a and b (cells &gt; 64 blocks from any boundary)</td></tr>
+<tr><td><code>cv_max_grad</code>, <code>field_speed</code></td><td>CV of <code>max_grad</code> over a pair's transects; |dv/ds| at the crossing</td></tr>
+<tr><td rowspan="4">Surface</td><td><code>width_10_90</code></td><td>logistic fit of band-averaged share of <code>surf_src = b</code>, τ bounded to [0.05, L], width = 2·ln 9·τ ≈ 4.39τ; if the fit hits a bound or fails, isotonic s<sub>90</sub> − s<sub>10</sub>; both stored</td></tr>
+<tr><td><code>islands</code></td><td>4-connected components of <code>surf_src</code> within 32 blocks of the boundary not connected to their biome's main region; per km of boundary and area share</td></tr>
+<tr><td><code>axis_alignment</code></td><td>share of boundary normals within ±5° of the axes minus the isotropic expectation (40°/360°)</td></tr>
+<tr><td><code>straightness</code></td><td>mean chord/path ratio over boundary arcs of 64 blocks</td></tr>
+<tr><td rowspan="3">Flora</td><td><code>density_profile</code>, <code>density_jump</code></td><td>plants per column along s, pooled over all transects of a pair and seed; max step of the smoothed (σ = 4) profile relative to the core-density difference</td></tr>
+<tr><td><code>flora_width_10_90</code></td><td>as surface width on <code>flora_src</code> composition, pooled profile</td></tr>
+<tr><td><code>mixed_zone</code></td><td>pooled profile: length of s where plants of a and of b each make up ≥ 10 % (flora measure for H4)</td></tr>
+<tr><td rowspan="4">Fidelity / robustness</td><td><code>core_share_b</code></td><td>(cells with <code>biome_dom = b</code> and <code>wmat_max ≥ round(0.95·255)</code>) ÷ (cells with <code>biome_dom = b</code>); Biome-first also with <code>whgt_max</code></td></tr>
+<tr><td><code>vanished_b</code></td><td>b below 0.1 % area or without core cells, while present in the baseline of the same seed</td></tr>
+<tr><td><code>implausible_len</code></td><td>boundary length of implausible pairs per km²</td></tr>
+<tr><td>tipping point</td><td>first level (moving away from the default) where the median over seeds leaves median ± 2·MAD of the per-seed values at the default level</td></tr>
+</table>
+
+<h3>20.4 Validation checks</h3>
+<table>
+<tr><th>ID</th><th>Check</th><th>Pass criterion</th></tr>
+<tr><td>V1</td><td>Terrain-first height independent of method</td><td>identical SHA-256 of <code>h_f32</code> across the 4 Terrain-first runs per seed</td></tr>
+<tr><td>V2</td><td>Baseline has hard edges</td><td>median <code>width_10_90</code> ≤ 1.5 blocks for surface and flora composition</td></tr>
+<tr><td>V3</td><td>Biome-first baseline jump matches parameters</td><td>(a) max step ≤ |ΔOffset| + Σ|Δa<sub>i</sub>| + |ΔJ| + p99.9 of 4-neighbour |ΔH| in the cores; (b) median jump (mean H over s ∈ [1,4] minus over s ∈ [−4,−1]) within [tolerance] of |ΔOffset + ΔJ·mean(P)|</td></tr>
+<tr><td>V4</td><td>Comparable height distributions</td><td>histograms + Wasserstein-1 distance between architectures per seed; threshold set after pilot</td></tr>
+<tr><td>V5</td><td>Biome-map difference</td><td>agreement share of <code>biome_nn</code> between architectures per seed (reported)</td></tr>
+</table>
+<div class="req"><span class="id">ANA-40</span><span class="kw must">MUST</span>A failed V1–V3 means an implementation bug: reported at the top, and hypothesis evaluation is skipped for the affected configurations.</div>
+
+<h3>20.5 Hypothesis evaluation</h3>
+<table>
+<tr><th>H</th><th>Computation</th><th>Plan</th></tr>
+<tr><td>H1</td><td>Biome-first height: per seed, relative |Δ| of median <code>max_step</code>, <code>max_grad</code>, <code>cliffs</code> between methods 3 and 2 ≤ [x %] (this per-seed equivalence is the "right direction" for the decision rule); both reduce median <code>max_step</code> vs baseline by ≥ [y %]. Focus pair Plains–Mountain.</td><td>main</td></tr>
+<tr><td>H2</td><td>Biome-first method 4: <code>cliffs</code> = 0 in ≥ 95 % of transects; <code>cv_max_grad</code>(M4) exceeds <code>cv_max_grad</code>(M2) by ≥ [z %]; Spearman ρ(field_speed, max_grad) with cluster-bootstrap CI</td><td>main</td></tr>
+<tr><td>H3</td><td>Material: <code>axis_alignment</code>/<code>straightness</code> of M3 improved vs M1 by ≥ [x %]; <code>width_10_90</code>(M3) ≤ [1–2]; M2 and M4 wider</td><td>main</td></tr>
+<tr><td>H4</td><td>Spearman correlation of method rankings by flora <code>mixed_zone</code> and by surface <code>width_10_90</code> ≥ [0.8], per architecture and seed</td><td>main</td></tr>
+<tr><td>H5</td><td>Terrain-first M4: r(width_10_90, |∇H| at crossing) ≤ [−0.3]; Biome-first M4: 95 % CI of r contains 0. M2/M3: architecture differences recomputed on transects with identical <code>biome_nn</code> in both architectures stay within [tolerance]</td><td>main</td></tr>
+<tr><td>H6</td><td>Typical biome extent = median equivalent diameter √(4·area/π) of <code>biome_nn</code> components. M2 core share drops by &gt; [x %] once the extent falls below ≈ 2·B<sub>mat</sub>; M4 core share stays within [± x %]; M4 width ∝ 1/frequency (log-log slope ≈ −1). The pilot must confirm the frequency range crosses 2·B.</td><td>sweep_frequency</td></tr>
+<tr><td>H7</td><td>Extensibility log (config entries, code changes, pairwise rules, spline changes) for adding Forest; share of area outside Forest with changed <code>h_int</code> or <code>biome_dom</code></td><td>extend_forest</td></tr>
+<tr><td>E1</td><td>Exploratory: Biome-first vs Terrain-first height metrics over σ<sub>hgt</sub>; core-share loss</td><td>e1_kernel</td></tr>
+</table>
+<div class="req"><span class="id">ANA-50</span><span class="kw must">MUST</span>Decision rule: <em>supported</em> if the effect points the predicted way in ≥ 4 of 5 seeds and the median over seeds reaches the threshold; <em>not supported</em> if the direction holds in ≤ 2 seeds; otherwise <em>inconclusive</em>. CIs by cluster bootstrap (resample seeds, then transects within each seed; 2000 replicates).</div>
+<div class="req"><span class="id">ANA-51</span><span class="kw must">MUST</span><code>results/</code>: <code>profile_table.csv</code> (8 configurations × continuity, gradation, artefact freedom, fidelity, robustness, effort), <code>hypotheses.md</code>, <code>validation.md</code>, figures.</div>
+<div class="req"><span class="id">ANA-60</span><span class="kw must">MUST</span>Metric tests on synthetic maps before real analysis: straight step (width ≤ 1, 0 islands, straightness ≈ 1); logistic τ = 4 (width 17.6 ± 5 %); axis-aligned square vs circle (axis_alignment positive vs ≈ 0); known ramp (max_grad = slope) and inserted 6-block step (1 cliff at n = 4); white-noise dither with known weights (island count in expected range); three-biome junction and double crossing rejected.</div>
+
+<h2 id="s21">21 · Phases (Part III) and open points</h2>
+<div class="phase"><h4>Phase R1 — Export &amp; runner</h4><p>§18, §19. Accept: <code>pilot.json</code> runs headless; manifests complete; deleting <code>Assets/Research</code> leaves Part I intact.</p></div>
+<div class="phase"><h4>Phase R2 — Analysis</h4><p>§20. Accept: synthetic tests pass; pilot analysed; V1–V3 pass. Then the user sets thresholds and freezes the YAML files; only then <code>main.json</code>.</p></div>
+<div class="phase"><h4>Phase R3 — Sweeps &amp; extensibility</h4><p>Sweep plans, extensibility protocol (record config entries, code changes, pairwise rules, spline changes for adding Forest), H6, H7, E1. Accept: report with hypothesis table.</p></div>
+<table>
+<tr><th>Open (decide before Part III)</th><th>Default</th></tr>
+<tr><td>OD-R3: Region size</td><td><strong>Decided 2026-10-21 (DEC-28): 4096² everywhere.</strong> The earlier fallback of 2048² for sweeps when disk is short is not used.</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="s22">22 · Appendix: defaults &amp; schemas</h2>
+<h3>22.1 Placeholder Terrain-first splines</h3>
+<p>Only to get a plausible starting world; the user replaces them. Heights in blocks, water level 124.</p>
+<pre><code>Offset(C, E, PV):
+  C:  0.00 → 70        (deep ocean)
+      0.30 → 110       (ocean)
+      0.40 → 122       (coast)
+      0.50 → spline over E:
+              E 0.0 → spline over PV: [-1 → 128, 0 → 136, 1 → 150]
+              E 0.6 → 132
+              E 1.0 → 128
+      0.75 → spline over E:
+              E 0.0 → spline over PV: [-1 → 135, 0 → 160, 1 → 195]
+              E 0.5 → spline over PV: [-1 → 132, 0 → 145, 1 → 165]
+              E 1.0 → 138
+      1.00 → spline over E: [0.0 → 175, 1.0 → 145]
+Amp(C, E, PV):   C [0 → 4, 0.4 → 6, 0.75 → spline over E: [0 → 22, 1 → 8], 1 → 26]
+J(C, E, PV):     C [0 → 0, 0.6 → 0, 0.8 → spline over E: [0 → spline over PV: [0 → 0, 1 → 40], 0.5 → 0], 1 → 50]</code></pre>
+
+<h3>22.2 Placeholder biome table</h3>
+<table>
+<tr><th>Biome</th><th>T</th><th>F</th><th>C</th><th>E</th><th>PV</th><th>h (Terrain-first)</th><th>Offset</th><th>Amp</th><th>OctaveWeights (512…16)</th><th>J</th></tr>
+<tr><td>Plains</td><td>0.55</td><td>0.45</td><td>0.45</td><td>0.70</td><td>−0.2</td><td>0.45</td><td>136</td><td>6</td><td>1, .6, .3, .12, .05, .02</td><td>0</td></tr>
+<tr><td>Desert</td><td>0.90</td><td>0.10</td><td>0.45</td><td>0.60</td><td>0.0</td><td>0.45</td><td>134</td><td>8</td><td>1, .8, .2, .05, .02, .01</td><td>0</td></tr>
+<tr><td>Mountain</td><td>0.35</td><td>0.40</td><td>0.80</td><td>0.15</td><td>0.6</td><td>0.75</td><td>165</td><td>22</td><td>.7, .7, .6, .45, .3, .15</td><td>35</td></tr>
+<tr><td>Snow</td><td>0.15</td><td>0.50</td><td>0.70</td><td>0.35</td><td>0.3</td><td>0.85</td><td>158</td><td>14</td><td>.8, .6, .45, .3, .15, .08</td><td>15</td></tr>
+<tr><td>Forest</td><td>0.50</td><td>0.70</td><td>0.50</td><td>0.55</td><td>0.0</td><td>0.50</td><td>140</td><td>9</td><td>1, .6, .35, .15, .06, .03</td><td>0</td></tr>
+<tr><td>Ocean</td><td>0.50</td><td>0.80</td><td>0.08</td><td>0.50</td><td>0.0</td><td>0.20</td><td>100</td><td>6</td><td>1, .5, .2, .05, .02, .01</td><td>0</td></tr>
+</table>
+<p class="small">T, F, C, E, h ∈ [0,1]; PV ∈ [−1,1]. Existing assets use different targets (e.g. Snow TargetHeight 1.0); migrate them deliberately, not automatically.</p>
+
+<h3>22.3 Experiment plan schema (Part III)</h3>
+<pre><code>{
+  "name": "sweep_frequency",
+  "seeds": "main",                          // "main" | "pilot" → resolved from Experiments/seeds.json
+  "region": {"originX": -2048, "originZ": -2048, "size": 4096},
+  "layers": "lean",                         // "lean" | "full"
+  "keep_raw": false,                        // false: analyse in batches, then delete .npy
+  "biome_set": "Assets/Research/BiomeSet_Main.asset",
+  "base_settings": "Assets/Research/WorldGen_Experiment.asset",
+  "configs": [
+    {"architecture": "TerrainFirst", "material": "None"},
+    {"architecture": "TerrainFirst", "material": "DistanceBlend"},
+    {"architecture": "TerrainFirst", "material": "DistortedBoundary"},
+    {"architecture": "TerrainFirst", "material": "ParameterSpaceWeighting"},
+    {"architecture": "BiomeFirst",   "material": "None",                    "height": "None"},
+    {"architecture": "BiomeFirst",   "material": "DistanceBlend",           "height": "DistanceBlend"},
+    {"architecture": "BiomeFirst",   "material": "DistortedBoundary",       "height": "DistortedBoundary"},
+    {"architecture": "BiomeFirst",   "material": "ParameterSpaceWeighting", "height": "ParameterSpaceWeighting"}
+  ],
+  "sweep": {"parameter": "ClimateFrequencyScale", "values": [0.5, 0.71, 1.0, 1.41, 2.0, 2.83]},
+  "overrides": {"EnableClimateOverrides": false}
+}</code></pre>
+
+<h3>22.4 analysis.yaml (excerpt, Part III)</h3>
+<pre><code>frozen: false            # set true + date after pilot
+frozen_on: null
+transect: {half_length: 96, band: 5, spacing: 48, normal_sigma: 4, core: 32}
+reject:   {third_biome_share: 0.10, underwater_share: 0.20}
+zone_distance: 32
+cliff_threshold: 4
+core_weight: 0.95
+bootstrap: {replicates: 2000, cluster: seed, seed: 12345}
+test_pairs: [[Plains, Desert], [Plains, Mountain], [Mountain, Snow]]
+implausible_pairs: [[Desert, Snow]]</code></pre>
+
 </main>
 </div>
 </body>
