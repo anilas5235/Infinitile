@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Mountain
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.VoxelConfig.Data.Generation.Biome
   TopBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
+  UnderwaterTopBlock: {fileID: 11400000, guid: 21001731817832e4d858f4069c005fde, type: 2}
   UnderBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   TargetHumidity: 0.4

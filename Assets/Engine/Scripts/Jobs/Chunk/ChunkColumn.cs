@@ -13,7 +13,7 @@
         /// </summary>
         public ushort Biome;
 
-        /// <summary>Surface block voxel ID.</summary>
+        /// <summary>Surface block voxel ID: the biome's top block, or its underwater top block when water covers it.</summary>
         public ushort TopBlock;
 
         /// <summary>Sub-surface block voxel ID (just below the top block).</summary>

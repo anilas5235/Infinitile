@@ -105,6 +105,7 @@ namespace Engine.Scripts.WorldGen.Settings{
             return new Dictionary<string, object>{
                 ["Name"] = b.name,
                 ["TopBlock"] = VoxelName(b.TopBlock),
+                ["UnderwaterTopBlock"] = VoxelName(b.UnderwaterTopBlock),
                 ["UnderBlock"] = VoxelName(b.UnderBlock),
                 ["StoneBlock"] = VoxelName(b.StoneBlock),
                 ["TargetTemperature"] = b.TargetTemperature,

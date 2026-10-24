@@ -14,6 +14,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
     public class Biome : ScriptableObject{
         [SerializeField] public Voxel.Voxel TopBlock;
 
+        [Tooltip("Top block of columns whose surface lies under water, so lake and sea floors carry no grass. "
+                 + "Empty uses UnderBlock.")]
+        [SerializeField] public Voxel.Voxel UnderwaterTopBlock;
+
         [SerializeField] public Voxel.Voxel UnderBlock;
 
         [SerializeField] public Voxel.Voxel StoneBlock;
@@ -67,6 +71,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                 throw new InvalidOperationException($"Biome {name}: TopBlock, UnderBlock and StoneBlock must be set");
             BiomeDef def = ToStruct();
             def.topBlock = voxelId(TopBlock);
+            def.underwaterTopBlock = voxelId(UnderwaterTopBlock ? UnderwaterTopBlock : UnderBlock);
             def.underBlock = voxelId(UnderBlock);
             def.stoneBlock = voxelId(StoneBlock);
             return def;
@@ -97,6 +102,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
         /// </summary>
         public struct BiomeDef : IDisposable{
             public ushort topBlock;
+
+            /// <summary>Top block of a column whose upper neighbour is water; 0 keeps <see cref="topBlock" />.</summary>
+            public ushort underwaterTopBlock;
+
             public ushort underBlock;
             public ushort stoneBlock;
             public float targetHumidity;

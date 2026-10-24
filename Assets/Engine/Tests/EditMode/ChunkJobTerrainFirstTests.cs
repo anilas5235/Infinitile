@@ -236,7 +236,7 @@ namespace Engine.Tests.EditMode{
                     ColumnSample b = WorldSampler.SampleColumn(0, z, _config.WorldGen);
                     Biome.BiomeDef defA = _config.WorldGen.Biomes[a.SurfaceSource];
                     Biome.BiomeDef defB = _config.WorldGen.Biomes[b.SurfaceSource];
-                    ushort expectedA = defA.topBlock; // top block at h_int even under water
+                    ushort expectedA = defA.topBlock; // the patched defs have no underwater block
                     ushort expectedB = defB.topBlock;
                     Assert.AreEqual(expectedA, west.GetVoxel(new int3(ChunkWidth - 1, a.ColumnHeight, z)), $"west z={z}");
                     Assert.AreEqual(expectedB, east.GetVoxel(new int3(0, b.ColumnHeight, z)), $"east z={z}");

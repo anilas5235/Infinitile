@@ -65,7 +65,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                 };
                 if (s.SurfaceSource >= 0 && s.SurfaceSource < cfg.BiomeCount){
                     Biome.BiomeDef def = cfg.Biomes[s.SurfaceSource];
-                    col.TopBlock = def.topBlock;
+                    col.TopBlock = TopBlockOf(def, col.Height, cfg.WaterLevel);
                     col.UnderBlock = def.underBlock;
                     col.StoneBlock = def.stoneBlock;
                 }
@@ -142,6 +142,16 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
+        ///     Top block of a column whose top block sits at <paramref name="height" />: the biome's underwater block when
+        ///     the voxel above it is water, otherwise its top block. Water fills y &lt; <paramref name="waterLevel" />, so a
+        ///     top block at <c>waterLevel - 1</c> touches the surface and stays dry.
+        /// </summary>
+        public static ushort TopBlockOf(in Biome.BiomeDef def, int height, int waterLevel){
+            bool submerged = height + 1 < waterLevel;
+            return submerged && def.underwaterTopBlock != 0 ? def.underwaterTopBlock : def.topBlock;
+        }
+
+        /// <summary>
         ///     Fills the voxel buffer for a chunk with terrain blocks based on the prepared column data
         ///     and configuration values.
         /// </summary>
@@ -173,7 +183,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                     ushort v;
                     if (y < gy - 4) v = st;
                     else if (y < gy) v = under;
-                    // The top block sits at h_int even under water, so Ocean floors are sand.
+                    // The column's top block sits at h_int; under water it is already the biome's underwater block.
                     else if (y == gy) v = top;
                     else v = y < waterLevel ? waterBlock : air;
 

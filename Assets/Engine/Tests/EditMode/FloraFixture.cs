@@ -302,7 +302,9 @@ namespace Engine.Tests.EditMode{
                 int h = math.clamp(Region.ColumnHeight[i], 0, MaxTerrainHeight);
                 int source = Region.SurfaceSource[i];
                 Biome b = source >= 0 ? biomes[source] : null;
-                ushort top = b ? fixture.Ids[b.TopBlock] : (ushort)0;
+                // Under water (the voxel above is water) the underwater block replaces the top block.
+                Voxel wet = b && b.UnderwaterTopBlock ? b.UnderwaterTopBlock : b ? b.UnderBlock : null;
+                ushort top = b ? fixture.Ids[h + 1 < waterLevel ? wet : b.TopBlock] : (ushort)0;
                 ushort under = b ? fixture.Ids[b.UnderBlock] : (ushort)0;
                 ushort stone = b ? fixture.Ids[b.StoneBlock] : (ushort)0;
                 for (int y = 0; y < ChunkHeight; y++){

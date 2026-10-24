@@ -120,6 +120,13 @@ namespace Engine.Tests.EditMode{
                 Assert.AreEqual(top, def.topBlock, $"{fullName}: top");
                 Assert.AreEqual(under, def.underBlock, $"{fullName}: under");
                 Assert.AreEqual(stone, def.stoneBlock, $"{fullName}: stone");
+
+                // Under water the biome's underwater block replaces the top block; an empty field uses the under block.
+                Voxel wet = biome.UnderwaterTopBlock ? biome.UnderwaterTopBlock : biome.UnderBlock;
+                Assert.IsTrue(_importer.VoxelRegistry.TryGetId(wet.GetFullName(), out ushort wetId), $"{fullName}: underwater");
+                Assert.AreEqual(wetId, def.underwaterTopBlock, $"{fullName}: underwater");
+                Assert.AreNotEqual("std:Grass", wet.GetFullName(), $"{fullName}: no grass under water");
+                if (fullName == "std:Ocean") Assert.AreEqual("std:Sand", wet.GetFullName(), "Ocean floors stay sand");
             }
 
             Assert.Greater(biomeCount, 0);
