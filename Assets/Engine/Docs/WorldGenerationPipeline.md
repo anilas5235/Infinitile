@@ -1,5 +1,111 @@
 # World Generation (Overview)
 
+# Version 1.7 (Tree species)
+
+Trees are parametric: a `TreeSpecies` asset holds weighted variants, and every value of a tree (variant, trunk,
+crown, branches, crown noise) is rolled from its anchor column and the seed. A tree therefore comes out voxel for
+voxel the same in every chunk that holds part of it, and neighbouring crowns differ. The standard
+package ships the Oak with one variant, Normal (today's tree), in Forest and Plains.
+
+## Trees in the flora pipeline
+
+```mermaid
+flowchart LR
+    R[rule roll
+SpeciesTree] --> V[variant
+Hash01 TreeVariant
+vs cumulative weights]
+    V --> SR[spacing radius
+of the variant]
+    SR --> A[anchor if no candidate
+at d ≤ max r_a, r_b
+outranks it]
+    A --> F[flat footprint?
+wide or leaning trunk:
+heights within 1 block]
+    F -- no --> N[narrow: 1 wide, upright]
+    F -- yes --> B[TreeShape.Build]
+    N --> B
+    B --> S[stamp by voxel class
+in-chunk voxels only]
+```
+
+### Description
+
+- **Assets** (`VoxelConfig/Data/Generation/TreeSpecies.cs`): a `FloraRule` names a `SpeciesTree` instead of a voxel
+  or structure. A `TreeVariant` has a name, a weight, and these parts:
+  - trunk: voxel, height range (0 for none), width 1 or 2, largest lean;
+  - crown: shape (None, Round, Ellipsoid, Cone, Tiered), main and alternative leaf voxel, radius, top radius,
+    height, `CrownTop` (top layer above the trunk top) and `CrownMinBase` (layers below are cut);
+  - branches: count, style (Diagonal, Arm), length, start band as a fraction of the trunk, tip cluster radius;
+  - crown noise: hole, bump, hang and alternative-leaf chances;
+  - its own spacing radius.
+
+  All ranges are inclusive `IntRange`s; swapped bounds are sorted.
+- **Config** (`FloraConfigBuilder.AddTree`): `WorldGenConfig.TreeSpecies` (start and count into the variants) and
+  `TreeVariants`. These are the sanitised values: clamped chances, the lean in per mille, the branch band in per
+  mille of the trunk height, and branches at most `TreeShape.MaxBranches`. Each variant also has a `Reach`: the
+  largest |x| or |z| of any voxel, from the range maxima.
+  - `FloraReach` is the largest reach of every structure and variant.
+  - `FloraSpacingMax` is the largest spacing radius: r_tree for structures and stacks, the variant's radius for
+    trees.
+  - `FloraPadding` = `FloraReach` + `FloraSpacingMax`.
+  - A missing trunk or leaf voxel is id 0 and never stamped; `AddTree` warns about it.
+- **Decision** (`FloraPlacement`): the spacing radius of a candidate is that of its variant (the variant is picked
+  first, `TreeShape.PickVariant`), otherwise r_tree. Two candidates at squared distance d² conflict when
+  d ≤ max(r_a, r_b) (`Conflict`). A candidate is an anchor if no candidate it conflicts with outranks it, by the same
+  strict order as before. So two anchors never lie within the larger of their radii.
+- **Shape** (`WorldGen/Flora/TreeShape.cs`): `Roll` rolls every range at the anchor column, and `Build` appends the
+  voxels relative to the anchor's top block + 1. Horizontal positions are doubled coordinates from the crown axis, so
+  a width-2 trunk gets a centred crown.
+  - Trunk: it leans one block at a time and gains the voxels that keep it face-connected. It is extended up to the
+    crown's lowest layer.
+  - Crown: centred on the trunk's top column, with its top layer `CrownTop` above the trunk top. Round and Ellipsoid
+    use one formula (a sphere without a height range); Cone narrows from the radius to the top radius; Tiered makes
+    every second layer from the top one block narrower.
+  - Branches start next to the trunk voxel that faces their direction:
+    - Diagonal branches step out and up in one of 8 directions;
+    - Arm branches go one block out, then straight up.
+  - Crown noise is a 3D hash (`Hash.Hash32(x, y, z, …)`) at each voxel's world position. It drops outer voxels
+    (holes), adds one voxel outward (bumps) or below the lower edge (hangs), and picks the alternative leaf. Leaves
+    right above the trunk top are never dropped. Because the hash is in world space, overlapping trees agree on
+    every voxel they share.
+- **Flat footprint**: a wide or leaning trunk needs the terrain heights under its footprint (`TreeShape.Footprint`:
+  the box from the anchor to the leaning top) to lie within 1 block. Otherwise the tree is built 1 wide and upright
+  (`TreeRoll.Narrow`), keeping its variant and spacing. The heights are the sampler's, so every chunk decides the
+  same.
+- **Chunk job**:
+  - `PrepareChunkMaps` fills the core samples and rule rolls, as before, and hands its `BlendCache` to the grid.
+  - `DecideFlora` (a separate pass, not inlined, because extra code inside `PrepareChunkMaps` slows the Burst build
+    of its sampling loops) fills the per-candidate `FloraGrid.Radius`, then the anchors within reach (`Anchor` 1, or 2 when narrowed).
+    For footprint columns outside the chunk it samples the core through the grid's cache. Then it fills species
+    and source of every chunk column.
+  - `PlaceVegetation` rolls and builds each anchored tree, and stamps it with the class overwrite rule.
+- **Preview**: the tree species gallery in the preview window (`TreeGallery`,
+  `WorldGenerationPreviewWindow.Gallery.cs`) stamps every variant of a species for a row of seeds. It draws a side
+  view (nearest voxel, darker with depth) and a top view (highest voxel), with the share, reach, spacing, height and
+  voxel ranges per variant, and the species inspector below. An option builds wide and leaning trunks as on uneven
+  ground. It redraws whenever the asset's dirty count changes, so edits and undo show at once.
+- **Tests**:
+  - `TreeShapeTests`: per crown shape, branch style and width over 200 seeds, the trunk is face-connected and stands
+    at the anchor, every voxel stays within the reach, noise never moves a log, the leaf count stays within the
+    noise bounds, and nearly every pair of anchors differs. Also: the roll is pure, the variant frequencies match
+    the weights, and the spacing with mixed radii leaves no conflicting anchors.
+  - `FloraChunkTests`: every fixture variant matches the whole-world stamp across chunk corners in both
+    architectures, including narrowed anchors, and trees do not depend on the chunk order.
+  - `HashAndSimplexTests`: the 3D hash avalanches, is uniform and does not correlate along an axis.
+  - `FloraPlacementTests`, `DataImporterTests`: tree tables, reach, spacing and padding; the shipped Oak.
+  - `TreeGalleryTests`: one row per variant, view sizes from the reach, the narrow option.
+- **Performance**: no new rows; the benchmark flora still uses the placeholder structure. See the 2026-10-24 G2
+  entry in `Tests/Performance/Baselines/README.md`.
+
+### Ownership of native memory
+
+- `WorldGenConfig` owns `TreeSpecies` and `TreeVariants`, which are created by `ToConfig` and released by `Dispose`.
+- `FloraGrid` owns `Radius` and the `BlendCache` it takes over from `PrepareChunkMaps`; both are `Allocator.Temp`
+  and are disposed with the grid at the end of the chunk's `Execute`.
+- `TreeShape.Build` appends to a caller-owned `NativeList<FloraVoxel>` (one Temp list per chunk, cleared per tree).
+
 # Version 1.6 (Preview tooling)
 
 The preview window is the comparison tool for world generation. It switches architecture, blend method and strength,
