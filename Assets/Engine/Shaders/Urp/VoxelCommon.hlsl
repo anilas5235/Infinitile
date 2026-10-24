@@ -12,7 +12,7 @@ struct PointData
     float3 position; // Voxel position in partition local space
     // x: quadIndex(u16) | texIndex(u16)
     // y: sky (4 corners × u4) | red (4 corners × u4)
-    // z: ao(u8) | depthFade(f16) | glow(u8)
+    // z: ao(u8) | depthFade(u8, quarter blocks, 0 = off) | surfaceAlpha(unorm8) | glow(u8)
     // w: green (4 corners × u4) | blue (4 corners × u4)
     // Corner order inside each 16-bit channel: up-left, up-right, down-right, down-left (UV space).
     uint4 packed;
@@ -116,14 +116,27 @@ void set_ao(inout uint4 packed, uint ao)
     packed.z = (packed.z & 0xFFFFFF00) | (ao & 0xFF);
 }
 
+// Depth fade distance in blocks, stored in quarter blocks (up to 63.75); 0 = no depth fade.
 float get_depth_fade_dist(in uint4 packed)
 {
-    return f16tof32(packed.z >> 8 & 0xFFFF);
+    return (float)(packed.z >> 8 & 0xFF) * 0.25f;
 }
 
 void set_depth_fade_dist(inout uint4 packed, in float depth_fade_dist)
 {
-    packed.z = (packed.z & 0xFF0000FF) | ((f32tof16(depth_fade_dist) & 0xFFFF) << 8); // bits 8-23
+    const uint quarters = depth_fade_dist > 0.0f ? clamp((uint)round(depth_fade_dist * 4.0f), 1u, 255u) : 0u;
+    packed.z = (packed.z & 0xFFFF00FF) | (quarters << 8); // bits 8-15
+}
+
+// Scale of the texture alpha where the depth fade starts, 0-1 (GEN-38).
+float get_surface_alpha(in uint4 packed)
+{
+    return (float)(packed.z >> 16 & 0xFF) / 255.0f;
+}
+
+void set_surface_alpha(inout uint4 packed, in uint surface_alpha)
+{
+    packed.z = (packed.z & 0xFF00FFFF) | ((surface_alpha & 0xFF) << 16); // bits 16-23
 }
 
 float get_glow(uint4 packed)

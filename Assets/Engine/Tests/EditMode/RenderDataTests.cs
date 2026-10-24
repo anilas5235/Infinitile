@@ -79,11 +79,12 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void GpuVoxelDef_Is80Bytes(){
+        public void GpuVoxelDef_Is84Bytes(){
             Type type = typeof(VoxelRegistry).GetNestedType("GPUVoxelDef", BindingFlags.NonPublic);
             Assert.IsNotNull(type, "VoxelRegistry.GPUVoxelDef not found");
-            Assert.AreEqual(80, Marshal.SizeOf(type));
+            Assert.AreEqual(84, Marshal.SizeOf(type));
             Assert.AreEqual(76, (int)Marshal.OffsetOf(type, "LightAttenuation"), "HLSL VoxelDef offset");
+            Assert.AreEqual(80, (int)Marshal.OffsetOf(type, "SurfaceAlpha"), "HLSL VoxelDef offset");
         }
 
         [Test]
@@ -98,11 +99,14 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(8, (int)Marshal.OffsetOf(type, "DepthFadeDistance"), "HLSL VoxelDef offset");
             Assert.AreEqual(12, (int)Marshal.OffsetOf(type, "Glow"), "HLSL VoxelDef offset");
 
-            Voxel.VoxelDef def = new(){ DepthFadeDistance = (half)4.5f, Glow = 200 };
+            Voxel.VoxelDef def = new(){ DepthFadeDistance = (half)4.5f, Glow = 200, SurfaceAlpha = 115 };
             object gpuDef = Activator.CreateInstance(type, def, (byte)0);
             uint bits = (uint)field.GetValue(gpuDef);
             Assert.AreEqual(math.f32tof16(4.5f), bits);
             Assert.AreEqual(4.5f, math.f16tof32(bits));
+            FieldInfo alpha = type.GetField("SurfaceAlpha", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(alpha, "GPUVoxelDef.SurfaceAlpha not found");
+            Assert.AreEqual(115u, (uint)alpha.GetValue(gpuDef));
         }
 
         #endregion

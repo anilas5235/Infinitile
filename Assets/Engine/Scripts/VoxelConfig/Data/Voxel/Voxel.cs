@@ -59,6 +59,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         /// </summary>
         public float depthFadeDistance = -1f;
 
+        /// <summary>
+        ///     Scale of the texture alpha where the depth fade starts (see-through water); 1 keeps the texture alpha.
+        /// </summary>
+        [Tooltip("Scale of the texture alpha at the surface; the depth fade rises from there to 1")]
+        [Range(0f, 1f)] public float surfaceAlpha = 1f;
+
         [Range(0, 255)] public int glow;
 
         /// <summary>
@@ -217,6 +223,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
 
             /// <summary>Distance at which depth fading starts for transparent voxels.</summary>
             public half DepthFadeDistance;
+
+            /// <summary>Scale of the texture alpha where the depth fade starts, 0-255 for 0-1.</summary>
+            public byte SurfaceAlpha;
 
             /// <summary> Emissive glow level for the voxel (0-255, where 255 is full brightness).</summary>
             public byte Glow;

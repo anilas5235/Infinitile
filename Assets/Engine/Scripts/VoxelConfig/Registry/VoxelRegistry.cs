@@ -66,6 +66,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                 MeshLayer = so.meshLayer,
                 AlwaysRenderAllFaces = so.alwaysRenderAllFaces,
                 DepthFadeDistance = (half)so.depthFadeDistance,
+                SurfaceAlpha = (byte)math.round(math.saturate(so.surfaceAlpha) * 255f),
                 Glow = (byte)so.glow,
                 Collision = so.collision,
                 LightAttenuation = (byte)math.clamp(so.lightAttenuation, 0, VoxelLightLimits.MaxLevel),
@@ -263,6 +264,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             private uint2 shape_quad_indices_front;
             private uint2 shape_quad_indices_back;
             private uint LightAttenuation; // the smooth light skips opaque (15) voxels
+            private uint SurfaceAlpha; // unorm8
 
             public GPUVoxelDef(Voxel.VoxelDef def, byte lightAttenuation){
                 MeshLayer = (uint)def.MeshLayer;
@@ -278,6 +280,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                 shape_quad_indices_front = def.Front;
                 shape_quad_indices_back = def.Back;
                 LightAttenuation = lightAttenuation;
+                SurfaceAlpha = def.SurfaceAlpha;
             }
         }
     }

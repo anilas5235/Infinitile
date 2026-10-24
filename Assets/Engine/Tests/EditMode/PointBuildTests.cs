@@ -52,9 +52,9 @@ namespace Engine.Tests.EditMode{
             Object.DestroyImmediate(_host);
         }
 
-        [TestCase(0, 2953, 0, 0, 1472186991310928819UL)] // cave pockets on the world bottom
-        [TestCase(3, 12394, 1115, 360, 11759718422290814586UL)] // surface, water and every voxel type
-        [TestCase(7, 5737, 0, 0, 5650419600492523958UL)] // floating blocks under the world top
+        [TestCase(0, 2953, 0, 0, 1102910112564121940UL)] // cave pockets on the world bottom
+        [TestCase(3, 12394, 1115, 360, 15270363330145384123UL)] // surface, water and every voxel type
+        [TestCase(7, 5737, 0, 0, 16801187266041425973UL)] // floating blocks under the world top
         public void BuildPoints_MatchesRecordedPoints(int partitionY, int solid, int transparent, int foliage,
             ulong hash){
             ComputeShader shader = AssetDatabase.LoadAssetAtPath<ComputeShader>(

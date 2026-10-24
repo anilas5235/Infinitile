@@ -20,6 +20,7 @@ struct VoxelDef
     uint2 ShapeQuadIndicesFront;
     uint2 ShapeQuadIndicesBack;
     uint LightAttenuation; // 15 = opaque, skipped by the smooth light
+    uint SurfaceAlpha; // unorm8
 };
 
 struct VoxelQuad
@@ -319,6 +320,7 @@ void add_quads(int3 in_chunk_pos, in float3 partitionPos, in VoxelDef myDef, uin
 
         set_ao(packed, ao_mask);
         set_depth_fade_dist(packed, f16tof32(myDef.DepthFadeDistance));
+        set_surface_alpha(packed, myDef.SurfaceAlpha);
         set_glow(packed, myDef.Glow);
 
         p.packed = packed;

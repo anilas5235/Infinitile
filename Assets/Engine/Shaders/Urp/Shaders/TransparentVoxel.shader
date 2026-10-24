@@ -92,6 +92,7 @@
                 uint texture_index;
                 uint ao;
                 float depth_fade_dist;
+                float surface_alpha;
                 float glow;
             };
 
@@ -101,13 +102,16 @@
                 data.texture_index = get_tex_index(packed);
                 data.ao = get_ao(packed);
                 data.depth_fade_dist = get_depth_fade_dist(packed);
+                data.surface_alpha = get_surface_alpha(packed);
                 data.glow = get_glow(packed);
                 return data;
             }
 
-            float depth_fade(const float4 positionSS, const float dist, const float texAlpha)
+            // Alpha rises from the surface alpha to 1 over dist blocks of scene behind the surface (eye depth). The
+            // rise is squared, so floors a few blocks deep stay visible while deep water still turns opaque.
+            float depth_fade(const float4 positionSS, const float dist, const float surfaceAlpha)
             {
-                if (dist <= 0.1f) return texAlpha;
+                if (dist <= 0.0f) return surfaceAlpha;
 
                 float2 ndc = positionSS.xy / positionSS.w;
 
@@ -115,7 +119,7 @@
                 float scene_eye_depth = LinearEyeDepth(raw_depth, _ZBufferParams);
 
                 float inter = saturate((scene_eye_depth - positionSS.w) / dist);
-                return lerp(texAlpha, 1, inter);
+                return lerp(surfaceAlpha, 1, inter * inter);
             }
 
             // ── Fragment shader ───────────────────────────────────────
@@ -133,7 +137,7 @@
                 const float3 light = calc_voxel_light(IN.packed, uv);
 
                 // --- Depth fade ---
-                const float alpha = depth_fade(IN.positionSS, extra.depth_fade_dist, albedo.w);
+                const float alpha = depth_fade(IN.positionSS, extra.depth_fade_dist, albedo.w * extra.surface_alpha);
 
                 // --- Glow ---
                 const float glow = calc_glow(extra.glow);
