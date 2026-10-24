@@ -8,7 +8,7 @@ using UnityEngine.UIElements;
 
 namespace Engine.Tests.PlayMode{
     /// <summary>
-    ///     GEN-39: the UI Toolkit HUD of the game scene runs without errors and its world panel shows the biome of
+    ///     The UI Toolkit HUD of the game scene runs without errors and its world panel shows the biome of
     ///     the column under the camera. The HUD lives in the game assembly, so the test reads it by element names.
     /// </summary>
     public class HudTests{

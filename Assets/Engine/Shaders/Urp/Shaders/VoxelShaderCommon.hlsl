@@ -167,7 +167,7 @@ float3 calc_voxel_light(const uint4 packed, float2 uv)
     return max(light, _VoxelAmbient);
 }
 
-// Horizon fog (GEN-37), set by VoxelWorldRenderer from the sky material: its horizon and zenith colours, and the
+// Horizon fog, set by VoxelWorldRenderer from the sky material: its horizon and zenith colours, and the
 // edge fade x = start, y = 1 / (end - start) in horizontal blocks, z = 1 when on, w = the sky's gradient power.
 float4 _VoxelHorizonColor;
 float4 _VoxelZenithColor;

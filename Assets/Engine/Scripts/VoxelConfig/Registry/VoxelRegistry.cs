@@ -197,7 +197,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
 
         /// <summary>
         ///     Gives a transparent voxel with post-process fog or a depth fade a volume slot. With fog, the scene seen
-        ///     through its surface gets the underwater fog and colour grading (GEN-38); the grading values are prepared
+        ///     through its surface gets the underwater fog and colour grading; the grading values are prepared
         ///     as URP prepares them for the underwater view (VoxelPostProcessHandler). 0 for every other voxel.
         /// </summary>
         private byte RegisterVolumeFog(Voxel so){

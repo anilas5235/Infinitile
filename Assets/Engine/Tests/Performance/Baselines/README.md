@@ -11,7 +11,7 @@ Each entry is checked against two rules:
   without blending (`None`) and 3 ms with the spatial blend methods; light 1 ms on natural terrain.
 
 The tables below keep the numbers of every baseline. Only the three latest result files stay in this folder;
-the older ones were removed on 2026-10-21 and are in the git history
+the older ones were removed (2026-10-21 and later) and are in the git history
 (`git log --diff-filter=D -- Assets/Engine/Tests/Performance/Baselines`).
 
 ## 2026-10-17 — first baseline (`2026-10-17-editmode-baseline.json`)
@@ -386,6 +386,29 @@ counting pass was tried and was slower than the original (+5 % to +14 %).
 Regression check, existing rows vs the previous run (median / min): every row between −6 % and +5 % (median) and
 −6 % and +6 % (min). `TerrainFirst None flora` is −16 % / +4 % because the previous JSON holds that row's median
 spike.
+
+## 2026-10-24 — snow, strata and ice (`2026-10-24-phaseG1-editmode-baseline.json`)
+
+Same machine and settings as above. Phase G1 adds the underwater top block, snow above a snow line, strata bands in
+the stone and a ragged ice edge (`SurfaceCover`). New rows: the DistanceBlend flora world in which every biome has
+a snow block and a strata block, so every column decides snow and the strata shift and every stone voxel is tested
+against the bands.
+
+| Sample group | Median | Min | Max | Compared with (same run) | Change (median / min) |
+|---|---|---|---|---|---|
+| ChunkJob.Run TerrainFirst DistanceBlend snow strata ms/chunk | 4.92 ms | 4.84 ms | 8.17 ms | DistanceBlend flora 4.67 / 4.60 ms | +5 % / +5 % |
+| ChunkJob.Run BiomeFirst DistanceBlend snow strata ms/chunk | 3.02 ms | 2.97 ms | 3.25 ms | DistanceBlend flora 2.74 / 2.71 ms | +10 % / +10 % |
+
+The G1 commits were not measured when they were made; the review measured them. With the snow, strata and ice
+decisions inside `PrepareChunkMaps`, `TerrainFirst DistanceBlend` took 5.5 ms instead of 4.1 ms (+35 % in the
+minimum, also with flora), and every other `ChunkJob` row was +3 % to +14 %. Bisecting showed it was not the work
+itself: the pass without the noise and without ice was just as slow, and so was the pass as a separate loop marked
+`NoInlining`. Only moving the call out of `PrepareChunkMaps` into the job (`ApplySurfaceCover`, after it) restores the
+old times, so the extra code changed how Burst compiled the sampling loop. The ice is now written once per column
+after the fill loop, and the strata test is guarded by a per-column flag.
+
+Regression check, existing rows vs the previous run (median / min): every row between −5 % and +6 % (median) and
+−4 % and +5 % (min). The highest is `ChunkJob.Run BiomeFirst` (single chunk, +6 % / +5 %).
 
 ## Re-running
 

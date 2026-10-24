@@ -44,6 +44,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             FloraGrid floraGrid = new(Config.WorldGen.FloraPadding, Allocator.Temp);
 
             PrepareChunkMaps(ref Config, ref chunkWorldPos, chunkColumns, ref floraGrid);
+            ApplySurfaceCover(chunkColumns, chunkWorldPos, Config.WorldGen);
 
             FillTerrain(chunkVoxels, chunkColumns, ref Config);
 

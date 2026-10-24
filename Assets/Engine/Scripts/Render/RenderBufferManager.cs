@@ -12,6 +12,7 @@ namespace Engine.Scripts.Render{
     ///     Automatically creates new buffers when capacity is exceeded.
     /// </summary>
     public class RenderBufferManager : IDisposable{
+        private readonly string _layerName; // Material.name allocates on every read
         private readonly Material _material;
         private readonly Material[] _passes; // drawn in order from the same culled pages; clones are owned
         private readonly Dictionary<int3, AllocInfo> _partitionAllocations = new();
@@ -25,12 +26,14 @@ namespace Engine.Scripts.Render{
         /// <param name="initialBuffers">The initial number of buffers to create. Defaults to 1.</param>
         public RenderBufferManager(Material mat, int initialBuffers = 1){
             _material = mat;
+            _layerName = mat != null ? mat.name : "<no material>";
             _passes = new[]{ mat };
             for (int i = 0; i < initialBuffers; i++) AddNewBuffer();
         }
 
         private RenderBufferManager(Material mat, Material[] passes){
             _material = mat;
+            _layerName = mat != null ? mat.name : "<no material>";
             _passes = passes;
             AddNewBuffer();
         }
@@ -53,8 +56,8 @@ namespace Engine.Scripts.Render{
             return new RenderBufferManager(plain, new[]{ plain, volume });
         }
 
-        /// <summary>Name of the material, used to label this layer in the culling overlay.</summary>
-        public string LayerName => _material != null ? _material.name : "<no material>";
+        /// <summary>Name of the material, used to label this layer in the culling stats.</summary>
+        public string LayerName => _layerName;
 
         /// <summary>The render buffers of this manager, in buffer-index order.</summary>
         internal IReadOnlyList<RenderBuffer> Buffers => _renderBuffers;

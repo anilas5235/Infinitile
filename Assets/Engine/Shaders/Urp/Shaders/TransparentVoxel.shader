@@ -197,7 +197,7 @@
                 return luma + fog.saturation * (color - luma);
             }
 
-            // The opaque scene behind the surface as the underwater view shows it before the grading (GEN-38):
+            // The opaque scene behind the surface as the underwater view shows it before the grading:
             // fogged with UnderwaterFog.shader's exp² fog over the distance the view ray travels through the
             // liquid, darkened with depth as there. The depth fade hides it at least as much, so deep liquid turns
             // into its fog. The sky behind counts as infinitely far.

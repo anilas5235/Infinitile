@@ -116,7 +116,7 @@ void set_ao(inout uint4 packed, uint ao)
     packed.z = (packed.z & 0xFFFFFF00) | (ao & 0xFF);
 }
 
-// Slot of the voxel's volume fog in _VoxelVolumeFog; 0 = none (GEN-38).
+// Slot of the voxel's volume fog in _VoxelVolumeFog; 0 = none.
 uint get_volume_fog(in uint4 packed)
 {
     return packed.z >> 8 & 0xFF;
@@ -127,7 +127,7 @@ void set_volume_fog(inout uint4 packed, in uint slot)
     packed.z = (packed.z & 0xFFFF00FF) | ((slot & 0xFF) << 8); // bits 8-15
 }
 
-// Scale of the texture alpha, 0-1 (GEN-38).
+// Scale of the texture alpha, 0-1.
 float get_surface_alpha(in uint4 packed)
 {
     return (float)(packed.z >> 16 & 0xFF) / 255.0f;

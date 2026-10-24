@@ -56,11 +56,13 @@ namespace UI{
         public int BookmarkCount => bookmarkKeys.Length;
 
         /// <summary>Label of the configuration the world was last regenerated with by these keys.</summary>
-        public string CurrentConfiguration => configurations.Count > 0 ? configurations[_current].Label : "";
+        public string CurrentConfiguration =>
+            _configurationLabel ?? (configurations.Count > 0 ? configurations[_current].Label : "");
 
         /// <summary>The last action's result, null once it has been shown for a few seconds.</summary>
         public string Message => Time.unscaledTime <= _messageUntil ? _message : null;
 
+        private string _configurationLabel; // null until a regeneration by these keys
         private string _message;
 
         private void Update(){
@@ -119,6 +121,7 @@ namespace UI{
                 }
 
                 world.Regenerate(variant);
+                _configurationLabel = configuration != null ? configuration.Label : configurations[_current].Label;
                 Show(message);
                 if (FindPlayer()) player.HoldUntilGrounded(); // the colliders under the player are gone until reload
             }
