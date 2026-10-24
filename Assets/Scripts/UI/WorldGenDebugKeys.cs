@@ -13,13 +13,15 @@ namespace UI{
     ///     <see cref="WorldGenSettings" /> unchanged; the others override architecture and blend methods on a transient
     ///     copy of it, so strengths, biomes and splines stay the asset's and the asset is never written. F1–F4 jump to
     ///     a camera bookmark, Shift+F1–F4 store the current pose; bookmarks persist in PlayerPrefs, so the same spot can
-    ///     be compared across configurations and sessions. Game-side only; the engine exposes
-    ///     <see cref="VoxelWorld.Regenerate" />.
+    ///     be compared across configurations and sessions. F11 switches the architecture of the assigned asset. The HUD
+    ///     shows <see cref="Message" /> and calls the same actions from its buttons. Game-side only; the engine
+    ///     exposes <see cref="VoxelWorld.Regenerate" />.
     /// </summary>
     public class WorldGenDebugKeys : MonoBehaviour{
         private const string BookmarkPrefsKey = "WorldGenDebugKeys.Bookmark";
 
         [SerializeField] private Key regenerateKey = Key.F10;
+        [SerializeField] private Key architectureKey = Key.F11;
         [SerializeField] private Key[] bookmarkKeys = { Key.F1, Key.F2, Key.F3, Key.F4 };
 
         [Tooltip("Player root that is moved and yawed by a bookmark; found in the scene when empty.")]
@@ -47,9 +49,19 @@ namespace UI{
         };
 
         private int _current;
-        private string _label;
-        private float _labelUntil;
+        private float _messageUntil;
         private LookController _look;
+
+        /// <summary>Number of bookmark slots.</summary>
+        public int BookmarkCount => bookmarkKeys.Length;
+
+        /// <summary>Label of the configuration the world was last regenerated with by these keys.</summary>
+        public string CurrentConfiguration => configurations.Count > 0 ? configurations[_current].Label : "";
+
+        /// <summary>The last action's result, null once it has been shown for a few seconds.</summary>
+        public string Message => Time.unscaledTime <= _messageUntil ? _message : null;
+
+        private string _message;
 
         private void Update(){
             Keyboard keyboard = Keyboard.current;
@@ -57,7 +69,8 @@ namespace UI{
             if (keyboard == null || world == null) return;
 
             bool shift = keyboard.shiftKey.isPressed;
-            if (keyboard[regenerateKey].wasPressedThisFrame && configurations.Count > 0) Regenerate(world, shift ? -1 : 1);
+            if (keyboard[regenerateKey].wasPressedThisFrame) StepConfiguration(shift ? -1 : 1);
+            if (keyboard[architectureKey].wasPressedThisFrame) SwitchArchitecture();
 
             for (int i = 0; i < bookmarkKeys.Length; i++){
                 if (!keyboard[bookmarkKeys[i]].wasPressedThisFrame) continue;
@@ -66,17 +79,39 @@ namespace UI{
             }
         }
 
-        private void OnGUI(){
-            if (_label == null || Time.unscaledTime > _labelUntil) return;
-            GUI.Label(new Rect(10, 10, 900, 24), _label);
-        }
-
-        private void Regenerate(VoxelWorld world, int step){
+        /// <summary>Regenerates the world with the next (<paramref name="step" /> 1) or previous (−1) configuration.</summary>
+        public void StepConfiguration(int step){
+            VoxelWorld world = VoxelWorld.Instance;
+            if (world == null || configurations.Count == 0) return;
             _current = (_current + step + configurations.Count) % configurations.Count;
             Configuration configuration = configurations[_current];
+            Regenerate(world, configuration.AsAssigned ? null : configuration,
+                $"World generation {_current + 1}/{configurations.Count}: {configuration.Label}");
+        }
+
+        /// <summary>
+        ///     Regenerates the world with the assigned asset under the other architecture than the one in use; the
+        ///     asset's blend methods stay.
+        /// </summary>
+        public void SwitchArchitecture(){
+            VoxelWorld world = VoxelWorld.Instance;
+            if (world == null || !world.TryGetGenerationMethods(out GenArchitecture architecture, out _, out _)) return;
+            WorldGenSettings asset = world.Settings.WorldGen;
+            Configuration configuration = new(){
+                Architecture = architecture == GenArchitecture.BiomeFirst
+                    ? GenArchitecture.TerrainFirst
+                    : GenArchitecture.BiomeFirst,
+                MaterialMethod = asset.MaterialMethod,
+                HeightMethod = asset.HeightMethod
+            };
+            Regenerate(world, configuration, $"World generation: {configuration.Label}");
+        }
+
+        /// <summary>Regenerates with <paramref name="configuration" /> applied to a copy of the asset (null = the asset).</summary>
+        private void Regenerate(VoxelWorld world, Configuration configuration, string message){
             WorldGenSettings variant = null;
             try{
-                if (!configuration.AsAssigned){
+                if (configuration != null){
                     variant = Instantiate(world.Settings.WorldGen);
                     variant.Architecture = configuration.Architecture;
                     variant.MaterialMethod = configuration.MaterialMethod;
@@ -84,19 +119,25 @@ namespace UI{
                 }
 
                 world.Regenerate(variant);
-                Show($"World generation {_current + 1}/{configurations.Count}: {configuration.Label}");
+                Show(message);
                 if (FindPlayer()) player.HoldUntilGrounded(); // the colliders under the player are gone until reload
             }
             catch (Exception e){
                 Debug.LogException(e);
-                Show($"{configuration.Label}: {e.Message}");
+                Show($"{message}: {e.Message}");
             }
             finally{
                 if (variant) Destroy(variant); // the engine copied its values
             }
         }
 
-        private void StoreBookmark(int index){
+        /// <summary>True when bookmark <paramref name="index" /> holds a pose.</summary>
+        public bool HasBookmark(int index){
+            return PlayerPrefs.HasKey(BookmarkPrefsKey + index);
+        }
+
+        /// <summary>Stores the player's pose in bookmark <paramref name="index" />.</summary>
+        public void StoreBookmark(int index){
             if (!FindPlayer()) return;
             Transform root = player.transform;
             Bookmark bookmark = new(){
@@ -107,7 +148,8 @@ namespace UI{
             Show($"Bookmark {index + 1} stored at {bookmark.Position:F0}");
         }
 
-        private void RestoreBookmark(int index){
+        /// <summary>Moves the player to bookmark <paramref name="index" />.</summary>
+        public void RestoreBookmark(int index){
             string json = PlayerPrefs.GetString(BookmarkPrefsKey + index, null);
             if (string.IsNullOrEmpty(json)){
                 Show($"Bookmark {index + 1} is empty (Shift+{bookmarkKeys[index]} stores one)");
@@ -136,9 +178,9 @@ namespace UI{
             return player;
         }
 
-        private void Show(string label){
-            _label = label;
-            _labelUntil = Time.unscaledTime + labelSeconds;
+        private void Show(string message){
+            _message = message;
+            _messageUntil = Time.unscaledTime + labelSeconds;
         }
 
         [Serializable]

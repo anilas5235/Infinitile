@@ -54,7 +54,7 @@ namespace Engine.Scripts.Render{
         private RenderBufferManager _foliageBufferManager;
 
         private GpuCuller _culler;
-        private Camera _overlayCamera; // the game camera whose counts the overlay shows
+        private Camera _statsCamera; // the game camera whose page counts GetCullingStats reports
         private RenderBufferManager[] _layers; // fixed array for per-frame loops
 
         [Header("Culling debug")]
@@ -64,8 +64,8 @@ namespace Engine.Scripts.Render{
         [Tooltip("Keeps the game camera's frustum: every camera (Scene view included) then draws exactly what the game camera kept. A gizmo shows the frozen frustum.")]
         [SerializeField] private bool freezeCulling;
 
-        [Tooltip("Visible / allocated pages per layer and buffer for the game camera (allocates while on).")]
-        [SerializeField] private bool showCullingOverlay;
+        [Tooltip("Reads back the visible page counts of the game camera for GetCullingStats.")]
+        [SerializeField] private bool collectCullingStats;
 
         /// <summary>
         ///     GPU frustum culling on/off at runtime (initialised from <see cref="RendererSettings.gpuCulling" />).
@@ -81,10 +81,10 @@ namespace Engine.Scripts.Render{
         public bool FreezeCulling{ get => freezeCulling; set => freezeCulling = value; }
 
         /// <summary>
-        ///     Draws visible pages / total pages per buffer and layer for the game camera. Debug only: the
-        ///     read-backs and the label strings allocate while it is on.
+        ///     Reads back the visible page counts of the game camera every frame for <see cref="GetCullingStats" />.
+        ///     Debug only: the read-backs cost GPU sync points.
         /// </summary>
-        public bool ShowCullingOverlay{ get => showCullingOverlay; set => showCullingOverlay = value; }
+        public bool CollectCullingStats{ get => collectCullingStats; set => collectCullingStats = value; }
 
         private InFlightBuild[] _inFlightBuilds;
         private PartitionBuildRequest[] _buildRequests; // one reusable request per in-flight slot
@@ -313,7 +313,7 @@ namespace Engine.Scripts.Render{
             _transparentBufferManager.Draw(cam, _culler, state, parameters);
             _foliageBufferManager.Draw(cam, _culler, state, parameters);
 
-            if (ShowCullingOverlay && cam.cameraType == CameraType.Game) UpdateOverlayReadbacks(cam, state);
+            if (CollectCullingStats && cam.cameraType == CameraType.Game) UpdateStatsReadbacks(cam, state);
         }
 
         /// <summary>
@@ -338,9 +338,9 @@ namespace Engine.Scripts.Render{
             return QualitySettings.shadowDistance;
         }
 
-        /// <summary>Polls and re-requests the visible page counts of every buffer for the overlay.</summary>
-        private void UpdateOverlayReadbacks(Camera cam, CameraCullState state){
-            _overlayCamera = cam;
+        /// <summary>Polls and re-requests the visible page counts of every buffer for the culling stats.</summary>
+        private void UpdateStatsReadbacks(Camera cam, CameraCullState state){
+            _statsCamera = cam;
             for (int l = 0; l < _layers.Length; l++){
                 IReadOnlyList<RenderBuffer> buffers = _layers[l].Buffers;
                 for (int b = 0; b < buffers.Count; b++){
@@ -352,44 +352,30 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     Debug overlay: visible pages / allocated pages per buffer and layer for the game camera, plus the
-        ///     culling and freeze switches. Allocates strings; only active while <see cref="ShowCullingOverlay" /> is on.
+        ///     Fills <paramref name="stats" /> (cleared first) with the visible and allocated pages per layer for the
+        ///     game camera. The visible counts are read back while <see cref="CollectCullingStats" /> is on, a few frames
+        ///     late. False before a game camera was culled with the collection on.
         /// </summary>
-        private void OnGUI(){
-            if (!ShowCullingOverlay || _isDestroyed || _layers == null) return;
+        public bool GetCullingStats(List<CullingLayerStats> stats){
+            stats.Clear();
+            if (_isDestroyed || _layers == null || _statsCamera == null ||
+                !_culler.TryGetState(_statsCamera, out CameraCullState state)) return false;
 
-            GUILayout.BeginArea(new Rect(10, 10, 420, 400), GUI.skin.box);
-            GUILayout.Label($"GPU culling: {(GpuCulling ? "on" : "off")}   freeze: {(FreezeCulling ? "on" : "off")}");
-            CameraCullState state = null;
-            if (_overlayCamera == null || !_culler.TryGetState(_overlayCamera, out state)){
-                GUILayout.Label("no game camera culled yet");
-            }
-            else{
-                for (int l = 0; l < _layers.Length; l++){
-                    RenderBufferManager layer = _layers[l];
-                    IReadOnlyList<RenderBuffer> buffers = layer.Buffers;
-                    uint visible = 0;
-                    int total = 0;
-                    for (int b = 0; b < buffers.Count; b++){
-                        total += buffers[b].Pages.AllocatedPages;
-                        if (state.TryGetLists(buffers[b], out BufferCullLists lists)) visible += lists.Main.LastVisibleCount;
-                    }
-
-                    GUILayout.Label($"{layer.LayerName}: {visible} / {total} pages visible");
-                    for (int b = 0; b < buffers.Count; b++){
-                        string shadow = "";
-                        uint bufferVisible = 0;
-                        if (state.TryGetLists(buffers[b], out BufferCullLists lists)){
-                            bufferVisible = lists.Main.LastVisibleCount;
-                            if (lists.HasShadow) shadow = $"   shadow {lists.Shadow.LastVisibleCount}";
-                        }
-
-                        GUILayout.Label($"    buffer {b}: {bufferVisible} / {buffers[b].Pages.AllocatedPages}{shadow}");
-                    }
+            for (int l = 0; l < _layers.Length; l++){
+                RenderBufferManager layer = _layers[l];
+                IReadOnlyList<RenderBuffer> buffers = layer.Buffers;
+                CullingLayerStats layerStats = new(){ Layer = layer.LayerName, Buffers = buffers.Count };
+                for (int b = 0; b < buffers.Count; b++){
+                    layerStats.AllocatedPages += buffers[b].Pages.AllocatedPages;
+                    if (!state.TryGetLists(buffers[b], out BufferCullLists lists)) continue;
+                    layerStats.VisiblePages += lists.Main.LastVisibleCount;
+                    if (lists.HasShadow) layerStats.ShadowPages += lists.Shadow.LastVisibleCount;
                 }
+
+                stats.Add(layerStats);
             }
 
-            GUILayout.EndArea();
+            return true;
         }
 
 #if UNITY_EDITOR
