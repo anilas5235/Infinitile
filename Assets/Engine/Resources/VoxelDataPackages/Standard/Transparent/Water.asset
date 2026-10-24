@@ -17,7 +17,7 @@ MonoBehaviour:
   meshLayer: 1
   alwaysRenderAllFaces: 0
   depthFadeDistance: 12
-  surfaceAlpha: 0.15
+  surfaceAlpha: 0.4
   glow: 0
   lightAttenuation: 2
   lightEmission: {x: 0, y: 0, z: 0}
