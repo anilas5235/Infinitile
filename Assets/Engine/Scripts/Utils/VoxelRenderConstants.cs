@@ -90,6 +90,9 @@ namespace Engine.Scripts.Utils{
         public static readonly int VoxelFogParamsNameID = Shader.PropertyToID("_VoxelFogParams");
         public static readonly int VoxelSunDirectionNameID = Shader.PropertyToID("_VoxelSunDirection");
 
+        // Volume fog of see-through liquids (VoxelRegistry, TransparentVoxel.shader)
+        public static readonly int VoxelVolumeFogNameID = Shader.PropertyToID("_VoxelVolumeFog");
+
         // Sky material properties the horizon fog copies, so fogged terrain matches the sky behind it
         public static readonly int SkyHorizonColorNameID = Shader.PropertyToID("_HorizonColor");
         public static readonly int SkyZenithColorNameID = Shader.PropertyToID("_ZenithColor");

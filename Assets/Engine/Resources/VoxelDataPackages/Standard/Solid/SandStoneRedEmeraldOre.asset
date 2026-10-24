@@ -16,7 +16,6 @@ MonoBehaviour:
   meshLayer: 0
   voxelType: 0
   alwaysRenderAllFaces: 0
-  depthFadeDistance: -1
   glow: 0
   postProcess:
     postProcessColor: {r: 0, g: 0, b: 0, a: 0}

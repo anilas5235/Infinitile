@@ -3,11 +3,11 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.Render{
     /// <summary>
-    ///     C# port of the per-corner light and depth fade accessors in VoxelCommon.hlsl and of the corner averaging
+    ///     C# port of the per-corner light, volume fog and surface alpha accessors in VoxelCommon.hlsl and of the corner averaging
     ///     in PointBuilder.compute, kept in step with the shaders so tests can check the packing round trip.
     ///     <c>PointData.packed.y</c> = sky | red &lt;&lt; 16, <c>packed.w</c> = green | blue &lt;&lt; 16; each 16-bit
     ///     channel holds four 4-bit corners in the order up-left, up-right, down-right, down-left.
-    ///     <c>packed.z</c> = ao | depth fade (quarter blocks) &lt;&lt; 8 | surface alpha (unorm8) &lt;&lt; 16 | glow &lt;&lt; 24.
+    ///     <c>packed.z</c> = ao | volume fog slot &lt;&lt; 8 | surface alpha (unorm8) &lt;&lt; 16 | glow &lt;&lt; 24.
     /// </summary>
     internal static class PointLightPacking{
         internal const int OpaqueAttenuation = 15;
@@ -46,13 +46,12 @@ namespace Engine.Scripts.Render{
             packed.w = PackCorners(green) | PackCorners(blue) << 16;
         }
 
-        internal static float GetDepthFadeDist(uint4 packed){
-            return (packed.z >> 8 & 0xFF) * 0.25f;
+        internal static uint GetVolumeFog(uint4 packed){
+            return packed.z >> 8 & 0xFF;
         }
 
-        internal static void SetDepthFadeDist(ref uint4 packed, float depthFadeDist){
-            uint quarters = depthFadeDist > 0f ? math.clamp((uint)math.round(depthFadeDist * 4f), 1u, 255u) : 0u;
-            packed.z = packed.z & 0xFFFF00FF | quarters << 8;
+        internal static void SetVolumeFog(ref uint4 packed, uint slot){
+            packed.z = packed.z & 0xFFFF00FF | (slot & 0xFF) << 8;
         }
 
         internal static float GetSurfaceAlpha(uint4 packed){

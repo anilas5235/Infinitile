@@ -55,14 +55,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         public bool alwaysRenderAllFaces;
 
         /// <summary>
-        ///     Distance at which transparent voxels start fading; negative value disables depth fading.
+        ///     Scale of the texture alpha (see-through water); 1 keeps the texture alpha. A transparent voxel with
+        ///     post-process fog draws its surface with this alpha over the scene behind it, fogged and colour graded as from inside.
         /// </summary>
-        public float depthFadeDistance = -1f;
-
-        /// <summary>
-        ///     Scale of the texture alpha where the depth fade starts (see-through water); 1 keeps the texture alpha.
-        /// </summary>
-        [Tooltip("Scale of the texture alpha at the surface; the depth fade rises from there to 1")]
+        [Tooltip("Scale of the texture alpha; with post-process fog the scene behind is fogged and graded as seen from inside")]
         [Range(0f, 1f)] public float surfaceAlpha = 1f;
 
         [Range(0, 255)] public int glow;
@@ -221,10 +217,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
             /// <summary>Whether all faces should always be rendered, even when hidden by neighbors.</summary>
             public bool AlwaysRenderAllFaces;
 
-            /// <summary>Distance at which depth fading starts for transparent voxels.</summary>
-            public half DepthFadeDistance;
+            /// <summary>Slot of the voxel's volume fog in the registry's fog buffer; 0 = none (plain alpha blend).</summary>
+            public byte VolumeFog;
 
-            /// <summary>Scale of the texture alpha where the depth fade starts, 0-255 for 0-1.</summary>
+            /// <summary>Scale of the texture alpha, 0-255 for 0-1.</summary>
             public byte SurfaceAlpha;
 
             /// <summary> Emissive glow level for the voxel (0-255, where 255 is full brightness).</summary>

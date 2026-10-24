@@ -88,25 +88,31 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void GpuVoxelDef_DepthFadeDistance_IsFp16BitsInA32BitSlot(){
-            // HLSL `half` in a structured buffer is a 32-bit float under fxc, so a 2-byte C# half would be misread.
-            // The slot is a uint holding the fp16 bits.
+        public void GpuVoxelDef_CopiesVolumeFogAndSurfaceAlpha(){
             Type type = typeof(VoxelRegistry).GetNestedType("GPUVoxelDef", BindingFlags.NonPublic);
             Assert.IsNotNull(type, "VoxelRegistry.GPUVoxelDef not found");
-            FieldInfo field = type.GetField("DepthFadeDistance", BindingFlags.NonPublic | BindingFlags.Instance);
-            Assert.IsNotNull(field, "GPUVoxelDef.DepthFadeDistance not found");
-            Assert.AreEqual(typeof(uint), field.FieldType);
-            Assert.AreEqual(8, (int)Marshal.OffsetOf(type, "DepthFadeDistance"), "HLSL VoxelDef offset");
+            FieldInfo field = type.GetField("VolumeFog", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(field, "GPUVoxelDef.VolumeFog not found");
+            Assert.AreEqual(8, (int)Marshal.OffsetOf(type, "VolumeFog"), "HLSL VoxelDef offset");
             Assert.AreEqual(12, (int)Marshal.OffsetOf(type, "Glow"), "HLSL VoxelDef offset");
 
-            Voxel.VoxelDef def = new(){ DepthFadeDistance = (half)4.5f, Glow = 200, SurfaceAlpha = 115 };
+            Voxel.VoxelDef def = new(){ VolumeFog = 3, Glow = 200, SurfaceAlpha = 115 };
             object gpuDef = Activator.CreateInstance(type, def, (byte)0);
-            uint bits = (uint)field.GetValue(gpuDef);
-            Assert.AreEqual(math.f32tof16(4.5f), bits);
-            Assert.AreEqual(4.5f, math.f16tof32(bits));
+            Assert.AreEqual(3u, (uint)field.GetValue(gpuDef));
             FieldInfo alpha = type.GetField("SurfaceAlpha", BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.IsNotNull(alpha, "GPUVoxelDef.SurfaceAlpha not found");
             Assert.AreEqual(115u, (uint)alpha.GetValue(gpuDef));
+        }
+
+        [Test]
+        public void VolumeFogDef_Is64Bytes(){
+            Type type = typeof(VoxelRegistry).GetNestedType("VolumeFogDef", BindingFlags.NonPublic);
+            Assert.IsNotNull(type, "VoxelRegistry.VolumeFogDef not found");
+            Assert.AreEqual(64, Marshal.SizeOf(type), "HLSL VolumeFog stride");
+            Assert.AreEqual(12, (int)Marshal.OffsetOf(type, "Density"), "HLSL VolumeFog offset");
+            Assert.AreEqual(28, (int)Marshal.OffsetOf(type, "SelfIllumination"), "HLSL VolumeFog offset");
+            Assert.AreEqual(44, (int)Marshal.OffsetOf(type, "Contrast"), "HLSL VolumeFog offset");
+            Assert.AreEqual(60, (int)Marshal.OffsetOf(type, "Saturation"), "HLSL VolumeFog offset");
         }
 
         #endregion

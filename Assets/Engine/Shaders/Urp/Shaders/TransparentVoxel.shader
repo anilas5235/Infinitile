@@ -75,6 +75,8 @@
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareOpaqueTexture.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 
             // ── Material properties ───────────────────────────────────
             CBUFFER_START(UnityPerMaterial)
@@ -87,11 +89,26 @@
             TEXTURE2D_ARRAY(_Textures);
             SAMPLER(sampler_Textures);
 
+            // Volume fog of see-through liquids, by slot (VoxelRegistry.VolumeFogDef); slot 0 = none.
+            struct VolumeFog
+            {
+                float3 fogColor;
+                float density;
+                float3 lift;
+                float selfIllumination;
+                float3 gain;
+                float contrast;
+                float3 invGamma;
+                float saturation;
+            };
+
+            StructuredBuffer<VolumeFog> _VoxelVolumeFog;
+
             struct FragExtraData
             {
                 uint texture_index;
                 uint ao;
-                float depth_fade_dist;
+                uint volume_fog;
                 float surface_alpha;
                 float glow;
             };
@@ -101,29 +118,50 @@
                 FragExtraData data;
                 data.texture_index = get_tex_index(packed);
                 data.ao = get_ao(packed);
-                data.depth_fade_dist = get_depth_fade_dist(packed);
+                data.volume_fog = get_volume_fog(packed);
                 data.surface_alpha = get_surface_alpha(packed);
                 data.glow = get_glow(packed);
                 return data;
             }
 
-            // Alpha rises from the surface alpha to 1 over dist blocks of scene behind the surface (eye depth). The
-            // rise is squared, so floors a few blocks deep stay visible while deep water still turns opaque.
-            float depth_fade(const float4 positionSS, const float dist, const float surfaceAlpha)
+            // The underwater colour grading, as URP's LutBuilderLdr applies the liquid's ColorAdjustments and
+            // LiftGammaGain overrides: contrast in LogC, lift/gamma/gain, global saturation.
+            float3 grade(const VolumeFog fog, float3 color)
             {
-                if (dist <= 0.0f) return surfaceAlpha;
+                color = LogCToLinear((LinearToLogC(color) - ACEScc_MIDGRAY) * fog.contrast + ACEScc_MIDGRAY);
+                color = max(0.0f, color);
+                color = color * fog.gain + fog.lift;
+                color = sign(color) * pow(abs(color), fog.invGamma);
+                const float luma = Luminance(color);
+                return luma + fog.saturation * (color - luma);
+            }
 
-                float2 ndc = positionSS.xy / positionSS.w;
+            // The opaque scene behind the surface as the underwater view shows it (GEN-38): fogged with
+            // UnderwaterFog.shader's exp² fog over the distance the view ray travels through the liquid, then
+            // colour graded. The sky behind counts as infinitely far.
+            float3 through_volume(const VolumeFog fog, const float4 positionSS, const float3 positionWS)
+            {
+                const float2 uv = positionSS.xy / positionSS.w;
+                const float3 scene = SampleSceneColor(uv);
 
-                float raw_depth = SampleSceneDepth(ndc);
-                float scene_eye_depth = LinearEyeDepth(raw_depth, _ZBufferParams);
+                const float raw_depth = SampleSceneDepth(uv);
+                #if UNITY_REVERSED_Z
+                const bool sky = raw_depth <= 0.0f;
+                #else
+                const bool sky = raw_depth >= 1.0f;
+                #endif
+                const float surface_eye_depth = positionSS.w;
+                const float behind = max(LinearEyeDepth(raw_depth, _ZBufferParams) - surface_eye_depth, 0.0f);
+                const float d = behind * distance(positionWS, _WorldSpaceCameraPos) / surface_eye_depth * fog.density;
 
-                float inter = saturate((scene_eye_depth - positionSS.w) / dist);
-                return lerp(surfaceAlpha, 1, inter * inter);
+                const float3 light = max(_VoxelSkyBrightness * _VoxelSkyTint.rgb, max(_VoxelAmbient, fog.selfIllumination));
+                const float3 fog_color = fog.fogColor * light;
+                const float amount = sky ? 1.0f : 1.0f - exp(-d * d);
+                return grade(fog, lerp(scene, fog_color, amount));
             }
 
             // ── Fragment shader ───────────────────────────────────────
-            half4 frag(Varyings IN) : SV_Target
+            half4 frag(Varyings IN, const bool front : SV_IsFrontFace) : SV_Target
             {
                 // --- Texture array sample ---
                 FragExtraData extra = unpack_frag_extra_data(IN.packed);
@@ -136,17 +174,25 @@
                 // --- Light ---
                 const float3 light = calc_voxel_light(IN.packed, uv);
 
-                // --- Depth fade ---
-                const float alpha = depth_fade(IN.positionSS, extra.depth_fade_dist, albedo.w * extra.surface_alpha);
-
                 // --- Glow ---
                 const float glow = calc_glow(extra.glow);
+
+                const float3 surface = ao_color.rgb * light * glow;
+                const float alpha = albedo.w * extra.surface_alpha;
+
+                // --- Volume fog: seen from outside, the surface lies over the fogged scene behind it. From inside
+                // (back faces) the underwater post-process fogs the view instead. ---
+                if (extra.volume_fog != 0 && front)
+                {
+                    const float3 behind = through_volume(_VoxelVolumeFog[extra.volume_fog], IN.positionSS, IN.positionWS);
+                    return half4(apply_horizon_fog(lerp(behind, surface, alpha), IN.positionWS), 1);
+                }
 
                 // --- Alpha clip ---
                 clip(alpha - 0.001f);
 
                 // --- Final colour ---
-                return half4(apply_horizon_fog(ao_color.rgb * light * glow, IN.positionWS), alpha);
+                return half4(apply_horizon_fog(surface, IN.positionWS), alpha);
             }
             ENDHLSL
         }

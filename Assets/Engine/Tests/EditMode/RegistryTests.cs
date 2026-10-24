@@ -348,6 +348,66 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void VoxelRegistry_TransparentVoxelsWithFog_GetVolumeFogSlots(){
+            VoxelDataPackage package = _fixtures.CreatePackage("fog");
+            QuadDefinition quad = _fixtures.CreateQuad("Quad", Vector3.zero);
+            VoxelShape shape = _fixtures.CreateShape("Cube", (quad, QuadDrawCondition.Always));
+            Texture2D tex = _fixtures.CreateTexture("Tex", new Color32(10, 20, 30, 128));
+            Voxel water = _fixtures.CreateVoxel("Water", package, shape, tex, MeshLayer.Transparent, false);
+            Voxel glass = _fixtures.CreateVoxel("Glass", package, shape, tex, MeshLayer.Transparent);
+            Voxel lava = _fixtures.CreateVoxel("Lava", package, shape, tex, MeshLayer.Transparent, false);
+            Voxel stone = _fixtures.CreateVoxel("Stone", package, shape, tex);
+            foreach (Voxel fogged in new[]{ water, lava, stone }){
+                fogged.usePostProcess = true;
+                fogged.postProcess.enableFog = true;
+            }
+
+            water.postProcess.fogColor = new Color(0.1f, 0.4f, 0.5f);
+            water.postProcess.fogDensity = 0.035f;
+            water.postProcess.postProcessColor = new Color(0.8f, 0.9f, 1f, 0f);
+            water.postProcess.contrast = 5f;
+            water.postProcess.saturation = 10f;
+            lava.postProcess.postProcessColor = new Color(1f, 1f, 1f, 0f);
+            lava.lightEmission = new Vector3Int(15, 9, 3);
+
+            VoxelRegistry registry = new();
+            _disposables.Add(registry);
+            registry.Initialize(_fixtures.CreateTexture("ErrSolid", new Color32(255, 0, 255, 255)),
+                _fixtures.CreateTexture("ErrTransparent", new Color32(255, 0, 255, 128)),
+                _fixtures.CreateTexture("ErrFoliage", new Color32(255, 0, 255, 64)));
+            foreach (Voxel voxel in new[]{ water, glass, lava, stone }) registry.Register("fog", voxel);
+            registry.FinalizeRegistry();
+
+            byte Slot(string name){
+                return registry.GetVoxelGenData().GetRenderDef(registry.GetIdOrThrow(name)).VolumeFog;
+            }
+
+            Assert.AreEqual(1, Slot("fog:Water"));
+            Assert.AreEqual(0, Slot("fog:Glass"), "no post-process fog");
+            Assert.AreEqual(2, Slot("fog:Lava"));
+            Assert.AreEqual(0, Slot("fog:Stone"), "solid voxels are never seen through");
+
+            Assert.AreEqual(3, registry.VolumeFogBuffer.count, "slot 0 plus water and lava");
+            // per slot: fog colour, density, lift, self-illumination, gain, contrast, inverse gamma, saturation
+            float[] data = new float[3 * 16];
+            registry.VolumeFogBuffer.GetData(data);
+            Assert.That(data.Take(16), Is.All.EqualTo(0f), "slot 0 is empty");
+            float[] w = data.Skip(16).Take(16).ToArray();
+            Assert.AreEqual(new[]{ 0.1f, 0.4f, 0.5f, 0.035f }, w.Take(4).ToArray());
+            Assert.That(w[6], Is.GreaterThan(0f).And.GreaterThan(w[4]), "a blue colour lifts blue over red");
+            Assert.That(w[10], Is.GreaterThan(w[8]), "gains blue over red");
+            Assert.That(w[14], Is.LessThan(w[12]), "and brightens blue's midtones more than red's");
+            Assert.AreEqual(1.05f, w[11], 1e-6f, "contrast factor");
+            Assert.AreEqual(1.1f, w[15], 1e-6f, "saturation factor");
+
+            float[] l = data.Skip(32).Take(16).ToArray();
+            Assert.AreEqual(1f, l[7], "lava's fog is lit by its own emission");
+            Assert.That(new[]{ l[8], l[9], l[10], l[12], l[13], l[14] }, Is.All.EqualTo(1f).Within(1e-5f),
+                "a white colour leaves gain and gamma neutral");
+            Assert.That(new[]{ l[4], l[5], l[6] }, Is.All.EqualTo(0f).Within(1e-5f), "and adds no lift");
+        }
+
+        [Test]
         public void BiomeRegistry_SameBiomeAssetInTwoPackages_RollsBackOnTopLevelFailure(){
             // A failed SO registration for the second name must be rolled back by TopLevelRegistry.Register, not
             // leave a default (air) BiomeDef at the end of BiomeArray.

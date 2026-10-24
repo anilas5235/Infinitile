@@ -35,33 +35,21 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void DepthFadeAndSurfaceAlpha_RoundTripWithoutTouchingAoAndGlow([Values(1, 2, 3)] int seed){
+        public void VolumeFogAndSurfaceAlpha_RoundTripWithoutTouchingAoAndGlow([Values(1, 2, 3)] int seed){
             Random random = new((uint)seed);
             for (int i = 0; i < 1000; i++){
                 uint4 packed = new(random.NextUInt(), random.NextUInt(), random.NextUInt(), random.NextUInt());
                 uint4 before = packed;
-                float dist = random.NextInt(1, 256) * 0.25f;
+                uint slot = random.NextUInt(256);
                 uint alpha = random.NextUInt(256);
-                PointLightPacking.SetDepthFadeDist(ref packed, dist);
+                PointLightPacking.SetVolumeFog(ref packed, slot);
                 PointLightPacking.SetSurfaceAlpha(ref packed, alpha);
 
-                Assert.AreEqual(dist, PointLightPacking.GetDepthFadeDist(packed));
+                Assert.AreEqual(slot, PointLightPacking.GetVolumeFog(packed));
                 Assert.AreEqual(alpha / 255f, PointLightPacking.GetSurfaceAlpha(packed));
                 Assert.AreEqual(before.z & 0xFF0000FF, packed.z & 0xFF0000FF, "ao and glow stay untouched");
                 Assert.AreEqual(new uint3(before.x, before.y, before.w), new uint3(packed.x, packed.y, packed.w));
             }
-        }
-
-        [TestCase(-1f, 0f)] // off
-        [TestCase(0f, 0f)]
-        [TestCase(0.05f, 0.25f)] // a tiny fade keeps its smallest step instead of switching off
-        [TestCase(12f, 12f)]
-        [TestCase(13.1f, 13f)]
-        [TestCase(100f, 63.75f)] // clamped
-        public void DepthFade_QuantisesToQuarterBlocks(float dist, float expected){
-            uint4 packed = 0;
-            PointLightPacking.SetDepthFadeDist(ref packed, dist);
-            Assert.AreEqual(expected, PointLightPacking.GetDepthFadeDist(packed));
         }
 
         [Test]
