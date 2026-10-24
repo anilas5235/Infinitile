@@ -9,6 +9,7 @@ using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Rendering;
 using static UnityEngine.GraphicsBuffer;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
 
@@ -26,6 +27,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         private readonly TexRegistry _transparentTexRegistry = new(100);
 
         private readonly Registry<Voxel.VoxelDef> _voxelRenderDefRegistry = new(100);
+        private readonly List<VolumeFogDef> _volumeFogs = new();
 
         private VoxelEngineRenderGenData _voxelEngineRenderGenData;
         private VoxelLightTable _lightTable;
@@ -35,10 +37,18 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         public GraphicsBuffer QuadBuffer{ get; private set; }
 
         public GraphicsBuffer QuadTexPairBuffer{ get; private set; }
+
+        /// <summary>
+        ///     Volume fog of the transparent voxels with post-process fog, by <see cref="Voxel.VoxelDef.VolumeFog" />
+        ///     slot (slot 0 unused); the transparent shader reads it as <c>_VoxelVolumeFog</c>.
+        /// </summary>
+        public GraphicsBuffer VolumeFogBuffer{ get; private set; }
         public NativeHashMap<FixedString32Bytes, Voxel.VoxelDef> VoxelMap{ get; private set; }
 
         public void Initialize(Texture2D errorTexSolid, Texture2D errorTexTransparent, Texture2D errorTexFoliage){
             InternalInitialize();
+            _volumeFogs.Clear();
+            _volumeFogs.Add(default); // slot 0 = no volume fog
 
             RegisterAir();
 
@@ -65,7 +75,8 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                 Id = id,
                 MeshLayer = so.meshLayer,
                 AlwaysRenderAllFaces = so.alwaysRenderAllFaces,
-                DepthFadeDistance = (half)so.depthFadeDistance,
+                VolumeFog = RegisterVolumeFog(so),
+                SurfaceAlpha = (byte)math.round(math.saturate(so.surfaceAlpha) * 255f),
                 Glow = (byte)so.glow,
                 Collision = so.collision,
                 LightAttenuation = (byte)math.clamp(so.lightAttenuation, 0, VoxelLightLimits.MaxLevel),
@@ -176,6 +187,46 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             QuadTexPairBuffer?.Dispose();
             QuadTexPairBuffer = new GraphicsBuffer(Target.Structured, _quadTexPairs.Count, sizeof(uint));
             QuadTexPairBuffer.SetData(_quadTexPairs.ToArray());
+
+            VolumeFogBuffer?.Dispose();
+            VolumeFogBuffer =
+                new GraphicsBuffer(Target.Structured, _volumeFogs.Count, Marshal.SizeOf<VolumeFogDef>());
+            VolumeFogBuffer.SetData(_volumeFogs);
+            Shader.SetGlobalBuffer(VoxelVolumeFogNameID, VolumeFogBuffer);
+        }
+
+        /// <summary>
+        ///     Gives a transparent voxel with post-process fog or a depth fade a volume slot. With fog, the scene seen
+        ///     through its surface gets the underwater fog and colour grading; the grading values are prepared
+        ///     as URP prepares them for the underwater view (VoxelPostProcessHandler). 0 for every other voxel.
+        /// </summary>
+        private byte RegisterVolumeFog(Voxel so){
+            if (so.meshLayer != MeshLayer.Transparent) return 0;
+            bool fogged = so.usePostProcess && so.postProcess.enableFog;
+            if (!fogged && so.depthFadeDistance <= 0f) return 0;
+            if (_volumeFogs.Count > byte.MaxValue){
+                VoxelEngineLogger.Warn<VoxelRegistry>($"No volume fog slot left for '{so.name}'");
+                return 0;
+            }
+
+            VoxelPostProcessData post = so.postProcess;
+            Vector3Int emission = so.lightEmission;
+            Vector4 color = post.postProcessColor;
+            (Vector4 lift, Vector4 invGamma, Vector4 gain) = ColorUtils.PrepareLiftGammaGain(color, color, color);
+            _volumeFogs.Add(new VolumeFogDef{
+                FogColor = new float3(post.fogColor.r, post.fogColor.g, post.fogColor.b),
+                Density = post.fogDensity,
+                Lift = ((float4)lift).xyz,
+                SelfIllumination = math.cmax(new float3(emission.x, emission.y, emission.z)) / VoxelLightLimits.MaxLevel,
+                Gain = ((float4)gain).xyz,
+                Contrast = post.contrast / 100f + 1f,
+                InvGamma = ((float4)invGamma).xyz,
+                Saturation = post.saturation / 100f + 1f,
+                DepthFade = math.max(so.depthFadeDistance, 0f),
+                DepthDarkening = fogged ? math.max(post.depthDarkening, 0f) : 0f,
+                Fogged = fogged ? 1f : 0f
+            });
+            return (byte)(_volumeFogs.Count - 1);
         }
 
         /// <summary>
@@ -242,17 +293,34 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             VoxelRenderDefBuffer?.Dispose();
             QuadBuffer?.Dispose();
             QuadTexPairBuffer?.Dispose();
+            VolumeFogBuffer?.Dispose();
             if (VoxelMap.IsCreated) VoxelMap.Dispose();
             _solidTexRegistry.DestroyArray();
             _transparentTexRegistry.DestroyArray();
             _foliageTexRegistry.DestroyArray();
         }
 
+        /// <summary>One <c>_VoxelVolumeFog</c> entry, as <c>VolumeFog</c> in TransparentVoxel.shader.</summary>
+        private struct VolumeFogDef{
+            public float3 FogColor; // lit like the underwater fog
+            public float Density; // per block, exp² as UnderwaterFog.shader
+            public float3 Lift; // lift/gamma/gain of the underwater view, as ColorUtils.PrepareLiftGammaGain
+            public float SelfIllumination; // the fog's light floor, max emission / 15
+            public float3 Gain;
+            public float Contrast; // ColorAdjustments contrast as a factor, contrast / 100 + 1
+            public float3 InvGamma;
+            public float Saturation; // ColorAdjustments saturation as a factor, saturation / 100 + 1
+            public float DepthFade; // blocks over which the alpha rises to 1, 0 = off
+            public float DepthDarkening; // fraction of the fog's light lost per block below the surface (exp)
+            public float Fogged; // 1 = the scene behind is fogged and graded, 0 = depth fade only
+            public float Pad; // keeps the stride a multiple of 16 bytes
+        }
+
         //TODO: Compacting?
         private struct GPUVoxelDef{
             private uint MeshLayer;
             private uint AlwaysRenderAllFaces;
-            private uint DepthFadeDistance; // fp16 bits in the low half; HLSL half is 32-bit under fxc
+            private uint VolumeFog; // slot in _VoxelVolumeFog, 0 = none
             private uint Glow;
             private uint Collision;
             private uint2 shape_quad_indices_alwaysRender;
@@ -263,11 +331,12 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             private uint2 shape_quad_indices_front;
             private uint2 shape_quad_indices_back;
             private uint LightAttenuation; // the smooth light skips opaque (15) voxels
+            private uint SurfaceAlpha; // unorm8
 
             public GPUVoxelDef(Voxel.VoxelDef def, byte lightAttenuation){
                 MeshLayer = (uint)def.MeshLayer;
                 AlwaysRenderAllFaces = def.AlwaysRenderAllFaces ? 1u : 0u;
-                DepthFadeDistance = def.DepthFadeDistance.value; // read with f16tof32 on the GPU
+                VolumeFog = def.VolumeFog;
                 Glow = def.Glow;
                 Collision = def.Collision ? 1u : 0u;
                 shape_quad_indices_alwaysRender = def.Always;
@@ -278,6 +347,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                 shape_quad_indices_front = def.Front;
                 shape_quad_indices_back = def.Back;
                 LightAttenuation = lightAttenuation;
+                SurfaceAlpha = def.SurfaceAlpha;
             }
         }
     }

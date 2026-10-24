@@ -32,6 +32,8 @@ namespace Engine.Tests.EditMode{
         internal const ushort Needles = 11;
         internal const ushort Cactus = 12;
         internal const ushort Glass = 13;
+        internal const ushort Snow = 14;
+        internal const ushort Granite = 15;
 
         private readonly List<Object> _created = new();
 
@@ -47,7 +49,8 @@ namespace Engine.Tests.EditMode{
             [Needles] = FloraVoxelClass.Leaves
         };
 
-        internal readonly Voxel GrassSo, DirtSo, StoneSo, SandSo, TuftSo, FlowerSo, LogSo, LeavesSo, NeedlesSo, CactusSo, GlassSo;
+        internal readonly Voxel GrassSo, DirtSo, StoneSo, SandSo, TuftSo, FlowerSo, LogSo, LeavesSo, NeedlesSo, CactusSo, GlassSo,
+            SnowSo, GraniteSo;
 
         /// <summary>Log line 0…4, a filled 5×3×5 leaf box centred at y 5 (y 4…6), one leaf on top (reach 2).</summary>
         internal readonly VoxelStructure Tree;
@@ -67,6 +70,8 @@ namespace Engine.Tests.EditMode{
             NeedlesSo = MakeVoxel("Needles", Needles, MeshLayer.Transparent, true);
             CactusSo = MakeVoxel("Cactus", Cactus, MeshLayer.Solid, true);
             GlassSo = MakeVoxel("Glass", Glass, MeshLayer.Transparent, false);
+            SnowSo = MakeVoxel("Snow", Snow, MeshLayer.Solid, true);
+            GraniteSo = MakeVoxel("Granite", Granite, MeshLayer.Solid, true);
 
             Tree = Create<VoxelStructure>("Tree");
             Tree.parts = new[]{
@@ -294,20 +299,30 @@ namespace Engine.Tests.EditMode{
 
             List<Object> species = FloraConfigBuilder.CollectSpecies(biomes);
             int waterLevel = config.WorldGen.WaterLevel;
-            bool ice = cfg.EnableClimateOverrides;
 
             for (int x = 0; x < Size.x; x++)
             for (int z = 0; z < Size.y; z++){
                 int i = Region.Index(Origin.x + x, Origin.y + z);
                 int h = math.clamp(Region.ColumnHeight[i], 0, MaxTerrainHeight);
                 int source = Region.SurfaceSource[i];
+                int wx = Origin.x + x, wz = Origin.y + z;
+                float t = Region.Fields[i].T;
                 Biome b = source >= 0 ? biomes[source] : null;
-                ushort top = b ? fixture.Ids[b.TopBlock] : (ushort)0;
+                Biome.BiomeDef def = source >= 0 ? cfg.Biomes[source] : default;
+                // Under water (the voxel above is water) the underwater block replaces the top block; cold dry
+                // columns take the snow block.
+                Voxel wet = b && b.UnderwaterTopBlock ? b.UnderwaterTopBlock : b ? b.UnderBlock : null;
+                ushort top = b ? fixture.Ids[h + 1 < waterLevel ? wet : b.TopBlock] : (ushort)0;
+                if (b && SurfaceCover.IsSnowCovered(wx, wz, t, h, def, cfg)) top = def.snowTopBlock;
                 ushort under = b ? fixture.Ids[b.UnderBlock] : (ushort)0;
                 ushort stone = b ? fixture.Ids[b.StoneBlock] : (ushort)0;
+                int shift = SurfaceCover.StrataShift(wx, wz, cfg);
+                bool frozen = SurfaceCover.WaterFreezes(wx, wz, t, cfg);
                 for (int y = 0; y < ChunkHeight; y++){
                     ushort v = y < h - 4 ? stone : y < h ? under : y == h ? top : y < waterLevel ? TestFixtures.Water : TestFixtures.Air;
-                    if (ice && y == waterLevel - 1 && v == TestFixtures.Water && Region.Fields[i].T < .2f) v = TestFixtures.Ice;
+                    if (v == stone && def.strataBlock != 0 && SurfaceCover.InStrataBand(y, shift, cfg.StrataPeriod, cfg.StrataThickness))
+                        v = def.strataBlock;
+                    if (frozen && y == waterLevel - 1 && v == TestFixtures.Water) v = TestFixtures.Ice;
                     _voxels[Flat(x, y, z)] = v;
                 }
             }

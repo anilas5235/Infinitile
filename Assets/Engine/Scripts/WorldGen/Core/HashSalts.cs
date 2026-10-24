@@ -15,6 +15,12 @@ namespace Engine.Scripts.WorldGen.Core{
         public const uint WeirdnessNoise = 0x70C2AD07u;
         public const uint PeakNoise = 0x81D3BE08u;
 
+        /// <summary>Noise on the effective temperature of the snow and ice overrides.</summary>
+        public const uint FreezeNoise = 0x3C8E6913u;
+
+        /// <summary>Rise and fall of the strata bands.</summary>
+        public const uint StrataNoise = 0x4D9F7A14u;
+
         /// <summary>Shared blend warp field, one salt per axis.</summary>
         public const uint BlendWarpX = 0x92E4CF09u;
 

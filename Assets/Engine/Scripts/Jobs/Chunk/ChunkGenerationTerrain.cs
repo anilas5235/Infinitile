@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Blending;
@@ -18,7 +19,8 @@ namespace Engine.Scripts.Jobs.Chunk{
         ///     Computes climate values, terrain height and biome information for every column of a chunk: one sampler
         ///     decision per column, independent of the chunk origin, so neighbouring chunks agree on every border
         ///     column. The blocks come from the surface-source biome; a column without an active biome (-1) gets air.
-        ///     Both architectures (Terrain-first, Biome-first) run through here. This overload discards the flora grid.
+        ///     Both architectures (Terrain-first, Biome-first) run through here. This overload discards the flora grid
+        ///     and includes the snow, strata and ice decisions of <see cref="ApplySurfaceCover" />.
         /// </summary>
         /// <param name="config">Generator configuration providing the world-gen config and voxel IDs.</param>
         /// <param name="chunkWordPos">World-space origin (in voxels) of the chunk.</param>
@@ -27,6 +29,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             NativeArray<ChunkColumn> chunkColumns){
             FloraGrid grid = new(config.WorldGen.FloraPadding, Allocator.Temp);
             PrepareChunkMaps(ref config, ref chunkWordPos, chunkColumns, ref grid);
+            ApplySurfaceCover(chunkColumns, chunkWordPos, config.WorldGen);
             grid.Dispose();
         }
 
@@ -36,7 +39,8 @@ namespace Engine.Scripts.Jobs.Chunk{
         ///     <see cref="PlaceVegetation" />. Every column equals <see cref="WorldSampler.SampleColumn(int,int,in WorldGenConfig)" />:
         ///     the core sample (<see cref="WorldSampler.SampleCore" />) of every chunk column, plus that of every ring
         ///     column that may be a multi-block candidate, then the rule roll and anchor order of
-        ///     <see cref="FloraPlacement.Decide" />, read from the grid instead of re-sampled.
+        ///     <see cref="FloraPlacement.Decide" />, read from the grid instead of re-sampled. Snow, strata and ice
+        ///     follow in <see cref="ApplySurfaceCover" />, which the caller runs next.
         /// </summary>
         public static void PrepareChunkMaps(ref GeneratorConfig config, ref int3 chunkWordPos,
             NativeArray<ChunkColumn> chunkColumns, ref FloraGrid grid){
@@ -65,9 +69,10 @@ namespace Engine.Scripts.Jobs.Chunk{
                 };
                 if (s.SurfaceSource >= 0 && s.SurfaceSource < cfg.BiomeCount){
                     Biome.BiomeDef def = cfg.Biomes[s.SurfaceSource];
-                    col.TopBlock = def.topBlock;
+                    col.TopBlock = TopBlockOf(def, col.Height, cfg.WaterLevel);
                     col.UnderBlock = def.underBlock;
                     col.StoneBlock = def.stoneBlock;
+                    col.StrataBlock = def.strataBlock;
                 }
 
                 int g = grid.Index(x, z);
@@ -142,6 +147,44 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
+        ///     Snow top block, strata shift and frozen water surface of every chunk column, from the sampled temperature,
+        ///     height and surface biome. Called after <see cref="PrepareChunkMaps(ref GeneratorConfig,ref int3,NativeArray{ChunkColumn},ref FloraGrid)" />
+        ///     rather than from it: inside it, even as a separate loop, this code made Burst compile the sampling slower
+        ///     (Terrain-first DistanceBlend about a third slower).
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal static void ApplySurfaceCover(NativeArray<ChunkColumn> chunkColumns, int3 chunkWordPos,
+            in WorldGenConfig cfg){
+            for (int x = 0; x < ChunkWidth; x++)
+            for (int z = 0; z < ChunkDepth; z++){
+                int i = GetColumnIdx(x, z, ChunkDepth);
+                int wx = chunkWordPos.x + x, wz = chunkWordPos.z + z;
+                ChunkColumn col = chunkColumns[i];
+                // Snow line and ice edge of the column share one evaluation of the freeze noise.
+                float freezeNoise = cfg.EnableClimateOverrides ? SurfaceCover.FreezeNoise(wx, wz, cfg) : 0f;
+                if (col.SurfaceSource >= 0 && col.SurfaceSource < cfg.BiomeCount){
+                    Biome.BiomeDef def = cfg.Biomes[col.SurfaceSource];
+                    if (SurfaceCover.IsSnowCovered(col.Temperature, col.Height, freezeNoise, def, cfg))
+                        col.TopBlock = def.snowTopBlock;
+                    if (def.strataBlock != 0) col.StrataShift = SurfaceCover.StrataShift(wx, wz, cfg);
+                }
+
+                col.Frozen = SurfaceCover.WaterFreezes(col.Temperature, freezeNoise, cfg) ? (byte)1 : (byte)0;
+                chunkColumns[i] = col;
+            }
+        }
+
+        /// <summary>
+        ///     Top block of a column whose top block sits at <paramref name="height" />: the biome's underwater block when
+        ///     the voxel above it is water, otherwise its top block. Water fills y &lt; <paramref name="waterLevel" />, so a
+        ///     top block at <c>waterLevel - 1</c> touches the surface and stays dry.
+        /// </summary>
+        public static ushort TopBlockOf(in Biome.BiomeDef def, int height, int waterLevel){
+            bool submerged = height + 1 < waterLevel;
+            return submerged && def.underwaterTopBlock != 0 ? def.underwaterTopBlock : def.topBlock;
+        }
+
+        /// <summary>
         ///     Fills the voxel buffer for a chunk with terrain blocks based on the prepared column data
         ///     and configuration values.
         /// </summary>
@@ -154,8 +197,8 @@ namespace Engine.Scripts.Jobs.Chunk{
             ushort waterBlock = config.Voxels["std:Water"].Id;
             ushort ice = config.Voxels["std:Ice"].Id;
             int waterLevel = config.WorldGen.WaterLevel;
-            // The ice override is a climate override that the settings can switch off.
-            bool iceOverride = config.WorldGen.EnableClimateOverrides;
+            int strataPeriod = config.WorldGen.StrataPeriod;
+            int strataThickness = config.WorldGen.StrataThickness;
 
             for (int x = 0; x < ChunkWidth; x++)
             for (int z = 0; z < ChunkDepth; z++){
@@ -168,20 +211,27 @@ namespace Engine.Scripts.Jobs.Chunk{
                 ushort top = col.TopBlock;
 
                 int gy = col.Height;
+                bool strata = col.StrataBlock != 0 && strataPeriod > 0 && strataThickness > 0;
 
                 for (int y = 0; y < ChunkHeight; y++){
                     ushort v;
                     if (y < gy - 4) v = st;
                     else if (y < gy) v = under;
-                    // The top block sits at h_int even under water, so Ocean floors are sand.
+                    // The column's top block sits at h_int; under water it is already the biome's underwater block.
                     else if (y == gy) v = top;
                     else v = y < waterLevel ? waterBlock : air;
 
-                    // The water surface is the topmost water voxel at waterLevel - 1 (y == waterLevel is air).
-                    if (iceOverride && y == waterLevel - 1 && v == waterBlock && col.Temperature < .2f) v = ice;
+                    // Strata bands replace the stone block wherever it lies, top and under included.
+                    if (strata && v == st && SurfaceCover.InStrataBand(y, col.StrataShift, strataPeriod, strataThickness))
+                        v = col.StrataBlock;
 
                     vox[ChunkSize.Flatten(x, y, z)] = v;
                 }
+
+                // The water surface is the topmost water voxel at waterLevel - 1 (y == waterLevel is air); it is water
+                // exactly when the top block lies below it.
+                int surface = waterLevel - 1;
+                if (col.Frozen != 0 && surface > gy && surface < ChunkHeight) vox[ChunkSize.Flatten(x, surface, z)] = ice;
             }
         }
     }

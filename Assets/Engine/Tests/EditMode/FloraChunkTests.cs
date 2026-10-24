@@ -3,6 +3,7 @@ using System.Linq;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.VoxelConfig.Data.Generation;
+using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
 using Unity.Collections;
@@ -16,7 +17,7 @@ namespace Engine.Tests.EditMode{
     ///     The chunk job's flora against the pure region API: heights, top block and flora of a 4×4-chunk area equal
     ///     <see cref="Engine.Scripts.WorldGen.Core.WorldGenApi.SampleRegion" /> in all 8 configurations
     ///     (2 architectures × 4 methods; Biome-first uses the method in both stages), trees that cross chunk borders
-    ///     are complete on both sides, and the same input gives the same output.
+    ///     are complete on both sides, snow, strata and ice agree as well, and the same input gives the same output.
     /// </summary>
     public class FloraChunkTests{
         private FloraFixture _fixture;
@@ -140,6 +141,66 @@ namespace Engine.Tests.EditMode{
             anchors = reference.Anchors.Count;
             Assert.Greater(planted, 500, "the area carries flora");
             Assert.Greater(anchors, 5, "the area carries multi-block flora");
+
+            Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
+            try{
+                List<string> report = new();
+                int mismatches = CompareVoxels(reference, chunkData, report);
+                Assert.AreEqual(0, mismatches, "chunk voxels differ from the whole-world stamp:\n" + string.Join("\n", report));
+            }
+            finally{
+                Release(results);
+            }
+        }
+
+        [Test]
+        public void ChunkJob_SnowStrataAndIceMatchTheRegionApi(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            // Snow tops, strata bands and ice of the chunk job equal the whole-world stamp, and snowy columns carry
+            // no single-block plants. A high freeze temperature brings snow and ice into the test area.
+            _biomes = _fixture.DefaultBiomes();
+            foreach (Biome b in _biomes){
+                b.SnowTopBlock = _fixture.SnowSo;
+                b.StrataBlock = _fixture.GraniteSo;
+            }
+
+            WorldGenSettings s = _fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes);
+            s.FreezeTemperature = .5f;
+            s.StrataPeriod = 3;
+            s.StrataThickness = 1;
+            _config = _fixture.GeneratorConfig(s);
+            int2 originChunk = new(1, 2), chunks = new(4, 4);
+            ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
+
+            int waterLevel = _config.WorldGen.WaterLevel;
+            int snowy = 0, bare = 0, ice = 0, strata = 0;
+            float coldest = float.MaxValue;
+            for (int x = reference.Origin.x; x < reference.Origin.x + reference.Size.x; x++)
+            for (int z = reference.Origin.y; z < reference.Origin.y + reference.Size.y; z++){
+                int h = reference.SurfaceAt(x, z);
+                if (reference[new int3(x, h, z)] == FloraFixture.Snow){
+                    snowy++;
+                    ushort above = reference[new int3(x, h + 1, z)];
+                    Assert.IsFalse(above == FloraFixture.Tuft || above == FloraFixture.Flower, $"({x},{z}) plant on snow");
+                }
+                else if (h + 1 >= waterLevel) bare++;
+
+                if (h + 1 >= waterLevel){
+                    int i = reference.Region.Index(x, z);
+                    coldest = math.min(coldest, SurfaceCover.EffectiveTemperature(x, z, reference.Region.Fields[i].T, h, _config.WorldGen));
+                }
+
+                if (reference[new int3(x, waterLevel - 1, z)] == TestFixtures.Ice) ice++;
+                for (int y = math.max(0, h - 5); y <= h; y++)
+                    if (reference[new int3(x, y, z)] == FloraFixture.Granite) strata++;
+            }
+
+            string counts = $"{architecture}: snowy {snowy}, bare dry {bare}, ice {ice}, strata voxels {strata}, coldest dry {coldest:F3}";
+            TestContext.WriteLine(counts);
+            Assert.Greater(snowy, 0, "the area has snow; " + counts);
+            Assert.Greater(bare, 0, "the area has dry columns without snow");
+            Assert.Greater(strata, 0, "the area has strata near the surface");
+            if (architecture == GenArchitecture.TerrainFirst) Assert.Greater(ice, 0, "the area has ice");
 
             Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
             try{

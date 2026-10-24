@@ -36,5 +36,27 @@ namespace Engine.Tests.EditMode{
             Vector3 sunrise = DayNightCycle.SunRotation(6f, 30f) * Vector3.forward;
             Assert.AreEqual(0f, sunrise.y, 1e-4f);
         }
+
+        [Test]
+        public void FogParams_EncodeTheRangeAndTheSkyGradient(){
+            // The shader computes saturate((d - x) * y): 0 at the start, 1 at the end.
+            Vector4 p = VoxelLightingGlobals.FogParams(true, 115.2f, 192f, .6f);
+            Assert.AreEqual(0f, (115.2f - p.x) * p.y, 1e-5f);
+            Assert.AreEqual(1f, (192f - p.x) * p.y, 1e-5f);
+            Assert.AreEqual(1f, p.z);
+            Assert.AreEqual(.6f, p.w);
+            Assert.AreEqual(0f, VoxelLightingGlobals.FogParams(false, 0f, 10f, 1f).z, "off");
+            Assert.IsTrue(float.IsFinite(VoxelLightingGlobals.FogParams(true, 50f, 50f, 1f).y), "empty range");
+        }
+
+        [Test]
+        public void HazeParams_EncodeDensityFalloffAndBase(){
+            Vector4 p = VoxelLightingGlobals.HazeParams(0.002f, 48f, 124f);
+            Assert.AreEqual(0.002f, p.x, 1e-7f);
+            Assert.AreEqual(1f / 48f, p.y, 1e-7f);
+            Assert.AreEqual(124f, p.z);
+            Assert.AreEqual(0f, VoxelLightingGlobals.HazeParams(-1f, 48f, 0f).x, "no negative density");
+            Assert.IsTrue(float.IsFinite(VoxelLightingGlobals.HazeParams(0f, 0f, 0f).y), "zero falloff");
+        }
     }
 }

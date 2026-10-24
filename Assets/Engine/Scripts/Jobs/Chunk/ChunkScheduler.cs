@@ -6,6 +6,7 @@ using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.World;
+using Engine.Scripts.WorldGen.Settings;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
@@ -55,6 +56,9 @@ namespace Engine.Scripts.Jobs.Chunk{
             );
         }
 
+
+        /// <summary>The world-generation config the chunk jobs read; released with this scheduler.</summary>
+        internal WorldGenConfig WorldGen => _config.WorldGen;
 
         /// <summary>
         ///     Gets a value indicating whether the scheduled job has completed.

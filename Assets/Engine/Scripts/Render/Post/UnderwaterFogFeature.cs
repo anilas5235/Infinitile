@@ -30,6 +30,16 @@ namespace Engine.Scripts.Render.Post{
         /// </summary>
         public static float SelfIllumination;
 
+        /// <summary>
+        ///     Fraction of the fog's light lost per block below <see cref="SurfaceHeight" /> (exponential).
+        /// </summary>
+        public static float DepthDarkening;
+
+        /// <summary>
+        ///     World height of the liquid's surface above the camera, for the depth darkening.
+        /// </summary>
+        public static float SurfaceHeight;
+
         [SerializeField] private Shader shader;
 
         private Material _material;
@@ -62,6 +72,7 @@ namespace Engine.Scripts.Render.Post{
             private static readonly int FogDensityId = Shader.PropertyToID("_UnderwaterFogDensity");
             private static readonly int FogEmissionId = Shader.PropertyToID("_UnderwaterFogEmission");
             private static readonly int FogDepthId = Shader.PropertyToID("_UnderwaterFogDepth");
+            private static readonly int FogSurfaceId = Shader.PropertyToID("_UnderwaterFogSurface");
 
             private readonly Material _material;
 
@@ -83,6 +94,7 @@ namespace Engine.Scripts.Render.Post{
                 _material.SetColor(FogColorId, FogColor);
                 _material.SetFloat(FogDensityId, FogDensity);
                 _material.SetFloat(FogEmissionId, SelfIllumination);
+                _material.SetVector(FogSurfaceId, new Vector4(SurfaceHeight, DepthDarkening));
 
                 TextureHandle source = resources.activeColorTexture;
                 TextureDesc desc = renderGraph.GetTextureDesc(source);

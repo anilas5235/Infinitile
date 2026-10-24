@@ -236,7 +236,7 @@ namespace Engine.Tests.EditMode{
                     ColumnSample b = WorldSampler.SampleColumn(0, z, _config.WorldGen);
                     Biome.BiomeDef defA = _config.WorldGen.Biomes[a.SurfaceSource];
                     Biome.BiomeDef defB = _config.WorldGen.Biomes[b.SurfaceSource];
-                    ushort expectedA = defA.topBlock; // top block at h_int even under water
+                    ushort expectedA = defA.topBlock; // the patched defs have no underwater block
                     ushort expectedB = defB.topBlock;
                     Assert.AreEqual(expectedA, west.GetVoxel(new int3(ChunkWidth - 1, a.ColumnHeight, z)), $"west z={z}");
                     Assert.AreEqual(expectedB, east.GetVoxel(new int3(0, b.ColumnHeight, z)), $"east z={z}");
@@ -269,7 +269,8 @@ namespace Engine.Tests.EditMode{
                 _columns[ChunkJob.GetColumnIdx(x, z, ChunkDepth)] = new ChunkColumn{
                     Height = 100, HeightF = 100f, Biome = 0, SurfaceSource = 0, FloraSource = -1,
                     TopBlock = TopA, UnderBlock = UnderA, StoneBlock = TestFixtures.Stone,
-                    Temperature = 0.1f, Humidity = 0.5f
+                    Temperature = 0.1f, Humidity = 0.5f,
+                    Frozen = SurfaceCover.WaterFreezes(x, z, 0.1f, _config.WorldGen) ? (byte)1 : (byte)0
                 };
         }
 

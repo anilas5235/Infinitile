@@ -13,8 +13,11 @@ MonoBehaviour:
   m_Name: Jungle
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.VoxelConfig.Data.Generation.Biome
   TopBlock: {fileID: 11400000, guid: 2e8eca1efe0447d4b845f277ce2ada8f, type: 2}
+  UnderwaterTopBlock: {fileID: 0}
   UnderBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
+  SnowTopBlock: {fileID: 0}
+  StrataBlock: {fileID: 0}
   TargetHumidity: 0.9
   TargetTemperature: 0.85
   TargetContinental: 0.4

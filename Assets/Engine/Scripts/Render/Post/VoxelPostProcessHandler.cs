@@ -22,6 +22,11 @@ namespace Engine.Scripts.Render.Post{
         /// </summary>
         public ushort currentVoxelId;
 
+        /// <summary>
+        ///     How far up the surface of the liquid is searched for the depth darkening; deeper counts as this deep.
+        /// </summary>
+        private const int MaxSurfaceSearch = 64;
+
         private PostProcessManager _postProcessManager;
 
         private VoxelRegistry _voxelRegistry;
@@ -32,13 +37,27 @@ namespace Engine.Scripts.Render.Post{
                 return;
             }
 
-            Vector3 camPos = target.transform.position;
+            Vector3Int camPos = Vector3Int.FloorToInt(target.transform.position);
 
-            ushort voxelId = VoxelWorld.Instance.GetVoxel(Vector3Int.FloorToInt(camPos).Int3());
-            if (voxelId == currentVoxelId) return;
+            ushort voxelId = VoxelWorld.Instance.GetVoxel(camPos.Int3());
+            if (voxelId != currentVoxelId){
+                currentVoxelId = voxelId;
+                UpdatePostProcessing(currentVoxelId);
+            }
 
-            currentVoxelId = voxelId;
-            UpdatePostProcessing(currentVoxelId);
+            if (UnderwaterFogFeature.Enabled) UnderwaterFogFeature.SurfaceHeight = FindSurface(camPos, voxelId);
+        }
+
+        /// <summary>
+        ///     Height of the liquid's surface above <paramref name="camPos" />: the bottom of the first voxel up the
+        ///     column that is not <paramref name="liquid" />.
+        /// </summary>
+        private static float FindSurface(Vector3Int camPos, ushort liquid){
+            VoxelWorld world = VoxelWorld.Instance;
+            int y = camPos.y + 1;
+            int top = camPos.y + MaxSurfaceSearch;
+            while (y < top && world.GetVoxel(new Vector3Int(camPos.x, y, camPos.z).Int3()) == liquid) y++;
+            return y;
         }
 
         private void OnEnable(){
@@ -73,6 +92,7 @@ namespace Engine.Scripts.Render.Post{
             UnderwaterFogFeature.Enabled = info.postProcess.enableFog;
             UnderwaterFogFeature.FogColor = info.postProcess.fogColor;
             UnderwaterFogFeature.FogDensity = info.postProcess.fogDensity;
+            UnderwaterFogFeature.DepthDarkening = info.postProcess.depthDarkening;
             Vector3Int emission = info.lightEmission;
             UnderwaterFogFeature.SelfIllumination = Mathf.Max(emission.x, emission.y, emission.z) / 15f;
         }

@@ -13,8 +13,11 @@ MonoBehaviour:
   m_Name: Snow
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.VoxelConfig.Data.Generation.Biome
   TopBlock: {fileID: 11400000, guid: dda8a6f1ece6d0243a39b247a2bd2a75, type: 2}
+  UnderwaterTopBlock: {fileID: 11400000, guid: 901457d9816d65f488d5806151d78b2e, type: 2}
   UnderBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
+  SnowTopBlock: {fileID: 0}
+  StrataBlock: {fileID: 11400000, guid: 2a1844411e45fba40a1da565a805687e, type: 2}
   TargetHumidity: 0.5
   TargetTemperature: 0.15
   TargetContinental: 0.7

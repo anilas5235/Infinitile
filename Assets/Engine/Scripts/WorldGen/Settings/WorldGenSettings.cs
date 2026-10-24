@@ -148,8 +148,40 @@ namespace Engine.Scripts.WorldGen.Settings{
             octaves = 3
         };
 
-        [Tooltip("Run the ice override after terrain fill.")]
+        [Header("Snow and ice")]
+        [Tooltip("Run the snow and ice overrides after terrain fill.")]
         public bool EnableClimateOverrides = true;
+
+        [Tooltip("Water freezes and dry columns take their biome's snow block where the effective temperature lies below this.")]
+        [Range(0f, 1f)]
+        public float FreezeTemperature = 0.2f;
+
+        [Tooltip("Drop of the effective temperature from the water surface up to HeightMax, so high peaks carry snow.")]
+        [Min(0f)]
+        public float SnowLapse = 0.45f;
+
+        [Tooltip("Amplitude of the noise on the effective temperature; it makes snow lines and ice edges ragged.")]
+        [Min(0f)]
+        public float FreezeNoiseAmplitude = 0.04f;
+
+        [Tooltip("Wavelength of that noise in blocks.")]
+        public float FreezeNoiseWavelength = 24f;
+
+        [Header("Strata")]
+        [Tooltip("Height of one strata cycle in blocks; 0 turns strata off.")]
+        [Min(0)]
+        public int StrataPeriod = 7;
+
+        [Tooltip("Blocks of the biome's strata block per cycle.")]
+        [Min(0)]
+        public int StrataThickness = 2;
+
+        [Tooltip("How far the bands rise and fall, in blocks.")]
+        [Min(0f)]
+        public float StrataWarpAmplitude = 4f;
+
+        [Tooltip("Wavelength of that rise and fall in blocks.")]
+        public float StrataWarpWavelength = 64f;
 
         [Header("Vegetation")]
         [Tooltip("r_tree: anchors of multi-block flora (trees, cacti) are at least this many blocks apart (default 3).")]
@@ -195,6 +227,8 @@ namespace Engine.Scripts.WorldGen.Settings{
                     if (!IsPositiveFinite(OctaveWavelengths[i])) yield return ($"OctaveWavelengths[{i}]", OctaveWavelengths[i]);
             if (!IsPositiveFinite(PeakWavelength)) yield return (nameof(PeakWavelength), PeakWavelength);
             if (!IsPositiveFinite(WarpWavelength)) yield return (nameof(WarpWavelength), WarpWavelength);
+            if (!IsPositiveFinite(FreezeNoiseWavelength)) yield return (nameof(FreezeNoiseWavelength), FreezeNoiseWavelength);
+            if (!IsPositiveFinite(StrataWarpWavelength)) yield return (nameof(StrataWarpWavelength), StrataWarpWavelength);
             // Not a divisor, but 0 flattens every climate field and a negative value mirrors the world.
             if (!IsPositiveFinite(ClimateFrequencyScale)) yield return (nameof(ClimateFrequencyScale), ClimateFrequencyScale);
 

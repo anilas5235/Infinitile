@@ -87,8 +87,18 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// </summary>
         public int WaterLevel;
 
-        /// <summary>Run the ice override after terrain fill.</summary>
+        /// <summary>Run the snow and ice overrides after terrain fill.</summary>
         [MarshalAs(UnmanagedType.U1)] public bool EnableClimateOverrides; // blittable for the Burst direct calls
+
+        // --- Snow, ice and strata (SurfaceCover) ------------------------------------------------------------------
+        public float FreezeTemperature;
+        public float SnowLapse;
+        public float FreezeNoiseAmplitude;
+        public float FreezeNoiseWavelength;
+        public int StrataPeriod;
+        public int StrataThickness;
+        public float StrataWarpAmplitude;
+        public float StrataWarpWavelength;
 
         /// <summary>Climate noise instances (T, F, C, E, W) and couplings. Owned.</summary>
         public ClimateParams Climate;

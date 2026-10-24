@@ -27,6 +27,7 @@ MonoBehaviour:
     enableFog: 1
     fogColor: {r: 1, g: 0.39, b: 0.12, a: 1}
     fogDensity: 0.2
+    depthDarkening: 0
   shape: {fileID: 11400000, guid: 4f233acb5e735874f81d54b07e03336a, type: 2}
   top: {fileID: 0}
   bottom: {fileID: 0}

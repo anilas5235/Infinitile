@@ -77,7 +77,15 @@ namespace Engine.Scripts.WorldGen.Settings{
                 HeightMax = settings.HeightMax,
                 PeakWavelength = settings.PeakWavelength,
                 WaterLevel = settings.WaterLevel,
-                EnableClimateOverrides = settings.EnableClimateOverrides
+                EnableClimateOverrides = settings.EnableClimateOverrides,
+                FreezeTemperature = settings.FreezeTemperature,
+                SnowLapse = settings.SnowLapse,
+                FreezeNoiseAmplitude = settings.FreezeNoiseAmplitude,
+                FreezeNoiseWavelength = settings.FreezeNoiseWavelength,
+                StrataPeriod = settings.StrataPeriod,
+                StrataThickness = settings.StrataThickness,
+                StrataWarpAmplitude = settings.StrataWarpAmplitude,
+                StrataWarpWavelength = settings.StrataWarpWavelength
             };
 
             // Biome.ToStruct and TerrainSplineSet.Flatten throw on bad data; free what was allocated so far before

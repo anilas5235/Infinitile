@@ -13,8 +13,11 @@ MonoBehaviour:
   m_Name: Desert
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.VoxelConfig.Data.Generation.Biome
   TopBlock: {fileID: 11400000, guid: b5df436b2cc46cf419e666fccd2d96b3, type: 2}
+  UnderwaterTopBlock: {fileID: 11400000, guid: b5df436b2cc46cf419e666fccd2d96b3, type: 2}
   UnderBlock: {fileID: 11400000, guid: 79377b51b078b354282e41ab801a29a6, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
+  SnowTopBlock: {fileID: 0}
+  StrataBlock: {fileID: 11400000, guid: eeed6c09b1b96c04faeab22d816e1b62, type: 2}
   TargetHumidity: 0.1
   TargetTemperature: 0.9
   TargetContinental: 0.45

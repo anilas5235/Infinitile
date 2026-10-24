@@ -74,11 +74,14 @@ namespace Player{
         public void OnSelectVoxel(InputValue value){
             if (!value.isPressed) return;
             if (!GetLookAtVoxelPos(out Vector3Int voxelWorldPos)) return;
-            ushort voxId = VoxelWorld.Instance.GetVoxel(voxelWorldPos.Int3());
-            if (voxId > 0 && voxId != voxelId){
-                voxelId = voxId;
-                OnVoxelIdChanged?.Invoke(voxelId);
-            }
+            SelectVoxel(VoxelWorld.Instance.GetVoxel(voxelWorldPos.Int3()));
+        }
+
+        /// <summary>Makes <paramref name="id" /> the placed voxel (air is ignored) and raises <see cref="OnVoxelIdChanged" />.</summary>
+        public void SelectVoxel(ushort id){
+            if (id == 0 || id == voxelId) return;
+            voxelId = id;
+            OnVoxelIdChanged?.Invoke(voxelId);
         }
 
         /// <summary>

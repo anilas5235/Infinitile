@@ -19,7 +19,7 @@ namespace Engine.Tests.EditMode{
                 PointLightPacking.SetCornerLight(ref packed, new uint4(corners[0], corners[1], corners[2], corners[3]));
 
                 Assert.AreEqual(before.x, packed.x, "quad and texture index stay untouched");
-                Assert.AreEqual(before.z, packed.z, "ao, depth fade and glow stay untouched");
+                Assert.AreEqual(before.z, packed.z, "ao, depth fade, surface alpha and glow stay untouched");
 
                 uint4 sky = PointLightPacking.GetSkyLight(packed);
                 uint4 red = PointLightPacking.GetRedLight(packed);
@@ -31,6 +31,24 @@ namespace Engine.Tests.EditMode{
                     Assert.AreEqual(VoxelLight.GetGreen(corners[c]), (int)green[c], $"green corner {c}");
                     Assert.AreEqual(VoxelLight.GetBlue(corners[c]), (int)blue[c], $"blue corner {c}");
                 }
+            }
+        }
+
+        [Test]
+        public void VolumeFogAndSurfaceAlpha_RoundTripWithoutTouchingAoAndGlow([Values(1, 2, 3)] int seed){
+            Random random = new((uint)seed);
+            for (int i = 0; i < 1000; i++){
+                uint4 packed = new(random.NextUInt(), random.NextUInt(), random.NextUInt(), random.NextUInt());
+                uint4 before = packed;
+                uint slot = random.NextUInt(256);
+                uint alpha = random.NextUInt(256);
+                PointLightPacking.SetVolumeFog(ref packed, slot);
+                PointLightPacking.SetSurfaceAlpha(ref packed, alpha);
+
+                Assert.AreEqual(slot, PointLightPacking.GetVolumeFog(packed));
+                Assert.AreEqual(alpha / 255f, PointLightPacking.GetSurfaceAlpha(packed));
+                Assert.AreEqual(before.z & 0xFF0000FF, packed.z & 0xFF0000FF, "ao and glow stay untouched");
+                Assert.AreEqual(new uint3(before.x, before.y, before.w), new uint3(packed.x, packed.y, packed.w));
             }
         }
 

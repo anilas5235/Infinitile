@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -112,12 +113,14 @@ namespace Engine.Scripts.Render{
         ///     rendering. With shadows on, a second list of pages whose extruded bounds reach the frustum is drawn as
         ///     shadow casters only.
         /// </summary>
-        /// <param name="mat">The material to use for rendering.</param>
+        /// <param name="materials">
+        ///     The materials to draw the visible pages with, in order; the first also draws the shadow casters.
+        /// </param>
         /// <param name="cam">The camera to render with.</param>
         /// <param name="culler">The culler that dispatches the kernels.</param>
         /// <param name="state">The camera's culling state (planes and per-buffer lists).</param>
         /// <param name="parameters">Culling switches and the shadow extrusion for this frame.</param>
-        public void Draw(Material mat, Camera cam, GpuCuller culler, CameraCullState state,
+        public void Draw(IReadOnlyList<Material> materials, Camera cam, GpuCuller culler, CameraCullState state,
             in CullingParameters parameters){
             if (!_shouldDraw) return;
 
@@ -125,12 +128,13 @@ namespace Engine.Scripts.Render{
 
             culler.Cull(this, lists.Main, state.Planes, float3.zero, parameters.CullingEnabled);
             // the main pass does not cast shadows, but still receives them when they are on
-            Graphics.DrawProceduralIndirect(mat, DrawBounds, MeshTopology.Triangles, lists.Main.Args, 0, cam,
-                lists.Main.PropertyBlock, ShadowCastingMode.Off, parameters.Shadows);
+            for (int i = 0; i < materials.Count; i++)
+                Graphics.DrawProceduralIndirect(materials[i], DrawBounds, MeshTopology.Triangles, lists.Main.Args, 0,
+                    cam, lists.Main.PropertyBlock, ShadowCastingMode.Off, parameters.Shadows);
 
             if (!parameters.Shadows) return;
             culler.Cull(this, lists.Shadow, state.Planes, parameters.ShadowExtrusion, parameters.CullingEnabled);
-            Graphics.DrawProceduralIndirect(mat, DrawBounds, MeshTopology.Triangles, lists.Shadow.Args, 0, cam,
+            Graphics.DrawProceduralIndirect(materials[0], DrawBounds, MeshTopology.Triangles, lists.Shadow.Args, 0, cam,
                 lists.Shadow.PropertyBlock, ShadowCastingMode.ShadowsOnly, true);
         }
 

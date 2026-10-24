@@ -3,10 +3,11 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.Render{
     /// <summary>
-    ///     C# port of the per-corner light accessors in VoxelCommon.hlsl and of the corner averaging in
-    ///     PointBuilder.compute, kept in step with the shaders so tests can check the packing round trip.
+    ///     C# port of the per-corner light, volume fog and surface alpha accessors in VoxelCommon.hlsl and of the corner averaging
+    ///     in PointBuilder.compute, kept in step with the shaders so tests can check the packing round trip.
     ///     <c>PointData.packed.y</c> = sky | red &lt;&lt; 16, <c>packed.w</c> = green | blue &lt;&lt; 16; each 16-bit
     ///     channel holds four 4-bit corners in the order up-left, up-right, down-right, down-left.
+    ///     <c>packed.z</c> = ao | volume fog slot &lt;&lt; 8 | surface alpha (unorm8) &lt;&lt; 16 | glow &lt;&lt; 24.
     /// </summary>
     internal static class PointLightPacking{
         internal const int OpaqueAttenuation = 15;
@@ -43,6 +44,22 @@ namespace Engine.Scripts.Render{
             uint4 blue = cornerLight & 0xF;
             packed.y = PackCorners(sky) | PackCorners(red) << 16;
             packed.w = PackCorners(green) | PackCorners(blue) << 16;
+        }
+
+        internal static uint GetVolumeFog(uint4 packed){
+            return packed.z >> 8 & 0xFF;
+        }
+
+        internal static void SetVolumeFog(ref uint4 packed, uint slot){
+            packed.z = packed.z & 0xFFFF00FF | (slot & 0xFF) << 8;
+        }
+
+        internal static float GetSurfaceAlpha(uint4 packed){
+            return (packed.z >> 16 & 0xFF) / 255f;
+        }
+
+        internal static void SetSurfaceAlpha(ref uint4 packed, uint surfaceAlpha){
+            packed.z = packed.z & 0xFF00FFFF | (surfaceAlpha & 0xFF) << 16;
         }
 
         /// <summary>

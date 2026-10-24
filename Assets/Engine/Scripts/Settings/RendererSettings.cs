@@ -42,6 +42,31 @@ namespace Engine.Scripts.Settings{
         public ComputeShader pageCulling;
 
         /// <summary>
+        ///     Skybox material (Engine/VoxelSky) set as the scene's skybox at startup. Its horizon colour is the colour
+        ///     of the horizon fog, so the fog meets the sky. Empty keeps the scene's skybox.
+        /// </summary>
+        [Header("Sky and fog")]
+        public Material skyMaterial;
+
+        /// <summary>
+        ///     Horizon fog in the voxel shaders: a thin height haze (aerial perspective) and an edge fade, full at
+        ///     the edge of the drawn chunks so they fade into the sky.
+        /// </summary>
+        public bool horizonFog = true;
+
+        /// <summary>Where the edge fade starts, as a fraction of the draw distance.</summary>
+        [Range(0f, 1f)] public float fogStart = 0.85f;
+
+        /// <summary>Haze density per block at <see cref="hazeBaseHeight" />; 0 leaves only the edge fade.</summary>
+        [Min(0f)] public float hazeDensity = 0.002f;
+
+        /// <summary>Blocks of height over which the haze thins out by a factor of e.</summary>
+        [Min(1f)] public float hazeFalloff = 48f;
+
+        /// <summary>World height of the haze's base density, the sea level.</summary>
+        public float hazeBaseHeight = 124f;
+
+        /// <summary>
         ///     GPU frustum culling of render pages. Off draws every page that holds points, for debugging and
         ///     before/after comparison; the image must be identical.
         /// </summary>

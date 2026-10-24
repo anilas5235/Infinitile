@@ -40,6 +40,7 @@
             float4 positionCS : SV_POSITION;
             float2 uv : TEXCOORD0; // xy = tile UV
             uint4 packed : TEXCOORD1; // PointData.packed, layout in VoxelCommon.hlsl
+            float3 positionWS : TEXCOORD2; // horizon fog
         };
 
         // ── Vertex shader with expansion ─────────────────────────────
@@ -51,6 +52,7 @@
             o.positionCS = TransformObjectToHClip(v.positionOS);
             o.uv = v.uv;
             o.packed = v.packed;
+            o.positionWS = TransformObjectToWorld(v.positionOS);
             return o;
         }
         ENDHLSL
@@ -110,7 +112,7 @@
                 float3 light = calc_voxel_light(IN.packed, uv);
 
                 // --- Final colour ---
-                return half4(ao_color.rgb * light, 1);
+                return half4(apply_horizon_fog(ao_color.rgb * light, IN.positionWS), 1);
             }
             ENDHLSL
         }

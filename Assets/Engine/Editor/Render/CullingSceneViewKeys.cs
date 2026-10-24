@@ -5,8 +5,8 @@ using UnityEngine;
 namespace Engine.Editor.Render{
     /// <summary>
     ///     Culling debug keys in the Scene view: the game-side keys go through the Input System, which in the Editor
-    ///     only receives the keyboard while the Game view has focus. While playing, F7 (overlay), F8 (culling) and F9
-    ///     (freeze) therefore also work with the Scene view focused, and a status line shows the switches.
+    ///     only receives the keyboard while the Game view has focus. While playing, F8 (culling) and F9 (freeze)
+    ///     therefore also work with the Scene view focused, and a status line shows the switches.
     /// </summary>
     [InitializeOnLoad]
     internal static class CullingSceneViewKeys{
@@ -23,7 +23,6 @@ namespace Engine.Editor.Render{
             if (e.type == EventType.KeyDown && !e.alt && !e.control && !e.shift && !e.command){
                 bool handled = true;
                 switch (e.keyCode){
-                    case KeyCode.F7: renderer.ShowCullingOverlay = !renderer.ShowCullingOverlay; break;
                     case KeyCode.F8: renderer.GpuCulling = !renderer.GpuCulling; break;
                     case KeyCode.F9: renderer.FreezeCulling = !renderer.FreezeCulling; break;
                     default: handled = false; break;

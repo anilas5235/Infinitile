@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
+using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
 using Unity.Collections;
@@ -117,6 +118,28 @@ namespace Engine.Tests.Performance{
             _config = BenchmarkFixtures.CreatePlaceholderGeneratorConfig(architecture, method, Allocator.Persistent, _created, true);
             Assert.IsTrue(_config.WorldGen.HasFlora);
             MeasurePerChunk($"ChunkJob.Run {architecture} {method} flora ms/chunk");
+        }
+
+        /// <summary>
+        ///     The flora world of <see cref="ChunkJob_Run_PerMethod_WithFlora_MsPerChunk" /> with DistanceBlend, where every
+        ///     biome has a snow top block and a strata block, so each column also decides snow and strata shift and every
+        ///     stone voxel is tested against the bands.
+        /// </summary>
+        [Test]
+        [Performance]
+        public void ChunkJob_Run_SnowAndStrata_MsPerChunk(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
+            _config = BenchmarkFixtures.CreatePlaceholderGeneratorConfig(architecture, BlendMethod.DistanceBlend,
+                Allocator.Persistent, _created, true);
+            for (int b = 0; b < _config.WorldGen.BiomeCount; b++){
+                Biome.BiomeDef def = _config.WorldGen.Biomes[b];
+                def.snowTopBlock = BenchmarkFixtures.Dirt;
+                def.strataBlock = BenchmarkFixtures.Dirt;
+                _config.WorldGen.Biomes[b] = def;
+            }
+
+            MeasurePerChunk($"ChunkJob.Run {architecture} DistanceBlend snow strata ms/chunk");
         }
 
         private void MeasurePerChunk(string sampleGroup){

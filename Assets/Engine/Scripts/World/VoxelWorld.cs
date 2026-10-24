@@ -11,6 +11,8 @@ using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.VoxelConfig;
+using Engine.Scripts.VoxelConfig.Data.Generation;
+using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Mathematics;
 using UnityEngine;
@@ -37,6 +39,8 @@ namespace Engine.Scripts.World{
 
         private bool _isFocused;
         private bool _isShuttingDown;
+
+        private string[] _biomeNames = Array.Empty<string>(); // of the config the chunk jobs use
 
         private VoxelEngineScheduler _scheduler;
 
@@ -123,6 +127,14 @@ namespace Engine.Scripts.World{
                 DataImporter.Instance.CreateConfig(),
                 this
             ));
+            RememberBiomeNames(settings.WorldGen);
+        }
+
+        /// <summary>Biome names in config order, for <see cref="BiomeName" />.</summary>
+        private void RememberBiomeNames(WorldGenSettings worldGen){
+            List<Biome> biomes = worldGen.ActiveBiomes();
+            _biomeNames = new string[biomes.Count];
+            for (int i = 0; i < biomes.Count; i++) _biomeNames[i] = biomes[i] ? biomes[i].name : null;
         }
 
         /// <summary>
@@ -230,8 +242,59 @@ namespace Engine.Scripts.World{
             ChunkManager.UnloadAll(); // the load ring outside the draw distance
 
             ConstructSchedulers(chunkScheduler);
+            RememberBiomeNames(worldGen ? worldGen : settings.WorldGen);
             Focus = UnsetFocus;
             TryFocusUpdate();
+        }
+
+        /// <summary>
+        ///     Samples column (<paramref name="x" />, <paramref name="z" />) with the generation config the chunks are
+        ///     built from (after <see cref="Regenerate" /> the new one): climate fields, height, biomes and flora as
+        ///     <see cref="WorldSampler.SampleColumn(int,int,in WorldGenConfig,out ColumnSample)" /> gives them. Biome
+        ///     indices resolve with <see cref="BiomeName" />. False while the world is not running.
+        /// </summary>
+        public bool TrySampleColumn(int x, int z, out ColumnSample sample){
+            sample = default;
+            if (_isShuttingDown || _chunkScheduler == null) return false;
+            WorldGenConfig cfg = _chunkScheduler.WorldGen;
+            if (!cfg.IsCreated) return false;
+            WorldSampler.SampleColumn(x, z, cfg, out sample);
+            return true;
+        }
+
+        /// <summary>Name of biome <paramref name="index" /> of <see cref="TrySampleColumn" />; null when out of range.</summary>
+        public string BiomeName(int index){
+            return index >= 0 && index < _biomeNames.Length ? _biomeNames[index] : null;
+        }
+
+        /// <summary>
+        ///     Architecture and blend methods of the generation config in use; false while the world is not
+        ///     running.
+        /// </summary>
+        public bool TryGetGenerationMethods(out GenArchitecture architecture, out BlendMethod material,
+            out BlendMethod height){
+            architecture = default;
+            material = height = default;
+            if (_isShuttingDown || _chunkScheduler == null || !_chunkScheduler.WorldGen.IsCreated) return false;
+            WorldGenConfig cfg = _chunkScheduler.WorldGen;
+            architecture = cfg.Architecture;
+            material = cfg.MaterialMethod;
+            height = cfg.HeightMethod;
+            return true;
+        }
+
+        /// <summary>Loaded chunks and job queue lengths; zero while the world is not running.</summary>
+        public WorldStats Stats{
+            get{
+                if (_isShuttingDown || _scheduler == null || ChunkManager == null) return default;
+                return new WorldStats{
+                    LoadedChunks = ChunkManager.ChunkCount(),
+                    DataQueue = _scheduler.DataQueueCount,
+                    LightQueue = _scheduler.LightQueueCount,
+                    MeshQueue = _scheduler.MeshQueueCount,
+                    BakeQueue = _scheduler.BakeQueueCount
+                };
+            }
         }
 
         /// <summary>
