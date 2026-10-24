@@ -11,13 +11,13 @@ using VoxelSo = Engine.Scripts.VoxelConfig.Data.Voxel.Voxel;
 namespace Engine.Scripts.WorldGen.Flora{
     /// <summary>
     ///     Builds the flora part of <see cref="WorldGenConfig" /> from the active biomes: the flattened
-    ///     rules with their cumulative intervals, the species table, the expanded structures and the voxel replace
-    ///     classes. Managed, once per settings change.
+    ///     rules with their cumulative intervals, the species table, the expanded structures, the tree variants and
+    ///     the voxel replace classes. Managed, once per settings change.
     /// </summary>
     internal static class FloraConfigBuilder{
         /// <summary>
-        ///     Species in id order (id = index + 1): every distinct voxel or structure named by a valid rule of
-        ///     an active biome, in biome and rule order.
+        ///     Species in id order (id = index + 1): every distinct voxel, structure or tree species named by a valid
+        ///     rule of an active biome, in biome and rule order.
         /// </summary>
         internal static List<Object> CollectSpecies(IReadOnlyList<Biome> biomes){
             List<Object> species = new();
@@ -34,6 +34,7 @@ namespace Engine.Scripts.WorldGen.Flora{
         }
 
         private static Object Species(FloraRule rule){
+            if (rule.SpeciesTree) return rule.SpeciesTree;
             return rule.SpeciesStructure ? rule.SpeciesStructure : rule.SpeciesVoxel;
         }
 
@@ -49,9 +50,13 @@ namespace Engine.Scripts.WorldGen.Flora{
             List<FloraStructureDef> structures = new();
             List<FloraVoxel> voxels = new();
             List<float2> multiBlockIntervals = new();
+            List<TreeSpeciesDef> trees = new();
+            List<TreeVariantDef> variants = new();
             Dictionary<VoxelStructure, int> structureIndex = new();
+            Dictionary<TreeSpecies, int> treeIndex = new();
             Dictionary<ushort, byte> classes = new();
             int reach = 0;
+            int spacing = 0;
             bool anyMultiBlock = false;
 
             for (int b = 0; b < biomes.Count; b++){
@@ -63,7 +68,7 @@ namespace Engine.Scripts.WorldGen.Flora{
                     for (int r = 0; r < biome.FloraRules.Count; r++){
                         FloraRule rule = biome.FloraRules[r];
                         if (rule == null || !rule.IsValid){
-                            Debug.LogWarning($"{biome.name}: flora rule {r} needs exactly one of SpeciesVoxel and SpeciesStructure; it is skipped.", owner);
+                            Debug.LogWarning($"{biome.name}: flora rule {r} needs exactly one of SpeciesVoxel, SpeciesStructure and SpeciesTree (a tree with at least one variant); it is skipped.", owner);
                             continue;
                         }
 
@@ -79,6 +84,7 @@ namespace Engine.Scripts.WorldGen.Flora{
                             MultiBlock = rule.IsMultiBlock ? (byte)1 : (byte)0,
                             MinHeightAboveWater = rule.MinHeightAboveWater,
                             Structure = -1,
+                            Tree = -1,
                             MinStackHeight = math.max(1, math.min(rule.MinStackHeight, rule.MaxStackHeight)),
                             MaxStackHeight = math.max(1, math.max(rule.MinStackHeight, rule.MaxStackHeight))
                         };
@@ -91,11 +97,26 @@ namespace Engine.Scripts.WorldGen.Flora{
                             }
 
                             reach = math.max(reach, structures[d.Structure].Reach);
+                            spacing = math.max(spacing, treeSpacingRadius);
+                        }
+                        else if (rule.SpeciesTree){
+                            if (!treeIndex.TryGetValue(rule.SpeciesTree, out d.Tree)){
+                                d.Tree = trees.Count;
+                                treeIndex.Add(rule.SpeciesTree, d.Tree);
+                                trees.Add(AddTree(rule.SpeciesTree, voxelId, variants, classes, owner));
+                            }
+
+                            TreeSpeciesDef tree = trees[d.Tree];
+                            for (int v = tree.VariantStart; v < tree.VariantStart + tree.VariantCount; v++){
+                                reach = math.max(reach, variants[v].Reach);
+                                spacing = math.max(spacing, variants[v].SpacingRadius);
+                            }
                         }
                         else{
                             d.Voxel = voxelId?.Invoke(rule.SpeciesVoxel) ?? 0;
                             d.VoxelClass = FloraVoxelClass.Of(rule.SpeciesVoxel.meshLayer, rule.SpeciesVoxel.collision);
                             classes[d.Voxel] = d.VoxelClass;
+                            if (rule.IsMultiBlock) spacing = math.max(spacing, treeSpacingRadius);
                         }
 
                         if (d.MultiBlock != 0){
@@ -115,10 +136,13 @@ namespace Engine.Scripts.WorldGen.Flora{
 
             cfg.TreeSpacingRadius = treeSpacingRadius;
             cfg.FloraReach = reach;
-            cfg.FloraPadding = anyMultiBlock ? reach + treeSpacingRadius : 0;
+            cfg.FloraSpacingMax = anyMultiBlock ? spacing : 0;
+            cfg.FloraPadding = anyMultiBlock ? reach + spacing : 0;
             cfg.FloraRules = ToNative(rules, allocator);
             cfg.FloraStructures = ToNative(structures, allocator);
             cfg.FloraVoxels = ToNative(voxels, allocator);
+            cfg.TreeSpecies = ToNative(trees, allocator);
+            cfg.TreeVariants = ToNative(variants, allocator);
             cfg.FloraMultiBlockIntervals = ToNative(multiBlockIntervals, allocator);
 
             // Ids absent from the table (terrain, water) are solid; air (0) is never a flora voxel.
@@ -134,6 +158,101 @@ namespace Engine.Scripts.WorldGen.Flora{
             NativeArray<T> array = new(list.Count, allocator);
             for (int i = 0; i < list.Count; i++) array[i] = list[i];
             return array;
+        }
+
+        /// <summary>
+        ///     Appends the sanitised variants of <paramref name="species" /> with cumulative weights (all equal when
+        ///     every weight is 0) and their reach. Missing voxels are id 0 of class air, so they are never stamped.
+        /// </summary>
+        internal static TreeSpeciesDef AddTree(TreeSpecies species, Func<VoxelSo, ushort> voxelId, List<TreeVariantDef> variants,
+            Dictionary<ushort, byte> classes, Object owner){
+            TreeSpeciesDef def = new(){ VariantStart = variants.Count, VariantCount = species.Variants.Count };
+            float total = 0f;
+            foreach (TreeVariant v in species.Variants) total += v == null ? 0f : math.max(v.Weight, 0f);
+
+            float cumulative = 0f;
+            for (int i = 0; i < species.Variants.Count; i++){
+                TreeVariant v = species.Variants[i] ?? new TreeVariant{ Weight = 0f };
+                cumulative += total > 0f ? math.max(v.Weight, 0f) / total : 1f / species.Variants.Count;
+                TreeVariantDef d = new(){
+                    CumulativeEnd = i == species.Variants.Count - 1 ? 1f : cumulative,
+                    TrunkHeight = Range(v.TrunkHeight),
+                    TrunkWidth = math.clamp(v.TrunkWidth, 1, 2),
+                    LeanPerMille = (int)math.round(math.clamp(v.MaxLean, 0f, .25f) * 1000f),
+                    Crown = v.CrownShape,
+                    CrownRadius = Range(v.CrownRadius),
+                    CrownTopRadius = Range(v.CrownTopRadius),
+                    CrownHeight = Range(v.CrownHeight),
+                    CrownTop = math.max(v.CrownTop, 1),
+                    CrownMinBase = v.CrownMinBase,
+                    BranchCount = math.min(Range(v.BranchCount), TreeShape.MaxBranches),
+                    Branches = v.BranchStyle,
+                    BranchLength = math.max(Range(v.BranchLength), 1),
+                    BranchBand = new int2(PerMille(math.min(v.BranchBandMin, v.BranchBandMax)),
+                        PerMille(math.max(v.BranchBandMin, v.BranchBandMax))),
+                    ClusterRadius = Range(v.BranchLeafRadius),
+                    HoleChance = math.saturate(v.HoleChance),
+                    BumpChance = math.saturate(v.BumpChance),
+                    HangChance = math.saturate(v.HangChance),
+                    AltLeafChance = math.saturate(v.AltLeafChance),
+                    SpacingRadius = math.max(v.SpacingRadius, 0)
+                };
+                d.TrunkVoxel = Voxel(v.TrunkVoxel, voxelId, classes, out d.TrunkClass);
+                d.LeafVoxel = Voxel(v.LeafVoxel, voxelId, classes, out d.LeafClass);
+                d.AltLeafVoxel = Voxel(v.AltLeafVoxel, voxelId, classes, out d.AltLeafClass);
+                if (!v.TrunkVoxel && (d.TrunkHeight.y > 0 || d.BranchCount.y > 0))
+                    Debug.LogWarning($"{species.name}: variant {i} has a trunk but no trunk voxel; the trunk is left out.", owner);
+                if (!v.LeafVoxel && (d.Crown != CrownShape.None || d.ClusterRadius.y > 0))
+                    Debug.LogWarning($"{species.name}: variant {i} has a crown but no leaf voxel; the leaves are left out.", owner);
+                d.Reach = Reach(d);
+                variants.Add(d);
+            }
+
+            return def;
+        }
+
+        /// <summary>
+        ///     Largest horizontal reach of a variant from the range maxima: lean and trunk width, plus the crown radius,
+        ///     or the branch length (Arm: 1) and tip cluster; crown bumps add one block.
+        /// </summary>
+        internal static int Reach(in TreeVariantDef d){
+            int lean = d.TrunkHeight.y * d.LeanPerMille / 1000;
+            int trunk = lean + d.TrunkWidth - 1;
+            int bump = d.BumpChance > 0f ? 1 : 0;
+            int reach = trunk;
+            if (d.Crown != CrownShape.None){
+                int radius = d.Crown is CrownShape.Cone or CrownShape.Tiered ? math.max(d.CrownRadius.y, d.CrownTopRadius.y) : d.CrownRadius.y;
+                reach = math.max(reach, trunk + radius + bump);
+            }
+
+            if (d.BranchCount.y > 0 && d.TrunkHeight.y > 0){
+                int length = d.Branches == BranchStyle.Arm ? 1 : d.BranchLength.y;
+                int cluster = d.ClusterRadius.y > 0 ? d.ClusterRadius.y + bump : 0;
+                reach = math.max(reach, trunk + length + cluster);
+            }
+
+            return reach;
+        }
+
+        private static int2 Range(IntRange range){
+            int min = math.max(0, math.min(range.Min, range.Max));
+            return new int2(min, math.max(min, range.Max));
+        }
+
+        private static int PerMille(float fraction){
+            return (int)math.round(math.saturate(fraction) * 1000f);
+        }
+
+        private static ushort Voxel(VoxelSo voxel, Func<VoxelSo, ushort> voxelId, Dictionary<ushort, byte> classes, out byte cls){
+            if (!voxel){
+                cls = FloraVoxelClass.Air;
+                return 0;
+            }
+
+            ushort id = voxelId?.Invoke(voxel) ?? 0;
+            cls = FloraVoxelClass.Of(voxel.meshLayer, voxel.collision);
+            classes[id] = cls;
+            return id;
         }
 
         private static FloraStructureDef AddStructure(VoxelStructure structure, Func<VoxelSo, ushort> voxelId,

@@ -1,5 +1,6 @@
 ﻿using System;
 using Engine.Scripts.Utils.Extensions;
+using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Collections;
@@ -9,8 +10,8 @@ using static Engine.Scripts.Utils.VoxelConstants;
 namespace Engine.Scripts.Jobs.Chunk{
     /// <summary>
     ///     Flora decisions of a chunk and its border ring: the chunk columns ± <c>FloraPadding</c>
-    ///     (r_tree + max canopy radius). <see cref="ChunkJob.PrepareChunkMaps(ref GeneratorConfig,ref int3,NativeArray{ChunkColumn},ref FloraGrid)" />
-    ///     fills it, <see cref="ChunkJob.PlaceVegetation" /> stamps from it. Element [gz + gx × Size.y] holds the
+    ///     (largest spacing radius + largest reach). <see cref="ChunkJob.PrepareChunkMaps(ref GeneratorConfig,ref int3,NativeArray{ChunkColumn},ref FloraGrid)" />
+    ///     and <see cref="ChunkJob.DecideFlora" /> fill it, <see cref="ChunkJob.PlaceVegetation" /> stamps from it. Element [gz + gx × Size.y] holds the
     ///     column (origin.x − Padding + gx, origin.z − Padding + gz): x-major like the chunk columns, so walking the
     ///     elements in order walks the world in (x, then z) order. Temp, owned by the job.
     /// </summary>
@@ -27,8 +28,17 @@ namespace Engine.Scripts.Jobs.Chunk{
         /// <summary>Surface block Y of the column (clamped like <c>ChunkColumn.Height</c>); valid where <see cref="Rule" /> ≥ 0.</summary>
         public NativeArray<int> Height;
 
-        /// <summary>1 for multi-block anchors whose structure may reach into the chunk.</summary>
+        /// <summary>
+        ///     Multi-block anchors whose structure may reach into the chunk: 1, or 2 for a tree whose wide or leaning
+        ///     trunk is built 1 wide and straight because its footprint is not flat.
+        /// </summary>
         public NativeArray<byte> Anchor;
+
+        /// <summary>Spacing radius of every multi-block candidate, 0 elsewhere.</summary>
+        public NativeArray<byte> Radius;
+
+        /// <summary>Blend lattices of the padded area, built by <c>PrepareChunkMaps</c> for the flora samples. Owned.</summary>
+        public BlendCache Cache;
 
         public FloraGrid(int padding, Allocator allocator){
             Padding = padding;
@@ -37,6 +47,8 @@ namespace Engine.Scripts.Jobs.Chunk{
             Rule = new NativeArray<int>(count, allocator, NativeArrayOptions.UninitializedMemory);
             Height = new NativeArray<int>(count, allocator);
             Anchor = new NativeArray<byte>(count, allocator);
+            Radius = new NativeArray<byte>(count, allocator);
+            Cache = default;
         }
 
         /// <summary>Element index of chunk-local column (x, z), which may lie in the ring (−Padding ≤ x &lt; Width + Padding).</summary>
@@ -48,6 +60,8 @@ namespace Engine.Scripts.Jobs.Chunk{
             if (Rule.IsCreated) Rule.Dispose();
             if (Height.IsCreated) Height.Dispose();
             if (Anchor.IsCreated) Anchor.Dispose();
+            if (Radius.IsCreated) Radius.Dispose();
+            Cache.Dispose();
         }
     }
 
@@ -82,13 +96,26 @@ namespace Engine.Scripts.Jobs.Chunk{
 
             // Multi-block anchors in chunk ± reach, world order.
             int reach = cfg.FloraReach;
+            NativeList<FloraVoxel> tree = new(256, Allocator.Temp);
             for (int x = -reach; x < ChunkWidth + reach; x++)
             for (int z = -reach; z < ChunkDepth + reach; z++){
                 int g = grid.Index(x, z);
                 if (grid.Anchor[g] == 0) continue;
                 FloraRuleDef d = cfg.FloraRules[grid.Rule[g]];
                 int baseY = grid.Height[g] + 1;
-                if (d.Structure >= 0){
+                int wx = chunkWordPos.x + x, wz = chunkWordPos.z + z;
+                if (d.Tree >= 0){
+                    int variant = TreeShape.PickVariant(wx, wz, cfg, d.Tree);
+                    TreeRoll roll = TreeShape.Roll(wx, wz, cfg.Seed, variant, cfg.TreeVariants[variant]);
+                    if (grid.Anchor[g] == 2) roll.Narrow();
+                    tree.Clear();
+                    TreeShape.Build(new int3(wx, baseY, wz), roll, cfg.TreeVariants[variant], cfg.Seed, ref tree);
+                    for (int i = 0; i < tree.Length; i++){
+                        FloraVoxel v = tree[i];
+                        Put(vox, x + v.Offset.x, baseY + v.Offset.y, z + v.Offset.z, v.Voxel, v.Class, cfg);
+                    }
+                }
+                else if (d.Structure >= 0){
                     FloraStructureDef structure = cfg.FloraStructures[d.Structure];
                     for (int i = structure.Start; i < structure.Start + structure.Count; i++){
                         FloraVoxel v = cfg.FloraVoxels[i];
@@ -97,10 +124,12 @@ namespace Engine.Scripts.Jobs.Chunk{
                 }
                 else{
                     // A stacked voxel (cactus) stays on its column.
-                    int height = FloraPlacement.StackHeight(chunkWordPos.x + x, chunkWordPos.z + z, cfg, d);
+                    int height = FloraPlacement.StackHeight(wx, wz, cfg, d);
                     for (int k = 0; k < height; k++) Put(vox, x, baseY + k, z, d.Voxel, d.VoxelClass, cfg);
                 }
             }
+
+            tree.Dispose();
         }
 
         /// <summary>Writes <paramref name="voxel" /> at a chunk-local position if it lies in the chunk and outranks the voxel there.</summary>

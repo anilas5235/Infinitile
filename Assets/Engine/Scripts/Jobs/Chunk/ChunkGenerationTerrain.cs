@@ -20,7 +20,8 @@ namespace Engine.Scripts.Jobs.Chunk{
         ///     decision per column, independent of the chunk origin, so neighbouring chunks agree on every border
         ///     column. The blocks come from the surface-source biome; a column without an active biome (-1) gets air.
         ///     Both architectures (Terrain-first, Biome-first) run through here. This overload discards the flora grid
-        ///     and includes the snow, strata and ice decisions of <see cref="ApplySurfaceCover" />.
+        ///     and includes the flora decisions of <see cref="DecideFlora" /> and the snow, strata and ice decisions of
+        ///     <see cref="ApplySurfaceCover" />.
         /// </summary>
         /// <param name="config">Generator configuration providing the world-gen config and voxel IDs.</param>
         /// <param name="chunkWordPos">World-space origin (in voxels) of the chunk.</param>
@@ -29,6 +30,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             NativeArray<ChunkColumn> chunkColumns){
             FloraGrid grid = new(config.WorldGen.FloraPadding, Allocator.Temp);
             PrepareChunkMaps(ref config, ref chunkWordPos, chunkColumns, ref grid);
+            DecideFlora(ref grid, chunkColumns, chunkWordPos, config.WorldGen);
             ApplySurfaceCover(chunkColumns, chunkWordPos, config.WorldGen);
             grid.Dispose();
         }
@@ -36,11 +38,11 @@ namespace Engine.Scripts.Jobs.Chunk{
         /// <summary>
         ///     <see cref="PrepareChunkMaps(ref GeneratorConfig,ref int3,NativeArray{ChunkColumn})" /> that also fills
         ///     <paramref name="grid" /> (built with <c>config.WorldGen.FloraPadding</c>) for
-        ///     <see cref="PlaceVegetation" />. Every column equals <see cref="WorldSampler.SampleColumn(int,int,in WorldGenConfig)" />:
-        ///     the core sample (<see cref="WorldSampler.SampleCore" />) of every chunk column, plus that of every ring
-        ///     column that may be a multi-block candidate, then the rule roll and anchor order of
-        ///     <see cref="FloraPlacement.Decide" />, read from the grid instead of re-sampled. Snow, strata and ice
-        ///     follow in <see cref="ApplySurfaceCover" />, which the caller runs next.
+        ///     <see cref="PlaceVegetation" />: the core sample (<see cref="WorldSampler.SampleCore" />) of every chunk
+        ///     column, plus that of every ring column that may be a multi-block candidate, and their rule rolls. The
+        ///     caller runs <see cref="DecideFlora" /> next, which completes every column to
+        ///     <see cref="WorldSampler.SampleColumn(int,int,in WorldGenConfig)" />, then <see cref="ApplySurfaceCover" />
+        ///     for snow, strata and ice. The grid keeps the blend cache for the flora pass.
         /// </summary>
         public static void PrepareChunkMaps(ref GeneratorConfig config, ref int3 chunkWordPos,
             NativeArray<ChunkColumn> chunkColumns, ref FloraGrid grid){
@@ -48,10 +50,11 @@ namespace Engine.Scripts.Jobs.Chunk{
             int padding = grid.Padding;
             // Spatial blend methods classify a padded, world-aligned lattice around the chunk once and then convolve;
             // the cache equals the pure per-tap evaluation bit for bit. It also covers the flora ring, whose few
-            // samples would otherwise evaluate every tap directly. Temp, disposed below.
+            // samples would otherwise evaluate every tap directly. Temp, owned by the grid.
             int2 minColumn = chunkWordPos.xz;
             int2 maxColumn = minColumn + new int2(ChunkWidth - 1, ChunkDepth - 1);
-            BlendCache cache = BlendCache.Build(cfg, minColumn - padding, maxColumn + padding, 1, Allocator.Temp);
+            grid.Cache = BlendCache.Build(cfg, minColumn - padding, maxColumn + padding, 1, Allocator.Temp);
+            ref BlendCache cache = ref grid.Cache;
 
             for (int x = 0; x < ChunkWidth; x++)
             for (int z = 0; z < ChunkDepth; z++){
@@ -96,14 +99,37 @@ namespace Engine.Scripts.Jobs.Chunk{
                     grid.Rule[g] = rule;
                     grid.Height[g] = math.clamp(s.ColumnHeight, 0, MaxTerrainHeight);
                 }
+            }
+        }
 
-                // Anchors within reach of the chunk; their r_tree discs lie inside the grid.
+        /// <summary>
+        ///     The flora decisions on the grid of <see cref="PrepareChunkMaps(ref GeneratorConfig,ref int3,NativeArray{ChunkColumn},ref FloraGrid)" />,
+        ///     the same as <see cref="FloraPlacement.Decide" />: the spacing radius of every multi-block candidate, the
+        ///     anchors within reach of the chunk (<see cref="FloraGrid.Anchor" />, including the flat-footprint test of
+        ///     wide and leaning trunks), then species and source of every chunk column. A separate pass: code added
+        ///     to <c>PrepareChunkMaps</c> slows the Burst build of its sampling loops.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal static void DecideFlora(ref FloraGrid grid, NativeArray<ChunkColumn> chunkColumns, int3 chunkWordPos,
+            in WorldGenConfig cfg){
+            if (cfg.HasFlora){
+                int padding = grid.Padding;
+                for (int x = -padding; x < ChunkWidth + padding; x++)
+                for (int z = -padding; z < ChunkDepth + padding; z++){
+                    int g = grid.Index(x, z);
+                    int rule = grid.Rule[g];
+                    grid.Radius[g] = FloraPlacement.IsMultiBlock(rule, cfg)
+                        ? (byte)math.min(FloraPlacement.SpacingRadius(chunkWordPos.x + x, chunkWordPos.z + z, rule, cfg), 255)
+                        : (byte)0;
+                }
+
+                // Anchors within reach of the chunk; every candidate they may conflict with lies inside the grid.
                 int reach = cfg.FloraReach;
-                int r = cfg.TreeSpacingRadius;
                 for (int x = -reach; x < ChunkWidth + reach; x++)
                 for (int z = -reach; z < ChunkDepth + reach; z++){
                     int g = grid.Index(x, z);
-                    grid.Anchor[g] = IsGridAnchor(grid, x, z, chunkWordPos.xz, r, cfg) ? (byte)1 : (byte)0;
+                    if (!IsGridAnchor(grid, x, z, chunkWordPos.xz, cfg)) continue;
+                    grid.Anchor[g] = FlatFootprint(grid, chunkColumns, x, z, chunkWordPos, cfg) ? (byte)1 : (byte)2;
                 }
             }
 
@@ -123,27 +149,61 @@ namespace Engine.Scripts.Jobs.Chunk{
 
                 chunkColumns[i] = col;
             }
-
-            cache.Dispose();
         }
 
         /// <summary>
-        ///     Anchor test on the grid: column (x, z) is a multi-block candidate and no candidate in its r_tree disc outranks
-        ///     it (<see cref="FloraPlacement.Outranks" />).
+        ///     Anchor test on the grid: column (x, z) is a multi-block candidate and no candidate it conflicts with
+        ///     (<see cref="FloraPlacement.Conflict" />) outranks it (<see cref="FloraPlacement.Outranks" />).
         /// </summary>
-        private static bool IsGridAnchor(in FloraGrid grid, int x, int z, int2 origin, int r, in WorldGenConfig cfg){
-            if (!FloraPlacement.IsMultiBlock(grid.Rule[grid.Index(x, z)], cfg)) return false;
+        private static bool IsGridAnchor(in FloraGrid grid, int x, int z, int2 origin, in WorldGenConfig cfg){
+            int g = grid.Index(x, z);
+            if (!FloraPlacement.IsMultiBlock(grid.Rule[g], cfg)) return false;
+            int own = grid.Radius[g];
+            int r = cfg.FloraSpacingMax;
             int2 self = origin + new int2(x, z);
-            uint own = FloraPlacement.Priority(self.x, self.y, cfg);
+            uint priority = FloraPlacement.Priority(self.x, self.y, cfg);
             for (int dx = -r; dx <= r; dx++)
             for (int dz = -r; dz <= r; dz++){
                 if (!FloraPlacement.InSpacingDisc(dx, dz, r)) continue;
-                if (!FloraPlacement.IsMultiBlock(grid.Rule[grid.Index(x + dx, z + dz)], cfg)) continue;
+                int n = grid.Index(x + dx, z + dz);
+                if (!FloraPlacement.IsMultiBlock(grid.Rule[n], cfg)) continue;
+                if (!FloraPlacement.Conflict(dx * dx + dz * dz, own, grid.Radius[n])) continue;
                 int2 other = self + new int2(dx, dz);
-                if (FloraPlacement.Outranks(other, FloraPlacement.Priority(other.x, other.y, cfg), self, own)) return false;
+                if (FloraPlacement.Outranks(other, FloraPlacement.Priority(other.x, other.y, cfg), self, priority)) return false;
             }
 
             return true;
+        }
+
+        /// <summary>
+        ///     False when the anchor at (x, z) is a tree whose wide or leaning trunk stands on ground that is not flat
+        ///     within 1 block (<see cref="TreeShape.Footprint" />); the tree is then built 1 wide and straight. The
+        ///     heights are the sampler's, so every chunk decides the same.
+        /// </summary>
+        private static bool FlatFootprint(in FloraGrid grid, NativeArray<ChunkColumn> chunkColumns, int x, int z, int3 chunkWordPos,
+            in WorldGenConfig cfg){
+            int rule = grid.Rule[grid.Index(x, z)];
+            int variant = FloraPlacement.Variant(chunkWordPos.x + x, chunkWordPos.z + z, rule, cfg);
+            if (variant < 0) return true;
+            TreeRoll roll = TreeShape.Roll(chunkWordPos.x + x, chunkWordPos.z + z, cfg.Seed, variant, cfg.TreeVariants[variant]);
+            if (!roll.NeedsFlatFootprint) return true;
+            int4 box = TreeShape.Footprint(roll);
+            int min = int.MaxValue, max = int.MinValue;
+            for (int fx = x + box.x; fx <= x + box.z; fx++)
+            for (int fz = z + box.y; fz <= z + box.w; fz++){
+                int h;
+                if (fx >= 0 && fx < ChunkWidth && fz >= 0 && fz < ChunkDepth)
+                    h = chunkColumns[GetColumnIdx(fx, fz, ChunkDepth)].Height;
+                else{
+                    WorldSampler.SampleCore(chunkWordPos.x + fx, chunkWordPos.z + fz, cfg, grid.Cache, out ColumnSample s);
+                    h = math.clamp(s.ColumnHeight, 0, MaxTerrainHeight);
+                }
+
+                min = math.min(min, h);
+                max = math.max(max, h);
+            }
+
+            return max - min <= 1;
         }
 
         /// <summary>
