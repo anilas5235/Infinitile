@@ -162,10 +162,11 @@ namespace Engine.Scripts.WorldGen.Flora{
 
         /// <summary>
         ///     Appends the sanitised variants of <paramref name="species" /> with cumulative weights (all equal when
-        ///     every weight is 0) and their reach. Missing voxels are id 0 of class air, so they are never stamped.
+        ///     every weight is 0) and their reach. Missing voxels are id 0 of class air, so they are never stamped;
+        ///     <paramref name="warn" /> false skips their warnings (the species gallery redraws on every edit).
         /// </summary>
         internal static TreeSpeciesDef AddTree(TreeSpecies species, Func<VoxelSo, ushort> voxelId, List<TreeVariantDef> variants,
-            Dictionary<ushort, byte> classes, Object owner){
+            Dictionary<ushort, byte> classes, Object owner, bool warn = true){
             TreeSpeciesDef def = new(){ VariantStart = variants.Count, VariantCount = species.Variants.Count };
             float total = 0f;
             foreach (TreeVariant v in species.Variants) total += v == null ? 0f : math.max(v.Weight, 0f);
@@ -200,9 +201,9 @@ namespace Engine.Scripts.WorldGen.Flora{
                 d.TrunkVoxel = Voxel(v.TrunkVoxel, voxelId, classes, out d.TrunkClass);
                 d.LeafVoxel = Voxel(v.LeafVoxel, voxelId, classes, out d.LeafClass);
                 d.AltLeafVoxel = Voxel(v.AltLeafVoxel, voxelId, classes, out d.AltLeafClass);
-                if (!v.TrunkVoxel && (d.TrunkHeight.y > 0 || d.BranchCount.y > 0))
+                if (warn && !v.TrunkVoxel && (d.TrunkHeight.y > 0 || d.BranchCount.y > 0))
                     Debug.LogWarning($"{species.name}: variant {i} has a trunk but no trunk voxel; the trunk is left out.", owner);
-                if (!v.LeafVoxel && (d.Crown != CrownShape.None || d.ClusterRadius.y > 0))
+                if (warn && !v.LeafVoxel && (d.Crown != CrownShape.None || d.ClusterRadius.y > 0))
                     Debug.LogWarning($"{species.name}: variant {i} has a crown but no leaf voxel; the leaves are left out.", owner);
                 d.Reach = Reach(d);
                 variants.Add(d);

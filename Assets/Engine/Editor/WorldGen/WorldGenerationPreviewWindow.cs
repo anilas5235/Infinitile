@@ -16,7 +16,8 @@ namespace Engine.Editor.WorldGen{
     ///         dominant material biome, max material weight, surface source, flora, climate, E, PV and in
     ///         Terrain-first Offset/Amp/J), the clamped share and the biome-pair boundary list. An A/B compare mode
     ///         shows the same view and seed for A and a preview-only configuration B layered on the asset, plus a
-    ///         difference view. 1D plots show every spline level at the probe C/E/PV.
+    ///         difference view. 1D plots show every spline level at the probe C/E/PV. The tree species gallery
+    ///         shows the variants of a species for a row of seeds (side and top view).
     ///     </para>
     /// </summary>
     public partial class WorldGenerationPreviewWindow : EditorWindow{
@@ -96,6 +97,7 @@ namespace Engine.Editor.WorldGen{
             _builder.Dispose();
             _builder = null;
             DisposeDiff();
+            DisposeGallery();
         }
 
         private void DestroyEditors(){
@@ -157,6 +159,7 @@ namespace Engine.Editor.WorldGen{
                     DrawSettingsPanel();
                     DrawBiomePanel();
                     DrawExtraPanels();
+                    DrawGalleryPanel();
                     EditorGUILayout.EndScrollView();
                 }
                 EditorGUILayout.EndVertical();
