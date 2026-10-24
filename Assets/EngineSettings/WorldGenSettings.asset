@@ -13,16 +13,16 @@ MonoBehaviour:
   m_Name: WorldGenSettings
   m_EditorClassIdentifier: 
   Architecture: 0
-  MaterialMethod: 0
+  MaterialMethod: 1
   MaterialBlendWidth: 32
   MaterialSigma: 0.04
-  HeightMethod: 0
+  HeightMethod: 1
   HeightBlendWidth: 32
   HeightSigma: 0.04
   WarpAmplitude: 24
   WarpWavelength: 96
   WarpOctaves: 2
-  LambdaTemperature: 1
+  LambdaTemperature: 1.5
   LambdaHumidity: 1
   LambdaContinental: 2
   LambdaErosion: 1
@@ -47,7 +47,7 @@ MonoBehaviour:
   - 0.03125
   PeakWavelength: 192
   WGain: 1.6
-  ClimateFrequencyScale: 1
+  ClimateFrequencyScale: 0.85
   temperatureProfile:
     scale: 900
     persistance: 0.5
@@ -147,7 +147,7 @@ MonoBehaviour:
     lacunarity: 2
     octaves: 4
   weirdnessProfile:
-    scale: 500
+    scale: 1000
     persistance: 0.5
     lacunarity: 2
     octaves: 3
