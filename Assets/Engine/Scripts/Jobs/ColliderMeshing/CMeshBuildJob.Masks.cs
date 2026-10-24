@@ -10,7 +10,7 @@ using static Engine.Scripts.Utils.VoxelConstants;
 namespace Engine.Scripts.Jobs.ColliderMeshing{
     internal partial struct CMeshBuildJob{
         // Collision mask: the partition plus a 1-voxel border in x, y and z, one byte per voxel (1 = collision),
-        // in the chunk's Flatten order (x, z, y) so a column is a contiguous run (spec 20.3). The border is read
+        // in the chunk's Flatten order (x, z, y) so a column is a contiguous run. The border is read
         // only along the face axes, so the four corner columns stay 0.
         private const int MaskWidth = PartitionWidth + 2;
         private const int MaskHeight = PartitionHeight + 2;

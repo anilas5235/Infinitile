@@ -19,7 +19,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         private readonly IList<SimpleNode> _nullNodesCache;
         private readonly GenericPriorityQueue<SimpleNode, TPriority> _queue;
 
-        // PERF-04: "item == null" on an unconstrained TItem boxes every value-type item under Mono; the null checks
+        // "item == null" on an unconstrained TItem boxes every value-type item under Mono; the null checks
         // are skipped entirely for value types.
         private static readonly bool ItemIsValueType = typeof(TItem).IsValueType;
 
@@ -27,7 +27,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
             return !ItemIsValueType && item == null;
         }
 
-        // PERF-04: nodes and per-item lists are pooled so steady-state Enqueue/Dequeue do not allocate.
+        // Nodes and per-item lists are pooled so steady-state Enqueue/Dequeue do not allocate.
         private readonly Stack<SimpleNode> _nodePool = new();
         private readonly Stack<List<SimpleNode>> _listPool = new();
 
@@ -51,7 +51,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         }
 
         /// <summary>
-        ///     PERF-04: pre-sizes the heap, the item cache and the node/list pools so that growing to
+        ///     Pre-sizes the heap, the item cache and the node/list pools so that growing to
         ///     <paramref name="capacity" /> items later does not allocate.
         /// </summary>
         public void Reserve(int capacity){
@@ -285,7 +285,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         }
 
         /// <summary>
-        ///     N-01 / PERF-04: allocation-free variant; pass the state explicitly and a static lambda so no closure
+        ///     Allocation-free variant; pass the state explicitly and a static lambda so no closure
         ///     is created per call.
         /// </summary>
         public void UpdateAllPriorities<TState>(TState state, Func<TState, TItem, TPriority> updateFunc){

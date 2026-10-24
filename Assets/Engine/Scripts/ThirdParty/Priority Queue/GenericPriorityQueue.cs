@@ -448,7 +448,7 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         }
 
         /// <summary>
-        ///     N-01 / PERF-04: recomputes every priority in place and re-heapifies bottom-up. Does not allocate when
+        ///     Recomputes every priority in place and re-heapifies bottom-up. Does not allocate when
         ///     <paramref name="updateFunc" /> is a cached (static) delegate; the caller state travels in
         ///     <paramref name="state" />. Replaces updating node by node while enumerating the heap, which moved
         ///     nodes past the enumerator.

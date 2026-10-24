@@ -209,7 +209,7 @@ namespace Engine.Tests.EditMode{
         public void MixedTerrain_MatchesRecordedMeshes(){
             // Golden hash of the quads (positions and indices, in order) for 16 partitions of noisy terrain with
             // caves, water, floating voxels at the world top and a missing neighbour chunk. Recorded from the
-            // per-voxel mesher before the flat-mask rewrite (spec 20.3); the colliders must not change.
+            // per-voxel mesher before the flat-mask rewrite; the colliders must not change.
             int2 north = new(-1, 2);
             int2 south = new(-1, 1);
             for (int x = -2; x <= 0; x++)
