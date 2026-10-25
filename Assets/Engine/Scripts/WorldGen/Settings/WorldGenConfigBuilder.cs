@@ -7,6 +7,7 @@ using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Height;
 using Engine.Scripts.WorldGen.Noise;
 using Unity.Collections;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace Engine.Scripts.WorldGen.Settings{
@@ -85,7 +86,11 @@ namespace Engine.Scripts.WorldGen.Settings{
                 StrataPeriod = settings.StrataPeriod,
                 StrataThickness = settings.StrataThickness,
                 StrataWarpAmplitude = settings.StrataWarpAmplitude,
-                StrataWarpWavelength = settings.StrataWarpWavelength
+                StrataWarpWavelength = settings.StrataWarpWavelength,
+                FloraDensityWavelength = new float4(settings.TreesDensityWavelength, settings.UndergrowthDensityWavelength,
+                    settings.FlowersDensityWavelength, settings.GroundDetailsDensityWavelength),
+                FloraDensityContrast = new float4(settings.TreesDensityContrast, settings.UndergrowthDensityContrast,
+                    settings.FlowersDensityContrast, settings.GroundDetailsDensityContrast)
             };
 
             // Biome.ToStruct and TerrainSplineSet.Flatten throw on bad data; free what was allocated so far before
@@ -125,7 +130,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 }
 
                 // Flora rules, species, structures.
-                FloraConfigBuilder.Build(active, voxelId, settings.TreeSpacingRadius, allocator, ref cfg, settings);
+                FloraConfigBuilder.Build(active, voxelId, settings.TreeSpacingRadius, settings.FloraDensityNoise, allocator, ref cfg, settings);
             }
             catch{
                 cfg.Dispose();

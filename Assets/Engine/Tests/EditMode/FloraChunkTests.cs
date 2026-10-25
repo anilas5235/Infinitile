@@ -4,6 +4,7 @@ using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Core;
+using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
 using Unity.Collections;
@@ -38,8 +39,18 @@ namespace Engine.Tests.EditMode{
             _fixture.Dispose();
         }
 
-        private void Use(GenArchitecture architecture, BlendMethod method, bool shippedSpecies = false){
+        private void Use(GenArchitecture architecture, BlendMethod method, bool shippedSpecies = false, bool dense = false){
             _biomes = shippedSpecies ? _fixture.ShippedSpeciesBiomes() : _fixture.DefaultBiomes();
+            if (dense){
+                // Every rule follows a density noise at full influence; the meadow's probabilities exceed 1 in groves.
+                _biomes[0].FloraRules[0].Probability = .7f;
+                foreach (Biome b in _biomes)
+                    for (int r = 0; r < b.FloraRules.Count; r++){
+                        b.FloraRules[r].DensityNoise = (FloraDensity)(r % 4);
+                        b.FloraRules[r].DensityInfluence = 1f;
+                    }
+            }
+
             WorldGenSettings s = _fixture.Settings(architecture, method, _biomes);
             _config = _fixture.GeneratorConfig(s);
         }
@@ -129,6 +140,19 @@ namespace Engine.Tests.EditMode{
             // Per-column decisions of PrepareChunkMaps and the stamped voxels of the job equal the pure region API,
             // chunk for chunk, over 4×4 chunks; with the fixture flora and with the shipped species set.
             Use(architecture, method, shippedSpecies);
+            AssertChunksMatchTheRegionApi();
+        }
+
+        [Test]
+        public void ChunkJob_DenseFloraMatchesTheRegionApi(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,
+            [Values(false, true)] bool shippedSpecies){
+            // The same with every rule on a density noise: per-column intervals and the widened pre-filter.
+            Use(architecture, BlendMethod.DistanceBlend, shippedSpecies, true);
+            AssertChunksMatchTheRegionApi();
+        }
+
+        private void AssertChunksMatchTheRegionApi(){
             int2 originChunk = new(1, 2), chunks = new(4, 4); // ~80 % land with shores in Terrain-first
             ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
             RegionSample region = reference.Region;

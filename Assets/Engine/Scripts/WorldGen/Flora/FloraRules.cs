@@ -30,6 +30,13 @@ namespace Engine.Scripts.WorldGen.Flora{
         [Tooltip("Minimum height of the top block's upper face above the water surface, in blocks (default 1).")]
         public int MinHeightAboveWater = 1;
 
+        [Tooltip("Density noise whose groves and clearings this rule follows (WorldGenSettings flora density).")]
+        public FloraDensity DensityNoise;
+
+        [Tooltip("How strongly the density noise modulates the probability: 0 = evenly spread, 1 = from none in clearings to twice the probability in groves. The long-run density stays the probability.")]
+        [Range(0f, 1f)]
+        public float DensityInfluence;
+
         [Tooltip("SpeciesVoxel only: the voxel is stacked this many blocks high at least (e.g. a cactus 1–3 high).")]
         [Min(1)]
         public int MinStackHeight = 1;
@@ -47,10 +54,23 @@ namespace Engine.Scripts.WorldGen.Flora{
     }
 
     /// <summary>
+    ///     The low-frequency density noises of the flora (<c>WorldGenSettings</c>): each rule follows one of them, so
+    ///     plants cluster into groves and patches instead of being spread like white noise.
+    /// </summary>
+    public enum FloraDensity{
+        Trees,
+        Undergrowth,
+        Flowers,
+        GroundDetails
+    }
+
+    /// <summary>
     ///     Burst mirror of a <see cref="FloraRule" />, stored flattened in <c>WorldGenConfig.FloraRules</c> and
     ///     addressed per biome by <c>BiomeDef.floraRuleStart/floraRuleCount</c>. The species roll picks the rule with
     ///     <see cref="CumulativeStart" /> ≤ u &lt; <see cref="CumulativeEnd" />; both bounds are computed once
-    ///     by the config builder, so the roll and the multi-block pre-filter compare against the same floats.
+    ///     by the config builder, so the roll and the multi-block pre-filter compare against the same floats. In a
+    ///     biome with density noise (<c>BiomeDef.floraDensity</c>) the intervals are computed per column from
+    ///     <see cref="Probability" /> instead (<see cref="FloraPlacement.RollRule" />).
     /// </summary>
     public struct FloraRuleDef{
         /// <summary>Species id (1-based index into the config's species table; 0 = none).</summary>
@@ -58,6 +78,15 @@ namespace Engine.Scripts.WorldGen.Flora{
 
         public float CumulativeStart;
         public float CumulativeEnd;
+
+        /// <summary>Probability per column p ≥ 0 before the density noise.</summary>
+        public float Probability;
+
+        /// <summary>Index of the density noise (<see cref="FloraDensity" />).</summary>
+        public byte DensityNoise;
+
+        /// <summary>Influence k of the density noise in [0, 1]; 0 when the noise is off.</summary>
+        public float Influence;
 
         /// <summary>1 when the plant needs surface source = flora source.</summary>
         public byte RequiresSurfaceFromSameBiome;

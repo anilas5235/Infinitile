@@ -1,6 +1,8 @@
+using System.Runtime.CompilerServices;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Core;
+using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Mathematics;
 
@@ -12,7 +14,11 @@ namespace Engine.Scripts.WorldGen.Flora{
     ///     over a padded grid instead of re-sampling neighbours, and gets the same answer.
     ///     <list type="number">
     ///         <item>Flora source biome: dithered pick from w_mat with <see cref="HashSalts.FloraBiome" />.</item>
-    ///         <item>Species: the rule whose cumulative interval holds Hash01(<see cref="HashSalts.FloraSpecies" />); none → no plant.</item>
+    ///         <item>
+    ///             Species: the rule whose cumulative interval holds Hash01(<see cref="HashSalts.FloraSpecies" />); none →
+    ///             no plant. A rule with a density noise has the probability p · lerp(1, m, k) at the column, with the
+    ///             noise factor m (<see cref="DensityFactor" />); when these sum above 1 they are scaled to a sum of 1.
+    ///         </item>
     ///         <item>
     ///             Conditions: same surface (optional), height above water, not clamped at Hmax, solid ground, and no
     ///             snow cover for single-block plants.
@@ -43,12 +49,15 @@ namespace Engine.Scripts.WorldGen.Flora{
 
             float u = Hash.Hash01(x, z, cfg.Seed, HashSalts.FloraSpecies);
             int rule = -1;
-            int end = def.floraRuleStart + def.floraRuleCount;
-            for (int r = def.floraRuleStart; r < end; r++){
-                FloraRuleDef candidate = cfg.FloraRules[r];
-                if (u >= candidate.CumulativeStart && u < candidate.CumulativeEnd){
-                    rule = r;
-                    break;
+            if (def.floraDensity != 0) rule = DenseRule(x, z, u, def, cfg);
+            else{
+                int end = def.floraRuleStart + def.floraRuleCount;
+                for (int r = def.floraRuleStart; r < end; r++){
+                    FloraRuleDef candidate = cfg.FloraRules[r];
+                    if (u >= candidate.CumulativeStart && u < candidate.CumulativeEnd){
+                        rule = r;
+                        break;
+                    }
                 }
             }
 
@@ -63,6 +72,51 @@ namespace Engine.Scripts.WorldGen.Flora{
 
             source = biome;
             return rule;
+        }
+
+        /// <summary>
+        ///     The rule of a biome with density noise whose interval holds <paramref name="u" />, or -1: the intervals
+        ///     follow from the column's probabilities p' = p · lerp(1, m, k), scaled to a sum of 1 when they exceed it.
+        ///     Each density noise is evaluated at most once. A separate method, so the even roll stays small.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static int DenseRule(int x, int z, float u, in Biome.BiomeDef def, in WorldGenConfig cfg){
+            int start = def.floraRuleStart, end = def.floraRuleStart + def.floraRuleCount;
+            float4 factor = 1f;
+            int evaluated = 0; // bit i: noise i is in factor
+            float total = 0f;
+            for (int r = start; r < end; r++){
+                FloraRuleDef d = cfg.FloraRules[r];
+                if (d.Influence > 0f && (evaluated & (1 << d.DensityNoise)) == 0){
+                    factor[d.DensityNoise] = DensityFactor(x, z, d.DensityNoise, cfg);
+                    evaluated |= 1 << d.DensityNoise;
+                }
+
+                total += ColumnProbability(d, factor);
+            }
+
+            float scale = total > 1f ? 1f / total : 1f;
+            float cumulative = 0f;
+            for (int r = start; r < end; r++){
+                cumulative += ColumnProbability(cfg.FloraRules[r], factor);
+                if (u < cumulative * scale) return r;
+            }
+
+            return -1;
+        }
+
+        private static float ColumnProbability(in FloraRuleDef d, float4 factor){
+            return d.Influence > 0f ? d.Probability * math.lerp(1f, factor[d.DensityNoise], d.Influence) : d.Probability;
+        }
+
+        /// <summary>
+        ///     Factor m of density noise <paramref name="noise" /> at the column: clamp(1 + c · D, 0, 2) for the simplex
+        ///     noise D in −1…1 and the noise's contrast c. Symmetric around 1, so its mean is 1 and the long-run density
+        ///     of a rule stays its probability.
+        /// </summary>
+        public static float DensityFactor(int x, int z, int noise, in WorldGenConfig cfg){
+            float d = SeededSimplex.Noise(new float2(x, z) / cfg.FloraDensityWavelength[noise], cfg.Seed, HashSalts.FloraDensity(noise));
+            return math.clamp(1f + cfg.FloraDensityContrast[noise] * d, 0f, 2f);
         }
 
         /// <summary>

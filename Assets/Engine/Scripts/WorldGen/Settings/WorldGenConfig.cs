@@ -100,6 +100,13 @@ namespace Engine.Scripts.WorldGen.Settings{
         public float StrataWarpAmplitude;
         public float StrataWarpWavelength;
 
+        // --- Flora density noises (FloraPlacement) ------------------------------------------------------------------
+        /// <summary>Wavelength in blocks of each flora density noise, indexed by <see cref="FloraDensity" />.</summary>
+        public float4 FloraDensityWavelength;
+
+        /// <summary>Contrast c of each density noise: its factor is clamp(1 + c · D, 0, 2) for the noise D in −1…1.</summary>
+        public float4 FloraDensityContrast;
+
         /// <summary>Climate noise instances (T, F, C, E, W) and couplings. Owned.</summary>
         public ClimateParams Climate;
 

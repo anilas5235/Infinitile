@@ -188,6 +188,39 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Min(0)]
         public int TreeSpacingRadius = 3;
 
+        [Header("Flora density")]
+        [Tooltip("Flora rules with a density influence cluster into groves and patches, with clearings between them. "
+                 + "Off: every rule is spread evenly.")]
+        public bool FloraDensityNoise = true;
+
+        [Tooltip("Wavelength of the Trees density noise in blocks: the size of groves and clearings.")]
+        public float TreesDensityWavelength = 96f;
+
+        [Tooltip("Contrast of the Trees density noise: higher values give denser groves and wider clearings.")]
+        [Min(0f)]
+        public float TreesDensityContrast = 2f;
+
+        [Tooltip("Wavelength of the Undergrowth density noise in blocks.")]
+        public float UndergrowthDensityWavelength = 48f;
+
+        [Tooltip("Contrast of the Undergrowth density noise.")]
+        [Min(0f)]
+        public float UndergrowthDensityContrast = 2f;
+
+        [Tooltip("Wavelength of the Flowers density noise in blocks.")]
+        public float FlowersDensityWavelength = 24f;
+
+        [Tooltip("Contrast of the Flowers density noise.")]
+        [Min(0f)]
+        public float FlowersDensityContrast = 2f;
+
+        [Tooltip("Wavelength of the Ground details density noise in blocks (rocks, boulders, mushrooms).")]
+        public float GroundDetailsDensityWavelength = 64f;
+
+        [Tooltip("Contrast of the Ground details density noise.")]
+        [Min(0f)]
+        public float GroundDetailsDensityContrast = 2f;
+
         [Header("Assets")]
         [Tooltip("Active biomes. Indices in jobs are indices into this set.")]
         public BiomeSet Biomes;
@@ -229,6 +262,12 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (!IsPositiveFinite(WarpWavelength)) yield return (nameof(WarpWavelength), WarpWavelength);
             if (!IsPositiveFinite(FreezeNoiseWavelength)) yield return (nameof(FreezeNoiseWavelength), FreezeNoiseWavelength);
             if (!IsPositiveFinite(StrataWarpWavelength)) yield return (nameof(StrataWarpWavelength), StrataWarpWavelength);
+            if (!IsPositiveFinite(TreesDensityWavelength)) yield return (nameof(TreesDensityWavelength), TreesDensityWavelength);
+            if (!IsPositiveFinite(UndergrowthDensityWavelength))
+                yield return (nameof(UndergrowthDensityWavelength), UndergrowthDensityWavelength);
+            if (!IsPositiveFinite(FlowersDensityWavelength)) yield return (nameof(FlowersDensityWavelength), FlowersDensityWavelength);
+            if (!IsPositiveFinite(GroundDetailsDensityWavelength))
+                yield return (nameof(GroundDetailsDensityWavelength), GroundDetailsDensityWavelength);
             // Not a divisor, but 0 flattens every climate field and a negative value mirrors the world.
             if (!IsPositiveFinite(ClimateFrequencyScale)) yield return (nameof(ClimateFrequencyScale), ClimateFrequencyScale);
 

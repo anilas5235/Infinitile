@@ -59,6 +59,15 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["StrataWarpAmplitude"] = s.StrataWarpAmplitude,
                 ["StrataWarpWavelength"] = s.StrataWarpWavelength,
                 ["TreeSpacingRadius"] = s.TreeSpacingRadius,
+                ["FloraDensityNoise"] = s.FloraDensityNoise,
+                ["TreesDensityWavelength"] = s.TreesDensityWavelength,
+                ["TreesDensityContrast"] = s.TreesDensityContrast,
+                ["UndergrowthDensityWavelength"] = s.UndergrowthDensityWavelength,
+                ["UndergrowthDensityContrast"] = s.UndergrowthDensityContrast,
+                ["FlowersDensityWavelength"] = s.FlowersDensityWavelength,
+                ["FlowersDensityContrast"] = s.FlowersDensityContrast,
+                ["GroundDetailsDensityWavelength"] = s.GroundDetailsDensityWavelength,
+                ["GroundDetailsDensityContrast"] = s.GroundDetailsDensityContrast,
                 ["Biomes"] = BiomeSetTree(s.Biomes),
                 ["Splines"] = s.Splines ? s.Splines.ToTree() : null
             };
@@ -107,6 +116,8 @@ namespace Engine.Scripts.WorldGen.Settings{
                         ["Probability"] = rule.Probability,
                         ["RequiresSurfaceFromSameBiome"] = rule.RequiresSurfaceFromSameBiome,
                         ["MinHeightAboveWater"] = rule.MinHeightAboveWater,
+                        ["DensityNoise"] = rule.DensityNoise.ToString(),
+                        ["DensityInfluence"] = rule.DensityInfluence,
                         ["MinStackHeight"] = rule.MinStackHeight,
                         ["MaxStackHeight"] = rule.MaxStackHeight
                     });

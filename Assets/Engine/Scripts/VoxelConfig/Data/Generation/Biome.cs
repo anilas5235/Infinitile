@@ -142,6 +142,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
             /// <summary>1 when the top block is solid ground that carries plants.</summary>
             public byte floraGround;
 
+            /// <summary>1 when a flora rule of the biome follows a density noise: its intervals are computed per column.</summary>
+            public byte floraDensity;
+
             public void Dispose(){ }
         }
     }
