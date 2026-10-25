@@ -17,7 +17,7 @@ namespace Engine.Tests.EditMode{
     ///     The chunk job's flora against the pure region API: heights, top block and flora of a 4×4-chunk area equal
     ///     <see cref="Engine.Scripts.WorldGen.Core.WorldGenApi.SampleRegion" /> in all 8 configurations
     ///     (2 architectures × 4 methods; Biome-first uses the method in both stages), trees that cross chunk borders
-    ///     are complete on both sides, every tree variant matches the whole-world stamp across chunk corners, snow,
+    ///     are complete on both sides, every test and shipped tree variant matches the whole-world stamp across chunk corners, snow,
     ///     strata and ice agree as well, and the same input gives the same output in any chunk order.
     /// </summary>
     public class FloraChunkTests{
@@ -293,6 +293,46 @@ namespace Engine.Tests.EditMode{
                 Assert.Greater(reference.Narrowed.Count, 0, "some wide trunk falls back to width 1");
                 Assert.Less(reference.Narrowed.Count, reference.Anchors.Count, "some wide trunk stands");
             }
+
+            Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
+            try{
+                List<string> report = new();
+                int mismatches = CompareVoxels(reference, chunkData, report);
+                Assert.AreEqual(0, mismatches, "chunk voxels differ from the whole-world stamp:\n" + string.Join("\n", report));
+            }
+            finally{
+                Release(results);
+            }
+        }
+
+        private static IEnumerable<string> ShippedVariants(){
+            return FloraFixture.ShippedVariantNames();
+        }
+
+        [Test]
+        public void ChunkJob_EveryShippedVariantMatchesTheWholeWorldStamp_AcrossChunkCorners(
+            [ValueSource(nameof(ShippedVariants))] string name,
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            // As above for each variant of the shipped species. Every tree with reach crosses a chunk border; small
+            // crowns rarely span a chunk corner, so four chunks are required from reach 4 on.
+            TreeSpecies single = _fixture.MakeTree("Single", _fixture.ShippedVariant(name));
+            _biomes = new[]{
+                _fixture.MakeBiome("Wood", .5f, 150f, 10f, _fixture.GrassSo, FloraFixture.Rule(single, .25f), FloraFixture.Rule(_fixture.TuftSo, .3f))
+            };
+            _config = _fixture.GeneratorConfig(_fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes));
+            int2 originChunk = new(1, 2), chunks = new(3, 3);
+            ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
+
+            int fourChunks = reference.Anchors.Count(a => a.footprint.Where(reference.InArea)
+                .Select(p => new int2((int)math.floor(p.x / (float)ChunkWidth), (int)math.floor(p.z / (float)ChunkDepth))).Distinct().Count() == 4);
+            int across = reference.Anchors.Count(a => a.footprint.Where(reference.InArea)
+                .Select(p => new int2((int)math.floor(p.x / (float)ChunkWidth), (int)math.floor(p.z / (float)ChunkDepth))).Distinct().Count() > 1);
+            int reach = _config.WorldGen.FloraReach;
+            TestContext.WriteLine($"{name} {architecture}: anchors {reference.Anchors.Count}, across a border {across}, " +
+                                  $"in four chunks {fourChunks}, reach {reach}");
+            Assert.Greater(reference.Anchors.Count, 20, "the area carries trees");
+            if (reach > 0) Assert.Greater(across, 0, "a tree crosses a chunk border");
+            if (reach >= 4) Assert.Greater(fourChunks, 0, "a tree falls into four chunks");
 
             Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
             try{

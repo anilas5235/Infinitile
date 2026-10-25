@@ -12,6 +12,7 @@ using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Collections;
 using Unity.Mathematics;
+using UnityEditor;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelConstants;
 using BlendWeights = Engine.Scripts.WorldGen.Blending.BlendWeights;
@@ -177,6 +178,32 @@ namespace Engine.Tests.EditMode{
                     BranchLeafRadius = new IntRange(1, 2), SpacingRadius = 3
                 }
             };
+        }
+
+        /// <summary>Folder of the shipped tree species.</summary>
+        internal const string ShippedTreesPath = "Assets/Engine/Resources/VoxelDataPackages/Standard/Trees";
+
+        /// <summary>Every variant of every shipped tree species, as "Species/index" (index into its variants).</summary>
+        internal static IEnumerable<string> ShippedVariantNames(){
+            foreach (string guid in AssetDatabase.FindAssets("t:TreeSpecies", new[]{ ShippedTreesPath }))
+            foreach (TreeSpecies species in AssetDatabase.LoadAllAssetsAtPath(AssetDatabase.GUIDToAssetPath(guid)).OfType<TreeSpecies>())
+                for (int i = 0; i < species.Variants.Count; i++)
+                    yield return $"{species.name}/{i}";
+        }
+
+        /// <summary>
+        ///     A copy of the shipped variant "Species/index" on this fixture's voxels: cactus trunks take the cactus,
+        ///     other trunks the log; spruce leaves take the needles, other leaves the leaves.
+        /// </summary>
+        internal TreeVariant ShippedVariant(string name){
+            string[] parts = name.Split('/');
+            TreeSpecies species = AssetDatabase.LoadAssetAtPath<TreeSpecies>($"{ShippedTreesPath}/{parts[0]}.asset");
+            TreeVariant source = species.Variants[int.Parse(parts[1])];
+            TreeVariant copy = JsonUtility.FromJson<TreeVariant>(JsonUtility.ToJson(source));
+            copy.TrunkVoxel = !source.TrunkVoxel ? null : source.TrunkVoxel.name == "Cactus" ? CactusSo : LogSo;
+            copy.LeafVoxel = !source.LeafVoxel ? null : source.LeafVoxel.name == "LeavesSpruce" ? NeedlesSo : LeavesSo;
+            copy.AltLeafVoxel = !source.AltLeafVoxel ? null : NeedlesSo;
+            return copy;
         }
 
         /// <summary>
