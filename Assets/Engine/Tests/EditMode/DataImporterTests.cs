@@ -193,7 +193,7 @@ namespace Engine.Tests.EditMode{
             WorldGenConfig cfg = ShippedConfig(out WorldGenSettings settings);
             try{
                 Assert.IsTrue(cfg.HasFlora);
-                Assert.AreEqual(4, cfg.FloraReach, "Oak Normal: crown r 3 + bump");
+                Assert.AreEqual(4, cfg.FloraReach, "Oak Normal: crown r 3 + bump, also branch 2 + cluster 1 + bump");
                 Assert.AreEqual(3, settings.TreeSpacingRadius);
                 Assert.AreEqual(3, cfg.FloraSpacingMax, "Oak Normal spacing");
                 Assert.AreEqual(7, cfg.FloraPadding, "reach + largest spacing radius");

@@ -46,8 +46,8 @@ MonoBehaviour:
     BranchBandMin: 0.5
     BranchBandMax: 0.9
     BranchLeafRadius:
-      Min: 0
-      Max: 0
+      Min: 1
+      Max: 1
     HoleChance: 0.2
     BumpChance: 0.1
     HangChance: 0.05
