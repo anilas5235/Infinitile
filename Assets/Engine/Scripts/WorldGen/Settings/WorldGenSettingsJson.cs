@@ -155,6 +155,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                             ["CrownHeight"] = Range(v.CrownHeight),
                             ["CrownBase"] = v.CrownBase,
                             ["CrownMinBase"] = v.CrownMinBase,
+                            ["BranchChance"] = v.BranchChance,
                             ["BranchCount"] = Range(v.BranchCount),
                             ["BranchStyle"] = v.BranchStyle.ToString(),
                             ["BranchLength"] = Range(v.BranchLength),

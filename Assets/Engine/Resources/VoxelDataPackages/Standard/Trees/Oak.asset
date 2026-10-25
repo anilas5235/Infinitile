@@ -35,8 +35,9 @@ MonoBehaviour:
       Max: 0
     CrownBase: 0
     CrownMinBase: 0
+    BranchChance: 0.3
     BranchCount:
-      Min: 0
+      Min: 1
       Max: 1
     BranchStyle: 0
     BranchLength:

@@ -37,7 +37,8 @@ in-chunk voxels only]
   - trunk: voxel, height range (0 for none), width 1 or 2, largest lean;
   - crown: shape (None, Round, Ellipsoid, Cone, Tiered), main and alternative leaf voxel, radius, top radius,
     height, `CrownBase` (lowest layer relative to the trunk top) and `CrownMinBase` (layers below are cut);
-  - branches: count, style (Diagonal, Arm), length, start band as a fraction of the trunk, tip cluster radius;
+  - branches: chance (a tree gets branches at all), count, style (Diagonal, Arm), length, start band as a fraction
+    of the trunk, tip cluster radius;
   - crown noise: hole, bump, hang and alternative-leaf chances;
   - its own spacing radius.
 
@@ -67,6 +68,8 @@ in-chunk voxels only]
   - Branches start next to the trunk voxel that faces their direction:
     - Diagonal branches step out and up in one of 8 directions;
     - Arm branches go one block out, then straight up.
+    - Both rise one layer per length step. With a crown, a branch starts at least so high that its tip reaches the
+      crown's lowest layer, so no bare stub sticks out below the crown.
   - Crown noise is a 3D hash (`Hash.Hash32(x, y, z, …)`) at each voxel's world position. It drops outer voxels
     (holes), adds one voxel outward (bumps) or below the lower edge (hangs), and picks the alternative leaf. Leaves
     right above the trunk top are never dropped. Because the hash is in world space, overlapping trees agree on

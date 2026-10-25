@@ -180,6 +180,39 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void Shapes_BranchesEndInTheCrown([Values(BranchStyle.Diagonal, BranchStyle.Arm)] BranchStyle style){
+            // One low branch per tree under a round crown that starts level with the trunk top.
+            TreeVariant variant = new(){
+                TrunkVoxel = _fixture.LogSo, LeafVoxel = _fixture.LeavesSo, TrunkHeight = new IntRange(4, 6), CrownShape = CrownShape.Round,
+                CrownRadius = new IntRange(2, 3), BranchCount = new IntRange(1, 1), BranchStyle = style, BranchLength = new IntRange(1, 2),
+                BranchBandMin = .2f, BranchBandMax = .5f, HoleChance = 0f, BumpChance = 0f, HangChance = 0f
+            };
+            TreeVariantDef v = Def(variant);
+            for (int s = 0; s < 200; s++){
+                int x = s * 37 - 3000, z = s * 53 + 211;
+                TreeRoll r = TreeShape.Roll(x, z, 7u, 0, v);
+                Dictionary<int3, ushort> voxels = Stamp(new int3(x, 100, z), r, v, 7u);
+                int tip = voxels.Where(kv => kv.Value == FloraFixture.Log && (kv.Key.x != 0 || kv.Key.z != 0)).Max(kv => kv.Key.y);
+                Assert.GreaterOrEqual(tip, r.TrunkHeight - 1, $"({x},{z}) trunk {r.TrunkHeight}: the branch ends below the crown");
+            }
+        }
+
+        [Test]
+        public void Roll_BranchChance_GivesBranchesToThatShareOfTrees(){
+            TreeVariant variant = new(){
+                TrunkVoxel = _fixture.LogSo, LeafVoxel = _fixture.LeavesSo, BranchChance = .3f, BranchCount = new IntRange(1, 1)
+            };
+            TreeVariantDef v = Def(variant);
+            const int n = 20000;
+            int branched = 0;
+            for (int i = 0; i < n; i++) branched += TreeShape.Roll(i % 200 - 100, i / 200, 5u, 0, v).BranchCount;
+            Assert.AreEqual(.3f, branched / (float)n, .015f);
+
+            variant.BranchChance = 0f;
+            Assert.AreEqual(int2.zero, Def(variant).BranchCount, "chance 0: no branches, no branch reach");
+        }
+
+        [Test]
         public void Roll_IsAPureFunctionOfTheAnchor_WithinTheRanges(){
             TreeVariantDef v = Def(_fixture.ShapeVariants()[1]);
             for (int i = 0; i < 100; i++){

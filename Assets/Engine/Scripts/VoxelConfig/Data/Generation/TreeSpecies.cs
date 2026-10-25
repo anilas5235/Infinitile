@@ -102,13 +102,16 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
         [Tooltip("Lowest crown layer in blocks above the ground (0 = the first voxel above the top block); layers below are cut.")]
         public int CrownMinBase;
 
-        [Header("Branches")] public IntRange BranchCount = new(0, 0);
+        [Header("Branches")] [Tooltip("Chance that a tree gets branches at all; Branch Count is rolled only then.")] [Range(0f, 1f)]
+        public float BranchChance = 1f;
+
+        public IntRange BranchCount = new(0, 0);
         public BranchStyle BranchStyle = BranchStyle.Diagonal;
 
         [Tooltip("Diagonal: steps up and out. Arm: blocks up after the first block out.")]
         public IntRange BranchLength = new(1, 2);
 
-        [Tooltip("Lowest start of a branch as a fraction of the trunk height.")]
+        [Tooltip("Lowest start of a branch as a fraction of the trunk height. With a crown, a branch starts at least so high that its tip reaches the crown.")]
         [Range(0f, 1f)]
         public float BranchBandMin = .5f;
 

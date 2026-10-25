@@ -45,6 +45,9 @@ namespace Engine.Scripts.WorldGen.Flora{
         public int CrownBase;
 
         public int CrownMinBase;
+        /// <summary>Chance that a tree gets branches at all, 0…1.</summary>
+        public float BranchChance;
+
         public int2 BranchCount;
         public BranchStyle Branches;
         public int2 BranchLength;
@@ -117,6 +120,7 @@ namespace Engine.Scripts.WorldGen.Flora{
         private const int RollCrownTopRadius = 4;
         private const int RollCrownHeight = 5;
         private const int RollBranchCount = 6;
+        private const int RollBranchChance = 7;
         private const int RollBranchBase = 8;
         private const int RollsPerBranch = 4;
 
@@ -139,7 +143,9 @@ namespace Engine.Scripts.WorldGen.Flora{
                 CrownRadius = RollRange(x, z, seed, RollCrownRadius, v.CrownRadius),
                 CrownTopRadius = RollRange(x, z, seed, RollCrownTopRadius, v.CrownTopRadius),
                 CrownHeight = RollRange(x, z, seed, RollCrownHeight, v.CrownHeight),
-                BranchCount = RollRange(x, z, seed, RollBranchCount, v.BranchCount)
+                BranchCount = Hash.Hash01(x, z, seed, HashSalts.TreeShape(RollBranchChance)) < v.BranchChance
+                    ? RollRange(x, z, seed, RollBranchCount, v.BranchCount)
+                    : 0
             };
             int maxLean = r.TrunkHeight * v.LeanPerMille / 1000;
             r.Lean = RollRange(x, z, seed, RollLean, new int2(0, maxLean));
@@ -235,6 +241,8 @@ namespace Engine.Scripts.WorldGen.Flora{
                 int2 dir = v.Branches == BranchStyle.Arm ? Direction4(dirHash) : Direction8(dirHash);
                 int length = RollRange(anchorBase.x, anchorBase.z, seed, salt + 2, v.BranchLength);
                 int cluster = RollRange(anchorBase.x, anchorBase.z, seed, salt + 3, v.ClusterRadius);
+                // Both styles rise one layer per length step, so the tip ends in the crown's lowest layer or higher.
+                if (hasCrown) startY = math.max(startY, crownBottom - length);
 
                 // Start on the trunk voxel that faces the branch direction.
                 int2 column = r.LeanDirection * RoundDiv(r.Lean * math.min(startY, rolledTop), rolledTop);
