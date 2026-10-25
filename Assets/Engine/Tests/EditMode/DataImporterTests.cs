@@ -193,21 +193,23 @@ namespace Engine.Tests.EditMode{
             WorldGenConfig cfg = ShippedConfig(out WorldGenSettings settings);
             try{
                 Assert.IsTrue(cfg.HasFlora);
-                Assert.AreEqual(4, cfg.FloraReach, "Oak Normal: crown r 3 + bump, also branch 2 + cluster 1 + bump");
+                Assert.AreEqual(6, cfg.FloraReach, "Oak Big: branch 3 + cluster 2 + bump");
                 Assert.AreEqual(3, settings.TreeSpacingRadius);
-                Assert.AreEqual(3, cfg.FloraSpacingMax, "Oak Normal spacing");
-                Assert.AreEqual(7, cfg.FloraPadding, "reach + largest spacing radius");
+                Assert.AreEqual(5, cfg.FloraSpacingMax, "Oak Big spacing");
+                Assert.AreEqual(11, cfg.FloraPadding, "reach + largest spacing radius");
                 for (int i = 0; i < cfg.FloraRules.Length; i++){
                     FloraRuleDef d = cfg.FloraRules[i];
                     Assert.AreNotEqual(0, d.Species);
                     if (d.Structure < 0 && d.Tree < 0) Assert.AreNotEqual(0, d.Voxel, $"rule {i}: voxel id");
                 }
 
-                Assert.Greater(cfg.TreeVariants.Length, 0, "Oak");
+                Assert.AreEqual(6, cfg.TreeSpecies.Length, "Oak, Birch, Bush, Spruce, DeadTree, Cactus");
                 for (int i = 0; i < cfg.TreeVariants.Length; i++){
-                    Assert.AreNotEqual(0, cfg.TreeVariants[i].TrunkVoxel, $"variant {i}: trunk voxel");
-                    Assert.AreNotEqual(0, cfg.TreeVariants[i].LeafVoxel, $"variant {i}: leaf voxel");
-                    Assert.AreEqual(FloraVoxelClass.Leaves, cfg.TreeVariants[i].LeafClass, $"variant {i}: leaf class");
+                    TreeVariantDef v = cfg.TreeVariants[i];
+                    if (v.TrunkHeight.y > 0) Assert.AreNotEqual(0, v.TrunkVoxel, $"variant {i}: trunk voxel");
+                    if (v.Crown == CrownShape.None && v.ClusterRadius.y == 0) continue;
+                    Assert.AreNotEqual(0, v.LeafVoxel, $"variant {i}: leaf voxel");
+                    Assert.AreEqual(FloraVoxelClass.Leaves, v.LeafClass, $"variant {i}: leaf class");
                 }
 
                 for (int i = 0; i < cfg.FloraVoxels.Length; i++) Assert.AreNotEqual(0, cfg.FloraVoxels[i].Voxel, $"structure voxel {i}");
@@ -216,6 +218,8 @@ namespace Engine.Tests.EditMode{
                 Assert.AreEqual(FloraVoxelClass.Leaves, cfg.VoxelClassOf(Id("std:Leaves")));
                 Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:LogOak")));
                 Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:Cactus")));
+                Assert.AreEqual(FloraVoxelClass.Leaves, cfg.VoxelClassOf(Id("std:LeavesSpruce")));
+                Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:LogSpruce")));
                 Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:Water")), "water is never overwritten");
             }
             finally{
@@ -268,6 +272,43 @@ namespace Engine.Tests.EditMode{
             finally{
                 buffers.SurfaceSource.Dispose();
                 buffers.FloraSource.Dispose();
+                cfg.Dispose();
+            }
+        }
+
+        [Test]
+        public void ShippedWorldGenSettings_EveryTreeSpeciesGrowsWithEveryVariant(){
+            // The same 4096² area at stride 8: every shipped tree species is planted somewhere, and its anchors pick
+            // every one of its variants.
+            LoadPackages();
+            WorldGenConfig cfg = ShippedConfig(out WorldGenSettings settings);
+            const int n = 512;
+            RegionBuffers buffers = new(){ FloraSpecies = new NativeArray<ushort>(n * n, Allocator.TempJob) };
+            try{
+                WorldGenRequest request = new(){ Config = cfg, Origin = new int2(-2048, -2048), Size = new int2(n, n), Stride = 8 };
+                WorldGenApi.SampleRegion(request, ref buffers).Complete();
+                Dictionary<int, int> treeOf = new();
+                for (int i = 0; i < cfg.FloraRules.Length; i++)
+                    if (cfg.FloraRules[i].Tree >= 0) treeOf[cfg.FloraRules[i].Species] = cfg.FloraRules[i].Tree;
+
+                int[] picks = new int[cfg.TreeVariants.Length];
+                for (int i = 0; i < n * n; i++){
+                    if (!treeOf.TryGetValue(buffers.FloraSpecies[i], out int tree)) continue;
+                    int x = request.Origin.x + i % n * request.Stride, z = request.Origin.y + i / n * request.Stride;
+                    picks[TreeShape.PickVariant(x, z, cfg, tree)]++;
+                }
+
+                string[] names = settings.FloraSpeciesNames();
+                string summary = string.Join(", ", treeOf.Select(kv => {
+                    TreeSpeciesDef s = cfg.TreeSpecies[kv.Value];
+                    return $"{names[kv.Key]}: " + string.Join("/", Enumerable.Range(s.VariantStart, s.VariantCount).Select(v => picks[v]));
+                }));
+                TestContext.WriteLine(summary);
+                Assert.AreEqual(cfg.TreeSpecies.Length, treeOf.Count, "every tree species has a rule");
+                for (int v = 0; v < picks.Length; v++) Assert.Greater(picks[v], 0, $"variant {v} never grows ({summary})");
+            }
+            finally{
+                buffers.FloraSpecies.Dispose();
                 cfg.Dispose();
             }
         }
