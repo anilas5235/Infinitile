@@ -220,6 +220,7 @@ namespace Engine.Tests.EditMode{
                 Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:Cactus")));
                 Assert.AreEqual(FloraVoxelClass.Leaves, cfg.VoxelClassOf(Id("std:LeavesSpruce")));
                 Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:LogSpruce")));
+                Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:DeadBush")));
                 Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:Water")), "water is never overwritten");
             }
             finally{

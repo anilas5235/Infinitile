@@ -38,7 +38,15 @@ MonoBehaviour:
   - SpeciesVoxel: {fileID: 11400000, guid: adeb115a333554e4199040f2126c76cc, type: 2}
     SpeciesStructure: {fileID: 0}
     SpeciesTree: {fileID: 0}
-    Probability: 0.03
+    Probability: 0.02
+    RequiresSurfaceFromSameBiome: 0
+    MinHeightAboveWater: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 11400000, guid: 7d70a9befae6460eb69514c9661cc35f, type: 2}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 0}
+    Probability: 0.01
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
     MinStackHeight: 1
