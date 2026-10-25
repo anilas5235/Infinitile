@@ -416,8 +416,8 @@ Same machine and settings as above. Phase G2 replaces the fixed tree with tree s
 radius per variant (two candidates conflict when their distance is at most the larger radius), the flat-footprint
 test of wide and leaning trunks, and crown noise from a 3D hash. The flora decisions moved out of `PrepareChunkMaps`
 into their own pass (`DecideFlora`, not inlined), as the G1 entry requires. No new rows: the benchmark flora still
-uses the placeholder tree structure, so the rows measure the new decision code, not the bigger Oak crowns (the
-species-set rows come with PERF-10).
+uses the placeholder tree structure, so the rows measure the new decision code, not the bigger Oak crowns (rows
+with a species set are still to come).
 
 | Sample group | Median | Min | Max | vs previous (median / min) |
 |---|---|---|---|---|

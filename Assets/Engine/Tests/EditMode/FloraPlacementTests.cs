@@ -443,6 +443,20 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void Config_TreeVariantsWithWeightZeroAtTheEnd_AreNeverPicked(){
+            TreeVariant a = new(){ TrunkVoxel = _fixture.LogSo, LeafVoxel = _fixture.LeavesSo, Weight = 1f };
+            TreeVariant b = new(){ TrunkVoxel = _fixture.LogSo, LeafVoxel = _fixture.LeavesSo, Weight = 2f };
+            TreeVariant zero = new(){ TrunkVoxel = _fixture.LogSo, LeafVoxel = _fixture.LeavesSo, Weight = 0f };
+            Biome biome = _fixture.MakeBiome("B", .5f, 150f, 2f, _fixture.GrassSo, FloraFixture.Rule(_fixture.MakeTree("Tail", a, b, zero, zero), .1f));
+            Use(GenArchitecture.BiomeFirst, BlendMethod.None, biome);
+            Assert.AreEqual(1f / 3f, _cfg.TreeVariants[0].CumulativeEnd, 1e-6f);
+            Assert.AreEqual(1f, _cfg.TreeVariants[1].CumulativeEnd, "the last weighted variant closes the interval");
+            for (int x = 0; x < 256; x++)
+            for (int z = 0; z < 256; z++)
+                Assert.Less(TreeShape.PickVariant(x, z, _cfg, 0), 2);
+        }
+
+        [Test]
         public void Config_TreeWithoutVariants_IsSkipped(){
             Biome b = _fixture.MakeBiome("B", .5f, 150f, 2f, _fixture.GrassSo, FloraFixture.Rule(_fixture.MakeTree("Empty"), .1f),
                 FloraFixture.Rule(_fixture.TuftSo, .2f));

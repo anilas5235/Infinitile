@@ -169,14 +169,19 @@ namespace Engine.Scripts.WorldGen.Flora{
             Dictionary<ushort, byte> classes, Object owner, bool warn = true){
             TreeSpeciesDef def = new(){ VariantStart = variants.Count, VariantCount = species.Variants.Count };
             float total = 0f;
-            foreach (TreeVariant v in species.Variants) total += v == null ? 0f : math.max(v.Weight, 0f);
+            int lastWeighted = species.Variants.Count - 1; // from here on the bound is 1, so rounding never picks a weight-0 tail
+            for (int i = 0; i < species.Variants.Count; i++){
+                float w = species.Variants[i] == null ? 0f : math.max(species.Variants[i].Weight, 0f);
+                total += w;
+                if (w > 0f) lastWeighted = i;
+            }
 
             float cumulative = 0f;
             for (int i = 0; i < species.Variants.Count; i++){
                 TreeVariant v = species.Variants[i] ?? new TreeVariant{ Weight = 0f };
                 cumulative += total > 0f ? math.max(v.Weight, 0f) / total : 1f / species.Variants.Count;
                 TreeVariantDef d = new(){
-                    CumulativeEnd = i == species.Variants.Count - 1 ? 1f : cumulative,
+                    CumulativeEnd = i >= lastWeighted ? 1f : cumulative,
                     TrunkHeight = Range(v.TrunkHeight),
                     TrunkWidth = math.clamp(v.TrunkWidth, 1, 2),
                     LeanPerMille = (int)math.round(math.clamp(v.MaxLean, 0f, .25f) * 1000f),

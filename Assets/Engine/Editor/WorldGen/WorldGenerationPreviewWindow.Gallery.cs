@@ -103,7 +103,7 @@ namespace Engine.Editor.WorldGen{
         private void DrawGalleryTexture(Texture2D texture){
             if (!texture) return;
             float available = position.width * .26f - 40f; // the left column, less the scroll bar and padding
-            float scale = Mathf.Min(GalleryPixelsPerVoxel, available / texture.width);
+            float scale = Mathf.Clamp(available / texture.width, 1f, GalleryPixelsPerVoxel);
             Rect rect = GUILayoutUtility.GetRect(texture.width * scale, texture.height * scale, GUILayout.ExpandWidth(false));
             GUI.DrawTexture(rect, texture, ScaleMode.ScaleToFit, false);
         }

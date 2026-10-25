@@ -96,8 +96,8 @@ in-chunk voxels only]
   - `HashAndSimplexTests`: the 3D hash avalanches, is uniform and does not correlate along an axis.
   - `FloraPlacementTests`, `DataImporterTests`: tree tables, reach, spacing and padding; the shipped Oak.
   - `TreeGalleryTests`: one row per variant, view sizes from the reach, the narrow option.
-- **Performance**: no new rows; the benchmark flora still uses the placeholder structure. See the 2026-10-24 G2
-  entry in `Tests/Performance/Baselines/README.md`.
+- **Performance**: no new rows; the benchmark flora still uses the placeholder structure. See the 2026-10-24
+  parametric trees entry in `Tests/Performance/Baselines/README.md`.
 
 ### Ownership of native memory
 
