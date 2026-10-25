@@ -5,7 +5,7 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Core{
     /// <summary>
-    ///     Snow, ice and strata of a column, pure functions of the world position. The effective temperature falls with
+    ///     Snow, ice, strata and beaches of a column, pure functions of the world position. The effective temperature falls with
     ///     the height above the water and carries a little noise, so snow lines and ice edges are ragged. Dry columns and
     ///     the water surface share the freeze temperature, so snow on a shore meets the ice.
     /// </summary>
@@ -68,6 +68,29 @@ namespace Engine.Scripts.WorldGen.Core{
 
         private static bool MayBeSnowCovered(int height, in Biome.BiomeDef def, in WorldGenConfig cfg){
             return cfg.EnableClimateOverrides && def.snowTopBlock != 0 && height + 1 >= cfg.WaterLevel;
+        }
+
+        /// <summary>
+        ///     The dry column (top block at <paramref name="height" />) is a beach of its surface biome
+        ///     <paramref name="def" />: its top block lies 0 … h_b − 1 blocks above the water surface (y = WaterLevel − 1)
+        ///     for the column's <see cref="BeachHeight" /> h_b. The height band is tested first, so most columns skip
+        ///     the noise.
+        /// </summary>
+        public static bool IsBeach(int x, int z, int height, in Biome.BiomeDef def, in WorldGenConfig cfg){
+            int above = height - (cfg.WaterLevel - 1);
+            if (above < 0 || above >= def.beachHeight) return false;
+            return above < BeachHeight(x, z, def.beachHeight, cfg);
+        }
+
+        /// <summary>
+        ///     Beach height h_b = round(h_b,max · s(B)) of the column: s rises smoothly from 0 at the beach threshold to 1
+        ///     a ramp above it, for the beach noise B mapped to 0…1. Shores where B stays below the threshold have no
+        ///     beach.
+        /// </summary>
+        public static int BeachHeight(int x, int z, int maxHeight, in WorldGenConfig cfg){
+            float b = .5f + .5f * SeededSimplex.Noise(new float2(x, z) / cfg.BeachWavelength, cfg.Seed, HashSalts.BeachNoise);
+            float s = math.smoothstep(cfg.BeachThreshold, cfg.BeachThreshold + cfg.BeachRamp, b);
+            return (int)math.round(maxHeight * s);
         }
 
         /// <summary>Vertical shift of the strata bands at the column, in whole blocks.</summary>

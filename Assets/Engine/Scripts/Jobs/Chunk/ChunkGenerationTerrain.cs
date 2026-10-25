@@ -209,8 +209,8 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
-        ///     Snow top block, strata shift and frozen water surface of every chunk column, from the sampled temperature,
-        ///     height and surface biome. Called after <see cref="PrepareChunkMaps(ref GeneratorConfig,ref int3,NativeArray{ChunkColumn},ref FloraGrid)" />
+        ///     Beach and snow top blocks, strata shift and frozen water surface of every chunk column, from the sampled
+        ///     temperature, height and surface biome. Called after <see cref="PrepareChunkMaps(ref GeneratorConfig,ref int3,NativeArray{ChunkColumn},ref FloraGrid)" />
         ///     rather than from it: inside it, even as a separate loop, this code made Burst compile the sampling slower
         ///     (Terrain-first DistanceBlend about a third slower).
         /// </summary>
@@ -226,6 +226,12 @@ namespace Engine.Scripts.Jobs.Chunk{
                 float freezeNoise = cfg.EnableClimateOverrides ? SurfaceCover.FreezeNoise(wx, wz, cfg) : 0f;
                 if (col.SurfaceSource >= 0 && col.SurfaceSource < cfg.BiomeCount){
                     Biome.BiomeDef def = cfg.Biomes[col.SurfaceSource];
+                    // Snow covers a beach like any dry column; the beach block stays under it.
+                    if (def.beachBlock != 0 && SurfaceCover.IsBeach(wx, wz, col.Height, def, cfg)){
+                        col.TopBlock = def.beachBlock;
+                        col.BeachBlock = def.beachBlock;
+                    }
+
                     if (SurfaceCover.IsSnowCovered(col.Temperature, col.Height, freezeNoise, def, cfg))
                         col.TopBlock = def.snowTopBlock;
                     if (def.strataBlock != 0) col.StrataShift = SurfaceCover.StrataShift(wx, wz, cfg);
@@ -271,6 +277,8 @@ namespace Engine.Scripts.Jobs.Chunk{
                 ushort st = col.StoneBlock;
                 ushort under = col.UnderBlock;
                 ushort top = col.TopBlock;
+                // A beach replaces the two blocks under the top as well.
+                ushort upperUnder = col.BeachBlock != 0 ? col.BeachBlock : under;
 
                 int gy = col.Height;
                 bool strata = col.StrataBlock != 0 && strataPeriod > 0 && strataThickness > 0;
@@ -278,7 +286,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                 for (int y = 0; y < ChunkHeight; y++){
                     ushort v;
                     if (y < gy - 4) v = st;
-                    else if (y < gy) v = under;
+                    else if (y < gy) v = y >= gy - 2 ? upperUnder : under;
                     // The column's top block sits at h_int; under water it is already the biome's underwater block.
                     else if (y == gy) v = top;
                     else v = y < waterLevel ? waterBlock : air;

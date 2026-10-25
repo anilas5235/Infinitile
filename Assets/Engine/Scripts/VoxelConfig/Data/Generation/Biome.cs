@@ -29,6 +29,14 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
         [Tooltip("Replaces the stone block in horizontal bands (WorldGenSettings strata). Empty: uniform stone.")]
         [SerializeField] public Voxel.Voxel StrataBlock;
 
+        [Tooltip("Top block of beach columns just above the water surface, and the two blocks under it. Beaches are "
+                 + "patchy (WorldGenSettings beaches). Empty: the biome has no beaches.")]
+        [SerializeField] public Voxel.Voxel BeachBlock;
+
+        [Tooltip("Largest beach height in blocks: a beach covers columns whose top block lies up to this many blocks "
+                 + "above the water surface, minus one; the beach noise scales it down per column.")]
+        [Min(0)] [SerializeField] public int BeachHeight = 3;
+
         // --- Classification target ------------------------------------------------------------------------------------
 
         [Range(0f, 1f)] [SerializeField] public float TargetHumidity = 0.5f;
@@ -83,6 +91,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
             def.stoneBlock = voxelId(StoneBlock);
             def.snowTopBlock = SnowTopBlock ? voxelId(SnowTopBlock) : (ushort)0;
             def.strataBlock = StrataBlock ? voxelId(StrataBlock) : (ushort)0;
+            def.beachBlock = BeachBlock ? voxelId(BeachBlock) : (ushort)0;
             return def;
         }
 
@@ -101,7 +110,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                 floraRuleStart = 0,
                 floraRuleCount = 0,
                 // Plants need solid ground; the mesh layer of the top block decides, no registry needed.
-                floraGround = TopBlock && TopBlock.meshLayer == Mesh.MeshLayer.Solid ? (byte)1 : (byte)0
+                floraGround = TopBlock && TopBlock.meshLayer == Mesh.MeshLayer.Solid ? (byte)1 : (byte)0,
+                beachHeight = BeachBlock ? (byte)Mathf.Clamp(BeachHeight, 0, 255) : (byte)0,
+                beachFloraGround = BeachBlock && BeachBlock.meshLayer == Mesh.MeshLayer.Solid ? (byte)1 : (byte)0
             };
         }
 
@@ -123,6 +134,15 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
             /// <summary>Block of the strata bands in the stone; 0 = uniform stone.</summary>
             public ushort strataBlock;
+
+            /// <summary>Top block of a beach column and the two blocks under it; 0 without a registry.</summary>
+            public ushort beachBlock;
+
+            /// <summary>Largest beach height h_b,max in blocks; 0 = the biome has no beaches.</summary>
+            public byte beachHeight;
+
+            /// <summary>1 when the beach block is solid ground that carries plants.</summary>
+            public byte beachFloraGround;
 
             public float targetHumidity;
             public float targetTemperature;

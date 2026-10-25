@@ -434,13 +434,16 @@ namespace Engine.Tests.EditMode{
                 // columns take the snow block.
                 Voxel wet = b && b.UnderwaterTopBlock ? b.UnderwaterTopBlock : b ? b.UnderBlock : null;
                 ushort top = b ? fixture.Ids[h + 1 < waterLevel ? wet : b.TopBlock] : (ushort)0;
+                bool beach = b && b.BeachBlock && SurfaceCover.IsBeach(wx, wz, h, def, cfg);
+                if (beach) top = fixture.Ids[b.BeachBlock];
                 if (b && SurfaceCover.IsSnowCovered(wx, wz, t, h, def, cfg)) top = def.snowTopBlock;
                 ushort under = b ? fixture.Ids[b.UnderBlock] : (ushort)0;
+                ushort beachUnder = beach ? fixture.Ids[b.BeachBlock] : under;
                 ushort stone = b ? fixture.Ids[b.StoneBlock] : (ushort)0;
                 int shift = SurfaceCover.StrataShift(wx, wz, cfg);
                 bool frozen = SurfaceCover.WaterFreezes(wx, wz, t, cfg);
                 for (int y = 0; y < ChunkHeight; y++){
-                    ushort v = y < h - 4 ? stone : y < h ? under : y == h ? top : y < waterLevel ? TestFixtures.Water : TestFixtures.Air;
+                    ushort v = y < h - 4 ? stone : y < h - 2 ? under : y < h ? beachUnder : y == h ? top : y < waterLevel ? TestFixtures.Water : TestFixtures.Air;
                     if (v == stone && def.strataBlock != 0 && SurfaceCover.InStrataBand(y, shift, cfg.StrataPeriod, cfg.StrataThickness))
                         v = def.strataBlock;
                     if (frozen && y == waterLevel - 1 && v == TestFixtures.Water) v = TestFixtures.Ice;

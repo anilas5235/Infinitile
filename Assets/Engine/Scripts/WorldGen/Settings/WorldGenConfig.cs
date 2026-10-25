@@ -90,7 +90,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// <summary>Run the snow and ice overrides after terrain fill.</summary>
         [MarshalAs(UnmanagedType.U1)] public bool EnableClimateOverrides; // blittable for the Burst direct calls
 
-        // --- Snow, ice and strata (SurfaceCover) ------------------------------------------------------------------
+        // --- Snow, ice, strata and beaches (SurfaceCover) ----------------------------------------------------------
         public float FreezeTemperature;
         public float SnowLapse;
         public float FreezeNoiseAmplitude;
@@ -99,6 +99,15 @@ namespace Engine.Scripts.WorldGen.Settings{
         public int StrataThickness;
         public float StrataWarpAmplitude;
         public float StrataWarpWavelength;
+
+        /// <summary>Wavelength of the beach noise in blocks.</summary>
+        public float BeachWavelength;
+
+        /// <summary>Beach noise value (0…1) below which a shore has no beach.</summary>
+        public float BeachThreshold;
+
+        /// <summary>Rise of the beach noise above the threshold to the full beach height; positive.</summary>
+        public float BeachRamp;
 
         // --- Flora density noises (FloraPlacement) ------------------------------------------------------------------
         /// <summary>Wavelength in blocks of each flora density noise, indexed by <see cref="FloraDensity" />.</summary>

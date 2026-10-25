@@ -20,8 +20,8 @@ namespace Engine.Scripts.WorldGen.Flora{
     ///             noise factor m (<see cref="DensityFactor" />); when these sum above 1 they are scaled to a sum of 1.
     ///         </item>
     ///         <item>
-    ///             Conditions: same surface (optional), height above water, not clamped at Hmax, solid ground, and no
-    ///             snow cover for single-block plants.
+    ///             Conditions: same surface (optional), height above water, not clamped at Hmax, solid ground, beach
+    ///             columns for beach-ground rules only, and no snow cover for single-block plants.
     ///         </item>
     ///         <item>
     ///             Multi-block species only: every candidate has a spacing radius (a tree's from its variant, rolled
@@ -66,6 +66,8 @@ namespace Engine.Scripts.WorldGen.Flora{
             // Optionally only on ground of the same biome.
             if (d.RequiresSurfaceFromSameBiome != 0 && s.SurfaceSource != biome) return -1;
             if (!GroundAllows(s, d.MinHeightAboveWater, cfg)) return -1;
+            // Beach columns carry only beach-ground rules, and those grow nowhere else.
+            if ((cfg.Biomes[s.SurfaceSource].beachHeight | d.BeachGround) != 0 && !BeachAllows(x, z, d.BeachGround, s, cfg)) return -1;
             // Snow keeps trees and cacti but carries no ground plants.
             if (d.MultiBlock == 0 &&
                 SurfaceCover.IsSnowCovered(x, z, s.Fields.T, s.ColumnHeight, cfg.Biomes[s.SurfaceSource], cfg)) return -1;
@@ -103,6 +105,18 @@ namespace Engine.Scripts.WorldGen.Flora{
             }
 
             return -1;
+        }
+
+        /// <summary>
+        ///     A rule with <paramref name="beachGround" /> passes on beach columns (<see cref="SurfaceCover.IsBeach" />)
+        ///     whose beach block carries plants, other rules only off the beach. A separate method, so the roll stays small.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static bool BeachAllows(int x, int z, byte beachGround, in ColumnSample s, in WorldGenConfig cfg){
+            Biome.BiomeDef def = cfg.Biomes[s.SurfaceSource];
+            bool beach = SurfaceCover.IsBeach(x, z, s.ColumnHeight, def, cfg);
+            if (beachGround == 0) return !beach;
+            return beach && def.beachFloraGround != 0;
         }
 
         private static float ColumnProbability(in FloraRuleDef d, float4 factor){

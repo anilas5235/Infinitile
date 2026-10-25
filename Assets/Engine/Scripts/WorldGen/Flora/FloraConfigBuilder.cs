@@ -85,6 +85,7 @@ namespace Engine.Scripts.WorldGen.Flora{
                             DensityNoise = (byte)math.clamp((int)rule.DensityNoise, 0, 3),
                             Influence = densityNoise ? math.saturate(rule.DensityInfluence) : 0f,
                             RequiresSurfaceFromSameBiome = rule.RequiresSurfaceFromSameBiome ? (byte)1 : (byte)0,
+                            BeachGround = rule.RequiresBeachGround ? (byte)1 : (byte)0,
                             MultiBlock = rule.IsMultiBlock ? (byte)1 : (byte)0,
                             MinHeightAboveWater = rule.MinHeightAboveWater,
                             Structure = -1,

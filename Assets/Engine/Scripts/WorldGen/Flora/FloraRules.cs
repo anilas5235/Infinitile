@@ -27,6 +27,9 @@ namespace Engine.Scripts.WorldGen.Flora{
         [Tooltip("When true, the plant is suppressed if the column's surface source biome differs from its flora source biome.")]
         public bool RequiresSurfaceFromSameBiome;
 
+        [Tooltip("When true, the plant grows only on beach columns; rules without it never grow there.")]
+        public bool RequiresBeachGround;
+
         [Tooltip("Minimum height of the top block's upper face above the water surface, in blocks (default 1).")]
         public int MinHeightAboveWater = 1;
 
@@ -90,6 +93,9 @@ namespace Engine.Scripts.WorldGen.Flora{
 
         /// <summary>1 when the plant needs surface source = flora source.</summary>
         public byte RequiresSurfaceFromSameBiome;
+
+        /// <summary>1 when the plant grows only on beach columns; 0 when it never does.</summary>
+        public byte BeachGround;
 
         /// <summary>1 for trees, structures and stacks above one block: anchor spacing applies.</summary>
         public byte MultiBlock;

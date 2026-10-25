@@ -183,6 +183,18 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Tooltip("Wavelength of that rise and fall in blocks.")]
         public float StrataWarpWavelength = 64f;
 
+        [Header("Beaches")]
+        [Tooltip("Wavelength of the beach noise in blocks: the length of beach and beachless stretches along a shore.")]
+        public float BeachWavelength = 128f;
+
+        [Tooltip("Beach noise value (0…1) below which a shore has no beach; about half of the shores at 0.45.")]
+        [Range(0f, 1f)]
+        public float BeachThreshold = .45f;
+
+        [Tooltip("How far the beach noise rises above the threshold until a beach reaches the biome's full beach height.")]
+        [Range(.01f, 1f)]
+        public float BeachRamp = .15f;
+
         [Header("Vegetation")]
         [Tooltip("r_tree: anchors of multi-block flora (trees, cacti) are at least this many blocks apart (default 3).")]
         [Min(0)]
@@ -262,6 +274,7 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (!IsPositiveFinite(WarpWavelength)) yield return (nameof(WarpWavelength), WarpWavelength);
             if (!IsPositiveFinite(FreezeNoiseWavelength)) yield return (nameof(FreezeNoiseWavelength), FreezeNoiseWavelength);
             if (!IsPositiveFinite(StrataWarpWavelength)) yield return (nameof(StrataWarpWavelength), StrataWarpWavelength);
+            if (!IsPositiveFinite(BeachWavelength)) yield return (nameof(BeachWavelength), BeachWavelength);
             if (!IsPositiveFinite(TreesDensityWavelength)) yield return (nameof(TreesDensityWavelength), TreesDensityWavelength);
             if (!IsPositiveFinite(UndergrowthDensityWavelength))
                 yield return (nameof(UndergrowthDensityWavelength), UndergrowthDensityWavelength);
