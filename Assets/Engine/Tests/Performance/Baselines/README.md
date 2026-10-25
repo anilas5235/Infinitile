@@ -433,6 +433,23 @@ made it worse: a local blend cache instead of a reference into the flora grid, a
 `DecideFlora`. `LightJob` code is unchanged in G2; the G1 code measured back to back showed the same +8–10 % on
 natural terrain, so that row is drift of the machine or Editor state.
 
+## 2026-10-25 — groves, ground details and beaches (`2026-10-25-phaseG4-editmode-baseline.json`)
+
+Same machine and settings as above. Phase G4 adds the flora density noises (a dense rule rolls in its own
+non-inlined pass, so `PrepareChunkMaps` keeps its code size), sunk and lying tree variants, and beaches with a
+water-distance test (water probed every 4 blocks with the pure terrain height, memoised per chunk on the blend
+cache). The benchmark worlds have no beaches, so the existing rows measure only the changed code shape. Two new rows
+give every placeholder biome a beach (height 3) on the DistanceBlend flora world:
+
+| Sample group | Median | Min | Max | vs `DistanceBlend flora` (median) |
+|---|---|---|---|---|
+| ChunkJob.Run TerrainFirst DistanceBlend beaches ms/chunk | 4.98 ms | 4.92 ms | 5.52 ms | +5 % |
+| ChunkJob.Run BiomeFirst DistanceBlend beaches ms/chunk | 2.77 ms | 2.74 ms | 2.95 ms | −1 % |
+
+Regression check, every row vs the previous baseline: within 10 %. `ChunkJob` rows are between −6 % and +5 %
+(median); the largest, `TerrainFirst ParameterSpaceWeighting` +5 %, read −1 % in a `ChunkGenerationBenchmark`-only run
+just before, so it is noise. `LightJob`, meshing and allocator rows are between −9 % and +3 %.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the
