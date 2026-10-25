@@ -166,6 +166,31 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void PreFilter_PassesOnlyTheColumnIntervals(){
+            // A dense ground plant before a dense tree: the tree's interval moves with the plant's noise, but the
+            // pre-filter passes only columns whose own roll can pick the tree, not the whole range it can move over.
+            Biome flat = Flat(Dense(FloraFixture.Rule(_fixture.TuftSo, .4f), FloraDensity.Undergrowth),
+                Dense(FloraFixture.Rule(_fixture.Tree, .01f), FloraDensity.Trees));
+            _cfg = _fixture.ToConfig(Settings(flat));
+            BlendCache noCache = default;
+            int passed = 0, candidates = 0;
+            const int n = 256;
+            for (int x = 0; x < n; x++)
+            for (int z = 0; z < n; z++){
+                bool mayBe = FloraPlacement.MayBeMultiBlock(x, z, _cfg);
+                if (mayBe) passed++;
+                WorldSampler.SampleCore(x, z, _cfg, noCache, out ColumnSample s);
+                if (!FloraPlacement.IsMultiBlock(FloraPlacement.RollRule(x, z, _cfg, default, s, out int _), _cfg)) continue;
+                candidates++;
+                Assert.IsTrue(mayBe, $"({x},{z})");
+            }
+
+            Assert.Greater(candidates, 100);
+            // Flat ground everywhere, so every column the pre-filter passes is a candidate.
+            Assert.AreEqual(candidates, passed);
+        }
+
+        [Test]
         public void DensityFactor_SpansZeroToTwoWithMeanOne(){
             Biome flat = Flat(Dense(FloraFixture.Rule(_fixture.TuftSo, .1f), FloraDensity.Flowers));
             _cfg = _fixture.ToConfig(Settings(flat));

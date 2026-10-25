@@ -450,6 +450,65 @@ Regression check, every row vs the previous baseline: within 10 %. `ChunkJob` ro
 (median); the largest, `TerrainFirst ParameterSpaceWeighting` +5 %, read −1 % in a `ChunkGenerationBenchmark`-only run
 just before, so it is noise. `LightJob`, meshing and allocator rows are between −9 % and +3 %.
 
+## 2026-10-25 — species set in the benchmarks (`2026-10-25-phaseG5-editmode-baseline.json`)
+
+Same machine and settings as above. Phase G5 measures the shipped species set for the first time. The new rows use
+the placeholder six-biome world with DistanceBlend (the shipped method). The species and rules come from the
+shipped package at test time, so **these rows move when the shipped Forest rules or species are tuned**:
+- **forest species**: every land biome carries the rules of the shipped Forest biome (Oak, Birch, Bush, fallen logs,
+  grass and mushrooms with their density noises); padding 11.
+- **largest reach**: every land biome grows only the shipped variant with the largest reach (Big oak, reach 6,
+  padding 11) at probability 0.1 with even density, so the spacing radius limits the anchors.
+
+The light and collider rows run on the forest-species world (Terrain-first): the light row on the 8 scattered chunks
+with their rings, the collider row as the mean over every partition of those chunks that holds a species voxel
+(8 partitions, the terrain surface with the crowns).
+
+| Sample group | Median | Min | Max | Compared with (same run) | Change (median) |
+|---|---|---|---|---|---|
+| ChunkJob.Run TerrainFirst DistanceBlend forest species ms/chunk | 6.66 ms | 6.62 ms | 10.58 ms | DistanceBlend flora 4.82 ms | +38 % |
+| ChunkJob.Run BiomeFirst DistanceBlend forest species ms/chunk | 4.29 ms | 4.25 ms | 4.36 ms | DistanceBlend flora 2.76 ms | +55 % |
+| ChunkJob.Run TerrainFirst DistanceBlend largest reach ms/chunk | 6.33 ms | 6.24 ms | 6.52 ms | DistanceBlend flora 4.82 ms | +31 % |
+| ChunkJob.Run BiomeFirst DistanceBlend largest reach ms/chunk | 3.93 ms | 3.84 ms | 6.21 ms | DistanceBlend flora 2.76 ms | +42 % |
+| LightJob.Run forest species ms/chunk | 1.06 ms | 0.99 ms | 1.44 ms | natural terrain 0.76 ms | +41 % |
+| CMeshBuildJob.Run forest species ms/partition | 0.68 ms | 0.68 ms | 0.74 ms | surface 0.50 ms | +36 % |
+
+The first run of the forest-species rows measured 8.20 ms (Terrain-first) and 5.03 ms (Biome-first). A breakdown with
+subsets of the Forest rules (Terrain-first, medians):
+
+| Forest rules | ms/chunk |
+|---|---|
+| all, as shipped | 8.04 |
+| all, density influence 0 | 5.94 |
+| multi-block rules only | 6.12 |
+| multi-block rules only, influence 0 | 5.82 |
+| single-block rules only (no padding) | 4.36 |
+
+So about 2.1 ms came from the density noise, but only with ground plants and multi-block rules together. The
+multi-block pre-filter built the intervals of a biome with density noise from every value the column probabilities
+can take: the fallen log comes after grass (0.2) and the mushrooms, so its interval reached from 0 to 0.52, and half
+of all ring columns went on to a full core sample. The pre-filter now computes the column's intervals of those biomes
+from the same noise factors, through the same non-inlined code as the roll, in its own non-inlined method so
+`PrepareChunkMaps` keeps its code size. The world is unchanged. That brought the rows to 6.66 / 4.29 ms (−19 % /
+−15 %).
+
+The light row is above the 1 ms/chunk light budget for natural terrain: the crowns' leaves attenuate and block the
+sky, so the BFS does more work. The light jobs run on worker threads; the user accepted it as it is.
+
+Play-mode flight with the shipped world: 0 of 300 frames allocate. The interval store peaked at 8117 and 8428 of
+17986 pages in two runs (45–47 %, about 8 of the 17 pages per list; 39 % when the store size was chosen) and did not
+grow.
+
+Regression check, every existing row vs the previous baseline (median / min):
+- `ChunkJob` rows are between −4 % and +5 % (median) and −3 % and +4 % (min); the highest is `TerrainFirst None`.
+- `LightJob`, meshing, culling and interval-list rows are between −3 % and +2 % (median).
+- `PageAllocator fill+release` measured 0.47 ms (+13 % / +14 %), and 0.42–0.48 ms in four other runs.
+  - `PageAllocator` is unchanged.
+  - 0.46–0.50 ms is its usual value; the previous baseline (0.41 ms) was a low reading.
+- Two more full runs were not recorded: one had a noisy light row (forest species 1.38 ms, max 2.38 ms), the other
+  background load on several rows (surface collider +70 %, natural-terrain light +21 %), with no code change between
+  them.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the

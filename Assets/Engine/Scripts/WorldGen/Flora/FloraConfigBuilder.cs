@@ -51,6 +51,7 @@ namespace Engine.Scripts.WorldGen.Flora{
             List<FloraStructureDef> structures = new();
             List<FloraVoxel> voxels = new();
             List<float2> multiBlockIntervals = new();
+            List<int> denseMultiBlockBiomes = new();
             List<TreeSpeciesDef> trees = new();
             List<TreeVariantDef> variants = new();
             Dictionary<VoxelStructure, int> structureIndex = new();
@@ -134,6 +135,7 @@ namespace Engine.Scripts.WorldGen.Flora{
                     Debug.LogWarning($"{biome.name}: flora probabilities sum to {cumulative}; rules past 1 are partly or never rolled.", owner);
                 def.floraRuleCount = rules.Count - def.floraRuleStart;
                 AddMultiBlockIntervals(rules, def, multiBlockIntervals);
+                if (def.floraDensity != 0 && HasMultiBlockRule(rules, def)) denseMultiBlockBiomes.Add(b);
                 cfg.Biomes[b] = def;
             }
 
@@ -147,6 +149,7 @@ namespace Engine.Scripts.WorldGen.Flora{
             cfg.TreeSpecies = ToNative(trees, allocator);
             cfg.TreeVariants = ToNative(variants, allocator);
             cfg.FloraMultiBlockIntervals = ToNative(multiBlockIntervals, allocator);
+            cfg.FloraDenseMultiBlockBiomes = ToNative(denseMultiBlockBiomes, allocator);
 
             // Ids absent from the table (terrain, water) are solid; air (0) is never a flora voxel.
             classes.Remove(0);
@@ -158,32 +161,22 @@ namespace Engine.Scripts.WorldGen.Flora{
         }
 
         /// <summary>
-        ///     The pre-filter intervals of the multi-block rules of biome <paramref name="def" />. Without density noise
-        ///     they are the rules' intervals. With it they must hold every interval the column probabilities can give:
-        ///     the start is at least Σ p(1 − k) of the rules before, divided by the largest possible sum
-        ///     max(1, Σ p(1 + k)); the end is at most min(1, Σ p(1 + k)) up to the rule. A small margin covers rounding.
+        ///     The pre-filter intervals of the multi-block rules of biome <paramref name="def" /> without density noise:
+        ///     the rules' own intervals. A biome with density noise adds none; the pre-filter computes its intervals
+        ///     per column instead (<see cref="FloraPlacement.MayBeMultiBlock" />).
         /// </summary>
         private static void AddMultiBlockIntervals(List<FloraRuleDef> rules, in Biome.BiomeDef def, List<float2> intervals){
-            const float margin = 1e-5f;
-            int start = def.floraRuleStart, end = def.floraRuleStart + def.floraRuleCount;
-            if (def.floraDensity == 0){
-                for (int r = start; r < end; r++)
-                    if (rules[r].MultiBlock != 0 && rules[r].CumulativeEnd > rules[r].CumulativeStart)
-                        intervals.Add(new float2(rules[r].CumulativeStart, rules[r].CumulativeEnd));
-                return;
-            }
+            if (def.floraDensity != 0) return;
+            for (int r = def.floraRuleStart; r < def.floraRuleStart + def.floraRuleCount; r++)
+                if (rules[r].MultiBlock != 0 && rules[r].CumulativeEnd > rules[r].CumulativeStart)
+                    intervals.Add(new float2(rules[r].CumulativeStart, rules[r].CumulativeEnd));
+        }
 
-            float highest = 0f;
-            for (int r = start; r < end; r++) highest += rules[r].Probability * (1f + rules[r].Influence);
-            float low = 0f, high = 0f;
-            for (int r = start; r < end; r++){
-                FloraRuleDef d = rules[r];
-                float lower = low / math.max(1f, highest);
-                low += d.Probability * (1f - d.Influence);
-                high += d.Probability * (1f + d.Influence);
-                if (d.MultiBlock != 0 && d.Probability > 0f)
-                    intervals.Add(new float2(math.max(lower - margin, 0f), math.min(high, 1f) + margin));
-            }
+        private static bool HasMultiBlockRule(List<FloraRuleDef> rules, in Biome.BiomeDef def){
+            for (int r = def.floraRuleStart; r < def.floraRuleStart + def.floraRuleCount; r++)
+                if (rules[r].MultiBlock != 0 && rules[r].Probability > 0f)
+                    return true;
+            return false;
         }
 
         private static NativeArray<T> ToNative<T>(List<T> list, Allocator allocator) where T : unmanaged{

@@ -6,10 +6,22 @@ using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.WorldGen.Flora;
 using System.Collections.Generic;
+using Engine.Scripts.Data;
+using NUnit.Framework;
 using Unity.Collections;
+using UnityEditor;
 using UnityEngine;
 
 namespace Engine.Tests.Performance{
+    /// <summary>Flora of <see cref="BenchmarkFixtures.CreateSpeciesGeneratorConfig" />.</summary>
+    internal enum SpeciesFlora{
+        /// <summary>The rules of the shipped Forest biome (its tree species, undergrowth, mushrooms and logs).</summary>
+        ShippedForest,
+
+        /// <summary>One rule with the shipped variant of the largest reach, so the padding is the largest possible.</summary>
+        LargestReach
+    }
+
     /// <summary>
     ///     Hand-built generator/render inputs so the benchmarks run without the Resources-based
     ///     DataImporter. Voxel IDs are fixed; the world-gen config comes from WorldGenSettings built in code,
@@ -98,6 +110,44 @@ namespace Engine.Tests.Performance{
         /// </param>
         internal static GeneratorConfig CreatePlaceholderGeneratorConfig(GenArchitecture architecture, BlendMethod method,
             Allocator allocator, List<Object> created, bool flora = false){
+            Dictionary<Voxel, ushort> ids = new();
+            System.Func<Voxel, ushort> voxelId = null;
+            if (flora) voxelId = v => v ? ids[v] : (ushort)0;
+            return CreatePlaceholderGeneratorConfig(architecture, method, allocator, created,
+                flora ? set => AddPlaceholderFlora(set, ids, created) : null, voxelId);
+        }
+
+        /// <summary>
+        ///     The placeholder world with DistanceBlend (the shipped method) and real species from the shipped package:
+        ///     the shipped Forest rules or the shipped variant with the largest reach, on every land biome.
+        /// </summary>
+        /// <param name="ids">
+        ///     Voxel id of every species voxel, from <see cref="VoxelTypeCount" /> upwards, for the light and collider
+        ///     tables (<see cref="CreateLightTable" />, <see cref="CreateRenderGenData(Dictionary{Voxel,ushort},Allocator)" />).
+        /// </param>
+        internal static GeneratorConfig CreateSpeciesGeneratorConfig(GenArchitecture architecture, SpeciesFlora flora,
+            Allocator allocator, List<Object> created, out Dictionary<Voxel, ushort> ids){
+            Dictionary<Voxel, ushort> map = new();
+            ushort next = VoxelTypeCount;
+
+            ushort VoxelId(Voxel v){
+                if (!v) return 0;
+                if (!map.TryGetValue(v, out ushort id)){
+                    id = next++;
+                    map.Add(v, id);
+                }
+
+                return id;
+            }
+
+            GeneratorConfig config = CreatePlaceholderGeneratorConfig(architecture, BlendMethod.DistanceBlend, allocator, created,
+                set => AddSpeciesFlora(set, flora, map, created), VoxelId);
+            ids = map;
+            return config;
+        }
+
+        private static GeneratorConfig CreatePlaceholderGeneratorConfig(GenArchitecture architecture, BlendMethod method,
+            Allocator allocator, List<Object> created, System.Action<BiomeSet> addFlora, System.Func<Voxel, ushort> voxelId){
             GeneratorConfig config = CreateGeneratorConfig(allocator);
             config.WorldGen.Dispose(); // replaced by the six-biome world below
 
@@ -116,10 +166,7 @@ namespace Engine.Tests.Performance{
             set.Biomes.Add(PlaceholderBiome("Ocean", .50f, .80f, .08f, .50f, 0f, 100, 6, new[]{ 1f, .5f, .2f, .05f, .02f, .01f }, 0, created));
             settings.Biomes = set;
 
-            Dictionary<Voxel, ushort> ids = new();
-            if (flora) AddPlaceholderFlora(set, ids, created);
-            System.Func<Voxel, ushort> voxelId = null;
-            if (flora) voxelId = v => v ? ids[v] : (ushort)0;
+            addFlora?.Invoke(set);
             config.WorldGen = settings.ToConfigWithVoxelIds(Seed, voxelId, allocator);
             for (int b = 0; b < config.WorldGen.BiomeCount; b++){
                 Biome.BiomeDef def = config.WorldGen.Biomes[b];
@@ -191,6 +238,110 @@ namespace Engine.Tests.Performance{
                 biome.StoneBlock = stone;
                 biome.FloraRules = new List<FloraRule>(rules[b]);
             }
+        }
+
+        /// <summary>Folders of the shipped species and biomes.</summary>
+        private const string ShippedTreesPath = "Assets/Engine/Resources/VoxelDataPackages/Standard/Trees";
+
+        private const string ShippedForestPath = "Assets/Engine/Resources/VoxelDataPackages/Standard/Bioms/Forest.asset";
+
+        /// <summary>Per-column probability of the largest-reach tree: high enough that the spacing radius limits the anchors.</summary>
+        private const float LargestReachProbability = .1f;
+
+        /// <summary>
+        ///     Gives the five land biomes the shipped Forest rules, or a single rule with the largest-reach variant at
+        ///     <see cref="LargestReachProbability" /> and even density. Ocean keeps no flora. The ground blocks are
+        ///     in-memory voxels with the fixture ids.
+        /// </summary>
+        private static void AddSpeciesFlora(BiomeSet set, SpeciesFlora flora, Dictionary<Voxel, ushort> ids, List<Object> created){
+            List<FloraRule> rules;
+            if (flora == SpeciesFlora.ShippedForest){
+                Biome forest = AssetDatabase.LoadAssetAtPath<Biome>(ShippedForestPath);
+                Assert.IsNotNull(forest, ShippedForestPath);
+                rules = forest.FloraRules;
+            }
+            else{
+                TreeSpecies tree = Create<TreeSpecies>("LargestReach", created);
+                tree.Variants.Add(LargestReachVariant());
+                rules = new List<FloraRule>{ new(){ SpeciesTree = tree, Probability = LargestReachProbability } };
+            }
+
+            Voxel Ground(string name, ushort id){
+                Voxel v = Create<Voxel>(name, created);
+                v.meshLayer = MeshLayer.Solid;
+                v.collision = true;
+                ids.Add(v, id);
+                return v;
+            }
+
+            Voxel grass = Ground("Grass", Grass), dirt = Ground("Dirt", Dirt), stone = Ground("Stone", Stone);
+            for (int b = 0; b < set.Biomes.Count; b++){
+                Biome biome = set.Biomes[b];
+                biome.TopBlock = b == 1 ? dirt : grass;
+                biome.UnderBlock = dirt;
+                biome.StoneBlock = stone;
+                if (b < set.Biomes.Count - 1) biome.FloraRules = new List<FloraRule>(rules);
+            }
+        }
+
+        /// <summary>The shipped variant with the largest horizontal reach; ties go to the first in path order.</summary>
+        internal static TreeVariant LargestReachVariant(){
+            TreeVariant best = null;
+            int bestReach = -1;
+            List<string> paths = new();
+            foreach (string guid in AssetDatabase.FindAssets("t:TreeSpecies", new[]{ ShippedTreesPath }))
+                paths.Add(AssetDatabase.GUIDToAssetPath(guid));
+            paths.Sort(System.StringComparer.Ordinal);
+            foreach (string path in paths){
+                TreeSpecies species = AssetDatabase.LoadAssetAtPath<TreeSpecies>(path);
+                List<TreeVariantDef> defs = new();
+                FloraConfigBuilder.AddTree(species, _ => 1, defs, new Dictionary<ushort, byte>(), null, false);
+                for (int i = 0; i < defs.Count; i++){
+                    if (defs[i].Reach <= bestReach) continue;
+                    bestReach = defs[i].Reach;
+                    best = species.Variants[i];
+                }
+            }
+
+            Assert.IsNotNull(best, ShippedTreesPath);
+            return best;
+        }
+
+        /// <summary>
+        ///     Light table of the fixture voxels (solid blocks opaque, water 2) and the species voxels with the
+        ///     attenuation and emission of their assets.
+        /// </summary>
+        internal static VoxelLightTable CreateLightTable(Dictionary<Voxel, ushort> ids, Allocator allocator){
+            VoxelLightTable table = new(TableSize(ids), allocator);
+            for (int id = 0; id < table.Count; id++) table.Set(id, 0, 0);
+            foreach (ushort solid in new[]{ Grass, Dirt, Stone, Ice }) table.Set(solid, (byte)VoxelLightLimits.MaxLevel, 0);
+            table.Set(Water, 2, 0);
+            foreach (KeyValuePair<Voxel, ushort> entry in ids){
+                if (entry.Value < VoxelTypeCount) continue; // fixture ids keep the values above
+                Vector3Int e = entry.Key.lightEmission;
+                table.Set(entry.Value, (byte)entry.Key.lightAttenuation, VoxelLight.PackRgb(e.x, e.y, e.z));
+            }
+
+            return table;
+        }
+
+        /// <summary>Render definitions of the fixture voxels and the species voxels, indexed by voxel ID.</summary>
+        internal static VoxelEngineRenderGenData CreateRenderGenData(Dictionary<Voxel, ushort> ids, Allocator allocator){
+            VoxelEngineRenderGenData data = CreateRenderGenData(allocator);
+            NativeArray<Voxel.VoxelDef> defs = new(TableSize(ids), allocator);
+            NativeArray<Voxel.VoxelDef>.Copy(data.VoxelRenderDefs, defs, VoxelTypeCount);
+            data.VoxelRenderDefs.Dispose();
+            foreach (KeyValuePair<Voxel, ushort> entry in ids)
+                if (entry.Value >= VoxelTypeCount)
+                    defs[entry.Value] = new Voxel.VoxelDef{ Id = entry.Value, MeshLayer = entry.Key.meshLayer, Collision = entry.Key.collision };
+            data.VoxelRenderDefs = defs;
+            return data;
+        }
+
+        private static int TableSize(Dictionary<Voxel, ushort> ids){
+            int size = VoxelTypeCount;
+            foreach (ushort id in ids.Values) size = Mathf.Max(size, id + 1);
+            return size;
         }
 
         private static T Create<T>(string name, List<Object> created) where T : ScriptableObject{
