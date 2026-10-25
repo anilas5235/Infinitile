@@ -349,8 +349,10 @@ namespace Engine.Tests.EditMode{
             [ValueSource(nameof(ShippedVariants))] string name,
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
             // As above for each variant of the shipped species. Every tree with reach crosses a chunk border; small
-            // crowns rarely span a chunk corner, so four chunks are required from reach 4 on.
-            TreeSpecies single = _fixture.MakeTree("Single", _fixture.ShippedVariant(name));
+            // crowns rarely span a chunk corner, so four chunks are required from reach 4 on (a lying trunk is a line
+            // and never spans a corner).
+            TreeVariant variant = _fixture.ShippedVariant(name);
+            TreeSpecies single = _fixture.MakeTree("Single", variant);
             _biomes = new[]{
                 _fixture.MakeBiome("Wood", .5f, 150f, 10f, _fixture.GrassSo, FloraFixture.Rule(single, .25f), FloraFixture.Rule(_fixture.TuftSo, .3f))
             };
@@ -367,7 +369,13 @@ namespace Engine.Tests.EditMode{
             Assert.Greater(reference.Anchors.Count, 20, "the area carries trees");
             Assert.Greater(nearCorner, 0, "an anchor lies next to a chunk corner");
             if (reach > 0) Assert.Greater(across, 0, "a tree crosses a chunk border");
-            if (reach >= 4) Assert.Greater(fourChunks, 0, "a tree falls into four chunks");
+            if (reach >= 4 && !variant.Lying) Assert.Greater(fourChunks, 0, "a tree falls into four chunks");
+            if (variant.Lying){
+                // A log needs the anchor's height under its whole length: both outcomes occur on the test hills.
+                TestContext.WriteLine($"shortened to 2: {reference.Narrowed.Count}");
+                Assert.Greater(reference.Narrowed.Count, 0, "some log is shortened to 2");
+                Assert.Less(reference.Narrowed.Count, reference.Anchors.Count, "some log lies at its rolled length");
+            }
 
             Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
             try{

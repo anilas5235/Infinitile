@@ -205,9 +205,40 @@ namespace Engine.Scripts.WorldGen.Flora{
             int rule = RollRule(x, z, cfg, s, out int biome);
             if (rule < 0) return;
             FloraRuleDef d = cfg.FloraRules[rule];
-            if (d.MultiBlock != 0 && !IsAnchor(x, z, SpacingRadius(x, z, rule, cfg), cfg, cache)) return;
+            if (d.MultiBlock != 0){
+                if (!IsAnchor(x, z, SpacingRadius(x, z, rule, cfg), cfg, cache)) return;
+                if (d.Tree >= 0 && !TreeFits(x, z, rule, cfg, cache)) return;
+            }
+
             species = d.Species;
             source = biome;
+        }
+
+        /// <summary>False for an anchor whose lying trunk fits nowhere (<see cref="LyingFit" /> 0); other trees always fit.</summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static bool TreeFits(int x, int z, int rule, in WorldGenConfig cfg, in BlendCache cache){
+            int variant = Variant(x, z, rule, cfg);
+            if (cfg.TreeVariants[variant].Lying == 0) return true;
+            TreeRoll roll = TreeShape.Roll(x, z, cfg.Seed, variant, cfg.TreeVariants[variant]);
+            return LyingFit(x, z, roll, cfg, cache) != 0;
+        }
+
+        /// <summary>
+        ///     Fit of the lying trunk <paramref name="roll" /> anchored at (x, z): 1 when every column under its rolled
+        ///     length has the anchor's terrain height, 2 when the first two do (it is built 2 long,
+        ///     <see cref="TreeRoll.Narrow" />), 0 otherwise (no log). The heights are the sampler's, so every chunk
+        ///     and the sampler decide alike.
+        /// </summary>
+        public static int LyingFit(int x, int z, in TreeRoll roll, in WorldGenConfig cfg, in BlendCache cache){
+            WorldSampler.SampleCore(x, z, cfg, cache, out ColumnSample anchor);
+            int run = 1;
+            for (; run < roll.TrunkHeight; run++){
+                int2 c = new int2(x, z) + roll.LeanDirection * run;
+                WorldSampler.SampleCore(c.x, c.y, cfg, cache, out ColumnSample s);
+                if (s.ColumnHeight != anchor.ColumnHeight) break;
+            }
+
+            return run >= roll.TrunkHeight ? 1 : run >= 2 ? 2 : 0;
         }
 
         /// <summary>

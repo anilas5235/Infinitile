@@ -79,6 +79,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
         [Range(0f, .25f)]
         public float MaxLean;
 
+        [Tooltip("A lying trunk (fallen logs): Trunk Height is the length of a line along x or z from the anchor; crown, branches, width and lean are not used. It needs ground of the anchor's height under its whole length, otherwise it is 2 long, otherwise left out.")]
+        public bool Lying;
+
         [Header("Crown")] public CrownShape CrownShape = CrownShape.Round;
 
         [Tooltip("Main leaf voxel of the crown and the branch clusters.")]
@@ -137,7 +140,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
         [Range(0f, 1f)]
         public float AltLeafChance;
 
-        [Header("Spacing")] [Tooltip("No other tree or structure anchor lies within this many blocks of this variant's anchor.")] [Min(0)]
+        [Header("Placement")] [Tooltip("Blocks the whole shape is sunk into the ground (boulders); sunk voxels never replace terrain.")]
+        public IntRange Sink = new(0, 0);
+
+        [Tooltip("No other tree or structure anchor lies within this many blocks of this variant's anchor.")] [Min(0)]
         public int SpacingRadius = 3;
     }
 }

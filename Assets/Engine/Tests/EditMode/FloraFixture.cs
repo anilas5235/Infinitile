@@ -193,7 +193,8 @@ namespace Engine.Tests.EditMode{
 
         /// <summary>
         ///     A copy of the shipped variant "Species/index" on this fixture's voxels: cactus trunks take the cactus,
-        ///     other trunks the log; spruce leaves take the needles, other leaves the leaves.
+        ///     other trunks the log; spruce leaves take the needles, stone "leaves" (boulders) the granite, other
+        ///     leaves the leaves.
         /// </summary>
         internal TreeVariant ShippedVariant(string name){
             string[] parts = name.Split('/');
@@ -201,7 +202,10 @@ namespace Engine.Tests.EditMode{
             TreeVariant source = species.Variants[int.Parse(parts[1])];
             TreeVariant copy = JsonUtility.FromJson<TreeVariant>(JsonUtility.ToJson(source));
             copy.TrunkVoxel = !source.TrunkVoxel ? null : source.TrunkVoxel.name == "Cactus" ? CactusSo : LogSo;
-            copy.LeafVoxel = !source.LeafVoxel ? null : source.LeafVoxel.name == "LeavesSpruce" ? NeedlesSo : LeavesSo;
+            copy.LeafVoxel = !source.LeafVoxel ? null
+                : source.LeafVoxel.name == "LeavesSpruce" ? NeedlesSo
+                : source.LeafVoxel.name.StartsWith("Stone") ? GraniteSo
+                : LeavesSo;
             copy.AltLeafVoxel = !source.AltLeafVoxel ? null : NeedlesSo;
             return copy;
         }
@@ -249,13 +253,14 @@ namespace Engine.Tests.EditMode{
         }
 
         /// <summary>
-        ///     The default biomes with the shipped species set on this fixture's voxels: oak, birch, bush and spruce in
-        ///     the meadow, cactus and dead tree in the dunes.
+        ///     The default biomes with the shipped species set on this fixture's voxels: oak, birch, bush, spruce,
+        ///     boulder and fallen log in the meadow, cactus and dead tree in the dunes.
         /// </summary>
         internal Biome[] ShippedSpeciesBiomes(){
             return new[]{
                 MakeBiome("Meadow", .25f, 150f, 10f, GrassSo, Rule(TuftSo, .3f), Rule(FlowerSo, .05f), Rule(ShippedSpecies("Oak"), .02f),
-                    Rule(ShippedSpecies("Birch"), .02f), Rule(ShippedSpecies("Bush"), .02f), Rule(ShippedSpecies("Spruce"), .02f)),
+                    Rule(ShippedSpecies("Birch"), .02f), Rule(ShippedSpecies("Bush"), .02f), Rule(ShippedSpecies("Spruce"), .02f),
+                    Rule(ShippedSpecies("Boulder"), .02f), Rule(ShippedSpecies("FallenLog"), .02f)),
                 MakeBiome("Dunes", .75f, 138f, 6f, SandSo, Rule(TuftSo, .05f), Rule(ShippedSpecies("Cactus"), .04f),
                     Rule(ShippedSpecies("DeadTree"), .03f))
             };
@@ -467,9 +472,12 @@ namespace Engine.Tests.EditMode{
                     int variant = TreeShape.PickVariant(wx, wz, cfg, treeIndex);
                     TreeVariantDef v = cfg.TreeVariants[variant];
                     TreeRoll roll = TreeShape.Roll(wx, wz, cfg.Seed, variant, v);
-                    if (roll.NeedsFlatFootprint && !FlatFootprint(wx, wz, TreeShape.Footprint(roll))){
+                    bool flat = roll.Lying ? LyingRun(wx, wz, roll) >= roll.TrunkHeight : FlatFootprint(wx, wz, TreeShape.Footprint(roll));
+                    if (roll.NeedsFlatFootprint && !flat){
                         roll.Narrow();
                         Narrowed.Add(new int2(wx, wz));
+                        if (roll.Lying && LyingRun(wx, wz, roll) < roll.TrunkHeight)
+                            throw new InvalidOperationException($"The region reports a lying trunk at ({wx}, {wz}) that fits nowhere.");
                     }
 
                     tree.Clear();
@@ -519,6 +527,14 @@ namespace Engine.Tests.EditMode{
             }
 
             return max - min <= 1;
+        }
+
+        /// <summary>Columns from the anchor along a lying trunk that share the anchor's clamped terrain height, up to its length.</summary>
+        private int LyingRun(int x, int z, in TreeRoll r){
+            int h = ColumnTop(Region.Index(x, z));
+            int run = 1;
+            while (run < r.TrunkHeight && ColumnTop(Region.Index(x + r.LeanDirection.x * run, z + r.LeanDirection.y * run)) == h) run++;
+            return run;
         }
 
         private int ColumnTop(int regionIndex){

@@ -203,13 +203,14 @@ namespace Engine.Tests.EditMode{
                     if (d.Structure < 0 && d.Tree < 0) Assert.AreNotEqual(0, d.Voxel, $"rule {i}: voxel id");
                 }
 
-                Assert.AreEqual(6, cfg.TreeSpecies.Length, "Oak, Birch, Bush, Spruce, DeadTree, Cactus");
+                Assert.AreEqual(8, cfg.TreeSpecies.Length, "Oak, Birch, Bush, Spruce, DeadTree, Cactus, Boulder, FallenLog");
                 for (int i = 0; i < cfg.TreeVariants.Length; i++){
                     TreeVariantDef v = cfg.TreeVariants[i];
                     if (v.TrunkHeight.y > 0) Assert.AreNotEqual(0, v.TrunkVoxel, $"variant {i}: trunk voxel");
                     if (v.Crown == CrownShape.None && v.ClusterRadius.y == 0) continue;
                     Assert.AreNotEqual(0, v.LeafVoxel, $"variant {i}: leaf voxel");
-                    Assert.AreEqual(FloraVoxelClass.Leaves, v.LeafClass, $"variant {i}: leaf class");
+                    // Boulders build their "crown" of stone.
+                    Assert.That(v.LeafClass, Is.EqualTo(FloraVoxelClass.Leaves).Or.EqualTo(FloraVoxelClass.Solid), $"variant {i}: leaf class");
                 }
 
                 for (int i = 0; i < cfg.FloraVoxels.Length; i++) Assert.AreNotEqual(0, cfg.FloraVoxels[i].Voxel, $"structure voxel {i}");
@@ -221,6 +222,7 @@ namespace Engine.Tests.EditMode{
                 Assert.AreEqual(FloraVoxelClass.Leaves, cfg.VoxelClassOf(Id("std:LeavesSpruce")));
                 Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:LogSpruce")));
                 Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:DeadBush")));
+                Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:StoneGrey")), "boulders never replace terrain");
                 Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:Water")), "water is never overwritten");
             }
             finally{

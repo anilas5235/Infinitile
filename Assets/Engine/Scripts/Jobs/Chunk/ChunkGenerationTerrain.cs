@@ -106,7 +106,7 @@ namespace Engine.Scripts.Jobs.Chunk{
         ///     The flora decisions on the grid of <see cref="PrepareChunkMaps(ref GeneratorConfig,ref int3,NativeArray{ChunkColumn},ref FloraGrid)" />,
         ///     the same as <see cref="FloraPlacement.Decide" />: the spacing radius of every multi-block candidate, the
         ///     anchors within reach of the chunk (<see cref="FloraGrid.Anchor" />, including the flat-footprint test of
-        ///     wide and leaning trunks), then species and source of every chunk column. A separate pass: code added
+        ///     wide, leaning and lying trunks), then species and source of every chunk column. A separate pass: code added
         ///     to <c>PrepareChunkMaps</c> slows the Burst build of its sampling loops.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -129,7 +129,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                 for (int z = -reach; z < ChunkDepth + reach; z++){
                     int g = grid.Index(x, z);
                     if (!IsGridAnchor(grid, x, z, chunkWordPos.xz, cfg)) continue;
-                    grid.Anchor[g] = FlatFootprint(grid, chunkColumns, x, z, chunkWordPos, cfg) ? (byte)1 : (byte)2;
+                    grid.Anchor[g] = AnchorFit(grid, chunkColumns, x, z, chunkWordPos, cfg);
                 }
             }
 
@@ -176,17 +176,19 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
-        ///     False when the anchor at (x, z) is a tree whose wide or leaning trunk stands on ground that is not flat
-        ///     within 1 block (<see cref="TreeShape.Footprint" />); the tree is then built 1 wide and straight. The
-        ///     heights are the sampler's, so every chunk decides the same.
+        ///     <see cref="FloraGrid.Anchor" /> code of the anchor at (x, z): 2 when it is a tree whose wide or leaning
+        ///     trunk stands on ground that is not flat within 1 block (<see cref="TreeShape.Footprint" />), so it is
+        ///     built 1 wide and straight; for a lying trunk its <see cref="FloraPlacement.LyingFit" />; 1 otherwise.
+        ///     The heights are the sampler's, so every chunk decides the same.
         /// </summary>
-        private static bool FlatFootprint(in FloraGrid grid, NativeArray<ChunkColumn> chunkColumns, int x, int z, int3 chunkWordPos,
+        private static byte AnchorFit(in FloraGrid grid, NativeArray<ChunkColumn> chunkColumns, int x, int z, int3 chunkWordPos,
             in WorldGenConfig cfg){
             int rule = grid.Rule[grid.Index(x, z)];
             int variant = FloraPlacement.Variant(chunkWordPos.x + x, chunkWordPos.z + z, rule, cfg);
-            if (variant < 0) return true;
+            if (variant < 0) return 1;
             TreeRoll roll = TreeShape.Roll(chunkWordPos.x + x, chunkWordPos.z + z, cfg.Seed, variant, cfg.TreeVariants[variant]);
-            if (!roll.NeedsFlatFootprint) return true;
+            if (!roll.NeedsFlatFootprint) return 1;
+            if (roll.Lying) return (byte)FloraPlacement.LyingFit(chunkWordPos.x + x, chunkWordPos.z + z, roll, cfg, grid.Cache);
             int4 box = TreeShape.Footprint(roll);
             int min = int.MaxValue, max = int.MinValue;
             for (int fx = x + box.x; fx <= x + box.z; fx++)
@@ -203,7 +205,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                 max = math.max(max, h);
             }
 
-            return max - min <= 1;
+            return max - min <= 1 ? (byte)1 : (byte)2;
         }
 
         /// <summary>

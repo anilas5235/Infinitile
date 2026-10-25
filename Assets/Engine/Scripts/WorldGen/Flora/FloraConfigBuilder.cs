@@ -233,8 +233,19 @@ namespace Engine.Scripts.WorldGen.Flora{
                     BumpChance = math.saturate(v.BumpChance),
                     HangChance = math.saturate(v.HangChance),
                     AltLeafChance = math.saturate(v.AltLeafChance),
+                    Sink = Range(v.Sink),
                     SpacingRadius = math.max(v.SpacingRadius, 0)
                 };
+                if (v.Lying){
+                    // A lying trunk is a line of trunk voxels and nothing else.
+                    d.Lying = 1;
+                    d.TrunkWidth = 1;
+                    d.LeanPerMille = 0;
+                    d.Crown = CrownShape.None;
+                    d.BranchCount = int2.zero;
+                    d.ClusterRadius = int2.zero;
+                }
+
                 d.TrunkVoxel = Voxel(v.TrunkVoxel, voxelId, classes, out d.TrunkClass);
                 d.LeafVoxel = Voxel(v.LeafVoxel, voxelId, classes, out d.LeafClass);
                 d.AltLeafVoxel = Voxel(v.AltLeafVoxel, voxelId, classes, out d.AltLeafClass);
@@ -251,9 +262,11 @@ namespace Engine.Scripts.WorldGen.Flora{
 
         /// <summary>
         ///     Largest horizontal reach of a variant from the range maxima: lean and trunk width, plus the crown radius,
-        ///     or the branch length (Arm: 1) and tip cluster; crown bumps add one block.
+        ///     or the branch length (Arm: 1) and tip cluster; crown bumps add one block. A lying trunk reaches its
+        ///     length - 1.
         /// </summary>
         internal static int Reach(in TreeVariantDef d){
+            if (d.Lying != 0) return math.max(d.TrunkHeight.y - 1, 0);
             int lean = d.TrunkHeight.y * d.LeanPerMille / 1000;
             int trunk = lean + d.TrunkWidth - 1;
             int bump = d.BumpChance > 0f ? 1 : 0;

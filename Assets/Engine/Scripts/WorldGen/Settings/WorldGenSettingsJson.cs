@@ -158,6 +158,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                             ["TrunkHeight"] = Range(v.TrunkHeight),
                             ["TrunkWidth"] = v.TrunkWidth,
                             ["MaxLean"] = v.MaxLean,
+                            ["Lying"] = v.Lying,
                             ["CrownShape"] = v.CrownShape.ToString(),
                             ["LeafVoxel"] = VoxelName(v.LeafVoxel),
                             ["AltLeafVoxel"] = VoxelName(v.AltLeafVoxel),
@@ -177,6 +178,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                             ["BumpChance"] = v.BumpChance,
                             ["HangChance"] = v.HangChance,
                             ["AltLeafChance"] = v.AltLeafChance,
+                            ["Sink"] = Range(v.Sink),
                             ["SpacingRadius"] = v.SpacingRadius
                         });
 
