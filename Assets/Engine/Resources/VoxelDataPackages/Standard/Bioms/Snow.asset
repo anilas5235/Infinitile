@@ -41,6 +41,8 @@ MonoBehaviour:
     Probability: 0.01
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 1
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 11400000, guid: 10218f21e1d9ac948ac6846e1469b188, type: 2}
@@ -49,6 +51,8 @@ MonoBehaviour:
     Probability: 0.01
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 3
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 0}
@@ -57,6 +61,8 @@ MonoBehaviour:
     Probability: 0.004
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 0
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 0}
@@ -65,6 +71,8 @@ MonoBehaviour:
     Probability: 0.002
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 0
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   RepresentativeColor: {r: 0.8867924, g: 0.8867924, b: 0.8867924, a: 1}
