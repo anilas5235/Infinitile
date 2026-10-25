@@ -90,7 +90,7 @@ MonoBehaviour:
   - SpeciesVoxel: {fileID: 0}
     SpeciesStructure: {fileID: 0}
     SpeciesTree: {fileID: 11400000, guid: 2904966c836544142994d7f63d04d07b, type: 2}
-    Probability: 0.004
+    Probability: 0.00004
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
     DensityNoise: 3
