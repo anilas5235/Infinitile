@@ -194,6 +194,8 @@ namespace Engine.Tests.Performance{
             BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
             _config = BenchmarkFixtures.CreateSpeciesGeneratorConfig(architecture, SpeciesFlora.LargestReach,
                 Allocator.Persistent, _created, out _);
+            Assert.Greater(_config.WorldGen.FloraReach, 0);
+            Assert.Greater(_config.WorldGen.FloraPadding, _config.WorldGen.FloraReach);
             UnityEngine.Debug.Log($"largest reach {_config.WorldGen.FloraReach}, padding {_config.WorldGen.FloraPadding}");
             MeasurePerChunk($"ChunkJob.Run {architecture} DistanceBlend largest reach ms/chunk");
         }

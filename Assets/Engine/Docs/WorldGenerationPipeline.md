@@ -30,10 +30,12 @@ when cold]
   details 64 blocks; contrast 2). A flora rule names one (`DensityNoise`) and an influence k (`DensityInfluence`,
   default 0). Its probability at a column is p' = p · lerp(1, m, k), where m = clamp(1 + c · D, 0, 2) and D is the
   noise. The mean of m is 1, so a rule's long-run density stays p. A biome with such a rule computes its intervals
-  per column and scales them to a sum of 1 when they exceed it. The multi-block pre-filter of such a biome is
-  widened to the largest possible p', so it stays a necessary condition. The switch `FloraDensityNoise` turns all
-  influences to 0. Every shipped rule uses influence 1: trees on the Trees noise, grass, dead bushes and bushes on
-  Undergrowth, flowers on Flowers, rocks, mushrooms and boulders on Ground details, fallen logs on Trees.
+  per column and scales them to a sum of 1 when they exceed it. The multi-block pre-filter computes the intervals of
+  such a biome at the column too, from the same noise factors and with the same non-inlined code as the roll, so it
+  stays a necessary condition and passes only columns whose roll picks a multi-block rule in some biome. The switch
+  `FloraDensityNoise` turns all influences to 0. Every shipped rule uses influence 1: trees on the Trees noise, grass,
+  dead bushes and bushes on Undergrowth, flowers on Flowers, rocks, mushrooms and boulders on Ground details, fallen
+  logs on Trees.
 - **Preview**: the flora view has a "Flora density" option that shades the bare ground by one noise's factor
   (dark = clearing, bright = grove).
 - **Sink**: a tree variant can sink 0…n blocks. The whole shape is built that much lower, and its crown noise is
@@ -395,7 +397,10 @@ in-chunk voxels only]
     - Circle is a horizontal disc (a ring when not filled);
     - Cylinder stacks circles.
   - Other tables:
-    - `FloraMultiBlockIntervals`: the cumulative ranges of multi-block rules, used as a sample-free pre-filter.
+    - `FloraMultiBlockIntervals`: the cumulative ranges of multi-block rules in biomes without density noise, used
+      as a sample-free pre-filter.
+    - `FloraDenseMultiBlockBiomes`: the biomes with density noise and a multi-block rule, whose intervals the
+      pre-filter computes per column.
     - `FloraReach`: the largest horizontal structure extent.
     - `FloraPadding`: reach + r_tree, or 0 without multi-block rules.
     - `VoxelClasses`: the replace class per voxel id.
@@ -458,6 +463,7 @@ in-chunk voxels only]
   - `FloraStructures`
   - `FloraVoxels`
   - `FloraMultiBlockIntervals`
+  - `FloraDenseMultiBlockBiomes`
   - `VoxelClasses`
 
   They are always created by `ToConfig` (possibly empty), and `WorldGenConfig.Dispose` releases them.
