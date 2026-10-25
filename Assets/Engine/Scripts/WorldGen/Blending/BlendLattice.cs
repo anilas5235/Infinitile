@@ -148,11 +148,25 @@ namespace Engine.Scripts.WorldGen.Blending{
     ///     lattice of nn(q) for DistanceBlend (material and/or height stage, shared when both use it) and one warped
     ///     lattice of nn~(q) for the DistortedBoundary height stage. Built per chunk by <c>ChunkJob</c> and per tile by
     ///     <see cref="WorldGenApi" />; a default instance means "no cache", and the sampler then evaluates every tap
-    ///     itself (the pure path) with the same result.
+    ///     itself (the pure path) with the same result. It also remembers the beach water probes
+    ///     (<see cref="SurfaceCover.NearWater" />) around the block, which neighbouring columns share.
     /// </summary>
     public struct BlendCache : IDisposable{
+        /// <summary>Most water probes a cache remembers; a larger area (a zoomed-out preview) probes directly.</summary>
+        private const int MaxWaterProbes = 1 << 16;
+
         public BlendLattice Unwarped;
         public BlendLattice Warped;
+
+        /// <summary>
+        ///     Water probe cells <see cref="WaterProbeOrigin" /> + (i, j) at [j × WaterProbeSize.x + i]: 0 not probed yet,
+        ///     1 dry, 2 under water. Filled on first use, also through a read-only cache: the values are pure, so
+        ///     the result never depends on them.
+        /// </summary>
+        public NativeArray<byte> WaterProbes;
+
+        public int2 WaterProbeOrigin;
+        public int2 WaterProbeSize;
 
         /// <summary>
         ///     Builds the lattices for the columns in [<paramref name="minColumn" />, <paramref name="maxColumn" />],
@@ -163,6 +177,17 @@ namespace Engine.Scripts.WorldGen.Blending{
         public static BlendCache Build(in WorldGenConfig cfg, int2 minColumn, int2 maxColumn, int columnStep, Allocator allocator){
             BlendCache cache = default;
             if (cfg.BiomeCount == 0) return cache;
+
+            if (cfg.HasBeaches && cfg.BeachWaterDistance > 0){
+                // Every probe cell a beach column of the block may test.
+                int2 first = SurfaceCover.ProbeCell(minColumn - cfg.BeachWaterDistance);
+                int2 size = SurfaceCover.ProbeCell(maxColumn + cfg.BeachWaterDistance) + 2 - first;
+                if ((long)size.x * size.y <= MaxWaterProbes){
+                    cache.WaterProbeOrigin = first;
+                    cache.WaterProbeSize = size;
+                    cache.WaterProbes = new NativeArray<byte>(size.x * size.y, allocator);
+                }
+            }
 
             bool biomeFirst = cfg.Architecture == GenArchitecture.BiomeFirst;
             int unwarpedStride = int.MaxValue, unwarpedReach = 0, unwarpedTaps = int.MaxValue;
@@ -198,6 +223,7 @@ namespace Engine.Scripts.WorldGen.Blending{
         public void Dispose(){
             Unwarped.Dispose();
             Warped.Dispose();
+            if (WaterProbes.IsCreated) WaterProbes.Dispose();
         }
     }
 }

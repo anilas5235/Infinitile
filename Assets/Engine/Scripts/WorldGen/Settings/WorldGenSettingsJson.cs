@@ -58,7 +58,20 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["StrataThickness"] = s.StrataThickness,
                 ["StrataWarpAmplitude"] = s.StrataWarpAmplitude,
                 ["StrataWarpWavelength"] = s.StrataWarpWavelength,
+                ["BeachWavelength"] = s.BeachWavelength,
+                ["BeachThreshold"] = s.BeachThreshold,
+                ["BeachRamp"] = s.BeachRamp,
+                ["BeachWaterDistance"] = s.BeachWaterDistance,
                 ["TreeSpacingRadius"] = s.TreeSpacingRadius,
+                ["FloraDensityNoise"] = s.FloraDensityNoise,
+                ["TreesDensityWavelength"] = s.TreesDensityWavelength,
+                ["TreesDensityContrast"] = s.TreesDensityContrast,
+                ["UndergrowthDensityWavelength"] = s.UndergrowthDensityWavelength,
+                ["UndergrowthDensityContrast"] = s.UndergrowthDensityContrast,
+                ["FlowersDensityWavelength"] = s.FlowersDensityWavelength,
+                ["FlowersDensityContrast"] = s.FlowersDensityContrast,
+                ["GroundDetailsDensityWavelength"] = s.GroundDetailsDensityWavelength,
+                ["GroundDetailsDensityContrast"] = s.GroundDetailsDensityContrast,
                 ["Biomes"] = BiomeSetTree(s.Biomes),
                 ["Splines"] = s.Splines ? s.Splines.ToTree() : null
             };
@@ -106,7 +119,10 @@ namespace Engine.Scripts.WorldGen.Settings{
                         ["SpeciesTree"] = rule.SpeciesTree ? TreeTree(rule.SpeciesTree) : null,
                         ["Probability"] = rule.Probability,
                         ["RequiresSurfaceFromSameBiome"] = rule.RequiresSurfaceFromSameBiome,
+                        ["RequiresBeachGround"] = rule.RequiresBeachGround,
                         ["MinHeightAboveWater"] = rule.MinHeightAboveWater,
+                        ["DensityNoise"] = rule.DensityNoise.ToString(),
+                        ["DensityInfluence"] = rule.DensityInfluence,
                         ["MinStackHeight"] = rule.MinStackHeight,
                         ["MaxStackHeight"] = rule.MaxStackHeight
                     });
@@ -119,6 +135,8 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["StoneBlock"] = VoxelName(b.StoneBlock),
                 ["SnowTopBlock"] = VoxelName(b.SnowTopBlock),
                 ["StrataBlock"] = VoxelName(b.StrataBlock),
+                ["BeachBlock"] = VoxelName(b.BeachBlock),
+                ["BeachHeight"] = b.BeachHeight,
                 ["TargetTemperature"] = b.TargetTemperature,
                 ["TargetHumidity"] = b.TargetHumidity,
                 ["TargetContinental"] = b.TargetContinental,
@@ -147,6 +165,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                             ["TrunkHeight"] = Range(v.TrunkHeight),
                             ["TrunkWidth"] = v.TrunkWidth,
                             ["MaxLean"] = v.MaxLean,
+                            ["Lying"] = v.Lying,
                             ["CrownShape"] = v.CrownShape.ToString(),
                             ["LeafVoxel"] = VoxelName(v.LeafVoxel),
                             ["AltLeafVoxel"] = VoxelName(v.AltLeafVoxel),
@@ -166,6 +185,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                             ["BumpChance"] = v.BumpChance,
                             ["HangChance"] = v.HangChance,
                             ["AltLeafChance"] = v.AltLeafChance,
+                            ["Sink"] = Range(v.Sink),
                             ["SpacingRadius"] = v.SpacingRadius
                         });
 

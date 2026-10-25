@@ -7,6 +7,7 @@ using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Height;
 using Engine.Scripts.WorldGen.Noise;
 using Unity.Collections;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace Engine.Scripts.WorldGen.Settings{
@@ -85,7 +86,15 @@ namespace Engine.Scripts.WorldGen.Settings{
                 StrataPeriod = settings.StrataPeriod,
                 StrataThickness = settings.StrataThickness,
                 StrataWarpAmplitude = settings.StrataWarpAmplitude,
-                StrataWarpWavelength = settings.StrataWarpWavelength
+                StrataWarpWavelength = settings.StrataWarpWavelength,
+                BeachWavelength = settings.BeachWavelength,
+                BeachThreshold = math.saturate(settings.BeachThreshold),
+                BeachRamp = math.max(settings.BeachRamp, .01f),
+                BeachWaterDistance = math.max(settings.BeachWaterDistance, 0),
+                FloraDensityWavelength = new float4(settings.TreesDensityWavelength, settings.UndergrowthDensityWavelength,
+                    settings.FlowersDensityWavelength, settings.GroundDetailsDensityWavelength),
+                FloraDensityContrast = new float4(settings.TreesDensityContrast, settings.UndergrowthDensityContrast,
+                    settings.FlowersDensityContrast, settings.GroundDetailsDensityContrast)
             };
 
             // Biome.ToStruct and TerrainSplineSet.Flatten throw on bad data; free what was allocated so far before
@@ -117,6 +126,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 for (int b = 0; b < active.Count; b++){
                     Biome biome = active[b];
                     cfg.Biomes[b] = voxelId != null ? biome.ToStruct(voxelId) : biome.ToStruct();
+                    if (cfg.Biomes[b].beachHeight != 0) cfg.HasBeaches = true;
                     for (int i = 0; i < octaveCount; i++){
                         // a_{b,i} = HeightAmplitude_b × OctaveWeights_{b,i}; missing weights count as 0.
                         float w = biome.OctaveWeights != null && i < biome.OctaveWeights.Length ? biome.OctaveWeights[i] : 0f;
@@ -125,7 +135,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 }
 
                 // Flora rules, species, structures.
-                FloraConfigBuilder.Build(active, voxelId, settings.TreeSpacingRadius, allocator, ref cfg, settings);
+                FloraConfigBuilder.Build(active, voxelId, settings.TreeSpacingRadius, settings.FloraDensityNoise, allocator, ref cfg, settings);
             }
             catch{
                 cfg.Dispose();

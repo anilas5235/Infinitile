@@ -60,6 +60,13 @@ namespace Engine.Scripts.WorldGen.Flora{
         public float BumpChance;
         public float HangChance;
         public float AltLeafChance;
+
+        /// <summary>1 for a lying trunk: a line of <see cref="TrunkHeight" /> voxels along x or z, nothing else.</summary>
+        public byte Lying;
+
+        /// <summary>Range of the blocks the shape is sunk into the ground.</summary>
+        public int2 Sink;
+
         public int SpacingRadius;
 
         /// <summary>Largest |x| or |z| of any voxel offset from the anchor column, from the range maxima.</summary>
@@ -83,11 +90,21 @@ namespace Engine.Scripts.WorldGen.Flora{
         public int CrownHeight;
         public int BranchCount;
 
-        /// <summary>True when the trunk is wide or leans, so its footprint must be flat (<see cref="TreeShape.Footprint" />).</summary>
-        public bool NeedsFlatFootprint => Width > 1 || Lean > 0;
+        /// <summary>A lying trunk: <see cref="TrunkHeight" /> is its length, <see cref="LeanDirection" /> (one of 4) its direction.</summary>
+        public bool Lying;
 
-        /// <summary>Fallback on uneven ground: one block wide, no lean.</summary>
+        /// <summary>Blocks the whole shape is moved down.</summary>
+        public int Sink;
+
+        /// <summary>
+        ///     True when the trunk is wide, leans or lies, so its footprint must be flat (<see cref="TreeShape.Footprint" />;
+        ///     a lying trunk needs the anchor's height under its whole length).
+        /// </summary>
+        public bool NeedsFlatFootprint => Lying || Width > 1 || Lean > 0;
+
+        /// <summary>Fallback on uneven ground: one block wide, no lean; a lying trunk 2 long.</summary>
         public void Narrow(){
+            if (Lying) TrunkHeight = math.min(TrunkHeight, 2);
             Width = 1;
             Lean = 0;
         }
@@ -123,6 +140,8 @@ namespace Engine.Scripts.WorldGen.Flora{
         private const int RollBranchChance = 7;
         private const int RollBranchBase = 8;
         private const int RollsPerBranch = 4;
+        private const int RollSink = RollBranchBase + MaxBranches * RollsPerBranch;
+        private const int RollLyingDirection = RollSink + 1;
 
         /// <summary>The variant of a tree species at anchor column (x, z): the weighted pick with <see cref="HashSalts.TreeVariant" />.</summary>
         public static int PickVariant(int x, int z, in WorldGenConfig cfg, int species){
@@ -147,6 +166,15 @@ namespace Engine.Scripts.WorldGen.Flora{
                     ? RollRange(x, z, seed, RollBranchCount, v.BranchCount)
                     : 0
             };
+            r.Sink = RollRange(x, z, seed, RollSink, v.Sink);
+            if (v.Lying != 0){
+                r.Lying = true;
+                r.Width = 1;
+                r.BranchCount = 0;
+                r.LeanDirection = Direction4(Hash.Hash32(x, z, seed, HashSalts.TreeShape(RollLyingDirection)));
+                return r;
+            }
+
             int maxLean = r.TrunkHeight * v.LeanPerMille / 1000;
             r.Lean = RollRange(x, z, seed, RollLean, new int2(0, maxLean));
             r.LeanDirection = Direction8(Hash.Hash32(x, z, seed, HashSalts.TreeShape(RollLeanDirection)));
@@ -159,7 +187,7 @@ namespace Engine.Scripts.WorldGen.Flora{
         ///     other for a wide or leaning trunk.
         /// </summary>
         public static int4 Footprint(in TreeRoll r){
-            int2 top = r.LeanDirection * r.Lean;
+            int2 top = r.LeanDirection * (r.Lying ? math.max(r.TrunkHeight - 1, 0) : r.Lean);
             int2 min = math.min(top, 0);
             int2 max = math.max(top, 0) + (r.Width - 1);
             return new int4(min, max);
@@ -169,8 +197,24 @@ namespace Engine.Scripts.WorldGen.Flora{
         ///     Appends the voxels of the tree to <paramref name="output" />, offsets relative to
         ///     <paramref name="anchorBase" />: the anchor column at its top block + 1, in world coordinates (the crown
         ///     noise hashes world positions). The list may hold duplicates; stamping resolves them by voxel class.
+        ///     A sunk shape is built <see cref="TreeRoll.Sink" /> lower, its noise hashed at the lower positions.
         /// </summary>
         public static void Build(int3 anchorBase, in TreeRoll r, in TreeVariantDef v, uint seed, ref NativeList<FloraVoxel> output){
+            int start = output.Length;
+            if (r.Lying)
+                for (int i = 0; i < r.TrunkHeight; i++)
+                    TrunkBlock(r.LeanDirection * i, 0, 1, v, ref output);
+            else BuildStanding(anchorBase - new int3(0, r.Sink, 0), r, v, seed, ref output);
+
+            if (r.Sink == 0) return;
+            for (int i = start; i < output.Length; i++){
+                FloraVoxel voxel = output[i];
+                voxel.Offset.y -= r.Sink;
+                output[i] = voxel;
+            }
+        }
+
+        private static void BuildStanding(int3 anchorBase, in TreeRoll r, in TreeVariantDef v, uint seed, ref NativeList<FloraVoxel> output){
             // Vertical layout: the crown's lowest layer lies CrownBase above the trunk top, its top layer at least one
             // above the trunk top and not below CrownMinBase; the trunk reaches the crown.
             int trunkTop = r.TrunkHeight - 1;

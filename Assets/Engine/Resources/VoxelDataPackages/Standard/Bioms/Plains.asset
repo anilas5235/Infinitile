@@ -18,6 +18,8 @@ MonoBehaviour:
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   SnowTopBlock: {fileID: 11400000, guid: bbd609c54f9fb07488a90c8376ce0fa2, type: 2}
   StrataBlock: {fileID: 0}
+  BeachBlock: {fileID: 11400000, guid: b5df436b2cc46cf419e666fccd2d96b3, type: 2}
+  BeachHeight: 3
   TargetHumidity: 0.45
   TargetTemperature: 0.55
   TargetContinental: 0.45
@@ -41,6 +43,8 @@ MonoBehaviour:
     Probability: 0.3
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 1
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 11400000, guid: 2859aedcdbe37214c8b06ac736ce4d1f, type: 2}
@@ -49,6 +53,8 @@ MonoBehaviour:
     Probability: 0.05
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 2
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 0}
@@ -57,6 +63,8 @@ MonoBehaviour:
     Probability: 0.004
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 0
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 0}
@@ -65,6 +73,8 @@ MonoBehaviour:
     Probability: 0.001
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 0
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 0}
@@ -73,6 +83,28 @@ MonoBehaviour:
     Probability: 0.006
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 1
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 0}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 11400000, guid: 2904966c836544142994d7f63d04d07b, type: 2}
+    Probability: 0.00001
+    RequiresSurfaceFromSameBiome: 0
+    MinHeightAboveWater: 1
+    DensityNoise: 3
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 0}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 11400000, guid: b63902cc64d597f4ab8d6519895c2ea0, type: 2}
+    Probability: 0.0005
+    RequiresSurfaceFromSameBiome: 0
+    MinHeightAboveWater: 1
+    DensityNoise: 0
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   RepresentativeColor: {r: 0.67952645, g: 0.83396226, b: 0.27536482, a: 1}

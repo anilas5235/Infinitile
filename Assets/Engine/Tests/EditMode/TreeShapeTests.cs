@@ -160,6 +160,57 @@ namespace Engine.Tests.EditMode{
             CollectionAssert.AreEquivalent(new[]{ new int3(0, 0, 0), new int3(0, 1, 0), new int3(0, 2, 0) }, voxels.Keys);
         }
 
+        [Test]
+        public void Shapes_Sink_MovesTheWholeShapeDown(){
+            // A boulder with crown noise: sunk by 2 it is the shape built 2 lower, its noise hashed there.
+            TreeVariant variant = new(){
+                LeafVoxel = _fixture.GraniteSo, TrunkHeight = new IntRange(0, 0), CrownShape = CrownShape.Round,
+                CrownRadius = new IntRange(2, 2), CrownBase = 1, HoleChance = .3f, BumpChance = .3f, Sink = new IntRange(2, 2)
+            };
+            TreeVariantDef v = Def(variant);
+            Assert.AreEqual(new int2(2, 2), v.Sink);
+            for (int s = 0; s < 20; s++){
+                int x = s * 31 - 40, z = s * 17 + 3;
+                TreeRoll sunk = TreeShape.Roll(x, z, 7u, 0, v);
+                Assert.AreEqual(2, sunk.Sink);
+                TreeRoll level = sunk;
+                level.Sink = 0;
+                Dictionary<int3, ushort> expected = Stamp(new int3(x, 98, z), level, v, 7u)
+                    .ToDictionary(kv => kv.Key - new int3(0, 2, 0), kv => kv.Value);
+                CollectionAssert.AreEquivalent(expected, Stamp(new int3(x, 100, z), sunk, v, 7u), $"anchor ({x}, {z})");
+            }
+        }
+
+        [Test]
+        public void Shapes_LyingTrunk_IsALineAlongXOrZ_TwoLongWhenNarrowed(){
+            // Length 3–6 along one of the 4 axis directions from the anchor at y 0; crown and branches are ignored.
+            TreeVariant variant = new(){
+                TrunkVoxel = _fixture.LogSo, LeafVoxel = _fixture.LeavesSo, TrunkHeight = new IntRange(3, 6), Lying = true,
+                CrownShape = CrownShape.Round, CrownRadius = new IntRange(2, 2), BranchCount = new IntRange(2, 2), MaxLean = .25f
+            };
+            TreeVariantDef v = Def(variant);
+            Assert.AreEqual(5, v.Reach);
+            HashSet<int2> directions = new();
+            HashSet<int> lengths = new();
+            for (int s = 0; s < 200; s++){
+                int x = s * 37 - 3000, z = s * 53 + 211;
+                TreeRoll r = TreeShape.Roll(x, z, 3u, 0, v);
+                Assert.IsTrue(r.Lying && r.NeedsFlatFootprint);
+                Assert.AreEqual(1, math.abs(r.LeanDirection.x) + math.abs(r.LeanDirection.y), "axis direction");
+                int3[] line = Enumerable.Range(0, r.TrunkHeight).Select(i => new int3(r.LeanDirection.x * i, 0, r.LeanDirection.y * i)).ToArray();
+                CollectionAssert.AreEquivalent(line, Stamp(new int3(x, 100, z), r, v, 3u).Keys, $"anchor ({x}, {z})");
+                int4 box = TreeShape.Footprint(r);
+                Assert.AreEqual(r.TrunkHeight, (box.z - box.x + 1) * (box.w - box.y + 1), "footprint is the line");
+                directions.Add(r.LeanDirection);
+                lengths.Add(r.TrunkHeight);
+                r.Narrow();
+                Assert.AreEqual(2, Stamp(new int3(x, 100, z), r, v, 3u).Count, "narrowed to 2");
+            }
+
+            Assert.AreEqual(4, directions.Count, "all 4 directions");
+            CollectionAssert.AreEquivalent(new[]{ 3, 4, 5, 6 }, lengths, "all lengths");
+        }
+
         [TestCase(0, 4, 8, 4, TestName = "Shapes_CrownBase_0_StartsLevelWithTheTrunkTop")]
         [TestCase(-2, 2, 6, 4, TestName = "Shapes_CrownBase_Negative_HangsDown")]
         [TestCase(-10, 1, 5, 4, TestName = "Shapes_CrownBase_FarBelow_KeepsOneLayerAboveTheTrunk")]
@@ -240,7 +291,7 @@ namespace Engine.Tests.EditMode{
             // the hang layer.
             TreeVariant variant = _fixture.ShippedVariant(name);
             TreeVariantDef v = Def(variant);
-            ushort trunk = _fixture.Ids[variant.TrunkVoxel];
+            ushort trunk = variant.TrunkVoxel ? _fixture.Ids[variant.TrunkVoxel] : (ushort)0;
             bool leafy = v.Crown != CrownShape.None || v.ClusterRadius.y > 0;
             bool tapered = v.Crown is CrownShape.Cone or CrownShape.Tiered;
             int lowest = int.MaxValue, highest = 0;
@@ -323,7 +374,7 @@ namespace Engine.Tests.EditMode{
             for (int j = 0; j < region.Size.y; j++){
                 int x = region.Origin.x + i, z = region.Origin.y + j;
                 WorldSampler.SampleColumn(x, z, _cfg, out ColumnSample c);
-                candidates[i, j] = FloraPlacement.IsMultiBlock(FloraPlacement.RollRule(x, z, _cfg, c, out int _), _cfg);
+                candidates[i, j] = FloraPlacement.IsMultiBlock(FloraPlacement.RollRule(x, z, _cfg, default, c, out int _), _cfg);
             }
 
             HashSet<int2> anchors = new();

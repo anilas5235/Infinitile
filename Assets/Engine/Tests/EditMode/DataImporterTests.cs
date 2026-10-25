@@ -203,13 +203,14 @@ namespace Engine.Tests.EditMode{
                     if (d.Structure < 0 && d.Tree < 0) Assert.AreNotEqual(0, d.Voxel, $"rule {i}: voxel id");
                 }
 
-                Assert.AreEqual(6, cfg.TreeSpecies.Length, "Oak, Birch, Bush, Spruce, DeadTree, Cactus");
+                Assert.AreEqual(8, cfg.TreeSpecies.Length, "Oak, Birch, Bush, Spruce, DeadTree, Cactus, Boulder, FallenLog");
                 for (int i = 0; i < cfg.TreeVariants.Length; i++){
                     TreeVariantDef v = cfg.TreeVariants[i];
                     if (v.TrunkHeight.y > 0) Assert.AreNotEqual(0, v.TrunkVoxel, $"variant {i}: trunk voxel");
                     if (v.Crown == CrownShape.None && v.ClusterRadius.y == 0) continue;
                     Assert.AreNotEqual(0, v.LeafVoxel, $"variant {i}: leaf voxel");
-                    Assert.AreEqual(FloraVoxelClass.Leaves, v.LeafClass, $"variant {i}: leaf class");
+                    // Boulders build their "crown" of stone.
+                    Assert.That(v.LeafClass, Is.EqualTo(FloraVoxelClass.Leaves).Or.EqualTo(FloraVoxelClass.Solid), $"variant {i}: leaf class");
                 }
 
                 for (int i = 0; i < cfg.FloraVoxels.Length; i++) Assert.AreNotEqual(0, cfg.FloraVoxels[i].Voxel, $"structure voxel {i}");
@@ -221,6 +222,7 @@ namespace Engine.Tests.EditMode{
                 Assert.AreEqual(FloraVoxelClass.Leaves, cfg.VoxelClassOf(Id("std:LeavesSpruce")));
                 Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:LogSpruce")));
                 Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:DeadBush")));
+                Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:StoneGrey")), "boulders never replace terrain");
                 Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:Water")), "water is never overwritten");
             }
             finally{
@@ -278,9 +280,10 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void ShippedWorldGenSettings_EveryTreeSpeciesGrowsWithEveryVariant(){
-            // The same 4096² area at stride 8: every shipped tree species is planted somewhere, and its anchors pick
-            // every one of its variants.
+        public void ShippedWorldGenSettings_EveryTreeSpeciesGrows_AndPicksEveryVariant(){
+            // The same 4096² area at stride 8: every shipped tree species is planted somewhere. The variant pick is a
+            // hash of the anchor, so every variant is checked at all sampled columns; rare species (boulders) have
+            // too few anchors in the sample to pick each of their variants there.
             LoadPackages();
             WorldGenConfig cfg = ShippedConfig(out WorldGenSettings settings);
             const int n = 512;
@@ -292,20 +295,23 @@ namespace Engine.Tests.EditMode{
                 for (int i = 0; i < cfg.FloraRules.Length; i++)
                     if (cfg.FloraRules[i].Tree >= 0) treeOf[cfg.FloraRules[i].Species] = cfg.FloraRules[i].Tree;
 
+                int[] grown = new int[cfg.TreeSpecies.Length];
                 int[] picks = new int[cfg.TreeVariants.Length];
                 for (int i = 0; i < n * n; i++){
-                    if (!treeOf.TryGetValue(buffers.FloraSpecies[i], out int tree)) continue;
                     int x = request.Origin.x + i % n * request.Stride, z = request.Origin.y + i / n * request.Stride;
-                    picks[TreeShape.PickVariant(x, z, cfg, tree)]++;
+                    for (int t = 0; t < cfg.TreeSpecies.Length; t++) picks[TreeShape.PickVariant(x, z, cfg, t)]++;
+                    if (treeOf.TryGetValue(buffers.FloraSpecies[i], out int tree)) grown[tree]++;
                 }
 
                 string[] names = settings.FloraSpeciesNames();
                 string summary = string.Join(", ", treeOf.Select(kv => {
                     TreeSpeciesDef s = cfg.TreeSpecies[kv.Value];
-                    return $"{names[kv.Key]}: " + string.Join("/", Enumerable.Range(s.VariantStart, s.VariantCount).Select(v => picks[v]));
+                    return $"{names[kv.Key]}: {grown[kv.Value]} grown, " +
+                           string.Join("/", Enumerable.Range(s.VariantStart, s.VariantCount).Select(v => picks[v]));
                 }));
                 TestContext.WriteLine(summary);
                 Assert.AreEqual(cfg.TreeSpecies.Length, treeOf.Count, "every tree species has a rule");
+                for (int t = 0; t < grown.Length; t++) Assert.Greater(grown[t], 0, $"tree species {t} never grows ({summary})");
                 for (int v = 0; v < picks.Length; v++) Assert.Greater(picks[v], 0, $"variant {v} never grows ({summary})");
             }
             finally{

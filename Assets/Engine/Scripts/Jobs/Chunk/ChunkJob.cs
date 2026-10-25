@@ -45,7 +45,7 @@ namespace Engine.Scripts.Jobs.Chunk{
 
             PrepareChunkMaps(ref Config, ref chunkWorldPos, chunkColumns, ref floraGrid);
             DecideFlora(ref floraGrid, chunkColumns, chunkWorldPos, Config.WorldGen);
-            ApplySurfaceCover(chunkColumns, chunkWorldPos, Config.WorldGen);
+            ApplySurfaceCover(chunkColumns, chunkWorldPos, Config.WorldGen, floraGrid.Cache);
 
             FillTerrain(chunkVoxels, chunkColumns, ref Config);
 

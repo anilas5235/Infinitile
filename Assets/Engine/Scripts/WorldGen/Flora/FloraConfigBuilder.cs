@@ -41,10 +41,11 @@ namespace Engine.Scripts.WorldGen.Flora{
         /// <summary>
         ///     Fills the flora fields of <paramref name="cfg" /> and the rule ranges of <c>cfg.Biomes</c> (which must
         ///     already hold the biome structs). <paramref name="voxelId" /> null leaves every voxel id at 0 (preview):
-        ///     the decision (species, source) is still complete, only stamping needs ids.
+        ///     the decision (species, source) is still complete, only stamping needs ids. <paramref name="densityNoise" />
+        ///     false sets every rule's density influence to 0, so every rule is spread evenly.
         /// </summary>
         internal static void Build(IReadOnlyList<Biome> biomes, Func<VoxelSo, ushort> voxelId, int treeSpacingRadius,
-            Allocator allocator, ref WorldGenConfig cfg, Object owner){
+            bool densityNoise, Allocator allocator, ref WorldGenConfig cfg, Object owner){
             List<Object> species = CollectSpecies(biomes);
             List<FloraRuleDef> rules = new();
             List<FloraStructureDef> structures = new();
@@ -80,7 +81,11 @@ namespace Engine.Scripts.WorldGen.Flora{
                             Species = (ushort)(species.IndexOf(Species(rule)) + 1),
                             CumulativeStart = start,
                             CumulativeEnd = cumulative,
+                            Probability = math.max(rule.Probability, 0f),
+                            DensityNoise = (byte)math.clamp((int)rule.DensityNoise, 0, 3),
+                            Influence = densityNoise ? math.saturate(rule.DensityInfluence) : 0f,
                             RequiresSurfaceFromSameBiome = rule.RequiresSurfaceFromSameBiome ? (byte)1 : (byte)0,
+                            BeachGround = rule.RequiresBeachGround ? (byte)1 : (byte)0,
                             MultiBlock = rule.IsMultiBlock ? (byte)1 : (byte)0,
                             MinHeightAboveWater = rule.MinHeightAboveWater,
                             Structure = -1,
@@ -119,11 +124,8 @@ namespace Engine.Scripts.WorldGen.Flora{
                             if (rule.IsMultiBlock) spacing = math.max(spacing, treeSpacingRadius);
                         }
 
-                        if (d.MultiBlock != 0){
-                            anyMultiBlock = true;
-                            if (d.CumulativeEnd > d.CumulativeStart) multiBlockIntervals.Add(new float2(d.CumulativeStart, d.CumulativeEnd));
-                        }
-
+                        if (d.MultiBlock != 0) anyMultiBlock = true;
+                        if (d.Influence > 0f) def.floraDensity = 1;
                         rules.Add(d);
                     }
                 }
@@ -131,6 +133,7 @@ namespace Engine.Scripts.WorldGen.Flora{
                 if (cumulative > 1f)
                     Debug.LogWarning($"{biome.name}: flora probabilities sum to {cumulative}; rules past 1 are partly or never rolled.", owner);
                 def.floraRuleCount = rules.Count - def.floraRuleStart;
+                AddMultiBlockIntervals(rules, def, multiBlockIntervals);
                 cfg.Biomes[b] = def;
             }
 
@@ -152,6 +155,35 @@ namespace Engine.Scripts.WorldGen.Flora{
             cfg.VoxelClasses = new NativeArray<byte>(maxId + 1, allocator);
             for (int i = 1; i <= maxId; i++) cfg.VoxelClasses[i] = FloraVoxelClass.Solid;
             foreach (KeyValuePair<ushort, byte> entry in classes) cfg.VoxelClasses[entry.Key] = entry.Value;
+        }
+
+        /// <summary>
+        ///     The pre-filter intervals of the multi-block rules of biome <paramref name="def" />. Without density noise
+        ///     they are the rules' intervals. With it they must hold every interval the column probabilities can give:
+        ///     the start is at least Σ p(1 − k) of the rules before, divided by the largest possible sum
+        ///     max(1, Σ p(1 + k)); the end is at most min(1, Σ p(1 + k)) up to the rule. A small margin covers rounding.
+        /// </summary>
+        private static void AddMultiBlockIntervals(List<FloraRuleDef> rules, in Biome.BiomeDef def, List<float2> intervals){
+            const float margin = 1e-5f;
+            int start = def.floraRuleStart, end = def.floraRuleStart + def.floraRuleCount;
+            if (def.floraDensity == 0){
+                for (int r = start; r < end; r++)
+                    if (rules[r].MultiBlock != 0 && rules[r].CumulativeEnd > rules[r].CumulativeStart)
+                        intervals.Add(new float2(rules[r].CumulativeStart, rules[r].CumulativeEnd));
+                return;
+            }
+
+            float highest = 0f;
+            for (int r = start; r < end; r++) highest += rules[r].Probability * (1f + rules[r].Influence);
+            float low = 0f, high = 0f;
+            for (int r = start; r < end; r++){
+                FloraRuleDef d = rules[r];
+                float lower = low / math.max(1f, highest);
+                low += d.Probability * (1f - d.Influence);
+                high += d.Probability * (1f + d.Influence);
+                if (d.MultiBlock != 0 && d.Probability > 0f)
+                    intervals.Add(new float2(math.max(lower - margin, 0f), math.min(high, 1f) + margin));
+            }
         }
 
         private static NativeArray<T> ToNative<T>(List<T> list, Allocator allocator) where T : unmanaged{
@@ -202,8 +234,19 @@ namespace Engine.Scripts.WorldGen.Flora{
                     BumpChance = math.saturate(v.BumpChance),
                     HangChance = math.saturate(v.HangChance),
                     AltLeafChance = math.saturate(v.AltLeafChance),
+                    Sink = Range(v.Sink),
                     SpacingRadius = math.max(v.SpacingRadius, 0)
                 };
+                if (v.Lying){
+                    // A lying trunk is a line of trunk voxels and nothing else.
+                    d.Lying = 1;
+                    d.TrunkWidth = 1;
+                    d.LeanPerMille = 0;
+                    d.Crown = CrownShape.None;
+                    d.BranchCount = int2.zero;
+                    d.ClusterRadius = int2.zero;
+                }
+
                 d.TrunkVoxel = Voxel(v.TrunkVoxel, voxelId, classes, out d.TrunkClass);
                 d.LeafVoxel = Voxel(v.LeafVoxel, voxelId, classes, out d.LeafClass);
                 d.AltLeafVoxel = Voxel(v.AltLeafVoxel, voxelId, classes, out d.AltLeafClass);
@@ -220,9 +263,11 @@ namespace Engine.Scripts.WorldGen.Flora{
 
         /// <summary>
         ///     Largest horizontal reach of a variant from the range maxima: lean and trunk width, plus the crown radius,
-        ///     or the branch length (Arm: 1) and tip cluster; crown bumps add one block.
+        ///     or the branch length (Arm: 1) and tip cluster; crown bumps add one block. A lying trunk reaches its
+        ///     length - 1.
         /// </summary>
         internal static int Reach(in TreeVariantDef d){
+            if (d.Lying != 0) return math.max(d.TrunkHeight.y - 1, 0);
             int lean = d.TrunkHeight.y * d.LeanPerMille / 1000;
             int trunk = lean + d.TrunkWidth - 1;
             int bump = d.BumpChance > 0f ? 1 : 0;

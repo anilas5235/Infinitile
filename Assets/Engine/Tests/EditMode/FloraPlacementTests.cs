@@ -197,7 +197,7 @@ namespace Engine.Tests.EditMode{
             RegionSample r = Region(Origin - pad, Size + 2 * pad);
             bool Candidate(int x, int z){
                 WorldSampler.SampleColumn(x, z, _cfg, out ColumnSample c);
-                return FloraPlacement.IsMultiBlock(FloraPlacement.RollRule(x, z, _cfg, c, out int _), _cfg);
+                return FloraPlacement.IsMultiBlock(FloraPlacement.RollRule(x, z, _cfg, default, c, out int _), _cfg);
             }
 
             bool[,] candidates = new bool[r.Size.x, r.Size.y];

@@ -1,5 +1,75 @@
 # World Generation (Overview)
 
+# Version 1.9 (Groves, ground details and beaches)
+
+Flora clusters into groves and clearings, boulders and fallen logs lie on the ground, and shores get patchy sand
+beaches. Everything stays a pure function of the world position. All values below are placeholders.
+
+## Density noises, beaches and lying trunks in the column pipeline
+
+```mermaid
+flowchart LR
+    S[SampleCore] --> R[RollRule]
+    R --> D[density factor m
+of the rule's noise
+p' = p · lerp 1, m, k]
+    R --> B[beach ground?
+IsBeach: band, noise,
+water probes]
+    S --> SC[ApplySurfaceCover]
+    SC --> BT[beach column:
+beach block on top
+and 2 blocks under it]
+    BT --> SN[snow covers it
+when cold]
+```
+
+### Description
+
+- **Density noises**: four low-frequency noises on `WorldGenSettings` (Trees 96, Undergrowth 48, Flowers 24, Ground
+  details 64 blocks; contrast 2). A flora rule names one (`DensityNoise`) and an influence k (`DensityInfluence`,
+  default 0). Its probability at a column is p' = p · lerp(1, m, k), where m = clamp(1 + c · D, 0, 2) and D is the
+  noise. The mean of m is 1, so a rule's long-run density stays p. A biome with such a rule computes its intervals
+  per column and scales them to a sum of 1 when they exceed it. The multi-block pre-filter of such a biome is
+  widened to the largest possible p', so it stays a necessary condition. The switch `FloraDensityNoise` turns all
+  influences to 0. Every shipped rule uses influence 1: trees on the Trees noise, grass, dead bushes and bushes on
+  Undergrowth, flowers on Flowers, rocks, mushrooms and boulders on Ground details, fallen logs on Trees.
+- **Preview**: the flora view has a "Flora density" option that shades the bare ground by one noise's factor
+  (dark = clearing, bright = grove).
+- **Sink**: a tree variant can sink 0…n blocks. The whole shape is built that much lower, and its crown noise is
+  hashed there. Boulders are Round crowns of stone with no trunk (Stone, Grey and Grassy variants, radius 1–2,
+  sink 0–1). Stone has voxel class Solid, so a sunk boulder never replaces terrain.
+- **Lying trunks**: a lying variant (`Lying`) builds its trunk as a line along x or z from the anchor, with the
+  direction hashed and `TrunkHeight` as the length; its reach is length − 1. The line needs the anchor's terrain
+  height under its whole length. Otherwise it is built 2 long, and if even that does not fit, no log is placed.
+  `FloraPlacement.LyingFit` decides this from the sampled heights, so the chunk (anchor code 1, 2 or 0) and the
+  sampler (species 0 when nothing fits) agree. The FallenLog species has Oak and Birch variants, length 3–6.
+- **Beaches**: a biome has an optional `BeachBlock` (Sand on all shipped biomes except Snow and Mountain) and a
+  beach height h_b,max (3). The beach noise B (wavelength 128) gives each column a beach height
+  h_b = round(h_b,max · smoothstep(0.45, 0.45 + 0.15, B)). With threshold 0.45, about half of the shores get no
+  beach. A dry column whose top lies 0 … h_b − 1 above the water surface is a beach if water lies near it. A beach
+  column takes the beach block as its top block and in the two blocks under it. Snow still covers a cold beach.
+- **Water probes**: "near water" means that some probe within `BeachWaterDistance` (16) blocks, measured as a
+  Euclidean distance, lies under water. Probes are the columns at multiples of 4 blocks, and each is tested by its
+  terrain height alone (`WorldSampler.SampleHeight`, the height of `SampleCore` bit for bit). The test runs only
+  for columns that pass the band and the noise, nearest probes first. `BlendCache` remembers the probes of a chunk or
+  region tile, so neighbouring columns share them. Water narrower than 4 blocks can go unseen. Without this test,
+  low flats far from any water turned into sand. At 4096² before the test, 15 % (Terrain-first) and 32 %
+  (Biome-first) of the beach columns had no water within 32 blocks.
+- **Beach flora**: flora rules treat beach columns as ground of the beach block. A rule with `RequiresBeachGround`
+  grows only on beaches whose beach block is solid, and all other rules skip beach columns. No shipped rule uses it
+  yet.
+- **Tests**:
+  - `FloraDensityTests`: on all four noises, the mean density of k = 1 rules over 4096² stays within 5 %. Also
+    checked: clustering, the switch off equals k = 0, scaling above 1, the pre-filter stays necessary.
+  - `FloraChunkTests`: the chunk job against the region API with every rule dense; both log outcomes; the shipped
+    species including Boulder and FallenLog.
+  - `TreeShapeTests`: sink moves the whole shape down; a lying trunk is a line in one of the four directions,
+    2 long when narrowed.
+  - `BeachTests`: the band and noise mask, `SampleHeight` equal to the core height in every Biome-first method,
+    `NearWater` (pure and cached) against brute force, and the chunk job against the region API in both
+    architectures, including beach-only flora and a beach block without plants.
+
 # Version 1.8 (Species set)
 
 The standard package ships six tree species with two variants each, on the land biomes next to the single-voxel

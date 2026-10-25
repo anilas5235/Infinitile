@@ -160,5 +160,19 @@ MonoBehaviour:
   StrataThickness: 2
   StrataWarpAmplitude: 4
   StrataWarpWavelength: 64
+  BeachWavelength: 128
+  BeachThreshold: 0.45
+  BeachRamp: 0.15
+  BeachWaterDistance: 16
+  TreeSpacingRadius: 3
+  FloraDensityNoise: 1
+  TreesDensityWavelength: 96
+  TreesDensityContrast: 2
+  UndergrowthDensityWavelength: 48
+  UndergrowthDensityContrast: 2
+  FlowersDensityWavelength: 24
+  FlowersDensityContrast: 2
+  GroundDetailsDensityWavelength: 64
+  GroundDetailsDensityContrast: 2
   Biomes: {fileID: 11400000, guid: f0ebb416c9f7eb0ebd760b80683faf16, type: 2}
   Splines: {fileID: 11400000, guid: 0514b19bf2060874fa278a044246d671, type: 2}

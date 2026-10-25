@@ -32,6 +32,7 @@
             <ui:VisualElement name="performance-panel" class="panel" picking-mode="Ignore">
                 <ui:Label text="Performance" class="panel__title" />
                 <ui:Label name="fps" class="row row--strong" />
+                <ui:Label name="vram" class="row" />
                 <ui:Label name="chunks" class="row" />
                 <ui:Label name="queues" class="row" />
                 <ui:Label text="Culling (visible / shadow / allocated pages)" class="row row--dim" />

@@ -18,6 +18,8 @@ MonoBehaviour:
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   SnowTopBlock: {fileID: 11400000, guid: dda8a6f1ece6d0243a39b247a2bd2a75, type: 2}
   StrataBlock: {fileID: 11400000, guid: 2a1844411e45fba40a1da565a805687e, type: 2}
+  BeachBlock: {fileID: 0}
+  BeachHeight: 3
   TargetHumidity: 0.4
   TargetTemperature: 0.35
   TargetContinental: 0.8
@@ -41,6 +43,8 @@ MonoBehaviour:
     Probability: 0.05
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 1
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 11400000, guid: 10218f21e1d9ac948ac6846e1469b188, type: 2}
@@ -49,6 +53,8 @@ MonoBehaviour:
     Probability: 0.02
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 3
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 11400000, guid: ad4d203a2cf19f544b576099a0c1ce6d, type: 2}
@@ -57,6 +63,8 @@ MonoBehaviour:
     Probability: 0.01
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 3
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 0}
@@ -65,6 +73,8 @@ MonoBehaviour:
     Probability: 0.01
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 0
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 0}
@@ -73,6 +83,18 @@ MonoBehaviour:
     Probability: 0.002
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 1
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 0}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 11400000, guid: 2904966c836544142994d7f63d04d07b, type: 2}
+    Probability: 0.00004
+    RequiresSurfaceFromSameBiome: 0
+    MinHeightAboveWater: 1
+    DensityNoise: 3
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   RepresentativeColor: {r: 0.7207546, g: 0.7207546, b: 0.7207546, a: 1}

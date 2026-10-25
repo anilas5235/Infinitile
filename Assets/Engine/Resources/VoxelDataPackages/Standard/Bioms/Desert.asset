@@ -18,6 +18,8 @@ MonoBehaviour:
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   SnowTopBlock: {fileID: 0}
   StrataBlock: {fileID: 11400000, guid: eeed6c09b1b96c04faeab22d816e1b62, type: 2}
+  BeachBlock: {fileID: 11400000, guid: b5df436b2cc46cf419e666fccd2d96b3, type: 2}
+  BeachHeight: 3
   TargetHumidity: 0.1
   TargetTemperature: 0.9
   TargetContinental: 0.45
@@ -41,6 +43,8 @@ MonoBehaviour:
     Probability: 0.005
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 1
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 11400000, guid: 7d70a9befae6460eb69514c9661cc35f, type: 2}
@@ -49,6 +53,8 @@ MonoBehaviour:
     Probability: 0.0025
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 1
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 0}
@@ -57,6 +63,8 @@ MonoBehaviour:
     Probability: 0.0025
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 0
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 0}
@@ -65,6 +73,8 @@ MonoBehaviour:
     Probability: 0.00025
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    DensityNoise: 0
+    DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   RepresentativeColor: {r: 0.9899782, g: 1, b: 0, a: 1}

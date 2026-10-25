@@ -30,7 +30,8 @@ namespace Engine.Scripts.Jobs.Chunk{
 
         /// <summary>
         ///     Multi-block anchors whose structure may reach into the chunk: 1, or 2 for a tree whose wide or leaning
-        ///     trunk is built 1 wide and straight because its footprint is not flat.
+        ///     trunk is built 1 wide and straight (a lying trunk 2 long) because its footprint is not flat. A lying
+        ///     trunk that fits nowhere is no anchor (0).
         /// </summary>
         public NativeArray<byte> Anchor;
 

@@ -90,7 +90,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// <summary>Run the snow and ice overrides after terrain fill.</summary>
         [MarshalAs(UnmanagedType.U1)] public bool EnableClimateOverrides; // blittable for the Burst direct calls
 
-        // --- Snow, ice and strata (SurfaceCover) ------------------------------------------------------------------
+        // --- Snow, ice, strata and beaches (SurfaceCover) ----------------------------------------------------------
         public float FreezeTemperature;
         public float SnowLapse;
         public float FreezeNoiseAmplitude;
@@ -99,6 +99,28 @@ namespace Engine.Scripts.WorldGen.Settings{
         public int StrataThickness;
         public float StrataWarpAmplitude;
         public float StrataWarpWavelength;
+
+        /// <summary>Wavelength of the beach noise in blocks.</summary>
+        public float BeachWavelength;
+
+        /// <summary>Beach noise value (0…1) below which a shore has no beach.</summary>
+        public float BeachThreshold;
+
+        /// <summary>Rise of the beach noise above the threshold to the full beach height; positive.</summary>
+        public float BeachRamp;
+
+        /// <summary>Largest distance in blocks from a beach column to an under-water water probe; 0 = no test.</summary>
+        public int BeachWaterDistance;
+
+        /// <summary>Some biome has beaches (beach height above 0).</summary>
+        [MarshalAs(UnmanagedType.U1)] public bool HasBeaches;
+
+        // --- Flora density noises (FloraPlacement) ------------------------------------------------------------------
+        /// <summary>Wavelength in blocks of each flora density noise, indexed by <see cref="FloraDensity" />.</summary>
+        public float4 FloraDensityWavelength;
+
+        /// <summary>Contrast c of each density noise: its factor is clamp(1 + c · D, 0, 2) for the noise D in −1…1.</summary>
+        public float4 FloraDensityContrast;
 
         /// <summary>Climate noise instances (T, F, C, E, W) and couplings. Owned.</summary>
         public ClimateParams Climate;

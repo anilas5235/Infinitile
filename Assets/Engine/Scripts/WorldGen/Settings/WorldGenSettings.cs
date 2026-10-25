@@ -183,10 +183,60 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Tooltip("Wavelength of that rise and fall in blocks.")]
         public float StrataWarpWavelength = 64f;
 
+        [Header("Beaches")]
+        [Tooltip("Wavelength of the beach noise in blocks: the length of beach and beachless stretches along a shore.")]
+        public float BeachWavelength = 128f;
+
+        [Tooltip("Beach noise value (0…1) below which a shore has no beach; about half of the shores at 0.45.")]
+        [Range(0f, 1f)]
+        public float BeachThreshold = .45f;
+
+        [Tooltip("How far the beach noise rises above the threshold until a beach reaches the biome's full beach height.")]
+        [Range(.01f, 1f)]
+        public float BeachRamp = .15f;
+
+        [Tooltip("A beach column needs water within this many blocks, so low flats away from any water stay dry; "
+                 + "probed on a lattice every 4 blocks. 0: no test.")]
+        [Min(0)]
+        public int BeachWaterDistance = 16;
+
         [Header("Vegetation")]
         [Tooltip("r_tree: anchors of multi-block flora (trees, cacti) are at least this many blocks apart (default 3).")]
         [Min(0)]
         public int TreeSpacingRadius = 3;
+
+        [Header("Flora density")]
+        [Tooltip("Flora rules with a density influence cluster into groves and patches, with clearings between them. "
+                 + "Off: every rule is spread evenly.")]
+        public bool FloraDensityNoise = true;
+
+        [Tooltip("Wavelength of the Trees density noise in blocks: the size of groves and clearings.")]
+        public float TreesDensityWavelength = 96f;
+
+        [Tooltip("Contrast of the Trees density noise: higher values give denser groves and wider clearings.")]
+        [Min(0f)]
+        public float TreesDensityContrast = 2f;
+
+        [Tooltip("Wavelength of the Undergrowth density noise in blocks.")]
+        public float UndergrowthDensityWavelength = 48f;
+
+        [Tooltip("Contrast of the Undergrowth density noise.")]
+        [Min(0f)]
+        public float UndergrowthDensityContrast = 2f;
+
+        [Tooltip("Wavelength of the Flowers density noise in blocks.")]
+        public float FlowersDensityWavelength = 24f;
+
+        [Tooltip("Contrast of the Flowers density noise.")]
+        [Min(0f)]
+        public float FlowersDensityContrast = 2f;
+
+        [Tooltip("Wavelength of the Ground details density noise in blocks (rocks, boulders, mushrooms).")]
+        public float GroundDetailsDensityWavelength = 64f;
+
+        [Tooltip("Contrast of the Ground details density noise.")]
+        [Min(0f)]
+        public float GroundDetailsDensityContrast = 2f;
 
         [Header("Assets")]
         [Tooltip("Active biomes. Indices in jobs are indices into this set.")]
@@ -229,6 +279,13 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (!IsPositiveFinite(WarpWavelength)) yield return (nameof(WarpWavelength), WarpWavelength);
             if (!IsPositiveFinite(FreezeNoiseWavelength)) yield return (nameof(FreezeNoiseWavelength), FreezeNoiseWavelength);
             if (!IsPositiveFinite(StrataWarpWavelength)) yield return (nameof(StrataWarpWavelength), StrataWarpWavelength);
+            if (!IsPositiveFinite(BeachWavelength)) yield return (nameof(BeachWavelength), BeachWavelength);
+            if (!IsPositiveFinite(TreesDensityWavelength)) yield return (nameof(TreesDensityWavelength), TreesDensityWavelength);
+            if (!IsPositiveFinite(UndergrowthDensityWavelength))
+                yield return (nameof(UndergrowthDensityWavelength), UndergrowthDensityWavelength);
+            if (!IsPositiveFinite(FlowersDensityWavelength)) yield return (nameof(FlowersDensityWavelength), FlowersDensityWavelength);
+            if (!IsPositiveFinite(GroundDetailsDensityWavelength))
+                yield return (nameof(GroundDetailsDensityWavelength), GroundDetailsDensityWavelength);
             // Not a divisor, but 0 flattens every climate field and a negative value mirrors the world.
             if (!IsPositiveFinite(ClimateFrequencyScale)) yield return (nameof(ClimateFrequencyScale), ClimateFrequencyScale);
 

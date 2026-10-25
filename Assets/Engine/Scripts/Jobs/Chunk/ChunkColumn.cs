@@ -14,10 +14,13 @@
         public ushort Biome;
 
         /// <summary>
-        ///     Surface block voxel ID: the biome's top block, its underwater top block when water covers it, or its snow
-        ///     block when the column is snow-covered.
+        ///     Surface block voxel ID: the biome's top block, its underwater top block when water covers it, its beach
+        ///     block on a beach, or its snow block when the column is snow-covered.
         /// </summary>
         public ushort TopBlock;
+
+        /// <summary>Beach block of a beach column, which also replaces the two under blocks below the top; 0 = no beach.</summary>
+        public ushort BeachBlock;
 
         /// <summary>Sub-surface block voxel ID (just below the top block).</summary>
         public ushort UnderBlock;

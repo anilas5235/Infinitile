@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Core;
+using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Burst;
@@ -39,6 +40,9 @@ namespace Engine.Editor.WorldGen{
 
         /// <summary>Vertical exaggeration of the hillshade (1 = true slope in blocks).</summary>
         public float Exaggeration;
+
+        /// <summary>Density noise (<see cref="FloraDensity" />) the flora view shades its ground with; -1 = none.</summary>
+        public int DensityOverlay;
     }
 
     /// <summary>
@@ -150,9 +154,15 @@ namespace Engine.Editor.WorldGen{
             };
             JobHandle sampled = WorldGenApi.SampleRegion(request, ref buffers);
 
+            int overlay = math.clamp(options.DensityOverlay, -1, 3);
             JobHandle views = new ViewJob{
                 Size = size,
                 Stride = stride,
+                Origin = origin,
+                Seed = _config.Seed,
+                DensityOverlay = overlay,
+                DensityWavelength = overlay >= 0 ? _config.FloraDensityWavelength[overlay] : 1f,
+                DensityContrast = overlay >= 0 ? _config.FloraDensityContrast[overlay] : 0f,
                 Fields = Fields,
                 Height = Height,
                 HardBiome = HardBiome,
@@ -349,6 +359,11 @@ namespace Engine.Editor.WorldGen{
         private struct ViewJob : IJobParallelFor{
             public int Size;
             public int Stride;
+            public int2 Origin;
+            public uint Seed;
+            public int DensityOverlay;
+            public float DensityWavelength;
+            public float DensityContrast;
             [ReadOnly] public NativeArray<WorldFields> Fields;
             [ReadOnly] public NativeArray<float> Height;
             [ReadOnly] public NativeArray<int> HardBiome;
@@ -388,11 +403,18 @@ namespace Engine.Editor.WorldGen{
                 byte w = (byte)math.round(math.saturate(weight) * 255f);
                 MaxWeightView[index] = new Color32(w, w, w, 255);
 
-                // Flora species over the darkened surface source.
+                // Flora species over the darkened surface source; with a density overlay the ground is dark in
+                // clearings (factor 0) and bright in groves (factor 2).
                 ushort species = FloraSpecies[index];
+                float ground = 0.4f;
+                if (DensityOverlay >= 0){
+                    int x = Origin.x + index % Size * Stride, z = Origin.y + index / Size * Stride;
+                    ground = 0.45f * FloraPlacement.DensityFactor(x, z, Seed, DensityOverlay, DensityWavelength, DensityContrast);
+                }
+
                 FloraView[index] = species != 0
                     ? SpeciesColor(species)
-                    : new Color32((byte)(surface.r * 0.4f), (byte)(surface.g * 0.4f), (byte)(surface.b * 0.4f), 255);
+                    : new Color32((byte)(surface.r * ground), (byte)(surface.g * ground), (byte)(surface.b * ground), 255);
 
                 HeightView[index] = HeightColor(index);
 

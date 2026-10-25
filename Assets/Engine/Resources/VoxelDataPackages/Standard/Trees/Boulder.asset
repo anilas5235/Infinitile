@@ -1,0 +1,147 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 25ad9f33b593d7e44aa899d24d1f01f5, type: 3}
+  m_Name: Boulder
+  m_EditorClassIdentifier: Engine.Runtime::Engine.Scripts.VoxelConfig.Data.Generation.TreeSpecies
+  Variants:
+  - Name: Stone
+    Weight: 1
+    TrunkVoxel: {fileID: 0}
+    TrunkHeight:
+      Min: 0
+      Max: 0
+    TrunkWidth: 1
+    MaxLean: 0
+    Lying: 0
+    CrownShape: 1
+    LeafVoxel: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
+    AltLeafVoxel: {fileID: 0}
+    CrownRadius:
+      Min: 1
+      Max: 2
+    CrownTopRadius:
+      Min: 0
+      Max: 0
+    CrownHeight:
+      Min: 0
+      Max: 0
+    CrownBase: 1
+    CrownMinBase: 0
+    BranchChance: 1
+    BranchCount:
+      Min: 0
+      Max: 0
+    BranchStyle: 0
+    BranchLength:
+      Min: 1
+      Max: 2
+    BranchBandMin: 0.5
+    BranchBandMax: 0.9
+    BranchLeafRadius:
+      Min: 0
+      Max: 0
+    HoleChance: 0.1
+    BumpChance: 0.15
+    HangChance: 0
+    AltLeafChance: 0
+    Sink:
+      Min: 0
+      Max: 1
+    SpacingRadius: 3
+  - Name: Grey
+    Weight: 1
+    TrunkVoxel: {fileID: 0}
+    TrunkHeight:
+      Min: 0
+      Max: 0
+    TrunkWidth: 1
+    MaxLean: 0
+    Lying: 0
+    CrownShape: 1
+    LeafVoxel: {fileID: 11400000, guid: 2a1844411e45fba40a1da565a805687e, type: 2}
+    AltLeafVoxel: {fileID: 0}
+    CrownRadius:
+      Min: 1
+      Max: 2
+    CrownTopRadius:
+      Min: 0
+      Max: 0
+    CrownHeight:
+      Min: 0
+      Max: 0
+    CrownBase: 1
+    CrownMinBase: 0
+    BranchChance: 1
+    BranchCount:
+      Min: 0
+      Max: 0
+    BranchStyle: 0
+    BranchLength:
+      Min: 1
+      Max: 2
+    BranchBandMin: 0.5
+    BranchBandMax: 0.9
+    BranchLeafRadius:
+      Min: 0
+      Max: 0
+    HoleChance: 0.1
+    BumpChance: 0.15
+    HangChance: 0
+    AltLeafChance: 0
+    Sink:
+      Min: 0
+      Max: 1
+    SpacingRadius: 3
+  - Name: Grassy
+    Weight: 1
+    TrunkVoxel: {fileID: 0}
+    TrunkHeight:
+      Min: 0
+      Max: 0
+    TrunkWidth: 1
+    MaxLean: 0
+    Lying: 0
+    CrownShape: 1
+    LeafVoxel: {fileID: 11400000, guid: 353f140206970744e9856f0241ad4fae, type: 2}
+    AltLeafVoxel: {fileID: 0}
+    CrownRadius:
+      Min: 1
+      Max: 2
+    CrownTopRadius:
+      Min: 0
+      Max: 0
+    CrownHeight:
+      Min: 0
+      Max: 0
+    CrownBase: 1
+    CrownMinBase: 0
+    BranchChance: 1
+    BranchCount:
+      Min: 0
+      Max: 0
+    BranchStyle: 0
+    BranchLength:
+      Min: 1
+      Max: 2
+    BranchBandMin: 0.5
+    BranchBandMax: 0.9
+    BranchLeafRadius:
+      Min: 0
+      Max: 0
+    HoleChance: 0.1
+    BumpChance: 0.15
+    HangChance: 0
+    AltLeafChance: 0
+    Sink:
+      Min: 0
+      Max: 1
+    SpacingRadius: 3

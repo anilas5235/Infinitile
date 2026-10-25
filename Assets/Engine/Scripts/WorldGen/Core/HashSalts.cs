@@ -21,6 +21,17 @@ namespace Engine.Scripts.WorldGen.Core{
         /// <summary>Rise and fall of the strata bands.</summary>
         public const uint StrataNoise = 0x4D9F7A14u;
 
+        /// <summary>Base salt of the flora density noises; noise i uses <see cref="FloraDensity" />.</summary>
+        private const uint FloraDensityBase = 0x7FA3C519u;
+
+        /// <summary>Salt of flora density noise <paramref name="i" /> (0…3).</summary>
+        public static uint FloraDensity(int i){
+            return FloraDensityBase + (uint)i;
+        }
+
+        /// <summary>Beach height noise of the shore band.</summary>
+        public const uint BeachNoise = 0x8E1B4D2Du;
+
         /// <summary>Shared blend warp field, one salt per axis.</summary>
         public const uint BlendWarpX = 0x92E4CF09u;
 
