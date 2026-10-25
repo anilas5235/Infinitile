@@ -142,6 +142,31 @@ namespace Engine.Tests.Performance{
             MeasurePerChunk($"ChunkJob.Run {architecture} DistanceBlend snow strata ms/chunk");
         }
 
+        /// <summary>
+        ///     The flora world of <see cref="ChunkJob_Run_PerMethod_WithFlora_MsPerChunk" /> with DistanceBlend, where every
+        ///     biome has beaches, so shore columns also roll the beach noise and probe for water nearby, and flora rules
+        ///     test the beach ground.
+        /// </summary>
+        [Test]
+        [Performance]
+        public void ChunkJob_Run_Beaches_MsPerChunk(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
+            _config = BenchmarkFixtures.CreatePlaceholderGeneratorConfig(architecture, BlendMethod.DistanceBlend,
+                Allocator.Persistent, _created, true);
+            for (int b = 0; b < _config.WorldGen.BiomeCount; b++){
+                Biome.BiomeDef def = _config.WorldGen.Biomes[b];
+                def.beachBlock = BenchmarkFixtures.Dirt;
+                def.beachHeight = 3;
+                def.beachFloraGround = 1;
+                _config.WorldGen.Biomes[b] = def;
+            }
+
+            _config.WorldGen.HasBeaches = true;
+            Assert.Greater(_config.WorldGen.BeachWaterDistance, 0);
+            MeasurePerChunk($"ChunkJob.Run {architecture} DistanceBlend beaches ms/chunk");
+        }
+
         private void MeasurePerChunk(string sampleGroup){
             _jobs.Clear();
             Random rng = new(42);

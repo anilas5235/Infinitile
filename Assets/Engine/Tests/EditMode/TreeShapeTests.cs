@@ -374,7 +374,7 @@ namespace Engine.Tests.EditMode{
             for (int j = 0; j < region.Size.y; j++){
                 int x = region.Origin.x + i, z = region.Origin.y + j;
                 WorldSampler.SampleColumn(x, z, _cfg, out ColumnSample c);
-                candidates[i, j] = FloraPlacement.IsMultiBlock(FloraPlacement.RollRule(x, z, _cfg, c, out int _), _cfg);
+                candidates[i, j] = FloraPlacement.IsMultiBlock(FloraPlacement.RollRule(x, z, _cfg, default, c, out int _), _cfg);
             }
 
             HashSet<int2> anchors = new();

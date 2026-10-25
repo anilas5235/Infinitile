@@ -90,6 +90,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 BeachWavelength = settings.BeachWavelength,
                 BeachThreshold = math.saturate(settings.BeachThreshold),
                 BeachRamp = math.max(settings.BeachRamp, .01f),
+                BeachWaterDistance = math.max(settings.BeachWaterDistance, 0),
                 FloraDensityWavelength = new float4(settings.TreesDensityWavelength, settings.UndergrowthDensityWavelength,
                     settings.FlowersDensityWavelength, settings.GroundDetailsDensityWavelength),
                 FloraDensityContrast = new float4(settings.TreesDensityContrast, settings.UndergrowthDensityContrast,
@@ -125,6 +126,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 for (int b = 0; b < active.Count; b++){
                     Biome biome = active[b];
                     cfg.Biomes[b] = voxelId != null ? biome.ToStruct(voxelId) : biome.ToStruct();
+                    if (cfg.Biomes[b].beachHeight != 0) cfg.HasBeaches = true;
                     for (int i = 0; i < octaveCount; i++){
                         // a_{b,i} = HeightAmplitude_b × OctaveWeights_{b,i}; missing weights count as 0.
                         float w = biome.OctaveWeights != null && i < biome.OctaveWeights.Length ? biome.OctaveWeights[i] : 0f;

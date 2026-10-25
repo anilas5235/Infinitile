@@ -35,7 +35,7 @@ namespace Engine.Scripts.WorldGen.Flora{
         ///     Steps 1–3: the index of the flora rule (into <c>cfg.FloraRules</c>) the column passes, or -1.
         ///     <paramref name="source" /> is the flora source biome of a passing rule, -1 otherwise.
         /// </summary>
-        public static int RollRule(int x, int z, in WorldGenConfig cfg, in ColumnSample s, out int source){
+        public static int RollRule(int x, int z, in WorldGenConfig cfg, in BlendCache cache, in ColumnSample s, out int source){
             source = -1;
             if (!cfg.HasFlora) return -1;
 
@@ -67,7 +67,7 @@ namespace Engine.Scripts.WorldGen.Flora{
             if (d.RequiresSurfaceFromSameBiome != 0 && s.SurfaceSource != biome) return -1;
             if (!GroundAllows(s, d.MinHeightAboveWater, cfg)) return -1;
             // Beach columns carry only beach-ground rules, and those grow nowhere else.
-            if ((cfg.Biomes[s.SurfaceSource].beachHeight | d.BeachGround) != 0 && !BeachAllows(x, z, d.BeachGround, s, cfg)) return -1;
+            if ((cfg.Biomes[s.SurfaceSource].beachHeight | d.BeachGround) != 0 && !BeachAllows(x, z, d.BeachGround, s, cfg, cache)) return -1;
             // Snow keeps trees and cacti but carries no ground plants.
             if (d.MultiBlock == 0 &&
                 SurfaceCover.IsSnowCovered(x, z, s.Fields.T, s.ColumnHeight, cfg.Biomes[s.SurfaceSource], cfg)) return -1;
@@ -112,9 +112,10 @@ namespace Engine.Scripts.WorldGen.Flora{
         ///     whose beach block carries plants, other rules only off the beach. A separate method, so the roll stays small.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static bool BeachAllows(int x, int z, byte beachGround, in ColumnSample s, in WorldGenConfig cfg){
+        private static bool BeachAllows(int x, int z, byte beachGround, in ColumnSample s, in WorldGenConfig cfg,
+            in BlendCache cache){
             Biome.BiomeDef def = cfg.Biomes[s.SurfaceSource];
-            bool beach = SurfaceCover.IsBeach(x, z, s.ColumnHeight, def, cfg);
+            bool beach = SurfaceCover.IsBeach(x, z, s.ColumnHeight, def, cfg, cache);
             if (beachGround == 0) return !beach;
             return beach && def.beachFloraGround != 0;
         }
@@ -216,7 +217,7 @@ namespace Engine.Scripts.WorldGen.Flora{
             out ushort species, out int source){
             species = 0;
             source = -1;
-            int rule = RollRule(x, z, cfg, s, out int biome);
+            int rule = RollRule(x, z, cfg, cache, s, out int biome);
             if (rule < 0) return;
             FloraRuleDef d = cfg.FloraRules[rule];
             if (d.MultiBlock != 0){
@@ -270,7 +271,7 @@ namespace Engine.Scripts.WorldGen.Flora{
                 if (!Outranks(new int2(nx, nz), Priority(nx, nz, cfg), self, own)) continue;
                 if (!MayBeMultiBlock(nx, nz, cfg)) continue;
                 WorldSampler.SampleCore(nx, nz, cfg, cache, out ColumnSample neighbour);
-                int rule = RollRule(nx, nz, cfg, neighbour, out int _);
+                int rule = RollRule(nx, nz, cfg, cache, neighbour, out int _);
                 if (!IsMultiBlock(rule, cfg)) continue;
                 if (Conflict(dx * dx + dz * dz, radius, SpacingRadius(nx, nz, rule, cfg))) return false;
             }

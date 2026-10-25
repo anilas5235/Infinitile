@@ -31,7 +31,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             FloraGrid grid = new(config.WorldGen.FloraPadding, Allocator.Temp);
             PrepareChunkMaps(ref config, ref chunkWordPos, chunkColumns, ref grid);
             DecideFlora(ref grid, chunkColumns, chunkWordPos, config.WorldGen);
-            ApplySurfaceCover(chunkColumns, chunkWordPos, config.WorldGen);
+            ApplySurfaceCover(chunkColumns, chunkWordPos, config.WorldGen, grid.Cache);
             grid.Dispose();
         }
 
@@ -79,7 +79,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                 }
 
                 int g = grid.Index(x, z);
-                grid.Rule[g] = FloraPlacement.RollRule(wx, wz, cfg, s, out col.FloraSource);
+                grid.Rule[g] = FloraPlacement.RollRule(wx, wz, cfg, cache, s, out col.FloraSource);
                 grid.Height[g] = col.Height;
                 chunkColumns[i] = col;
             }
@@ -94,7 +94,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                     grid.Rule[g] = -1;
                     if (!FloraPlacement.MayBeMultiBlock(wx, wz, cfg)) continue;
                     WorldSampler.SampleCore(wx, wz, cfg, cache, out ColumnSample s);
-                    int rule = FloraPlacement.RollRule(wx, wz, cfg, s, out int _);
+                    int rule = FloraPlacement.RollRule(wx, wz, cfg, cache, s, out int _);
                     if (!FloraPlacement.IsMultiBlock(rule, cfg)) continue;
                     grid.Rule[g] = rule;
                     grid.Height[g] = math.clamp(s.ColumnHeight, 0, MaxTerrainHeight);
@@ -216,7 +216,7 @@ namespace Engine.Scripts.Jobs.Chunk{
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
         internal static void ApplySurfaceCover(NativeArray<ChunkColumn> chunkColumns, int3 chunkWordPos,
-            in WorldGenConfig cfg){
+            in WorldGenConfig cfg, in BlendCache cache){
             for (int x = 0; x < ChunkWidth; x++)
             for (int z = 0; z < ChunkDepth; z++){
                 int i = GetColumnIdx(x, z, ChunkDepth);
@@ -227,7 +227,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                 if (col.SurfaceSource >= 0 && col.SurfaceSource < cfg.BiomeCount){
                     Biome.BiomeDef def = cfg.Biomes[col.SurfaceSource];
                     // Snow covers a beach like any dry column; the beach block stays under it.
-                    if (def.beachBlock != 0 && SurfaceCover.IsBeach(wx, wz, col.Height, def, cfg)){
+                    if (def.beachBlock != 0 && SurfaceCover.IsBeach(wx, wz, col.Height, def, cfg, cache)){
                         col.TopBlock = def.beachBlock;
                         col.BeachBlock = def.beachBlock;
                     }

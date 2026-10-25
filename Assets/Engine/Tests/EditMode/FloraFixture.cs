@@ -420,6 +420,8 @@ namespace Engine.Tests.EditMode{
 
             List<Object> species = FloraConfigBuilder.CollectSpecies(biomes);
             int waterLevel = config.WorldGen.WaterLevel;
+            // Remembers the beach water probes of the area (the same result as the pure probes, only faster).
+            BlendCache probes = BlendCache.Build(cfg, Origin, Origin + Size - 1, 1, Allocator.Temp);
 
             for (int x = 0; x < Size.x; x++)
             for (int z = 0; z < Size.y; z++){
@@ -434,7 +436,7 @@ namespace Engine.Tests.EditMode{
                 // columns take the snow block.
                 Voxel wet = b && b.UnderwaterTopBlock ? b.UnderwaterTopBlock : b ? b.UnderBlock : null;
                 ushort top = b ? fixture.Ids[h + 1 < waterLevel ? wet : b.TopBlock] : (ushort)0;
-                bool beach = b && b.BeachBlock && SurfaceCover.IsBeach(wx, wz, h, def, cfg);
+                bool beach = b && b.BeachBlock && SurfaceCover.IsBeach(wx, wz, h, def, cfg, probes);
                 if (beach) top = fixture.Ids[b.BeachBlock];
                 if (b && SurfaceCover.IsSnowCovered(wx, wz, t, h, def, cfg)) top = def.snowTopBlock;
                 ushort under = b ? fixture.Ids[b.UnderBlock] : (ushort)0;
@@ -450,6 +452,8 @@ namespace Engine.Tests.EditMode{
                     _voxels[Flat(x, y, z)] = v;
                 }
             }
+
+            probes.Dispose();
 
             // Single-block plants.
             for (int x = 0; x < Size.x; x++)

@@ -109,6 +109,12 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// <summary>Rise of the beach noise above the threshold to the full beach height; positive.</summary>
         public float BeachRamp;
 
+        /// <summary>Largest distance in blocks from a beach column to an under-water water probe; 0 = no test.</summary>
+        public int BeachWaterDistance;
+
+        /// <summary>Some biome has beaches (beach height above 0).</summary>
+        [MarshalAs(UnmanagedType.U1)] public bool HasBeaches;
+
         // --- Flora density noises (FloraPlacement) ------------------------------------------------------------------
         /// <summary>Wavelength in blocks of each flora density noise, indexed by <see cref="FloraDensity" />.</summary>
         public float4 FloraDensityWavelength;

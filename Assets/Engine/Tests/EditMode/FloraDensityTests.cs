@@ -156,7 +156,7 @@ namespace Engine.Tests.EditMode{
             for (int x = -1200; x < -1200 + 256; x++)
             for (int z = -400; z < -400 + 256; z++){
                 WorldSampler.SampleCore(x, z, _cfg, noCache, out ColumnSample s);
-                int rule = FloraPlacement.RollRule(x, z, _cfg, s, out int _);
+                int rule = FloraPlacement.RollRule(x, z, _cfg, default, s, out int _);
                 if (!FloraPlacement.IsMultiBlock(rule, _cfg)) continue;
                 candidates++;
                 Assert.IsTrue(FloraPlacement.MayBeMultiBlock(x, z, _cfg), $"({x},{z})");

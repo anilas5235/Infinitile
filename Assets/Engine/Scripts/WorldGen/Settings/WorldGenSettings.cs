@@ -195,6 +195,11 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Range(.01f, 1f)]
         public float BeachRamp = .15f;
 
+        [Tooltip("A beach column needs water within this many blocks, so low flats away from any water stay dry; "
+                 + "probed on a lattice every 4 blocks. 0: no test.")]
+        [Min(0)]
+        public int BeachWaterDistance = 16;
+
         [Header("Vegetation")]
         [Tooltip("r_tree: anchors of multi-block flora (trees, cacti) are at least this many blocks apart (default 3).")]
         [Min(0)]

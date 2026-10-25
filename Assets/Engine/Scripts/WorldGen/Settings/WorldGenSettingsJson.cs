@@ -61,6 +61,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["BeachWavelength"] = s.BeachWavelength,
                 ["BeachThreshold"] = s.BeachThreshold,
                 ["BeachRamp"] = s.BeachRamp,
+                ["BeachWaterDistance"] = s.BeachWaterDistance,
                 ["TreeSpacingRadius"] = s.TreeSpacingRadius,
                 ["FloraDensityNoise"] = s.FloraDensityNoise,
                 ["TreesDensityWavelength"] = s.TreesDensityWavelength,

@@ -128,6 +128,28 @@ namespace Engine.Scripts.WorldGen.Core{
             sample = s;
         }
 
+        /// <summary>
+        ///     The terrain height H of <see cref="SampleCore" /> alone, bit for bit: Terrain-first skips the classification
+        ///     and the material stage, Biome-first the surface pick. Direct-call entry point, so a managed caller gets the
+        ///     jobs' bits.
+        /// </summary>
+        [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
+        public static void SampleHeight(int x, int z, in WorldGenConfig cfg, in BlendCache cache, out float height){
+            float2 p = new(x, z);
+            SampleFields(p, cfg, out WorldFields fields);
+            if (cfg.Architecture == GenArchitecture.TerrainFirst){
+                TerrainFirstHeight.Sample(p, fields, cfg, out float3 _, out height, out float _);
+                return;
+            }
+
+            int2 column = new(x, z);
+            int hard = BiomeClassifier.Distances(fields, 0f, false, cfg, out BlendWeights distancesSq);
+            BlendWeights weights = cfg.StagesShareWeights
+                ? BlendMethods.Compute(BlendStage.Material, cfg.MaterialMethod, column, hard, distancesSq, cfg, cache)
+                : BlendMethods.Compute(BlendStage.Height, cfg.HeightMethod, column, hard, distancesSq, cfg, cache);
+            BiomeFirstHeight.Sample(p, weights, cfg, out height, out float _);
+        }
+
         /// <summary>h = saturate((H − Hmin)/(Hmax − Hmin)).</summary>
         public static float NormalizedHeight(float height, in WorldGenConfig cfg){
             return math.saturate((height - cfg.HeightMin) / (cfg.HeightMax - cfg.HeightMin));
