@@ -532,7 +532,9 @@ namespace Engine.Editor.WorldGen{
                 PreviewView.MaxMaterialWeight => $"Max material weight (mean {pass.MeanMaxWeight:0.00})",
                 PreviewView.SurfaceSource => "Surface source",
                 PreviewView.Flora => $"Flora ({flora:N0} columns, {pass.FloraCounts.Count} species)"
-                                     + (_densityOverlay >= 0 ? $" on {DensityOverlayLabels[_densityOverlay + 1]} density" : ""),
+                                     + (_densityOverlay >= 0 ? $" on {DensityOverlayLabels[_densityOverlay + 1]} density" : "")
+                                     + (_densityOverlay >= 0 && WorldGenSettings && !WorldGenSettings.FloraDensityNoise
+                                         ? " (density noise off: not applied)" : ""),
                 PreviewView.Climate => "Climate (T, C, F)",
                 PreviewView.Erosion => "Erosion E",
                 PreviewView.PeaksValleys => "Peaks & valleys PV",
