@@ -83,6 +83,22 @@ namespace Engine.Tests.EditMode{
             return chunks[chunk].GetVoxel(local);
         }
 
+        /// <summary>Anchors within two blocks of a chunk corner.</summary>
+        private static int CountNearCorner(ReferenceWorld reference){
+            static bool NearBorder(int c, int size){
+                int m = (c % size + size) % size;
+                return m <= 2 || m >= size - 2;
+            }
+
+            return reference.Anchors.Count(a => NearBorder(a.column.x, ChunkWidth) && NearBorder(a.column.y, ChunkDepth));
+        }
+
+        /// <summary>Anchors whose footprint within the area falls into the given number of chunks or more.</summary>
+        private static int CountInChunks(ReferenceWorld reference, int atLeast){
+            return reference.Anchors.Count(a => a.footprint.Where(reference.InArea)
+                .Select(p => new int2((int)math.floor(p.x / (float)ChunkWidth), (int)math.floor(p.z / (float)ChunkDepth))).Distinct().Count() >= atLeast);
+        }
+
         /// <summary>
         ///     Compares the voxels around every surface (h − 5 … h + 14) and at every position the reference stamped a
         ///     plant on. Returns the mismatch count; the first few are listed in <paramref name="report" />.
@@ -274,14 +290,8 @@ namespace Engine.Tests.EditMode{
             int2 originChunk = new(1, 2), chunks = new(3, 3);
             ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
 
-            static bool NearBorder(int c, int size){
-                int m = (c % size + size) % size;
-                return m <= 2 || m >= size - 2;
-            }
-
-            int nearCorner = reference.Anchors.Count(a => NearBorder(a.column.x, ChunkWidth) && NearBorder(a.column.y, ChunkDepth));
-            int fourChunks = reference.Anchors.Count(a => a.footprint.Where(reference.InArea)
-                .Select(p => new int2((int)math.floor(p.x / (float)ChunkWidth), (int)math.floor(p.z / (float)ChunkDepth))).Distinct().Count() == 4);
+            int nearCorner = CountNearCorner(reference);
+            int fourChunks = CountInChunks(reference, 4);
             TestContext.WriteLine($"variant {variant} {architecture}: anchors {reference.Anchors.Count}, near a corner {nearCorner}, " +
                                   $"in four chunks {fourChunks}, narrowed {reference.Narrowed.Count}, reach {_config.WorldGen.FloraReach}");
             Assert.Greater(reference.Anchors.Count, 20, "the area carries trees");
@@ -324,14 +334,14 @@ namespace Engine.Tests.EditMode{
             int2 originChunk = new(1, 2), chunks = new(3, 3);
             ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
 
-            int fourChunks = reference.Anchors.Count(a => a.footprint.Where(reference.InArea)
-                .Select(p => new int2((int)math.floor(p.x / (float)ChunkWidth), (int)math.floor(p.z / (float)ChunkDepth))).Distinct().Count() == 4);
-            int across = reference.Anchors.Count(a => a.footprint.Where(reference.InArea)
-                .Select(p => new int2((int)math.floor(p.x / (float)ChunkWidth), (int)math.floor(p.z / (float)ChunkDepth))).Distinct().Count() > 1);
+            int nearCorner = CountNearCorner(reference);
+            int fourChunks = CountInChunks(reference, 4);
+            int across = CountInChunks(reference, 2);
             int reach = _config.WorldGen.FloraReach;
-            TestContext.WriteLine($"{name} {architecture}: anchors {reference.Anchors.Count}, across a border {across}, " +
-                                  $"in four chunks {fourChunks}, reach {reach}");
+            TestContext.WriteLine($"{name} {architecture}: anchors {reference.Anchors.Count}, near a corner {nearCorner}, " +
+                                  $"across a border {across}, in four chunks {fourChunks}, reach {reach}");
             Assert.Greater(reference.Anchors.Count, 20, "the area carries trees");
+            Assert.Greater(nearCorner, 0, "an anchor lies next to a chunk corner");
             if (reach > 0) Assert.Greater(across, 0, "a tree crosses a chunk border");
             if (reach >= 4) Assert.Greater(fourChunks, 0, "a tree falls into four chunks");
 

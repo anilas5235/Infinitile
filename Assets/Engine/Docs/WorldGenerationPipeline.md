@@ -3,8 +3,8 @@
 # Version 1.8 (Species set)
 
 The standard package ships six tree species with two variants each, on the land biomes next to the single-voxel
-plants. No code changed; the set is data in `Resources/VoxelDataPackages/Standard/Trees`, and every value is a
-placeholder to tune in the species gallery.
+plants. The set is data in `Resources/VoxelDataPackages/Standard/Trees`, and every value is a placeholder to tune
+in the species gallery; the only code change is the arm rule below.
 
 | Species  | Variants (weight)              | Voxels                   | Biomes (probability per column)      |
 |----------|--------------------------------|--------------------------|--------------------------------------|
@@ -19,16 +19,19 @@ placeholder to tune in the species gallery.
   registry ids of the existing voxels stay the same. Their textures are tinted copies in `Artwork/Placeholder`.
   DeadBush is a foliage cross like GrassFDead; the Desert's dry plants are GrassFDead .02 and DeadBush .01.
 - **Cactus**: the tree species replaces the stacked cactus voxel rule of the Desert. Pillar is a bare trunk of 1 to 3
-  blocks; Arms adds one or two Arm branches without leaves.
+  blocks; Arms adds one or two Arm branches without leaves. `TreeShape` cuts an Arm branch on a crownless trunk so
+  its tip ends at least one block below the trunk top; an arm never reaches the top of its pillar.
+- **Bush**: Low has no trunk and its crown sits on the ground (`CrownBase` 1). Round has a one-block trunk with the
+  crown one layer above it (`CrownBase` 1), so the trunk shows.
 - **Flora tables**: the Big oak sets the shipped reach to 6 (branch 3, cluster 2, bump 1) and the largest spacing
   radius to 5, so the padding grows from 7 to 11. Chunk generation in play samples a wider ring for flora; the
   benchmarks keep their own placeholder flora.
 - **Tests**:
   - `TreeShapeTests`: every shipped variant over 200 anchors stands on its anchor, reaches its crown, stays within
-    its reach and above the hang layer. Leafless variants carry no leaves, and cone and tiered crowns keep their
-    minimum base.
-  - `FloraChunkTests`: every shipped variant matches the whole-world stamp in both architectures. Trees with reach
-    cross chunk borders, and from reach 4 on some fall into four chunks. The region API comparison (8 configurations)
+    its reach and above the hang layer. Leafless variants carry no leaves, cone and tiered crowns keep their
+    minimum base, and the arms of a crownless trunk stay below its top.
+  - `FloraChunkTests`: every shipped variant matches the whole-world stamp in both architectures, with an anchor
+    next to a chunk corner. Trees with reach cross chunk borders, and from reach 4 on some fall into four chunks. The region API comparison (8 configurations)
     and the border test also run on `FloraFixture.ShippedSpeciesBiomes`, the biome pair with all six species.
   - `DataImporterTests`: the shipped tables (reach 6, spacing 5, padding 11, six species, the new voxel classes),
     and a 4096² area in which every species grows and picks every variant.

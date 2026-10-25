@@ -236,7 +236,8 @@ namespace Engine.Tests.EditMode{
         public void Shapes_ShippedVariant_StandsOnItsAnchor_WithinReach(string name){
             // Every variant of the shipped species over 200 anchors: a face-connected trunk on the anchor that reaches
             // its crown (none for trunk 0), leaves only with a crown or branch clusters, a cone or tiered crown not
-            // below its minimum base, and no voxel beyond the reach or below the hang layer.
+            // below its minimum base, arms of a crownless trunk below its top, and no voxel beyond the reach or below
+            // the hang layer.
             TreeVariant variant = _fixture.ShippedVariant(name);
             TreeVariantDef v = Def(variant);
             ushort trunk = _fixture.Ids[variant.TrunkVoxel];
@@ -264,6 +265,9 @@ namespace Engine.Tests.EditMode{
                 else Assert.IsEmpty(leafSet, $"{at}: leaves without a crown or clusters");
                 if (tapered)
                     Assert.GreaterOrEqual(leafSet.Min(p => p.y), v.CrownMinBase - 1, $"{at}: the crown starts below its minimum base");
+                if (v.Crown == CrownShape.None && v.Branches == BranchStyle.Arm && r.Lean == 0)
+                    foreach (int3 l in logs.Where(l => l.x < 0 || l.x >= r.Width || l.z < 0 || l.z >= r.Width))
+                        Assert.Less(l.y, r.TrunkHeight - 1, $"{at}: arm voxel {l} not below the trunk top");
 
                 foreach (int3 p in voxels.Keys){
                     Assert.LessOrEqual(math.max(math.abs(p.x), math.abs(p.z)), v.Reach, $"{at}: voxel {p} beyond reach {v.Reach}");
