@@ -13,6 +13,7 @@ using Engine.Scripts.WorldGen.Settings;
 using Player;
 using Unity.Collections;
 using Unity.Mathematics;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
@@ -23,7 +24,7 @@ namespace UI{
     /// <summary>
     ///     The in-game HUD (UI Toolkit, Hud.uxml): crosshair, a hotbar of voxels to place, and three debug panels
     ///     toggled with F7: the world under the player (position, chunk, biome, climate, generation methods), the
-    ///     engine's performance (frame time, chunk queues, culling pages per layer) and the world generation controls
+    ///     engine's performance (frame time, graphics memory, chunk queues, culling pages per layer) and the world generation controls
     ///     of <see cref="WorldGenDebugKeys" />. Holding Left Alt frees the cursor to click the panel buttons.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
@@ -51,12 +52,13 @@ namespace UI{
         private readonly List<VisualElement> _slots = new();
         private Button[] _bookmarkGo;
         private Label _biome, _chunk, _chunks, _climate, _configuration, _fps, _generation, _height, _hint;
-        private Label _message, _position, _queues, _voxelName;
+        private Label _message, _position, _queues, _vram, _voxelName;
         private VisualElement _culling, _debugLeft, _debugRight;
 
         private bool _cursorFree;
         private float _frameTimeSum;
         private int _frames;
+        private ProfilerRecorder _gfxMemory;
         private LookController _look;
         private float _nextRefresh;
         private int _selected;
@@ -84,12 +86,16 @@ namespace UI{
             _climate = Root.Q<Label>("climate");
             _generation = Root.Q<Label>("generation");
             _fps = Root.Q<Label>("fps");
+            _vram = Root.Q<Label>("vram");
             _chunks = Root.Q<Label>("chunks");
             _queues = Root.Q<Label>("queues");
             _culling = Root.Q("culling");
             _configuration = Root.Q<Label>("configuration");
             _voxelName = Root.Q<Label>("voxel-name");
 
+            // Unity's own graphics allocations (textures, meshes, buffers, render targets); in the Editor this
+            // includes the Editor's windows.
+            _gfxMemory = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "Gfx Used Memory");
             BindGenControls();
             BuildHotbar();
             if (voxelEditor) voxelEditor.OnVoxelIdChanged += OnVoxelIdChanged;
@@ -99,6 +105,7 @@ namespace UI{
         private void OnDisable(){
             if (voxelEditor) voxelEditor.OnVoxelIdChanged -= OnVoxelIdChanged;
             if (_cursorFree) SetCursorFree(false);
+            _gfxMemory.Dispose();
             if (VoxelWorldRenderer.Instance) VoxelWorldRenderer.Instance.CollectCullingStats = false;
         }
 
@@ -212,6 +219,8 @@ namespace UI{
         private void RefreshPerformance(){
             float ms = _frames > 0 ? _frameTimeSum / _frames * 1000f : 0f;
             _fps.text = ms > 0f ? Invariant($"{1000f / ms:F0} FPS   {ms:F1} ms") : "- FPS";
+            string usedMb = _gfxMemory.Valid ? $"{_gfxMemory.LastValue / (1024 * 1024)}" : "-";
+            _vram.text = $"VRAM {usedMb} / {SystemInfo.graphicsMemorySize} MB";
 
             VoxelWorld world = VoxelWorld.Instance;
             if (world){
