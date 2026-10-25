@@ -99,7 +99,7 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 <div class="layout">
 <nav class="toc" aria-label="Contents">
   <div class="brand">World Generation Spec</div>
-  <div class="ver">v1.6 · 2026-10-24 · Terrain-first &amp; Biome-first</div>
+  <div class="ver">v1.7 · 2026-10-25 · Terrain-first &amp; Biome-first</div>
   <ol>
     <li><a href="#s0">0 · How to use this spec</a></li>
     <li class="toc-part">Part I · World generation</li>
@@ -126,36 +126,38 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
     <li><a href="#s15">15 · Engine cleanup</a></li>
     <li><a href="#s16">16 · Improvement ideas</a></li>
     <li><a href="#s17">17 · Generation improvements</a></li>
+    <li><a href="#s18">18 · Rotated voxels</a></li>
+    <li><a href="#s19">19 · Caves</a></li>
     <li class="toc-part">Part III · Research tooling</li>
-    <li><a href="#s18">18 · Separation rules</a></li>
-    <li><a href="#s19">19 · Export &amp; runner</a></li>
-    <li><a href="#s20">20 · Analysis pipeline</a></li>
-    <li><a href="#s21">21 · Phases (Part III)</a></li>
+    <li><a href="#s20">20 · Separation rules</a></li>
+    <li><a href="#s21">21 · Export &amp; runner</a></li>
+    <li><a href="#s22">22 · Analysis pipeline</a></li>
+    <li><a href="#s23">23 · Phases (Part III)</a></li>
     <li class="toc-part">Appendix</li>
-    <li><a href="#s22">22 · Defaults &amp; schemas</a></li>
+    <li><a href="#s24">24 · Defaults &amp; schemas</a></li>
   </ol>
 </nav>
 
 <main>
 <h1>World Generation Spec — Terrain-first &amp; Biome-first</h1>
-<p class="sub">Implementation specification for the voxel engine in <code>Assets/Engine</code>, written for a coding agent. Part I builds the world generation; Part E holds the engine-wide rules for performance, culling and lighting. Part II records the engine cleanup and the improvement ideas that were implemented after Part I, and plans the next generation improvements (Phase G). Part III, which comes later and stays separate, builds the tooling that collects research data from it.</p>
+<p class="sub">Implementation specification for the voxel engine in <code>Assets/Engine</code>, written for a coding agent. Part I builds the world generation; Part E holds the engine-wide rules for performance, culling and lighting. Part II records the engine cleanup and the improvement ideas that were implemented after Part I, records the generation improvements of Phase G, and plans rotated voxels (Phase O) and caves (Phase K). Part III, which comes later and stays separate, builds the tooling that collects research data from it.</p>
 <div class="meta">
   <span class="chip">Unity · Burst · Jobs · C#</span>
   <span class="chip">Part I: priority 1</span>
   <span class="chip">Part E: performance, culling, lighting</span>
-  <span class="chip">Part II: cleanup &amp; ideas done 2026-10-21; Phase G planned</span>
+  <span class="chip">Part II: cleanup &amp; ideas done 2026-10-21; Phase G done 2026-10-25; Phases O and K planned</span>
   <span class="chip">Part III: priority 2, separate assembly</span>
-  <span class="chip">Decisions recorded 2026-10-17 (§14), 2026-10-21 (§15.4) and 2026-10-24 (§17.8)</span>
+  <span class="chip">Decisions recorded 2026-10-17 (§14), 2026-10-21 (§15.4), 2026-10-24 (§17.8) and 2026-10-25 (§18.6, §19.9)</span>
 </div>
 
 <!-- ============================================================ -->
 <h2 id="s0">0 · How to use this spec</h2>
 <ul>
-  <li><strong>Order of work:</strong> <strong>Phase S</strong> (test and fix existing code) → <strong>Phase C</strong> (GPU culling, §E2) → Part I phases 0–5 (world generation) → <strong>Phase L</strong> (lighting, §E3) → <strong>Part II</strong> (engine cleanup and the scheduled ideas, §15–16, done 2026-10-21; then <strong>Phase G</strong>, generation improvements, §17) → Part III only when the user asks. The Part I phases are listed in §13, Phase G in §17.10, the Part III phases in §21. Performance rules (§E1) apply throughout.</li>
+  <li><strong>Order of work:</strong> <strong>Phase S</strong> (test and fix existing code) → <strong>Phase C</strong> (GPU culling, §E2) → Part I phases 0–5 (world generation) → <strong>Phase L</strong> (lighting, §E3) → <strong>Part II</strong> (engine cleanup and the scheduled ideas, §15–16, done 2026-10-21; then <strong>Phase G</strong>, generation improvements, §17; then <strong>Phase O</strong>, rotated voxels, §18, and <strong>Phase K</strong>, caves, §19) → Part III only when the user asks. The Part I phases are listed in §13, Phase G in §17.10, Phase O in §18.7, Phase K in §19.10, the Part III phases in §23. Performance rules (§E1) apply throughout.</li>
   <li><strong>Read order:</strong> §2 (rules) → §3 (what exists, known defects and review findings) → §11.7 (Unity CLI workflow) → §11.1 and §12 for Phase S → afterwards §5 (shared foundations) and the section of the current phase (§13 points to it).</li>
   <li><strong>Requirement keywords:</strong> <span class="kw must">MUST</span> is mandatory; <span class="kw should">SHOULD</span> is strongly recommended (deviate only with a stated reason in the commit/PR); <span class="kw may">MAY</span> is optional.</li>
-  <li><strong>Requirement IDs</strong> are stable. Part E: <code>PERF-</code>, <code>CUL-</code>, <code>LGT-</code>. Part I: <code>GEN-</code>, <code>TRN-</code> (Terrain-first), <code>BIO-</code> (Biome-first), <code>BLD-</code>, <code>VEG-</code>, <code>INT-</code>, <code>TST-</code>, <code>TOOL-</code>. Part III: <code>RES-</code>, <code>EXP-</code>, <code>ANA-</code>. In Part II, §15–16 record finished work and have no requirement IDs; §17 continues the Part I prefixes (<code>GEN-30</code>…, <code>VEG-10</code>…, <code>TST-30</code>…, <code>PERF-10</code>, <code>INT-31</code>). Reference IDs in commit messages and PR descriptions only. Since the cleanup (§15, R8) the code and everything the Editor shows carry <strong>no</strong> spec references.</li>
-  <li><strong>Decisions</strong> taken by the user are recorded in §14 (2026-10-17), §15.4 (2026-10-21) and §17.8 (2026-10-24) and are binding. If the agent hits a new design question, it asks the user instead of choosing silently.</li>
+  <li><strong>Requirement IDs</strong> are stable. Part E: <code>PERF-</code>, <code>CUL-</code>, <code>LGT-</code>. Part I: <code>GEN-</code>, <code>TRN-</code> (Terrain-first), <code>BIO-</code> (Biome-first), <code>BLD-</code>, <code>VEG-</code>, <code>INT-</code>, <code>TST-</code>, <code>TOOL-</code>. Part III: <code>RES-</code>, <code>EXP-</code>, <code>ANA-</code>. In Part II, §15–16 record finished work and have no requirement IDs; §17 continues the Part I prefixes (<code>GEN-30</code>…, <code>VEG-10</code>…, <code>TST-30</code>…, <code>PERF-10</code>, <code>INT-31</code>). §18 adds the prefix <code>ROT-</code> and §19 adds <code>CAV-</code>; both continue the shared ones (<code>TST-40</code>…, <code>TST-50</code>…, <code>PERF-11</code>, <code>PERF-12</code>, <code>INT-32</code>, <code>INT-33</code>, <code>DEC-47</code>…). Reference IDs in commit messages and PR descriptions only. Since the cleanup (§15, R8) the code and everything the Editor shows carry <strong>no</strong> spec references.</li>
+  <li><strong>Decisions</strong> taken by the user are recorded in §14 (2026-10-17), §15.4 (2026-10-21), §17.8 (2026-10-24), §18.6 and §19.9 (2026-10-25) and are binding. If the agent hits a new design question, it asks the user instead of choosing silently.</li>
   <li><strong>Placeholders.</strong> Numeric defaults (spline points, biome positions, biome height parameters, flora rules) are starting values so the world looks plausible. The user tunes them; the agent must not "optimise" them on its own (R5).</li>
 </ul>
 
@@ -177,10 +179,10 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 
 <h3>Non-goals for Part I</h3>
 <ul class="tight">
-  <li>No data export, experiment runner, metrics or analysis. That is Part III and lives outside the engine (§18).</li>
-  <li>No 3D density fields, overhangs or caves. The world is heightmap-based (2.5D): exactly one surface height per column.</li>
+  <li>No data export, experiment runner, metrics or analysis. That is Part III and lives outside the engine (§20).</li>
+  <li>No 3D density fields, overhangs or caves. The world is heightmap-based (2.5D): exactly one surface height per column. Part II adds caves below that surface (§19); the surface stays one height per column.</li>
   <li>No changes to meshing, rendering, colliders or the scheduler beyond what integration needs — except the Phase S fixes and Part E (culling, lighting). Performance is a goal throughout (§E1).</li>
-  <li>Ores, caves and structures (currently commented out in <code>ChunkJob</code>) stay disabled.</li>
+  <li>Ores, caves and structures stay disabled in Part I; their commented-out passes were removed in the §15 cleanup. Phase K (§19) builds caves and ores anew.</li>
 </ul>
 
 <!-- ============================================================ -->
@@ -432,7 +434,7 @@ Normalisation: PV enters as (PV + 1)/2 so that all dimensions live in [0,1]</pre
 <div class="req"><span class="id">TRN-02</span><span class="kw must">MUST</span>Interpolation is monotone cubic Hermite (Fritsch–Carlson) by default, piecewise linear as a per-spline option. Splines are C<sup>0</sup> everywhere, so the height field is continuous by construction. Outside the first/last control point a spline returns the end value. PV splines are defined over [−1,1], C and E splines over [0,1].</div>
 <div class="req"><span class="id">TRN-03</span><span class="kw must">MUST</span>Height: <code>H = Offset + Amp · Σ_i g_i · N_i + J · P</code>, i.e. <code>a_i = Amp · g_i</code> with a <strong>global</strong> octave-weight vector <code>g</code> (default <code>[1, .5, .25, .125, .0625, .03125]</code>). T and F never influence height.</div>
 <div class="req"><span class="id">TRN-04</span><span class="kw should">SHOULD</span>Comment the jaggedness spline as an own extension (the Minecraft Wiki documents splines for offset and factor). <em>Amp</em> replaces Minecraft's "factor", which has no 2D equivalent.</div>
-<div class="req"><span class="id">TRN-05</span><span class="kw must">MUST</span>Splines are authored in a ScriptableObject (<code>TerrainSplineSet</code>) with JSON import/export. Placeholder control points: §22.1.</div>
+<div class="req"><span class="id">TRN-05</span><span class="kw must">MUST</span>Splines are authored in a ScriptableObject (<code>TerrainSplineSet</code>) with JSON import/export. Placeholder control points: §24.1.</div>
 <div class="req"><span class="id">TRN-06</span><span class="kw should">SHOULD</span>Spline preview in the editor window: Offset/Amp/J as images over the view, and 1D plots of each spline level.</div>
 
 <h3>7.2 Classification</h3>
@@ -700,7 +702,7 @@ Docs/                                 WorldGenSpec.html (this file; outside Asse
 <div class="phase"><h4>Phase L — Lighting (after Part I)</h4>
 <p>Sections: §E3. Requirements: LGT-01…11, PERF-03.</p>
 <p><strong>Accept:</strong> shadows under trees and in water, lava glows coloured, light seamless across chunk borders, edits update light correctly; day/night cycle runs without re-propagation; LGT-11 tests and light benchmarks pass the budget.</p></div>
-<p class="small">After Phase L the work continued with Part II: the engine cleanup (§15) and the scheduled ideas (§16), all merged on 2026-10-21. Next is Phase G (§17); Part III follows when the user asks.</p>
+<p class="small">After Phase L the work continued with Part II: the engine cleanup (§15) and the scheduled ideas (§16), all merged on 2026-10-21. Phase G (§17) followed, then Phase O (§18) and Phase K (§19); Part III follows when the user asks.</p>
 
 <!-- ============================================================ -->
 <h2 id="s14">14 · Decisions</h2>
@@ -779,8 +781,8 @@ Docs/                                 WorldGenSpec.html (this file; outside Asse
 <div class="req"><span class="id">LGT-11</span><span class="kw must">MUST</span>EditMode tests: single emitter in open air gives <code>15 − Manhattan distance</code>; an opaque wall blocks; leaves/water attenuate by their value; channels are independent (red emitter leaves G and B at 0); sky column stays 15 down to the ground; <strong>border exactness</strong>: light of the centre chunk computed from its 3 × 3 region equals the light from one large computation over 5 × 5 chunks; <strong>edit exactness</strong>: 500 random edits with incremental updates equal a full recomputation; GPU packing round trip (C# port of the accessors). Benchmarks per PERF-02.</div>
 
 <!-- ============================================================ -->
-<div class="part" id="part2"><span>Part II</span> Engine cleanup, implemented ideas and generation improvements</div>
-<div class="box note"><p><strong>§15 and §16 are a record; §17 is planned work.</strong> §15 documents the engine cleanup and §16 the improvement ideas the user scheduled after Phase L, all merged on 2026-10-21 in PRs #38–#41. What keeps applying from them: rule R8, the decisions in §15.4 and the acceptance criteria of §16 as regression targets. §17 plans Phase G, the next round of generation improvements (2026-10-24). New ideas go to §16 and stay unscheduled until the user picks them.</p></div>
+<div class="part" id="part2"><span>Part II</span> Engine cleanup, implemented ideas, generation improvements, rotated voxels and caves</div>
+<div class="box note"><p><strong>§15 and §16 are a record; §17 records Phase G; §18 and §19 are planned work.</strong> §15 documents the engine cleanup and §16 the improvement ideas the user scheduled after Phase L, all merged on 2026-10-21 in PRs #38–#41. What keeps applying from them: rule R8, the decisions in §15.4 and the acceptance criteria of §16 as regression targets. §17 holds Phase G, the generation improvements (planned 2026-10-24, implemented 2026-10-24…25). §18 plans rotated voxels (Phase O) and §19 caves (Phase K), both on 2026-10-25. New ideas go to §16 and stay unscheduled until the user picks them.</p></div>
 
 <h2 id="s15">15 · Engine cleanup</h2>
 <p>Branch <code>phase/cleanup</code>, merged as PR #39 on 2026-10-21, after §16.1–16.2 (PR #38) and before §16.3–16.7 (PRs #40, #41). Goal: an engine whose code and Editor-visible text stand on their own, without references to this spec, plus the fixes of an engine review done on the same branch. Tests at merge: EditMode 448/448, PlayMode 34/34; compute and voxel shaders compile with only the known <code>fetch_vertex_data</code> warning.</p>
@@ -827,7 +829,7 @@ Docs/                                 WorldGenSpec.html (this file; outside Asse
 <tr><td>DEC-25</td><td>Project structure</td><td>Editor code only in <code>Engine/Editor</code>; prune unused built-in modules; spec out of <code>Assets</code> into <code>Docs/</code>; baselines pruned to the three latest files; <code>Resources/Artwork</code> stays</td><td>§15.3; the Docs tree in §11.</td></tr>
 <tr><td>DEC-26</td><td>Improvement ideas before Part III</td><td>§16.1–16.2 done first; the oversized classes, the preview debounce and the other review ideas recorded as §16.3–16.7 instead of being done in the cleanup, then all scheduled the same day (16.3–16.4, then 16.5–16.7)</td><td>PRs #38, #40, #41.</td></tr>
 <tr><td>DEC-27</td><td>Interval store start size (§16.1)</td><td>17 pages per list, the same memory as the old pool (over 10 or 8)</td><td>TST-E21 peak 39 %; do not shrink it without asking.</td></tr>
-<tr><td>DEC-28</td><td>OD-R3 region size (Part III)</td><td>4096² everywhere</td><td>§21 open points.</td></tr>
+<tr><td>DEC-28</td><td>OD-R3 region size (Part III)</td><td>4096² everywhere</td><td>§23 open points.</td></tr>
 <tr><td>DEC-29</td><td>Flaky PlayMode test <code>SchedulerEvictionTests.UnloadChunk_RaisesEvictionAndReleasesRenderBuffer</code></td><td>Deferred ("can be fixed later"), not part of PR #41</td><td>§15.5.</td></tr>
 </table>
 
@@ -1163,23 +1165,184 @@ Add <code>Hash32(int x, int y, int z, uint seed, uint salt)</code> and its <code
 </ol>
 <p><strong>Accept:</strong> no grass or snow top blocks under water; every species of §17.6 grows in its biomes with visibly different variants and no two identical crowns side by side; groves, clearings and patchy beaches show in the preview and in play; all tests above, the existing EditMode and PlayMode suites and the TST-E21 flight pass; benchmarks within PERF-03 or with an explanation the user accepts.</p></div>
 
+<h2 id="s18">18 · Rotated voxels (Phase O)</h2>
+<p>Planned on 2026-10-25. Goal: voxels that can be placed in different orientations, as in Minecraft. A log lies along the axis of the face it was placed on, an oven turns its front to the player, a slab sits in the upper or lower half. Most voxels do not rotate. Each <code>Voxel</code> asset chooses its mode, and the default is no rotation (DEC-47). Generation uses rotated logs for lying trunks and branches. The decisions behind this section are DEC-47…53 (§18.6). Rules R1, R2 and R8 apply, and so does the existing rule that registry ids of existing voxels must not change (§17.7).</p>
+
+<h3>18.1 Asset and registry</h3>
+<div class="req"><span class="id">ROT-01</span><span class="kw must">MUST</span>Each <code>Voxel</code> asset gets a facing mode <code>VoxelFacing</code> (<code>None</code>, <code>Axis</code>, <code>Horizontal</code>, <code>Full</code>; default <code>None</code>) and a separate toggle <code>TopBottom</code> (default off). The modes combine (DEC-48). The number of orientations is F × T, with F = 1 / 3 / 4 / 6 for None / Axis / Horizontal / Full, and T = 2 when <code>TopBottom</code> is on, otherwise 1. For example, Horizontal with TopBottom gives 8 orientations, which is enough for stairs later. A voxel with None and the toggle off keeps exactly one id, as today.</div>
+<div class="req"><span class="id">ROT-02</span><span class="kw must">MUST</span>Variant ids (DEC-49). Every orientation is its own registry id with its own <code>VoxelDef</code>, so chunk data, RLE, light, the GPU point packing and the shaders stay as they are. The base voxel keeps its current id and is the orientation the asset is authored in: axis Y, front +Z (the <code>front</code> texture), lower half. The registry appends the other variants <em>after all base voxels</em>, in a fixed order (base registration order, then facing index, then top/bottom). That way no base id ever changes. Variant ids shift whenever a base voxel is added or removed anywhere in the package (Phase K adds Bedrock, CAV-42), not only when a rotatable voxel changes. So nothing may hard-code or store them: baked lookups (ROT-21) and test fixtures resolve them from base id plus orientation at bake or test time, and data that is ever persisted stores the base id plus the orientation.</div>
+<div class="req"><span class="id">ROT-03</span><span class="kw must">MUST</span>Burst-compatible lookups in the runtime registry, backed by native arrays: <code>BaseOf(id)</code>, <code>OrientationOf(id)</code> and <code>VariantOf(baseId, orientation)</code>. An orientation is one byte: the facing index plus an upside-down bit. A variant has the same mesh layer, collision, light attenuation, light emission, glow, surface alpha and depth fade as its base. Code that asks what kind of voxel something is (flora rules, surface checks, the hotbar) compares <code>BaseOf(id)</code>. Variants have no <code>Voxel</code> asset of their own. The name registry gets a derived name for each variant (the base name plus an orientation suffix, for example <code>#x</code>), so logs and debug output can tell them apart. Every managed id lookup resolves a variant to its base asset: the ScriptableObject registry, the voxel map, the HUD readout, the post-process handler and the player spawn checks. Registry setup must not report variant ids as missing voxels.</div>
+<div class="req"><span class="id">ROT-04</span><span class="kw must">MUST</span>Shape and textures rotate together (DEC-50). The <code>VoxelDef</code> of a variant is built from the base shape by rotating it about the voxel centre (0.5, 0.5, 0.5). The rotation applies to quad positions, normal, up and right; the per-corner UVs stay with their corners, so textures turn with the shape and the bark grain follows the log axis. The same rotation remaps each quad's draw condition (for example Up → Right; Always stays Always), and the texture moves with its quad: the texture authored for the top ends up on the faces that now point along the axis. Rotated quads are appended to the quad registry. The compute shaders, the point packing and the voxel shaders do not change. The slab keeps its single shape <code>Half</code>: <code>HalfUp</code>, <code>HalfFront</code> and the others are that shape's six face quads, not orientations, and its rotated variants are generated from it like every other shape.</div>
+<table>
+<tr><th>Mode</th><th>Orientations (rotation of the authored shape)</th></tr>
+<tr><td>Axis</td><td>Y = identity · X = 90° about Z · Z = 90° about X</td></tr>
+<tr><td>Horizontal</td><td>front +Z = identity · +X, −Z, −X = 90°, 180°, 270° about Y</td></tr>
+<tr><td>Full</td><td>the four of Horizontal, plus front +Y and front −Y (±90° about X)</td></tr>
+<tr><td>TopBottom</td><td>upper variant = 180° about the authored front axis (Z), applied before the facing rotation. The profile is mirrored vertically and the front stays the front (a slab moves to the upper half, a stair turns upside down).</td></tr>
+</table>
+<div class="req"><span class="id">ROT-05</span><span class="kw must">MUST</span>Face culling and colliders keep today's rules. The mesher compares mesh layers of neighbours, and a rotated variant takes part in that exactly like its base. Colliders stay per voxel, as today. Before StoneSlab gets TopBottom, the agent checks how the slab culls its neighbours today. If a slab, or a slab after rotation, leaves holes in the faces next to it, the agent asks the user before changing the culling. Shape-accurate culling or colliders are not part of this phase; if they are wanted, they go to §16 as an idea.</div>
+
+<h3>18.2 Placement (like Minecraft)</h3>
+<div class="req"><span class="id">ROT-10</span><span class="kw must">MUST</span>A pure, public function <code>VoxelPlacement.Resolve(baseId, hitNormal, hitPoint, lookDir) → id</code> picks the variant. It needs no world state, so EditMode tests can cover it. The rules:
+<ul class="tight">
+<li><b>Axis:</b> the axis of the clicked face's normal. Clicking the side of a block gives a log lying away from that face.</li>
+<li><b>Horizontal:</b> the front faces the player, taken from the dominant horizontal component of −<code>lookDir</code>.</li>
+<li><b>Full:</b> the front faces the player, taken from the dominant component of −<code>lookDir</code> including y. Looking steeply down gives front +Y.</li>
+<li><b>TopBottom:</b> clicking the top face of a block gives the lower variant, clicking the bottom face gives the upper one. On a side face, the upper variant is chosen when the hit point lies in the upper half of that face.</li>
+<li>Combined modes apply both rules. Ties between components break in a fixed order: horizontal before vertical, X before Z.</li>
+</ul></div>
+<div class="req"><span class="id">ROT-11</span><span class="kw must">MUST</span><code>VoxelEditor</code> passes <code>hitInfo.normal</code>, <code>hitInfo.point</code> and the camera's forward vector to <code>Resolve</code>, and hands the resulting id to <code>VoxelWorld.SetVoxel</code>, whose signature does not change. The hotbar and any inventory hold base ids only. Breaking a variant gives its base, and a pick action, if there is one, returns the base.</div>
+
+<h3>18.3 World generation</h3>
+<div class="req"><span class="id">ROT-20</span><span class="kw must">MUST</span>Rotated logs in trees (DEC-51). A lying trunk (VEG-41) uses the Axis variant of its direction, X or Z. Diagonal and Arm branches use, per voxel, the axis of the dominant component of the segment's direction. Upright trunks stay the base (Y). When the trunk voxel has no Axis mode (for example Cactus), the base id is used. The chunk job, the species gallery (INT-31) and every other stamping path give the same voxels.</div>
+<div class="req"><span class="id">ROT-21</span><span class="kw must">MUST</span>Generation resolves variant ids through the ROT-03 lookups, baked once with the flora settings, and never searches the registry per voxel.</div>
+
+<h3>18.4 Shipped voxels</h3>
+<table>
+<tr><th>Voxel</th><th>Mode</th><th>Note</th></tr>
+<tr><td>LogOak, LogBirch, LogSpruce</td><td>Axis</td><td>TopBottomSides textures: the ring texture moves to the ends of the log.</td></tr>
+<tr><td>Oven</td><td>Horizontal</td><td>SixSidesUnique; its <code>front</code> texture is the front.</td></tr>
+<tr><td>Workbench</td><td>Horizontal</td><td>TopBottomSides today, so all four sides look the same and the rotation is invisible. It needs a front texture, which the user makes or approves (as DEC-34). Until then the agent may use SixSidesUnique with the current side texture on all sides.</td></tr>
+<tr><td>StoneSlab</td><td>TopBottom</td><td>See ROT-05 for the culling check first.</td></tr>
+</table>
+
+<h3>18.5 Tests and performance</h3>
+<div class="req"><span class="id">TST-40</span><span class="kw must">MUST</span>Registry. A snapshot of name → id for every base voxel of the shipped package, taken before Phase O, still matches afterwards. Each rotatable asset has F × T variants. <code>BaseOf</code>, <code>OrientationOf</code> and <code>VariantOf</code> round-trip for every id. Every variant has its base's light, layer and collision values.</div>
+<div class="req"><span class="id">TST-41</span><span class="kw must">MUST</span>Geometry. For every mode, the rotated quads stay inside the unit cube, and every normal matches its remapped draw condition. A rotated full cube culls exactly like its base. Four 90° turns about Y give the identity. The X variant of a log shows the top texture on its ±X faces, and its side UVs run along X. The upper slab occupies y 0.5…1.</div>
+<div class="req"><span class="id">TST-42</span><span class="kw must">MUST</span>Placement. <code>Resolve</code> is checked against a table of normals, look directions and hit points for every mode and the combinations, including the 45° ties of ROT-10.</div>
+<div class="req"><span class="id">TST-43</span><span class="kw must">MUST</span>Generation. Fallen logs along X and Z carry the matching axis variant, and branch voxels follow their segment direction. TST-30 (determinism and seams) passes with variant ids.</div>
+<div class="req"><span class="id">PERF-11</span><span class="kw must">MUST</span>The registry and the quad buffer grow by the variants. Report the extra GPU memory and the registry build time. The chunk generation rows stay within PERF-03, and the TST-E21 flight keeps 0/300 allocating frames.</div>
+
+<h3>18.6 Decisions (2026-10-25)</h3>
+<table>
+<tr><th>ID</th><th>Question</th><th>Decision</th><th>Consequence</th></tr>
+<tr><td>DEC-47</td><td>Which voxels rotate</td><td>Chosen per asset; the default is no rotation</td><td>ROT-01.</td></tr>
+<tr><td>DEC-48</td><td>Rotation modes</td><td>Axis (3), Horizontal facing (4), Full facing (6) and a Top/bottom toggle (2), combinable</td><td>ROT-01, ROT-04, ROT-10.</td></tr>
+<tr><td>DEC-49</td><td>How the orientation is stored</td><td>Variant ids appended after the base voxels; no bits in the id, no separate state list</td><td>ROT-02, ROT-03.</td></tr>
+<tr><td>DEC-50</td><td>What rotates</td><td>Shape and textures</td><td>ROT-04, ROT-05.</td></tr>
+<tr><td>DEC-51</td><td>Rotated voxels in generation</td><td>Fallen logs and branches; upright trunks stay Y</td><td>ROT-20.</td></tr>
+<tr><td>DEC-52</td><td>Shipped modes</td><td>Logs Axis; Oven and Workbench Horizontal; StoneSlab Top/bottom</td><td>§18.4.</td></tr>
+<tr><td>DEC-53</td><td>Place in the spec and the order of work</td><td>Two new Part II phases, Phase O (rotated voxels, §18) before Phase K (caves, §19); Part III moves to §20–23 with unchanged requirement IDs</td><td>§0, §19.</td></tr>
+</table>
+
+<h3>18.7 Phase O steps</h3>
+<div class="phase"><h4>Phase O — Rotated voxels</h4>
+<ol class="tight">
+  <li><strong>O1 Registry and geometry.</strong> ROT-01…05, TST-40, TST-41.</li>
+  <li><strong>O2 Placement.</strong> ROT-10, ROT-11, TST-42, then a play-test in game: place logs, the oven and slabs from every side.</li>
+  <li><strong>O3 Generation and shipped voxels.</strong> ROT-20, ROT-21, §18.4, TST-43, PERF-11.</li>
+</ol>
+<p><strong>Accept:</strong> a log placed on a side lies along the clicked axis, with the bark grain along the log; the oven faces the player; slabs go to the upper or lower half as in Minecraft; fallen logs and branches show rotated logs in the preview gallery and in play; ids of existing voxels are unchanged; all tests above, the existing EditMode and PlayMode suites and the TST-E21 flight pass.</p></div>
+
+<!-- ============================================================ -->
+<h2 id="s19">19 · Caves (Phase K)</h2>
+<p>Planned on 2026-10-25. Goal: a world with something below the surface. Big caverns and long worm tunnels run through the stone, with rare entrances from the surface. Lava pockets lie at the bottom, ore veins sit in the rock, and a bedrock layer closes off the floor. The surface itself stays per column: height, biome, surface blocks and the flora pick are unchanged, and the caves are 3D passes that carve the stone after <code>FillTerrain</code>. This lifts the Part I non-goal "no caves" (§1) for Part II. The decisions behind this section are DEC-54…61 (§19.9).</p>
+<p>Ideas come from the user's earlier project Infinitile (v0.3.0, <code>Jobs/Chunk/ChunkGenerationCavesOres.cs</code>). Its <code>CarveCaves</code> carved where <code>snoise² + cellular²</code> exceeded a threshold that rose towards the surface, <code>lerp(0.8, 1.3, (y/h)²)</code>, and filled carved voxels below y 5 with lava. Its <code>PlaceOres</code> picked ores by depth and noise. Phase K keeps the threshold that fades out towards the surface (for caverns) and lava at the bottom. The rest changes: the worms follow Minecraft's cave carvers, and every voxel is a pure function of world position (the old code fed the seed in as a coordinate offset). Source comments follow R6.</p>
+<div class="box note"><p><strong>Placeholders.</strong> Every wavelength, threshold, band, share, radius and ore value in this section is a starting value so the agent can build and test. The user tunes them in the preview cross-section (INT-33), and the agent must not "optimise" them (R5).</p></div>
+
+<h3>19.1 Rules and pass order</h3>
+<div class="req"><span class="id">CAV-01</span><span class="kw must">MUST</span>R3 in 3D. Every carved, lava, ore and bedrock voxel is a pure function of (worldX, y, worldZ, seed, config). Noises are seeded the way §5 seeds them, never by adding the seed to coordinates and never from the chunk origin.</div>
+<div class="req"><span class="id">CAV-02</span><span class="kw must">MUST</span>Pass order in the chunk job: PrepareChunkMaps → DecideFlora → ApplySurfaceCover → FillTerrain → <b>Ores → Caverns → Worms → Lava pockets → Bottom layer</b> → PlaceVegetation → pack. Ores come first, so caves expose them. Each new pass is its own method after <code>PrepareChunkMaps</code>, never inside it (extra code there once slowed the DistanceBlend rows by 35 %). Every pass is benchmarked when it lands.</div>
+<div class="req"><span class="id">CAV-03</span><span class="kw must">MUST</span>Caves are on everywhere (DEC-61). A <code>Caves</code> section on <code>WorldGenSettings</code> holds all values of this section and is part of <code>ToCanonicalJson()</code>. Its <code>Enabled</code> toggle defaults to <em>on</em> in the code and in the shipped asset. The same values apply everywhere, with no per-biome factor (DEC-58). Existing tests and baselines move with caves. A test that checks surface blocks either skips entrance columns or turns caves off explicitly, and each such test says which.</div>
+<div class="req"><span class="id">CAV-04</span><span class="kw must">MUST</span>The surface keeps its meaning. <code>ChunkColumn.Height</code> and the region API's <code>Height</code> / <code>ColumnHeight</code> are the terrain surface before carving, so Part III is unaffected. <code>PlaceVegetation</code> skips an anchor whose ground voxel is carved, and a tree is skipped when the voxel under its trunk is not solid. The test is a pure function of the anchor position: all cave passes are evaluated at that voxel, never read back from the chunk buffer. Each chunk also stamps trees anchored in its flora padding, and every chunk that stamps part of a tree has to make the same choice. So the chunk job evaluates the test for padding anchors too, and the cave enumeration of a chunk (CAV-21) covers the chunk plus <code>FloraPadding</code>. Trees may stand above caves.</div>
+<div class="req"><span class="id">CAV-05</span><span class="kw must">MUST</span>Water stays where it is. No carved voxel may touch a water voxel (6-neighbourhood), because water does not flow. Around submerged columns, carving keeps a cover of <code>WaterCover</code> = 6 blocks below the lowest surface in the column's 3 × 3 neighbourhood. No entrance opens within <code>EntranceWaterDistance</code> = 16 blocks of a submerged column, probed like the beach water-distance test (GEN-41).</div>
+
+<h3>19.2 Big caverns</h3>
+<div class="req"><span class="id">CAV-10</span><span class="kw must">MUST</span>Rare large halls (DEC-54). A low-frequency 3D noise (wavelength 96 horizontal, 48 vertical) carves where it exceeds a threshold. Within the band y 20…90 the threshold rises towards both edges of the band (after Infinitile's depth fade), so halls close off at top and bottom. A 2D cavern mask lets halls form on only about 15 % of the area. Pillars: inside a hall, a second 3D noise with a short horizontal wavelength (12) and strong vertical stretch keeps columns of stone standing where it exceeds its own threshold. Caverns never come closer to the surface than <code>Cover</code> = 8 blocks.</div>
+<div class="req"><span class="id">CAV-11</span><span class="kw should">SHOULD</span>Evaluate the cavern noises on a coarse lattice (4 × 4 × 4) and interpolate trilinearly, skipping lattice cells outside the band or the mask. Benchmark this against sampling every voxel and keep the faster one if the shapes look the same in the cross-section.</div>
+
+<h3>19.3 Worm tunnels</h3>
+<div class="req"><span class="id">CAV-20</span><span class="kw must">MUST</span>Start points. The world is divided into start cells of 64 × 64 columns. From a hash of (cell, seed), each cell gets 0, 1 or 2 worms (mean 0.6). A worm starts at a hashed point in the cell, with y between 20 and surface − <code>Cover</code>, or near the surface inside the entrance mask (CAV-23).</div>
+<div class="req"><span class="id">CAV-21</span><span class="kw must">MUST</span>Path. Each worm walks from its own hash, never from the chunk being generated, in steps of 1 block. Yaw and pitch follow a damped random walk, with pitch clamped to ±35°. The radius varies smoothly along the path between 1.5 and 4. With 25 % probability the worm branches at a hashed point, and the branch gets half the remaining length. A worm branches at most once, and branches do not branch again. The path of a worm and its branch never runs more than <code>WormReach</code> = 128 blocks horizontally from its start, 4 chunks (DEC-57). Because each step carves a sphere, the carved voxels reach up to <code>WormReach</code> + <code>MaxRadius</code> = 132 blocks. That distance is the cave padding: a chunk looks at every start cell within 132 blocks of its border, plus <code>FloraPadding</code> for the anchor test of CAV-04.</div>
+<div class="req"><span class="id">CAV-22</span><span class="kw must">MUST</span>Per chunk. Enumerate the start cells within the padding. A start box (start ± (<code>WormReach</code> + <code>MaxRadius</code>)) only drops worms at the edge of the padding, so the real saving is per step. Each relevant worm is walked in full, which is cheap (a hash and some trigonometry per step, no voxel writes). A step carves only when its sphere box overlaps the chunk, and then writes only voxels inside the chunk. PERF-12 reports walked and carved steps per chunk. No managed allocations (R2). The buffers are sized for the worst case by construction: max worms per cell × start cells in the padding × 2 (one branch) × max steps. They must never truncate, because a cap that drops worms would depend on the chunk and break CAV-01. A test asserts that the worst case fits.</div>
+<div class="req"><span class="id">CAV-23</span><span class="kw must">MUST</span>Rare entrances (DEC-55). Outside the entrance mask, worms carve nothing above surface − <code>Cover</code>. The entrance mask is a 2D noise covering about 3 % of land. Inside it, worms may break the surface, and worms that start there begin near the surface so the opening leads down. There are never entrances under water or near it (CAV-05). Caverns never break the surface.</div>
+
+<h3>19.4 Lava</h3>
+<div class="req"><span class="id">CAV-30</span><span class="kw must">MUST</span>Lava mask. A 2D noise selects about 40 % of the area. The TST-53 report prints the real share, and the user tunes it towards the target.</div>
+<div class="req"><span class="id">CAV-31</span><span class="kw must">MUST</span>Lava pockets, on their own (DEC-56). Inside the mask, a separate pass carves flat pockets around <code>LavaLevel</code> = 5: a 3D noise with horizontal wavelength 32 and a strong vertical squash, in the band y 3…10. Carved voxels at y ≤ <code>LavaLevel</code> become lava and those above become air, so a pocket has a lava surface under a low air gap. Pockets exist whether or not a cave reaches them.</div>
+<div class="req"><span class="id">CAV-32</span><span class="kw must">MUST</span>Lava in caves. Inside the mask, every cave voxel at y ≤ <code>LavaLevel</code> becomes lava as well; outside the mask it stays air. With the placeholder cavern band (y 20…90), only worms reach that deep. Worms may descend to y 3 (CAV-42 keeps y ≤ 2 solid). If the user lowers the cavern band, caverns get lava by the same rule. Lava does not flow and is not simulated; like water, it stays where generation put it.</div>
+
+<h3>19.5 Ores and bottom layer</h3>
+<div class="req"><span class="id">CAV-40</span><span class="kw must">MUST</span>Ore veins (DEC-59) replace only their host voxel. The world is divided into 3D cells of 16³. From a hash of (cell, rule, seed), each cell holds 0…k vein seeds per ore rule, and each vein is a short random-walk blob of n voxels. A chunk looks at the cells overlapping it plus a padding of the largest vein extent. Veins do not use per-voxel 3D noise, so the cost stays within PERF-12.</div>
+<div class="req"><span class="id">CAV-41</span><span class="kw must">MUST</span>Ore rules live in the <code>Caves</code> section as a list (voxel, host, y range, veins per cell, vein size) and are part of <code>ToCanonicalJson()</code>. The placeholders below use the existing ore voxels:</div>
+<table>
+<tr><th>Ore</th><th>Host</th><th>y range</th><th>Veins / cell</th><th>Vein size</th></tr>
+<tr><td>StoneCoalOre</td><td>Stone</td><td>10…200</td><td>3</td><td>6…12</td></tr>
+<tr><td>StoneIronBrownOre</td><td>Stone</td><td>5…110</td><td>2</td><td>4…8</td></tr>
+<tr><td>StoneIronGreenOre</td><td>Stone</td><td>5…80</td><td>1</td><td>4…8</td></tr>
+<tr><td>StoneSilverOre</td><td>Stone</td><td>5…70</td><td>1</td><td>3…6</td></tr>
+<tr><td>StoneGoldOre</td><td>Stone</td><td>3…40</td><td>0.5</td><td>3…6</td></tr>
+<tr><td>StoneDiamondOre</td><td>Stone</td><td>3…20</td><td>0.25</td><td>2…5</td></tr>
+<tr><td>GreystoneRubyOre</td><td>StoneGrey</td><td>3…60</td><td>0.25</td><td>2…4</td></tr>
+<tr><td>SandStoneRedEmeraldOre</td><td>SandStoneRed</td><td>3…255 (the host exists only in the Desert strata bands, GEN-35)</td><td>0.25</td><td>2…4</td></tr>
+</table>
+<div class="req"><span class="id">CAV-42</span><span class="kw must">MUST</span>Bottom layer (DEC-59). A new voxel Bedrock (Solid; placeholder texture StoneGrey, tinted dark; the user makes or approves the final texture, as DEC-34) and a new asset flag <code>Unbreakable</code> (default off; on for Bedrock). y 0 is always bedrock. y 1 and y 2 are bedrock where a 3D hash falls below 0.5 and 0.25. Caves and lava pockets never carve y ≤ 2. <code>VoxelEditor</code> refuses to break unbreakable voxels; <code>SetVoxel</code> itself stays unrestricted, as decided in Phase L.</div>
+
+<h3>19.6 Engine effects</h3>
+<div class="req"><span class="id">CAV-50</span><span class="kw must">MUST</span>Light. Caves are dark except near entrances, and lava emits (15, 9, 3). The lava pockets put many emitters into the bottom of every chunk inside the mask. Measure the light job on such chunks and report against the PERF-05 budget. If the budget is exceeded, the user decides, as with DEC-46.</div>
+<div class="req"><span class="id">CAV-51</span><span class="kw must">MUST</span>Interval store. Caves split the vertical runs of the RLE. Report intervals per column (today a median of 4.0 / 4.6 and a maximum of 6, §16.1) and the interval-store peak of the TST-E21 flight against the 17 pages per list. If the peak goes over, ask the user before raising the page count.</div>
+<div class="req"><span class="id">CAV-52</span><span class="kw must">MUST</span>Meshing and colliders. Cave walls add faces and collider triangles that are rarely visible. Report points per chunk and collider build time before and after. If occlusion culling for caves looks necessary, record it as an idea in §16 and do not build it in this phase.</div>
+
+<h3>19.7 Region API and preview</h3>
+<div class="req"><span class="id">INT-32</span><span class="kw must">MUST</span>Region API (DEC-60). <code>RegionBuffers</code> gets an optional <code>CaveVolume</code> buffer: the number of carved voxels per column. A new <code>WorldGenApi.SampleSlice(in WorldGenRequest req, SliceAxis axis, int coordinate, int yMin, int yMax, ref NativeArray&lt;ushort&gt; outVoxels) → JobHandle</code> returns the final voxel ids of a vertical XY or ZY slice: terrain, ores, caves, lava and bedrock, with flora optional. It shares the code of the chunk passes, so there is a single implementation (TST-52).</div>
+<div class="req"><span class="id">INT-33</span><span class="kw must">MUST</span>Preview cross-section view. It shows a vertical slice at a chosen X or Z, with voxel colours and a selectable y range, and draws the slice position as a line in the top view. The top view gets layers for cave volume per column, the lava mask, the cavern mask and the entrance mask. Redraws are debounced like the other views (§16.7).</div>
+
+<h3>19.8 Tests and performance</h3>
+<div class="req"><span class="id">TST-50</span><span class="kw must">MUST</span>Determinism and seams. Caverns, worms (including one that crosses 4 chunks), lava pockets, ores and bedrock come out identical in a whole-world buffer and chunk by chunk, independent of chunk order. A worm that starts 130 blocks from a chunk, with its largest radius at the end of its path, still carves into it. The worst-case worm buffers of CAV-22 never fill up.</div>
+<div class="req"><span class="id">TST-51</span><span class="kw must">MUST</span>Rules, over 64 chunks that include coasts:
+<ul class="tight">
+<li>no carved voxel touches water;</li>
+<li>nothing is carved at y ≤ 2, and y 0 is all bedrock;</li>
+<li>caverns stay below surface − <code>Cover</code>, and entrances lie only inside the entrance mask;</li>
+<li>lava appears only at y ≤ <code>LavaLevel</code> and only inside the mask;</li>
+<li>ores appear only in their host voxel and their y range.</li>
+</ul></div>
+<div class="req"><span class="id">TST-52</span><span class="kw must">MUST</span><code>SampleSlice</code> returns the same voxels as the chunk job for the same columns, and <code>CaveVolume</code> matches the carved voxels of the chunk job.</div>
+<div class="req"><span class="id">TST-53</span><span class="kw must">MUST</span>An EditMode report that prints values and sets no hard limits, over 4096² columns: lava-mask area share (target about 40 %), entrances per km², cave volume share per 16-block depth band, cavern share, and voxels per ore rule.</div>
+<div class="req"><span class="id">TST-54</span><span class="kw must">MUST</span>Flora. No anchor stands on a carved ground voxel. A tree anchored on a carved column one block from a chunk border shows up in neither chunk. TST-02, TST-03 and TST-30 pass with caves on.</div>
+<div class="req"><span class="id">PERF-12</span><span class="kw must">MUST</span>New benchmark rows: chunk generation with caves on typical land; a worst case with many worms, a cavern and the lava mask in one chunk; the light job on lava-pocket chunks; collider meshing on cave chunks. Since caves are on everywhere, the existing rows move too. New baselines go into the baselines README with a note, and the TST-E21 flight keeps 0/300 allocating frames.</div>
+
+<h3>19.9 Decisions (2026-10-25)</h3>
+<table>
+<tr><th>ID</th><th>Question</th><th>Decision</th><th>Consequence</th></tr>
+<tr><td>DEC-54</td><td>Kinds of caves</td><td>Big caverns and worm carvers. The pockets of the old code and spaghetti tunnels were not chosen</td><td>CAV-10…23.</td></tr>
+<tr><td>DEC-55</td><td>Openings to the surface</td><td>Rare entrances through a mask; elsewhere a cover; never under water</td><td>CAV-05, CAV-23.</td></tr>
+<tr><td>DEC-56</td><td>Lava</td><td>Pockets at the bottom around y 5 on about 40 % of the area: both separate lava pockets and lava in caves that reach down, inside the same mask</td><td>CAV-30…32.</td></tr>
+<tr><td>DEC-57</td><td>Worm reach</td><td>About 128 blocks (4 chunks), with a bounding-box pre-filter per worm</td><td>CAV-21, CAV-22.</td></tr>
+<tr><td>DEC-58</td><td>Variation across the world</td><td>Same everywhere; no per-biome factor and no cave regions beyond the cavern, lava and entrance masks</td><td>CAV-03.</td></tr>
+<tr><td>DEC-59</td><td>Extras</td><td>Ores and a bedrock bottom layer; cave floor details not chosen</td><td>CAV-40…42.</td></tr>
+<tr><td>DEC-60</td><td>Tooling</td><td>Preview cross-section plus optional cave buffers in the region API; the heightmap keeps its meaning</td><td>INT-32, INT-33.</td></tr>
+<tr><td>DEC-61</td><td>Settings switch</td><td>Caves on everywhere, in the code defaults as well; tests and baselines move with them</td><td>CAV-03, PERF-12.</td></tr>
+</table>
+
+<h3>19.10 Phase K steps</h3>
+<div class="phase"><h4>Phase K — Caves</h4>
+<ol class="tight">
+  <li><strong>K1 Foundations and tooling.</strong> The <code>Caves</code> settings section, the pass order, Bedrock and <code>Unbreakable</code> (CAV-01…03, CAV-42), <code>SampleSlice</code>, <code>CaveVolume</code> and the cross-section view (INT-32, INT-33), TST-52. Tooling comes first so the user sees each pass as it lands.</li>
+  <li><strong>K2 Caverns and worms.</strong> CAV-04, CAV-05, CAV-10…23, TST-50, TST-54 and the matching parts of TST-51.</li>
+  <li><strong>K3 Lava.</strong> CAV-30…32.</li>
+  <li><strong>K4 Ores.</strong> CAV-40, CAV-41.</li>
+  <li><strong>K5 Engine effects and performance.</strong> CAV-50…52, PERF-12 and the TST-53 report, then a play-test review as in GEN-31: the agent flies through caves in both architectures and collects defects with coordinates and screenshots, and the user picks which to fix.</li>
+</ol>
+<p><strong>Accept:</strong> caverns and worm tunnels show in the cross-section and in play, with rare entrances and no flooded or drained water; lava pockets lie around y 5 on about 40 % of the area; ores sit in their hosts and depth bands; no one can dig through the bedrock; all tests above, the existing EditMode and PlayMode suites (updated for caves on) and the TST-E21 flight pass; benchmarks within PERF-03 or with an explanation the user accepts.</p></div>
+
 <!-- ============================================================ -->
 <div class="part" id="part3"><span>Part III</span> Research data tooling — priority 2, separate</div>
-<div class="box note"><p><strong>Do not start Part III until the user asks for it.</strong> Part I and §15–16 of Part II are complete (2026-10-21); Phase G (§17) comes first. Part III only reads from the world generator through its public API. It is described here so that Part I's API (GEN-17) is shaped right.</p></div>
+<div class="box note"><p><strong>Do not start Part III until the user asks for it.</strong> Part I and §15–16 of Part II are complete (2026-10-21); Phase G (§17) is implemented; Phase O (§18) and Phase K (§19) come first. Part III only reads from the world generator through its public API. It is described here so that Part I's API (GEN-17) is shaped right.</p></div>
 
-<h2 id="s18">18 · Separation rules</h2>
+<h2 id="s20">20 · Separation rules</h2>
 <div class="req"><span class="id">RES-01</span><span class="kw must">MUST</span>All Part III Unity code lives in <code>Assets/Research/</code> with its own <code>Research.Editor.asmdef</code> (Editor platform) referencing <code>Engine.Runtime</code>. The engine never references Research. Deleting <code>Assets/Research/</code> must leave the game and all Part I tests working.</div>
 <div class="req"><span class="id">RES-02</span><span class="kw must">MUST</span>Part III uses only public engine API (<code>WorldGenApi</code>, <code>WorldGenSettings</code>, <code>BiomeSet</code>, <code>TerrainSplineSet</code>). If something is missing, add a small, generic public API to the engine as a separate change — never research-specific code in the engine.</div>
 <div class="req"><span class="id">RES-03</span><span class="kw must">MUST</span>Python analysis lives in <code>&lt;ProjectRoot&gt;/Analysis/</code>; outputs in <code>&lt;ProjectRoot&gt;/Exports/</code> (outside <code>Assets/</code>, git-ignored).</div>
 <div class="req"><span class="id">RES-04</span><span class="kw must">MUST NOT</span>change hypothesis thresholds, analysis parameters marked <code>frozen</code>, or the fixed seeds (DEC-10, <code>Experiments/seeds.json</code>). If a result looks wrong, report it; don't tune code or thresholds towards a hypothesis.</div>
 <div class="req"><span class="id">RES-05</span><span class="kw must">MUST</span>Research biome sets are separate <code>BiomeSet</code> assets in <code>Assets/Research/</code>, all containing Ocean (DEC-02): <em>main</em> = Plains, Desert, Mountain, Snow, Ocean; <em>extended</em> = main + Forest, i.e. the same 6 biomes as the game. The extensibility test (H7) measures adding Forest to the main set. Boundaries with Ocean are measured but are not test pairs.</div>
 
-<h2 id="s19">19 · Export &amp; experiment runner</h2>
-<h3>19.1 Region and orientation</h3>
+<h2 id="s21">21 · Export &amp; experiment runner</h2>
+<h3>21.1 Region and orientation</h3>
 <div class="req"><span class="id">EXP-01</span><span class="kw must">MUST</span>An export covers <code>[originX, originX + size) × [originZ, originZ + size)</code> at 1 sample per block, via <code>WorldGenApi.SampleRegion</code> in tiles (e.g. 512 × 512). Arrays have shape <code>(size, size)</code>, C order, element <code>[j, i]</code> = column <code>(originX + i, originZ + j)</code>. Default region: origin (−2048, −2048), size 4096.</div>
 <div class="req"><span class="id">EXP-02</span><span class="kw must">MUST</span>The runner asserts that Burst compilation is enabled and runs the Part I EditMode tests before a plan; abort on failure.</div>
 
-<h3>19.2 Layers</h3>
+<h3>21.2 Layers</h3>
 <table>
 <tr><th>Layer</th><th>dtype</th><th>Set</th><th>Content</th></tr>
 <tr><td><code>h_f32</code></td><td>float32</td><td>lean, full</td><td>H before floor</td></tr>
@@ -1196,16 +1359,16 @@ Add <code>Hash32(int x, int y, int z, uint seed, uint salt)</code> and its <code
 <div class="req"><span class="id">EXP-03</span><span class="kw must">MUST</span>Arrays are written as <code>.npy</code> (format 1.0: magic <code>\x93NUMPY</code>, version, little-endian header length, dict <code>{'descr': '&lt;f4', 'fortran_order': False, 'shape': (4096, 4096), }</code> padded with spaces to a multiple of 64 bytes, ending in <code>\n</code>). A small <code>NpyWriter</code> suffices.</div>
 <div class="req"><span class="id">EXP-04</span><span class="kw must">MUST</span>Size per 4096² run: full ≈ 0.9 GB, lean ≈ 0.25 GB. Sweep plans set <code>keep_raw: false</code>: analysed in batches right after export, raw layers then deleted, metrics/manifests/previews kept. If disk is short, run sweeps at 2048² after checking ≥ 30 transects per test pair and seed.</div>
 
-<h3>19.3 Manifest and resume</h3>
+<h3>21.3 Manifest and resume</h3>
 <div class="req"><span class="id">EXP-10</span><span class="kw must">MUST</span>Each run folder has <code>manifest.json</code>: spec version, run id, UTC timestamp, git commit, Unity version, config hash (SHA-256 of <code>ToCanonicalJson()</code>), full canonical config, architecture, methods and strengths, effective lattice stride, seed, region, biome table (targets, height parameters, flora), water level, Hmin/Hmax, stats (clamped share, underwater share, seconds), and per layer file, dtype and SHA-256.</div>
 <div class="req"><span class="id">EXP-11</span><span class="kw must">MUST</span>A run is skipped on resume only if its <em>run key</em> matches: SHA-256 of config hash + seed + region + layer set + git commit + spec version.</div>
 
-<h3>19.4 Plans and runner</h3>
+<h3>21.4 Plans and runner</h3>
 <pre><code>// Experiments/seeds.json – drawn once, never changed (DEC-10)
 { "drawn_on": "2026-10-17",
   "main":  [617800548, 1035220005, 38752999, 2073214123, 827781431],
   "pilot": [1135345306, 93056379] }</code></pre>
-<div class="req"><span class="id">EXP-20</span><span class="kw must">MUST</span>Plans are JSON in <code>&lt;ProjectRoot&gt;/Experiments/</code> (schema §22.3), expanded into runs written to <code>Exports/&lt;plan&gt;/&lt;Architecture&gt;_&lt;Method&gt;[/&lt;param&gt;=&lt;value&gt;]/seed_&lt;s&gt;/</code>. Runnable from a menu, as a registered Editor command on a running Editor (<code>unity command …</code>), and headless (<code>unity run --command …</code>, TOOL-06); exit code ≠ 0 on failure. Exact command syntax from <code>unity run --help</code>.</div>
+<div class="req"><span class="id">EXP-20</span><span class="kw must">MUST</span>Plans are JSON in <code>&lt;ProjectRoot&gt;/Experiments/</code> (schema §24.3), expanded into runs written to <code>Exports/&lt;plan&gt;/&lt;Architecture&gt;_&lt;Method&gt;[/&lt;param&gt;=&lt;value&gt;]/seed_&lt;s&gt;/</code>. Runnable from a menu, as a registered Editor command on a running Editor (<code>unity command …</code>), and headless (<code>unity run --command …</code>, TOOL-06); exit code ≠ 0 on failure. Exact command syntax from <code>unity run --help</code>.</div>
 <table>
 <tr><th>Plan</th><th>Content</th><th>Runs</th></tr>
 <tr><td><code>pilot.json</code></td><td>8 configurations × the 2 pilot seeds, full layers; used to set thresholds</td><td>16</td></tr>
@@ -1218,8 +1381,8 @@ Add <code>Hash32(int x, int y, int z, uint seed, uint salt)</code> and its <code
 </table>
 <p class="small">Sweeps vary one parameter at a time. For frequency and position sweeps, paired comparisons use the baseline at the same sweep level.</p>
 
-<h2 id="s20">20 · Analysis pipeline (Python)</h2>
-<h3>20.1 Package</h3>
+<h2 id="s22">22 · Analysis pipeline (Python)</h2>
+<h3>22.1 Package</h3>
 <pre><code>Analysis/
   pyproject.toml            numpy, scipy, scikit-image, pandas, matplotlib, pyyaml, pyarrow
   config/analysis.yaml      transect + metric parameters (frozen after pilot)
@@ -1229,7 +1392,7 @@ Add <code>Hash32(int x, int y, int z, uint seed, uint salt)</code> and its <code
   tests/                    synthetic-map tests (ANA-60)</code></pre>
 <div class="req"><span class="id">ANA-01</span><span class="kw must">MUST</span>Every output records the hashes of <code>analysis.yaml</code> and <code>hypotheses.yaml</code> and whether they were frozen; unfrozen reports are stamped <strong>PRELIMINARY</strong>.</div>
 
-<h3>20.2 Boundaries and transects</h3>
+<h3>22.2 Boundaries and transects</h3>
 <div class="req"><span class="id">ANA-10</span><span class="kw must">MUST</span>Boundary pixels: cells whose 4-neighbour has a different <code>biome_dom</code>, assigned to the unordered pair {a, b}.</div>
 <div class="req"><span class="id">ANA-11</span><span class="kw must">MUST</span>Transect centres: boundary pixels of a pair, Poisson-disk subsampled (spacing ≥ 48, fixed analysis seed). Normal: gradient of the Gaussian-blurred (σ = 4) indicator <code>[biome_dom = a]</code>, oriented a → b with a &lt; b.</div>
 <div class="req"><span class="id">ANA-12</span><span class="kw must">MUST</span>Half-length L = 96 (≥ A<sub>max</sub>·√2 + B<sub>max</sub>/2 + margin), step 1, band of 5 parallel lines (averaged) plus the centre line on its own; bilinear for float layers, nearest for categorical. Core metrics use |s| ≤ 32 after re-centring on the observed crossing.</div>
@@ -1237,7 +1400,7 @@ Add <code>Hash32(int x, int y, int z, uint seed, uint salt)</code> and its <code
 <div class="req"><span class="id">ANA-14</span><span class="kw must">MUST</span>Primary analysis: each run uses transects on its <strong>own</strong> effective boundary. Method 3 moves boundaries by up to A·√2 and makes them oblique; baseline transects would smear a hard warped edge into an artificial width. Methods are compared on aggregates per (pair, seed).</div>
 <div class="req"><span class="id">ANA-15</span><span class="kw should">SHOULD</span>Secondary analysis for methods 1, 2, 4: paired transects from the baseline <code>biome_nn</code> of the same architecture, seed and sweep level.</div>
 
-<h3>20.3 Metrics</h3>
+<h3>22.3 Metrics</h3>
 <table>
 <tr><th>Dimension</th><th>Metric</th><th>Definition</th></tr>
 <tr><td rowspan="5">Height</td><td><code>max_step</code></td><td>max |h_int(s+1) − h_int(s)| in the core, centre line</td></tr>
@@ -1258,7 +1421,7 @@ Add <code>Hash32(int x, int y, int z, uint seed, uint salt)</code> and its <code
 <tr><td>tipping point</td><td>first level (moving away from the default) where the median over seeds leaves median ± 2·MAD of the per-seed values at the default level</td></tr>
 </table>
 
-<h3>20.4 Validation checks</h3>
+<h3>22.4 Validation checks</h3>
 <table>
 <tr><th>ID</th><th>Check</th><th>Pass criterion</th></tr>
 <tr><td>V1</td><td>Terrain-first height independent of method</td><td>identical SHA-256 of <code>h_f32</code> across the 4 Terrain-first runs per seed</td></tr>
@@ -1269,7 +1432,7 @@ Add <code>Hash32(int x, int y, int z, uint seed, uint salt)</code> and its <code
 </table>
 <div class="req"><span class="id">ANA-40</span><span class="kw must">MUST</span>A failed V1–V3 means an implementation bug: reported at the top, and hypothesis evaluation is skipped for the affected configurations.</div>
 
-<h3>20.5 Hypothesis evaluation</h3>
+<h3>22.5 Hypothesis evaluation</h3>
 <table>
 <tr><th>H</th><th>Computation</th><th>Plan</th></tr>
 <tr><td>H1</td><td>Biome-first height: per seed, relative |Δ| of median <code>max_step</code>, <code>max_grad</code>, <code>cliffs</code> between methods 3 and 2 ≤ [x %] (this per-seed equivalence is the "right direction" for the decision rule); both reduce median <code>max_step</code> vs baseline by ≥ [y %]. Focus pair Plains–Mountain.</td><td>main</td></tr>
@@ -1285,9 +1448,9 @@ Add <code>Hash32(int x, int y, int z, uint seed, uint salt)</code> and its <code
 <div class="req"><span class="id">ANA-51</span><span class="kw must">MUST</span><code>results/</code>: <code>profile_table.csv</code> (8 configurations × continuity, gradation, artefact freedom, fidelity, robustness, effort), <code>hypotheses.md</code>, <code>validation.md</code>, figures.</div>
 <div class="req"><span class="id">ANA-60</span><span class="kw must">MUST</span>Metric tests on synthetic maps before real analysis: straight step (width ≤ 1, 0 islands, straightness ≈ 1); logistic τ = 4 (width 17.6 ± 5 %); axis-aligned square vs circle (axis_alignment positive vs ≈ 0); known ramp (max_grad = slope) and inserted 6-block step (1 cliff at n = 4); white-noise dither with known weights (island count in expected range); three-biome junction and double crossing rejected.</div>
 
-<h2 id="s21">21 · Phases (Part III) and open points</h2>
-<div class="phase"><h4>Phase R1 — Export &amp; runner</h4><p>§18, §19. Accept: <code>pilot.json</code> runs headless; manifests complete; deleting <code>Assets/Research</code> leaves Part I intact.</p></div>
-<div class="phase"><h4>Phase R2 — Analysis</h4><p>§20. Accept: synthetic tests pass; pilot analysed; V1–V3 pass. Then the user sets thresholds and freezes the YAML files; only then <code>main.json</code>.</p></div>
+<h2 id="s23">23 · Phases (Part III) and open points</h2>
+<div class="phase"><h4>Phase R1 — Export &amp; runner</h4><p>§20, §21. Accept: <code>pilot.json</code> runs headless; manifests complete; deleting <code>Assets/Research</code> leaves Part I intact.</p></div>
+<div class="phase"><h4>Phase R2 — Analysis</h4><p>§22. Accept: synthetic tests pass; pilot analysed; V1–V3 pass. Then the user sets thresholds and freezes the YAML files; only then <code>main.json</code>.</p></div>
 <div class="phase"><h4>Phase R3 — Sweeps &amp; extensibility</h4><p>Sweep plans, extensibility protocol (record config entries, code changes, pairwise rules, spline changes for adding Forest), H6, H7, E1. Accept: report with hypothesis table.</p></div>
 <table>
 <tr><th>Open (decide before Part III)</th><th>Default</th></tr>
@@ -1295,8 +1458,8 @@ Add <code>Hash32(int x, int y, int z, uint seed, uint salt)</code> and its <code
 </table>
 
 <!-- ============================================================ -->
-<h2 id="s22">22 · Appendix: defaults &amp; schemas</h2>
-<h3>22.1 Placeholder Terrain-first splines</h3>
+<h2 id="s24">24 · Appendix: defaults &amp; schemas</h2>
+<h3>24.1 Placeholder Terrain-first splines</h3>
 <p>Only to get a plausible starting world; the user replaces them. Heights in blocks, water level 124.</p>
 <pre><code>Offset(C, E, PV):
   C:  0.00 → 70        (deep ocean)
@@ -1314,7 +1477,7 @@ Add <code>Hash32(int x, int y, int z, uint seed, uint salt)</code> and its <code
 Amp(C, E, PV):   C [0 → 4, 0.4 → 6, 0.75 → spline over E: [0 → 22, 1 → 8], 1 → 26]
 J(C, E, PV):     C [0 → 0, 0.6 → 0, 0.8 → spline over E: [0 → spline over PV: [0 → 0, 1 → 40], 0.5 → 0], 1 → 50]</code></pre>
 
-<h3>22.2 Placeholder biome table</h3>
+<h3>24.2 Placeholder biome table</h3>
 <table>
 <tr><th>Biome</th><th>T</th><th>F</th><th>C</th><th>E</th><th>PV</th><th>h (Terrain-first)</th><th>Offset</th><th>Amp</th><th>OctaveWeights (512…16)</th><th>J</th></tr>
 <tr><td>Plains</td><td>0.55</td><td>0.45</td><td>0.45</td><td>0.70</td><td>−0.2</td><td>0.45</td><td>136</td><td>6</td><td>1, .6, .3, .12, .05, .02</td><td>0</td></tr>
@@ -1326,7 +1489,7 @@ J(C, E, PV):     C [0 → 0, 0.6 → 0, 0.8 → spline over E: [0 → spline ove
 </table>
 <p class="small">T, F, C, E, h ∈ [0,1]; PV ∈ [−1,1]. Existing assets use different targets (e.g. Snow TargetHeight 1.0); migrate them deliberately, not automatically.</p>
 
-<h3>22.3 Experiment plan schema (Part III)</h3>
+<h3>24.3 Experiment plan schema (Part III)</h3>
 <pre><code>{
   "name": "sweep_frequency",
   "seeds": "main",                          // "main" | "pilot" → resolved from Experiments/seeds.json
@@ -1349,7 +1512,7 @@ J(C, E, PV):     C [0 → 0, 0.6 → 0, 0.8 → spline over E: [0 → spline ove
   "overrides": {"EnableClimateOverrides": false}
 }</code></pre>
 
-<h3>22.4 analysis.yaml (excerpt, Part III)</h3>
+<h3>24.4 analysis.yaml (excerpt, Part III)</h3>
 <pre><code>frozen: false            # set true + date after pilot
 frozen_on: null
 transect: {half_length: 96, band: 5, spacing: 48, normal_sigma: 4, core: 32}
