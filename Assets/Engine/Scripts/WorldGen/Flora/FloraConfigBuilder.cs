@@ -189,7 +189,7 @@ namespace Engine.Scripts.WorldGen.Flora{
                     CrownRadius = Range(v.CrownRadius),
                     CrownTopRadius = Range(v.CrownTopRadius),
                     CrownHeight = Range(v.CrownHeight),
-                    CrownTop = math.max(v.CrownTop, 1),
+                    CrownBase = v.CrownBase,
                     CrownMinBase = v.CrownMinBase,
                     BranchCount = math.min(Range(v.BranchCount), TreeShape.MaxBranches),
                     Branches = v.BranchStyle,

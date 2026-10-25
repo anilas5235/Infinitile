@@ -153,7 +153,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                             ["CrownRadius"] = Range(v.CrownRadius),
                             ["CrownTopRadius"] = Range(v.CrownTopRadius),
                             ["CrownHeight"] = Range(v.CrownHeight),
-                            ["CrownTop"] = v.CrownTop,
+                            ["CrownBase"] = v.CrownBase,
                             ["CrownMinBase"] = v.CrownMinBase,
                             ["BranchCount"] = Range(v.BranchCount),
                             ["BranchStyle"] = v.BranchStyle.ToString(),

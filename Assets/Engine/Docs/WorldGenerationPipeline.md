@@ -36,7 +36,7 @@ in-chunk voxels only]
   or structure. A `TreeVariant` has a name, a weight, and these parts:
   - trunk: voxel, height range (0 for none), width 1 or 2, largest lean;
   - crown: shape (None, Round, Ellipsoid, Cone, Tiered), main and alternative leaf voxel, radius, top radius,
-    height, `CrownTop` (top layer above the trunk top) and `CrownMinBase` (layers below are cut);
+    height, `CrownBase` (lowest layer relative to the trunk top) and `CrownMinBase` (layers below are cut);
   - branches: count, style (Diagonal, Arm), length, start band as a fraction of the trunk, tip cluster radius;
   - crown noise: hole, bump, hang and alternative-leaf chances;
   - its own spacing radius.
@@ -60,9 +60,10 @@ in-chunk voxels only]
   a width-2 trunk gets a centred crown.
   - Trunk: it leans one block at a time and gains the voxels that keep it face-connected. It is extended up to the
     crown's lowest layer.
-  - Crown: centred on the trunk's top column, with its top layer `CrownTop` above the trunk top. Round and Ellipsoid
-    use one formula (a sphere without a height range); Cone narrows from the radius to the top radius; Tiered makes
-    every second layer from the top one block narrower.
+  - Crown: centred on the trunk's top column, with its lowest layer `CrownBase` above the trunk top (negative is
+    lower) and its top layer at least one above the trunk top. Round and Ellipsoid use one formula (a sphere without
+    a height range); Cone narrows from the radius to the top radius; Tiered makes every second layer from the top
+    one block narrower.
   - Branches start next to the trunk voxel that faces their direction:
     - Diagonal branches step out and up in one of 8 directions;
     - Arm branches go one block out, then straight up.

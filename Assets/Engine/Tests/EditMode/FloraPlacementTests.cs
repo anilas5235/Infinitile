@@ -418,10 +418,10 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void Config_TreeVariantsAreSanitised(){
-            // Swapped and negative ranges, too many branches, zero weights and a crown top below 1 are clamped.
+            // Swapped and negative ranges, too many branches and zero weights are clamped.
             TreeVariant odd = new(){
                 TrunkVoxel = _fixture.LogSo, LeafVoxel = _fixture.LeavesSo, Weight = 0f, TrunkHeight = new IntRange(7, 3),
-                TrunkWidth = 5, MaxLean = 3f, CrownRadius = new IntRange(-2, 1), CrownTop = -4, BranchCount = new IntRange(2, 40),
+                TrunkWidth = 5, MaxLean = 3f, CrownRadius = new IntRange(-2, 1), BranchCount = new IntRange(2, 40),
                 BranchLength = new IntRange(0, 0), BranchBandMin = .9f, BranchBandMax = .1f, HoleChance = 2f, SpacingRadius = -1
             };
             TreeVariant zero = new(){ TrunkVoxel = _fixture.LogSo, LeafVoxel = _fixture.LeavesSo, Weight = 0f };
@@ -434,7 +434,6 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(2, d.TrunkWidth);
             Assert.AreEqual(250, d.LeanPerMille);
             Assert.AreEqual(new int2(0, 1), d.CrownRadius);
-            Assert.AreEqual(1, d.CrownTop);
             Assert.AreEqual(new int2(2, TreeShape.MaxBranches), d.BranchCount);
             Assert.AreEqual(new int2(1, 1), d.BranchLength);
             Assert.AreEqual(new int2(100, 900), d.BranchBand);

@@ -162,7 +162,7 @@ namespace Engine.Tests.EditMode{
                 new TreeVariant{
                     Name = "Spire", TrunkVoxel = LogSo, LeafVoxel = NeedlesSo, TrunkHeight = new IntRange(8, 10),
                     CrownShape = CrownShape.Cone, CrownRadius = new IntRange(3, 3), CrownTopRadius = new IntRange(0, 0),
-                    CrownTop = 1, CrownMinBase = 3, SpacingRadius = 2
+                    CrownMinBase = 3, SpacingRadius = 2
                 },
                 new TreeVariant{
                     Name = "Tiered", TrunkVoxel = LogSo, LeafVoxel = NeedlesSo, TrunkHeight = new IntRange(7, 9),

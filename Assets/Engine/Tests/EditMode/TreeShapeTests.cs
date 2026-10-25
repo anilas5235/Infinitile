@@ -123,7 +123,7 @@ namespace Engine.Tests.EditMode{
 
                 // Logs: the rolled trunk at least; at most the trunk extended to the crown, its lean steps and the branches.
                 int minLogs = r.TrunkHeight * width * width;
-                int maxLogs = (r.TrunkHeight + v.CrownTop + v.CrownMinBase + 2 * r.Lean) * width * width +
+                int maxLogs = (r.TrunkHeight + math.max(v.CrownBase, 0) + v.CrownMinBase + 2 * r.Lean) * width * width +
                               r.BranchCount * (style == BranchStyle.Arm ? 1 + v.BranchLength.y : 3 * v.BranchLength.y);
                 Assert.That(logs.Count, Is.InRange(minLogs, maxLogs), $"{at}: log count");
 
@@ -158,6 +158,25 @@ namespace Engine.Tests.EditMode{
             TreeRoll r = TreeShape.Roll(5, 7, 1u, 0, v);
             Dictionary<int3, ushort> voxels = Stamp(new int3(5, 80, 7), r, v, 1u);
             CollectionAssert.AreEquivalent(new[]{ new int3(0, 0, 0), new int3(0, 1, 0), new int3(0, 2, 0) }, voxels.Keys);
+        }
+
+        [TestCase(0, 4, 8, 4, TestName = "Shapes_CrownBase_0_StartsLevelWithTheTrunkTop")]
+        [TestCase(-2, 2, 6, 4, TestName = "Shapes_CrownBase_Negative_HangsDown")]
+        [TestCase(-10, 1, 5, 4, TestName = "Shapes_CrownBase_FarBelow_KeepsOneLayerAboveTheTrunk")]
+        [TestCase(3, 7, 11, 6, TestName = "Shapes_CrownBase_Above_ExtendsTheTrunk")]
+        public void Shapes_CrownBase_PlacesTheLowestLayer(int crownBase, int bottom, int top, int trunkTop){
+            // Trunk 5 (y 0…4) and a round crown of radius 2 (5 layers), without noise or branches.
+            TreeVariant variant = new(){
+                TrunkVoxel = _fixture.LogSo, LeafVoxel = _fixture.LeavesSo, TrunkHeight = new IntRange(5, 5), CrownShape = CrownShape.Round,
+                CrownRadius = new IntRange(2, 2), CrownBase = crownBase, HoleChance = 0f, BumpChance = 0f, HangChance = 0f
+            };
+            TreeVariantDef v = Def(variant);
+            TreeRoll r = TreeShape.Roll(5, 7, 1u, 0, v);
+            Dictionary<int3, ushort> voxels = Stamp(new int3(5, 80, 7), r, v, 1u);
+            int[] leafY = voxels.Where(kv => kv.Value != FloraFixture.Log).Select(kv => kv.Key.y).ToArray();
+            Assert.AreEqual(bottom, leafY.Min(), "lowest leaf layer");
+            Assert.AreEqual(top, leafY.Max(), "top leaf layer");
+            Assert.AreEqual(trunkTop, voxels.Where(kv => kv.Value == FloraFixture.Log).Max(kv => kv.Key.y), "trunk top");
         }
 
         [Test]

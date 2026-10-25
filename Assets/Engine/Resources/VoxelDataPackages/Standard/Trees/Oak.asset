@@ -33,7 +33,7 @@ MonoBehaviour:
     CrownHeight:
       Min: 0
       Max: 0
-    CrownTop: 2
+    CrownBase: 0
     CrownMinBase: 0
     BranchCount:
       Min: 0

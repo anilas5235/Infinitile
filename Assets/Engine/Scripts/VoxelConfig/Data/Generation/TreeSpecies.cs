@@ -93,11 +93,11 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
         [Tooltip("Cone and Tiered: radius at the top layer.")]
         public IntRange CrownTopRadius = new(0, 1);
 
-        [Tooltip("Crown height in layers. 0–0 derives it: 2r + 1 for Round and Ellipsoid, down to Crown Min Base for Cone and Tiered.")]
+        [Tooltip("Crown height in layers. 0–0 derives it: 2r + 1 for Round and Ellipsoid; Cone and Tiered from Crown Min Base up to one layer above the trunk.")]
         public IntRange CrownHeight = new(0, 0);
 
-        [Tooltip("Top layer of the crown in blocks above the trunk's top voxel (at least 1).")]
-        public int CrownTop = 2;
+        [Tooltip("Lowest crown layer in blocks above the trunk's top voxel (0 = level with it, negative = lower). The crown always ends at least one layer above the trunk. Not used by Cone and Tiered with a derived height.")]
+        public int CrownBase;
 
         [Tooltip("Lowest crown layer in blocks above the ground (0 = the first voxel above the top block); layers below are cut.")]
         public int CrownMinBase;

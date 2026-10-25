@@ -41,8 +41,8 @@ namespace Engine.Scripts.WorldGen.Flora{
         /// <summary>Crown height range; (0, 0) derives it from the shape.</summary>
         public int2 CrownHeight;
 
-        /// <summary>Top crown layer above the trunk's top voxel, at least 1.</summary>
-        public int CrownTop;
+        /// <summary>Lowest crown layer relative to the trunk's top voxel; may be negative.</summary>
+        public int CrownBase;
 
         public int CrownMinBase;
         public int2 BranchCount;
@@ -97,7 +97,7 @@ namespace Engine.Scripts.WorldGen.Flora{
     ///     crown axis, so a width-2 trunk gets a centred crown.
     ///     <list type="bullet">
     ///         <item>Trunk: from y 0 up, leaning by one block at a time; at each step it gains the voxels that keep it face-connected.</item>
-    ///         <item>Crown: centred on the trunk's top column; its top layer lies <c>CrownTop</c> above the trunk top, and the trunk reaches its lowest layer.</item>
+    ///         <item>Crown: centred on the trunk's top column; its lowest layer lies <c>CrownBase</c> above the trunk top, its top layer at least one above it, and the trunk reaches its lowest layer.</item>
     ///         <item>Branches: face-connected paths that start next to a trunk voxel.</item>
     ///         <item>
     ///             Crown noise: a 3D hash at each crown voxel's world position drops outer voxels, adds a voxel outward
@@ -165,17 +165,24 @@ namespace Engine.Scripts.WorldGen.Flora{
         ///     noise hashes world positions). The list may hold duplicates; stamping resolves them by voxel class.
         /// </summary>
         public static void Build(int3 anchorBase, in TreeRoll r, in TreeVariantDef v, uint seed, ref NativeList<FloraVoxel> output){
-            // Vertical layout: the crown's top layer lies CrownTop above the trunk top; the trunk reaches the crown.
+            // Vertical layout: the crown's lowest layer lies CrownBase above the trunk top, its top layer at least one
+            // above the trunk top and not below CrownMinBase; the trunk reaches the crown.
             int trunkTop = r.TrunkHeight - 1;
             int crownTop = 0, crownBottom = 0, fullBottom = 0, height = 0;
             bool hasCrown = v.Crown != CrownShape.None;
             if (hasCrown){
-                crownTop = math.max(trunkTop + v.CrownTop, v.CrownMinBase);
+                fullBottom = trunkTop + v.CrownBase;
                 height = r.CrownHeight;
-                if (height <= 0)
-                    height = v.Crown is CrownShape.Round or CrownShape.Ellipsoid
-                        ? 2 * r.CrownRadius + 1
-                        : math.max(crownTop - v.CrownMinBase + 1, 1);
+                if (height <= 0){
+                    if (v.Crown is CrownShape.Round or CrownShape.Ellipsoid) height = 2 * r.CrownRadius + 1;
+                    else{
+                        // Cone and Tiered: from CrownMinBase up to one layer above the trunk top.
+                        fullBottom = v.CrownMinBase;
+                        height = math.max(trunkTop + 2 - fullBottom, 1);
+                    }
+                }
+
+                crownTop = math.max(fullBottom + height - 1, math.max(trunkTop + 1, v.CrownMinBase));
                 fullBottom = crownTop - height + 1;
                 crownBottom = math.max(fullBottom, v.CrownMinBase);
                 if (r.TrunkHeight > 0) trunkTop = math.max(trunkTop, crownBottom - 1);
