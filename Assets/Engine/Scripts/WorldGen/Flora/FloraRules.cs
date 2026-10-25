@@ -73,7 +73,8 @@ namespace Engine.Scripts.WorldGen.Flora{
     ///     <see cref="CumulativeStart" /> ≤ u &lt; <see cref="CumulativeEnd" />; both bounds are computed once
     ///     by the config builder, so the roll and the multi-block pre-filter compare against the same floats. In a
     ///     biome with density noise (<c>BiomeDef.floraDensity</c>) the intervals are computed per column from
-    ///     <see cref="Probability" /> instead (<see cref="FloraPlacement.RollRule" />).
+    ///     <see cref="Probability" /> instead (<see cref="FloraPlacement.RollRule" />), and the pre-filter computes the
+    ///     same intervals.
     /// </summary>
     public struct FloraRuleDef{
         /// <summary>Species id (1-based index into the config's species table; 0 = none).</summary>

@@ -187,11 +187,18 @@ namespace Engine.Scripts.WorldGen.Settings{
         [ReadOnly] public NativeArray<TreeVariantDef> TreeVariants;
 
         /// <summary>
-        ///     [start, end) of every multi-block rule's species interval over all biomes: a column whose species roll
-        ///     lies in none of them cannot be a multi-block candidate, whatever its flora biome (pre-filter).
-        ///     Owned.
+        ///     [start, end) of every multi-block rule's species interval over the biomes without density noise: a
+        ///     column whose species roll lies in none of them, and in no multi-block interval of a biome in
+        ///     <see cref="FloraDenseMultiBlockBiomes" /> at that column, cannot be a multi-block candidate, whatever its
+        ///     flora biome (pre-filter). Owned.
         /// </summary>
         [ReadOnly] public NativeArray<float2> FloraMultiBlockIntervals;
+
+        /// <summary>
+        ///     Biomes with density noise and a multi-block rule. Their intervals depend on the column, so the
+        ///     pre-filter computes them per column like the roll does. Owned.
+        /// </summary>
+        [ReadOnly] public NativeArray<int> FloraDenseMultiBlockBiomes;
 
         /// <summary>
         ///     Replace class (<see cref="FloraVoxelClass" />) per voxel id for the flora voxels; id 0 is air, ids not
@@ -238,6 +245,7 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (TreeSpecies.IsCreated) TreeSpecies.Dispose();
             if (TreeVariants.IsCreated) TreeVariants.Dispose();
             if (FloraMultiBlockIntervals.IsCreated) FloraMultiBlockIntervals.Dispose();
+            if (FloraDenseMultiBlockBiomes.IsCreated) FloraDenseMultiBlockBiomes.Dispose();
             if (VoxelClasses.IsCreated) VoxelClasses.Dispose();
         }
     }

@@ -83,9 +83,21 @@ namespace Engine.Scripts.WorldGen.Flora{
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static int DenseRule(int x, int z, float u, in Biome.BiomeDef def, in WorldGenConfig cfg){
-            int start = def.floraRuleStart, end = def.floraRuleStart + def.floraRuleCount;
             float4 factor = 1f;
-            int evaluated = 0; // bit i: noise i is in factor
+            int evaluated = 0;
+            return DenseRule(x, z, u, def, cfg, ref factor, ref evaluated);
+        }
+
+        /// <summary>
+        ///     <see cref="DenseRule(int,int,float,in Biome.BiomeDef,in WorldGenConfig)" /> with the noise factors
+        ///     evaluated so far (bit i of <paramref name="evaluated" />: noise i is in <paramref name="factor" />), so
+        ///     several biomes share them. Not inlined, so the roll and the pre-filter run the same code and get the
+        ///     same floats.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static int DenseRule(int x, int z, float u, in Biome.BiomeDef def, in WorldGenConfig cfg,
+            ref float4 factor, ref int evaluated){
+            int start = def.floraRuleStart, end = def.floraRuleStart + def.floraRuleCount;
             float total = 0f;
             for (int r = start; r < end; r++){
                 FloraRuleDef d = cfg.FloraRules[r];
@@ -158,14 +170,31 @@ namespace Engine.Scripts.WorldGen.Flora{
 
         /// <summary>
         ///     Necessary condition for a multi-block candidate that needs no sample: the species roll lies in a
-        ///     multi-block interval of some biome (pre-filter).
+        ///     multi-block interval of some biome (pre-filter). A biome with density noise has the intervals of the
+        ///     column, from the same noise factors the roll uses.
         /// </summary>
         public static bool MayBeMultiBlock(int x, int z, in WorldGenConfig cfg){
-            if (cfg.FloraMultiBlockIntervals.Length == 0) return false;
+            if (cfg.FloraMultiBlockIntervals.Length == 0 && cfg.FloraDenseMultiBlockBiomes.Length == 0) return false;
             float u = Hash.Hash01(x, z, cfg.Seed, HashSalts.FloraSpecies);
             for (int i = 0; i < cfg.FloraMultiBlockIntervals.Length; i++){
                 float2 interval = cfg.FloraMultiBlockIntervals[i];
                 if (u >= interval.x && u < interval.y) return true;
+            }
+
+            return cfg.FloraDenseMultiBlockBiomes.Length != 0 && MayBeDenseMultiBlock(x, z, u, cfg);
+        }
+
+        /// <summary>
+        ///     True when the roll <paramref name="u" /> picks a multi-block rule in some biome with density noise. Each
+        ///     noise is evaluated at most once for all biomes. A separate method, so the pre-filter stays small.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static bool MayBeDenseMultiBlock(int x, int z, float u, in WorldGenConfig cfg){
+            float4 factor = 1f;
+            int evaluated = 0;
+            for (int i = 0; i < cfg.FloraDenseMultiBlockBiomes.Length; i++){
+                int rule = DenseRule(x, z, u, cfg.Biomes[cfg.FloraDenseMultiBlockBiomes[i]], cfg, ref factor, ref evaluated);
+                if (IsMultiBlock(rule, cfg)) return true;
             }
 
             return false;
