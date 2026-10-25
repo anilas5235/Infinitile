@@ -167,6 +167,37 @@ namespace Engine.Tests.Performance{
             MeasurePerChunk($"ChunkJob.Run {architecture} DistanceBlend beaches ms/chunk");
         }
 
+        /// <summary>
+        ///     The DistanceBlend world in which every land biome carries the rules of the shipped Forest biome: its tree
+        ///     species, undergrowth, mushrooms and fallen logs with their density noises. This is the cost of the
+        ///     species set in play, so the row moves when the shipped Forest rules or species are tuned.
+        /// </summary>
+        [Test]
+        [Performance]
+        public void ChunkJob_Run_ForestSpecies_MsPerChunk(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
+            _config = BenchmarkFixtures.CreateSpeciesGeneratorConfig(architecture, SpeciesFlora.ShippedForest,
+                Allocator.Persistent, _created, out _);
+            Assert.Greater(_config.WorldGen.FloraPadding, 0);
+            MeasurePerChunk($"ChunkJob.Run {architecture} DistanceBlend forest species ms/chunk");
+        }
+
+        /// <summary>
+        ///     Worst case: every land biome grows only the shipped variant with the largest reach, so every chunk evaluates
+        ///     the largest padding and is filled with the biggest trees as densely as their spacing allows.
+        /// </summary>
+        [Test]
+        [Performance]
+        public void ChunkJob_Run_LargestReach_MsPerChunk(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
+            _config = BenchmarkFixtures.CreateSpeciesGeneratorConfig(architecture, SpeciesFlora.LargestReach,
+                Allocator.Persistent, _created, out _);
+            UnityEngine.Debug.Log($"largest reach {_config.WorldGen.FloraReach}, padding {_config.WorldGen.FloraPadding}");
+            MeasurePerChunk($"ChunkJob.Run {architecture} DistanceBlend largest reach ms/chunk");
+        }
+
         private void MeasurePerChunk(string sampleGroup){
             _jobs.Clear();
             Random rng = new(42);
