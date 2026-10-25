@@ -4,7 +4,7 @@ namespace Engine.Scripts.WorldGen.Core{
     /// <summary>
     ///     Integer hashing for every random decision in world generation. Each decision passes its
     ///     own salt from <see cref="HashSalts" />, so two decisions at the same column never correlate.
-    ///     Pure function of (x, z, seed, salt): the same inputs give the same value on every thread, in Burst
+    ///     Pure function of (x, z, seed, salt), or (x, y, z, seed, salt) for voxel decisions: the same inputs give the same value on every thread, in Burst
     ///     and in Mono, and independent of chunk boundaries.
     /// </summary>
     [BurstCompile]
@@ -34,6 +34,22 @@ namespace Engine.Scripts.WorldGen.Core{
         /// <summary>Uniform float in [0, 1) built from the top 24 bits of <see cref="Hash32" /> (exact in float32).</summary>
         public static float Hash01(int x, int z, uint seed, uint salt){
             return (Hash32(x, z, seed, salt) >> 8) * (1f / 16777216f);
+        }
+
+        /// <summary>
+        ///     Hashes an integer lattice point in 3D (a voxel position) together with the world seed and a salt. Same
+        ///     construction as the 2D <see cref="Hash32(int,int,uint,uint)" />, with a third odd constant for y.
+        /// </summary>
+        public static uint Hash32(int x, int y, int z, uint seed, uint salt){
+            uint h = Mix((uint)x * 0x9E3779B1u ^ salt);
+            h = Mix(h ^ (uint)y * 0xC2B2AE3Du);
+            h = Mix(h ^ (uint)z * 0x85EBCA77u);
+            return Mix(h ^ seed);
+        }
+
+        /// <summary>Uniform float in [0, 1) from the top 24 bits of the 3D <see cref="Hash32(int,int,int,uint,uint)" />.</summary>
+        public static float Hash01(int x, int y, int z, uint seed, uint salt){
+            return (Hash32(x, y, z, seed, salt) >> 8) * (1f / 16777216f);
         }
 
         /// <summary>Uniform float in [-1, 1) built from <see cref="Hash01" />.</summary>

@@ -17,7 +17,8 @@ namespace Engine.Tests.EditMode{
     ///     The chunk job's flora against the pure region API: heights, top block and flora of a 4×4-chunk area equal
     ///     <see cref="Engine.Scripts.WorldGen.Core.WorldGenApi.SampleRegion" /> in all 8 configurations
     ///     (2 architectures × 4 methods; Biome-first uses the method in both stages), trees that cross chunk borders
-    ///     are complete on both sides, snow, strata and ice agree as well, and the same input gives the same output.
+    ///     are complete on both sides, every tree variant matches the whole-world stamp across chunk corners, snow,
+    ///     strata and ice agree as well, and the same input gives the same output in any chunk order.
     /// </summary>
     public class FloraChunkTests{
         private FloraFixture _fixture;
@@ -45,10 +46,17 @@ namespace Engine.Tests.EditMode{
 
         /// <summary>Runs the chunk job on every chunk of the area, managed copies of the voxels by chunk.</summary>
         private Dictionary<int2, ChunkVoxelData> RunChunks(int2 originChunk, int2 chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results){
-            NativeList<int2> jobs = new(chunks.x * chunks.y, Allocator.TempJob);
+            List<int2> order = new();
             for (int cx = 0; cx < chunks.x; cx++)
             for (int cz = 0; cz < chunks.y; cz++)
-                jobs.Add(originChunk + new int2(cx, cz));
+                order.Add(originChunk + new int2(cx, cz));
+            return RunChunks(order, out results);
+        }
+
+        /// <summary>Runs the chunk job on <paramref name="order" />, in that order.</summary>
+        private Dictionary<int2, ChunkVoxelData> RunChunks(IReadOnlyList<int2> order, out NativeParallelHashMap<int2, ChunkVoxelData> results){
+            NativeList<int2> jobs = new(order.Count, Allocator.TempJob);
+            foreach (int2 chunk in order) jobs.Add(chunk);
             results = new NativeParallelHashMap<int2, ChunkVoxelData>(jobs.Length, Allocator.TempJob);
             try{
                 new ChunkJob{
@@ -248,6 +256,84 @@ namespace Engine.Tests.EditMode{
             }
             finally{
                 Release(results);
+            }
+        }
+
+        [Test]
+        public void ChunkJob_EveryTreeVariantMatchesTheWholeWorldStamp_AcrossChunkCorners(
+            [Values(0, 1, 2, 3, 4)] int variant,
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            // Each shape variant alone, dense enough that anchors sit next to chunk corners, so their trees fall into
+            // up to four chunks: the chunk job equals the whole-world stamp voxel for voxel.
+            TreeSpecies single = _fixture.MakeTree("Single", _fixture.ShapeVariants()[variant]);
+            _biomes = new[]{
+                _fixture.MakeBiome("Wood", .5f, 150f, 10f, _fixture.GrassSo, FloraFixture.Rule(single, .25f), FloraFixture.Rule(_fixture.TuftSo, .3f))
+            };
+            _config = _fixture.GeneratorConfig(_fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes));
+            int2 originChunk = new(1, 2), chunks = new(3, 3);
+            ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
+
+            static bool NearBorder(int c, int size){
+                int m = (c % size + size) % size;
+                return m <= 2 || m >= size - 2;
+            }
+
+            int nearCorner = reference.Anchors.Count(a => NearBorder(a.column.x, ChunkWidth) && NearBorder(a.column.y, ChunkDepth));
+            int fourChunks = reference.Anchors.Count(a => a.footprint.Where(reference.InArea)
+                .Select(p => new int2((int)math.floor(p.x / (float)ChunkWidth), (int)math.floor(p.z / (float)ChunkDepth))).Distinct().Count() == 4);
+            TestContext.WriteLine($"variant {variant} {architecture}: anchors {reference.Anchors.Count}, near a corner {nearCorner}, " +
+                                  $"in four chunks {fourChunks}, narrowed {reference.Narrowed.Count}, reach {_config.WorldGen.FloraReach}");
+            Assert.Greater(reference.Anchors.Count, 20, "the area carries trees");
+            Assert.Greater(nearCorner, 0, "an anchor lies next to a chunk corner");
+            Assert.Greater(fourChunks, 0, "a tree falls into four chunks");
+            Assert.IsTrue(reference.TreeVariants.Values.All(v => v == 0), "the species has one variant");
+            if (variant == 1 && architecture == GenArchitecture.TerrainFirst){
+                // The 2×2 trunk always needs a flat footprint: both outcomes occur on the spline terrain (the
+                // Biome-first test hills are flat within 1 block everywhere).
+                Assert.Greater(reference.Narrowed.Count, 0, "some wide trunk falls back to width 1");
+                Assert.Less(reference.Narrowed.Count, reference.Anchors.Count, "some wide trunk stands");
+            }
+
+            Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
+            try{
+                List<string> report = new();
+                int mismatches = CompareVoxels(reference, chunkData, report);
+                Assert.AreEqual(0, mismatches, "chunk voxels differ from the whole-world stamp:\n" + string.Join("\n", report));
+            }
+            finally{
+                Release(results);
+            }
+        }
+
+        [Test]
+        public void ChunkJob_TreesDoNotDependOnTheChunkOrder(){
+            // Mixed variant radii and trees across chunk borders: generating the chunks in reverse order gives the
+            // same voxels in every chunk.
+            Use(GenArchitecture.BiomeFirst, BlendMethod.DistanceBlend);
+            List<int2> order = new();
+            for (int cx = 0; cx < 3; cx++)
+            for (int cz = 0; cz < 2; cz++)
+                order.Add(new int2(2 + cx, -1 + cz));
+            List<int2> reversed = Enumerable.Reverse(order).ToList();
+            Dictionary<int2, ChunkVoxelData> forward = RunChunks(order, out NativeParallelHashMap<int2, ChunkVoxelData> r1);
+            Dictionary<int2, ChunkVoxelData> backward = RunChunks(reversed, out NativeParallelHashMap<int2, ChunkVoxelData> r2);
+            try{
+                int logs = 0;
+                foreach (int2 chunk in order)
+                    for (int x = 0; x < ChunkWidth; x++)
+                    for (int z = 0; z < ChunkDepth; z++)
+                    for (int y = 0; y < ChunkHeight; y++){
+                        int3 p = new(x, y, z);
+                        ushort a = forward[chunk].GetVoxel(p);
+                        if (a != backward[chunk].GetVoxel(p)) Assert.Fail($"chunk {chunk} voxel {p}: {a} vs {backward[chunk].GetVoxel(p)}");
+                        if (a == FloraFixture.Log) logs++;
+                    }
+
+                Assert.Greater(logs, 100, "the chunks carry trees");
+            }
+            finally{
+                Release(r1);
+                Release(r2);
             }
         }
 

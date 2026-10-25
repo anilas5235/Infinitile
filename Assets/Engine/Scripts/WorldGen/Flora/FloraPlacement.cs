@@ -18,8 +18,9 @@ namespace Engine.Scripts.WorldGen.Flora{
     ///             snow cover for single-block plants.
     ///         </item>
     ///         <item>
-    ///             Multi-block species only: the column is an anchor if no other candidate within r_tree has a higher
-    ///             <see cref="HashSalts.TreePriority" /> hash; otherwise it carries no plant.
+    ///             Multi-block species only: every candidate has a spacing radius (a tree's from its variant, rolled
+    ///             first, otherwise r_tree). A column is an anchor if no candidate at distance ≤ max(r_a, r_b) has a
+    ///             higher <see cref="HashSalts.TreePriority" /> hash; otherwise it carries no plant.
     ///         </item>
     ///     </list>
     /// </summary>
@@ -103,7 +104,7 @@ namespace Engine.Scripts.WorldGen.Flora{
 
         /// <summary>
         ///     Strict total order of candidates: higher priority wins; equal hashes go to the lower (x, z). So of two
-        ///     candidates within r_tree exactly one outranks the other and at most one becomes an anchor.
+        ///     conflicting candidates exactly one outranks the other and at most one becomes an anchor.
         /// </summary>
         public static bool Outranks(int2 a, uint priorityA, int2 b, uint priorityB){
             if (priorityA != priorityB) return priorityA > priorityB;
@@ -113,6 +114,24 @@ namespace Engine.Scripts.WorldGen.Flora{
         /// <summary>True for the offsets of the r_tree disc around a column (dx² + dz² ≤ r², the column excluded).</summary>
         public static bool InSpacingDisc(int dx, int dz, int radius){
             return (dx != 0 || dz != 0) && dx * dx + dz * dz <= radius * radius;
+        }
+
+        /// <summary>Two candidates with spacing radii ra and rb at squared distance d² conflict when d ≤ max(ra, rb).</summary>
+        public static bool Conflict(int distanceSq, int radiusA, int radiusB){
+            int r = math.max(radiusA, radiusB);
+            return distanceSq <= r * r;
+        }
+
+        /// <summary>The tree variant (index into <c>cfg.TreeVariants</c>) of a candidate of rule <paramref name="rule" />, -1 for other species.</summary>
+        public static int Variant(int x, int z, int rule, in WorldGenConfig cfg){
+            int tree = cfg.FloraRules[rule].Tree;
+            return tree < 0 ? -1 : TreeShape.PickVariant(x, z, cfg, tree);
+        }
+
+        /// <summary>Spacing radius of a multi-block candidate: its tree variant's, or r_tree for structures and stacks.</summary>
+        public static int SpacingRadius(int x, int z, int rule, in WorldGenConfig cfg){
+            int variant = Variant(x, z, rule, cfg);
+            return variant < 0 ? cfg.TreeSpacingRadius : cfg.TreeVariants[variant].SpacingRadius;
         }
 
         /// <summary>
@@ -127,14 +146,17 @@ namespace Engine.Scripts.WorldGen.Flora{
             int rule = RollRule(x, z, cfg, s, out int biome);
             if (rule < 0) return;
             FloraRuleDef d = cfg.FloraRules[rule];
-            if (d.MultiBlock != 0 && !IsAnchor(x, z, cfg, cache)) return;
+            if (d.MultiBlock != 0 && !IsAnchor(x, z, SpacingRadius(x, z, rule, cfg), cfg, cache)) return;
             species = d.Species;
             source = biome;
         }
 
-        /// <summary>Anchor test for a column that is a multi-block candidate itself: no outranking multi-block neighbour within r_tree.</summary>
-        private static bool IsAnchor(int x, int z, in WorldGenConfig cfg, in BlendCache cache){
-            int r = cfg.TreeSpacingRadius;
+        /// <summary>
+        ///     Anchor test for a column that is a multi-block candidate itself with spacing radius
+        ///     <paramref name="radius" />: no outranking multi-block candidate it conflicts with.
+        /// </summary>
+        private static bool IsAnchor(int x, int z, int radius, in WorldGenConfig cfg, in BlendCache cache){
+            int r = cfg.FloraSpacingMax;
             int2 self = new(x, z);
             uint own = Priority(x, z, cfg);
             for (int dx = -r; dx <= r; dx++)
@@ -144,7 +166,9 @@ namespace Engine.Scripts.WorldGen.Flora{
                 if (!Outranks(new int2(nx, nz), Priority(nx, nz, cfg), self, own)) continue;
                 if (!MayBeMultiBlock(nx, nz, cfg)) continue;
                 WorldSampler.SampleCore(nx, nz, cfg, cache, out ColumnSample neighbour);
-                if (IsMultiBlock(RollRule(nx, nz, cfg, neighbour, out int _), cfg)) return false;
+                int rule = RollRule(nx, nz, cfg, neighbour, out int _);
+                if (!IsMultiBlock(rule, cfg)) continue;
+                if (Conflict(dx * dx + dz * dz, radius, SpacingRadius(nx, nz, rule, cfg))) return false;
             }
 
             return true;

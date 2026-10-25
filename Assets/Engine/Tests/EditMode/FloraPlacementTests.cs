@@ -346,7 +346,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void Config_FloraTables(){
-            Use(GenArchitecture.BiomeFirst, BlendMethod.None);
+            Use(GenArchitecture.BiomeFirst, BlendMethod.None, _fixture.StructureBiomes());
             // Species ids are 1-based in first-use order over the biomes: Tuft, Flower, Tree, Cactus, Pine.
             Assert.AreEqual(6, _cfg.FloraRules.Length, "6 rules, 5 distinct species");
             CollectionAssert.AreEqual(new ushort[]{ 1, 2, 3, 4, 1, 5 }, _cfg.FloraRules.Select(r => r.Species).ToArray());
@@ -382,6 +382,91 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void Config_TreeTables(){
+            // The default biomes: the Grove species (5 variants) in the meadow, the Pine structure in the dunes.
+            Use(GenArchitecture.BiomeFirst, BlendMethod.None);
+            Assert.AreEqual(1, _cfg.FloraStructures.Length, "pine");
+            Assert.AreEqual(1, _cfg.TreeSpecies.Length);
+            Assert.AreEqual(5, _cfg.TreeVariants.Length);
+            Assert.AreEqual(0, _cfg.TreeSpecies[0].VariantStart);
+            Assert.AreEqual(5, _cfg.TreeSpecies[0].VariantCount);
+            Assert.AreEqual(0, _cfg.FloraRules[2].Tree);
+            Assert.AreEqual(-1, _cfg.FloraRules[2].Structure);
+            Assert.AreEqual(1, _cfg.FloraRules[2].MultiBlock);
+            Assert.AreEqual(-1, _cfg.FloraRules[5].Tree);
+            Assert.AreEqual(0, _cfg.FloraRules[5].Structure);
+            CollectionAssert.AreEqual(new[]{ .2f, .4f, .6f, .8f, 1f }, Enumerable.Range(0, 5).Select(i => _cfg.TreeVariants[i].CumulativeEnd).ToArray());
+
+            // Reach: Normal 0 + r 3 + bump; Wide lean 8 · 0.2 = 1 and width 2, + r 4 + bump; Spire r 3 + bump;
+            // Tiered r 4 + bump; Snag lean 5 · 0.25 = 1, + branch 3 + cluster 2 + bump.
+            CollectionAssert.AreEqual(new[]{ 4, 7, 4, 5, 7 }, Enumerable.Range(0, 5).Select(i => _cfg.TreeVariants[i].Reach).ToArray());
+            CollectionAssert.AreEqual(new[]{ 3, 5, 2, 4, 3 }, Enumerable.Range(0, 5).Select(i => _cfg.TreeVariants[i].SpacingRadius).ToArray());
+            Assert.AreEqual(7, _cfg.FloraReach, "largest variant reach");
+            Assert.AreEqual(5, _cfg.FloraSpacingMax, "largest variant radius");
+            Assert.AreEqual(12, _cfg.FloraPadding, "reach + largest spacing radius");
+
+            TreeVariantDef wide = _cfg.TreeVariants[1];
+            Assert.AreEqual(FloraFixture.Log, wide.TrunkVoxel);
+            Assert.AreEqual(FloraVoxelClass.Solid, wide.TrunkClass);
+            Assert.AreEqual(FloraFixture.Needles, wide.AltLeafVoxel);
+            Assert.AreEqual(FloraVoxelClass.Leaves, wide.AltLeafClass);
+            Assert.AreEqual(200, wide.LeanPerMille);
+            Assert.AreEqual(new int2(4, 5), wide.CrownHeight);
+            Assert.AreEqual(TestFixtures.Air, _cfg.TreeVariants[0].AltLeafVoxel, "no alternative leaf");
+            Assert.AreEqual(FloraVoxelClass.Air, _cfg.TreeVariants[0].AltLeafClass);
+        }
+
+        [Test]
+        public void Config_TreeVariantsAreSanitised(){
+            // Swapped and negative ranges, too many branches and zero weights are clamped.
+            TreeVariant odd = new(){
+                TrunkVoxel = _fixture.LogSo, LeafVoxel = _fixture.LeavesSo, Weight = 0f, TrunkHeight = new IntRange(7, 3),
+                TrunkWidth = 5, MaxLean = 3f, CrownRadius = new IntRange(-2, 1), BranchCount = new IntRange(2, 40),
+                BranchLength = new IntRange(0, 0), BranchBandMin = .9f, BranchBandMax = .1f, HoleChance = 2f, SpacingRadius = -1
+            };
+            TreeVariant zero = new(){ TrunkVoxel = _fixture.LogSo, LeafVoxel = _fixture.LeavesSo, Weight = 0f };
+            Biome b = _fixture.MakeBiome("B", .5f, 150f, 2f, _fixture.GrassSo, FloraFixture.Rule(_fixture.MakeTree("Odd", odd, zero), .1f));
+            Use(GenArchitecture.BiomeFirst, BlendMethod.None, b);
+            TreeVariantDef d = _cfg.TreeVariants[0];
+            Assert.AreEqual(.5f, d.CumulativeEnd, "all weights 0: equal");
+            Assert.AreEqual(1f, _cfg.TreeVariants[1].CumulativeEnd);
+            Assert.AreEqual(new int2(3, 7), d.TrunkHeight);
+            Assert.AreEqual(2, d.TrunkWidth);
+            Assert.AreEqual(250, d.LeanPerMille);
+            Assert.AreEqual(new int2(0, 1), d.CrownRadius);
+            Assert.AreEqual(new int2(2, TreeShape.MaxBranches), d.BranchCount);
+            Assert.AreEqual(new int2(1, 1), d.BranchLength);
+            Assert.AreEqual(new int2(100, 900), d.BranchBand);
+            Assert.AreEqual(1f, d.HoleChance);
+            Assert.AreEqual(0, d.SpacingRadius);
+        }
+
+        [Test]
+        public void Config_TreeVariantsWithWeightZeroAtTheEnd_AreNeverPicked(){
+            TreeVariant a = new(){ TrunkVoxel = _fixture.LogSo, LeafVoxel = _fixture.LeavesSo, Weight = 1f };
+            TreeVariant b = new(){ TrunkVoxel = _fixture.LogSo, LeafVoxel = _fixture.LeavesSo, Weight = 2f };
+            TreeVariant zero = new(){ TrunkVoxel = _fixture.LogSo, LeafVoxel = _fixture.LeavesSo, Weight = 0f };
+            Biome biome = _fixture.MakeBiome("B", .5f, 150f, 2f, _fixture.GrassSo, FloraFixture.Rule(_fixture.MakeTree("Tail", a, b, zero, zero), .1f));
+            Use(GenArchitecture.BiomeFirst, BlendMethod.None, biome);
+            Assert.AreEqual(1f / 3f, _cfg.TreeVariants[0].CumulativeEnd, 1e-6f);
+            Assert.AreEqual(1f, _cfg.TreeVariants[1].CumulativeEnd, "the last weighted variant closes the interval");
+            for (int x = 0; x < 256; x++)
+            for (int z = 0; z < 256; z++)
+                Assert.Less(TreeShape.PickVariant(x, z, _cfg, 0), 2);
+        }
+
+        [Test]
+        public void Config_TreeWithoutVariants_IsSkipped(){
+            Biome b = _fixture.MakeBiome("B", .5f, 150f, 2f, _fixture.GrassSo, FloraFixture.Rule(_fixture.MakeTree("Empty"), .1f),
+                FloraFixture.Rule(_fixture.TuftSo, .2f));
+            LogAssert.Expect(LogType.Warning, new Regex("exactly one of"));
+            Use(GenArchitecture.BiomeFirst, BlendMethod.None, b);
+            Assert.AreEqual(1, _cfg.FloraRules.Length);
+            Assert.AreEqual(0, _cfg.TreeSpecies.Length);
+            Assert.AreEqual(0, _cfg.FloraPadding);
+        }
+
+        [Test]
         public void Config_WithoutMultiBlockFlora_HasNoPadding(){
             Biome flat = _fixture.MakeBiome("Flat", .5f, 150f, 2f, _fixture.GrassSo, FloraFixture.Rule(_fixture.TuftSo, .3f));
             Use(GenArchitecture.BiomeFirst, BlendMethod.None, flat);
@@ -412,7 +497,7 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void FloraSpeciesNames_StartWithNone(){
             WorldGenSettings s = _fixture.Settings(GenArchitecture.BiomeFirst, BlendMethod.None);
-            CollectionAssert.AreEqual(new[]{ "none", "Tuft", "Flower", "Tree", "Cactus", "Pine" }, s.FloraSpeciesNames());
+            CollectionAssert.AreEqual(new[]{ "none", "Tuft", "Flower", "Grove", "Cactus", "Pine" }, s.FloraSpeciesNames());
         }
 
         [Test]

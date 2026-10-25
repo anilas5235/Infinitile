@@ -5,17 +5,20 @@ using UnityEngine;
 
 namespace Engine.Scripts.WorldGen.Flora{
     /// <summary>
-    ///     One flora rule of a biome: a species (single voxel, a stack of one voxel, or a multi-block
-    ///     structure), its probability per column and placement conditions. The Burst mirror is
+    ///     One flora rule of a biome: a species (single voxel, a stack of one voxel, a hand-made multi-block
+    ///     structure or a parametric tree), its probability per column and placement conditions. The Burst mirror is
     ///     <see cref="FloraRuleDef" />; <see cref="FloraPlacement" /> evaluates it.
     /// </summary>
     [Serializable]
     public class FloraRule{
-        [Tooltip("Single-voxel species (grass, flowers, mushrooms, rocks, cactus). Leave empty when SpeciesStructure is set.")]
+        [Tooltip("Single-voxel species (grass, flowers, mushrooms, rocks, cactus). Set exactly one of the three species fields.")]
         public VoxelConfig.Data.Voxel.Voxel SpeciesVoxel;
 
-        [Tooltip("Multi-block species (tree). Leave empty when SpeciesVoxel is set.")]
+        [Tooltip("Hand-made multi-block species. Set exactly one of the three species fields.")]
         public VoxelStructure SpeciesStructure;
+
+        [Tooltip("Parametric tree species with variants. Set exactly one of the three species fields.")]
+        public TreeSpecies SpeciesTree;
 
         [Tooltip("Probability per column that this species is rolled, in [0,1]. The rules of one biome are cumulative.")]
         [Range(0f, 1f)]
@@ -35,11 +38,12 @@ namespace Engine.Scripts.WorldGen.Flora{
         [Min(1)]
         public int MaxStackHeight = 1;
 
-        /// <summary>True when the rule names exactly one species.</summary>
-        public bool IsValid => (SpeciesVoxel != null) ^ (SpeciesStructure != null);
+        /// <summary>True when the rule names exactly one species (a tree needs at least one variant).</summary>
+        public bool IsValid => (SpeciesVoxel != null ? 1 : 0) + (SpeciesStructure != null ? 1 : 0) + (SpeciesTree != null ? 1 : 0) == 1 &&
+                               (SpeciesTree == null || SpeciesTree.Variants is{ Count: > 0 });
 
-        /// <summary>Structures and stacks higher than one block take part in the anchor spacing.</summary>
-        public bool IsMultiBlock => SpeciesStructure != null || math.max(MinStackHeight, MaxStackHeight) > 1;
+        /// <summary>Trees, structures and stacks higher than one block take part in the anchor spacing.</summary>
+        public bool IsMultiBlock => SpeciesStructure != null || SpeciesTree != null || math.max(MinStackHeight, MaxStackHeight) > 1;
     }
 
     /// <summary>
@@ -58,15 +62,18 @@ namespace Engine.Scripts.WorldGen.Flora{
         /// <summary>1 when the plant needs surface source = flora source.</summary>
         public byte RequiresSurfaceFromSameBiome;
 
-        /// <summary>1 for structures and stacks above one block: anchor spacing applies.</summary>
+        /// <summary>1 for trees, structures and stacks above one block: anchor spacing applies.</summary>
         public byte MultiBlock;
 
         public int MinHeightAboveWater;
 
-        /// <summary>Index into <c>WorldGenConfig.FloraStructures</c>, or -1 for a (stacked) voxel species.</summary>
+        /// <summary>Index into <c>WorldGenConfig.FloraStructures</c>, or -1.</summary>
         public int Structure;
 
-        /// <summary>Voxel id of a voxel species; 0 for structures (and without a registry).</summary>
+        /// <summary>Index into <c>WorldGenConfig.TreeSpecies</c>, or -1.</summary>
+        public int Tree;
+
+        /// <summary>Voxel id of a voxel species; 0 for structures and trees (and without a registry).</summary>
         public ushort Voxel;
 
         /// <summary>Replace class of <see cref="Voxel" /> (<see cref="FloraVoxelClass" />).</summary>

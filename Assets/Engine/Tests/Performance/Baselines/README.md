@@ -410,6 +410,29 @@ after the fill loop, and the strata test is guarded by a per-column flag.
 Regression check, existing rows vs the previous run (median / min): every row between −5 % and +6 % (median) and
 −4 % and +5 % (min). The highest is `ChunkJob.Run BiomeFirst` (single chunk, +6 % / +5 %).
 
+## 2026-10-24 — parametric trees (`2026-10-24-phaseG2-editmode-baseline.json`)
+
+Same machine and settings as above. Phase G2 replaces the fixed tree with tree species: weighted variants, a spacing
+radius per variant (two candidates conflict when their distance is at most the larger radius), the flat-footprint
+test of wide and leaning trunks, and crown noise from a 3D hash. The flora decisions moved out of `PrepareChunkMaps`
+into their own pass (`DecideFlora`, not inlined), as the G1 entry requires. No new rows: the benchmark flora still
+uses the placeholder tree structure, so the rows measure the new decision code, not the bigger Oak crowns (rows
+with a species set are still to come).
+
+| Sample group | Median | Min | Max | vs previous (median / min) |
+|---|---|---|---|---|
+| ChunkJob.Run TerrainFirst DistanceBlend snow strata ms/chunk | 5.23 ms | 5.17 ms | 5.37 ms | +6 % / +7 % |
+| ChunkJob.Run TerrainFirst DistortedBoundary flora ms/chunk | 4.27 ms | 4.16 ms | 4.43 ms | +8 % / +7 % |
+| LightJob.Run natural terrain ms/chunk | 0.76 ms | 0.72 ms | 0.97 ms | +9 % / +10 % |
+
+Regression check, every row vs the previous baseline: within 10 %. Every other `ChunkJob` row is between −1 % and
++3 % (median). The two Terrain-first flora rows above pay 0.25–0.3 ms per chunk, but `TerrainFirst DistanceBlend
+flora` is unchanged (+1 %), although the work is the same in all three; it looks like Burst code generation, as in
+G1. Measured back to back with the G1 code, the two rows are +7–10 %. Two attempts to win it back changed nothing or
+made it worse: a local blend cache instead of a reference into the flora grid, and letting Burst inline
+`DecideFlora`. `LightJob` code is unchanged in G2; the G1 code measured back to back showed the same +8–10 % on
+natural terrain, so that row is drift of the machine or Editor state.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the

@@ -88,6 +88,67 @@ namespace Engine.Tests.EditMode{
             }
         }
 
+        [Test]
+        public void Hash32_3D_FlippingOneInputBit_FlipsAboutHalfTheOutputBits(){
+            // The 3D hash of crown noise: the same avalanche for x, y, z, seed and salt.
+            double flipped = 0;
+            int trials = 0;
+            for (int i = 0; i < 2000; i++){
+                int x = i * 7919 - 1000003;
+                int y = i * 31 - 300;
+                int z = i * 104729 + 17;
+                uint baseline = Hash.Hash32(x, y, z, Seed, Salt);
+                for (int bit = 0; bit < 32; bit++){
+                    flipped += math.countbits(baseline ^ Hash.Hash32(x ^ (1 << bit), y, z, Seed, Salt));
+                    flipped += math.countbits(baseline ^ Hash.Hash32(x, y ^ (1 << bit), z, Seed, Salt));
+                    flipped += math.countbits(baseline ^ Hash.Hash32(x, y, z ^ (1 << bit), Seed, Salt));
+                    flipped += math.countbits(baseline ^ Hash.Hash32(x, y, z, Seed ^ (1u << bit), Salt));
+                    flipped += math.countbits(baseline ^ Hash.Hash32(x, y, z, Seed, Salt ^ (1u << bit)));
+                    trials += 5;
+                }
+            }
+
+            double average = flipped / trials;
+            Debug.Log($"Hash32 3D: avalanche {average:F3} bits per flipped input bit");
+            Assert.That(average, Is.InRange(15.5, 16.5));
+        }
+
+        [Test]
+        public void Hash01_3D_IsUniformAndUncorrelatedAcrossLayers(){
+            // 64^3 samples in 16 buckets (chi-square, 15 degrees of freedom, p = 0.001 bound 37.7); the layer above
+            // and the 2D hash of the same column are uncorrelated with it.
+            const int n = 64;
+            const int count = n * n * n;
+            int[] buckets = new int[16];
+            double sum = 0, sumUp = 0, sum2D = 0, sumSq = 0, sumSqUp = 0, sumSq2D = 0, crossUp = 0, cross2D = 0;
+            for (int x = -n / 2; x < n / 2; x++)
+            for (int y = 0; y < n; y++)
+            for (int z = -n / 2; z < n / 2; z++){
+                double a = Hash.Hash01(x, y, z, Seed, Salt);
+                double up = Hash.Hash01(x, y + 1, z, Seed, Salt);
+                double flat = Hash.Hash01(x, z, Seed, Salt);
+                if (a < 0.0 || a >= 1.0) Assert.Fail($"Hash01 out of [0,1) at ({x},{y},{z}): {a}");
+                buckets[(int)(a * 16)]++;
+                sum += a;
+                sumUp += up;
+                sum2D += flat;
+                sumSq += a * a;
+                sumSqUp += up * up;
+                sumSq2D += flat * flat;
+                crossUp += a * up;
+                cross2D += a * flat;
+            }
+
+            double expected = count / 16.0, chi = 0;
+            foreach (int b in buckets) chi += (b - expected) * (b - expected) / expected;
+            double corrUp = Correlation(count, sum, sumUp, sumSq, sumSqUp, crossUp);
+            double corr2D = Correlation(count, sum, sum2D, sumSq, sumSq2D, cross2D);
+            Debug.Log($"Hash01 3D: chi-square {chi:F2}, corr(y)/(y+1) {corrUp:E2}, corr 3D/2D {corr2D:E2}");
+            Assert.Less(chi, 37.7, "uniform buckets");
+            Assert.Less(Math.Abs(corrUp), 0.01, "correlation between (x,y,z) and (x,y+1,z)");
+            Assert.Less(Math.Abs(corr2D), 0.01, "correlation between the 3D and the 2D hash");
+        }
+
         private static double Correlation(int n, double sumA, double sumB, double sumA2, double sumB2, double sumAb){
             double cov = sumAb / n - sumA / n * (sumB / n);
             double varA = sumA2 / n - sumA / n * (sumA / n);

@@ -134,15 +134,18 @@ namespace Engine.Scripts.WorldGen.Settings{
         public SplineRoot JaggednessSpline;
 
         // --- Flora -------------------------------------------------------------------------------------------------
-        /// <summary>r_tree: anchors of multi-block flora are at least this far apart (default 3).</summary>
+        /// <summary>r_tree: spacing radius of structure and stack species (default 3); tree variants have their own.</summary>
         public int TreeSpacingRadius;
 
-        /// <summary>Largest horizontal reach of a multi-block species from its anchor column (max canopy radius).</summary>
+        /// <summary>Largest horizontal reach of a multi-block species from its anchor column (canopy, branches, lean).</summary>
         public int FloraReach;
+
+        /// <summary>Largest spacing radius of any multi-block species (<see cref="TreeSpacingRadius" /> or a variant's).</summary>
+        public int FloraSpacingMax;
 
         /// <summary>
         ///     Columns a chunk evaluates beyond its border for multi-block flora: <see cref="FloraReach" /> +
-        ///     <see cref="TreeSpacingRadius" />, 0 when no biome has a multi-block rule.
+        ///     <see cref="FloraSpacingMax" />, 0 when no biome has a multi-block rule.
         /// </summary>
         public int FloraPadding;
 
@@ -154,6 +157,12 @@ namespace Engine.Scripts.WorldGen.Settings{
 
         /// <summary>Voxels of every structure in <see cref="FloraStructures" />. Owned.</summary>
         [ReadOnly] public NativeArray<FloraVoxel> FloraVoxels;
+
+        /// <summary>Tree species, indexed by <see cref="FloraRuleDef.Tree" />. Owned.</summary>
+        [ReadOnly] public NativeArray<TreeSpeciesDef> TreeSpecies;
+
+        /// <summary>Variants of every species in <see cref="TreeSpecies" />. Owned.</summary>
+        [ReadOnly] public NativeArray<TreeVariantDef> TreeVariants;
 
         /// <summary>
         ///     [start, end) of every multi-block rule's species interval over all biomes: a column whose species roll
@@ -204,6 +213,8 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (FloraRules.IsCreated) FloraRules.Dispose();
             if (FloraStructures.IsCreated) FloraStructures.Dispose();
             if (FloraVoxels.IsCreated) FloraVoxels.Dispose();
+            if (TreeSpecies.IsCreated) TreeSpecies.Dispose();
+            if (TreeVariants.IsCreated) TreeVariants.Dispose();
             if (FloraMultiBlockIntervals.IsCreated) FloraMultiBlockIntervals.Dispose();
             if (VoxelClasses.IsCreated) VoxelClasses.Dispose();
         }

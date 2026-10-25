@@ -63,5 +63,23 @@ namespace Engine.Scripts.WorldGen.Core{
 
         /// <summary>Height of a stacked voxel species such as a cactus 1–3 high.</summary>
         public const uint FloraStackHeight = 0x2B7D5812u;
+
+        /// <summary>Weighted variant pick of a tree species at its anchor column.</summary>
+        public const uint TreeVariant = 0x3C8E6915u;
+
+        /// <summary>Base salt of the shape rolls of a tree: roll i (a range or a direction) uses <see cref="TreeShape" />.</summary>
+        private const uint TreeShapeBase = 0x4D9F7A16u;
+
+        /// <summary>Salt of shape roll <paramref name="i" /> of a tree at its anchor column. Distinct for every i.</summary>
+        public static uint TreeShape(int i){
+            return TreeShapeBase + (uint)i;
+        }
+
+        // --- Per-voxel random decisions ---------------------------------------------------------------------------
+        /// <summary>Hole, bump or hang of a crown voxel at its world position.</summary>
+        public const uint Crown = 0x5EA08B17u;
+
+        /// <summary>Main or alternative leaf voxel of a crown voxel at its world position.</summary>
+        public const uint CrownLeafMix = 0x6FB19C18u;
     }
 }
