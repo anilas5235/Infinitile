@@ -8,8 +8,8 @@ in the species gallery; the only code change is the arm rule below.
 
 | Species  | Variants (weight)              | Voxels                   | Biomes (probability per column)      |
 |----------|--------------------------------|--------------------------|--------------------------------------|
-| Oak      | Normal 0.85, Big 0.15          | LogOak, Leaves           | Plains .004, Forest .015             |
-| Birch    | Slim 0.6, Tall 0.4             | LogBirch, Leaves         | Forest .015, Plains .001             |
+| Oak      | Normal 0.85, Big 0.15          | LogOak, Leaves           | Plains .004, Forest .02125           |
+| Birch    | Slim 0.6, Tall 0.4             | LogBirch, Leaves         | Forest .00875, Plains .001           |
 | Spruce   | Cone 0.5, Tiered 0.5           | LogSpruce, LeavesSpruce  | Mountain .01, Snow .004              |
 | Bush     | Low 0.6 (no trunk), Round 0.4  | LogOak, Leaves           | Plains .006, Forest .005, Mountain .002 |
 | DeadTree | Bare 0.5, Branched 0.5         | LogOak, no leaves        | Snow .002, Desert .001               |
