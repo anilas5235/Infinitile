@@ -55,6 +55,8 @@ namespace Engine.Editor.WorldGen{
         private bool _showHumidity = true;
         [SerializeField] private bool _hillshade = true;
         [SerializeField] private float _exaggeration = 2f;
+        [SerializeField] private int _densityOverlay = -1;
+        private static readonly string[] DensityOverlayLabels ={ "None", "Trees", "Undergrowth", "Flowers", "Ground details" };
 
         // --- Distribution plane (classifier over T x F); C/E/PV are also the spline-plot probe ----------------------
         private float _planeContinental = 0.5f;
@@ -479,6 +481,12 @@ namespace Engine.Editor.WorldGen{
                     }
 
                     GUILayout.Space(20f);
+                    EditorGUIUtility.labelWidth = 90f;
+                    _densityOverlay = EditorGUILayout.Popup("Flora density", _densityOverlay + 1, DensityOverlayLabels,
+                        GUILayout.Width(220f)) - 1;
+                    EditorGUIUtility.labelWidth = 0f;
+
+                    GUILayout.Space(20f);
                     DrawCompareToggle();
 
                     GUILayout.FlexibleSpace();
@@ -523,7 +531,8 @@ namespace Engine.Editor.WorldGen{
                 PreviewView.DominantBiome => "Dominant material biome",
                 PreviewView.MaxMaterialWeight => $"Max material weight (mean {pass.MeanMaxWeight:0.00})",
                 PreviewView.SurfaceSource => "Surface source",
-                PreviewView.Flora => $"Flora ({flora:N0} columns, {pass.FloraCounts.Count} species)",
+                PreviewView.Flora => $"Flora ({flora:N0} columns, {pass.FloraCounts.Count} species)"
+                                     + (_densityOverlay >= 0 ? $" on {DensityOverlayLabels[_densityOverlay + 1]} density" : ""),
                 PreviewView.Climate => "Climate (T, C, F)",
                 PreviewView.Erosion => "Erosion E",
                 PreviewView.PeaksValleys => "Peaks & valleys PV",
@@ -631,7 +640,8 @@ namespace Engine.Editor.WorldGen{
                     ShowContinental = _showContinental,
                     ShowHumidity = _showHumidity,
                     Hillshade = _hillshade,
-                    Exaggeration = _exaggeration
+                    Exaggeration = _exaggeration,
+                    DensityOverlay = _densityOverlay
                 },
                 Probe = new float3(_planeContinental, _planeErosion, _planePV),
                 ProbeHeight = _planeHeight

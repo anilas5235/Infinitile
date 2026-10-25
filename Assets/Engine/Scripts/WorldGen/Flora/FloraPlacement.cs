@@ -115,8 +115,13 @@ namespace Engine.Scripts.WorldGen.Flora{
         ///     of a rule stays its probability.
         /// </summary>
         public static float DensityFactor(int x, int z, int noise, in WorldGenConfig cfg){
-            float d = SeededSimplex.Noise(new float2(x, z) / cfg.FloraDensityWavelength[noise], cfg.Seed, HashSalts.FloraDensity(noise));
-            return math.clamp(1f + cfg.FloraDensityContrast[noise] * d, 0f, 2f);
+            return DensityFactor(x, z, cfg.Seed, noise, cfg.FloraDensityWavelength[noise], cfg.FloraDensityContrast[noise]);
+        }
+
+        /// <summary><see cref="DensityFactor(int,int,int,in WorldGenConfig)" /> from the noise's settings alone.</summary>
+        public static float DensityFactor(int x, int z, uint seed, int noise, float wavelength, float contrast){
+            float d = SeededSimplex.Noise(new float2(x, z) / wavelength, seed, HashSalts.FloraDensity(noise));
+            return math.clamp(1f + contrast * d, 0f, 2f);
         }
 
         /// <summary>
