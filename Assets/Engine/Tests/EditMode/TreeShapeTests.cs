@@ -11,8 +11,8 @@ using Unity.Mathematics;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     Parametric trees: shapes per crown shape and branch style over 200 seeds, the variant pick, and the
-    ///     anchor spacing with mixed variant radii.
+    ///     Parametric trees: shapes per crown shape and branch style over 200 seeds, every shipped variant, the
+    ///     variant pick, and the anchor spacing with mixed variant radii.
     /// </summary>
     public class TreeShapeTests{
         private const int Seeds = 200;
@@ -226,6 +226,62 @@ namespace Engine.Tests.EditMode{
                 Assert.LessOrEqual(a.Lean, a.TrunkHeight * v.LeanPerMille / 1000);
                 Assert.AreEqual(1, math.max(math.abs(a.LeanDirection.x), math.abs(a.LeanDirection.y)));
             }
+        }
+
+        private static IEnumerable<string> ShippedVariants(){
+            return FloraFixture.ShippedVariantNames();
+        }
+
+        [TestCaseSource(nameof(ShippedVariants))]
+        public void Shapes_ShippedVariant_StandsOnItsAnchor_WithinReach(string name){
+            // Every variant of the shipped species over 200 anchors: a face-connected trunk on the anchor that reaches
+            // its crown (none for trunk 0), leaves only with a crown or branch clusters, a cone or tiered crown not
+            // below its minimum base, arms of a crownless trunk below its top, and no voxel beyond the reach or below
+            // the hang layer.
+            TreeVariant variant = _fixture.ShippedVariant(name);
+            TreeVariantDef v = Def(variant);
+            ushort trunk = _fixture.Ids[variant.TrunkVoxel];
+            bool leafy = v.Crown != CrownShape.None || v.ClusterRadius.y > 0;
+            bool tapered = v.Crown is CrownShape.Cone or CrownShape.Tiered;
+            int lowest = int.MaxValue, highest = 0;
+            long count = 0;
+            for (int s = 0; s < Seeds; s++){
+                uint seed = (uint)(1000 + s * 7919);
+                int x = s * 37 - 3000, z = s * 53 + 211;
+                TreeRoll r = TreeShape.Roll(x, z, seed, 0, v);
+                Dictionary<int3, ushort> voxels = Stamp(new int3(x, 100, z), r, v, seed);
+                string at = $"{name} seed {seed} ({x},{z}) trunk {r.TrunkHeight} r {r.CrownRadius} branches {r.BranchCount}";
+
+                HashSet<int3> logs = new(voxels.Where(kv => kv.Value == trunk).Select(kv => kv.Key));
+                HashSet<int3> leafSet = new(voxels.Where(kv => kv.Value != trunk).Select(kv => kv.Key));
+                if (r.TrunkHeight > 0){
+                    Assert.IsTrue(FaceConnected(logs, int3.zero), $"{at}: logs are not face-connected from the anchor");
+                    if (v.Crown != CrownShape.None)
+                        Assert.IsTrue(logs.Any(l => leafSet.Contains(l + Up)), $"{at}: the trunk does not reach its crown");
+                }
+                else Assert.IsEmpty(logs, $"{at}: trunk 0 has no logs");
+
+                if (leafy) Assert.IsNotEmpty(leafSet, $"{at}: no leaves");
+                else Assert.IsEmpty(leafSet, $"{at}: leaves without a crown or clusters");
+                if (tapered)
+                    Assert.GreaterOrEqual(leafSet.Min(p => p.y), v.CrownMinBase - 1, $"{at}: the crown starts below its minimum base");
+                if (v.Crown == CrownShape.None && v.Branches == BranchStyle.Arm && r.Lean == 0)
+                    foreach (int3 l in logs.Where(l => l.x < 0 || l.x >= r.Width || l.z < 0 || l.z >= r.Width))
+                        Assert.Less(l.y, r.TrunkHeight - 1, $"{at}: arm voxel {l} not below the trunk top");
+
+                foreach (int3 p in voxels.Keys){
+                    Assert.LessOrEqual(math.max(math.abs(p.x), math.abs(p.z)), v.Reach, $"{at}: voxel {p} beyond reach {v.Reach}");
+                    Assert.GreaterOrEqual(p.y, -1, $"{at}: voxel {p} below the hang layer");
+                }
+
+                int top = voxels.Keys.Max(p => p.y);
+                lowest = math.min(lowest, top);
+                highest = math.max(highest, top);
+                count += voxels.Count;
+            }
+
+            TestContext.WriteLine($"{name}: reach {v.Reach}, spacing {v.SpacingRadius}, top layer {lowest}…{highest}, " +
+                                  $"{count / (float)Seeds:F1} voxels per tree");
         }
 
         // --- Variant pick and spacing -------------------------------------------------------------------------------

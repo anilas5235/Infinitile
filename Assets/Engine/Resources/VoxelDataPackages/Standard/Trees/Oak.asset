@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Engine.Runtime::Engine.Scripts.VoxelConfig.Data.Generation.TreeSpecies
   Variants:
   - Name: Normal
-    Weight: 1
+    Weight: 0.85
     TrunkVoxel: {fileID: 11400000, guid: 717e752d88b00d64eb6f6f5e6622a136, type: 2}
     TrunkHeight:
       Min: 4
@@ -53,3 +53,43 @@ MonoBehaviour:
     HangChance: 0.05
     AltLeafChance: 0
     SpacingRadius: 3
+  - Name: Big
+    Weight: 0.15
+    TrunkVoxel: {fileID: 11400000, guid: 717e752d88b00d64eb6f6f5e6622a136, type: 2}
+    TrunkHeight:
+      Min: 6
+      Max: 9
+    TrunkWidth: 1
+    MaxLean: 0
+    CrownShape: 1
+    LeafVoxel: {fileID: 11400000, guid: f40ca8ec657e32349900f989d0ebd529, type: 2}
+    AltLeafVoxel: {fileID: 0}
+    CrownRadius:
+      Min: 3
+      Max: 4
+    CrownTopRadius:
+      Min: 0
+      Max: 1
+    CrownHeight:
+      Min: 0
+      Max: 0
+    CrownBase: -2
+    CrownMinBase: 0
+    BranchChance: 1
+    BranchCount:
+      Min: 2
+      Max: 4
+    BranchStyle: 0
+    BranchLength:
+      Min: 2
+      Max: 3
+    BranchBandMin: 0.4
+    BranchBandMax: 0.8
+    BranchLeafRadius:
+      Min: 1
+      Max: 2
+    HoleChance: 0.2
+    BumpChance: 0.1
+    HangChance: 0.05
+    AltLeafChance: 0
+    SpacingRadius: 5

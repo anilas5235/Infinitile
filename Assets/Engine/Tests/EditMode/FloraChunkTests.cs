@@ -17,7 +17,7 @@ namespace Engine.Tests.EditMode{
     ///     The chunk job's flora against the pure region API: heights, top block and flora of a 4×4-chunk area equal
     ///     <see cref="Engine.Scripts.WorldGen.Core.WorldGenApi.SampleRegion" /> in all 8 configurations
     ///     (2 architectures × 4 methods; Biome-first uses the method in both stages), trees that cross chunk borders
-    ///     are complete on both sides, every tree variant matches the whole-world stamp across chunk corners, snow,
+    ///     are complete on both sides, every test and shipped tree variant matches the whole-world stamp across chunk corners, snow,
     ///     strata and ice agree as well, and the same input gives the same output in any chunk order.
     /// </summary>
     public class FloraChunkTests{
@@ -38,8 +38,8 @@ namespace Engine.Tests.EditMode{
             _fixture.Dispose();
         }
 
-        private void Use(GenArchitecture architecture, BlendMethod method){
-            _biomes = _fixture.DefaultBiomes();
+        private void Use(GenArchitecture architecture, BlendMethod method, bool shippedSpecies = false){
+            _biomes = shippedSpecies ? _fixture.ShippedSpeciesBiomes() : _fixture.DefaultBiomes();
             WorldGenSettings s = _fixture.Settings(architecture, method, _biomes);
             _config = _fixture.GeneratorConfig(s);
         }
@@ -83,6 +83,22 @@ namespace Engine.Tests.EditMode{
             return chunks[chunk].GetVoxel(local);
         }
 
+        /// <summary>Anchors within two blocks of a chunk corner.</summary>
+        private static int CountNearCorner(ReferenceWorld reference){
+            static bool NearBorder(int c, int size){
+                int m = (c % size + size) % size;
+                return m <= 2 || m >= size - 2;
+            }
+
+            return reference.Anchors.Count(a => NearBorder(a.column.x, ChunkWidth) && NearBorder(a.column.y, ChunkDepth));
+        }
+
+        /// <summary>Anchors whose footprint within the area falls into the given number of chunks or more.</summary>
+        private static int CountInChunks(ReferenceWorld reference, int atLeast){
+            return reference.Anchors.Count(a => a.footprint.Where(reference.InArea)
+                .Select(p => new int2((int)math.floor(p.x / (float)ChunkWidth), (int)math.floor(p.z / (float)ChunkDepth))).Distinct().Count() >= atLeast);
+        }
+
         /// <summary>
         ///     Compares the voxels around every surface (h − 5 … h + 14) and at every position the reference stamped a
         ///     plant on. Returns the mismatch count; the first few are listed in <paramref name="report" />.
@@ -109,10 +125,10 @@ namespace Engine.Tests.EditMode{
         public void ChunkJob_FloraAndSurfaceMatchTheRegionApi(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,
             [Values(BlendMethod.None, BlendMethod.DistanceBlend, BlendMethod.DistortedBoundary, BlendMethod.ParameterSpaceWeighting)]
-            BlendMethod method){
+            BlendMethod method, [Values(false, true)] bool shippedSpecies){
             // Per-column decisions of PrepareChunkMaps and the stamped voxels of the job equal the pure region API,
-            // chunk for chunk, over 4×4 chunks.
-            Use(architecture, method);
+            // chunk for chunk, over 4×4 chunks; with the fixture flora and with the shipped species set.
+            Use(architecture, method, shippedSpecies);
             int2 originChunk = new(1, 2), chunks = new(4, 4); // ~80 % land with shores in Terrain-first
             ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
             RegionSample region = reference.Region;
@@ -224,10 +240,11 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void ChunkJob_TreesCrossingChunkBordersAreComplete(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,
-            [Values(BlendMethod.None, BlendMethod.DistanceBlend)] BlendMethod method){
+            [Values(BlendMethod.None, BlendMethod.DistanceBlend)] BlendMethod method, [Values(false, true)] bool shippedSpecies){
             // Every voxel of a structure whose footprint spans two or more chunks is present in each chunk it
-            // falls into (unless a voxel of a higher class from the whole-world stamp is there), identical on both sides.
-            Use(architecture, method);
+            // falls into (unless a voxel of a higher class from the whole-world stamp is there), identical on both sides;
+            // with the fixture flora and with the shipped species set.
+            Use(architecture, method, shippedSpecies);
             int2 originChunk = new(5, -1), chunks = new(2, 2);
             ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
 
@@ -273,14 +290,8 @@ namespace Engine.Tests.EditMode{
             int2 originChunk = new(1, 2), chunks = new(3, 3);
             ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
 
-            static bool NearBorder(int c, int size){
-                int m = (c % size + size) % size;
-                return m <= 2 || m >= size - 2;
-            }
-
-            int nearCorner = reference.Anchors.Count(a => NearBorder(a.column.x, ChunkWidth) && NearBorder(a.column.y, ChunkDepth));
-            int fourChunks = reference.Anchors.Count(a => a.footprint.Where(reference.InArea)
-                .Select(p => new int2((int)math.floor(p.x / (float)ChunkWidth), (int)math.floor(p.z / (float)ChunkDepth))).Distinct().Count() == 4);
+            int nearCorner = CountNearCorner(reference);
+            int fourChunks = CountInChunks(reference, 4);
             TestContext.WriteLine($"variant {variant} {architecture}: anchors {reference.Anchors.Count}, near a corner {nearCorner}, " +
                                   $"in four chunks {fourChunks}, narrowed {reference.Narrowed.Count}, reach {_config.WorldGen.FloraReach}");
             Assert.Greater(reference.Anchors.Count, 20, "the area carries trees");
@@ -293,6 +304,46 @@ namespace Engine.Tests.EditMode{
                 Assert.Greater(reference.Narrowed.Count, 0, "some wide trunk falls back to width 1");
                 Assert.Less(reference.Narrowed.Count, reference.Anchors.Count, "some wide trunk stands");
             }
+
+            Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
+            try{
+                List<string> report = new();
+                int mismatches = CompareVoxels(reference, chunkData, report);
+                Assert.AreEqual(0, mismatches, "chunk voxels differ from the whole-world stamp:\n" + string.Join("\n", report));
+            }
+            finally{
+                Release(results);
+            }
+        }
+
+        private static IEnumerable<string> ShippedVariants(){
+            return FloraFixture.ShippedVariantNames();
+        }
+
+        [Test]
+        public void ChunkJob_EveryShippedVariantMatchesTheWholeWorldStamp_AcrossChunkCorners(
+            [ValueSource(nameof(ShippedVariants))] string name,
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            // As above for each variant of the shipped species. Every tree with reach crosses a chunk border; small
+            // crowns rarely span a chunk corner, so four chunks are required from reach 4 on.
+            TreeSpecies single = _fixture.MakeTree("Single", _fixture.ShippedVariant(name));
+            _biomes = new[]{
+                _fixture.MakeBiome("Wood", .5f, 150f, 10f, _fixture.GrassSo, FloraFixture.Rule(single, .25f), FloraFixture.Rule(_fixture.TuftSo, .3f))
+            };
+            _config = _fixture.GeneratorConfig(_fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes));
+            int2 originChunk = new(1, 2), chunks = new(3, 3);
+            ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
+
+            int nearCorner = CountNearCorner(reference);
+            int fourChunks = CountInChunks(reference, 4);
+            int across = CountInChunks(reference, 2);
+            int reach = _config.WorldGen.FloraReach;
+            TestContext.WriteLine($"{name} {architecture}: anchors {reference.Anchors.Count}, near a corner {nearCorner}, " +
+                                  $"across a border {across}, in four chunks {fourChunks}, reach {reach}");
+            Assert.Greater(reference.Anchors.Count, 20, "the area carries trees");
+            Assert.Greater(nearCorner, 0, "an anchor lies next to a chunk corner");
+            if (reach > 0) Assert.Greater(across, 0, "a tree crosses a chunk border");
+            if (reach >= 4) Assert.Greater(fourChunks, 0, "a tree falls into four chunks");
 
             Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
             try{

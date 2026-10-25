@@ -39,7 +39,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
         /// <summary>Up and out: one block out and one up per step, in one of 8 directions (oaks, dead trees).</summary>
         Diagonal,
 
-        /// <summary>One block out in one of 4 directions, then straight up (cactus arms).</summary>
+        /// <summary>One block out in one of 4 directions, then straight up (cactus arms); without a crown the tip stays below the trunk top.</summary>
         Arm
     }
 
@@ -108,7 +108,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
         public IntRange BranchCount = new(0, 0);
         public BranchStyle BranchStyle = BranchStyle.Diagonal;
 
-        [Tooltip("Diagonal: steps up and out. Arm: blocks up after the first block out.")]
+        [Tooltip("Diagonal: steps up and out. Arm: blocks up after the first block out, cut on a crownless trunk so the tip stays below the trunk top.")]
         public IntRange BranchLength = new(1, 2);
 
         [Tooltip("Lowest start of a branch as a fraction of the trunk height. With a crown, a branch starts at least so high that its tip reaches the crown.")]

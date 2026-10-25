@@ -101,7 +101,7 @@ namespace Engine.Scripts.WorldGen.Flora{
     ///     <list type="bullet">
     ///         <item>Trunk: from y 0 up, leaning by one block at a time; at each step it gains the voxels that keep it face-connected.</item>
     ///         <item>Crown: centred on the trunk's top column; its lowest layer lies <c>CrownBase</c> above the trunk top, its top layer at least one above it, and the trunk reaches its lowest layer.</item>
-    ///         <item>Branches: face-connected paths that start next to a trunk voxel.</item>
+    ///         <item>Branches: face-connected paths that start next to a trunk voxel; an arm on a crownless trunk ends below the trunk top.</item>
     ///         <item>
     ///             Crown noise: a 3D hash at each crown voxel's world position drops outer voxels, adds a voxel outward
     ///             or below, or picks the alternative leaf, so two trees agree on every voxel they share.
@@ -243,6 +243,8 @@ namespace Engine.Scripts.WorldGen.Flora{
                 int cluster = RollRange(anchorBase.x, anchorBase.z, seed, salt + 3, v.ClusterRadius);
                 // Both styles rise one layer per length step, so the tip ends in the crown's lowest layer or higher.
                 if (hasCrown) startY = math.max(startY, crownBottom - length);
+                // An arm on a bare trunk ends at least one block below the trunk top, so the trunk stays the tallest column.
+                else if (v.Branches == BranchStyle.Arm) length = math.clamp(trunkTop - 1 - startY, 0, length);
 
                 // Start on the trunk voxel that faces the branch direction.
                 int2 column = r.LeanDirection * RoundDiv(r.Lean * math.min(startY, rolledTop), rolledTop);

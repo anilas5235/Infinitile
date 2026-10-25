@@ -12,6 +12,7 @@ using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Collections;
 using Unity.Mathematics;
+using UnityEditor;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelConstants;
 using BlendWeights = Engine.Scripts.WorldGen.Blending.BlendWeights;
@@ -179,6 +180,38 @@ namespace Engine.Tests.EditMode{
             };
         }
 
+        /// <summary>Folder of the shipped tree species.</summary>
+        internal const string ShippedTreesPath = "Assets/Engine/Resources/VoxelDataPackages/Standard/Trees";
+
+        /// <summary>Every variant of every shipped tree species, as "Species/index" (index into its variants).</summary>
+        internal static IEnumerable<string> ShippedVariantNames(){
+            foreach (string guid in AssetDatabase.FindAssets("t:TreeSpecies", new[]{ ShippedTreesPath }))
+            foreach (TreeSpecies species in AssetDatabase.LoadAllAssetsAtPath(AssetDatabase.GUIDToAssetPath(guid)).OfType<TreeSpecies>())
+                for (int i = 0; i < species.Variants.Count; i++)
+                    yield return $"{species.name}/{i}";
+        }
+
+        /// <summary>
+        ///     A copy of the shipped variant "Species/index" on this fixture's voxels: cactus trunks take the cactus,
+        ///     other trunks the log; spruce leaves take the needles, other leaves the leaves.
+        /// </summary>
+        internal TreeVariant ShippedVariant(string name){
+            string[] parts = name.Split('/');
+            TreeSpecies species = AssetDatabase.LoadAssetAtPath<TreeSpecies>($"{ShippedTreesPath}/{parts[0]}.asset");
+            TreeVariant source = species.Variants[int.Parse(parts[1])];
+            TreeVariant copy = JsonUtility.FromJson<TreeVariant>(JsonUtility.ToJson(source));
+            copy.TrunkVoxel = !source.TrunkVoxel ? null : source.TrunkVoxel.name == "Cactus" ? CactusSo : LogSo;
+            copy.LeafVoxel = !source.LeafVoxel ? null : source.LeafVoxel.name == "LeavesSpruce" ? NeedlesSo : LeavesSo;
+            copy.AltLeafVoxel = !source.AltLeafVoxel ? null : NeedlesSo;
+            return copy;
+        }
+
+        /// <summary>The shipped species <paramref name="name" /> with every variant on this fixture's voxels.</summary>
+        internal TreeSpecies ShippedSpecies(string name){
+            int count = AssetDatabase.LoadAssetAtPath<TreeSpecies>($"{ShippedTreesPath}/{name}.asset").Variants.Count;
+            return MakeTree(name, Enumerable.Range(0, count).Select(i => ShippedVariant($"{name}/{i}")).ToArray());
+        }
+
         /// <summary>
         ///     A biome usable by both architectures: Biome-first reads the height parameters, Terrain-first the climate
         ///     targets (h = .5). The flora biomes differ only in temperature, so both occur within a few chunks.
@@ -212,6 +245,19 @@ namespace Engine.Tests.EditMode{
             return new[]{
                 MakeBiome("Meadow", .25f, 150f, 10f, GrassSo, Rule(TuftSo, .3f), Rule(FlowerSo, .05f), Rule(Grove, .06f)),
                 MakeBiome("Dunes", .75f, 138f, 6f, SandSo, Rule(CactusSo, .03f, 1, 3), Rule(TuftSo, .05f), Rule(Pine, .03f))
+            };
+        }
+
+        /// <summary>
+        ///     The default biomes with the shipped species set on this fixture's voxels: oak, birch, bush and spruce in
+        ///     the meadow, cactus and dead tree in the dunes.
+        /// </summary>
+        internal Biome[] ShippedSpeciesBiomes(){
+            return new[]{
+                MakeBiome("Meadow", .25f, 150f, 10f, GrassSo, Rule(TuftSo, .3f), Rule(FlowerSo, .05f), Rule(ShippedSpecies("Oak"), .02f),
+                    Rule(ShippedSpecies("Birch"), .02f), Rule(ShippedSpecies("Bush"), .02f), Rule(ShippedSpecies("Spruce"), .02f)),
+                MakeBiome("Dunes", .75f, 138f, 6f, SandSo, Rule(TuftSo, .05f), Rule(ShippedSpecies("Cactus"), .04f),
+                    Rule(ShippedSpecies("DeadTree"), .03f))
             };
         }
 

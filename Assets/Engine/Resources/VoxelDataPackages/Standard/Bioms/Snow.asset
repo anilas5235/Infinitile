@@ -37,6 +37,7 @@ MonoBehaviour:
   FloraRules:
   - SpeciesVoxel: {fileID: 11400000, guid: adeb115a333554e4199040f2126c76cc, type: 2}
     SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 0}
     Probability: 0.01
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
@@ -44,7 +45,24 @@ MonoBehaviour:
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 11400000, guid: 10218f21e1d9ac948ac6846e1469b188, type: 2}
     SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 0}
     Probability: 0.01
+    RequiresSurfaceFromSameBiome: 0
+    MinHeightAboveWater: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 0}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 11400000, guid: 848dca3f23de4e129f80781ec35e85fe, type: 2}
+    Probability: 0.004
+    RequiresSurfaceFromSameBiome: 0
+    MinHeightAboveWater: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 0}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 11400000, guid: e0b80b74beb141ae9a55c0d9d88cb810, type: 2}
+    Probability: 0.002
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
     MinStackHeight: 1
