@@ -206,6 +206,12 @@ namespace Engine.Tests.EditMode{
             return copy;
         }
 
+        /// <summary>The shipped species <paramref name="name" /> with every variant on this fixture's voxels.</summary>
+        internal TreeSpecies ShippedSpecies(string name){
+            int count = AssetDatabase.LoadAssetAtPath<TreeSpecies>($"{ShippedTreesPath}/{name}.asset").Variants.Count;
+            return MakeTree(name, Enumerable.Range(0, count).Select(i => ShippedVariant($"{name}/{i}")).ToArray());
+        }
+
         /// <summary>
         ///     A biome usable by both architectures: Biome-first reads the height parameters, Terrain-first the climate
         ///     targets (h = .5). The flora biomes differ only in temperature, so both occur within a few chunks.
@@ -239,6 +245,19 @@ namespace Engine.Tests.EditMode{
             return new[]{
                 MakeBiome("Meadow", .25f, 150f, 10f, GrassSo, Rule(TuftSo, .3f), Rule(FlowerSo, .05f), Rule(Grove, .06f)),
                 MakeBiome("Dunes", .75f, 138f, 6f, SandSo, Rule(CactusSo, .03f, 1, 3), Rule(TuftSo, .05f), Rule(Pine, .03f))
+            };
+        }
+
+        /// <summary>
+        ///     The default biomes with the shipped species set on this fixture's voxels: oak, birch, bush and spruce in
+        ///     the meadow, cactus and dead tree in the dunes.
+        /// </summary>
+        internal Biome[] ShippedSpeciesBiomes(){
+            return new[]{
+                MakeBiome("Meadow", .25f, 150f, 10f, GrassSo, Rule(TuftSo, .3f), Rule(FlowerSo, .05f), Rule(ShippedSpecies("Oak"), .02f),
+                    Rule(ShippedSpecies("Birch"), .02f), Rule(ShippedSpecies("Bush"), .02f), Rule(ShippedSpecies("Spruce"), .02f)),
+                MakeBiome("Dunes", .75f, 138f, 6f, SandSo, Rule(TuftSo, .05f), Rule(ShippedSpecies("Cactus"), .04f),
+                    Rule(ShippedSpecies("DeadTree"), .03f))
             };
         }
 

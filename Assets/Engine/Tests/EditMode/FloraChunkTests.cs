@@ -38,8 +38,8 @@ namespace Engine.Tests.EditMode{
             _fixture.Dispose();
         }
 
-        private void Use(GenArchitecture architecture, BlendMethod method){
-            _biomes = _fixture.DefaultBiomes();
+        private void Use(GenArchitecture architecture, BlendMethod method, bool shippedSpecies = false){
+            _biomes = shippedSpecies ? _fixture.ShippedSpeciesBiomes() : _fixture.DefaultBiomes();
             WorldGenSettings s = _fixture.Settings(architecture, method, _biomes);
             _config = _fixture.GeneratorConfig(s);
         }
@@ -109,10 +109,10 @@ namespace Engine.Tests.EditMode{
         public void ChunkJob_FloraAndSurfaceMatchTheRegionApi(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,
             [Values(BlendMethod.None, BlendMethod.DistanceBlend, BlendMethod.DistortedBoundary, BlendMethod.ParameterSpaceWeighting)]
-            BlendMethod method){
+            BlendMethod method, [Values(false, true)] bool shippedSpecies){
             // Per-column decisions of PrepareChunkMaps and the stamped voxels of the job equal the pure region API,
-            // chunk for chunk, over 4×4 chunks.
-            Use(architecture, method);
+            // chunk for chunk, over 4×4 chunks; with the fixture flora and with the shipped species set.
+            Use(architecture, method, shippedSpecies);
             int2 originChunk = new(1, 2), chunks = new(4, 4); // ~80 % land with shores in Terrain-first
             ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
             RegionSample region = reference.Region;
@@ -224,10 +224,11 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void ChunkJob_TreesCrossingChunkBordersAreComplete(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,
-            [Values(BlendMethod.None, BlendMethod.DistanceBlend)] BlendMethod method){
+            [Values(BlendMethod.None, BlendMethod.DistanceBlend)] BlendMethod method, [Values(false, true)] bool shippedSpecies){
             // Every voxel of a structure whose footprint spans two or more chunks is present in each chunk it
-            // falls into (unless a voxel of a higher class from the whole-world stamp is there), identical on both sides.
-            Use(architecture, method);
+            // falls into (unless a voxel of a higher class from the whole-world stamp is there), identical on both sides;
+            // with the fixture flora and with the shipped species set.
+            Use(architecture, method, shippedSpecies);
             int2 originChunk = new(5, -1), chunks = new(2, 2);
             ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
 
