@@ -12,12 +12,12 @@ in the species gallery; the only code change is the arm rule below.
 | Birch    | Slim 0.6, Tall 0.4             | LogBirch, Leaves         | Forest .00875, Plains .001           |
 | Spruce   | Cone 0.5, Tiered 0.5           | LogSpruce, LeavesSpruce  | Mountain .01, Snow .004              |
 | Bush     | Low 0.6 (no trunk), Round 0.4  | LogOak, Leaves           | Plains .006, Forest .005, Mountain .002 |
-| DeadTree | Bare 0.5, Branched 0.5         | LogOak, no leaves        | Snow .002, Desert .001               |
-| Cactus   | Pillar 0.7, Arms 0.3           | Cactus                   | Desert .01                           |
+| DeadTree | Bare 0.5, Branched 0.5         | LogOak, no leaves        | Snow .002, Desert .00025             |
+| Cactus   | Pillar 0.7, Arms 0.3           | Cactus                   | Desert .0025                         |
 
 - **Voxels**: LeavesSpruce, LogSpruce and DeadBush are appended to the end of the Standard voxel list, so the
   registry ids of the existing voxels stay the same. Their textures are tinted copies in `Artwork/Placeholder`.
-  DeadBush is a foliage cross like GrassFDead; the Desert's dry plants are GrassFDead .02 and DeadBush .01.
+  DeadBush is a foliage cross like GrassFDead; the Desert's dry plants are GrassFDead .005 and DeadBush .0025.
 - **Cactus**: the tree species replaces the stacked cactus voxel rule of the Desert. Pillar is a bare trunk of 1 to 3
   blocks; Arms adds one or two Arm branches without leaves. `TreeShape` cuts an Arm branch on a crownless trunk so
   its tip ends at least one block below the trunk top; an arm never reaches the top of its pillar.
