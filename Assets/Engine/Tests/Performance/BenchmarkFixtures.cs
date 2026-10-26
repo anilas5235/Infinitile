@@ -295,7 +295,7 @@ namespace Engine.Tests.Performance{
             foreach (string path in paths){
                 TreeSpecies species = AssetDatabase.LoadAssetAtPath<TreeSpecies>(path);
                 List<TreeVariantDef> defs = new();
-                FloraConfigBuilder.AddTree(species, _ => 1, defs, new Dictionary<ushort, byte>(), null, false);
+                FloraConfigBuilder.AddTree(species, _ => 1, null, defs, new Dictionary<ushort, byte>(), null, false);
                 for (int i = 0; i < defs.Count; i++){
                     if (defs[i].Reach <= bestReach) continue;
                     bestReach = defs[i].Reach;

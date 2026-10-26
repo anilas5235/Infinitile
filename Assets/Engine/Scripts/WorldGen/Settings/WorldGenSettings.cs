@@ -345,17 +345,23 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// <param name="allocator">Allocator of the flattened arrays.</param>
         public WorldGenConfig ToConfig(int seed, VoxelRegistry registry = null, Allocator allocator = Allocator.Persistent){
             Func<VoxelConfig.Data.Voxel.Voxel, ushort> voxelId = null;
-            if (registry != null) voxelId = v => registry.GetIdOrThrow(v.GetFullName());
-            return ToConfigWithVoxelIds(seed, voxelId, allocator);
+            Func<ushort, byte, ushort> variantOf = null;
+            if (registry != null){
+                voxelId = v => registry.GetIdOrThrow(v.GetFullName());
+                variantOf = registry.VariantOf;
+            }
+
+            return ToConfigWithVoxelIds(seed, voxelId, allocator, variantOf);
         }
 
         /// <summary>
         ///     <see cref="ToConfig(int,VoxelRegistry,Allocator)" /> with block ids from <paramref name="voxelId" />
-        ///     (the registry, or a test's own id table); null leaves every block and flora voxel id at 0.
+        ///     (the registry, or a test's own id table); null leaves every block and flora voxel id at 0. Lying logs
+        ///     come from <paramref name="variantOf" /> (base id, orientation → variant id); null keeps them upright.
         /// </summary>
         internal WorldGenConfig ToConfigWithVoxelIds(int seed, Func<VoxelConfig.Data.Voxel.Voxel, ushort> voxelId,
-            Allocator allocator = Allocator.Persistent){
-            return WorldGenConfigBuilder.Build(this, seed, voxelId, allocator);
+            Allocator allocator = Allocator.Persistent, Func<ushort, byte, ushort> variantOf = null){
+            return WorldGenConfigBuilder.Build(this, seed, voxelId, variantOf, allocator);
         }
 
         /// <summary>

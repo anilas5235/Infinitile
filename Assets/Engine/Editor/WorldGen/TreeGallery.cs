@@ -21,6 +21,7 @@ namespace Engine.Editor.WorldGen{
         private static readonly Color32 Background = new(26, 26, 26, 255);
         private static readonly Color32 Ground = new(92, 70, 48, 255);
         private static readonly Color32 TrunkColor = new(122, 84, 46, 255);
+        private static readonly Color32 LyingTrunkColor = new(176, 128, 78, 255);
         private static readonly Color32 LeafColor = new(64, 140, 48, 255);
         private static readonly Color32 AltLeafColor = new(44, 108, 92, 255);
 
@@ -51,17 +52,29 @@ namespace Engine.Editor.WorldGen{
 
             // Local voxel ids: only the role colours matter here, not the engine's ids.
             Dictionary<VoxelSo, ushort> ids = new();
+            ushort next = 0;
             ushort Id(VoxelSo voxel){
                 if (!ids.TryGetValue(voxel, out ushort id)){
-                    id = (ushort)(ids.Count + 1);
+                    id = ++next;
                     ids[voxel] = id;
                 }
 
                 return id;
             }
 
+            // Lying logs get ids of their own, so they show in their own colour.
+            Dictionary<(ushort, byte), ushort> variantIds = new();
+            ushort VariantOf(ushort id, byte orientation){
+                if (!variantIds.TryGetValue((id, orientation), out ushort variant)){
+                    variant = ++next;
+                    variantIds[(id, orientation)] = variant;
+                }
+
+                return variant;
+            }
+
             List<TreeVariantDef> defs = new();
-            FloraConfigBuilder.AddTree(species, Id, defs, new Dictionary<ushort, byte>(), species, false);
+            FloraConfigBuilder.AddTree(species, Id, VariantOf, defs, new Dictionary<ushort, byte>(), species, false);
 
             NativeList<FloraVoxel> list = new(512, Allocator.Temp);
             try{
@@ -99,7 +112,11 @@ namespace Engine.Editor.WorldGen{
                     Dictionary<ushort, Color32> colors = new(){ [0] = Background };
                     if (def.AltLeafVoxel != 0) colors.TryAdd(def.AltLeafVoxel, AltLeafColor);
                     if (def.LeafVoxel != 0) colors[def.LeafVoxel] = LeafColor;
-                    if (def.TrunkVoxel != 0) colors[def.TrunkVoxel] = TrunkColor;
+                    if (def.TrunkVoxel != 0){
+                        colors[def.TrunkVoxelX] = LyingTrunkColor;
+                        colors[def.TrunkVoxelZ] = LyingTrunkColor;
+                        colors[def.TrunkVoxel] = TrunkColor;
+                    }
                     int reach = math.max(def.Reach, 1);
                     row.Side = RenderSide(trees, reach, top, colors);
                     row.Top = RenderTop(trees, reach, top, colors);

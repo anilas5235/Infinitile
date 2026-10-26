@@ -23,6 +23,11 @@ namespace Engine.Scripts.WorldGen.Flora{
         public float CumulativeEnd;
 
         public ushort TrunkVoxel;
+
+        /// <summary>The trunk voxel lying along x and along z; the trunk voxel itself when it has no axis mode.</summary>
+        public ushort TrunkVoxelX;
+
+        public ushort TrunkVoxelZ;
         public byte TrunkClass;
         public int2 TrunkHeight;
         public int TrunkWidth;
@@ -119,6 +124,7 @@ namespace Engine.Scripts.WorldGen.Flora{
     ///         <item>Trunk: from y 0 up, leaning by one block at a time; at each step it gains the voxels that keep it face-connected.</item>
     ///         <item>Crown: centred on the trunk's top column; its lowest layer lies <c>CrownBase</c> above the trunk top, its top layer at least one above it, and the trunk reaches its lowest layer.</item>
     ///         <item>Branches: face-connected paths that start next to a trunk voxel; an arm on a crownless trunk ends below the trunk top.</item>
+    ///         <item>Logs: upright trunks stand; a lying trunk lies along its direction, and each branch voxel follows the step that reached it.</item>
     ///         <item>
     ///             Crown noise: a 3D hash at each crown voxel's world position drops outer voxels, adds a voxel outward
     ///             or below, or picks the alternative leaf, so two trees agree on every voxel they share.
@@ -203,7 +209,7 @@ namespace Engine.Scripts.WorldGen.Flora{
             int start = output.Length;
             if (r.Lying)
                 for (int i = 0; i < r.TrunkHeight; i++)
-                    TrunkBlock(r.LeanDirection * i, 0, 1, v, ref output);
+                    Add(ref output, new int3(r.LeanDirection.x * i, 0, r.LeanDirection.y * i), LyingVoxel(r.LeanDirection, v), v.TrunkClass);
             else BuildStanding(anchorBase - new int3(0, r.Sink, 0), r, v, seed, ref output);
 
             if (r.Sink == 0) return;
@@ -293,9 +299,10 @@ namespace Engine.Scripts.WorldGen.Flora{
                 // Start on the trunk voxel that faces the branch direction.
                 int2 column = r.LeanDirection * RoundDiv(r.Lean * math.min(startY, rolledTop), rolledTop);
                 int3 p = new(column.x + (dir.x > 0 ? r.Width - 1 : 0), startY, column.y + (dir.y > 0 ? r.Width - 1 : 0));
+                // Each branch voxel lies along the step that reached it; the upward steps stand.
                 if (v.Branches == BranchStyle.Arm){
                     p.xz += dir;
-                    Add(ref output, p, v.TrunkVoxel, v.TrunkClass);
+                    Add(ref output, p, LyingVoxel(dir, v), v.TrunkClass);
                     for (int k = 0; k < length; k++){
                         p.y++;
                         Add(ref output, p, v.TrunkVoxel, v.TrunkClass);
@@ -305,12 +312,12 @@ namespace Engine.Scripts.WorldGen.Flora{
                     for (int k = 0; k < length; k++){
                         if (dir.x != 0){
                             p.x += dir.x;
-                            Add(ref output, p, v.TrunkVoxel, v.TrunkClass);
+                            Add(ref output, p, v.TrunkVoxelX, v.TrunkClass);
                         }
 
                         if (dir.y != 0){
                             p.z += dir.y;
-                            Add(ref output, p, v.TrunkVoxel, v.TrunkClass);
+                            Add(ref output, p, v.TrunkVoxelZ, v.TrunkClass);
                         }
 
                         p.y++;
@@ -444,6 +451,11 @@ namespace Engine.Scripts.WorldGen.Flora{
             bool alt = v.AltLeafChance > 0f && Hash.Hash01(world.x, world.y, world.z, seed, HashSalts.CrownLeafMix) < v.AltLeafChance;
             if (alt) Add(ref output, p, v.AltLeafVoxel, v.AltLeafClass);
             else Add(ref output, p, v.LeafVoxel, v.LeafClass);
+        }
+
+        /// <summary>The trunk voxel lying along horizontal step <paramref name="step" /> (one of x or z non-zero).</summary>
+        private static ushort LyingVoxel(int2 step, in TreeVariantDef v){
+            return step.x != 0 ? v.TrunkVoxelX : v.TrunkVoxelZ;
         }
 
         private static void TrunkBlock(int2 column, int y, int width, in TreeVariantDef v, ref NativeList<FloraVoxel> output){

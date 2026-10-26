@@ -372,7 +372,7 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(FloraVoxelClass.Solid, _cfg.FloraRules[3].VoxelClass);
 
             foreach (ushort id in new[]{ TestFixtures.Air, TestFixtures.Grass, TestFixtures.Water, FloraFixture.Tuft, FloraFixture.Flower,
-                         FloraFixture.Log, FloraFixture.Leaves, FloraFixture.Needles, FloraFixture.Cactus, (ushort)200 })
+                         FloraFixture.Log, FloraFixture.LogX, FloraFixture.LogZ, FloraFixture.Leaves, FloraFixture.Needles, FloraFixture.Cactus, (ushort)200 })
                 Assert.AreEqual(_fixture.ClassOf(id), _cfg.VoxelClassOf(id), $"class of {id}");
 
             // The tree: 5 log + 75 leaf + 1 top voxels, the log wins over the leaves at y = 4 when stamped.
@@ -407,6 +407,8 @@ namespace Engine.Tests.EditMode{
 
             TreeVariantDef wide = _cfg.TreeVariants[1];
             Assert.AreEqual(FloraFixture.Log, wide.TrunkVoxel);
+            Assert.AreEqual(FloraFixture.LogX, wide.TrunkVoxelX, "baked lying log along x");
+            Assert.AreEqual(FloraFixture.LogZ, wide.TrunkVoxelZ, "baked lying log along z");
             Assert.AreEqual(FloraVoxelClass.Solid, wide.TrunkClass);
             Assert.AreEqual(FloraFixture.Needles, wide.AltLeafVoxel);
             Assert.AreEqual(FloraVoxelClass.Leaves, wide.AltLeafClass);

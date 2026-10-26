@@ -19,11 +19,12 @@ namespace Engine.Scripts.WorldGen.Settings{
     internal static class WorldGenConfigBuilder{
         /// <summary>
         ///     <see cref="WorldGenSettings.ToConfig" /> with block ids from <paramref name="voxelId" /> (the
-        ///     registry, or a test's own id table); null leaves every block and flora voxel id at 0. The caller owns
-        ///     the result and must dispose it.
+        ///     registry, or a test's own id table); null leaves every block and flora voxel id at 0. Lying logs come
+        ///     from <paramref name="variantOf" /> (base id, orientation → variant id); null keeps them upright. The
+        ///     caller owns the result and must dispose it.
         /// </summary>
         internal static WorldGenConfig Build(WorldGenSettings settings, int seed,
-            Func<VoxelConfig.Data.Voxel.Voxel, ushort> voxelId, Allocator allocator){
+            Func<VoxelConfig.Data.Voxel.Voxel, ushort> voxelId, Func<ushort, byte, ushort> variantOf, Allocator allocator){
             string name = settings.name;
             int octaveCount = settings.OctaveCount;
             if (octaveCount == 0) throw new InvalidOperationException($"{name}: OctaveWavelengths is empty.");
@@ -135,7 +136,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 }
 
                 // Flora rules, species, structures.
-                FloraConfigBuilder.Build(active, voxelId, settings.TreeSpacingRadius, settings.FloraDensityNoise, allocator, ref cfg, settings);
+                FloraConfigBuilder.Build(active, voxelId, variantOf, settings.TreeSpacingRadius, settings.FloraDensityNoise, allocator, ref cfg, settings);
             }
             catch{
                 cfg.Dispose();

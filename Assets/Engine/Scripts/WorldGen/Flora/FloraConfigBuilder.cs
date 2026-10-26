@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Engine.Scripts.VoxelConfig.Data.Generation;
+using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -42,9 +43,11 @@ namespace Engine.Scripts.WorldGen.Flora{
         ///     Fills the flora fields of <paramref name="cfg" /> and the rule ranges of <c>cfg.Biomes</c> (which must
         ///     already hold the biome structs). <paramref name="voxelId" /> null leaves every voxel id at 0 (preview):
         ///     the decision (species, source) is still complete, only stamping needs ids. <paramref name="densityNoise" />
-        ///     false sets every rule's density influence to 0, so every rule is spread evenly.
+        ///     false sets every rule's density influence to 0, so every rule is spread evenly. <paramref name="variantOf" />
+        ///     (base id, orientation → variant id) gives the lying logs of the trees; null keeps every log upright.
         /// </summary>
-        internal static void Build(IReadOnlyList<Biome> biomes, Func<VoxelSo, ushort> voxelId, int treeSpacingRadius,
+        internal static void Build(IReadOnlyList<Biome> biomes, Func<VoxelSo, ushort> voxelId,
+            Func<ushort, byte, ushort> variantOf, int treeSpacingRadius,
             bool densityNoise, Allocator allocator, ref WorldGenConfig cfg, Object owner){
             List<Object> species = CollectSpecies(biomes);
             List<FloraRuleDef> rules = new();
@@ -109,7 +112,7 @@ namespace Engine.Scripts.WorldGen.Flora{
                             if (!treeIndex.TryGetValue(rule.SpeciesTree, out d.Tree)){
                                 d.Tree = trees.Count;
                                 treeIndex.Add(rule.SpeciesTree, d.Tree);
-                                trees.Add(AddTree(rule.SpeciesTree, voxelId, variants, classes, owner));
+                                trees.Add(AddTree(rule.SpeciesTree, voxelId, variantOf, variants, classes, owner));
                             }
 
                             TreeSpeciesDef tree = trees[d.Tree];
@@ -188,10 +191,13 @@ namespace Engine.Scripts.WorldGen.Flora{
         /// <summary>
         ///     Appends the sanitised variants of <paramref name="species" /> with cumulative weights (all equal when
         ///     every weight is 0) and their reach. Missing voxels are id 0 of class air, so they are never stamped;
-        ///     <paramref name="warn" /> false skips their warnings (the species gallery redraws on every edit).
+        ///     <paramref name="warn" /> false skips their warnings (the species gallery redraws on every edit). The lying
+        ///     trunk voxels come from <paramref name="variantOf" /> (base id, orientation → variant id) when the trunk
+        ///     voxel has the axis mode; otherwise, or when it is null, they are the trunk voxel itself.
         /// </summary>
-        internal static TreeSpeciesDef AddTree(TreeSpecies species, Func<VoxelSo, ushort> voxelId, List<TreeVariantDef> variants,
-            Dictionary<ushort, byte> classes, Object owner, bool warn = true){
+        internal static TreeSpeciesDef AddTree(TreeSpecies species, Func<VoxelSo, ushort> voxelId,
+            Func<ushort, byte, ushort> variantOf, List<TreeVariantDef> variants, Dictionary<ushort, byte> classes,
+            Object owner, bool warn = true){
             TreeSpeciesDef def = new(){ VariantStart = variants.Count, VariantCount = species.Variants.Count };
             float total = 0f;
             int lastWeighted = species.Variants.Count - 1; // from here on the bound is 1, so rounding never picks a weight-0 tail
@@ -241,6 +247,8 @@ namespace Engine.Scripts.WorldGen.Flora{
                 }
 
                 d.TrunkVoxel = Voxel(v.TrunkVoxel, voxelId, classes, out d.TrunkClass);
+                d.TrunkVoxelX = LyingVoxel(v.TrunkVoxel, d.TrunkVoxel, VoxelOrientation.AxisX, variantOf, classes, d.TrunkClass);
+                d.TrunkVoxelZ = LyingVoxel(v.TrunkVoxel, d.TrunkVoxel, VoxelOrientation.AxisZ, variantOf, classes, d.TrunkClass);
                 d.LeafVoxel = Voxel(v.LeafVoxel, voxelId, classes, out d.LeafClass);
                 d.AltLeafVoxel = Voxel(v.AltLeafVoxel, voxelId, classes, out d.AltLeafClass);
                 if (warn && !v.TrunkVoxel && (d.TrunkHeight.y > 0 || d.BranchCount.y > 0))
@@ -298,6 +306,15 @@ namespace Engine.Scripts.WorldGen.Flora{
             cls = FloraVoxelClass.Of(voxel.meshLayer, voxel.collision);
             classes[id] = cls;
             return id;
+        }
+
+        /// <summary>The axis variant <paramref name="axis" /> of a trunk voxel, with the trunk's replace class.</summary>
+        private static ushort LyingVoxel(VoxelSo voxel, ushort id, byte axis, Func<ushort, byte, ushort> variantOf,
+            Dictionary<ushort, byte> classes, byte cls){
+            if (id == 0 || variantOf == null || voxel.facing != VoxelFacing.Axis) return id;
+            ushort variant = variantOf(id, VoxelOrientation.Make(axis, false));
+            classes[variant] = cls;
+            return variant;
         }
 
         private static FloraStructureDef AddStructure(VoxelStructure structure, Func<VoxelSo, ushort> voxelId,

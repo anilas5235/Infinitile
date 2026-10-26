@@ -1,5 +1,33 @@
 # World Generation (Overview)
 
+# Version 1.10 (Lying logs)
+
+Trees use turned logs (see `MeshAndRenderPipeline.md`, Version 1.7). An upright trunk stands, a fallen log lies
+along its direction, and a branch log lies along the step that reached it.
+
+- **Baked ids**: `TreeVariantDef` carries `TrunkVoxelX` and `TrunkVoxelZ` next to `TrunkVoxel`.
+  `FloraConfigBuilder.AddTree` fills them once per settings change from a variant lookup (base id, orientation →
+  variant id; `VoxelRegistry.VariantOf` in the engine). A trunk voxel without the axis mode (the cactus), or a
+  missing lookup, keeps the trunk voxel in all three. The variants get the trunk's replace class.
+- **Lying trunk**: every voxel is `TrunkVoxelX` when the direction is along x, otherwise `TrunkVoxelZ`.
+- **Branches**: a branch is a chain of single steps. A step along x places `TrunkVoxelX`, a step along z places
+  `TrunkVoxelZ`, and an upward step places the upright trunk voxel. An arm has one sideways log, then upright
+  ones. A diagonal branch has lying and upright logs in turn. Trunks stay upright even when they lean or are 2 wide.
+- **Same voxels everywhere**: the chunk job, the whole-world reference of the tests and the species gallery all call
+  `TreeShape.Build` with the same def. Duplicates keep the first voxel of the highest class, as before. The gallery
+  hands out local ids for the variants and draws lying logs in a lighter brown.
+- **Tests**: the test fixture's log has the axis mode and its own variant ids (`FloraFixture.LogX`, `LogZ`), so the
+  seam, chunk-order and determinism tests of `FloraChunkTests` run with variant ids.
+  - `TreeShapeTests`:
+    - a fallen log lies along its direction, and both directions occur;
+    - a cactus, or no lookup, keeps the base id;
+    - trunks stand, and every branch log follows its step: a lying log has a log next to it along its axis, and
+      an upright branch log has a log below it.
+  - `FloraChunkTests`:
+    - the shipped FallenLog stamps logs along x and along z, and none upright;
+    - the Tiered and Snag fixture variants stamp lying branch logs.
+  - `FloraPlacementTests` checks the baked ids and their classes.
+
 # Version 1.9 (Groves, ground details and beaches)
 
 Flora clusters into groves and clearings, boulders and fallen logs lie on the ground, and shores get patchy sand

@@ -40,7 +40,7 @@ namespace Engine.Tests.EditMode{
         /// <summary>The sanitised config value of one variant.</summary>
         private TreeVariantDef Def(TreeVariant variant){
             List<TreeVariantDef> variants = new();
-            FloraConfigBuilder.AddTree(_fixture.MakeTree("T", variant), v => _fixture.Ids[v], variants, new Dictionary<ushort, byte>(), null);
+            FloraConfigBuilder.AddTree(_fixture.MakeTree("T", variant), v => _fixture.Ids[v], FloraFixture.VariantOf, variants, new Dictionary<ushort, byte>(), null);
             return variants[0];
         }
 
@@ -60,6 +60,10 @@ namespace Engine.Tests.EditMode{
             finally{
                 list.Dispose();
             }
+        }
+
+        private static bool IsLog(ushort id){
+            return FloraFixture.BaseOf(id) == FloraFixture.Log;
         }
 
         private static bool FaceConnected(HashSet<int3> set, int3 start){
@@ -106,8 +110,8 @@ namespace Engine.Tests.EditMode{
                 Dictionary<int3, ushort> voxels = Stamp(anchorBase, r, v, seed);
                 string at = $"seed {seed} ({x},{z}) trunk {r.TrunkHeight} lean {r.Lean} r {r.CrownRadius} branches {r.BranchCount}";
 
-                HashSet<int3> logs = new(voxels.Where(kv => kv.Value == FloraFixture.Log).Select(kv => kv.Key));
-                HashSet<int3> leafSet = new(voxels.Where(kv => kv.Value != FloraFixture.Log).Select(kv => kv.Key));
+                HashSet<int3> logs = new(voxels.Where(kv => IsLog(kv.Value)).Select(kv => kv.Key));
+                HashSet<int3> leafSet = new(voxels.Where(kv => !IsLog(kv.Value)).Select(kv => kv.Key));
                 for (int i = 0; i < width; i++)
                 for (int j = 0; j < width; j++)
                     Assert.IsTrue(logs.Contains(new int3(i, 0, j)), $"{at}: the trunk starts at the anchor's top block + 1");
@@ -129,9 +133,9 @@ namespace Engine.Tests.EditMode{
 
                 // Leaves against the same tree without crown noise: each voxel adds at most one extra.
                 Dictionary<int3, ushort> plain = Stamp(anchorBase, r, quiet, seed);
-                int plainLeaves = plain.Count(kv => kv.Value != FloraFixture.Log);
+                int plainLeaves = plain.Count(kv => !IsLog(kv.Value));
                 Assert.LessOrEqual(leafSet.Count, 2 * plainLeaves, $"{at}: leaf count");
-                CollectionAssert.AreEquivalent(logs, plain.Where(kv => kv.Value == FloraFixture.Log).Select(kv => kv.Key),
+                CollectionAssert.AreEquivalent(logs, plain.Where(kv => IsLog(kv.Value)).Select(kv => kv.Key),
                     $"{at}: crown noise moved a log");
                 leaves += leafSet.Count;
                 quietLeaves += plainLeaves;
@@ -211,6 +215,105 @@ namespace Engine.Tests.EditMode{
             CollectionAssert.AreEquivalent(new[]{ 3, 4, 5, 6 }, lengths, "all lengths");
         }
 
+        [Test]
+        public void Logs_LyingTrunk_LiesAlongItsDirection(){
+            // A fallen log is the trunk voxel lying along x or z, whichever its direction is; both occur.
+            TreeVariant variant = new(){
+                TrunkVoxel = _fixture.LogSo, TrunkHeight = new IntRange(3, 6), Lying = true, CrownShape = CrownShape.None
+            };
+            TreeVariantDef v = Def(variant);
+            Assert.AreEqual(FloraFixture.LogX, v.TrunkVoxelX);
+            Assert.AreEqual(FloraFixture.LogZ, v.TrunkVoxelZ);
+            HashSet<ushort> seen = new();
+            for (int s = 0; s < 200; s++){
+                int x = s * 37 - 3000, z = s * 53 + 211;
+                TreeRoll r = TreeShape.Roll(x, z, 3u, 0, v);
+                ushort expected = r.LeanDirection.x != 0 ? FloraFixture.LogX : FloraFixture.LogZ;
+                foreach ((int3 p, ushort id) in Stamp(new int3(x, 100, z), r, v, 3u))
+                    Assert.AreEqual(expected, id, $"anchor ({x}, {z}) direction {r.LeanDirection} voxel {p}");
+                seen.Add(expected);
+            }
+
+            Assert.AreEqual(2, seen.Count, "logs along x and along z");
+        }
+
+        [Test]
+        public void Logs_TrunkWithoutAxisMode_StaysTheBase(){
+            // A trunk voxel without the axis mode (a cactus) keeps its own id for lying trunks and branches.
+            TreeVariant variant = new(){
+                TrunkVoxel = _fixture.CactusSo, TrunkHeight = new IntRange(3, 6), Lying = true, CrownShape = CrownShape.None
+            };
+            TreeVariantDef lying = Def(variant);
+            Assert.AreEqual(FloraFixture.Cactus, lying.TrunkVoxelX);
+            Assert.AreEqual(FloraFixture.Cactus, lying.TrunkVoxelZ);
+            variant.Lying = false;
+            variant.BranchCount = new IntRange(2, 3);
+            variant.BranchStyle = BranchStyle.Arm;
+            TreeVariantDef armed = Def(variant);
+            for (int s = 0; s < 50; s++){
+                TreeRoll r = TreeShape.Roll(s * 11, s * 5, 9u, 0, armed);
+                foreach (ushort id in Stamp(new int3(s * 11, 100, s * 5), r, armed, 9u).Values)
+                    Assert.AreEqual(FloraFixture.Cactus, id);
+            }
+
+            // Without a variant table every log stands.
+            List<TreeVariantDef> variants = new();
+            FloraConfigBuilder.AddTree(_fixture.MakeTree("T", _fixture.Normal()), v => _fixture.Ids[v], null, variants,
+                new Dictionary<ushort, byte>(), null);
+            Assert.AreEqual(FloraFixture.Log, variants[0].TrunkVoxelX);
+            Assert.AreEqual(FloraFixture.Log, variants[0].TrunkVoxelZ);
+        }
+
+        [Test]
+        public void Logs_TrunkStands_BranchVoxelsFollowTheStepThatReachedThem(
+            [Values(BranchStyle.Diagonal, BranchStyle.Arm)] BranchStyle style, [Values(1, 2)] int width){
+            // Upright, leaning and wide trunks stand. A branch voxel reached by a step along x lies along x, along z
+            // lies along z, and one reached by an upward step stands: each lying log has a log next to it along its
+            // axis, and each standing branch log has a log right below it.
+            TreeVariant variant = new(){
+                TrunkVoxel = _fixture.LogSo, LeafVoxel = _fixture.LeavesSo, TrunkHeight = new IntRange(4, 8), TrunkWidth = width,
+                MaxLean = .25f, CrownShape = CrownShape.Round, CrownRadius = new IntRange(2, 3), BranchCount = new IntRange(1, 4),
+                BranchStyle = style, BranchLength = new IntRange(1, 3), BranchLeafRadius = new IntRange(0, 1)
+            };
+            TreeVariantDef v = Def(variant);
+            int lyingX = 0, lyingZ = 0, standingBranch = 0;
+            for (int s = 0; s < Seeds; s++){
+                uint seed = (uint)(1000 + s * 7919);
+                int x = s * 37 - 3000, z = s * 53 + 211;
+                TreeRoll r = TreeShape.Roll(x, z, seed, 0, v);
+                Dictionary<int3, ushort> voxels = Stamp(new int3(x, 100, z), r, v, seed);
+                string at = $"seed {seed} ({x},{z}) lean {r.Lean} branches {r.BranchCount}";
+
+                // The trunk alone, from the same roll without branches.
+                TreeRoll bare = r;
+                bare.BranchCount = 0;
+                HashSet<int3> trunk = new(Stamp(new int3(x, 100, z), bare, v, seed).Where(kv => IsLog(kv.Value)).Select(kv => kv.Key));
+                foreach (int3 p in trunk) Assert.AreEqual(FloraFixture.Log, voxels[p], $"{at}: trunk voxel {p} does not stand");
+
+                bool LogAt(int3 q) => voxels.TryGetValue(q, out ushort n) && IsLog(n);
+                foreach ((int3 p, ushort id) in voxels){
+                    if (!IsLog(id) || trunk.Contains(p)) continue;
+                    if (id == FloraFixture.LogX){
+                        lyingX++;
+                        Assert.IsTrue(LogAt(p + new int3(1, 0, 0)) || LogAt(p - new int3(1, 0, 0)), $"{at}: x log {p} reached along x");
+                    }
+                    else if (id == FloraFixture.LogZ){
+                        lyingZ++;
+                        Assert.IsTrue(LogAt(p + new int3(0, 0, 1)) || LogAt(p - new int3(0, 0, 1)), $"{at}: z log {p} reached along z");
+                    }
+                    else{
+                        standingBranch++;
+                        Assert.IsTrue(LogAt(p - Up), $"{at}: standing branch log {p} reached from below");
+                    }
+                }
+            }
+
+            TestContext.WriteLine($"{style} w{width}: branch logs along x {lyingX}, along z {lyingZ}, standing {standingBranch}");
+            Assert.Greater(lyingX, 0, "branch logs along x");
+            Assert.Greater(lyingZ, 0, "branch logs along z");
+            Assert.Greater(standingBranch, 0, "standing branch logs");
+        }
+
         [TestCase(0, 4, 8, 4, TestName = "Shapes_CrownBase_0_StartsLevelWithTheTrunkTop")]
         [TestCase(-2, 2, 6, 4, TestName = "Shapes_CrownBase_Negative_HangsDown")]
         [TestCase(-10, 1, 5, 4, TestName = "Shapes_CrownBase_FarBelow_KeepsOneLayerAboveTheTrunk")]
@@ -224,10 +327,10 @@ namespace Engine.Tests.EditMode{
             TreeVariantDef v = Def(variant);
             TreeRoll r = TreeShape.Roll(5, 7, 1u, 0, v);
             Dictionary<int3, ushort> voxels = Stamp(new int3(5, 80, 7), r, v, 1u);
-            int[] leafY = voxels.Where(kv => kv.Value != FloraFixture.Log).Select(kv => kv.Key.y).ToArray();
+            int[] leafY = voxels.Where(kv => !IsLog(kv.Value)).Select(kv => kv.Key.y).ToArray();
             Assert.AreEqual(bottom, leafY.Min(), "lowest leaf layer");
             Assert.AreEqual(top, leafY.Max(), "top leaf layer");
-            Assert.AreEqual(trunkTop, voxels.Where(kv => kv.Value == FloraFixture.Log).Max(kv => kv.Key.y), "trunk top");
+            Assert.AreEqual(trunkTop, voxels.Where(kv => IsLog(kv.Value)).Max(kv => kv.Key.y), "trunk top");
         }
 
         [Test]
@@ -243,7 +346,7 @@ namespace Engine.Tests.EditMode{
                 int x = s * 37 - 3000, z = s * 53 + 211;
                 TreeRoll r = TreeShape.Roll(x, z, 7u, 0, v);
                 Dictionary<int3, ushort> voxels = Stamp(new int3(x, 100, z), r, v, 7u);
-                int tip = voxels.Where(kv => kv.Value == FloraFixture.Log && (kv.Key.x != 0 || kv.Key.z != 0)).Max(kv => kv.Key.y);
+                int tip = voxels.Where(kv => IsLog(kv.Value) && (kv.Key.x != 0 || kv.Key.z != 0)).Max(kv => kv.Key.y);
                 Assert.GreaterOrEqual(tip, r.TrunkHeight - 1, $"({x},{z}) trunk {r.TrunkHeight}: the branch ends below the crown");
             }
         }
@@ -303,8 +406,8 @@ namespace Engine.Tests.EditMode{
                 Dictionary<int3, ushort> voxels = Stamp(new int3(x, 100, z), r, v, seed);
                 string at = $"{name} seed {seed} ({x},{z}) trunk {r.TrunkHeight} r {r.CrownRadius} branches {r.BranchCount}";
 
-                HashSet<int3> logs = new(voxels.Where(kv => kv.Value == trunk).Select(kv => kv.Key));
-                HashSet<int3> leafSet = new(voxels.Where(kv => kv.Value != trunk).Select(kv => kv.Key));
+                HashSet<int3> logs = new(voxels.Where(kv => FloraFixture.BaseOf(kv.Value) == trunk).Select(kv => kv.Key));
+                HashSet<int3> leafSet = new(voxels.Where(kv => FloraFixture.BaseOf(kv.Value) != trunk).Select(kv => kv.Key));
                 if (r.TrunkHeight > 0){
                     Assert.IsTrue(FaceConnected(logs, int3.zero), $"{at}: logs are not face-connected from the anchor");
                     if (v.Crown != CrownShape.None)
