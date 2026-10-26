@@ -222,7 +222,7 @@ MonoBehaviour:
     LavaPocketBandMin: 3
     LavaPocketBandMax: 10
     Ores: []
-    BedrockVoxel: {fileID: 0}
+    BedrockVoxel: {fileID: 11400000, guid: 5f97ffa5334f41d5bd26f9b5015eba49, type: 2}
     BedrockChance1: 0.5
     BedrockChance2: 0.25
   Biomes: {fileID: 11400000, guid: f0ebb416c9f7eb0ebd760b80683faf16, type: 2}

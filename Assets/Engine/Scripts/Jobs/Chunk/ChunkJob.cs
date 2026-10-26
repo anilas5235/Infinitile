@@ -48,6 +48,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             ApplySurfaceCover(chunkColumns, chunkWorldPos, Config.WorldGen, floraGrid.Cache);
 
             FillTerrain(chunkVoxels, chunkColumns, ref Config);
+            ApplyBottomLayer(chunkVoxels, chunkWorldPos, Config.WorldGen);
 
             PlaceVegetation(chunkVoxels, chunkColumns, floraGrid, chunkWorldPos, ref Config);
 

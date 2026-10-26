@@ -92,5 +92,12 @@ namespace Engine.Scripts.WorldGen.Core{
 
         /// <summary>Main or alternative leaf voxel of a crown voxel at its world position.</summary>
         public const uint CrownLeafMix = 0x6FB19C18u;
+
+        // --- Caves -----------------------------------------------------------------------------------------------
+        /// <summary>Bedrock or not at y 1.</summary>
+        public const uint BedrockLayer1 = 0xA1C3E519u;
+
+        /// <summary>Bedrock or not at y 2.</summary>
+        public const uint BedrockLayer2 = 0xB2D4F61Au;
     }
 }

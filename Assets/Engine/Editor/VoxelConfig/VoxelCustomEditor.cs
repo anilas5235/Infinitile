@@ -27,6 +27,7 @@ namespace Engine.Editor.VoxelConfig{
 
             EditorGUILayout.PropertyField(serializedObject.FindProperty("meshLayer"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("collision"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("unbreakable"));
 
             EditorGUILayout.PropertyField(serializedObject.FindProperty("alwaysRenderAllFaces"));
 

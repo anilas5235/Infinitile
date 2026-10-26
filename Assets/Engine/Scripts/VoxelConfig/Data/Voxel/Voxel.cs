@@ -133,6 +133,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         /// </summary>
         public bool collision = true;
 
+        /// <summary>
+        ///     If true, the player cannot break this voxel. Generation and <c>VoxelWorld.SetVoxel</c> still replace it.
+        /// </summary>
+        [Tooltip("The player cannot break it; generation and scripts still can")]
+        public bool unbreakable;
+
         public Dictionary<QuadDefinition, Texture2D> allUnique;
 
         /// <summary>

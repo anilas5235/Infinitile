@@ -26,6 +26,9 @@ namespace Engine.Tests.EditMode{
     ///     decompressed the whole chunks.
     /// </summary>
     public class PointBuildTests{
+        /// <summary>Base voxels (air included) of the package when the values below were recorded.</summary>
+        private const int RecordedBaseCount = 63;
+
         private GameObject _host;
         private DataImporter _importer;
 
@@ -63,8 +66,10 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(Marshal.SizeOf<Vertex>(), Marshal.SizeOf<RawPoint>());
 
             VoxelRegistry registry = _importer.VoxelRegistry;
-            // Base voxels only, so turned variants added to the package leave the recorded world unchanged
-            NativeArray<Voxel.VoxelDef> defs = registry.GetVoxelGenData().VoxelRenderDefs.GetSubArray(0, registry.BaseCount);
+            // The base voxels the values were recorded with (air included), so voxels appended to the package later
+            // and turned variants leave the recorded world unchanged
+            Assert.GreaterOrEqual(registry.BaseCount, RecordedBaseCount);
+            NativeArray<Voxel.VoxelDef> defs = registry.GetVoxelGenData().VoxelRenderDefs.GetSubArray(0, RecordedBaseCount);
             ushort[] solids = Ids(defs, d => d.MeshLayer == MeshLayer.Solid);
             ushort[] liquids = Ids(defs, d => d.MeshLayer == MeshLayer.Transparent);
             ushort[] all = Ids(defs, d => d.MeshLayer != MeshLayer.Air);
