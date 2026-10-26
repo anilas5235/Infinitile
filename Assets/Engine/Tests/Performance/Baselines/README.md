@@ -509,6 +509,26 @@ Regression check, every existing row vs the previous baseline (median / min):
   background load on several rows (surface collider +70 %, natural-terrain light +21 %), with no code change between
   them.
 
+## 2026-10-26 — rotated voxels (no new baseline file)
+
+Turned voxels are variant ids appended after the base voxels; generated trees write lying logs. Nothing per chunk
+grows, so the G5 baseline stays the reference and only `ChunkGenerationBenchmark` was re-run against it.
+
+Registry and GPU memory (shipped package, 4 builds in the Editor):
+- 64 base ids (air included), 10 variants (3 logs × 2 axes, Oven × 3 fronts, StoneSlab upper half).
+- Extra GPU memory 5.3 KB of 13.7 KB: 10 voxel definitions × 88 B, 36 turned quads × 116 B, 60 quad/texture pairs ×
+  4 B. The voxel definition grew from 80 to 88 bytes for the occluder flag.
+- Registering the variants takes 0.6–1.3 ms of a 58–100 ms registry build; loading the voxels and their textures is
+  the rest.
+
+`ChunkJob` rows vs the G5 baseline (median / min): between −6 % and +8 % / −5 % and +9 %, except two medians in the
+first run:
+- `Beaches BiomeFirst` +15 % (min +4.5 %); re-run alone −0.1 % / −0.8 %.
+- `TerrainFirst` +10.4 % (min +3.8 %); re-run alone +7.4 % / +3.0 %.
+
+Play-mode flight with the shipped world: 0 of 300 frames allocate; the interval store peaked at 8123 of 17986 pages
+(45 %) and did not grow.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the
