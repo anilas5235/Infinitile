@@ -79,12 +79,13 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void GpuVoxelDef_Is84Bytes(){
+        public void GpuVoxelDef_Is88Bytes(){
             Type type = typeof(VoxelRegistry).GetNestedType("GPUVoxelDef", BindingFlags.NonPublic);
             Assert.IsNotNull(type, "VoxelRegistry.GPUVoxelDef not found");
-            Assert.AreEqual(84, Marshal.SizeOf(type));
+            Assert.AreEqual(88, Marshal.SizeOf(type));
             Assert.AreEqual(76, (int)Marshal.OffsetOf(type, "LightAttenuation"), "HLSL VoxelDef offset");
             Assert.AreEqual(80, (int)Marshal.OffsetOf(type, "SurfaceAlpha"), "HLSL VoxelDef offset");
+            Assert.AreEqual(84, (int)Marshal.OffsetOf(type, "HidesNeighbourFaces"), "HLSL VoxelDef offset");
         }
 
         [Test]

@@ -39,24 +39,27 @@ namespace Engine.Scripts.Render.Post{
 
             Vector3Int camPos = Vector3Int.FloorToInt(target.transform.position);
 
-            ushort voxelId = VoxelWorld.Instance.GetVoxel(camPos.Int3());
+            // Base voxel: a turned variant shows its base's effects
+            ushort voxelId = _voxelRegistry.BaseOf(VoxelWorld.Instance.GetVoxel(camPos.Int3()));
             if (voxelId != currentVoxelId){
                 currentVoxelId = voxelId;
                 UpdatePostProcessing(currentVoxelId);
             }
 
-            if (UnderwaterFogFeature.Enabled) UnderwaterFogFeature.SurfaceHeight = FindSurface(camPos, voxelId);
+            if (UnderwaterFogFeature.Enabled)
+                UnderwaterFogFeature.SurfaceHeight = FindSurface(_voxelRegistry, camPos, voxelId);
         }
 
         /// <summary>
         ///     Height of the liquid's surface above <paramref name="camPos" />: the bottom of the first voxel up the
-        ///     column that is not <paramref name="liquid" />.
+        ///     column that is not <paramref name="liquid" /> (a base voxel id).
         /// </summary>
-        private static float FindSurface(Vector3Int camPos, ushort liquid){
+        private static float FindSurface(VoxelRegistry registry, Vector3Int camPos, ushort liquid){
             VoxelWorld world = VoxelWorld.Instance;
             int y = camPos.y + 1;
             int top = camPos.y + MaxSurfaceSearch;
-            while (y < top && world.GetVoxel(new Vector3Int(camPos.x, y, camPos.z).Int3()) == liquid) y++;
+            while (y < top && registry.BaseOf(world.GetVoxel(new Vector3Int(camPos.x, y, camPos.z).Int3())) == liquid)
+                y++;
             return y;
         }
 

@@ -111,6 +111,11 @@ namespace Engine.Tests.EditMode{
                 CreateVoxel("Stone", package, shape, tex)
             };
 
+            return CreateVoxelRegistry(voxels);
+        }
+
+        /// <summary>A finalised voxel registry of std:air (0) and the given voxels in order.</summary>
+        public VoxelRegistry CreateVoxelRegistry(params Voxel[] voxels){
             VoxelRegistry registry = new();
             registry.Initialize(
                 CreateTexture("ErrSolid", new Color32(255, 0, 255, 255)),

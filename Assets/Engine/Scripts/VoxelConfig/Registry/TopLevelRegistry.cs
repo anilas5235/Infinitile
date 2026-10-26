@@ -82,7 +82,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             return NameRegistry.TryGet(id, out name);
         }
 
-        public bool TryGet(ushort id, out T so){
+        public virtual bool TryGet(ushort id, out T so){
             return SoRegistry.TryGet(id, out so);
         }
     }

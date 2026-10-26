@@ -36,6 +36,11 @@ namespace Engine.Tests.EditMode{
         internal const ushort Snow = 14;
         internal const ushort Granite = 15;
 
+        /// <summary>The log lying along x and along z (<see cref="VariantOf" />).</summary>
+        internal const ushort LogX = 16;
+
+        internal const ushort LogZ = 17;
+
         private readonly List<Object> _created = new();
 
         /// <summary>Test-side id of every voxel ScriptableObject.</summary>
@@ -70,6 +75,7 @@ namespace Engine.Tests.EditMode{
             TuftSo = MakeVoxel("Tuft", Tuft, MeshLayer.Foliage, false);
             FlowerSo = MakeVoxel("Flower", Flower, MeshLayer.Foliage, false);
             LogSo = MakeVoxel("Log", Log, MeshLayer.Solid, true);
+            LogSo.facing = VoxelFacing.Axis;
             LeavesSo = MakeVoxel("Leaves", Leaves, MeshLayer.Transparent, true);
             NeedlesSo = MakeVoxel("Needles", Needles, MeshLayer.Transparent, true);
             CactusSo = MakeVoxel("Cactus", Cactus, MeshLayer.Solid, true);
@@ -291,7 +297,22 @@ namespace Engine.Tests.EditMode{
         }
 
         internal WorldGenConfig ToConfig(WorldGenSettings s, Allocator allocator = Allocator.Persistent){
-            return s.ToConfigWithVoxelIds(TestFixtures.Seed, v => v ? Ids[v] : (ushort)0, allocator);
+            return s.ToConfigWithVoxelIds(TestFixtures.Seed, v => v ? Ids[v] : (ushort)0, allocator, VariantOf);
+        }
+
+        /// <summary>The test's variant table: the log's axis variants <see cref="LogX" /> and <see cref="LogZ" />.</summary>
+        internal static ushort VariantOf(ushort id, byte orientation){
+            if (id != Log) return id;
+            return orientation switch{
+                VoxelOrientation.AxisX => LogX,
+                VoxelOrientation.AxisZ => LogZ,
+                _ => id
+            };
+        }
+
+        /// <summary>The base voxel of a test id: <see cref="Log" /> for its variants.</summary>
+        internal static ushort BaseOf(ushort id){
+            return id is LogX or LogZ ? Log : id;
         }
 
         /// <summary>A chunk-job config: the settings' world-gen config plus the water/ice ids FillTerrain needs.</summary>

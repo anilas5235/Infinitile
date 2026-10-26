@@ -53,7 +53,7 @@ namespace Engine.Tests.EditMode{
         }
 
         [TestCase(0, 2953, 0, 0, 1102910112564121940UL)] // cave pockets on the world bottom
-        [TestCase(3, 12283, 1150, 380, 3049752351769920539UL)] // surface, water and every voxel type
+        [TestCase(3, 12299, 1155, 380, 16766896623082871830UL)] // surface, water and every voxel type
         [TestCase(7, 5737, 0, 0, 16801187266041425973UL)] // floating blocks under the world top
         public void BuildPoints_MatchesRecordedPoints(int partitionY, int solid, int transparent, int foliage,
             ulong hash){
@@ -63,7 +63,8 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(Marshal.SizeOf<Vertex>(), Marshal.SizeOf<RawPoint>());
 
             VoxelRegistry registry = _importer.VoxelRegistry;
-            NativeArray<Voxel.VoxelDef> defs = registry.GetVoxelGenData().VoxelRenderDefs;
+            // Base voxels only, so turned variants added to the package leave the recorded world unchanged
+            NativeArray<Voxel.VoxelDef> defs = registry.GetVoxelGenData().VoxelRenderDefs.GetSubArray(0, registry.BaseCount);
             ushort[] solids = Ids(defs, d => d.MeshLayer == MeshLayer.Solid);
             ushort[] liquids = Ids(defs, d => d.MeshLayer == MeshLayer.Transparent);
             ushort[] all = Ids(defs, d => d.MeshLayer != MeshLayer.Air);

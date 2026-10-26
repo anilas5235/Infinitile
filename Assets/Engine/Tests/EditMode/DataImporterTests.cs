@@ -95,9 +95,10 @@ namespace Engine.Tests.EditMode{
                 Assert.IsTrue(_importer.VoxelRegistry.VoxelMap.ContainsKey(voxel.GetFullName()));
             }
 
-            Assert.AreEqual(voxelCount + 1, entries.Count, "air + every package voxel");
-            Assert.AreEqual(entries.Count, _importer.VoxelRegistry.VoxelMap.Count);
-            Assert.AreEqual(entries.Count, _importer.VoxelRegistry.GetVoxelGenData().VoxelRenderDefs.Length);
+            Assert.AreEqual(voxelCount + 1, _importer.VoxelRegistry.BaseCount, "air + every package voxel");
+            Assert.AreEqual(_importer.VoxelRegistry.BaseCount, _importer.VoxelRegistry.VoxelMap.Count, "base voxels");
+            Assert.AreEqual(entries.Count, _importer.VoxelRegistry.GetVoxelGenData().VoxelRenderDefs.Length,
+                "base voxels and their turned variants");
         }
 
         [Test]

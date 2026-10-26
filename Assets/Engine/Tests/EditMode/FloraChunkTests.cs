@@ -94,6 +94,11 @@ namespace Engine.Tests.EditMode{
             return chunks[chunk].GetVoxel(local);
         }
 
+        /// <summary>Stamped voxels that are a log lying along x or z.</summary>
+        private static int LyingLogs(ReferenceWorld reference){
+            return reference.Stamped.Count(p => reference[p] is FloraFixture.LogX or FloraFixture.LogZ);
+        }
+
         /// <summary>Anchors within two blocks of a chunk corner.</summary>
         private static int CountNearCorner(ReferenceWorld reference){
             static bool NearBorder(int c, int size){
@@ -322,6 +327,7 @@ namespace Engine.Tests.EditMode{
             Assert.Greater(nearCorner, 0, "an anchor lies next to a chunk corner");
             Assert.Greater(fourChunks, 0, "a tree falls into four chunks");
             Assert.IsTrue(reference.TreeVariants.Values.All(v => v == 0), "the species has one variant");
+            if (variant >= 3) Assert.Greater(LyingLogs(reference), 0, "the branches carry lying logs");
             if (variant == 1 && architecture == GenArchitecture.TerrainFirst){
                 // The 2×2 trunk always needs a flat footprint: both outcomes occur on the spline terrain (the
                 // Biome-first test hills are flat within 1 block everywhere).
@@ -374,6 +380,9 @@ namespace Engine.Tests.EditMode{
                 // A log needs the anchor's height under its whole length: both outcomes occur on the test hills.
                 TestContext.WriteLine($"shortened to 2: {reference.Narrowed.Count}");
                 Assert.Greater(reference.Narrowed.Count, 0, "some log is shortened to 2");
+                Assert.Greater(reference.Stamped.Count(p => reference[p] == FloraFixture.LogX), 0, "logs lying along x");
+                Assert.Greater(reference.Stamped.Count(p => reference[p] == FloraFixture.LogZ), 0, "logs lying along z");
+                Assert.AreEqual(0, reference.Stamped.Count(p => reference[p] == FloraFixture.Log), "no fallen log stands");
                 Assert.Less(reference.Narrowed.Count, reference.Anchors.Count, "some log lies at its rolled length");
             }
 
@@ -409,7 +418,7 @@ namespace Engine.Tests.EditMode{
                         int3 p = new(x, y, z);
                         ushort a = forward[chunk].GetVoxel(p);
                         if (a != backward[chunk].GetVoxel(p)) Assert.Fail($"chunk {chunk} voxel {p}: {a} vs {backward[chunk].GetVoxel(p)}");
-                        if (a == FloraFixture.Log) logs++;
+                        if (FloraFixture.BaseOf(a) == FloraFixture.Log) logs++;
                     }
 
                 Assert.Greater(logs, 100, "the chunks carry trees");
