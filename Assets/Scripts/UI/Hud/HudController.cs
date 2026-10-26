@@ -67,6 +67,7 @@ namespace UI{
         private int _frames;
         private ProfilerRecorder _gfxMemory;
         private LookController _look;
+        private PlayerControllerManager _movement;
         private float _nextRefresh;
         private PlayerInput _playerInput;
         private int _searchBaseCount;
@@ -83,6 +84,7 @@ namespace UI{
             if (!voxelEditor) voxelEditor = FindFirstObjectByType<VoxelEditor>();
             if (!worldGenKeys) worldGenKeys = FindFirstObjectByType<WorldGenDebugKeys>();
             _look = FindFirstObjectByType<LookController>();
+            _movement = FindFirstObjectByType<PlayerControllerManager>();
 
             _crosshair = Root.Q("crosshair");
             _crosshair.style.backgroundImage = crosshair;
@@ -188,10 +190,11 @@ namespace UI{
             _debugLeft.style.display = display;
             _debugRight.style.display = display;
             if (VoxelWorldRenderer.Instance) VoxelWorldRenderer.Instance.CollectCullingStats = show;
+            string modes = _movement ? $"    {_movement.ModeKey}: walk / fly / spectator" : "";
             _hint.text = show
                 ? $"{debugPanelsKey}: hide panels    hold {cursorKey}: cursor    1–9 / wheel: voxel    middle click: pick" +
-                  $"    {voxelSearchKey}: all voxels"
-                : $"{debugPanelsKey}: debug panels    {voxelSearchKey}: all voxels";
+                  $"    {voxelSearchKey}: all voxels{modes}"
+                : $"{debugPanelsKey}: debug panels    {voxelSearchKey}: all voxels{modes}";
             _nextRefresh = 0f;
         }
 
@@ -216,7 +219,8 @@ namespace UI{
             Vector3 pos = cam.transform.position;
             int3 block = new((int)math.floor(pos.x), (int)math.floor(pos.y), (int)math.floor(pos.z));
             _position.text = Invariant($"Position {pos.x:F1} {pos.y:F1} {pos.z:F1}") +
-                             $"   facing {Facing(cam.transform.forward)}";
+                             $"   facing {Facing(cam.transform.forward)}" +
+                             (_movement ? $"   {_movement.Mode}" : "");
             int2 chunk = VoxelConstants.WorldToChunkPos(block);
             _chunk.text = $"Chunk {chunk.x} {chunk.y}   block in chunk {block.x - chunk.x * VoxelConstants.ChunkWidth} " +
                           $"{block.z - chunk.y * VoxelConstants.ChunkWidth}";
