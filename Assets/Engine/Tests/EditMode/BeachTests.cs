@@ -235,7 +235,7 @@ namespace Engine.Tests.EditMode{
             Assert.Greater(beaches, 30, "the area has beaches");
             Assert.Greater(flowers, 0, "beach flowers grow");
 
-            // The chunk job equals the reference stamp around every surface.
+            // The chunk job equals the reference stamp around every surface; caves stay on, the reference carves too.
             NativeList<int2> jobs = new(4, Allocator.TempJob);
             for (int cx = 0; cx < chunks.x; cx++)
             for (int cz = 0; cz < chunks.y; cz++)

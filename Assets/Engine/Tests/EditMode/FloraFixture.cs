@@ -6,6 +6,7 @@ using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.WorldGen.Blending;
+using Engine.Scripts.WorldGen.Caves;
 using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Noise;
@@ -410,7 +411,9 @@ namespace Engine.Tests.EditMode{
     ///     (<see cref="WorldGenApi.SampleRegion" />) and the fixture's own block and class tables: the FillTerrain
     ///     layering, then every single-block plant on its column, then every anchor whose structure may reach the
     ///     area, in world (x, then z) order; a voxel replaces only one of a lower class. The chunk job must produce
-    ///     exactly this, chunk by chunk.
+    ///     exactly this, chunk by chunk. With caves on, the reference carves with the pure cave evaluation
+    ///     (<see cref="CaveCarving" />) wherever the comparisons look: the surface band of entrance columns and every
+    ///     stamped voxel at or below the surface. A plant or anchor whose ground is carved is left out, as in the job.
     /// </summary>
     internal sealed class ReferenceWorld{
         internal readonly int2 Origin;
@@ -429,11 +432,19 @@ namespace Engine.Tests.EditMode{
         /// <summary>Tree anchors in <see cref="Anchors" /> whose wide or leaning trunk fell back to a narrow, upright one.</summary>
         internal readonly HashSet<int2> Narrowed = new();
 
+        /// <summary>Anchors (world column) left out because their ground is carved.</summary>
+        internal readonly HashSet<int2> OnCarvedGround = new();
+
         private readonly ushort[] _voxels;
+        private readonly WorldGenConfig _cfg;
+
+        /// <summary>Voxels the cave evaluation has already decided.</summary>
+        private readonly HashSet<int3> _caveChecked = new();
 
         internal ReferenceWorld(FloraFixture fixture, IReadOnlyList<Biome> biomes, in GeneratorConfig config,
             int2 originChunk, int2 chunks){
             WorldGenConfig cfg = config.WorldGen;
+            _cfg = cfg;
             Origin = originChunk * new int2(ChunkWidth, ChunkDepth);
             Size = chunks * new int2(ChunkWidth, ChunkDepth);
             int reach = cfg.FloraReach;
@@ -477,6 +488,11 @@ namespace Engine.Tests.EditMode{
                     if (frozen && y == waterLevel - 1 && v == TestFixtures.Water) v = TestFixtures.Ice;
                     _voxels[Flat(x, y, z)] = v;
                 }
+
+                // Outside entrances the caves keep Cover blocks of rock, below the band the comparisons look at.
+                if (cfg.Caves.Enabled && (cfg.Caves.Cover <= 5 || CaveColumns.IsEntrance(wx, wz, h, cfg, probes)))
+                    for (int y = math.max(0, h - 5); y <= h; y++)
+                        Carve(new int3(wx, y, wz));
             }
 
             probes.Dispose();
@@ -486,7 +502,7 @@ namespace Engine.Tests.EditMode{
             for (int z = 0; z < Size.y; z++){
                 int wx = Origin.x + x, wz = Origin.y + z;
                 FloraRule rule = RuleAt(biomes, species, wx, wz, out int i);
-                if (rule == null || rule.IsMultiBlock) continue;
+                if (rule == null || rule.IsMultiBlock || Carved(new int3(wx, ColumnTop(i), wz))) continue;
                 Put(fixture, new int3(wx, ColumnTop(i) + 1, wz), fixture.Ids[rule.SpeciesVoxel]);
             }
 
@@ -497,6 +513,11 @@ namespace Engine.Tests.EditMode{
                 FloraRule rule = RuleAt(biomes, species, wx, wz, out int i);
                 if (rule == null || !rule.IsMultiBlock) continue;
                 int3 basePos = new(wx, ColumnTop(i) + 1, wz);
+                if (!rule.SpeciesTree && Carved(basePos - new int3(0, 1, 0))){
+                    OnCarvedGround.Add(new int2(wx, wz));
+                    continue;
+                }
+
                 List<int3> footprint = new();
                 if (rule.SpeciesTree){
                     // Variant and shape from the shared tree code; the flat-footprint fallback from the region heights.
@@ -511,6 +532,12 @@ namespace Engine.Tests.EditMode{
                         Narrowed.Add(new int2(wx, wz));
                         if (roll.Lying && LyingRun(wx, wz, roll) < roll.TrunkHeight)
                             throw new InvalidOperationException($"The region reports a lying trunk at ({wx}, {wz}) that fits nowhere.");
+                    }
+
+                    if (TrunkGroundCarved(wx, ColumnTop(i) - roll.Sink, wz, roll)){
+                        OnCarvedGround.Add(new int2(wx, wz));
+                        Narrowed.Remove(new int2(wx, wz));
+                        continue;
                     }
 
                     tree.Clear();
@@ -570,6 +597,26 @@ namespace Engine.Tests.EditMode{
             return run;
         }
 
+        /// <summary>Some voxel under the trunk of <paramref name="roll" />, anchored at (x, z), is carved at <paramref name="y" />.</summary>
+        private bool TrunkGroundCarved(int x, int y, int z, in TreeRoll roll){
+            int4 box = roll.Lying ? TreeShape.Footprint(roll) : new int4(0, 0, roll.Width - 1, roll.Width - 1);
+            for (int fx = x + box.x; fx <= x + box.z; fx++)
+            for (int fz = z + box.y; fz <= z + box.w; fz++)
+                if (Carved(new int3(fx, y, fz)))
+                    return true;
+            return false;
+        }
+
+        private bool Carved(int3 world){
+            return _cfg.Caves.Enabled && CaveCarving.IsCarved(world.x, world.y, world.z, _cfg);
+        }
+
+        /// <summary>Carves <paramref name="world" /> if the caves do (once per voxel).</summary>
+        private void Carve(int3 world){
+            if (!InArea(world) || !_caveChecked.Add(world)) return;
+            if (Carved(world)) _voxels[Flat(world.x - Origin.x, world.y, world.z - Origin.y)] = TestFixtures.Air;
+        }
+
         private int ColumnTop(int regionIndex){
             return math.clamp(Region.ColumnHeight[regionIndex], 0, MaxTerrainHeight);
         }
@@ -595,6 +642,7 @@ namespace Engine.Tests.EditMode{
         private void Put(FloraFixture fixture, int3 world, ushort voxel){
             if (!InArea(world)) return;
             Stamped.Add(world);
+            if (world.y <= SurfaceAt(world.x, world.z)) Carve(world);
             int idx = Flat(world.x - Origin.x, world.y, world.z - Origin.y);
             if (fixture.ClassOf(_voxels[idx]) < fixture.ClassOf(voxel)) _voxels[idx] = voxel;
         }

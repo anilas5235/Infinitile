@@ -19,7 +19,8 @@ namespace Engine.Tests.EditMode{
     ///     <see cref="Engine.Scripts.WorldGen.Core.WorldGenApi.SampleRegion" /> in all 8 configurations
     ///     (2 architectures × 4 methods; Biome-first uses the method in both stages), trees that cross chunk borders
     ///     are complete on both sides, every test and shipped tree variant matches the whole-world stamp across chunk corners, snow,
-    ///     strata and ice agree as well, and the same input gives the same output in any chunk order.
+    ///     strata and ice agree as well, and the same input gives the same output in any chunk order. Caves stay on: the
+    ///     reference world carves with the pure cave evaluation and leaves out flora on carved ground, as the job does.
     /// </summary>
     public class FloraChunkTests{
         private FloraFixture _fixture;

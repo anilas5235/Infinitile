@@ -233,9 +233,14 @@ namespace Engine.Tests.EditMode{
 
                 Assert.IsTrue(results.TryGetValue(new int2(-1, 0), out ChunkVoxelData west));
                 Assert.IsTrue(results.TryGetValue(new int2(0, 0), out ChunkVoxelData east));
+                // Caves stay on; rows with an entrance column, where worms may break the surface, are skipped.
+                int checkedRows = 0;
                 for (int z = 0; z < ChunkDepth; z++){
                     ColumnSample a = WorldSampler.SampleColumn(-1, z, _config.WorldGen);
                     ColumnSample b = WorldSampler.SampleColumn(0, z, _config.WorldGen);
+                    if (TestFixtures.CaveEntrance(-1, z, a.ColumnHeight, _config.WorldGen) ||
+                        TestFixtures.CaveEntrance(0, z, b.ColumnHeight, _config.WorldGen)) continue;
+                    checkedRows++;
                     Biome.BiomeDef defA = _config.WorldGen.Biomes[a.SurfaceSource];
                     Biome.BiomeDef defB = _config.WorldGen.Biomes[b.SurfaceSource];
                     ushort expectedA = defA.topBlock; // the patched defs have no underwater block
@@ -245,6 +250,8 @@ namespace Engine.Tests.EditMode{
                     Assert.AreEqual(defA.underBlock, west.GetVoxel(new int3(ChunkWidth - 1, a.ColumnHeight - 1, z)));
                     Assert.AreEqual(defB.underBlock, east.GetVoxel(new int3(0, b.ColumnHeight - 1, z)));
                 }
+
+                Assert.Greater(checkedRows, 0, "some row lies outside the entrances");
             }
             finally{
                 foreach (KeyValue<int2, ChunkVoxelData> kv in results) kv.Value.Dispose();

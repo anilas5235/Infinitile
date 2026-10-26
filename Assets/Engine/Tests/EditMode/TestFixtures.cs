@@ -1,4 +1,4 @@
-using Engine.Scripts.Data;
+﻿using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
@@ -6,6 +6,7 @@ using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Data.Internal;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
+using Engine.Scripts.WorldGen.Caves;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -74,6 +75,15 @@ namespace Engine.Tests.EditMode{
                 Object.DestroyImmediate(set);
                 Object.DestroyImmediate(settings);
             }
+        }
+
+        /// <summary>
+        ///     Worms may break the surface of column (x, z) with top block <paramref name="height" />. Tests that check
+        ///     surface blocks of the chunk job skip these columns and keep caves on; elsewhere the caves keep a cover of
+        ///     rock, so the surface blocks are those of the uncarved column.
+        /// </summary>
+        internal static bool CaveEntrance(int x, int z, int height, in WorldGenConfig cfg){
+            return cfg.Caves.Enabled && CaveColumns.IsEntrance(x, z, height, cfg, default);
         }
 
         /// <summary>
