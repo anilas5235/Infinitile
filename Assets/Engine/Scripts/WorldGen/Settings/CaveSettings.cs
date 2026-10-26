@@ -74,7 +74,7 @@ namespace Engine.Scripts.WorldGen.Settings{
 
         [Tooltip("Mean number of worms per start cell (0…2): each cell holds 0, 1 or 2 worms.")]
         [Range(0f, 2f)]
-        public float WormsPerCell = .6f;
+        public float WormsPerCell = 1.2f;
 
         [Tooltip("Lowest start y of a worm away from an entrance.")]
         public int WormStartMinY = 20;

@@ -193,7 +193,7 @@ MonoBehaviour:
     PillarVerticalWavelength: 96
     PillarThreshold: 0.55
     WormCellSize: 64
-    WormsPerCell: 0.6
+    WormsPerCell: 1.2
     WormStartMinY: 20
     WormLength:
       Min: 96
