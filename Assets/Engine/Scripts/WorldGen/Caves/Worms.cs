@@ -28,6 +28,12 @@ namespace Engine.Scripts.WorldGen.Caves{
         /// <summary>Step at which the branch leaves, −1 for none (and on a branch).</summary>
         public int BranchStep;
 
+        /// <summary>
+        ///     A worm that starts in the entrance mask goes straight down while it is above this y, so its shaft stays
+        ///     in the mask until the column limits outside it let the tunnel through; int.MaxValue for others.
+        /// </summary>
+        public int ShaftAbove;
+
         /// <summary>A worm that starts in the entrance mask aims down while it is above this y; int.MaxValue for others.</summary>
         public int DescendAbove;
     }
@@ -88,8 +94,10 @@ namespace Engine.Scripts.WorldGen.Caves{
         /// <summary>
         ///     Starts worm <paramref name="k" /> of <paramref name="cell" />; false when the cell has no such worm or its
         ///     start column has no room for one (surface − Cover below the lowest start height outside an entrance).
-        ///     A worm in the entrance mask starts up to <c>EntranceStartDepth</c> below the surface and aims down until it
-        ///     is <c>Cover</c> below it, so the opening leads into the rock. The start leaves out the water test of the
+        ///     A worm in the entrance mask starts up to <c>EntranceStartDepth</c> below the surface, goes straight down
+        ///     until its sphere lies below <c>Cover</c> (outside the mask nothing above it is carved, so a sloped start
+        ///     left the opening a dead end), then aims down to the top of the cavern band, where the halls and the
+        ///     other worms run; its length grows by the steps of that descent. The start leaves out the water test of the
         ///     entrance: starts lie up to <c>WormPadding</c> away, beyond the block's probes, and the column limits keep
         ///     the worm <c>Cover</c> deep wherever water is near.
         /// </summary>
@@ -102,15 +110,20 @@ namespace Engine.Scripts.WorldGen.Caves{
             int surface = CaveColumns.SurfaceY(column.x, column.y, cfg, cache);
             bool entrance = CaveColumns.InEntranceMask(column.x, column.y, surface, cfg);
             int y;
+            int extraSteps = 0;
             if (entrance){
                 y = surface - (int)(Roll(hash, RollY) * (c.EntranceStartDepth + 1));
-                worm.DescendAbove = surface - c.Cover;
+                worm.ShaftAbove = surface - c.Cover - (int)math.ceil(c.WormMaxRadius);
+                worm.DescendAbove = math.min(worm.ShaftAbove, c.CavernBandMax);
                 worm.Pitch = -c.WormMaxPitch;
+                extraSteps = math.max(y - worm.ShaftAbove, 0) +
+                             (int)math.ceil((worm.ShaftAbove - worm.DescendAbove) / math.max(math.sin(c.WormMaxPitch), .1f));
             }
             else{
                 int top = surface - c.Cover;
                 if (top < c.WormStartMinY) return false;
                 y = c.WormStartMinY + (int)(Roll(hash, RollY) * (top - c.WormStartMinY + 1));
+                worm.ShaftAbove = int.MaxValue;
                 worm.DescendAbove = int.MaxValue;
                 worm.Pitch = (Roll(hash, RollPitch) * 2f - 1f) * .5f * c.WormMaxPitch;
             }
@@ -119,7 +132,8 @@ namespace Engine.Scripts.WorldGen.Caves{
             worm.Origin = worm.Position.xz;
             worm.Yaw = Roll(hash, RollYaw) * 2f * math.PI;
             worm.Hash = hash;
-            worm.Length = c.WormLength.x + (int)(RollBits(hash, RollLength) % (uint)(c.WormLength.y - c.WormLength.x + 1));
+            worm.Length = c.WormLength.x + (int)(RollBits(hash, RollLength) % (uint)(c.WormLength.y - c.WormLength.x + 1)) +
+                          extraSteps;
             worm.BranchStep = worm.Length >= 2 && Roll(hash, RollBranch) < c.WormBranchChance
                 ? 1 + (int)(RollBits(hash, RollBranchStep) % (uint)(worm.Length - 1))
                 : -1;
@@ -148,12 +162,20 @@ namespace Engine.Scripts.WorldGen.Caves{
         /// <summary>
         ///     Moves <paramref name="worm" /> one block on: the yaw and pitch rates keep <c>WormTurnDamping</c> of
         ///     their value and gain a jitter, the pitch relaxes towards level (towards down while an entrance worm is
-        ///     still high) and stays within ±<c>WormMaxPitch</c>, and the worm bounces off <c>WormMinY</c>. False when
-        ///     the path ends: its length is used up or the next step would leave <c>WormReach</c> of the start.
+        ///     still high) and stays within ±<c>WormMaxPitch</c>, and the worm bounces off <c>WormMinY</c>. An entrance
+        ///     worm above <see cref="Worm.ShaftAbove" /> steps straight down instead. False when the path ends: its
+        ///     length is used up or the next step would leave <c>WormReach</c> of the start.
         /// </summary>
         public static bool Next(ref Worm worm, in CaveConfig c){
             int step = worm.Step + 1;
             if (step >= worm.Length) return false;
+            if (worm.Position.y > worm.ShaftAbove){
+                worm.Position.y -= 1f;
+                worm.Step = step;
+                worm.Radius = RadiusAt(worm.Hash, step, c);
+                return true;
+            }
+
             float damping = c.WormTurnDamping;
             worm.YawRate = worm.YawRate * damping + c.WormYawJitter * Hash.HashSigned(step, 0, worm.Hash, HashSalts.WormTurn);
             worm.PitchRate = worm.PitchRate * damping + c.WormPitchJitter * Hash.HashSigned(step, 1, worm.Hash, HashSalts.WormTurn);

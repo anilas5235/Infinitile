@@ -415,6 +415,44 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void EntranceWorm_ShaftLeadsFromItsStartBelowTheCover(){
+            // Outside the entrance mask nothing above surface − Cover is carved, so an entrance worm goes straight down
+            // in its start column until its sphere lies below the cover; a sloped start left the opening a dead end.
+            // With the mask wide open and every cell full, the start column of each dry entrance worm is air from the
+            // start down to the shaft bottom, and the descent then reaches the top of the cavern band or its reach.
+            _settings.Caves.EntranceThreshold = 0f;
+            _settings.Caves.WormsPerCell = 2f;
+            _config = Build();
+            WorldGenConfig cfg = _config.WorldGen;
+            ref readonly CaveConfig c = ref cfg.Caves;
+            List<(int2 start, Worm worm)> entrances = WormsIn(new int2(-2, -2), new int2(2, 2), cfg)
+                .Where(w => w.worm.ShaftAbove != int.MaxValue &&
+                            CaveColumns.Limits(w.start.x, w.start.y, cfg, default).Worm ==
+                            CaveColumns.SurfaceY(w.start.x, w.start.y, cfg, default))
+                .ToList();
+            TestContext.WriteLine($"{entrances.Count} dry entrance worms");
+            Assert.GreaterOrEqual(entrances.Count, 5, "the area has entrance worms");
+
+            int2[] chunkList = entrances.Select(e => ChunkOf(e.start.x, e.start.y)).Distinct().ToArray();
+            Blocks blocks = Generate(_config, chunkList.Select(k => new int3(k.x * ChunkWidth, 0, k.y * ChunkDepth)).ToArray(), false);
+            int reachedBand = 0;
+            foreach ((int2 start, Worm worm) in entrances){
+                int2 chunk = ChunkOf(start.x, start.y);
+                int b = Array.IndexOf(chunkList, chunk);
+                int top = (int)math.floor(worm.Position.y);
+                for (int y = top; y >= worm.ShaftAbove; y--){
+                    ushort voxel = blocks.Voxel(b, start.x - chunk.x * ChunkWidth, y, start.y - chunk.y * ChunkDepth);
+                    Assert.AreEqual(0, voxel, $"shaft of the worm at {start} is closed at y {y} (start {top}, bottom {worm.ShaftAbove})");
+                }
+
+                if (Walk(worm, c).Min(s => s.Position.y) <= worm.DescendAbove + 1) reachedBand++;
+            }
+
+            TestContext.WriteLine($"{reachedBand} of {entrances.Count} descend to y {c.CavernBandMax} or below the shaft");
+            Assert.Greater(reachedBand, entrances.Count / 2, "most entrance worms descend to the cavern band");
+        }
+
+        [Test]
         public void Worm_StartingBeyondItsReach_CarvesIntoTheBlock(){
             // With every radius at its largest, a worm whose path ends near its reach carves a voxel more than
             // WormReach columns from its start; a block placed with that voxel on its edge nearest to the start still
