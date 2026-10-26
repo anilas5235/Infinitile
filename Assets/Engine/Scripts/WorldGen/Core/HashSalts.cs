@@ -99,5 +99,14 @@ namespace Engine.Scripts.WorldGen.Core{
 
         /// <summary>Bedrock or not at y 2.</summary>
         public const uint BedrockLayer2 = 0xB2D4F61Au;
+
+        /// <summary>2D mask of the halls.</summary>
+        public const uint CavernMask = 0xC3E5071Bu;
+
+        /// <summary>2D mask of the surface openings.</summary>
+        public const uint EntranceMask = 0xD4F6182Cu;
+
+        /// <summary>2D mask of the lava floor.</summary>
+        public const uint LavaMask = 0xE507293Du;
     }
 }

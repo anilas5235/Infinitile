@@ -1,5 +1,6 @@
 using System;
 using Engine.Scripts.WorldGen.Blending;
+using Engine.Scripts.WorldGen.Caves;
 using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Burst;
@@ -66,6 +67,21 @@ namespace Engine.Scripts.WorldGen.Core{
 
         /// <summary>Terrain-first (Offset, Amp, J) per column; zero in Biome-first.</summary>
         public NativeArray<float3> TerrainParams;
+
+        /// <summary>
+        ///     Carved voxels per column: those at or below the column's surface that are air or lava after the cave
+        ///     passes. Generates whole chunk-sized blocks of voxels, so it needs a stride of 1.
+        /// </summary>
+        public NativeArray<int> CaveVolume;
+
+        /// <summary>Cavern mask per column, −1…1; halls may form above its threshold.</summary>
+        public NativeArray<float> CavernMask;
+
+        /// <summary>Entrance mask per column, −1…1; worms may break the surface above its threshold.</summary>
+        public NativeArray<float> EntranceMask;
+
+        /// <summary>Lava mask per column, −1…1; the cave floor turns to lava above its threshold.</summary>
+        public NativeArray<float> LavaMask;
     }
 
     /// <summary>
@@ -73,7 +89,7 @@ namespace Engine.Scripts.WorldGen.Core{
     ///     running <see cref="WorldSampler.SampleColumn" /> per column in a Burst job, tile by tile with a blend
     ///     lattice per tile for the spatial methods. Generic engine functionality without research code.
     /// </summary>
-    public static class WorldGenApi{
+    public static partial class WorldGenApi{
         /// <summary>Samples per tile edge: one job index per tile, each with its own blend lattice.</summary>
         private const int TileSize = 64;
 
@@ -81,7 +97,10 @@ namespace Engine.Scripts.WorldGen.Core{
         ///     Schedules the sampling of <paramref name="request" /> into the created arrays of
         ///     <paramref name="buffers" />. Returns the job handle; the caller completes it before reading.
         /// </summary>
-        /// <exception cref="ArgumentException">A created buffer is shorter than the request, or the size is not positive.</exception>
+        /// <exception cref="ArgumentException">
+        ///     A created buffer is shorter than the request, the size is not positive, or a cave volume is requested at
+        ///     a stride above 1.
+        /// </exception>
         public static JobHandle SampleRegion(in WorldGenRequest request, ref RegionBuffers buffers, JobHandle dependsOn = default){
             if (request.Size.x <= 0 || request.Size.y <= 0)
                 throw new ArgumentException($"Region size must be positive, got {request.Size}.", nameof(request));
@@ -103,6 +122,12 @@ namespace Engine.Scripts.WorldGen.Core{
             Validate(buffers.Clamped, count, nameof(buffers.Clamped));
             Validate(buffers.NormalizedHeight, count, nameof(buffers.NormalizedHeight));
             Validate(buffers.TerrainParams, count, nameof(buffers.TerrainParams));
+            Validate(buffers.CaveVolume, count, nameof(buffers.CaveVolume));
+            Validate(buffers.CavernMask, count, nameof(buffers.CavernMask));
+            Validate(buffers.EntranceMask, count, nameof(buffers.EntranceMask));
+            Validate(buffers.LavaMask, count, nameof(buffers.LavaMask));
+            if (buffers.CaveVolume.IsCreated && request.Stride > 1)
+                throw new ArgumentException($"RegionBuffers.CaveVolume needs a stride of 1, got {request.Stride}.", nameof(request));
 
             SampleRegionJob job = new(){
                 Config = request.Config,
@@ -128,9 +153,14 @@ namespace Engine.Scripts.WorldGen.Core{
             job.WriteClamped = Bind(ref buffers.Clamped, out job.Clamped, out NativeArray<byte> dClamped);
             job.WriteNormalizedHeight = Bind(ref buffers.NormalizedHeight, out job.NormalizedHeight, out NativeArray<float> dNormalized);
             job.WriteTerrainParams = Bind(ref buffers.TerrainParams, out job.TerrainParams, out NativeArray<float3> dTerrainParams);
+            job.WriteCavernMask = Bind(ref buffers.CavernMask, out job.CavernMask, out NativeArray<float> dCavern);
+            job.WriteEntranceMask = Bind(ref buffers.EntranceMask, out job.EntranceMask, out NativeArray<float> dEntrance);
+            job.WriteLavaMask = Bind(ref buffers.LavaMask, out job.LavaMask, out NativeArray<float> dLava);
 
             int tiles = job.TilesX * ((request.Size.y + TileSize - 1) / TileSize);
             JobHandle handle = job.Schedule(tiles, 1, dependsOn);
+            if (buffers.CaveVolume.IsCreated)
+                handle = JobHandle.CombineDependencies(handle, ScheduleCaveVolume(request, buffers.CaveVolume, dependsOn));
 
             handle = DisposeDummy(dFields, handle);
             handle = DisposeDummy(dHeight, handle);
@@ -145,6 +175,9 @@ namespace Engine.Scripts.WorldGen.Core{
             handle = DisposeDummy(dClamped, handle);
             handle = DisposeDummy(dNormalized, handle);
             handle = DisposeDummy(dTerrainParams, handle);
+            handle = DisposeDummy(dCavern, handle);
+            handle = DisposeDummy(dEntrance, handle);
+            handle = DisposeDummy(dLava, handle);
             return handle;
         }
 
@@ -197,6 +230,9 @@ namespace Engine.Scripts.WorldGen.Core{
             public bool WriteClamped;
             public bool WriteNormalizedHeight;
             public bool WriteTerrainParams;
+            public bool WriteCavernMask;
+            public bool WriteEntranceMask;
+            public bool WriteLavaMask;
 
             // Each tile writes many indices, and dummies are length 1, so the per-index restriction is lifted; tiles
             // never overlap and the flags guarantee dummies are never written.
@@ -213,6 +249,9 @@ namespace Engine.Scripts.WorldGen.Core{
             [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<byte> Clamped;
             [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<float> NormalizedHeight;
             [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<float3> TerrainParams;
+            [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<float> CavernMask;
+            [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<float> EntranceMask;
+            [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<float> LavaMask;
 
             public void Execute(int tile){
                 int2 first = new int2(tile % TilesX, tile / TilesX) * TileSize;
@@ -243,6 +282,9 @@ namespace Engine.Scripts.WorldGen.Core{
                 if (WriteClamped) Clamped[index] = s.Clamped ? (byte)1 : (byte)0;
                 if (WriteNormalizedHeight) NormalizedHeight[index] = s.NormalizedHeight;
                 if (WriteTerrainParams) TerrainParams[index] = s.TerrainParams;
+                if (WriteCavernMask) CavernMask[index] = CaveMasks.Cavern(x, z, Config);
+                if (WriteEntranceMask) EntranceMask[index] = CaveMasks.Entrance(x, z, Config);
+                if (WriteLavaMask) LavaMask[index] = CaveMasks.Lava(x, z, Config);
             }
         }
     }
