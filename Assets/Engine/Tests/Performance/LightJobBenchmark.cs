@@ -18,7 +18,8 @@ namespace Engine.Tests.Performance{
     ///     Light job, ms per chunk on a single worker (LightJob.Run). Natural terrain is the
     ///     Terrain-first six-biome world with the placeholder flora (trees, leaves, water); the worst case is a
     ///     cavity full of emitters under a leaf roof, where the BFS has to visit every voxel of the region for all
-    ///     four channels. The forest row lights the same chunks grown with the shipped Forest species. Budget: ≤ 1 ms per chunk on natural terrain.
+    ///     four channels. The forest row lights the same chunks grown with the shipped Forest species, the lava row the
+    ///     same chunks with the shipped caves inside the lava mask. Budget: ≤ 1 ms per chunk on natural terrain.
     /// </summary>
     [TestFixture]
     internal class LightJobBenchmark{
@@ -26,10 +27,11 @@ namespace Engine.Tests.Performance{
         private const int MeasurementCount = 20;
         private const int ChunkCount = 8;
 
-        // Light table ids: the fixture ids plus the placeholder flora (BenchmarkFixtures.AddPlaceholderFlora)
+        // Light table ids: the fixture ids plus the placeholder flora (BenchmarkFixtures.AddPlaceholderFlora) and the
+        // cave voxels (BenchmarkFixtures.UseShippedCaves)
         private const ushort Leaves = 16;
-        private const ushort Lava = 17;
-        private const int TableSize = 18;
+        private const ushort Lava = BenchmarkFixtures.CaveLava;
+        private const int TableSize = BenchmarkFixtures.CaveTypeCount;
 
         private readonly List<UnityEngine.Object> _created = new();
         private NativeParallelHashMap<int2, ChunkVoxelData> _chunks;
@@ -45,7 +47,8 @@ namespace Engine.Tests.Performance{
             _table = new VoxelLightTable(TableSize, Allocator.Persistent);
             for (int id = 0; id < TableSize; id++) _table.Set(id, 0, 0); // air and foliage (6…13) are clear
             foreach (ushort solid in new ushort[]{
-                         BenchmarkFixtures.Grass, BenchmarkFixtures.Dirt, BenchmarkFixtures.Stone, BenchmarkFixtures.Ice, 14, 15
+                         BenchmarkFixtures.Grass, BenchmarkFixtures.Dirt, BenchmarkFixtures.Stone, BenchmarkFixtures.Ice, 14, 15,
+                         BenchmarkFixtures.CaveOre, BenchmarkFixtures.CaveBedrock
                      })
                 _table.Set(solid, 15, 0);
             _table.Set(BenchmarkFixtures.Water, 2, 0);
@@ -87,6 +90,30 @@ namespace Engine.Tests.Performance{
             _table.Dispose();
             _table = BenchmarkFixtures.CreateLightTable(ids, Allocator.Persistent);
             MeasurePerChunk("LightJob.Run forest species ms/chunk");
+        }
+
+        /// <summary>
+        ///     The same chunks on the DistanceBlend flora world with the shipped caves and the lava mask open everywhere,
+        ///     so every chunk holds lava pockets and lava-filled cave floors full of emitters.
+        /// </summary>
+        [Test]
+        [Performance]
+        public void LightJob_Run_LavaPockets_MsPerChunk(){
+            GeneratorConfig config = BenchmarkFixtures.CreatePlaceholderGeneratorConfig(GenArchitecture.TerrainFirst,
+                BlendMethod.DistanceBlend, Allocator.Persistent, _created, true);
+            BenchmarkFixtures.UseShippedCaves(ref config, Allocator.Persistent);
+            config.WorldGen.Caves.LavaMaskThreshold = -1f;
+            GenerateScatteredChunks(ref config);
+            long lava = 0;
+            foreach (int2 chunk in _jobs)
+                for (int x = 0; x < ChunkWidth; x++)
+                for (int z = 0; z < ChunkDepth; z++)
+                for (int y = 0; y < ChunkHeight; y++)
+                    if (_chunks[chunk].GetVoxel(new int3(x, y, z)) == Lava)
+                        lava++;
+            Assert.Greater(lava, 0, "the chunks hold lava");
+            UnityEngine.Debug.Log($"lava pockets: {(double)lava / _jobs.Length:F0} lava voxels per chunk");
+            MeasurePerChunk("LightJob.Run lava pockets ms/chunk");
         }
 
         [Test]
