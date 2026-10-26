@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
@@ -34,6 +35,17 @@ namespace Engine.Tests.EditMode{
             WorldGenSettings settings = LoadShipped();
             Assert.AreEqual(BlendMethod.DistanceBlend, settings.MaterialMethod);
             Assert.AreEqual(BlendMethod.DistanceBlend, settings.HeightMethod);
+        }
+
+        [Test]
+        public void ShippedBiomes_OnlyColdBiomesTakeSnowAndIce(){
+            // Snow and ice stay in the biomes that want them (DEC-65); a cold Plains column stays green.
+            string[] cold = { "Mountain", "Snow" };
+            foreach (Biome biome in LoadShipped().Biomes.Biomes){
+                bool wanted = System.Array.IndexOf(cold, biome.name) >= 0;
+                Assert.AreEqual(wanted, biome.FreezesWater, $"{biome.name}: FreezesWater");
+                if (!wanted) Assert.IsNull(biome.SnowTopBlock, $"{biome.name}: SnowTopBlock");
+            }
         }
 
         [TestCase(GenArchitecture.TerrainFirst)]

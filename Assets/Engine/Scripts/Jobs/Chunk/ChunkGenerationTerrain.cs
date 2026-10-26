@@ -235,9 +235,9 @@ namespace Engine.Scripts.Jobs.Chunk{
                     if (SurfaceCover.IsSnowCovered(col.Temperature, col.Height, freezeNoise, def, cfg))
                         col.TopBlock = def.snowTopBlock;
                     if (def.strataBlock != 0) col.StrataShift = SurfaceCover.StrataShift(wx, wz, cfg);
+                    col.Frozen = SurfaceCover.WaterFreezes(col.Temperature, freezeNoise, def, cfg) ? (byte)1 : (byte)0;
                 }
 
-                col.Frozen = SurfaceCover.WaterFreezes(col.Temperature, freezeNoise, cfg) ? (byte)1 : (byte)0;
                 chunkColumns[i] = col;
             }
         }

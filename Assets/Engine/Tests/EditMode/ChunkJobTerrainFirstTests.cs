@@ -92,6 +92,7 @@ namespace Engine.Tests.EditMode{
             a.topBlock = TopA;
             a.underBlock = UnderA;
             a.stoneBlock = TestFixtures.Stone;
+            a.freezesWater = 1;
             _config.WorldGen.Biomes[0] = a;
             Biome.BiomeDef b = _config.WorldGen.Biomes[1];
             b.topBlock = TopB;
@@ -270,7 +271,7 @@ namespace Engine.Tests.EditMode{
                     Height = 100, HeightF = 100f, Biome = 0, SurfaceSource = 0, FloraSource = -1,
                     TopBlock = TopA, UnderBlock = UnderA, StoneBlock = TestFixtures.Stone,
                     Temperature = 0.1f, Humidity = 0.5f,
-                    Frozen = SurfaceCover.WaterFreezes(x, z, 0.1f, _config.WorldGen) ? (byte)1 : (byte)0
+                    Frozen = SurfaceCover.WaterFreezes(x, z, 0.1f, _config.WorldGen.Biomes[0], _config.WorldGen) ? (byte)1 : (byte)0
                 };
         }
 

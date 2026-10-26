@@ -26,6 +26,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                  + "Empty: the biome never takes snow.")]
         [SerializeField] public Voxel.Voxel SnowTopBlock;
 
+        [Tooltip("The water surface over columns of this biome freezes to ice where it is colder than the freeze "
+                 + "temperature. Off: the biome's water never freezes.")]
+        [SerializeField] public bool FreezesWater;
+
         [Tooltip("Replaces the stone block in horizontal bands (WorldGenSettings strata). Empty: uniform stone.")]
         [SerializeField] public Voxel.Voxel StrataBlock;
 
@@ -111,6 +115,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                 floraRuleCount = 0,
                 // Plants need solid ground; the mesh layer of the top block decides, no registry needed.
                 floraGround = TopBlock && TopBlock.meshLayer == Mesh.MeshLayer.Solid ? (byte)1 : (byte)0,
+                freezesWater = FreezesWater ? (byte)1 : (byte)0,
                 beachHeight = BeachBlock ? (byte)Mathf.Clamp(BeachHeight, 0, 255) : (byte)0,
                 beachFloraGround = BeachBlock && BeachBlock.meshLayer == Mesh.MeshLayer.Solid ? (byte)1 : (byte)0
             };
@@ -131,6 +136,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
             /// <summary>Top block of a snow-covered dry column; 0 = the biome takes no snow.</summary>
             public ushort snowTopBlock;
+
+            /// <summary>1 when the water surface over the biome's columns may freeze to ice.</summary>
+            public byte freezesWater;
 
             /// <summary>Block of the strata bands in the stone; 0 = uniform stone.</summary>
             public ushort strataBlock;

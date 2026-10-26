@@ -214,6 +214,7 @@ namespace Engine.Tests.EditMode{
             _biomes = _fixture.DefaultBiomes();
             foreach (Biome b in _biomes){
                 b.SnowTopBlock = _fixture.SnowSo;
+                b.FreezesWater = true;
                 b.StrataBlock = _fixture.GraniteSo;
             }
 

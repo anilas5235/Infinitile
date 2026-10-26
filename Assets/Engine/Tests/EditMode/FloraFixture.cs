@@ -464,7 +464,7 @@ namespace Engine.Tests.EditMode{
                 ushort beachUnder = beach ? fixture.Ids[b.BeachBlock] : under;
                 ushort stone = b ? fixture.Ids[b.StoneBlock] : (ushort)0;
                 int shift = SurfaceCover.StrataShift(wx, wz, cfg);
-                bool frozen = SurfaceCover.WaterFreezes(wx, wz, t, cfg);
+                bool frozen = SurfaceCover.WaterFreezes(wx, wz, t, def, cfg);
                 for (int y = 0; y < ChunkHeight; y++){
                     ushort v = y < h - 4 ? stone : y < h - 2 ? under : y < h ? beachUnder : y == h ? top : y < waterLevel ? TestFixtures.Water : TestFixtures.Air;
                     if (v == stone && def.strataBlock != 0 && SurfaceCover.InStrataBand(y, shift, cfg.StrataPeriod, cfg.StrataThickness))

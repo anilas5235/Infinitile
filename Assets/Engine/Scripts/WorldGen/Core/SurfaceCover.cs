@@ -58,17 +58,22 @@ namespace Engine.Scripts.WorldGen.Core{
             return EffectiveTemperature(temperature, height, freezeNoise, cfg) < cfg.FreezeTemperature;
         }
 
-        /// <summary>The water surface (y = WaterLevel − 1) above the column freezes to ice.</summary>
-        public static bool WaterFreezes(int x, int z, float temperature, in WorldGenConfig cfg){
-            if (!cfg.EnableClimateOverrides) return false;
+        /// <summary>
+        ///     The water surface (y = WaterLevel − 1) above the column of surface biome <paramref name="def" /> freezes to
+        ///     ice. Biomes without <c>freezesWater</c> never do.
+        /// </summary>
+        public static bool WaterFreezes(int x, int z, float temperature, in Biome.BiomeDef def, in WorldGenConfig cfg){
+            if (!cfg.EnableClimateOverrides || def.freezesWater == 0) return false;
             return EffectiveTemperature(x, z, temperature, cfg.WaterLevel - 1, cfg) < cfg.FreezeTemperature;
         }
 
         /// <summary>
-        ///     <see cref="WaterFreezes(int,int,float,in WorldGenConfig)" /> with the column's <see cref="FreezeNoise" />.
+        ///     <see cref="WaterFreezes(int,int,float,in Biome.BiomeDef,in WorldGenConfig)" /> with the column's
+        ///     <see cref="FreezeNoise" />.
         /// </summary>
-        public static bool WaterFreezes(float temperature, float freezeNoise, in WorldGenConfig cfg){
-            if (!cfg.EnableClimateOverrides) return false;
+        public static bool WaterFreezes(float temperature, float freezeNoise, in Biome.BiomeDef def,
+            in WorldGenConfig cfg){
+            if (!cfg.EnableClimateOverrides || def.freezesWater == 0) return false;
             return EffectiveTemperature(temperature, cfg.WaterLevel - 1, freezeNoise, cfg) < cfg.FreezeTemperature;
         }
 

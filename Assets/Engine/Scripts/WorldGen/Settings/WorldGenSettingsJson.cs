@@ -134,6 +134,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["UnderBlock"] = VoxelName(b.UnderBlock),
                 ["StoneBlock"] = VoxelName(b.StoneBlock),
                 ["SnowTopBlock"] = VoxelName(b.SnowTopBlock),
+                ["FreezesWater"] = b.FreezesWater,
                 ["StrataBlock"] = VoxelName(b.StrataBlock),
                 ["BeachBlock"] = VoxelName(b.BeachBlock),
                 ["BeachHeight"] = b.BeachHeight,
