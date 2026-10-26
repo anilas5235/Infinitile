@@ -49,13 +49,18 @@ skips carved ground]
   cavern mask (wavelength 384) is open. The threshold rises towards the band edges and over the 0.1 of mask value
   above its threshold, so halls close before the mask edge instead of ending in a wall. Pillars keep rock where the
   pillar noise is high.
-- **Worms** (`Worms`, `CarveWorms`): worms start in 64 × 64 cells (`WormsPerCell` 0.6, at most 2), walk in steps of
+- **Worms** (`Worms`, `CarveWorms`): worms start in 64 × 64 cells (`WormsPerCell` 1.2, at most 2), walk in steps of
   one block with damped yaw and pitch jitter, carve a sphere whose radius changes smoothly, may branch once, and stay
   within `WormReach` (128) of their start. A block walks every worm that starts within `WormPadding` (reach + largest
   radius) of it, in full, and carves the steps whose sphere touches it. There is no buffer, so no cap can drop a
-  worm. A worm that starts in the entrance mask starts just below the surface and aims down until it is `Cover`
-  deep. The start tests only the mask and a dry column, not the water distance: starts lie up to `WormPadding` away,
-  beyond the block's water probes, and the column limits keep the worm `Cover` deep wherever water is near.
+  worm. A worm that starts in the entrance mask starts just below the surface, goes straight down in its start
+  column until its sphere lies below `Cover` (outside the mask nothing above surface − `Cover` is carved, so a
+  sloped start would end in a dead-end pit), then aims down to the top of the cavern band. The start tests only the
+  mask and a dry column, not the water distance: starts lie up to `WormPadding` away, beyond the block's water
+  probes, and the column limits keep the worm `Cover` deep wherever water is near. Only a start in the mask reads
+  the exact surface height; the others take their depth range from the unblended height
+  (`WorldSampler.SampleUnblendedHeight`, the hard biome's height in Biome-first), which saves a blend of every
+  kernel tap per start.
 - **Flora on carved ground**: `RegisterCaveProbes` gives the worm pass the ground voxels of the flora ring. The worm
   pass records which of them a sphere carves, and `PlaceVegetation` skips plants and tree anchors whose ground is
   carved (halls and pockets are tested directly).
@@ -81,18 +86,18 @@ skips carved ground]
     hall share, voxels per ore rule, voxel runs per column), with no hard limits.
   - `SampleSliceTests` and the region API tests compare slices and the cave volume with the chunk job.
 - **Performance** (ms per chunk on one worker, DistanceBlend flora world with the shipped caves): Terrain-first
-  5.65 with caves against 4.70 without, Biome-first 6.01 against 2.75; the cave worst case 6.82 / 10.62. The
-  carving itself costs about the same in both (ores, halls, worm walking and lava 0.6–0.9 ms); Biome-first pays
-  more for height reads outside the chunk: the wider blend lattice over the water probes (+0.75) and the exact
-  surface height at each worm start, about 18 uncached blends per chunk (+1.25). The hall lattice takes 1.06 ms
-  per worst-case chunk against 5.92 with both noises at every voxel. Light with lava pockets 0.99 ms, cave
-  partitions of the collider mesh 0.52 ms against 0.36 without caves. Benchmarks: `ChunkGenerationBenchmark`
+  5.83 with caves against 4.66 without, Biome-first 5.06 against 2.74; the cave worst case 6.83 / 6.09, with 27.1
+  worms per chunk (45.1 in the worst case). The carving itself costs about the same in both; Biome-first pays more
+  for height reads outside the chunk: the wider blend lattice over the water probes and the exact surface height at
+  the worm starts in the entrance mask. The hall lattice takes 1.07 ms per worst-case chunk against 5.86 with both
+  noises at every voxel. Light with lava pockets 1.03 ms, cave partitions of the collider mesh 0.55 ms against 0.36
+  without caves. Benchmarks: `ChunkGenerationBenchmark`
   (caves on/off, worst case), `CaveCarvingBenchmark`, `LightJobBenchmark` (lava pockets) and
   `ColliderMeshBenchmark` (cave partitions); baseline `2026-10-26-phaseK-editmode-baseline.json`.
-- **Engine effects**: the voxel runs per column grow from a median of 4 to 8 (maximum 68 with flora); the play-mode
-  flight peaks at 11840 of 17986 interval-store pages (66 %) and allocates in none of its 300 frames. Cave walls add
-  solid points below the surface: +80 % (Terrain-first) and +69 % (Biome-first) in the solid layer around the spawn;
-  water and foliage are unchanged. Occlusion culling for them is an idea in spec §16.12, not built.
+- **Engine effects**: the voxel runs per column grow from a median of 4 to 9 (maximum 68 with flora); the play-mode
+  flight peaks at 11597 of 17986 interval-store pages (64 %) and allocates in none of its 300 frames. Cave walls add
+  solid points below the surface: +80 % (Terrain-first) and +69 % (Biome-first) in the solid layer around the spawn,
+  measured with 0.6 worms per cell; water and foliage are unchanged. Occlusion culling for them is an idea in spec §16.12, not built.
 
 ### Ownership of native memory
 

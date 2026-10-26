@@ -548,16 +548,26 @@ DistanceBlend:
 
 | Sample group | Median | Min | Max | Compared with (same run) | Change (median) |
 |---|---|---|---|---|---|
-| ChunkJob.Run TerrainFirst DistanceBlend caves on ms/chunk | 5.65 ms | 5.59 ms | 5.88 ms | caves off 4.70 ms | +20 % |
-| ChunkJob.Run BiomeFirst DistanceBlend caves on ms/chunk | 6.01 ms | 5.82 ms | 6.50 ms | caves off 2.75 ms | +118 % |
-| ChunkJob.Run TerrainFirst DistanceBlend cave worst case ms/chunk | 6.82 ms | 6.80 ms | 6.96 ms | caves off 4.70 ms | +45 % |
-| ChunkJob.Run BiomeFirst DistanceBlend cave worst case ms/chunk | 10.62 ms | 10.52 ms | 10.92 ms | caves off 2.75 ms | +286 % |
-| CarveCaverns lattice ms/chunk | 1.06 ms | 1.05 ms | 1.31 ms | per voxel 5.92 ms | −82 % |
-| LightJob.Run lava pockets ms/chunk | 0.99 ms | 0.97 ms | 1.15 ms | natural terrain 0.76 ms | +31 % |
-| CMeshBuildJob.Run cave partitions caves on ms/partition | 0.52 ms | 0.52 ms | 0.54 ms | caves off 0.36 ms | +44 % |
+| ChunkJob.Run TerrainFirst DistanceBlend caves on ms/chunk | 5.83 ms | 5.80 ms | 6.19 ms | caves off 4.66 ms | +25 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves on ms/chunk | 5.06 ms | 4.88 ms | 5.59 ms | caves off 2.74 ms | +85 % |
+| ChunkJob.Run TerrainFirst DistanceBlend cave worst case ms/chunk | 6.83 ms | 6.72 ms | 9.64 ms | caves off 4.66 ms | +47 % |
+| ChunkJob.Run BiomeFirst DistanceBlend cave worst case ms/chunk | 6.09 ms | 5.92 ms | 7.02 ms | caves off 2.74 ms | +122 % |
+| CarveCaverns lattice ms/chunk | 1.07 ms | 1.05 ms | 1.25 ms | per voxel 5.86 ms | −82 % |
+| LightJob.Run lava pockets ms/chunk | 1.03 ms | 1.00 ms | 1.06 ms | natural terrain 0.79 ms | +31 % |
+| CMeshBuildJob.Run cave partitions caves on ms/partition | 0.55 ms | 0.55 ms | 0.56 ms | caves off 0.36 ms | +53 % |
 
-Worms per chunk (logged by the caves rows): with the shipped settings a chunk walks 12.9 worms, 2132 steps, of which
-31 carve into it; in the worst case 45.1 worms, 7592 steps, 99 carving.
+Worms per chunk (logged by the caves rows): with the shipped settings a chunk walks 27.1 worms, 4622 steps, of which
+63 carve into it; in the worst case 45.1 worms, 7739 steps, 99 carving.
+
+The file was recorded again after the play-test changes (spec DEC-73): entrance worms dig a shaft below the cover,
+`WormsPerCell` went from 0.6 to 1.2, and worm starts outside the entrance mask take the unblended surface height. The
+first recording, with 12.9 worms per chunk and exact start heights everywhere, measured Terrain-first / Biome-first
+caves on 5.65 / 6.01 ms and the worst case 6.82 / 10.62 ms. With 1.2 worms per cell and exact start heights the
+Biome-first rows with a spatial blend grew by 23–34 % (caves on 7.52 ms): each start blended every kernel tap,
+uncached, at about 36 starts per chunk. The unblended height took them 13–21 % below the first recording. Terrain-first
+pays for the extra worms only: +1 % to +9 % on every `ChunkJob` row. In this file the `ChunkJob.Run TerrainFirst
+ms/chunk` row is bimodal (samples at 2.9 and 4.7 ms, median 4.64): the Editor lost focus for part of that test. Two
+runs of the benchmark alone just before measured 2.73 and 2.74 ms; compare with those.
 
 The first full run measured Biome-first DistanceBlend at 11.98 ms with caves on (2.76 off). Most of it was the
 entrance water test at worm starts: a start lies up to 143 blocks from the chunk, beyond its water probes, so each
@@ -594,7 +604,8 @@ Regression check, every existing row vs the previous baseline (median):
 - `PageAllocator fill+release` −4 %.
 
 Play-mode flight with the shipped world: 0 of 300 frames allocate; the interval store peaked at 11840 of 17986 pages
-(66 %, about 11 of the 17 pages per list; 45 % before the caves) and did not grow.
+(66 %, about 11 of the 17 pages per list; 45 % before the caves) and did not grow. With the play-test changes
+(1.2 worms per cell) it peaked at 11597 pages (64 %).
 
 Points in the render buffers once the world around the spawn (0, 250, 0) is meshed: 169 chunk columns, the player held
 in place, the shipped settings with caves on and off (a temporary probe, not committed):
