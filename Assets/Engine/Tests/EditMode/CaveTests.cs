@@ -19,9 +19,9 @@ using Voxel = Engine.Scripts.VoxelConfig.Data.Voxel.Voxel;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     Caverns, worms and lava on a copy of the shipped settings with a local voxel id table: the same voxels in
-    ///     every block that holds them, equal to the pure evaluation, worms that cross chunks or start far away, the
-    ///     rules next to water, at the floor, at the surface and for lava, and flora on carved ground. Blocks run
+    ///     Caverns, worms, lava and ores on a copy of the shipped settings with a local voxel id table: the same voxels
+    ///     in every block that holds them, equal to the pure evaluation, worms that cross chunks or start far away, the
+    ///     rules next to water, at the floor, at the surface, for lava and for ores, and flora on carved ground. Blocks run
     ///     through the chunk job's voxel pipeline in a Burst job.
     /// </summary>
     public class CaveTests{
@@ -306,14 +306,16 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void Blocks_AtShiftedOriginsAndInAnyOrder_EqualTheChunks(){
-            // A block at any origin holds the same voxels as the chunks it overlaps, flora and lava included, and the
-            // chunks do not depend on the order they are generated in.
+            // A block at any origin holds the same voxels as the chunks it overlaps, flora, lava and ores included, and
+            // the chunks do not depend on the order they are generated in.
             _config = Build();
             Area area = GenerateArea(_config, new int2(0, 4), new int2(3, 3), true);
-            int carved = area.CountCarved(), lava = area.CountLava();
-            TestContext.WriteLine($"{carved} carved voxels in 3 × 3 chunks, {lava} of them lava");
+            HashSet<ushort> ores = new(_config.WorldGen.Caves.Ores.Select(o => o.Ore));
+            int carved = area.CountCarved(), lava = area.CountLava(), ore = area.Blocks.Voxels.Count(ores.Contains);
+            TestContext.WriteLine($"{carved} carved voxels in 3 × 3 chunks, {lava} of them lava; {ore} ore voxels");
             Assert.Greater(carved, 1000, "the area holds caves");
             Assert.Greater(lava, 100, "the area holds lava");
+            Assert.Greater(ore, 1000, "the area holds ores");
 
             Area reversed = GenerateArea(_config, new int2(0, 4), new int2(3, 3), true, reversed: true);
             Assert.IsTrue(area.Blocks.Voxels.SequenceEqual(reversed.Blocks.Voxels), "chunks generated in reverse order differ");
@@ -580,6 +582,70 @@ namespace Engine.Tests.EditMode{
             TestContext.WriteLine($"{pocketVoxels} pocket voxels, {gaps} columns with lava under air at y {c.LavaLevel}");
             Assert.Greater(pocketVoxels, 100, "the area holds pockets");
             Assert.Greater(gaps, 10, "pockets hold lava under an air gap");
+        }
+
+        [Test]
+        public void Ores_Over64Chunks_ReplaceOnlyTheirHostInTheirRange(){
+            // Against the same chunks without ore rules, every changed voxel is the ore of a rule over that rule's host,
+            // within its y range, and the ore the pure vein walk puts there; so is every unchanged host voxel sampled.
+            _config = Build();
+            WorldGenConfig cfg = _config.WorldGen;
+            OreRuleDef[] rules = cfg.Caves.Ores.ToArray();
+            Assert.AreEqual(8, rules.Length, "the shipped ore rules resolve");
+            Area area = GenerateArea(_config, new int2(-2, 2), new int2(8, 8), false);
+            _settings.Caves.Ores.Clear();
+            GeneratorConfig withoutOres = Build();
+            Area plain;
+            try{
+                plain = GenerateArea(withoutOres, new int2(-2, 2), new int2(8, 8), false);
+            }
+            finally{
+                Release(ref withoutOres);
+            }
+
+            int[] perRule = new int[rules.Length];
+            int failures = 0, pureChecked = 0;
+            List<string> report = new();
+            void Fail(string message){
+                if (failures++ < 12) report.Add(message);
+            }
+
+            HashSet<ushort> hosts = new(rules.Select(r => r.Host));
+            System.Random random = new(11);
+            List<int3> pure = new();
+            for (int b = 0; b < area.Blocks.Origins.Length; b++)
+            for (int x = 0; x < ChunkWidth; x++)
+            for (int z = 0; z < ChunkDepth; z++)
+            for (int y = 0; y < ChunkHeight; y++){
+                ushort with = area.Blocks.Voxel(b, x, y, z), without = plain.Blocks.Voxel(b, x, y, z);
+                int3 p = area.Blocks.Origins[b] + new int3(x, y, z);
+                if (with == without){
+                    if (hosts.Contains(without) && random.Next(2000) == 0) pure.Add(p);
+                    continue;
+                }
+
+                int r = Array.FindIndex(rules, o => o.Ore == with);
+                if (r < 0 || rules[r].Host != without || y < rules[r].MinY || y > rules[r].MaxY){
+                    Fail($"{p}: {with} over {without}, not an ore over its host in its range");
+                    continue;
+                }
+
+                perRule[r]++;
+                if (random.Next(20) == 0) pure.Add(p);
+            }
+
+            foreach (int3 p in pure){
+                int b = area.Block(p.x, p.z, out int lx, out int lz);
+                ushort expected = OreVeins.Apply(p, plain.Blocks.Voxel(b, lx, p.y, lz), cfg), actual = area[p.x, p.y, p.z];
+                pureChecked++;
+                if (expected != actual) Fail($"{p}: pure veins give {expected}, chunk {actual}");
+            }
+
+            string counts = "ore voxels per rule: " + string.Join(", ", perRule) + $"; {pureChecked} voxels checked against the pure walk";
+            TestContext.WriteLine(counts);
+            Assert.AreEqual(0, failures, counts + "\n" + string.Join("\n", report));
+            for (int r = 0; r < 6; r++) Assert.Greater(perRule[r], 0, $"stone ore rule {r} places veins; " + counts);
+            Assert.Greater(pureChecked, 1000, counts);
         }
 
         #endregion

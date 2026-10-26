@@ -132,5 +132,17 @@ namespace Engine.Scripts.WorldGen.Core{
 
         /// <summary>3D noise of the lava pockets.</summary>
         public const uint LavaPocket = 0x6D8FB1B5u;
+
+        /// <summary>Hash of one 16³ ore cell, from which its vein counts and veins follow.</summary>
+        public const uint OreCell = 0x7EA0C2C6u;
+
+        /// <summary>Number of veins of one ore rule in a cell.</summary>
+        public const uint OreCount = 0x8FB1D3D7u;
+
+        /// <summary>Hash, seed and size of one ore vein.</summary>
+        public const uint OreVein = 0x90C2E4E8u;
+
+        /// <summary>Direction of one step of an ore vein's walk.</summary>
+        public const uint OreStep = 0xA1D3F5F9u;
     }
 }

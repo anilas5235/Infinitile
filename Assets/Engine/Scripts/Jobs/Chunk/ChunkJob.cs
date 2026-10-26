@@ -52,7 +52,7 @@ namespace Engine.Scripts.Jobs.Chunk{
         /// <summary>
         ///     The voxels of one chunk-sized block at <paramref name="origin" /> (a multiple of the chunk size is not
         ///     required: every pass is a function of world coordinates), in pass order: column maps, flora decisions,
-        ///     surface cover, terrain fill, the cave passes, the bottom layer, then the vegetation. Shared by the chunk
+        ///     surface cover, terrain fill, the ores and cave passes, the bottom layer, then the vegetation. Shared by the chunk
         ///     job and the region queries (slices, cave volume), so they see the same world.
         /// </summary>
         /// <param name="vox">Chunk-sized voxel buffer, written completely.</param>
@@ -72,6 +72,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             FillTerrain(vox, columns, ref config);
             CaveColumnData caves = default;
             if (config.WorldGen.Caves.Enabled){
+                PlaceOres(vox, origin, config.WorldGen);
                 caves = new CaveColumnData(floraGrid.Padding, Allocator.Temp);
                 PrepareCaveColumns(ref caves, columns, origin, config.WorldGen, floraGrid.Cache);
                 if (flora) RegisterCaveProbes(ref caves, floraGrid, columns, origin, config.WorldGen);

@@ -233,6 +233,42 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
+        ///     Ore veins (<see cref="OreVeins" />): rule by rule, walks every vein whose seed lies within the rule's
+        ///     longest walk of the block and replaces the rule's host voxel within its y range wherever the walk passes.
+        ///     Runs before the carving passes, so the caves expose the ores.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal static void PlaceOres(NativeArray<ushort> vox, int3 origin, in WorldGenConfig cfg){
+            ref readonly CaveConfig c = ref cfg.Caves;
+            for (int r = 0; r < c.Ores.Length; r++){
+                OreRuleDef def = c.Ores[r];
+                int3 lo = new(origin.x, math.max(def.MinY, CaveColumns.Floor + 1), origin.z);
+                int3 hi = new(origin.x + ChunkWidth - 1, math.min(def.MaxY, ChunkHeight - 1), origin.z + ChunkDepth - 1);
+                if (lo.y > hi.y) continue;
+                int reach = def.VeinSize.y - 1;
+                int3 first = OreVeins.Cell(lo - reach), last = OreVeins.Cell(hi + reach);
+                for (int cx = first.x; cx <= last.x; cx++)
+                for (int cy = first.y; cy <= last.y; cy++)
+                for (int cz = first.z; cz <= last.z; cz++){
+                    int3 cell = new(cx, cy, cz);
+                    int count = OreVeins.Count(cell, r, def, cfg);
+                    for (int k = 0; k < count; k++){
+                        OreVein vein = OreVeins.Begin(cell, r, k, def, cfg);
+                        int extent = vein.Size - 1;
+                        if (math.any(vein.Seed + extent < lo) || math.any(vein.Seed - extent > hi)) continue;
+                        int3 v = vein.Seed;
+                        for (int s = 0; s < vein.Size; s++){
+                            if (s > 0) v = OreVeins.Next(vein, s, v);
+                            if (math.any(v < lo) || math.any(v > hi)) continue;
+                            int i = ChunkSize.Flatten(v.x - origin.x, v.y - origin.y, v.z - origin.z);
+                            if (vox[i] == def.Host) vox[i] = def.Ore;
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         ///     Halls (<see cref="Caverns" />): the hall and pillar noises on a lattice over the columns whose mask is open,
         ///     interpolated at every voxel of the cavern band up to the column's limit.
         /// </summary>
