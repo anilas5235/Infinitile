@@ -129,5 +129,8 @@ namespace Engine.Scripts.WorldGen.Core{
 
         /// <summary>Radius at one radius knot of a worm.</summary>
         public const uint WormRadius = 0x5C7EA0A4u;
+
+        /// <summary>3D noise of the lava pockets.</summary>
+        public const uint LavaPocket = 0x6D8FB1B5u;
     }
 }

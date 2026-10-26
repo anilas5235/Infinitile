@@ -19,10 +19,10 @@ using Voxel = Engine.Scripts.VoxelConfig.Data.Voxel.Voxel;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     Caverns and worms on a copy of the shipped settings with a local voxel id table: the same voxels in every
-    ///     block that holds them, equal to the pure evaluation, worms that cross chunks or start far away, the rules
-    ///     next to water, at the floor and at the surface, and flora on carved ground. Blocks run through the chunk
-    ///     job's voxel pipeline in a Burst job.
+    ///     Caverns, worms and lava on a copy of the shipped settings with a local voxel id table: the same voxels in
+    ///     every block that holds them, equal to the pure evaluation, worms that cross chunks or start far away, the
+    ///     rules next to water, at the floor, at the surface and for lava, and flora on carved ground. Blocks run
+    ///     through the chunk job's voxel pipeline in a Burst job.
     /// </summary>
     public class CaveTests{
         private const string ShippedSettingsPath = "Assets/EngineSettings/WorldGenSettings.asset";
@@ -164,6 +164,7 @@ namespace Engine.Tests.EditMode{
             public int2 Origin;
             public int2 Chunks;
             public Blocks Blocks;
+            public ushort Lava;
 
             public bool Contains(int x, int z){
                 return x >= Origin.x && z >= Origin.y && x < Origin.x + Chunks.x * ChunkWidth && z < Origin.y + Chunks.y * ChunkDepth;
@@ -193,18 +194,37 @@ namespace Engine.Tests.EditMode{
                 return Blocks.Species[Blocks.Column(b, lx, lz)];
             }
 
-            /// <summary>Air at or below the surface before carving.</summary>
+            /// <summary>Air or lava, which only the cave passes leave at or below the surface.</summary>
+            public bool IsHole(ushort voxel){
+                return voxel == 0 || (Lava != 0 && voxel == Lava);
+            }
+
+            /// <summary>Air or lava at or below the surface before carving.</summary>
             public bool Carved(int x, int y, int z){
-                return y <= Height(x, z) && this[x, y, z] == 0;
+                return y <= Height(x, z) && IsHole(this[x, y, z]);
+            }
+
+            /// <summary>What the cave passes left at a voxel at or below the surface, as <see cref="CaveCarving.Kind" />.</summary>
+            public int Kind(int x, int y, int z){
+                ushort v = this[x, y, z];
+                return v == 0 ? CaveCarving.Air : Lava != 0 && v == Lava ? CaveCarving.Lava : CaveCarving.Solid;
             }
 
             public int CountCarved(){
+                return Count(Carved);
+            }
+
+            public int CountLava(){
+                return Count((x, y, z) => this[x, y, z] == Lava);
+            }
+
+            private int Count(Func<int, int, int, bool> test){
                 int n = 0;
                 for (int x = Origin.x; x < Origin.x + Chunks.x * ChunkWidth; x++)
                 for (int z = Origin.y; z < Origin.y + Chunks.y * ChunkDepth; z++){
                     int h = Height(x, z);
                     for (int y = 0; y <= h; y++)
-                        if (this[x, y, z] == 0)
+                        if (test(x, y, z))
                             n++;
                 }
 
@@ -218,7 +238,9 @@ namespace Engine.Tests.EditMode{
             for (int cx = 0; cx < chunks.x; cx++)
             for (int cz = 0; cz < chunks.y; cz++)
                 origins.Add(new int3((originChunk.x + cx) * ChunkWidth, 0, (originChunk.y + cz) * ChunkDepth));
-            Area area = new(){ Origin = originChunk * new int2(ChunkWidth, ChunkDepth), Chunks = chunks };
+            Area area = new(){
+                Origin = originChunk * new int2(ChunkWidth, ChunkDepth), Chunks = chunks, Lava = config.WorldGen.Caves.LavaVoxel
+            };
             if (!reversed){
                 area.Blocks = Generate(config, origins, flora, anchors);
                 return area;
@@ -284,13 +306,14 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void Blocks_AtShiftedOriginsAndInAnyOrder_EqualTheChunks(){
-            // A block at any origin holds the same voxels as the chunks it overlaps, flora included, and the chunks
-            // do not depend on the order they are generated in.
+            // A block at any origin holds the same voxels as the chunks it overlaps, flora and lava included, and the
+            // chunks do not depend on the order they are generated in.
             _config = Build();
             Area area = GenerateArea(_config, new int2(0, 4), new int2(3, 3), true);
-            int carved = area.CountCarved();
-            TestContext.WriteLine($"{carved} carved voxels in 3 × 3 chunks");
+            int carved = area.CountCarved(), lava = area.CountLava();
+            TestContext.WriteLine($"{carved} carved voxels in 3 × 3 chunks, {lava} of them lava");
             Assert.Greater(carved, 1000, "the area holds caves");
+            Assert.Greater(lava, 100, "the area holds lava");
 
             Area reversed = GenerateArea(_config, new int2(0, 4), new int2(3, 3), true, reversed: true);
             Assert.IsTrue(area.Blocks.Voxels.SequenceEqual(reversed.Blocks.Voxels), "chunks generated in reverse order differ");
@@ -314,40 +337,43 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void ChunkVoxels_EqualThePureCaveEvaluation(){
-            // Every voxel of the columns with the most carving, and of random columns, is carved exactly where the
-            // single-voxel evaluation (halls, then every worm that can reach it) says so.
+            // Every voxel of the columns with the most carving, the most lava and of random columns is carved, and holds
+            // air or lava, exactly as the single-voxel evaluation (halls, pockets, every worm that can reach it) says.
             _config = Build();
             Area area = GenerateArea(_config, new int2(0, 4), new int2(3, 3), false);
             List<int2> columns = new();
             for (int x = area.Origin.x; x < area.Origin.x + 3 * ChunkWidth; x++)
             for (int z = area.Origin.y; z < area.Origin.y + 3 * ChunkDepth; z++)
                 columns.Add(new int2(x, z));
-            int CarvedIn(int2 c){
+            int CountIn(int2 c, int kind){
                 int n = 0;
                 for (int y = 0; y <= area.Height(c.x, c.y); y++)
-                    if (area[c.x, y, c.y] == 0)
+                    if (area.Kind(c.x, y, c.y) == kind)
                         n++;
                 return n;
             }
 
             System.Random random = new(5);
-            List<int2> picked = columns.OrderByDescending(CarvedIn).Take(64).ToList();
+            List<int2> picked = columns.OrderByDescending(c => CountIn(c, CaveCarving.Air)).Take(64).ToList();
+            picked.AddRange(columns.OrderByDescending(c => CountIn(c, CaveCarving.Lava)).Take(32));
             picked.AddRange(columns.OrderBy(_ => random.Next()).Take(48));
 
-            int carved = 0, solid = 0, mismatches = 0;
+            int carved = 0, lava = 0, solid = 0, mismatches = 0;
             List<string> report = new();
             WorldGenConfig cfg = _config.WorldGen;
-            foreach (int2 c in picked)
+            foreach (int2 c in picked.Distinct())
                 for (int y = 0; y <= area.Height(c.x, c.y); y++){
-                    bool expected = CaveCarving.IsCarved(c.x, y, c.y, cfg), actual = area[c.x, y, c.y] == 0;
-                    if (actual) carved++;
+                    int expected = CaveCarving.Kind(c.x, y, c.y, cfg), actual = area.Kind(c.x, y, c.y);
+                    if (actual == CaveCarving.Air) carved++;
+                    else if (actual == CaveCarving.Lava) lava++;
                     else solid++;
                     if (expected != actual && mismatches++ < 12) report.Add($"({c.x},{y},{c.y}): pure {expected}, chunk {actual}");
                 }
 
-            string counts = $"{carved} carved and {solid} solid voxels checked in {picked.Count} columns";
+            string counts = $"{carved} air, {lava} lava and {solid} solid voxels checked in {picked.Distinct().Count()} columns";
             TestContext.WriteLine(counts);
             Assert.Greater(carved, 500, "the columns hold caves; " + counts);
+            Assert.Greater(lava, 50, "the columns hold lava; " + counts);
             Assert.AreEqual(0, mismatches, "chunk voxels differ from the pure evaluation:\n" + string.Join("\n", report));
         }
 
@@ -381,7 +407,8 @@ namespace Engine.Tests.EditMode{
             Blocks blocks = Generate(_config, chunkList.Select(k => new int3(k.x * ChunkWidth, 0, k.y * ChunkDepth)).ToArray(), false);
             foreach ((int3 v, int2 chunk) in checks){
                 int b = Array.IndexOf(chunkList, chunk);
-                Assert.AreEqual(0, blocks.Voxel(b, v.x - chunk.x * ChunkWidth, v.y, v.z - chunk.y * ChunkDepth), $"step centre {v} in chunk {chunk}");
+                ushort voxel = blocks.Voxel(b, v.x - chunk.x * ChunkWidth, v.y, v.z - chunk.y * ChunkDepth);
+                Assert.IsTrue(voxel == 0 || voxel == c.LavaVoxel, $"step centre {v} in chunk {chunk} is {voxel}");
             }
         }
 
@@ -425,7 +452,8 @@ namespace Engine.Tests.EditMode{
                 delta.y > 0 ? farthest.z : farthest.z - (ChunkDepth - 1));
             Blocks block = Generate(_config, new[]{ origin }, false);
             int3 local = farthest - origin;
-            Assert.AreEqual(0, block.Voxel(0, local.x, local.y, local.z), $"{farthest} in the block at {origin}");
+            ushort voxel = block.Voxel(0, local.x, local.y, local.z);
+            Assert.IsTrue(voxel == 0 || voxel == c.LavaVoxel, $"{farthest} in the block at {origin} is {voxel}");
         }
 
         [Test]
@@ -460,9 +488,10 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void Rules_Over64ChunksWithCoasts([Values(false, true)] bool moreEntrances){
             // 8 × 8 chunks with ~27 % water and entrance columns: no carved voxel touches water or ice, nothing is
-            // carved at y ≤ 2 and y 0 is bedrock, and carving above surface − Cover happens only in entrance columns
-            // (caverns never come that close, worms only there). Worms rarely start in an entrance, so a second run
-            // widens the mask and fills every cell with worms to open some.
+            // carved at y ≤ 2 and y 0 is bedrock, carving above surface − Cover happens only in entrance columns
+            // (caverns and pockets never come that close, worms only there), and lava lies only at or below LavaLevel
+            // inside the lava mask, where no carved voxel at that depth holds air. Worms rarely start in an entrance,
+            // so a second run widens the mask and fills every cell with worms to open some.
             if (moreEntrances){
                 _settings.Caves.EntranceThreshold = 0f;
                 _settings.Caves.WormsPerCell = 2f;
@@ -471,12 +500,13 @@ namespace Engine.Tests.EditMode{
             _config = Build();
             WorldGenConfig cfg = _config.WorldGen;
             ref readonly CaveConfig c = ref cfg.Caves;
-            ushort water = cfg.WaterVoxel, ice = cfg.IceVoxel, bedrock = c.BedrockVoxel;
+            ushort water = cfg.WaterVoxel, ice = cfg.IceVoxel, bedrock = c.BedrockVoxel, lavaVoxel = c.LavaVoxel;
             Assert.AreNotEqual(0, water, "water resolves through the id table");
             Assert.AreNotEqual(0, bedrock, "bedrock resolves through the id table");
+            Assert.AreNotEqual(0, lavaVoxel, "lava resolves through the id table");
             Area area = GenerateArea(_config, new int2(-2, 2), new int2(8, 8), true);
 
-            int carved = 0, wet = 0, openings = 0;
+            int carved = 0, wet = 0, openings = 0, lava = 0, lavaColumns = 0;
             List<string> report = new();
             int failures = 0;
             void Fail(string message){
@@ -490,10 +520,19 @@ namespace Engine.Tests.EditMode{
                 if (CaveColumns.Submerged(h, cfg)) wet++;
                 if (area[x, 0, z] != bedrock) Fail($"({x},0,{z}) is {area[x, 0, z]}, not bedrock");
                 int highest = int.MinValue;
-                for (int y = 1; y <= h; y++){
-                    if (area[x, y, z] != 0) continue;
+                bool inMask = LavaPockets.MaskOpen(CaveMasks.Lava(x, z, cfg), c);
+                if (inMask) lavaColumns++;
+                for (int y = 1; y < ChunkHeight; y++){
+                    ushort voxel = area[x, y, z];
+                    if (voxel == lavaVoxel){
+                        lava++;
+                        if (y > c.LavaLevel || !inMask) Fail($"({x},{y},{z}) lava above LavaLevel or outside the mask");
+                    }
+
+                    if (y > h || !area.IsHole(voxel)) continue;
                     carved++;
                     highest = y;
+                    if (voxel == 0 && inMask && y <= c.LavaLevel) Fail($"({x},{y},{z}) air at the lava level inside the mask");
                     if (y <= CaveColumns.Floor) Fail($"({x},{y},{z}) carved in the bottom layer");
                     foreach (int3 f in faces){
                         int3 n = new int3(x, y, z) + f;
@@ -510,12 +549,37 @@ namespace Engine.Tests.EditMode{
             }
 
             int columns = 64 * Columns;
-            string counts = $"{carved} carved voxels, {wet * 100f / columns:F1} % submerged columns, {openings} columns open to the sky";
+            string counts = $"{carved} carved voxels ({lava} lava), {wet * 100f / columns:F1} % submerged columns, " +
+                            $"{lavaColumns * 100f / columns:F1} % in the lava mask, {openings} columns open to the sky";
             TestContext.WriteLine(counts);
             Assert.AreEqual(0, failures, counts + "\n" + string.Join("\n", report));
             Assert.Greater(wet, columns / 10, "the area has coasts; " + counts);
             Assert.Greater(carved, 10000, "the area holds caves; " + counts);
+            Assert.Greater(lava, 1000, "the area holds lava; " + counts);
             if (moreEntrances) Assert.Greater(openings, 0, "some entrance opens to the sky; " + counts);
+        }
+
+        [Test]
+        public void LavaPockets_HoldLavaUnderAnAirGap(){
+            // Inside the lava mask, pockets carve the low band whether or not a cave reaches them: lava up to LavaLevel
+            // with air above it, so some columns hold lava at LavaLevel under air.
+            _config = Build();
+            WorldGenConfig cfg = _config.WorldGen;
+            ref readonly CaveConfig c = ref cfg.Caves;
+            Area area = GenerateArea(_config, new int2(0, 4), new int2(3, 3), false);
+            int gaps = 0, pocketVoxels = 0;
+            for (int x = area.Origin.x; x < area.Origin.x + 3 * ChunkWidth; x++)
+            for (int z = area.Origin.y; z < area.Origin.y + 3 * ChunkDepth; z++){
+                if (area[x, c.LavaLevel, z] == c.LavaVoxel && area[x, c.LavaLevel + 1, z] == 0) gaps++;
+                int top = CaveColumns.Limits(x, z, cfg, default).Cavern;
+                for (int y = c.LavaPocketBandMin; y <= c.LavaPocketBandMax; y++)
+                    if (LavaPockets.Carves(x, y, z, top, cfg))
+                        pocketVoxels++;
+            }
+
+            TestContext.WriteLine($"{pocketVoxels} pocket voxels, {gaps} columns with lava under air at y {c.LavaLevel}");
+            Assert.Greater(pocketVoxels, 100, "the area holds pockets");
+            Assert.Greater(gaps, 10, "pockets hold lava under an air gap");
         }
 
         #endregion

@@ -198,8 +198,8 @@ namespace Engine.Scripts.Jobs.Chunk{
 
         /// <summary>
         ///     The cave passes carve voxel (x, y, z) of the block or its ring, a probed voxel (worm spheres are known only
-        ///     there): the worm record and the hall noise, each within the column's limits, which ring columns sample on
-        ///     first use. Equals the pure evaluation at that voxel.
+        ///     there): the worm record, the hall noise and the lava pockets, each within the column's limits, which ring
+        ///     columns sample on first use. Equals the pure evaluation at that voxel.
         /// </summary>
         private static bool GroundCarved(ref CaveColumnData caves, int x, int y, int z, int3 origin,
             in WorldGenConfig cfg, in BlendCache cache){
@@ -209,24 +209,27 @@ namespace Engine.Scripts.Jobs.Chunk{
             int wx = origin.x + x, wz = origin.z + z;
 
             int top = caves.ProbeTop[g];
-            bool inWorm = top != CaveColumnData.Unknown && y <= top && top - y < CaveColumnData.ProbeDepth
-                          && (caves.ProbeWorm[g] & (1u << (top - y))) != 0;
+            bool inWorm = top != CaveColumnData.Unknown && y >= c.WormMinY && y <= top
+                          && top - y < CaveColumnData.ProbeDepth && (caves.ProbeWorm[g] & (1u << (top - y))) != 0;
             bool mayHall = y >= c.CavernBandMin && y <= c.CavernBandMax;
-            if (!(inWorm && y >= c.WormMinY) && !mayHall) return false;
+            bool mayPocket = c.LavaVoxel != 0 && y >= c.LavaPocketBandMin && y <= c.LavaPocketBandMax;
+            if (!inWorm && !mayHall && !mayPocket) return false;
 
-            // Both limits lie at or below the top block.
+            // Every limit lies at or below the top block, the hall limit (which the pockets keep too) Cover below it.
             if (caves.Height[g] == CaveColumnData.Unknown) caves.Height[g] = CaveColumns.SurfaceY(wx, wz, cfg, cache);
             if (y > caves.Height[g]) return false;
-            bool hallBelowCover = mayHall && y <= caves.Height[g] - c.Cover;
-            if (!(inWorm && y >= c.WormMinY) && !hallBelowCover) return false;
+            bool belowCover = (mayHall || mayPocket) && y <= caves.Height[g] - c.Cover;
+            if (!inWorm && !belowCover) return false;
             if (caves.WormTop[g] == CaveColumnData.Unknown){
                 CaveLimits limits = CaveColumns.Limits(wx, wz, cfg, cache);
                 caves.CavernTop[g] = limits.Cavern;
                 caves.WormTop[g] = limits.Worm;
             }
 
-            if (inWorm && y >= c.WormMinY && y <= caves.WormTop[g]) return true;
-            return hallBelowCover && Caverns.Carves(wx, y, wz, caves.CavernTop[g], cfg);
+            if (inWorm && y <= caves.WormTop[g]) return true;
+            if (!belowCover) return false;
+            return (mayHall && Caverns.Carves(wx, y, wz, caves.CavernTop[g], cfg))
+                   || (mayPocket && LavaPockets.Carves(wx, y, wz, caves.CavernTop[g], cfg));
         }
 
         /// <summary>
@@ -375,6 +378,37 @@ namespace Engine.Scripts.Jobs.Chunk{
                     if (Worms.Contains(worm, new int3(origin.x + x, y, origin.z + z)))
                         bits |= 1u << (top - y);
                 caves.ProbeWorm[g] = bits;
+            }
+        }
+
+        /// <summary>
+        ///     Lava (<see cref="LavaPockets" />): in the columns inside the lava mask, carves the pockets of the low band up
+        ///     to the column's hall limit, lava at or below <c>LavaLevel</c> and air above, and fills every voxel the halls
+        ///     and worms carved at or below <c>LavaLevel</c> with lava.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal static void FillLava(NativeArray<ushort> vox, in CaveColumnData caves, int3 origin, in WorldGenConfig cfg){
+            ref readonly CaveConfig c = ref cfg.Caves;
+            ushort lava = c.LavaVoxel;
+            if (lava == 0) return;
+            for (int x = 0; x < ChunkWidth; x++)
+            for (int z = 0; z < ChunkDepth; z++){
+                int wx = origin.x + x, wz = origin.z + z;
+                float mask = CaveMasks.Lava(wx, wz, cfg);
+                if (!LavaPockets.MaskOpen(mask, c)) continue;
+                int g = caves.Index(x, z);
+                float raise = LavaPockets.MaskRaise(mask, c);
+                int2 band = LavaPockets.Band(caves.CavernTop[g], c);
+                for (int y = band.x; y <= band.y; y++)
+                    if (LavaPockets.Noise(wx, y, wz, cfg) > LavaPockets.Threshold(y, raise, c))
+                        vox[ChunkSize.Flatten(x, y, z)] = y <= c.LavaLevel ? lava : (ushort)0;
+
+                // The terrain fill leaves no air at or below the top block, so air there is carved.
+                int top = math.min(math.min(c.LavaLevel, caves.Height[g]), ChunkHeight - 1);
+                for (int y = CaveColumns.Floor + 1; y <= top; y++){
+                    int i = ChunkSize.Flatten(x, y, z);
+                    if (vox[i] == 0) vox[i] = lava;
+                }
             }
         }
 

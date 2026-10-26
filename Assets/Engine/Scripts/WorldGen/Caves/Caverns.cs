@@ -32,7 +32,15 @@ namespace Engine.Scripts.WorldGen.Caves{
         ///     <see cref="MaskRise" /> − 1 the column carves no hall.
         /// </summary>
         public static float MaskRaise(float mask, in CaveConfig c){
-            return MaskRise * (1f - math.saturate((mask - c.CavernMaskThreshold) / MaskFade));
+            return FadeRaise(mask, c.CavernMaskThreshold);
+        }
+
+        /// <summary>
+        ///     Threshold rise of a mask value <paramref name="mask" /> that opens above <paramref name="threshold" />:
+        ///     <see cref="MaskRise" /> at the threshold, falling smoothly to 0 over <see cref="MaskFade" /> above it.
+        /// </summary>
+        public static float FadeRaise(float mask, float threshold){
+            return MaskRise * (1f - math.saturate((mask - threshold) / MaskFade));
         }
 
         /// <summary>The column's mask lets halls form at all.</summary>
@@ -42,10 +50,19 @@ namespace Engine.Scripts.WorldGen.Caves{
 
         /// <summary>Hall threshold at height <paramref name="y" /> in a column whose mask raises it by <paramref name="raise" />.</summary>
         public static float Threshold(int y, float raise, in CaveConfig c){
-            float mid = .5f * (c.CavernBandMin + c.CavernBandMax);
-            float half = math.max(.5f * (c.CavernBandMax - c.CavernBandMin), .5f);
+            return BandThreshold(y, c.CavernBandMin, c.CavernBandMax, c.CavernThreshold, c.CavernEdgeRise) + raise;
+        }
+
+        /// <summary>
+        ///     <paramref name="threshold" /> at height <paramref name="y" />, rising by <paramref name="rise" /> times the
+        ///     square of the distance from the middle of the band <paramref name="min" />…<paramref name="max" />
+        ///     (1 at its edges).
+        /// </summary>
+        public static float BandThreshold(int y, int min, int max, float threshold, float rise){
+            float mid = .5f * (min + max);
+            float half = math.max(.5f * (max - min), .5f);
             float t = (y - mid) / half;
-            return c.CavernThreshold + c.CavernEdgeRise * t * t + raise;
+            return threshold + rise * t * t;
         }
 
         /// <summary>Hall noise at lattice point (x, y, z), a multiple of <see cref="LatticeStep" />.</summary>

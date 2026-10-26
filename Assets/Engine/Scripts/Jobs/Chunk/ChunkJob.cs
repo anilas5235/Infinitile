@@ -77,6 +77,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                 if (flora) RegisterCaveProbes(ref caves, floraGrid, columns, origin, config.WorldGen);
                 CarveCaverns(vox, caves, origin, config.WorldGen);
                 CarveWorms(vox, ref caves, origin, config.WorldGen, floraGrid.Cache);
+                FillLava(vox, caves, origin, config.WorldGen);
             }
 
             ApplyBottomLayer(vox, origin, config.WorldGen);

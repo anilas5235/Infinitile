@@ -211,7 +211,7 @@ MonoBehaviour:
     EntranceWavelength: 96
     EntranceThreshold: 0.7
     EntranceStartDepth: 4
-    LavaVoxel: {fileID: 0}
+    LavaVoxel: {fileID: 11400000, guid: b574c546e5456dc4784fdec84feb4e04, type: 2}
     LavaLevel: 5
     LavaMaskWavelength: 256
     LavaMaskThreshold: -0.15
