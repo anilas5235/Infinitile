@@ -195,7 +195,6 @@
 .voxel-search__panel {
     width: 60%;
     max-width: 760px;
-    max-height: 70%;
     padding: 8px 10px 8px 10px;
     background-color: rgba(0, 0, 0, 0.75);
 }
@@ -223,8 +222,10 @@
     text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.9);
 }
 
+/* Four rows of slots (52px + 2 × 2px margin) whatever the number of results; more rows scroll. */
 .voxel-search__results {
-    flex-shrink: 1;
+    height: 224px;
+    flex-shrink: 0;
 }
 
 .voxel-search__results .unity-scroll-view__content-container {
