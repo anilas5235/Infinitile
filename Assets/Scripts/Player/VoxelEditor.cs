@@ -1,5 +1,6 @@
 ﻿using System;
 using Engine.Scripts.Utils.Extensions;
+using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.World;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -21,7 +22,8 @@ namespace Player{
         public bool place;
 
         /// <summary>
-        ///     Currently selected voxel ID that will be placed in placement mode.
+        ///     Currently selected voxel ID that will be placed in placement mode; always a base voxel, turned on
+        ///     placement to face the way it was placed.
         /// </summary>
         public ushort voxelId = 1;
 
@@ -30,13 +32,15 @@ namespace Player{
 
         private void FixedUpdate(){
             if (destruct){
-                if (!GetLookAtVoxelPos(out Vector3Int voxelWorldPos)) return;
+                if (!GetLookAtVoxelPos(out Vector3Int voxelWorldPos, out _)) return;
                 VoxelWorld.Instance.SetVoxel(0, voxelWorldPos);
             }
             else if (place){
-                if (!GetLookAtVoxelPos(out Vector3Int voxelWorldPos, true)) return;
+                if (!GetLookAtVoxelPos(out Vector3Int voxelWorldPos, out RaycastHit hitInfo, true)) return;
                 if (Physics.CheckBox(voxelWorldPos + Vector3.one * .5f, Vector3.one * 0.45f)) return;
-                VoxelWorld.Instance.SetVoxel(voxelId, voxelWorldPos);
+                ushort id = VoxelPlacement.Resolve(DataImporter.Instance.VoxelRegistry, voxelId, hitInfo.normal,
+                    hitInfo.point, _camera.transform.forward);
+                VoxelWorld.Instance.SetVoxel(id, voxelWorldPos);
             }
         }
 
@@ -47,7 +51,7 @@ namespace Player{
 #if UNITY_EDITOR
         private void OnDrawGizmos(){
             if (!enabled) return;
-            if (Application.isPlaying && GetLookAtVoxelPos(out Vector3Int voxelWorldPos)){
+            if (Application.isPlaying && GetLookAtVoxelPos(out Vector3Int voxelWorldPos, out _)){
                 Gizmos.color = Color.yellow;
                 Gizmos.DrawWireCube(voxelWorldPos + Vector3.one * .5f, Vector3.one * 0.45f);
             }
@@ -68,13 +72,14 @@ namespace Player{
         }
 
         /// <summary>
-        ///     Input System callback to sample the voxel currently looked at and set it as the active <see cref="voxelId" />.
+        ///     Input System callback to sample the voxel currently looked at and set it as the active <see cref="voxelId" />;
+        ///     a turned voxel gives its base.
         /// </summary>
         /// <param name="value">Button state indicating whether selection is triggered.</param>
         public void OnSelectVoxel(InputValue value){
             if (!value.isPressed) return;
-            if (!GetLookAtVoxelPos(out Vector3Int voxelWorldPos)) return;
-            SelectVoxel(VoxelWorld.Instance.GetVoxel(voxelWorldPos.Int3()));
+            if (!GetLookAtVoxelPos(out Vector3Int voxelWorldPos, out _)) return;
+            SelectVoxel(DataImporter.Instance.VoxelRegistry.BaseOf(VoxelWorld.Instance.GetVoxel(voxelWorldPos.Int3())));
         }
 
         /// <summary>Makes <paramref name="id" /> the placed voxel (air is ignored) and raises <see cref="OnVoxelIdChanged" />.</summary>
@@ -96,11 +101,12 @@ namespace Player{
         ///     Calculates the world voxel position the camera is currently looking at within a short range.
         /// </summary>
         /// <param name="voxelWorldPos">Resulting voxel world position when the raycast hits.</param>
+        /// <param name="hitInfo">The raycast hit on the voxel's face.</param>
         /// <param name="placeMode">If true, the position is offset for placement in front of the hit surface.</param>
         /// <returns><c>true</c> if a voxel position could be determined; otherwise, <c>false</c>.</returns>
-        private bool GetLookAtVoxelPos(out Vector3Int voxelWorldPos, bool placeMode = false){
+        private bool GetLookAtVoxelPos(out Vector3Int voxelWorldPos, out RaycastHit hitInfo, bool placeMode = false){
             voxelWorldPos = Vector3Int.zero;
-            bool res = Physics.Raycast(_camera.transform.position, _camera.transform.forward, out RaycastHit hitInfo,
+            bool res = Physics.Raycast(_camera.transform.position, _camera.transform.forward, out hitInfo,
                 5f, voxelLayerMask);
             if (!res) return false;
 
