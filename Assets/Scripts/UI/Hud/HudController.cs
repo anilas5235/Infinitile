@@ -56,7 +56,7 @@ namespace UI{
         private Button[] _bookmarkGo;
         private Label _biome, _chunk, _chunks, _climate, _configuration, _fps, _generation, _height, _hint;
         private Label _message, _position, _queues, _vram, _voxelName;
-        private VisualElement _culling, _debugLeft, _debugRight, _search;
+        private VisualElement _crosshair, _culling, _debugLeft, _debugRight, _search;
         private TextField _searchField;
         private Label _searchName;
         private ScrollView _searchResults;
@@ -69,6 +69,7 @@ namespace UI{
         private LookController _look;
         private float _nextRefresh;
         private PlayerInput _playerInput;
+        private int _searchBaseCount;
         private bool _searchOpen;
         private int _selected;
         private ushort[] _slotIds;
@@ -82,9 +83,9 @@ namespace UI{
             if (!voxelEditor) voxelEditor = FindFirstObjectByType<VoxelEditor>();
             if (!worldGenKeys) worldGenKeys = FindFirstObjectByType<WorldGenDebugKeys>();
             _look = FindFirstObjectByType<LookController>();
-            _playerInput = FindFirstObjectByType<PlayerInput>();
 
-            Root.Q("crosshair").style.backgroundImage = crosshair;
+            _crosshair = Root.Q("crosshair");
+            _crosshair.style.backgroundImage = crosshair;
             _message = Root.Q<Label>("message");
             _hint = Root.Q<Label>("hint");
             _debugLeft = Root.Q("debug-left");
@@ -116,6 +117,8 @@ namespace UI{
         private void OnDisable(){
             if (voxelEditor) voxelEditor.OnVoxelIdChanged -= OnVoxelIdChanged;
             if (_searchOpen) SetVoxelSearch(false);
+            _searchField?.UnregisterValueChangedCallback(OnSearchChanged);
+            _searchField?.UnregisterCallback<FocusOutEvent>(OnSearchFocusOut);
             if (_cursorFree) SetCursorFree(false);
             _gfxMemory.Dispose();
             if (VoxelWorldRenderer.Instance) VoxelWorldRenderer.Instance.CollectCullingStats = false;
@@ -155,9 +158,9 @@ namespace UI{
             if (keyboard == null) return;
             if (keyboard[debugPanelsKey].wasPressedThisFrame) SetDebugPanels(!showDebugPanels);
             if (_searchOpen){
-                // The search key types into the field while it has focus.
+                // A search key that types (a letter, say) is part of the query; any other closes the list again.
                 if (keyboard.escapeKey.wasPressedThisFrame ||
-                    (keyboard[voxelSearchKey].wasPressedThisFrame && !SearchFieldFocused()))
+                    (keyboard[voxelSearchKey].wasPressedThisFrame && !TypesText(voxelSearchKey)))
                     SetVoxelSearch(false);
                 else if (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame)
                     PickFirstMatch();
@@ -330,19 +333,30 @@ namespace UI{
             _slots.Clear();
             _slotIds = new ushort[math.min(hotbarVoxels.Length, 9)];
             for (int i = 0; i < _slotIds.Length; i++){
-                VisualElement slot = new(){ pickingMode = PickingMode.Ignore };
-                slot.AddToClassList("slot");
-                VisualElement icon = new(){ name = "icon", pickingMode = PickingMode.Ignore };
-                icon.AddToClassList("slot__icon");
-                Label key = new($"{i + 1}"){ pickingMode = PickingMode.Ignore };
-                key.AddToClassList("slot__key");
-                slot.Add(icon);
-                slot.Add(key);
+                VisualElement slot = CreateSlot($"{i + 1}");
+                slot.pickingMode = PickingMode.Ignore;
                 hotbar.Add(slot);
                 _slots.Add(slot);
             }
 
             ResolveHotbar();
+        }
+
+        /// <summary>A slot of the hotbar or the voxel list: the voxel's icon (element "icon") with a label in the corner.</summary>
+        private static VisualElement CreateSlot(string keyText){
+            VisualElement slot = new();
+            slot.AddToClassList("slot");
+            VisualElement icon = new(){ name = "icon", pickingMode = PickingMode.Ignore };
+            icon.AddToClassList("slot__icon");
+            Label key = new(keyText){ pickingMode = PickingMode.Ignore };
+            key.AddToClassList("slot__key");
+            slot.Add(icon);
+            slot.Add(key);
+            return slot;
+        }
+
+        private static Texture2D IconOf(Voxel voxel){
+            return voxel.GetDisplayTexture(QuadDrawCondition.Forward);
         }
 
         private bool HotbarResolved(){
@@ -372,9 +386,7 @@ namespace UI{
         private void SetSlot(int index, ushort id){
             _slotIds[index] = id;
             VoxelRegistry registry = Registry();
-            Texture2D texture = registry != null && registry.TryGet(id, out Voxel voxel)
-                ? voxel.GetDisplayTexture(QuadDrawCondition.Forward)
-                : null;
+            Texture2D texture = registry != null && registry.TryGet(id, out Voxel voxel) ? IconOf(voxel) : null;
             _slots[index].Q("icon").style.backgroundImage = texture;
         }
 
@@ -417,20 +429,37 @@ namespace UI{
             _searchResults = Root.Q<ScrollView>("voxel-search-results");
             _searchName = Root.Q<Label>("voxel-search-name");
             _searchField.textEdition.placeholder = "Name or id";
-            _searchField.RegisterValueChangedCallback(_ => FilterVoxelSearch());
+            _searchField.RegisterValueChangedCallback(OnSearchChanged);
+            _searchField.RegisterCallback<FocusOutEvent>(OnSearchFocusOut);
             _searchEntries.Clear();
             _searchResults.Clear();
+            _searchBaseCount = 0;
             _search.style.display = DisplayStyle.None;
+        }
+
+        private void OnSearchChanged(ChangeEvent<string> _){
+            FilterVoxelSearch();
+        }
+
+        /// <summary>
+        ///     A click on the scrollbar or the panel takes the focus from the field; it comes back a frame later, so
+        ///     typing goes on filtering.
+        /// </summary>
+        private void OnSearchFocusOut(FocusOutEvent _){
+            if (_searchOpen && _focusSearchFrame < 0) _focusSearchFrame = Time.frameCount + 1;
         }
 
         /// <summary>Opens or closes the voxel list; while it is open the cursor is free and the player's input is off.</summary>
         private void SetVoxelSearch(bool open){
             _searchOpen = open;
             _search.style.display = open ? DisplayStyle.Flex : DisplayStyle.None;
-            Root.Q("crosshair").style.display = open ? DisplayStyle.None : DisplayStyle.Flex;
+            _crosshair.style.display = open ? DisplayStyle.None : DisplayStyle.Flex;
+            // Looked up on every open: the player may spawn after the HUD, or be replaced.
+            if (open) _playerInput = FindFirstObjectByType<PlayerInput>();
             if (_playerInput){
                 if (open) _playerInput.DeactivateInput();
-                else _playerInput.ActivateInput();
+                // In teardown the PlayerInput may already be disabled; it activates itself when enabled again.
+                else if (_playerInput.isActiveAndEnabled) _playerInput.ActivateInput();
             }
 
             if (!open){
@@ -439,7 +468,7 @@ namespace UI{
                 return;
             }
 
-            if (_searchEntries.Count == 0) BuildVoxelSearch(); // the registry fills in the DataImporter's Awake
+            BuildVoxelSearch();
             _searchField.SetValueWithoutNotify("");
             FilterVoxelSearch();
             _searchResults.scrollOffset = Vector2.zero;
@@ -447,23 +476,23 @@ namespace UI{
             _focusSearchFrame = Time.frameCount + 1;
         }
 
-        /// <summary>One slot per base voxel in id order; turned variants are placed from their base.</summary>
+        /// <summary>
+        ///     One slot per base voxel in id order; turned variants are placed from their base. Rebuilt when the
+        ///     registry's voxel count changes (it fills in the DataImporter's Awake).
+        /// </summary>
         private void BuildVoxelSearch(){
             VoxelRegistry registry = Registry();
-            if (registry == null) return;
-            for (ushort id = 1; id < registry.BaseCount; id++){
+            int baseCount = registry?.BaseCount ?? 0;
+            if (baseCount == _searchBaseCount) return;
+            _searchBaseCount = baseCount;
+            _searchEntries.Clear();
+            _searchResults.Clear();
+            for (ushort id = 1; id < baseCount; id++){
                 if (!registry.TryGet(id, out Voxel voxel)) continue;
                 string fullName = registry.TryGetName(id, out FixedString32Bytes name) ? name.ToString() : voxel.name;
                 ushort voxelId = id;
-                VisualElement slot = new();
-                slot.AddToClassList("slot");
-                VisualElement icon = new(){ pickingMode = PickingMode.Ignore };
-                icon.AddToClassList("slot__icon");
-                icon.style.backgroundImage = voxel.GetDisplayTexture(QuadDrawCondition.Forward);
-                Label key = new($"{id}"){ pickingMode = PickingMode.Ignore };
-                key.AddToClassList("slot__key");
-                slot.Add(icon);
-                slot.Add(key);
+                VisualElement slot = CreateSlot($"{id}");
+                slot.Q("icon").style.backgroundImage = IconOf(voxel);
                 slot.RegisterCallback<ClickEvent>(_ => PickFromSearch(voxelId));
                 slot.RegisterCallback<PointerEnterEvent>(_ => _searchName.text = $"{fullName}   id {voxelId}");
                 slot.RegisterCallback<PointerLeaveEvent>(_ => _searchName.text = "");
@@ -486,7 +515,9 @@ namespace UI{
                 if (entry.Visible) shown++;
             }
 
-            _searchName.text = shown == 0 ? "No voxel matches." : "";
+            _searchName.text = _searchEntries.Count == 0 ? "The voxels are not loaded yet."
+                : shown == 0 ? "No voxel matches."
+                : "";
         }
 
         private void PickFirstMatch(){
@@ -511,9 +542,10 @@ namespace UI{
             SetVoxelSearch(false);
         }
 
-        private bool SearchFieldFocused(){
-            Focusable focused = _searchField.focusController?.focusedElement;
-            return focused is VisualElement element && (element == _searchField || _searchField.Contains(element));
+        /// <summary>The key types a character into a focused text field.</summary>
+        private static bool TypesText(Key key){
+            return key == Key.Space || (key >= Key.Backquote && key <= Key.Digit0) ||
+                   (key >= Key.NumpadDivide && key <= Key.Numpad9);
         }
 
         private class SearchEntry{

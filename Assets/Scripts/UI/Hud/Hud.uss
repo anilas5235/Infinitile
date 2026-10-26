@@ -190,6 +190,8 @@
     bottom: 0;
     align-items: center;
     justify-content: center;
+    /* Hidden until the HudController opens it. */
+    display: none;
 }
 
 .voxel-search__panel {
