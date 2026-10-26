@@ -181,3 +181,66 @@
     font-size: 11px;
     color: rgba(255, 255, 255, 0.85);
 }
+
+.voxel-search {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+    /* Hidden until the HudController opens it. */
+    display: none;
+}
+
+.voxel-search__panel {
+    width: 60%;
+    max-width: 760px;
+    padding: 8px 10px 8px 10px;
+    background-color: rgba(0, 0, 0, 0.75);
+}
+
+.voxel-search__field {
+    margin: 4px 0 6px 0;
+    font-size: 14px;
+}
+
+.voxel-search__field .unity-text-field__input {
+    padding: 3px 6px;
+    color: rgb(235, 235, 235);
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    --unity-cursor-color: rgb(235, 235, 235);
+    --unity-selection-color: rgba(255, 214, 120, 0.4);
+}
+
+.voxel-search__field:focus .unity-text-field__input {
+    border-color: rgb(255, 214, 120);
+}
+
+.voxel-search .slot__key {
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.9);
+}
+
+/* Four rows of slots (52px + 2 × 2px margin) whatever the number of results; more rows scroll. */
+.voxel-search__results {
+    height: 224px;
+    flex-shrink: 0;
+}
+
+.voxel-search__results .unity-scroll-view__content-container {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.voxel-search .slot:hover {
+    border-color: rgb(255, 214, 120);
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.voxel-search__name {
+    margin-top: 4px;
+    min-height: 18px;
+}

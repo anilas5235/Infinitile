@@ -46,5 +46,15 @@
             <ui:Label name="voxel-name" class="voxel-name" picking-mode="Ignore" />
             <ui:VisualElement name="hotbar" class="hotbar" picking-mode="Ignore" />
         </ui:VisualElement>
+
+        <ui:VisualElement name="voxel-search" class="voxel-search" picking-mode="Ignore">
+            <ui:VisualElement class="panel voxel-search__panel">
+                <ui:Label text="Voxels" class="panel__title" />
+                <ui:TextField name="voxel-search-field" class="voxel-search__field" />
+                <ui:ScrollView name="voxel-search-results" class="voxel-search__results" />
+                <ui:Label name="voxel-search-name" class="row row--strong voxel-search__name" />
+                <ui:Label text="Click or Enter (first match): put into the hotbar    Esc: close" class="row row--dim" />
+            </ui:VisualElement>
+        </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>
