@@ -178,10 +178,13 @@ namespace Engine.Scripts.WorldGen.Blending{
             BlendCache cache = default;
             if (cfg.BiomeCount == 0) return cache;
 
-            if (cfg.HasBeaches && cfg.BeachWaterDistance > 0){
-                // Every probe cell a beach column of the block may test.
-                int2 first = SurfaceCover.ProbeCell(minColumn - cfg.BeachWaterDistance);
-                int2 size = SurfaceCover.ProbeCell(maxColumn + cfg.BeachWaterDistance) + 2 - first;
+            // Beaches and cave entrances look for water on the same probes.
+            int waterDistance = cfg.HasBeaches ? cfg.BeachWaterDistance : 0;
+            if (cfg.Caves.Enabled) waterDistance = math.max(waterDistance, cfg.Caves.EntranceWaterDistance);
+            if (waterDistance > 0){
+                // Every probe cell a beach or entrance column of the block may test.
+                int2 first = SurfaceCover.ProbeCell(minColumn - waterDistance);
+                int2 size = SurfaceCover.ProbeCell(maxColumn + waterDistance) + 2 - first;
                 if ((long)size.x * size.y <= MaxWaterProbes){
                     cache.WaterProbeOrigin = first;
                     cache.WaterProbeSize = size;

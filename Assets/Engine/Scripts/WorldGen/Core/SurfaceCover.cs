@@ -109,9 +109,16 @@ namespace Engine.Scripts.WorldGen.Core{
         ///     the columns at multiples of <see cref="WaterProbeStride" />, tested by their terrain height alone, nearest
         ///     rings first. Water narrower than the stride may go unseen.
         /// </summary>
-        [MethodImpl(MethodImplOptions.NoInlining)]
         public static bool NearWater(int x, int z, in WorldGenConfig cfg, in BlendCache cache){
-            int r = cfg.BeachWaterDistance;
+            return NearWater(x, z, cfg.BeachWaterDistance, cfg, cache);
+        }
+
+        /// <summary>
+        ///     <see cref="NearWater(int,int,in WorldGenConfig,in BlendCache)" /> within <paramref name="r" /> blocks
+        ///     instead of <c>BeachWaterDistance</c>, on the same probes.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool NearWater(int x, int z, int r, in WorldGenConfig cfg, in BlendCache cache){
             int2 p = new(x, z);
             int2 center = ProbeCell(p);
             // The column lies in cell center … center + 1, so probes within r lie at most r / stride + 1 cells away.

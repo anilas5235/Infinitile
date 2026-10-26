@@ -108,5 +108,26 @@ namespace Engine.Scripts.WorldGen.Core{
 
         /// <summary>2D mask of the lava floor.</summary>
         public const uint LavaMask = 0xE507293Du;
+
+        /// <summary>3D noise of the halls.</summary>
+        public const uint CavernNoise = 0xF6183A4Eu;
+
+        /// <summary>3D noise of the stone pillars inside a hall.</summary>
+        public const uint PillarNoise = 0x07294B5Fu;
+
+        /// <summary>Number of worms of a start cell (one roll per possible worm).</summary>
+        public const uint WormCount = 0x183A5C60u;
+
+        /// <summary>Hash of one worm of a start cell, from which every roll of its path follows.</summary>
+        public const uint Worm = 0x294B6D71u;
+
+        /// <summary>Start position, direction, length and branch rolls of a worm.</summary>
+        public const uint WormStart = 0x3A5C7E82u;
+
+        /// <summary>Yaw and pitch jitter of one worm step.</summary>
+        public const uint WormTurn = 0x4B6D8F93u;
+
+        /// <summary>Radius at one radius knot of a worm.</summary>
+        public const uint WormRadius = 0x5C7EA0A4u;
     }
 }
