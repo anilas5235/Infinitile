@@ -80,6 +80,7 @@ namespace Engine.Tests.EditMode{
 
             _config.WorldGen.Dispose();
             _config.WorldGen = s.ToConfig(TestFixtures.Seed);
+            TestFixtures.SetFillVoxels(ref _config.WorldGen);
             Biome.BiomeDef a = _config.WorldGen.Biomes[0];
             a.topBlock = TopA;
             a.underBlock = UnderA;

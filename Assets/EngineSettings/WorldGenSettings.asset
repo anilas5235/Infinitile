@@ -31,6 +31,7 @@ MonoBehaviour:
   HeightMin: 40
   HeightMax: 250
   WaterLevel: 124
+  WaterVoxel: {fileID: 11400000, guid: 7b0b0eaca79300d468e0f7c8c0b8d1f3, type: 2}
   OctaveWavelengths:
   - 512
   - 256
@@ -152,6 +153,7 @@ MonoBehaviour:
     lacunarity: 2
     octaves: 3
   EnableClimateOverrides: 1
+  IceVoxel: {fileID: 11400000, guid: a0254e99cf594614496c8d97c76c38f0, type: 2}
   FreezeTemperature: 0.2
   SnowLapse: 0.6
   FreezeNoiseAmplitude: 0.04
@@ -174,5 +176,54 @@ MonoBehaviour:
   FlowersDensityContrast: 2
   GroundDetailsDensityWavelength: 64
   GroundDetailsDensityContrast: 2
+  Caves:
+    Enabled: 1
+    Cover: 8
+    WaterCover: 6
+    EntranceWaterDistance: 16
+    CavernWavelength: 96
+    CavernVerticalWavelength: 48
+    CavernThreshold: 0.45
+    CavernEdgeRise: 0.6
+    CavernBandMin: 20
+    CavernBandMax: 90
+    CavernMaskWavelength: 384
+    CavernMaskThreshold: 0.35
+    PillarWavelength: 12
+    PillarVerticalWavelength: 96
+    PillarThreshold: 0.55
+    WormCellSize: 64
+    WormsPerCell: 0.6
+    WormStartMinY: 20
+    WormLength:
+      Min: 96
+      Max: 224
+    WormMinRadius: 1.5
+    WormMaxRadius: 4
+    WormRadiusPeriod: 24
+    WormReach: 128
+    WormMaxPitch: 35
+    WormYawJitter: 6
+    WormPitchJitter: 4
+    WormTurnDamping: 0.8
+    WormBranchChance: 0.25
+    WormMinY: 3
+    EntranceWavelength: 96
+    EntranceThreshold: 0.7
+    EntranceStartDepth: 4
+    LavaVoxel: {fileID: 0}
+    LavaLevel: 5
+    LavaMaskWavelength: 256
+    LavaMaskThreshold: -0.15
+    LavaPocketWavelength: 32
+    LavaPocketVerticalWavelength: 8
+    LavaPocketThreshold: 0.35
+    LavaPocketEdgeRise: 0.6
+    LavaPocketBandMin: 3
+    LavaPocketBandMax: 10
+    Ores: []
+    BedrockVoxel: {fileID: 0}
+    BedrockChance1: 0.5
+    BedrockChance2: 0.25
   Biomes: {fileID: 11400000, guid: f0ebb416c9f7eb0ebd760b80683faf16, type: 2}
   Splines: {fileID: 11400000, guid: 0514b19bf2060874fa278a044246d671, type: 2}

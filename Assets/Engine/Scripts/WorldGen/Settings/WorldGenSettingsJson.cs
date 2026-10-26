@@ -37,6 +37,8 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["HeightMin"] = s.HeightMin,
                 ["HeightMax"] = s.HeightMax,
                 ["WaterLevel"] = s.WaterLevel,
+                ["WaterVoxel"] = VoxelName(s.WaterVoxel),
+                ["IceVoxel"] = VoxelName(s.IceVoxel),
                 ["OctaveWavelengths"] = s.OctaveWavelengths ?? Array.Empty<float>(),
                 ["GlobalOctaveWeights"] = s.GlobalOctaveWeights ?? Array.Empty<float>(),
                 ["PeakWavelength"] = s.PeakWavelength,
@@ -72,6 +74,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["FlowersDensityContrast"] = s.FlowersDensityContrast,
                 ["GroundDetailsDensityWavelength"] = s.GroundDetailsDensityWavelength,
                 ["GroundDetailsDensityContrast"] = s.GroundDetailsDensityContrast,
+                ["Caves"] = CaveTree(s.Caves),
                 ["Biomes"] = BiomeSetTree(s.Biomes),
                 ["Splines"] = s.Splines ? s.Splines.ToTree() : null
             };
@@ -99,6 +102,72 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["WarpNoise"] = ProfileTree(l.warpNoise),
                 ["WarpStrength"] = l.warpStrength,
                 ["RedistributionCurve"] = curve
+            };
+        }
+
+        private static Dictionary<string, object> CaveTree(CaveSettings c){
+            if (c == null) return null;
+            List<object> ores = new();
+            if (c.Ores != null)
+                foreach (OreRule rule in c.Ores)
+                    ores.Add(rule == null
+                        ? null
+                        : new Dictionary<string, object>{
+                            ["Ore"] = VoxelName(rule.Ore),
+                            ["Host"] = VoxelName(rule.Host),
+                            ["MinY"] = rule.MinY,
+                            ["MaxY"] = rule.MaxY,
+                            ["VeinsPerCell"] = rule.VeinsPerCell,
+                            ["VeinSize"] = Range(rule.VeinSize)
+                        });
+
+            return new Dictionary<string, object>{
+                ["Enabled"] = c.Enabled,
+                ["Cover"] = c.Cover,
+                ["WaterCover"] = c.WaterCover,
+                ["EntranceWaterDistance"] = c.EntranceWaterDistance,
+                ["CavernWavelength"] = c.CavernWavelength,
+                ["CavernVerticalWavelength"] = c.CavernVerticalWavelength,
+                ["CavernThreshold"] = c.CavernThreshold,
+                ["CavernEdgeRise"] = c.CavernEdgeRise,
+                ["CavernBandMin"] = c.CavernBandMin,
+                ["CavernBandMax"] = c.CavernBandMax,
+                ["CavernMaskWavelength"] = c.CavernMaskWavelength,
+                ["CavernMaskThreshold"] = c.CavernMaskThreshold,
+                ["PillarWavelength"] = c.PillarWavelength,
+                ["PillarVerticalWavelength"] = c.PillarVerticalWavelength,
+                ["PillarThreshold"] = c.PillarThreshold,
+                ["WormCellSize"] = c.WormCellSize,
+                ["WormsPerCell"] = c.WormsPerCell,
+                ["WormStartMinY"] = c.WormStartMinY,
+                ["WormLength"] = Range(c.WormLength),
+                ["WormMinRadius"] = c.WormMinRadius,
+                ["WormMaxRadius"] = c.WormMaxRadius,
+                ["WormRadiusPeriod"] = c.WormRadiusPeriod,
+                ["WormReach"] = c.WormReach,
+                ["WormMaxPitch"] = c.WormMaxPitch,
+                ["WormYawJitter"] = c.WormYawJitter,
+                ["WormPitchJitter"] = c.WormPitchJitter,
+                ["WormTurnDamping"] = c.WormTurnDamping,
+                ["WormBranchChance"] = c.WormBranchChance,
+                ["WormMinY"] = c.WormMinY,
+                ["EntranceWavelength"] = c.EntranceWavelength,
+                ["EntranceThreshold"] = c.EntranceThreshold,
+                ["EntranceStartDepth"] = c.EntranceStartDepth,
+                ["LavaVoxel"] = VoxelName(c.LavaVoxel),
+                ["LavaLevel"] = c.LavaLevel,
+                ["LavaMaskWavelength"] = c.LavaMaskWavelength,
+                ["LavaMaskThreshold"] = c.LavaMaskThreshold,
+                ["LavaPocketWavelength"] = c.LavaPocketWavelength,
+                ["LavaPocketVerticalWavelength"] = c.LavaPocketVerticalWavelength,
+                ["LavaPocketThreshold"] = c.LavaPocketThreshold,
+                ["LavaPocketEdgeRise"] = c.LavaPocketEdgeRise,
+                ["LavaPocketBandMin"] = c.LavaPocketBandMin,
+                ["LavaPocketBandMax"] = c.LavaPocketBandMax,
+                ["Ores"] = ores,
+                ["BedrockVoxel"] = VoxelName(c.BedrockVoxel),
+                ["BedrockChance1"] = c.BedrockChance1,
+                ["BedrockChance2"] = c.BedrockChance2
             };
         }
 

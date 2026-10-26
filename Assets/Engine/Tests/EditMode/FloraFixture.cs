@@ -297,7 +297,9 @@ namespace Engine.Tests.EditMode{
         }
 
         internal WorldGenConfig ToConfig(WorldGenSettings s, Allocator allocator = Allocator.Persistent){
-            return s.ToConfigWithVoxelIds(TestFixtures.Seed, v => v ? Ids[v] : (ushort)0, allocator, VariantOf);
+            WorldGenConfig cfg = s.ToConfigWithVoxelIds(TestFixtures.Seed, v => v ? Ids[v] : (ushort)0, allocator, VariantOf);
+            TestFixtures.SetFillVoxels(ref cfg);
+            return cfg;
         }
 
         /// <summary>The test's variant table: the log's axis variants <see cref="LogX" /> and <see cref="LogZ" />.</summary>

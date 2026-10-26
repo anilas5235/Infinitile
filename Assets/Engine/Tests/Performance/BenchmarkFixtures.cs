@@ -65,6 +65,8 @@ namespace Engine.Tests.Performance{
                 def.underBlock = Dirt;
                 def.stoneBlock = Stone;
                 worldGen.Biomes[0] = def;
+                worldGen.WaterVoxel = Water;
+                worldGen.IceVoxel = Ice;
 
                 NativeHashMap<FixedString32Bytes, Voxel.VoxelDef> voxels = new(VoxelTypeCount, allocator);
                 voxels.Add("std:air", new Voxel.VoxelDef{ Id = Air, MeshLayer = MeshLayer.Air });
@@ -176,6 +178,8 @@ namespace Engine.Tests.Performance{
                 config.WorldGen.Biomes[b] = def;
             }
 
+            config.WorldGen.WaterVoxel = Water;
+            config.WorldGen.IceVoxel = Ice;
             return config;
         }
 

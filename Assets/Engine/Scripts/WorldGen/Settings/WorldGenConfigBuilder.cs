@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Blending;
+using Engine.Scripts.WorldGen.Caves;
 using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Height;
@@ -43,6 +44,10 @@ namespace Engine.Scripts.WorldGen.Settings{
                 throw new InvalidOperationException(
                     $"{name}: TreeSpacingRadius must not be negative, got {settings.TreeSpacingRadius}.");
 
+            CaveSettings caves = settings.Caves ?? throw new InvalidOperationException($"{name}: Caves is not set.");
+            foreach ((string field, string problem) in caves.InvalidRanges())
+                throw new InvalidOperationException($"{name}: Caves.{field} {problem}.");
+
             List<Biome> active = settings.ActiveBiomes();
 
             // The height stage does not exist in Terrain-first; a configured method is reported and ignored.
@@ -79,6 +84,8 @@ namespace Engine.Scripts.WorldGen.Settings{
                 HeightMax = settings.HeightMax,
                 PeakWavelength = settings.PeakWavelength,
                 WaterLevel = settings.WaterLevel,
+                WaterVoxel = Id(settings.WaterVoxel, voxelId),
+                IceVoxel = Id(settings.IceVoxel, voxelId),
                 EnableClimateOverrides = settings.EnableClimateOverrides,
                 FreezeTemperature = settings.FreezeTemperature,
                 SnowLapse = settings.SnowLapse,
@@ -137,6 +144,8 @@ namespace Engine.Scripts.WorldGen.Settings{
 
                 // Flora rules, species, structures.
                 FloraConfigBuilder.Build(active, voxelId, variantOf, settings.TreeSpacingRadius, settings.FloraDensityNoise, allocator, ref cfg, settings);
+
+                BuildCaves(caves, voxelId, allocator, ref cfg.Caves);
             }
             catch{
                 cfg.Dispose();
@@ -144,6 +153,79 @@ namespace Engine.Scripts.WorldGen.Settings{
             }
 
             return cfg;
+        }
+
+        /// <summary>Voxel id of <paramref name="voxel" />; 0 without a voxel or an id table.</summary>
+        private static ushort Id(VoxelConfig.Data.Voxel.Voxel voxel, Func<VoxelConfig.Data.Voxel.Voxel, ushort> voxelId){
+            return voxel && voxelId != null ? voxelId(voxel) : (ushort)0;
+        }
+
+        /// <summary>
+        ///     The cave passes' values, with angles in radians and the ore rules flattened; a rule without its ore or
+        ///     host voxel is left out.
+        /// </summary>
+        private static void BuildCaves(CaveSettings s, Func<VoxelConfig.Data.Voxel.Voxel, ushort> voxelId, Allocator allocator,
+            ref CaveConfig caves){
+            caves = new CaveConfig{
+                Enabled = s.Enabled,
+                Cover = math.max(s.Cover, 0),
+                WaterCover = math.max(s.WaterCover, 1),
+                EntranceWaterDistance = math.max(s.EntranceWaterDistance, 0),
+                CavernWavelength = new float2(s.CavernWavelength, s.CavernVerticalWavelength),
+                CavernThreshold = s.CavernThreshold,
+                CavernEdgeRise = math.max(s.CavernEdgeRise, 0f),
+                CavernBandMin = math.max(s.CavernBandMin, BottomLayer.Height),
+                CavernBandMax = s.CavernBandMax,
+                CavernMaskWavelength = s.CavernMaskWavelength,
+                CavernMaskThreshold = s.CavernMaskThreshold,
+                PillarWavelength = new float2(s.PillarWavelength, s.PillarVerticalWavelength),
+                PillarThreshold = s.PillarThreshold,
+                WormCellSize = s.WormCellSize,
+                WormsPerCell = math.clamp(s.WormsPerCell, 0f, 2f),
+                WormStartMinY = s.WormStartMinY,
+                WormLength = new int2(s.WormLength.Min, s.WormLength.Max),
+                WormMinRadius = s.WormMinRadius,
+                WormMaxRadius = s.WormMaxRadius,
+                WormRadiusPeriod = s.WormRadiusPeriod,
+                WormReach = s.WormReach,
+                WormMaxPitch = math.radians(math.clamp(s.WormMaxPitch, 0f, 89f)),
+                WormYawJitter = math.radians(math.max(s.WormYawJitter, 0f)),
+                WormPitchJitter = math.radians(math.max(s.WormPitchJitter, 0f)),
+                WormTurnDamping = math.saturate(s.WormTurnDamping),
+                WormBranchChance = math.saturate(s.WormBranchChance),
+                WormMinY = math.max(s.WormMinY, BottomLayer.Height),
+                EntranceWavelength = s.EntranceWavelength,
+                EntranceThreshold = s.EntranceThreshold,
+                EntranceStartDepth = math.max(s.EntranceStartDepth, 0),
+                LavaVoxel = Id(s.LavaVoxel, voxelId),
+                LavaLevel = s.LavaLevel,
+                LavaMaskWavelength = s.LavaMaskWavelength,
+                LavaMaskThreshold = s.LavaMaskThreshold,
+                LavaPocketWavelength = new float2(s.LavaPocketWavelength, s.LavaPocketVerticalWavelength),
+                LavaPocketThreshold = s.LavaPocketThreshold,
+                LavaPocketEdgeRise = math.max(s.LavaPocketEdgeRise, 0f),
+                LavaPocketBandMin = math.max(s.LavaPocketBandMin, BottomLayer.Height),
+                LavaPocketBandMax = s.LavaPocketBandMax,
+                BedrockVoxel = Id(s.BedrockVoxel, voxelId),
+                BedrockChance1 = math.saturate(s.BedrockChance1),
+                BedrockChance2 = math.saturate(s.BedrockChance2)
+            };
+
+            List<OreRuleDef> ores = new();
+            if (s.Ores != null)
+                foreach (OreRule rule in s.Ores){
+                    if (rule == null || !rule.Ore || !rule.Host) continue;
+                    ores.Add(new OreRuleDef{
+                        Ore = Id(rule.Ore, voxelId),
+                        Host = Id(rule.Host, voxelId),
+                        MinY = rule.MinY,
+                        MaxY = rule.MaxY,
+                        VeinsPerCell = math.max(rule.VeinsPerCell, 0f),
+                        VeinSize = new int2(rule.VeinSize.Min, rule.VeinSize.Max)
+                    });
+                }
+
+            caves.Ores = new NativeArray<OreRuleDef>(ores.ToArray(), allocator);
         }
 
         /// <summary>

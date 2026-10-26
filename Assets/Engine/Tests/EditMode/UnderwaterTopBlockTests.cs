@@ -84,6 +84,7 @@ namespace Engine.Tests.EditMode{
 
             _config.WorldGen.Dispose();
             _config.WorldGen = s.ToConfig(TestFixtures.Seed);
+            TestFixtures.SetFillVoxels(ref _config.WorldGen);
             Patch(0, TopA, UnderA, WetA);
             Patch(1, TopB, UnderB, WetB);
         }

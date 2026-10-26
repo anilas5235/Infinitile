@@ -262,12 +262,12 @@ namespace Engine.Scripts.Jobs.Chunk{
         /// </summary>
         /// <param name="vox">Voxel buffer to write to (one entry per voxel).</param>
         /// <param name="chunkColumns">Per-column terrain metadata produced by <see cref="PrepareChunkMaps" />.</param>
-        /// <param name="config">Generator configuration providing voxel IDs for stone, dirt, grass, etc.</param>
+        /// <param name="config">Generator configuration providing the biome blocks and the water and ice ids.</param>
         public static void FillTerrain(NativeArray<ushort> vox, NativeArray<ChunkColumn> chunkColumns,
             ref GeneratorConfig config){
             const ushort air = 0;
-            ushort waterBlock = config.Voxels["std:Water"].Id;
-            ushort ice = config.Voxels["std:Ice"].Id;
+            ushort waterBlock = config.WorldGen.WaterVoxel;
+            ushort ice = config.WorldGen.IceVoxel;
             int waterLevel = config.WorldGen.WaterLevel;
             int strataPeriod = config.WorldGen.StrataPeriod;
             int strataThickness = config.WorldGen.StrataThickness;

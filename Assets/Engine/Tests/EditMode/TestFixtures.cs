@@ -54,6 +54,7 @@ namespace Engine.Tests.EditMode{
                 def.underBlock = Dirt;
                 def.stoneBlock = Stone;
                 worldGen.Biomes[0] = def;
+                SetFillVoxels(ref worldGen);
 
                 NativeHashMap<FixedString32Bytes, Voxel.VoxelDef> voxels = new(VoxelTypeCount, allocator);
                 voxels.Add("std:air", new Voxel.VoxelDef{ Id = Air, MeshLayer = MeshLayer.Air });
@@ -73,6 +74,15 @@ namespace Engine.Tests.EditMode{
                 Object.DestroyImmediate(set);
                 Object.DestroyImmediate(settings);
             }
+        }
+
+        /// <summary>
+        ///     Sets the water and ice ids of a config built without an id table (<c>ToConfig(seed, null)</c>) to the
+        ///     fixture's <see cref="Water" /> and <see cref="Ice" />.
+        /// </summary>
+        internal static void SetFillVoxels(ref WorldGenConfig cfg){
+            cfg.WaterVoxel = Water;
+            cfg.IceVoxel = Ice;
         }
 
         /// <summary>
