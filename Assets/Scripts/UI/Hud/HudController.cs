@@ -25,7 +25,8 @@ namespace UI{
     ///     The in-game HUD (UI Toolkit, Hud.uxml): crosshair, a hotbar of voxels to place, and three debug panels
     ///     toggled with F7: the world under the player (position, chunk, biome, climate, generation methods), the
     ///     engine's performance (frame time, graphics memory, chunk queues, culling pages per layer) and the world generation controls
-    ///     of <see cref="WorldGenDebugKeys" />. Holding Left Alt frees the cursor to click the panel buttons.
+    ///     of <see cref="WorldGenDebugKeys" />. Holding Left Alt frees the cursor to click the panel buttons. E opens
+    ///     a list of every voxel, searchable by name or id, that puts the clicked voxel into the hotbar.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class HudController : MonoBehaviour{
@@ -39,6 +40,7 @@ namespace UI{
 
         [SerializeField] private Key debugPanelsKey = Key.F7;
         [SerializeField] private Key cursorKey = Key.LeftAlt;
+        [SerializeField] private Key voxelSearchKey = Key.E;
         [SerializeField] private bool showDebugPanels = true;
 
         [Tooltip("Seconds between text refreshes of the debug panels.")]
@@ -49,18 +51,25 @@ namespace UI{
 
         private readonly List<CullingLayerStats> _cullingStats = new();
         private readonly List<Label> _cullingRows = new();
+        private readonly List<SearchEntry> _searchEntries = new();
         private readonly List<VisualElement> _slots = new();
         private Button[] _bookmarkGo;
         private Label _biome, _chunk, _chunks, _climate, _configuration, _fps, _generation, _height, _hint;
         private Label _message, _position, _queues, _vram, _voxelName;
-        private VisualElement _culling, _debugLeft, _debugRight;
+        private VisualElement _culling, _debugLeft, _debugRight, _search;
+        private TextField _searchField;
+        private Label _searchName;
+        private ScrollView _searchResults;
 
         private bool _cursorFree;
+        private int _focusSearchFrame = -1;
         private float _frameTimeSum;
         private int _frames;
         private ProfilerRecorder _gfxMemory;
         private LookController _look;
         private float _nextRefresh;
+        private PlayerInput _playerInput;
+        private bool _searchOpen;
         private int _selected;
         private ushort[] _slotIds;
 
@@ -73,6 +82,7 @@ namespace UI{
             if (!voxelEditor) voxelEditor = FindFirstObjectByType<VoxelEditor>();
             if (!worldGenKeys) worldGenKeys = FindFirstObjectByType<WorldGenDebugKeys>();
             _look = FindFirstObjectByType<LookController>();
+            _playerInput = FindFirstObjectByType<PlayerInput>();
 
             Root.Q("crosshair").style.backgroundImage = crosshair;
             _message = Root.Q<Label>("message");
@@ -98,12 +108,14 @@ namespace UI{
             _gfxMemory = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "Gfx Used Memory");
             BindGenControls();
             BuildHotbar();
+            BindVoxelSearch();
             if (voxelEditor) voxelEditor.OnVoxelIdChanged += OnVoxelIdChanged;
             SetDebugPanels(showDebugPanels);
         }
 
         private void OnDisable(){
             if (voxelEditor) voxelEditor.OnVoxelIdChanged -= OnVoxelIdChanged;
+            if (_searchOpen) SetVoxelSearch(false);
             if (_cursorFree) SetCursorFree(false);
             _gfxMemory.Dispose();
             if (VoxelWorldRenderer.Instance) VoxelWorldRenderer.Instance.CollectCullingStats = false;
@@ -115,6 +127,11 @@ namespace UI{
             _frames++;
 
             HandleInput();
+            if (_searchOpen && _focusSearchFrame >= 0 && Time.frameCount >= _focusSearchFrame){
+                _focusSearchFrame = -1;
+                _searchField.Focus();
+            }
+
             if (!HotbarResolved()) ResolveHotbar(); // the registry fills in the DataImporter's Awake
 
             string message = worldGenKeys ? worldGenKeys.Message : null;
@@ -137,8 +154,20 @@ namespace UI{
             Keyboard keyboard = Keyboard.current;
             if (keyboard == null) return;
             if (keyboard[debugPanelsKey].wasPressedThisFrame) SetDebugPanels(!showDebugPanels);
-            bool cursorHeld = keyboard[cursorKey].isPressed;
-            if (cursorHeld != _cursorFree) SetCursorFree(cursorHeld);
+            if (_searchOpen){
+                // The search key types into the field while it has focus.
+                if (keyboard.escapeKey.wasPressedThisFrame ||
+                    (keyboard[voxelSearchKey].wasPressedThisFrame && !SearchFieldFocused()))
+                    SetVoxelSearch(false);
+                else if (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame)
+                    PickFirstMatch();
+            }
+            else if (keyboard[voxelSearchKey].wasPressedThisFrame){
+                SetVoxelSearch(true);
+            }
+
+            bool cursorFree = _searchOpen || keyboard[cursorKey].isPressed;
+            if (cursorFree != _cursorFree) SetCursorFree(cursorFree);
 
             if (_slotIds.Length == 0 || _cursorFree) return;
             for (int i = 0; i < _slotIds.Length; i++)
@@ -157,12 +186,13 @@ namespace UI{
             _debugRight.style.display = display;
             if (VoxelWorldRenderer.Instance) VoxelWorldRenderer.Instance.CollectCullingStats = show;
             _hint.text = show
-                ? $"{debugPanelsKey}: hide panels    hold {cursorKey}: cursor    1–9 / wheel: voxel    middle click: pick"
-                : $"{debugPanelsKey}: debug panels";
+                ? $"{debugPanelsKey}: hide panels    hold {cursorKey}: cursor    1–9 / wheel: voxel    middle click: pick" +
+                  $"    {voxelSearchKey}: all voxels"
+                : $"{debugPanelsKey}: debug panels    {voxelSearchKey}: all voxels";
             _nextRefresh = 0f;
         }
 
-        /// <summary>Unlocks the cursor and stops looking and editing while the cursor key is held.</summary>
+        /// <summary>Unlocks the cursor and stops looking and editing while the cursor key is held or the voxel list is open.</summary>
         private void SetCursorFree(bool free){
             _cursorFree = free;
             Cursor.lockState = free ? CursorLockMode.None : CursorLockMode.Locked;
@@ -377,6 +407,120 @@ namespace UI{
 
         private static VoxelRegistry Registry(){
             return DataImporter.Instance ? DataImporter.Instance.VoxelRegistry : null;
+        }
+
+        // ── Voxel search ─────────────────────────────────────────────────────
+
+        private void BindVoxelSearch(){
+            _search = Root.Q("voxel-search");
+            _searchField = Root.Q<TextField>("voxel-search-field");
+            _searchResults = Root.Q<ScrollView>("voxel-search-results");
+            _searchName = Root.Q<Label>("voxel-search-name");
+            _searchField.textEdition.placeholder = "Name or id";
+            _searchField.RegisterValueChangedCallback(_ => FilterVoxelSearch());
+            _searchEntries.Clear();
+            _searchResults.Clear();
+            _search.style.display = DisplayStyle.None;
+        }
+
+        /// <summary>Opens or closes the voxel list; while it is open the cursor is free and the player's input is off.</summary>
+        private void SetVoxelSearch(bool open){
+            _searchOpen = open;
+            _search.style.display = open ? DisplayStyle.Flex : DisplayStyle.None;
+            Root.Q("crosshair").style.display = open ? DisplayStyle.None : DisplayStyle.Flex;
+            if (_playerInput){
+                if (open) _playerInput.DeactivateInput();
+                else _playerInput.ActivateInput();
+            }
+
+            if (!open){
+                _focusSearchFrame = -1;
+                _searchField.Blur();
+                return;
+            }
+
+            if (_searchEntries.Count == 0) BuildVoxelSearch(); // the registry fills in the DataImporter's Awake
+            _searchField.SetValueWithoutNotify("");
+            FilterVoxelSearch();
+            _searchResults.scrollOffset = Vector2.zero;
+            // Focus a frame later, so the key that opened the list is not typed into the field.
+            _focusSearchFrame = Time.frameCount + 1;
+        }
+
+        /// <summary>One slot per base voxel in id order; turned variants are placed from their base.</summary>
+        private void BuildVoxelSearch(){
+            VoxelRegistry registry = Registry();
+            if (registry == null) return;
+            for (ushort id = 1; id < registry.BaseCount; id++){
+                if (!registry.TryGet(id, out Voxel voxel)) continue;
+                string fullName = registry.TryGetName(id, out FixedString32Bytes name) ? name.ToString() : voxel.name;
+                ushort voxelId = id;
+                VisualElement slot = new();
+                slot.AddToClassList("slot");
+                VisualElement icon = new(){ pickingMode = PickingMode.Ignore };
+                icon.AddToClassList("slot__icon");
+                icon.style.backgroundImage = voxel.GetDisplayTexture(QuadDrawCondition.Forward);
+                Label key = new($"{id}"){ pickingMode = PickingMode.Ignore };
+                key.AddToClassList("slot__key");
+                slot.Add(icon);
+                slot.Add(key);
+                slot.RegisterCallback<ClickEvent>(_ => PickFromSearch(voxelId));
+                slot.RegisterCallback<PointerEnterEvent>(_ => _searchName.text = $"{fullName}   id {voxelId}");
+                slot.RegisterCallback<PointerLeaveEvent>(_ => _searchName.text = "");
+                _searchResults.Add(slot);
+                _searchEntries.Add(new SearchEntry{
+                    Id = voxelId, IdText = $"{id}", Name = fullName.ToLowerInvariant(), Slot = slot
+                });
+            }
+        }
+
+        /// <summary>Shows the voxels whose full name contains the query or whose id starts with it.</summary>
+        private void FilterVoxelSearch(){
+            string query = _searchField.value.Trim().ToLowerInvariant();
+            int shown = 0;
+            foreach (SearchEntry entry in _searchEntries){
+                entry.Visible = query.Length == 0 || entry.Name.Contains(query) ||
+                                entry.IdText.StartsWith(query, StringComparison.Ordinal);
+                entry.Slot.style.display = entry.Visible ? DisplayStyle.Flex : DisplayStyle.None;
+                entry.Slot.EnableInClassList("slot--selected", voxelEditor && entry.Id == voxelEditor.voxelId);
+                if (entry.Visible) shown++;
+            }
+
+            _searchName.text = shown == 0 ? "No voxel matches." : "";
+        }
+
+        private void PickFirstMatch(){
+            foreach (SearchEntry entry in _searchEntries)
+                if (entry.Visible){
+                    PickFromSearch(entry.Id);
+                    return;
+                }
+        }
+
+        /// <summary>Selects the slot holding the voxel, or puts it into the selected slot, and closes the list.</summary>
+        private void PickFromSearch(ushort id){
+            if (_slotIds.Length == 0){
+                if (voxelEditor) voxelEditor.SelectVoxel(id);
+            }
+            else{
+                int existing = Array.IndexOf(_slotIds, id);
+                if (existing < 0) SetSlot(_selected, id);
+                SelectSlot(existing >= 0 ? existing : _selected);
+            }
+
+            SetVoxelSearch(false);
+        }
+
+        private bool SearchFieldFocused(){
+            Focusable focused = _searchField.focusController?.focusedElement;
+            return focused is VisualElement element && (element == _searchField || _searchField.Contains(element));
+        }
+
+        private class SearchEntry{
+            public ushort Id;
+            public string IdText, Name;
+            public VisualElement Slot;
+            public bool Visible;
         }
     }
 }
