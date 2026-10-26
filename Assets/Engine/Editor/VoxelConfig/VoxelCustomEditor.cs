@@ -44,6 +44,8 @@ namespace Engine.Editor.VoxelConfig{
             }
 
             EditorGUILayout.PropertyField(serializedObject.FindProperty("shape"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("facing"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("topBottom"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("textureMode"));
             switch (voxelDef.TextureMode){
                 case Voxel.VoxelTexMode.AllSame:

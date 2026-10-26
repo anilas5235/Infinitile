@@ -21,6 +21,7 @@ struct VoxelDef
     uint2 ShapeQuadIndicesBack;
     uint LightAttenuation; // 15 = opaque, skipped by the smooth light
     uint SurfaceAlpha; // unorm8
+    uint HidesNeighbourFaces; // full cube; a partial shape (slab, plant) leaves its neighbours' faces drawn
 };
 
 struct VoxelQuad
@@ -203,6 +204,7 @@ bool should_render_face(in VoxelDef currentVoxel, in VoxelDef neighborVoxel)
 {
     if (currentVoxel.AlwaysRenderAllFaces == (uint)true) return true;
     if (currentVoxel.MeshLayer < neighborVoxel.MeshLayer) return true;
+    if (neighborVoxel.HidesNeighbourFaces == 0u) return true;
     return false;
 }
 

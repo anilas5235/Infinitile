@@ -31,6 +31,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
 
         private VoxelEngineRenderGenData _voxelEngineRenderGenData;
         private VoxelLightTable _lightTable;
+        private VoxelVariantTable _variantTable;
 
         public GraphicsBuffer VoxelRenderDefBuffer{ get; private set; }
 
@@ -44,6 +45,9 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         /// </summary>
         public GraphicsBuffer VolumeFogBuffer{ get; private set; }
         public NativeHashMap<FixedString32Bytes, Voxel.VoxelDef> VoxelMap{ get; private set; }
+
+        /// <summary>Number of base voxel ids (air included); the turned variants follow after them.</summary>
+        public int BaseCount{ get; private set; }
 
         public void Initialize(Texture2D errorTexSolid, Texture2D errorTexTransparent, Texture2D errorTexFoliage){
             InternalInitialize();
@@ -84,6 +88,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                     math.clamp(so.lightEmission.x, 0, VoxelLightLimits.MaxLevel),
                     math.clamp(so.lightEmission.y, 0, VoxelLightLimits.MaxLevel),
                     math.clamp(so.lightEmission.z, 0, VoxelLightLimits.MaxLevel)),
+                HidesNeighbourFaces = IsFullCube(so.shape),
                 Always = RegisterFaces(so, QuadDrawCondition.Always),
                 Right = RegisterFaces(so, QuadDrawCondition.Right),
                 Left = RegisterFaces(so, QuadDrawCondition.Left),
@@ -109,6 +114,111 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             return new uint2((uint)baseIndex, (uint)texPairsAdded);
         }
 
+        /// <summary>
+        ///     True when the shape closes all six faces of the unit cube, each with a quad drawn towards that face. Only
+        ///     such a voxel hides the faces of its neighbours; a slab or a plant leaves them drawn, so no hole opens
+        ///     next to its open part.
+        /// </summary>
+        private static bool IsFullCube(VoxelShape shape){
+            if (!shape || shape.quads == null) return false;
+            for (QuadDrawCondition condition = QuadDrawCondition.Up; condition <= QuadDrawCondition.Right; condition++){
+                bool covered = false;
+                foreach (VoxelQuad quad in shape.quads)
+                    if (quad != null && quad.drawCondition == condition && quad.quadDef &&
+                        CoversFace(quad.quadDef, VoxelOrientation.Direction(condition)))
+                        covered = true;
+                if (!covered) return false;
+            }
+
+            return true;
+        }
+
+        private static bool CoversFace(QuadDefinition quad, int3 direction){
+            const float epsilon = 1e-4f;
+            int axis = direction.x != 0 ? 0 : direction.y != 0 ? 1 : 2;
+            float plane = direction[axis] > 0 ? 1f : 0f;
+            float3 min = new(float.MaxValue), max = new(float.MinValue);
+            foreach (Vector3 corner in new[]{ quad.position00, quad.position01, quad.position02, quad.position03 }){
+                float3 p = corner;
+                if (math.abs(p[axis] - plane) > epsilon) return false;
+                min = math.min(min, p);
+                max = math.max(max, p);
+            }
+
+            min[axis] = 0f;
+            max[axis] = 1f;
+            return math.all(min <= epsilon) && math.all(max >= 1f - epsilon);
+        }
+
+        /// <summary>
+        ///     Appends the turned variants of every rotatable voxel after all base voxels: base order, then facing
+        ///     index, then top/bottom, so base ids never change. A variant copies its base's values and gets the base
+        ///     shape turned about the voxel centre; each quad keeps its texture and moves to the draw condition its
+        ///     turned normal points to.
+        /// </summary>
+        private void RegisterVariants(){
+            BaseCount = NameRegistry.Count;
+            List<(ushort id, ushort baseId, byte orientation)> variants = new();
+            for (ushort baseId = 0; baseId < BaseCount; baseId++){
+                if (!SoRegistry.TryGet(baseId, out Voxel so) ||
+                    !_voxelRenderDefRegistry.TryGet(baseId, out Voxel.VoxelDef baseDef)) continue;
+                int count = VoxelOrientation.Count(so.facing, so.topBottom);
+                for (int index = 1; index < count; index++){
+                    byte orientation = VoxelOrientation.AtIndex(so.topBottom, index);
+                    ushort id = NameRegistry.Register(VariantName(baseId, so.facing, orientation));
+                    _voxelRenderDefRegistry.Register(id, BuildVariant(so, baseDef, id,
+                        VoxelOrientation.Rotation(so.facing, orientation)));
+                    variants.Add((id, baseId, orientation));
+                }
+            }
+
+            _variantTable.Dispose();
+            _variantTable = new VoxelVariantTable(NameRegistry.Count, BaseCount, Allocator.Domain);
+            foreach ((ushort id, ushort baseId, byte orientation) in variants)
+                _variantTable.SetVariant(id, baseId, orientation);
+        }
+
+        /// <summary>Base name plus the orientation suffix; an id-based name if that does not fit or is taken.</summary>
+        private FixedString32Bytes VariantName(ushort baseId, VoxelFacing facing, byte orientation){
+            NameRegistry.TryGet(baseId, out FixedString32Bytes baseName);
+            string suffix = VoxelOrientation.Suffix(facing, orientation);
+            FixedString32Bytes name = baseName;
+            if (name.Append(suffix) == FormatError.None && !NameRegistry.TryGetId(name, out _)) return name;
+            name = $"#{baseId}.{orientation}";
+            VoxelEngineLogger.Warn<VoxelRegistry>($"Variant name '{baseName}{suffix}' does not fit; using '{name}'.");
+            return name;
+        }
+
+        private Voxel.VoxelDef BuildVariant(Voxel so, Voxel.VoxelDef baseDef, ushort id, int3x3 rotation){
+            List<uint>[] pairs = new List<uint>[(int)QuadDrawCondition.Right + 1];
+            for (QuadDrawCondition condition = QuadDrawCondition.Always; condition <= QuadDrawCondition.Right;
+                 condition++){
+                QuadDrawCondition turned = VoxelOrientation.Remap(condition, rotation);
+                foreach ((QuadDefinition qDef, Texture2D tex) in so.GetQuadsAndTextures(condition)){
+                    ushort texId = RegisterTexture(tex, so.meshLayer);
+                    ushort quadId = _quadRegistry.RegisterRotated(qDef, rotation);
+                    (pairs[(int)turned] ??= new List<uint>()).Add(quadId | ((uint)texId << 16));
+                }
+            }
+
+            Voxel.VoxelDef def = baseDef;
+            def.Id = id;
+            def.Always = AddPairs(pairs[(int)QuadDrawCondition.Always]);
+            def.Right = AddPairs(pairs[(int)QuadDrawCondition.Right]);
+            def.Left = AddPairs(pairs[(int)QuadDrawCondition.Left]);
+            def.Up = AddPairs(pairs[(int)QuadDrawCondition.Up]);
+            def.Down = AddPairs(pairs[(int)QuadDrawCondition.Down]);
+            def.Front = AddPairs(pairs[(int)QuadDrawCondition.Forward]);
+            def.Back = AddPairs(pairs[(int)QuadDrawCondition.Backward]);
+            return def;
+        }
+
+        private uint2 AddPairs(List<uint> pairs){
+            int baseIndex = _quadTexPairs.Count;
+            if (pairs != null) _quadTexPairs.AddRange(pairs);
+            return new uint2((uint)baseIndex, (uint)(_quadTexPairs.Count - baseIndex));
+        }
+
         private ushort RegisterTexture(Texture2D tex, MeshLayer meshLayer){
             return meshLayer switch{
                 MeshLayer.Solid => _solidTexRegistry.Register(tex),
@@ -123,6 +233,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         /// </summary>
         public void FinalizeRegistry(){
             InternalFinalize();
+            RegisterVariants();
             PrepareArrays();
             PrepareRenderData();
             PrepareGeneratiionData();
@@ -142,7 +253,8 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                     Allocator.Domain);
             }
 
-            for (ushort i = 0; i < _voxelRenderDefRegistry.Count; i++){
+            // Base voxels only: a variant has no asset name of its own and resolves to its base
+            for (ushort i = 0; i < BaseCount; i++){
                 if (_voxelRenderDefRegistry.TryGet(i, out Voxel.VoxelDef def) &&
                     NameRegistry.TryGet(i, out FixedString32Bytes name)){
                     if (!VoxelMap.TryAdd(name, def))
@@ -237,6 +349,37 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             return _voxelEngineRenderGenData;
         }
 
+        /// <summary>The runtime quad array: the registered quads, then their turned copies.</summary>
+        internal QuadDefinition.QuadDef[] QuadArray => _quadRegistry.QuadArray;
+
+        /// <summary>The pairs the face ranges of the render definitions point into: quad id | texture id &lt;&lt; 16.</summary>
+        internal IReadOnlyList<uint> QuadTexPairs => _quadTexPairs;
+
+        /// <summary>Base voxel and orientation of every id and the variant ids, for Burst code.</summary>
+        public VoxelVariantTable GetVariantTable(){
+            return _variantTable;
+        }
+
+        /// <summary>The base voxel of an id; a base is its own base.</summary>
+        public ushort BaseOf(ushort id){
+            return _variantTable.IsCreated ? _variantTable.BaseOf(id) : id;
+        }
+
+        /// <summary>The orientation of an id (see <see cref="VoxelOrientation" />); 0 for a base.</summary>
+        public byte OrientationOf(ushort id){
+            return _variantTable.IsCreated ? _variantTable.OrientationOf(id) : (byte)0;
+        }
+
+        /// <summary>The id of a base voxel in an orientation; the base id when it has no such orientation.</summary>
+        public ushort VariantOf(ushort baseId, byte orientation){
+            return _variantTable.IsCreated ? _variantTable.VariantOf(baseId, orientation) : baseId;
+        }
+
+        /// <summary>The voxel asset of an id; a variant resolves to its base's asset.</summary>
+        public override bool TryGet(ushort id, out Voxel so){
+            return base.TryGet(BaseOf(id), out so);
+        }
+
         /// <summary>
         ///     Light attenuation and emission per voxel id, read by the light jobs.
         /// </summary>
@@ -290,6 +433,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             if (_voxelEngineRenderGenData.VoxelRenderDefs.IsCreated)
                 _voxelEngineRenderGenData.VoxelRenderDefs.Dispose();
             _lightTable.Dispose();
+            _variantTable.Dispose();
             VoxelRenderDefBuffer?.Dispose();
             QuadBuffer?.Dispose();
             QuadTexPairBuffer?.Dispose();
@@ -332,6 +476,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             private uint2 shape_quad_indices_back;
             private uint LightAttenuation; // the smooth light skips opaque (15) voxels
             private uint SurfaceAlpha; // unorm8
+            private uint HidesNeighbourFaces; // full cube: a neighbour of the same or a lower layer skips its face
 
             public GPUVoxelDef(Voxel.VoxelDef def, byte lightAttenuation){
                 MeshLayer = (uint)def.MeshLayer;
@@ -348,6 +493,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                 shape_quad_indices_back = def.Back;
                 LightAttenuation = lightAttenuation;
                 SurfaceAlpha = def.SurfaceAlpha;
+                HidesNeighbourFaces = def.HidesNeighbourFaces ? 1u : 0u;
             }
         }
     }

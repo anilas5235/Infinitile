@@ -93,6 +93,17 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
 
         public VoxelShape shape;
 
+        /// <summary>
+        ///     How the voxel may be turned when placed. The asset is authored as the unturned orientation: axis Y,
+        ///     front +Z (the <see cref="front" /> texture), lower half. Each other orientation is its own voxel id.
+        /// </summary>
+        [Tooltip("How the voxel may be turned when placed; the asset is authored with axis Y and front +Z")]
+        public VoxelFacing facing;
+
+        /// <summary>Adds an upper (upside-down) orientation to every facing, like a slab in the upper half.</summary>
+        [Tooltip("Adds an upper (upside-down) orientation to every facing, like a slab in the upper half")]
+        public bool topBottom;
+
         /// <summary>Texture used for the top face.</summary>
         public Texture2D top;
 
@@ -241,6 +252,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
 
             /// <summary>Emitted block light, packed like the voxel light with sky 0 (see VoxelLight).</summary>
             public ushort LightEmission;
+
+            /// <summary>
+            ///     The shape closes all six faces of the cube, so a neighbour of the same or a lower mesh layer skips its
+            ///     face towards it. Off for partial shapes such as slabs and plants.
+            /// </summary>
+            public bool HidesNeighbourFaces;
 
             public uint2 Always;
             public uint2 Right;
