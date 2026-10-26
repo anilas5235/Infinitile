@@ -286,6 +286,9 @@ namespace Engine.Tests.EditMode{
             s.Architecture = architecture;
             s.MaterialMethod = method;
             s.HeightMethod = architecture == GenArchitecture.BiomeFirst ? method : BlendMethod.None;
+            // No caves: the whole-world reference evaluates them voxel by voxel without a cache, which made a
+            // Biome-first flora test take about 17 s; the cave tests cover flora on carved ground.
+            s.Caves.Enabled = false;
             if (architecture == GenArchitecture.TerrainFirst){
                 s.Splines = Create<TerrainSplineSet>("Splines");
                 s.Splines.ResetToPlaceholders();
