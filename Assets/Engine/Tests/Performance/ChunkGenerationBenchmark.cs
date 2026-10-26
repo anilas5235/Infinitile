@@ -122,8 +122,8 @@ namespace Engine.Tests.Performance{
 
         /// <summary>
         ///     The flora world of <see cref="ChunkJob_Run_PerMethod_WithFlora_MsPerChunk" /> with DistanceBlend, where every
-        ///     biome has a snow top block and a strata block, so each column also decides snow and strata shift and every
-        ///     stone voxel is tested against the bands.
+        ///     biome has a snow top block, freezing water and a strata block, so each column also decides snow, ice and
+        ///     strata shift and every stone voxel is tested against the bands.
         /// </summary>
         [Test]
         [Performance]
@@ -135,6 +135,7 @@ namespace Engine.Tests.Performance{
             for (int b = 0; b < _config.WorldGen.BiomeCount; b++){
                 Biome.BiomeDef def = _config.WorldGen.Biomes[b];
                 def.snowTopBlock = BenchmarkFixtures.Dirt;
+                def.freezesWater = 1;
                 def.strataBlock = BenchmarkFixtures.Dirt;
                 _config.WorldGen.Biomes[b] = def;
             }

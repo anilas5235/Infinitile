@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Blending;
@@ -210,7 +210,7 @@ namespace Engine.Scripts.Jobs.Chunk{
 
         /// <summary>
         ///     Beach and snow top blocks, strata shift and frozen water surface of every chunk column, from the sampled
-        ///     temperature, height and surface biome. Called after <see cref="PrepareChunkMaps(ref GeneratorConfig,ref int3,NativeArray{ChunkColumn},ref FloraGrid)" />
+        ///     temperature, height and surface biome (the hard biome for the ice). Called after <see cref="PrepareChunkMaps(ref GeneratorConfig,ref int3,NativeArray{ChunkColumn},ref FloraGrid)" />
         ///     rather than from it: inside it, even as a separate loop, this code made Burst compile the sampling slower
         ///     (Terrain-first DistanceBlend about a third slower).
         /// </summary>
@@ -222,10 +222,14 @@ namespace Engine.Scripts.Jobs.Chunk{
                 int i = GetColumnIdx(x, z, ChunkDepth);
                 int wx = chunkWordPos.x + x, wz = chunkWordPos.z + z;
                 ChunkColumn col = chunkColumns[i];
-                // Snow line and ice edge of the column share one evaluation of the freeze noise.
-                float freezeNoise = cfg.EnableClimateOverrides ? SurfaceCover.FreezeNoise(wx, wz, cfg) : 0f;
                 if (col.SurfaceSource >= 0 && col.SurfaceSource < cfg.BiomeCount){
                     Biome.BiomeDef def = cfg.Biomes[col.SurfaceSource];
+                    // Ice follows the hard biome, not the dithered surface pick, so its edge is a line.
+                    Biome.BiomeDef waterDef = cfg.Biomes[col.Biome];
+                    // Snow line and ice edge of the column share one evaluation of the freeze noise, which most biomes
+                    // (no snow block, open water) skip.
+                    bool cold = cfg.EnableClimateOverrides && (def.snowTopBlock != 0 || waterDef.freezesWater != 0);
+                    float freezeNoise = cold ? SurfaceCover.FreezeNoise(wx, wz, cfg) : 0f;
                     // Snow covers a beach like any dry column; the beach block stays under it.
                     if (def.beachBlock != 0 && SurfaceCover.IsBeach(wx, wz, col.Height, def, cfg, cache)){
                         col.TopBlock = def.beachBlock;
@@ -235,7 +239,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                     if (SurfaceCover.IsSnowCovered(col.Temperature, col.Height, freezeNoise, def, cfg))
                         col.TopBlock = def.snowTopBlock;
                     if (def.strataBlock != 0) col.StrataShift = SurfaceCover.StrataShift(wx, wz, cfg);
-                    col.Frozen = SurfaceCover.WaterFreezes(col.Temperature, freezeNoise, def, cfg) ? (byte)1 : (byte)0;
+                    col.Frozen = SurfaceCover.WaterFreezes(col.Temperature, freezeNoise, waterDef, cfg) ? (byte)1 : (byte)0;
                 }
 
                 chunkColumns[i] = col;
