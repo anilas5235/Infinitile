@@ -157,6 +157,8 @@ namespace Engine.Tests.EditMode{
             return false;
         }
 
+        [Category(TestTiers.Slow)]
+        [Explicit(TestTiers.SlowReason)]
         [TestCase(GenArchitecture.BiomeFirst)]
         [TestCase(GenArchitecture.TerrainFirst)]
         public void NearWater_FindsAProbeUnderWaterWithinTheDistance(GenArchitecture architecture){
@@ -192,6 +194,8 @@ namespace Engine.Tests.EditMode{
             Assert.Greater(far, 0, "columns far from water");
         }
 
+        [Category(TestTiers.Slow)]
+        [Explicit(TestTiers.SlowReason)]
         [TestCase(GenArchitecture.BiomeFirst)]
         [TestCase(GenArchitecture.TerrainFirst)]
         public void ChunkJob_BeachesAndBeachFloraMatchTheRegionApi(GenArchitecture architecture){

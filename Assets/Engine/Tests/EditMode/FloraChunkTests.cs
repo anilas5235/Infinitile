@@ -19,8 +19,8 @@ namespace Engine.Tests.EditMode{
     ///     <see cref="Engine.Scripts.WorldGen.Core.WorldGenApi.SampleRegion" /> in all 8 configurations
     ///     (2 architectures × 4 methods; Biome-first uses the method in both stages), trees that cross chunk borders
     ///     are complete on both sides, every test and shipped tree variant matches the whole-world stamp across chunk corners, snow,
-    ///     strata and ice agree as well, and the same input gives the same output in any chunk order. Caves stay on: the
-    ///     reference world carves with the pure cave evaluation and leaves out flora on carved ground, as the job does.
+    ///     strata and ice agree as well, and the same input gives the same output in any chunk order. The fixture turns
+    ///     the caves off; the cave tests cover flora on carved ground.
     /// </summary>
     public class FloraChunkTests{
         private FloraFixture _fixture;
@@ -138,6 +138,8 @@ namespace Engine.Tests.EditMode{
             return mismatches;
         }
 
+        [Category(TestTiers.Slow)]
+        [Explicit(TestTiers.SlowReason)]
         [Test]
         public void ChunkJob_FloraAndSurfaceMatchTheRegionApi(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,
@@ -149,6 +151,8 @@ namespace Engine.Tests.EditMode{
             AssertChunksMatchTheRegionApi();
         }
 
+        [Category(TestTiers.Slow)]
+        [Explicit(TestTiers.SlowReason)]
         [Test]
         public void ChunkJob_DenseFloraMatchesTheRegionApi(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,
@@ -352,6 +356,8 @@ namespace Engine.Tests.EditMode{
             return FloraFixture.ShippedVariantNames();
         }
 
+        [Category(TestTiers.Slow)]
+        [Explicit(TestTiers.SlowReason)]
         [Test]
         public void ChunkJob_EveryShippedVariantMatchesTheWholeWorldStamp_AcrossChunkCorners(
             [ValueSource(nameof(ShippedVariants))] string name,

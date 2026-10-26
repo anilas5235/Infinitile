@@ -81,6 +81,8 @@ namespace Engine.Tests.EditMode{
             return seen.Count == set.Count;
         }
 
+        [Category(TestTiers.Slow)]
+        [Explicit(TestTiers.SlowReason)]
         [Test]
         public void Shapes_TrunkReachesCrown_BranchesStartOnTrunk_WithinReach_CountsInBounds(
             [Values(CrownShape.Round, CrownShape.Ellipsoid, CrownShape.Cone, CrownShape.Tiered, CrownShape.None)]

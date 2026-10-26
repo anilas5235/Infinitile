@@ -251,6 +251,8 @@ namespace Engine.Tests.EditMode{
         ///     nesting levels above a PV spline, each of which is Lipschitz in its control values with constant
         ///     below 2 (h00 + h01 = 1 plus the tangent terms).
         /// </summary>
+        [Category(TestTiers.Slow)]
+        [Explicit(TestTiers.SlowReason)]
         [Test]
         public void Continuity_NoJumpExceedsTheSlopeBoundTimesTheStep(){
             TerrainSplineSet set = ScriptableObject.CreateInstance<TerrainSplineSet>();

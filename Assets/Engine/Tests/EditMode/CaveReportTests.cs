@@ -22,6 +22,8 @@ namespace Engine.Tests.EditMode{
     ///     rule and the runs per column the interval store has to hold. It prints values and sets no limits; the
     ///     placeholders are tuned towards their targets from it.
     /// </summary>
+    [Category(TestTiers.Report)]
+    [Explicit(TestTiers.ReportReason)]
     public class CaveReportTests{
         private const string ShippedSettingsPath = "Assets/EngineSettings/WorldGenSettings.asset";
         private const int Size = 4096;

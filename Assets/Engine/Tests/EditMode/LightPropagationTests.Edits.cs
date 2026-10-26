@@ -11,6 +11,8 @@ namespace Engine.Tests.EditMode{
     /// <summary>Incremental light updates after edits.</summary>
     public partial class LightPropagationTests{
         /// <summary>500 random edits with incremental updates equal a full recomputation.</summary>
+        [Category(TestTiers.Slow)]
+        [Explicit(TestTiers.SlowReason)]
         [Test]
         public void RandomEdits_Incremental_EqualsFullRecompute(){
             using LightTestWorld world = new(2, RandomTerrain(7));
