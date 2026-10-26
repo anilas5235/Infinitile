@@ -140,6 +140,7 @@ This is the main setup point for voxel content.
 ### `VoxelRegistry`
 Stores voxel render definitions, voxel IDs, texture arrays, quad arrays, and GPU buffers.
 If you need voxel-to-render mapping or ID lookup, this is usually the place.
+Turned voxels (logs on their side, an oven facing the player, an upper slab) are variant ids appended after all base voxels; `GetVariantTable()` gives `BaseOf`, `OrientationOf` and `VariantOf` for Burst code, and `VoxelPlacement` picks the variant for a click. Variant ids depend on the package, so resolve them at bake or test time and never store them (see `MeshAndRenderPipeline.md`, version 1.7).
 
 ### `VoxelWorldRenderer`
 Owns the meshless GPU rendering path.

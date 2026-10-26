@@ -599,3 +599,64 @@ away along each axis).
 - **Tests.** `PointBuildTests` hashes the points of three partitions (world bottom, surface with every voxel type,
   world top), recorded with the old kernels; they pass unchanged. `IntervalStoreTests` checks every box voxel of
   all 8 partitions of a chunk read through scattered pages and after a growth step.
+
+# Version 1.7 (Rotated voxels)
+
+## Turned Variants as Voxel Ids of Their Own
+
+```mermaid
+flowchart LR
+subgraph Registry["VoxelRegistry.FinalizeRegistry"]
+    direction LR
+    A[Base voxels
+    ids unchanged] --> B[RegisterVariants
+    per base: facing index,
+    then top/bottom]
+    B --> C[Variant VoxelDef
+    base values,
+    turned quads]
+    B --> D[VoxelVariantTable
+    BaseOf / OrientationOf / VariantOf]
+end
+C --> E[GPUVoxelDef buffer
++ quad buffer]
+D --> F[Jobs, flora bake,
+placement]
+```
+
+### Description
+
+A voxel asset can turn: `facing` is None, Axis (3 orientations, like a log), Horizontal (4 fronts) or Full (6
+fronts), and `topBottom` adds an upper half (a slab). Each turned orientation is a voxel id of its own, so the chunk
+data, the interval lists, the light and the point builder stay one `ushort` per voxel and need no extra bits.
+
+- **Ids.** `RegisterVariants` runs after all base voxels are registered and appends the variants: base order, then
+  facing index, then top/bottom. Base ids never change. Variant ids depend on the package, so nothing stores them:
+  the flora bake, the placement and the tests resolve them through the `VoxelVariantTable` (Burst-friendly native
+  arrays: `BaseOf`, `OrientationOf`, `VariantOf`). Data that is ever persisted stores the base id plus the
+  orientation. An orientation the base does not have gives the base id.
+- **Names.** A variant's name is its base name plus a suffix (for example `std:LogOak#x`, `#-z`, `#u` for an upper half);
+  if that does not fit into 32 bytes or is taken, it falls back to `#<base>.<orientation>` and logs a warning.
+- **Orientation byte.** Bits 0–2 are the facing index (axis Y 0, X 1, Z 2; fronts +Z 0, +X 1, −Z 2, −X 3, +Y 4,
+  −Y 5), bit 3 is the upper half (`VoxelOrientation`). `Rotation` gives the integer rotation of the authored shape:
+  the upper half is 180° about Z, applied before the facing.
+- **Geometry.** A variant copies its base's `VoxelDef` (mesh layer, collision, light, glow, surface alpha, fog) and
+  gets the base quads turned about the voxel centre: `QuadRegistry.RegisterRotated` adds each (quad, rotation) pair
+  once, after all authored quads, and the identity returns the quad itself. Positions, normal, up and right turn,
+  the UVs stay with their corners, so the texture, the AO basis and the corner light turn with the quad. Each quad
+  moves to the draw condition its turned normal points to (`VoxelOrientation.Remap`), so the face culling works on
+  the turned shape.
+- **Face culling.** A neighbour hid a face whenever it was in the same or a lower mesh layer. That is wrong for a
+  slab, which covers only half a face. `GPUVoxelDef` (now 88 bytes) carries `HidesNeighbourFaces`, set for full
+  cubes only; a partial shape (slab, plant) leaves its neighbours' faces drawn. Turning a full cube keeps it a full
+  cube, so every variant has its base's flag.
+- **Placement.** `VoxelPlacement.Resolve` picks the variant for a click like Minecraft: Axis follows the clicked
+  face, a front faces the player, top/bottom takes the clicked half. A variant in the hotbar is placed as its base
+  would be; picking a voxel returns its base.
+- **Generation.** The flora bake resolves the lying logs once (`TreeVariantDef.TrunkVoxelX/Z`); see
+  `WorldGenerationPipeline.md`, version 1.10.
+
+Trade-offs:
+
+- The registry, the voxel def buffer and the quad buffer grow by the variants; nothing per chunk grows.
+- Adding or removing a rotatable voxel shifts every later variant id, which is why ids are never stored.
