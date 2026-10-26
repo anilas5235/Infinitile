@@ -607,7 +607,7 @@ in place, the shipped settings with caves on and off (a temporary probe, not com
 | Biome-first | transparent / foliage | 900761 / 91776 | 900761 / 91776 | 0 |
 
 Per chunk column the solid layer grows from 1384 to 2494 points (Terrain-first) and from 1641 to 2769 (Biome-first);
-all layers together +20 % / +15 %. The spawn lies at the coast, so water dominates the transparent layer. The extra
+all layers together +20 % / +15 %. Water covers every column around the spawn, so it dominates the transparent layer. The extra
 solid points are cave walls below the surface, which are rarely visible; occlusion culling for them is recorded as an
 idea in the spec, not built. Collider build time: see the `CMeshBuildJob cave partitions` rows above.
 

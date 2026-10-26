@@ -1,5 +1,105 @@
 # World Generation (Overview)
 
+# Version 1.11 (Caves)
+
+Caves are on everywhere, in the code defaults too. Halls, worm tunnels, lava, ore veins and a bedrock floor are 3D
+passes after the terrain fill. They change voxels below the surface and never the column data, so the surface, the
+biome and the flora decisions stay those of the uncarved column. Every voxel is a pure function of its world
+position, the seed and the config. All values are placeholders.
+
+## Voxel passes of a block
+
+```mermaid
+flowchart LR
+    M[PrepareChunkMaps
+DecideFlora
+ApplySurfaceCover] --> F[FillTerrain]
+    F --> O[PlaceOres]
+    O --> P[PrepareCaveColumns
+limits per column]
+    P --> G[RegisterCaveProbes
+ground of the flora ring]
+    G --> H[CarveCaverns
+4×4×4 lattice]
+    H --> W[CarveWorms]
+    W --> L[FillLava]
+    L --> B[ApplyBottomLayer
+bedrock]
+    B --> V[PlaceVegetation
+skips carved ground]
+```
+
+### Description
+
+- **One pipeline**: `ChunkJob.GenerateVoxels` runs the passes in this order at any world origin, with the vegetation
+  optional. Chunks, `WorldGenApi.SampleSlice` and the cave volume of the region API share it. Each pass is its own
+  non-inlined method after `PrepareChunkMaps`. The cave passes run only when `Caves.Enabled` is set; the bottom
+  layer always runs.
+- **Settings**: `CaveSettings` (the `Caves` section of `WorldGenSettings`, in `ToCanonicalJson`) with its Burst mirror
+  `CaveConfig` on `WorldGenConfig`. The water, ice, lava, ore and bedrock ids are resolved into the config, so no
+  pass looks up voxel names.
+- **Column limits** (`CaveColumns`, `PrepareCaveColumns`): halls and worms carve only up to `Cover` (8) below the
+  surface. Where the column or one of its 8 neighbours lies under water, both limits are `WaterCover` (6) below the
+  lowest of the 9 heights, so no cave drains a lake or floods. Inside the entrance mask (wavelength 96, threshold 0.7),
+  with no water within `EntranceWaterDistance` (16) blocks, worms may carve up to the surface, so the rare openings
+  appear there. Nothing carves at or below the floor (y 2). In Biome-first the blend lattice spans the water probe
+  cells as well, since a probe outside it would evaluate every blend tap.
+- **Halls** (`Caverns`, `CarveCaverns`): a hall noise and a pillar noise (seeded 3D simplex after Gustavson) on a
+  world-aligned 4 × 4 × 4 lattice, interpolated trilinearly at every voxel of the hall band in the columns whose
+  cavern mask (wavelength 384) is open. The threshold rises towards the band edges and over the 0.1 of mask value
+  above its threshold, so halls close before the mask edge instead of ending in a wall. Pillars keep rock where the
+  pillar noise is high.
+- **Worms** (`Worms`, `CarveWorms`): worms start in 64 × 64 cells (`WormsPerCell` 0.6, at most 2), walk in steps of
+  one block with damped yaw and pitch jitter, carve a sphere whose radius changes smoothly, may branch once, and stay
+  within `WormReach` (128) of their start. A block walks every worm that starts within `WormPadding` (reach + largest
+  radius) of it, in full, and carves the steps whose sphere touches it. There is no buffer, so no cap can drop a
+  worm. A worm that starts in the entrance mask starts just below the surface and aims down until it is `Cover`
+  deep. The start tests only the mask and a dry column, not the water distance: starts lie up to `WormPadding` away,
+  beyond the block's water probes, and the column limits keep the worm `Cover` deep wherever water is near.
+- **Flora on carved ground**: `RegisterCaveProbes` gives the worm pass the ground voxels of the flora ring. The worm
+  pass records which of them a sphere carves, and `PlaceVegetation` skips plants and tree anchors whose ground is
+  carved (halls and pockets are tested directly).
+- **Lava** (`LavaPockets`, `FillLava`): inside the lava mask (wavelength 256), flat pockets of a squashed 3D noise in
+  the low band, below each column's hall limit, with lava at or below `LavaLevel` (5) and air above. Every voxel the
+  halls and worms carved at or below `LavaLevel` inside the mask becomes lava too.
+- **Ores** (`OreVeins`, `PlaceOres`): 16³ cells hold a hashed number of vein seeds per ore rule (mean
+  `VeinsPerCell`). A vein is a hashed random walk of `VeinSize` voxels that replaces only the rule's host within its
+  y range, rules in list order. The pass runs before the carving, so caves expose the ores. The shipped table has
+  eight rules (coal to diamond in Stone, ruby in StoneGrey, emerald in SandStoneRed).
+- **Bedrock** (`ApplyBottomLayer`): all of y 0 and hashed shares of y 1 (0.5) and y 2 (0.25). The voxel is
+  `Unbreakable`, so `VoxelEditor` does not break it; `SetVoxel` stays unrestricted.
+- **Pure references**: `CaveCarving.Kind(x, y, z, cfg)` (solid, air or lava) and `OreVeins.Apply` evaluate one voxel
+  without a block; the tests compare every pass with them.
+- **Region API and preview**: `SampleSlice` returns the final voxels of an XY or ZY slice. `RegionBuffers` has
+  `CaveVolume` (carved voxels per column) and the cavern, entrance and lava mask values. The preview has a
+  cross-section mode (top view plus slice) and top-view layers for the cave volume and the masks.
+- **Tests**:
+  - `CaveTests`: seams across shifted and reordered blocks, chunks against the pure evaluation, worms that cross
+    chunks or start beyond their reach, the worm padding, the water, floor, cover and lava rules over 64 chunks,
+    ores against their hosts and the pure walk, and flora on carved ground.
+  - `CaveReportTests`: a report over 4096² columns (mask shares, entrances per km², carved share per 16-block band,
+    hall share, voxels per ore rule, voxel runs per column), with no hard limits.
+  - `SampleSliceTests` and the region API tests compare slices and the cave volume with the chunk job.
+- **Performance** (ms per chunk on one worker, DistanceBlend flora world with the shipped caves): Terrain-first
+  5.65 with caves against 4.70 without, Biome-first 6.01 against 2.75; the cave worst case 6.82 / 10.62. The
+  carving itself costs about the same in both (ores, halls, worm walking and lava 0.6–0.9 ms); Biome-first pays
+  more for height reads outside the chunk: the wider blend lattice over the water probes (+0.75) and the exact
+  surface height at each worm start, about 18 uncached blends per chunk (+1.25). The hall lattice takes 1.06 ms
+  per worst-case chunk against 5.92 with both noises at every voxel. Light with lava pockets 0.99 ms, cave
+  partitions of the collider mesh 0.52 ms against 0.36 without caves. Benchmarks: `ChunkGenerationBenchmark`
+  (caves on/off, worst case), `CaveCarvingBenchmark`, `LightJobBenchmark` (lava pockets) and
+  `ColliderMeshBenchmark` (cave partitions); baseline `2026-10-26-phaseK-editmode-baseline.json`.
+- **Engine effects**: the voxel runs per column grow from a median of 4 to 8 (maximum 68 with flora); the play-mode
+  flight peaks at 11840 of 17986 interval-store pages (66 %) and allocates in none of its 300 frames. Cave walls add
+  solid points below the surface: +80 % (Terrain-first) and +69 % (Biome-first) in the solid layer around the spawn;
+  water and foliage are unchanged. Occlusion culling for them is an idea in spec §16.12, not built.
+
+### Ownership of native memory
+
+- `CaveColumnData` (heights, hall and worm limits, ground probes of the block and its flora ring) is Temp memory of
+  one `GenerateVoxels` call and is released at its end, like the flora grid.
+- The ore rules are a `NativeArray` on `CaveConfig`, released with the world-gen config.
+
 # Version 1.10 (Lying logs)
 
 Trees use turned logs (see `MeshAndRenderPipeline.md`, Version 1.7). An upright trunk stands, a fallen log lies
