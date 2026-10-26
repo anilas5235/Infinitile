@@ -268,6 +268,30 @@ namespace Engine.Tests.EditMode{
 
         #region Worm walks
 
+        /// <summary>Every step of the worm and, apart, every step of its branch (empty without one).</summary>
+        private static (List<Worm> main, List<Worm> branch) Paths(Worm worm, in CaveConfig c){
+            List<Worm> main = new(), steps = new();
+            Worm branch = default;
+            bool branched = false;
+            do{
+                main.Add(worm);
+                if (worm.Step == worm.BranchStep) branched = Worms.Branch(worm, c, out branch);
+            } while (Worms.Next(ref worm, c));
+
+            if (!branched) return (main, steps);
+            do{
+                steps.Add(branch);
+            } while (Worms.Next(ref branch, c));
+
+            return (main, steps);
+        }
+
+        /// <summary>Some step's sphere lies within <c>WormMinRadius</c> of <paramref name="target" />: the worm opens into the worm that starts there.</summary>
+        private static bool Reaches(List<Worm> steps, float3 target, in CaveConfig c){
+            float min = c.WormMinRadius;
+            return steps.Any(s => math.lengthsq(s.Position - target) <= (s.Radius + min) * (s.Radius + min));
+        }
+
         /// <summary>Every step of the worm, then every step of its branch.</summary>
         private static List<Worm> Walk(Worm worm, in CaveConfig c){
             List<Worm> steps = new();
@@ -514,11 +538,67 @@ namespace Engine.Tests.EditMode{
             }
 
             int cells = (ChunkWidth + 2 * c.WormPadding) / c.WormCellSize + 2;
-            int worstSteps = cells * cells * Worms.MaxPerCell * (c.WormLength.y + c.WormLength.y / 2);
+            int worstSteps = cells * cells * Worms.MaxPerCell * Worms.MaxSteps(c);
             TestContext.WriteLine($"{worms} worms, farthest sphere edge {reach:F2} columns from the start, padding {c.WormPadding}, " +
                                   $"longest walk {longest} steps, at most {worstSteps} steps per chunk");
             Assert.Greater(worms, 100, "the cells hold worms");
             Assert.LessOrEqual(reach, c.WormPadding, "a sphere reaches beyond the padding");
+            Assert.LessOrEqual(longest, Worms.MaxSteps(c), "a walk is longer than the bound");
+        }
+
+        [Test]
+        public void Worms_ReachTheirTargets(){
+            // No tunnel lies alone: a worm steers towards the nearest other starts of its 3 × 3 cells and its length
+            // grows to reach the first, so every worm with a target opens into it; its branch takes the next one and
+            // the bridges of a cell reach the nearest start of the +x and +z neighbour cells. Every bridge and every
+            // first target must arrive; the later ones are reported.
+            _config = Build();
+            WorldGenConfig cfg = _config.WorldGen;
+            ref readonly CaveConfig c = ref cfg.Caves;
+            int primaries = 0, withTarget = 0, alone = 0, first = 0, second = 0, secondReached = 0, branch = 0, branchReached = 0;
+            int bridges = 0, bridgesReached = 0;
+            List<string> missed = new();
+            for (int cx = -8; cx < 8; cx++)
+            for (int cz = -8; cz < 8; cz++)
+            for (int k = 0; k < Worms.MaxPerCell; k++){
+                int2 cell = new(cx, cz);
+                if (!Worms.Begin(cell, k, cfg, default, out Worm worm)) continue;
+                (List<Worm> main, List<Worm> fork) = Paths(worm, c);
+                if (k >= Worms.PrimariesPerCell){
+                    bridges++;
+                    Assert.AreEqual(1, worm.TargetsLeft, $"bridge {k} of {cell} has one target");
+                    if (Reaches(main, worm.Target, c)) bridgesReached++;
+                    else missed.Add($"bridge {k} of cell {cell} from {worm.Position} misses {worm.Target} in {main.Count} steps");
+                    continue;
+                }
+
+                primaries++;
+                if (worm.TargetsLeft == 0){
+                    alone++;
+                    continue;
+                }
+
+                withTarget++;
+                if (Reaches(main, worm.Target, c)) first++;
+                else missed.Add($"worm {k} of cell {cell} from {worm.Position} misses {worm.Target} in {main.Count} steps");
+                if (worm.TargetsLeft > 1){
+                    second++;
+                    if (Reaches(main, worm.NextTarget, c)) secondReached++;
+                }
+
+                if (fork.Count > 0 && worm.BranchTargets > 0){
+                    branch++;
+                    if (Reaches(fork, worm.BranchTarget, c)) branchReached++;
+                }
+            }
+
+            TestContext.WriteLine($"{primaries} worms: {withTarget} with a target ({alone} without one in reach), first target reached " +
+                                  $"by {first}, second by {secondReached} of {second}, branch target by {branchReached} of {branch}; " +
+                                  $"{bridges} bridges, {bridgesReached} reach their target");
+            Assert.Greater(withTarget, 100, "the cells hold worms with targets");
+            Assert.Greater(bridges, 50, "the cells hold bridges");
+            Assert.AreEqual(0, missed.Count, "paths miss their first target:\n" + string.Join("\n", missed));
+            Assert.Greater(secondReached, second / 2, "most second targets are reached");
         }
 
         #endregion

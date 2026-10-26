@@ -54,6 +54,15 @@ namespace Engine.Scripts.WorldGen.Caves{
         public float WormBranchChance;
         public int WormMinY;
 
+        /// <summary>Other starts a worm steers towards, 0…2; its branch takes the next one.</summary>
+        public int WormTargets;
+
+        /// <summary>Share of the turn towards the target a worm takes per step, 0…1.</summary>
+        public float WormSteer;
+
+        /// <summary>Each cell with a worm sends a bridge worm to the nearest start of its +x and +z neighbour cells.</summary>
+        [MarshalAs(UnmanagedType.U1)] public bool WormBridges;
+
         // --- Entrances ----------------------------------------------------------------------------------------------
         public float EntranceWavelength;
         public float EntranceThreshold;

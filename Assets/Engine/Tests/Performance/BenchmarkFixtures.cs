@@ -423,7 +423,7 @@ namespace Engine.Tests.Performance{
         internal static void MakeCaveWorstCase(ref CaveConfig caves){
             caves.CavernMaskThreshold = -1f;
             caves.LavaMaskThreshold = -1f;
-            caves.WormsPerCell = Worms.MaxPerCell;
+            caves.WormsPerCell = Worms.PrimariesPerCell;
         }
 
         /// <summary>

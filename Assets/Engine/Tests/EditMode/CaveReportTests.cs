@@ -147,16 +147,29 @@ namespace Engine.Tests.EditMode{
                 long columns = (long)Size * Size;
                 double km2 = columns / 1e6;
 
-                // Worms that start inside an entrance, over the same area.
-                int entranceWorms = 0, worms = 0;
+                // Worms that start inside an entrance, and the links between worms, over the same area.
+                int entranceWorms = 0, worms = 0, alone = 0, targets = 0, reached = 0, bridges = 0, bridgesReached = 0;
                 int2 firstCell = Worms.Cell(new int2(-Size / 2), cfg), lastCell = Worms.Cell(new int2(Size / 2 - 1), cfg);
+                WormAnchors anchors = WormAnchors.Create(firstCell - 1, lastCell + 1, cfg, default, Allocator.Temp);
                 for (int cx = firstCell.x; cx <= lastCell.x; cx++)
                 for (int cz = firstCell.y; cz <= lastCell.y; cz++)
                 for (int k = 0; k < Worms.MaxPerCell; k++){
-                    if (!Worms.Begin(new int2(cx, cz), k, cfg, default, out Worm worm)) continue;
+                    if (!Worms.Begin(new int2(cx, cz), k, cfg, default, anchors, out Worm worm)) continue;
+                    if (k >= Worms.PrimariesPerCell){
+                        bridges++;
+                        if (Reaches(worm, worm.Target, cfg.Caves)) bridgesReached++;
+                        continue;
+                    }
+
                     worms++;
-                    if (worm.DescendAbove != int.MaxValue) entranceWorms++;
+                    if (worm.ShaftAbove != int.MaxValue) entranceWorms++;
+                    if (worm.TargetsLeft == 0) alone++;
+                    int wanted = worm.TargetsLeft + (worm.BranchStep >= 0 ? worm.BranchTargets : 0);
+                    targets += wanted;
+                    reached += wanted - Unreached(worm, cfg.Caves);
                 }
+
+                anchors.Dispose();
 
                 StringBuilder report = new();
                 report.AppendLine($"Caves over {Size}² columns around the origin, seed {TestFixtures.Seed}:");
@@ -165,6 +178,8 @@ namespace Engine.Tests.EditMode{
                                   $"entrance columns {100.0 * sum[EntranceMask] / columns:F2} %");
                 report.AppendLine($"entrances: {entranceWorms / km2:F1} entrance worms per km² ({entranceWorms} of {worms} worms), " +
                                   $"{sum[Openings] / km2:F0} columns open to the sky per km²");
+                report.AppendLine($"links: {worms - alone} of {worms} worms steer at other starts ({alone} have none in reach), " +
+                                  $"{reached} of {targets} targets reached; {bridges} bridges, {bridgesReached} reach their target");
                 long carved = Enumerable.Range(0, Bands).Sum(b => sum[CarvedBand + b]);
                 report.AppendLine($"carved {carved} voxels, {100.0 * sum[Halls] / carved:F1} % of them in halls; " +
                                   $"lava {sum[Lava]} voxels ({100.0 * sum[Lava] / carved:F1} % of the carved)");
@@ -190,6 +205,30 @@ namespace Engine.Tests.EditMode{
                 config.WorldGen.Dispose();
                 config.Voxels.Dispose();
             }
+        }
+
+        /// <summary>Some step of the worm (without its branch) opens into the worm that starts at <paramref name="target" />.</summary>
+        private static bool Reaches(Worm worm, float3 target, in CaveConfig c){
+            do{
+                float r = worm.Radius + c.WormMinRadius;
+                if (math.lengthsq(worm.Position - target) <= r * r) return true;
+            } while (Worms.Next(ref worm, c));
+
+            return false;
+        }
+
+        /// <summary>Targets of the worm and its branch that no step of the path reaches.</summary>
+        private static int Unreached(Worm worm, in CaveConfig c){
+            int missed = 0;
+            if (worm.TargetsLeft > 0 && !Reaches(worm, worm.Target, c)) missed++;
+            if (worm.TargetsLeft > 1 && !Reaches(worm, worm.NextTarget, c)) missed++;
+            if (worm.BranchStep < 0 || worm.BranchTargets == 0) return missed;
+            Worm parent = worm;
+            while (parent.Step < parent.BranchStep && Worms.Next(ref parent, c)){ }
+
+            if (parent.Step == parent.BranchStep && Worms.Branch(parent, c, out Worm branch) && !Reaches(branch, branch.Target, c))
+                missed++;
+            return missed;
         }
 
         private static string Runs(long[] sum, int histogram, long columns){

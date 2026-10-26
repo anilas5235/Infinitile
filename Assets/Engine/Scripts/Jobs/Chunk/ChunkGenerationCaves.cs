@@ -346,7 +346,8 @@ namespace Engine.Scripts.Jobs.Chunk{
         ///     Worm tunnels (<see cref="Worms" />): walks every worm whose start lies within <c>WormPadding</c> of the
         ///     block or its ring, with its branch, and carves each step's sphere into the block below the column limits.
         ///     Steps near a ground probe of the ring are recorded for the flora test. Nothing is buffered: the walk
-        ///     carves as it goes, so no cap can drop a worm.
+        ///     carves as it goes, so no cap can drop a worm. The anchors of the cells one beyond the range are
+        ///     computed once, since every worm steers at starts of its neighbour cells.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
         internal static void CarveWorms(NativeArray<ushort> vox, ref CaveColumnData caves, int3 origin, in WorldGenConfig cfg,
@@ -355,6 +356,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             int padding = c.WormPadding + caves.Padding;
             int2 min = origin.xz - padding, max = origin.xz + new int2(ChunkWidth - 1, ChunkDepth - 1) + padding;
             int2 firstCell = Worms.Cell(min, cfg), lastCell = Worms.Cell(max, cfg);
+            WormAnchors anchors = WormAnchors.Create(firstCell - 1, lastCell + 1, cfg, cache, Allocator.Temp);
             for (int cx = firstCell.x; cx <= lastCell.x; cx++)
             for (int cz = firstCell.y; cz <= lastCell.y; cz++)
             for (int k = 0; k < Worms.MaxPerCell; k++){
@@ -362,7 +364,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                 if (!Worms.Present(cell, k, cfg)) continue;
                 int2 start = Worms.StartColumn(cell, k, cfg);
                 if (math.any(start < min) || math.any(start > max)) continue;
-                if (!Worms.Begin(cell, k, cfg, cache, out Worm worm)) continue;
+                if (!Worms.Begin(cell, k, cfg, cache, anchors, out Worm worm)) continue;
                 Worm branch = default;
                 bool branched = false;
                 do{
@@ -375,6 +377,8 @@ namespace Engine.Scripts.Jobs.Chunk{
                     CarveStep(vox, ref caves, branch, origin, c);
                 } while (Worms.Next(ref branch, c));
             }
+
+            anchors.Dispose();
         }
 
         private static void CarveStep(NativeArray<ushort> vox, ref CaveColumnData caves, in Worm worm, int3 origin,

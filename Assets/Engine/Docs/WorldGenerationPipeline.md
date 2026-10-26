@@ -49,7 +49,8 @@ skips carved ground]
   cavern mask (wavelength 384) is open. The threshold rises towards the band edges and over the 0.1 of mask value
   above its threshold, so halls close before the mask edge instead of ending in a wall. Pillars keep rock where the
   pillar noise is high.
-- **Worms** (`Worms`, `CarveWorms`): worms start in 64 × 64 cells (`WormsPerCell` 1.2, at most 2), walk in steps of
+- **Worms** (`Worms`, `CarveWorms`): worms start in 64 × 64 cells (`WormsPerCell` 1.2, at most 2 primary worms and
+  2 bridges, see the links below), walk in steps of
   one block with damped yaw and pitch jitter, carve a sphere whose radius changes smoothly, may branch once, and stay
   within `WormReach` (128) of their start. A block walks every worm that starts within `WormPadding` (reach + largest
   radius) of it, in full, and carves the steps whose sphere touches it. There is no buffer, so no cap can drop a
@@ -61,6 +62,22 @@ skips carved ground]
   the exact surface height; the others take their depth range from the unblended height
   (`WorldSampler.SampleUnblendedHeight`, the hard biome's height in Biome-first), which saves a blend of every
   kernel tap per start.
+- **Worm links** (`WormAnchor`, `WormAnchors`): so that no tunnel lies alone, every worm steers towards other
+  worms. Each primary worm (slots 0 and 1 of a cell) has an anchor: its start column, start y and, for other worms to
+  aim at, the centre of its first sphere (the bottom of the shaft for an entrance worm). A worm takes the
+  `WormTargets` (2) nearest anchors of its 3 × 3 cells within 75 % of `WormReach`, ranked by horizontal distance plus
+  the climb at the largest pitch, and steers at them one after the other: each step turns the yaw `WormSteer` (0.25)
+  of the way towards the target and relaxes the pitch towards it; a target counts as reached when the sphere lies
+  within `WormMinRadius` of it, so the two tunnels overlap. The length grows to the way to the first target
+  (1.5 steps per block plus 16), so the first target is always reached; the second gets what is left, and the branch
+  takes the next anchor with its own length. A start in the cavern mask above the band (and every entrance worm)
+  first descends at the largest pitch towards the column where that descent ends on the way to its target, then
+  steers; the descent ends once below the band top, so a target above it may lead back up. Each cell with a worm
+  also sends bridge worms (slots 2 and 3, `WormBridges`) from its first primary's anchor to the nearest anchor of
+  the +x and +z neighbour cells, unless the primary steers at that anchor already; a bridge has one target, no
+  branch and just the length to arrive. `CarveWorms` computes the anchors of the cells one beyond its range once per
+  block (`WormAnchors.Create`), since every worm reads those of its neighbours; `Worms.Begin` without a table computes
+  them on demand, and `Worms.Covers` builds its own table.
 - **Flora on carved ground**: `RegisterCaveProbes` gives the worm pass the ground voxels of the flora ring. The worm
   pass records which of them a sphere carves, and `PlaceVegetation` skips plants and tree anchors whose ground is
   carved (halls and pockets are tested directly).

@@ -622,6 +622,38 @@ all layers together +20 % / +15 %. Water covers every column around the spawn, s
 solid points are cave walls below the surface, which are rarely visible; occlusion culling for them is recorded as an
 idea in the spec, not built. Collider build time: see the `CMeshBuildJob cave partitions` rows above.
 
+## 2026-10-27 — linked worms (`2026-10-27-phaseK-links-editmode-baseline.json`)
+
+Same machine and settings as above. Worms now steer towards the nearest other worm starts of their 3 × 3 cells
+(two targets, the branch takes the third) with their length extended to reach the first, each cell sends bridge
+worms to its +x and +z neighbour cells, and a start in the cavern mask above the band descends to the band top
+first (spec DEC-74). Caves are on in every `ChunkJob` row, so every one of them pays for the longer walks: a chunk
+with the shipped settings now walks 42.3 worms (27.1 primary worms and the bridges) and 7907 steps instead of 27.1
+worms and 4622 steps, of which 88 carve into it; in the worst case 73.8 worms, 13602 steps, 193 carving. The walk
+itself got cheaper per step on the way (the two jitter rolls share one hash, the radius knots are rolled once per
+knot instead of per step, the steering wraps its angle with one `atan2`), which took the first measurement of the
+links from 9299 steps and 6.52 ms down to this file.
+
+| Sample group | Median | Min | Max | Previous baseline | Change (median) |
+|---|---|---|---|---|---|
+| ChunkJob.Run TerrainFirst DistanceBlend caves on ms/chunk | 6.42 ms | 6.35 ms | 6.62 ms | 5.83 ms | +10 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves on ms/chunk | 5.78 ms | 5.75 ms | 5.83 ms | 5.06 ms | +14 % |
+| ChunkJob.Run TerrainFirst DistanceBlend caves off ms/chunk | 4.66 ms | 4.61 ms | 4.71 ms | 4.66 ms | 0 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves off ms/chunk | 2.74 ms | 2.71 ms | 2.76 ms | 2.74 ms | 0 % |
+| ChunkJob.Run TerrainFirst DistanceBlend cave worst case ms/chunk | 7.71 ms | 7.65 ms | 8.01 ms | 6.83 ms | +13 % |
+| ChunkJob.Run BiomeFirst DistanceBlend cave worst case ms/chunk | 7.45 ms | 7.39 ms | 7.56 ms | 6.09 ms | +22 % |
+| ChunkJob.Run TerrainFirst None ms/chunk | 3.46 ms | 3.43 ms | 3.62 ms | 2.89 ms | +20 % |
+| ChunkJob.Run BiomeFirst None ms/chunk | 2.65 ms | 2.63 ms | 2.68 ms | 2.06 ms | +29 % |
+| ChunkJob.Run TerrainFirst DistanceBlend ms/chunk | 5.42 ms | 5.39 ms | 5.47 ms | 4.87 ms | +11 % |
+| ChunkJob.Run BiomeFirst DistanceBlend ms/chunk | 5.02 ms | 4.98 ms | 5.08 ms | 4.02 ms | +25 % |
+
+Every `ChunkJob` row with caves grew by about the same +0.5–0.6 ms (Terrain-first) / +0.6–1.0 ms (Biome-first): the
+extra walked steps, and in Biome-first the anchors of the cells one beyond the padding (about 30 more unblended height
+reads per chunk). The percentages are largest on the cheap rows (`None`, `ParameterSpaceWeighting`, +18–29 %); the
+DistanceBlend rows are +5–13 % Terrain-first and +14–25 % Biome-first. The caves-off rows, meshing, light, culling
+and the interval-list rows are within ±7 %. The `ChunkJob.Run TerrainFirst ms/chunk` row (3.14 ms) compares with the 2.73–2.74 ms of the focused
+runs noted above, not with the bimodal 4.63 of the previous file.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the

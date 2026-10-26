@@ -122,6 +122,20 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Min(3)]
         public int WormMinY = 3;
 
+        [Tooltip("Other worm starts (of the 3×3 cells around it, nearest first) a worm steers towards, one after the other; "
+                 + "its length grows to reach the first, and its branch takes the next one. 0 lets worms wander alone.")]
+        [Range(0, 2)]
+        public int WormTargets = 2;
+
+        [Tooltip("Share of the turn towards its target a worm takes per step (0…1); lower values keep more of the random "
+                 + "bends but need more steps to arrive.")]
+        [Range(0f, 1f)]
+        public float WormSteer = .25f;
+
+        [Tooltip("Each cell with a worm also sends a short bridge worm to the nearest start of its +x and +z neighbour "
+                 + "cells, so the tunnels of neighbouring cells link up.")]
+        public bool WormBridges = true;
+
         [Header("Entrances")]
         [Tooltip("Wavelength of the 2D entrance mask in blocks.")]
         public float EntranceWavelength = 96f;

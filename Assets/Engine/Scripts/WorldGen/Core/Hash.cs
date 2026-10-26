@@ -1,4 +1,5 @@
 using Unity.Burst;
+using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Core{
     /// <summary>
@@ -55,6 +56,12 @@ namespace Engine.Scripts.WorldGen.Core{
         /// <summary>Uniform float in [-1, 1) built from <see cref="Hash01" />.</summary>
         public static float HashSigned(int x, int z, uint seed, uint salt){
             return Hash01(x, z, seed, salt) * 2f - 1f;
+        }
+
+        /// <summary>Two uniform floats in [−1, 1) from one <see cref="Hash32(int,int,uint,uint)" />, 16 bits each.</summary>
+        public static float2 HashSigned2(int x, int z, uint seed, uint salt){
+            uint h = Hash32(x, z, seed, salt);
+            return new float2(h & 0xFFFFu, h >> 16) * (2f / 65536f) - 1f;
         }
     }
 }
