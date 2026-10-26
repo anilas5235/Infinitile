@@ -111,7 +111,7 @@ namespace Engine.Tests.EditMode{
             "SandGrey", "SandRed", "SandStoneRed", "SandStoneRedEmeraldOre", "SandStoneRedSandy", "StoneCoalOre",
             "StoneDiamondOre", "StoneGoldOre", "StoneGrassy", "StoneGravel", "StoneGrey", "StoneGreySandy",
             "StoneIronBrownOre", "StoneIronGreenOre", "StoneSandy", "StoneSilverOre", "StoneSnowy", "WheatStage1",
-            "WheatStage2", "WheatStage3", "WheatStage4", "Workbench", "Flowers", "Snow", "StoneSlab", "StoneSnowy 1",
+            "WheatStage2", "WheatStage3", "WheatStage4", "Workbench", "Flowers", "Snow", "StoneSlab",
             "LeavesSpruce", "LogSpruce", "DeadBush"
         };
 
