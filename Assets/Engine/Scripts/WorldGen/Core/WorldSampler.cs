@@ -150,6 +150,25 @@ namespace Engine.Scripts.WorldGen.Core{
             BiomeFirstHeight.Sample(p, weights, cfg, out height, out float _);
         }
 
+        /// <summary>
+        ///     The terrain height H of column (x, z) without the spatial blend: Terrain-first has none, so this equals
+        ///     <see cref="SampleHeight(int,int,in WorldGenConfig,in BlendCache,out float)" />; Biome-first composes it
+        ///     from the hard biome alone, one classification instead of one per kernel tap. An estimate for decisions
+        ///     that tolerate the jump at a biome border. Direct-call entry point, so a managed caller gets the jobs' bits.
+        /// </summary>
+        [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
+        public static void SampleUnblendedHeight(int x, int z, in WorldGenConfig cfg, out float height){
+            float2 p = new(x, z);
+            SampleFields(p, cfg, out WorldFields fields);
+            if (cfg.Architecture == GenArchitecture.TerrainFirst){
+                TerrainFirstHeight.Sample(p, fields, cfg, out float3 _, out height, out float _);
+                return;
+            }
+
+            int hard = BiomeClassifier.Distances(fields, 0f, false, cfg, out BlendWeights _);
+            BiomeFirstHeight.Sample(p, BlendWeights.OneHot(hard), cfg, out height, out float _);
+        }
+
         /// <summary>h = saturate((H − Hmin)/(Hmax − Hmin)).</summary>
         public static float NormalizedHeight(float height, in WorldGenConfig cfg){
             return math.saturate((height - cfg.HeightMin) / (cfg.HeightMax - cfg.HeightMin));

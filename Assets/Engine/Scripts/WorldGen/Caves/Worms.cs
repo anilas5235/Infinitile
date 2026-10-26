@@ -93,7 +93,8 @@ namespace Engine.Scripts.WorldGen.Caves{
 
         /// <summary>
         ///     Starts worm <paramref name="k" /> of <paramref name="cell" />; false when the cell has no such worm or its
-        ///     start column has no room for one (surface − Cover below the lowest start height outside an entrance).
+        ///     start column has no room for one (surface − Cover below the lowest start height outside an entrance;
+        ///     outside the entrance mask the surface is the unblended height).
         ///     A worm in the entrance mask starts up to <c>EntranceStartDepth</c> below the surface, goes straight down
         ///     until its sphere lies below <c>Cover</c> (outside the mask nothing above it is carved, so a sloped start
         ///     left the opening a dead end), then aims down to the top of the cavern band, where the halls and the
@@ -107,8 +108,14 @@ namespace Engine.Scripts.WorldGen.Caves{
             if (!Present(cell, k, cfg)) return false;
             uint hash = WormHash(cell, k, cfg);
             int2 column = StartColumn(cell, k, cfg);
-            int surface = CaveColumns.SurfaceY(column.x, column.y, cfg, cache);
-            bool entrance = CaveColumns.InEntranceMask(column.x, column.y, surface, cfg);
+            // Only a start in the entrance mask needs the exact surface, for its opening. The depth range of the others
+            // takes the unblended height, which in Biome-first saves a blend of every kernel tap per start; the column
+            // limits still keep those worms Cover below the exact surface.
+            bool inMask = CaveMasks.Entrance(column.x, column.y, cfg) > c.EntranceThreshold;
+            int surface = inMask
+                ? CaveColumns.SurfaceY(column.x, column.y, cfg, cache)
+                : CaveColumns.UnblendedSurfaceY(column.x, column.y, cfg);
+            bool entrance = inMask && !CaveColumns.Submerged(surface, cfg);
             int y;
             int extraSteps = 0;
             if (entrance){

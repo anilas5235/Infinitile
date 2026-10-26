@@ -28,6 +28,15 @@ namespace Engine.Scripts.WorldGen.Caves{
             return math.clamp((int)math.floor(height), 0, MaxTerrainHeight);
         }
 
+        /// <summary>
+        ///     <see cref="SurfaceY" /> from the unblended height (<see cref="WorldSampler.SampleUnblendedHeight" />):
+        ///     the same in Terrain-first, the hard biome's height in Biome-first.
+        /// </summary>
+        public static int UnblendedSurfaceY(int x, int z, in WorldGenConfig cfg){
+            WorldSampler.SampleUnblendedHeight(x, z, cfg, out float height);
+            return math.clamp((int)math.floor(height), 0, MaxTerrainHeight);
+        }
+
         /// <summary>The voxel above top block <paramref name="height" /> is water.</summary>
         public static bool Submerged(int height, in WorldGenConfig cfg){
             return height + 1 < cfg.WaterLevel;
