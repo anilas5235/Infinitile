@@ -529,6 +529,88 @@ first run:
 Play-mode flight with the shipped world: 0 of 300 frames allocate; the interval store peaked at 8123 of 17986 pages
 (45 %) and did not grow.
 
+## 2026-10-26 — caves (`2026-10-26-phaseK-editmode-baseline.json`)
+
+Same machine and settings as above. Caves are on everywhere, in the code defaults too, so **every `ChunkJob` row now
+includes them** (halls, worms, lava, ores and bedrock). The cave rows use the shipped cave settings (loaded from the
+shipped `WorldGenSettings` with its ore table and lava voxel) on the placeholder six-biome flora world with
+DistanceBlend:
+- **caves on / off**: the shipped caves, and the same world with caves disabled.
+- **cave worst case**: cavern and lava masks open everywhere and the most worms per cell (2), so every column carves
+  its hall band and lava pockets.
+- **CarveCaverns lattice / per voxel**: the hall pass alone on the 16 worst-case chunks, on the 4 × 4 × 4 lattice and
+  with both noises at every voxel; the column limits are prepared beforehand and not timed. The lattice carves
+  5648 hall voxels per chunk against 5422 per voxel; 9.9 % of the voxels differ.
+- **LightJob lava pockets**: the forest flora world (Terrain-first) with the lava mask open everywhere, 204 lava
+  voxels per chunk.
+- **CMeshBuildJob cave partitions**: the 16 partitions of the scattered caves-on chunks that hold air or lava below
+  their column's highest collision voxel, meshed with caves on and off.
+
+| Sample group | Median | Min | Max | Compared with (same run) | Change (median) |
+|---|---|---|---|---|---|
+| ChunkJob.Run TerrainFirst DistanceBlend caves on ms/chunk | 5.65 ms | 5.59 ms | 5.88 ms | caves off 4.70 ms | +20 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves on ms/chunk | 6.01 ms | 5.82 ms | 6.50 ms | caves off 2.75 ms | +118 % |
+| ChunkJob.Run TerrainFirst DistanceBlend cave worst case ms/chunk | 6.82 ms | 6.80 ms | 6.96 ms | caves off 4.70 ms | +45 % |
+| ChunkJob.Run BiomeFirst DistanceBlend cave worst case ms/chunk | 10.62 ms | 10.52 ms | 10.92 ms | caves off 2.75 ms | +286 % |
+| CarveCaverns lattice ms/chunk | 1.06 ms | 1.05 ms | 1.31 ms | per voxel 5.92 ms | −82 % |
+| LightJob.Run lava pockets ms/chunk | 0.99 ms | 0.97 ms | 1.15 ms | natural terrain 0.76 ms | +31 % |
+| CMeshBuildJob.Run cave partitions caves on ms/partition | 0.52 ms | 0.52 ms | 0.54 ms | caves off 0.36 ms | +44 % |
+
+Worms per chunk (logged by the caves rows): with the shipped settings a chunk walks 12.9 worms, 2132 steps, of which
+31 carve into it; in the worst case 45.1 worms, 7592 steps, 99 carving.
+
+The first full run measured Biome-first DistanceBlend at 11.98 ms with caves on (2.76 off). Most of it was the
+entrance water test at worm starts: a start lies up to 143 blocks from the chunk, beyond its water probes, so each
+start in the entrance mask ran up to 81 uncached Biome-first height samples, in every chunk in reach. Starts now test
+only the entrance mask and a dry column (the column limits still keep every opening 16 blocks from water), and the
+Biome-first blend lattice spans the water probe cells. That brought the row to 6.0 ms. The rest of the gap between the
+architectures comes from height reads, not from carving. Stage by stage (Biome-first / Terrain-first, ms per chunk,
+probe run):
+
+| Stage | Biome-first | Terrain-first |
+|---|---|---|
+| caves off | 2.37 | 4.26 |
+| cache with the wider lattice and the water probes | +0.76 | +0.0 |
+| ores | +0.13 | +0.11 |
+| cave column limits | +0.36 | +0.29 |
+| exact surface height at the worm starts (about 18 per chunk) | +1.25 | +0.0 |
+| halls | +0.10 | +0.14 |
+| worm walking and carving | +0.2 | +0.16 |
+| lava | +0.24 | +0.32 |
+| full | 5.38 | 5.29 |
+
+An uncached Biome-first height blends every tap (about 70 µs); in Terrain-first it is one noise sample. The user kept
+the exact start height, since both architectures now cost about the same with caves.
+
+Regression check, every existing row vs the previous baseline (median):
+- **Terrain-first `ChunkJob` rows: +5 % to +19 %, above the 10 % rule.** The caves cost 0.3–0.6 ms per chunk; the
+  rows without blending grow most in percent (`None` +18 %, `ParameterSpaceWeighting` +18 %). Accepted: the caves are
+  a new feature that every row includes.
+- **Biome-first `ChunkJob` rows: +20 % to +104 %, above the 10 % rule.** Without a spatial blend (`None`,
+  `ParameterSpaceWeighting`) +0.3–0.5 ms (+20–30 %); with DistanceBlend or DistortedBoundary +2.5–3.0 ms (+69–104 %),
+  the height reads above. DistanceBlend 2.51 → 5.11 ms, flora 2.76 → 5.48 ms.
+- **`CMeshBuildJob` solid +36 % (0.33 → 0.44 ms):** the solid partition lies below the surface, where caves now open
+  faces. The other meshing rows, light, culling and interval-list rows are between −13 % and +3 %.
+- `PageAllocator fill+release` −4 %.
+
+Play-mode flight with the shipped world: 0 of 300 frames allocate; the interval store peaked at 11840 of 17986 pages
+(66 %, about 11 of the 17 pages per list; 45 % before the caves) and did not grow.
+
+Points in the render buffers once the world around the spawn (0, 250, 0) is meshed: 169 chunk columns, the player held
+in place, the shipped settings with caves on and off (a temporary probe, not committed):
+
+| Architecture | Layer | Caves off | Caves on | Change |
+|---|---|---|---|---|
+| Terrain-first | solid | 233914 points, 206 partitions | 421520 points, 401 partitions | +80 % |
+| Terrain-first | transparent / foliage | 668171 / 33568 | 668171 / 33568 | 0 |
+| Biome-first | solid | 277286 points, 209 partitions | 468013 points, 425 partitions | +69 % |
+| Biome-first | transparent / foliage | 900761 / 91776 | 900761 / 91776 | 0 |
+
+Per chunk column the solid layer grows from 1384 to 2494 points (Terrain-first) and from 1641 to 2769 (Biome-first);
+all layers together +20 % / +15 %. The spawn lies at the coast, so water dominates the transparent layer. The extra
+solid points are cave walls below the surface, which are rarely visible; occlusion culling for them is recorded as an
+idea in the spec, not built. Collider build time: see the `CMeshBuildJob cave partitions` rows above.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the
@@ -537,6 +619,9 @@ project open):
 ```
 unity command run_tests --mode EditMode --filter Engine.Tests.Performance --timeout 600 --result-only
 ```
+
+A run that outlasts the calling shell is cancelled with it. `unity command --detach run_tests -- …` submits the run as
+a job and returns at once; the Editor log reports `[TestResultCollector] Run finished` at the end.
 
 With the Editor closed:
 

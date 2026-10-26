@@ -1,0 +1,2150 @@
+{
+    "TestSuite": "Editmode",
+    "Date": 1793041958440,
+    "Player": {
+        "Development": true,
+        "ScreenWidth": 1920,
+        "ScreenHeight": 1080,
+        "ScreenRefreshRate": 60,
+        "Fullscreen": false,
+        "Vsync": 0,
+        "AntiAliasing": 0,
+        "Batchmode": false,
+        "RenderThreadingMode": "MultiThreaded",
+        "MtRendering": true,
+        "GraphicsJobs": false,
+        "GpuSkinning": true,
+        "Platform": "WindowsEditor",
+        "ColorSpace": "Linear",
+        "AnisotropicFiltering": "ForceEnable",
+        "BlendWeights": "FourBones",
+        "GraphicsApi": "Direct3D11",
+        "ScriptingBackend": "Mono2x",
+        "AndroidTargetSdkVersion": "AndroidApiLevelAuto",
+        "AndroidBuildSystem": "Gradle",
+        "BuildTarget": "StandaloneWindows64",
+        "StereoRenderingPath": "MultiPass"
+    },
+    "Hardware": {
+        "OperatingSystem": "Windows 11  (10.0.26300)",
+        "DeviceModel": "B550 Steel Legend (To Be Filled By O.E.M.)",
+        "DeviceName": "NIKLAS-GAMINGPC",
+        "ProcessorType": "AMD Ryzen 7 5800X 8-Core Processor ",
+        "ProcessorCount": 16,
+        "GraphicsDeviceName": "AMD Radeon RX 6900 XT",
+        "SystemMemorySizeMB": 32690
+    },
+    "Editor": {
+        "Version": "6000.3.11f1",
+        "Branch": "6000.3/staging",
+        "Changeset": "3000ef702840",
+        "Date": 1772572323
+    },
+    "Dependencies": [
+        "com.unity.ide.rider@3.0.40",
+        "com.unity.inputsystem@1.19.0",
+        "com.unity.pipeline@0.8.0-exp.1",
+        "com.unity.render-pipelines.universal@17.3.0",
+        "com.unity.test-framework@1.6.0",
+        "com.unity.test-framework.performance@3.2.0",
+        "com.unity.testtools.codecoverage@1.3.0",
+        "com.unity.ugui@2.0.0",
+        "com.unity.modules.accessibility@1.0.0",
+        "com.unity.modules.ai@1.0.0",
+        "com.unity.modules.androidjni@1.0.0",
+        "com.unity.modules.animation@1.0.0",
+        "com.unity.modules.audio@1.0.0",
+        "com.unity.modules.imageconversion@1.0.0",
+        "com.unity.modules.imgui@1.0.0",
+        "com.unity.modules.jsonserialize@1.0.0",
+        "com.unity.modules.particlesystem@1.0.0",
+        "com.unity.modules.physics@1.0.0",
+        "com.unity.modules.screencapture@1.0.0",
+        "com.unity.modules.terrain@1.0.0",
+        "com.unity.modules.ui@1.0.0",
+        "com.unity.modules.uielements@1.0.0",
+        "com.unity.modules.unitywebrequest@1.0.0",
+        "com.unity.modules.hierarchycore@1.0.0",
+        "com.unity.settings-manager@2.1.1",
+        "com.unity.ext.nunit@2.0.5",
+        "com.unity.render-pipelines.core@17.3.0",
+        "com.unity.shadergraph@17.3.0",
+        "com.unity.render-pipelines.universal-config@17.0.3",
+        "com.unity.nuget.mono-cecil@1.11.6",
+        "com.unity.nuget.newtonsoft-json@3.2.2",
+        "com.unity.searcher@4.9.4",
+        "com.unity.burst@1.8.28",
+        "com.unity.mathematics@1.3.3",
+        "com.unity.collections@2.6.2"
+    ],
+    "Results": [
+        {
+            "Name": "Engine.Tests.Performance.CaveCarvingBenchmark.CarveCaverns_Run_MsPerChunk(True)",
+            "ClassName": "Engine.Tests.Performance.CaveCarvingBenchmark",
+            "MethodName": "CarveCaverns_Run_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "CarveCaverns lattice ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        1.07154375,
+                        1.1853875,
+                        1.29715625,
+                        1.3067375,
+                        1.157,
+                        1.08651875,
+                        1.08761875,
+                        1.0787312500000002,
+                        1.0600875,
+                        1.0626,
+                        1.07183125,
+                        1.0519625000000002,
+                        1.05830625,
+                        1.048925,
+                        1.0538750000000002,
+                        1.0590062500000002,
+                        1.05295,
+                        1.051625,
+                        1.0450125000000002,
+                        1.0480125
+                    ],
+                    "Min": 1.0450125000000002,
+                    "Max": 1.3067375,
+                    "Median": 1.06134375,
+                    "Average": 1.096744375,
+                    "StandardDeviation": 0.07683235808960555,
+                    "Sum": 21.9348875
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.CaveCarvingBenchmark.CarveCaverns_Run_MsPerChunk(False)",
+            "ClassName": "Engine.Tests.Performance.CaveCarvingBenchmark",
+            "MethodName": "CarveCaverns_Run_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "CarveCaverns per voxel ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        5.913250000000001,
+                        5.924975,
+                        5.9884312500000009,
+                        6.0504375,
+                        5.94269375,
+                        5.97611875,
+                        5.922643750000001,
+                        5.9176,
+                        5.8356125,
+                        5.80728125,
+                        5.9284625,
+                        6.32440625,
+                        5.981262500000001,
+                        5.926681250000001,
+                        5.86709375,
+                        5.854687500000001,
+                        5.872025000000001,
+                        5.8649375,
+                        5.8777875,
+                        5.8744625
+                    ],
+                    "Min": 5.80728125,
+                    "Max": 6.32440625,
+                    "Median": 5.920121875,
+                    "Average": 5.932542499999999,
+                    "StandardDeviation": 0.10625258477738316,
+                    "Sum": 118.65085
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_Beaches_MsPerChunk(TerrainFirst)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_Beaches_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainFirst DistanceBlend beaches ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        5.6016,
+                        6.1159125,
+                        5.41251875,
+                        5.422625,
+                        5.3927125,
+                        5.4138625000000009,
+                        5.37893125,
+                        5.438750000000001,
+                        5.38010625,
+                        5.38610625,
+                        5.4977625,
+                        5.456356250000001,
+                        5.43629375,
+                        5.42660625,
+                        5.405812500000001,
+                        5.4614062500000009,
+                        5.4182875,
+                        5.41474375,
+                        5.42180625,
+                        5.44545625
+                    ],
+                    "Min": 5.37893125,
+                    "Max": 6.1159125,
+                    "Median": 5.422215625,
+                    "Average": 5.466382812500001,
+                    "StandardDeviation": 0.15654785517677728,
+                    "Sum": 109.32765625000002
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_Beaches_MsPerChunk(BiomeFirst)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_Beaches_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run BiomeFirst DistanceBlend beaches ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        5.3657312500000009,
+                        5.31825,
+                        5.365075,
+                        5.34776875,
+                        5.384812500000001,
+                        5.3663125,
+                        5.3721875,
+                        5.419887500000001,
+                        5.38868125,
+                        5.3232625,
+                        5.3689375,
+                        5.35895625,
+                        5.369025000000001,
+                        5.3700875,
+                        5.3725812500000009,
+                        5.338275,
+                        5.37181875,
+                        5.4578750000000009,
+                        5.351793750000001,
+                        5.36920625
+                    ],
+                    "Min": 5.31825,
+                    "Max": 5.4578750000000009,
+                    "Median": 5.368981250000001,
+                    "Average": 5.369026249999999,
+                    "StandardDeviation": 0.02970720014785987,
+                    "Sum": 107.380525
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_BiomeFirst_MsPerChunk",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_BiomeFirst_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run BiomeFirst ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        1.8327,
+                        1.8011999999999998,
+                        1.796800000000001,
+                        1.7285000000000004,
+                        1.747399999999999,
+                        1.797900000000002,
+                        1.7066000000000017,
+                        1.8847000000000025,
+                        1.7299999999999969,
+                        1.7617000000000012,
+                        1.7523000000000018,
+                        1.7338999999999985,
+                        1.7113000000000014,
+                        1.7101000000000009,
+                        1.7299000000000009,
+                        1.7105999999999997,
+                        1.9044000000000024,
+                        1.893000000000001,
+                        1.783999999999999,
+                        1.734099999999998
+                    ],
+                    "Min": 1.7066000000000017,
+                    "Max": 1.9044000000000024,
+                    "Median": 1.7498500000000004,
+                    "Average": 1.7725550000000006,
+                    "StandardDeviation": 0.06156789321553949,
+                    "Sum": 35.45110000000001
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_Caves_MsPerChunk(TerrainFirst,True)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_Caves_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainFirst DistanceBlend caves on ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        5.5908125,
+                        5.646287500000001,
+                        5.71134375,
+                        5.603325,
+                        5.6332625,
+                        5.67635625,
+                        5.6072750000000008,
+                        5.65611875,
+                        5.67718125,
+                        5.650525,
+                        5.7168937500000009,
+                        5.73053125,
+                        5.7149125000000009,
+                        5.64405625,
+                        5.66275,
+                        5.6593375,
+                        5.642168750000001,
+                        5.62441875,
+                        5.61756875,
+                        5.878656250000001
+                    ],
+                    "Min": 5.5908125,
+                    "Max": 5.878656250000001,
+                    "Median": 5.653321875,
+                    "Average": 5.667189062500001,
+                    "StandardDeviation": 0.06190153347993877,
+                    "Sum": 113.34378125000002
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_Caves_MsPerChunk(TerrainFirst,False)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_Caves_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainFirst DistanceBlend caves off ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        4.71361875,
+                        4.7349125,
+                        4.8114,
+                        4.7616375,
+                        4.67706875,
+                        4.66290625,
+                        4.75151875,
+                        4.701350000000001,
+                        4.68686875,
+                        4.73981875,
+                        5.08911875,
+                        4.76246875,
+                        4.7694875,
+                        4.644875,
+                        4.68183125,
+                        4.694625,
+                        4.636737500000001,
+                        4.6396125,
+                        4.64465,
+                        4.6610875
+                    ],
+                    "Min": 4.636737500000001,
+                    "Max": 5.08911875,
+                    "Median": 4.6979875,
+                    "Average": 4.723279687499999,
+                    "StandardDeviation": 0.0971748399888338,
+                    "Sum": 94.46559374999998
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_Caves_MsPerChunk(BiomeFirst,True)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_Caves_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run BiomeFirst DistanceBlend caves on ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        5.959275,
+                        6.013,
+                        6.0038625,
+                        5.9538,
+                        5.9466937500000009,
+                        6.0086375,
+                        6.2862375,
+                        5.97745625,
+                        5.850806250000001,
+                        5.95634375,
+                        6.2256875,
+                        6.324856250000001,
+                        6.3676562500000009,
+                        6.50035625,
+                        6.260318750000001,
+                        6.2277000000000009,
+                        6.199125,
+                        5.94023125,
+                        5.82155625,
+                        5.848743750000001
+                    ],
+                    "Min": 5.82155625,
+                    "Max": 6.50035625,
+                    "Median": 6.00625,
+                    "Average": 6.083617187499999,
+                    "StandardDeviation": 0.19146956654668188,
+                    "Sum": 121.67234374999998
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_Caves_MsPerChunk(BiomeFirst,False)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_Caves_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run BiomeFirst DistanceBlend caves off ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        2.69419375,
+                        2.7225,
+                        2.7049375,
+                        2.73705625,
+                        2.7162437500000005,
+                        2.67580625,
+                        2.7515750000000005,
+                        2.8513312500000005,
+                        2.7867312500000005,
+                        2.76088125,
+                        2.8058125,
+                        2.74551875,
+                        3.0586312500000005,
+                        2.7715062500000005,
+                        2.7433750000000005,
+                        2.7311312500000004,
+                        3.111975,
+                        2.93179375,
+                        2.7413937500000005,
+                        2.7648437500000004
+                    ],
+                    "Min": 2.67580625,
+                    "Max": 3.111975,
+                    "Median": 2.748546875,
+                    "Average": 2.7903618749999996,
+                    "StandardDeviation": 0.11302422332492768,
+                    "Sum": 55.80723749999999
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_CaveWorstCase_MsPerChunk(TerrainFirst)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_CaveWorstCase_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainFirst DistanceBlend cave worst case ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        6.955325,
+                        6.85281875,
+                        6.82289375,
+                        6.821268750000001,
+                        6.815375,
+                        6.821243750000001,
+                        6.828331250000001,
+                        6.817525000000001,
+                        6.83835,
+                        6.84145625,
+                        6.79845625,
+                        6.7991875,
+                        6.811506250000001,
+                        6.7969687500000008,
+                        6.8164750000000009,
+                        6.88000625,
+                        6.8125125,
+                        6.85450625,
+                        6.94464375,
+                        6.89491875
+                    ],
+                    "Min": 6.7969687500000008,
+                    "Max": 6.955325,
+                    "Median": 6.82208125,
+                    "Average": 6.8411884375,
+                    "StandardDeviation": 0.04405970754781753,
+                    "Sum": 136.82376875
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_CaveWorstCase_MsPerChunk(BiomeFirst)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_CaveWorstCase_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run BiomeFirst DistanceBlend cave worst case ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        10.5860625,
+                        10.5165375,
+                        10.5667375,
+                        10.61721875,
+                        10.64270625,
+                        10.62185625,
+                        10.5777625,
+                        10.713918750000002,
+                        10.5691,
+                        10.57853125,
+                        10.6554625,
+                        10.59,
+                        10.57491875,
+                        10.55470625,
+                        10.78306875,
+                        10.79580625,
+                        10.922981250000002,
+                        10.640718750000002,
+                        10.79345625,
+                        10.653506250000002
+                    ],
+                    "Min": 10.5165375,
+                    "Max": 10.922981250000002,
+                    "Median": 10.6195375,
+                    "Average": 10.6477528125,
+                    "StandardDeviation": 0.10102470123523248,
+                    "Sum": 212.95505625
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_ForestSpecies_MsPerChunk(TerrainFirst)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_ForestSpecies_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainFirst DistanceBlend forest species ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        7.28945,
+                        7.27884375,
+                        7.297531250000001,
+                        7.28259375,
+                        7.3967625,
+                        7.29158125,
+                        7.280275000000001,
+                        7.29096875,
+                        7.2853,
+                        7.291425,
+                        7.287368750000001,
+                        7.273625,
+                        7.30493125,
+                        7.27679375,
+                        7.26121875,
+                        7.30971875,
+                        7.280862500000001,
+                        7.2603625,
+                        7.305175,
+                        7.188187500000001
+                    ],
+                    "Min": 7.188187500000001,
+                    "Max": 7.3967625,
+                    "Median": 7.286334375000001,
+                    "Average": 7.28664875,
+                    "StandardDeviation": 0.03534093062362318,
+                    "Sum": 145.732975
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_ForestSpecies_MsPerChunk(BiomeFirst)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_ForestSpecies_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run BiomeFirst DistanceBlend forest species ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        7.1958625000000009,
+                        7.382612500000001,
+                        7.25259375,
+                        7.245950000000001,
+                        7.2773,
+                        7.192925000000001,
+                        7.200500000000001,
+                        7.18325,
+                        7.25543125,
+                        7.24993125,
+                        7.215131250000001,
+                        7.278756250000001,
+                        7.188831250000001,
+                        7.229950000000001,
+                        7.227600000000001,
+                        7.21495,
+                        7.611987500000001,
+                        7.518718750000001,
+                        7.2835375,
+                        7.2382125
+                    ],
+                    "Min": 7.18325,
+                    "Max": 7.611987500000001,
+                    "Median": 7.24208125,
+                    "Average": 7.272201562499999,
+                    "StandardDeviation": 0.10817696296309104,
+                    "Sum": 145.44403125
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_LargestReach_MsPerChunk(TerrainFirst)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_LargestReach_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainFirst DistanceBlend largest reach ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        6.637137500000001,
+                        6.62735625,
+                        6.620500000000001,
+                        6.62470625,
+                        6.617500000000001,
+                        6.6221875,
+                        6.694987500000001,
+                        6.7409625,
+                        6.752937500000001,
+                        6.65848125,
+                        6.7336375,
+                        6.6737,
+                        6.6325062500000009,
+                        6.64269375,
+                        6.6305125,
+                        6.6984562500000008,
+                        6.8188,
+                        6.742018750000001,
+                        6.683937500000001,
+                        6.63225625
+                    ],
+                    "Min": 6.617500000000001,
+                    "Max": 6.8188,
+                    "Median": 6.6505875,
+                    "Average": 6.6742637500000019,
+                    "StandardDeviation": 0.05580371976008865,
+                    "Sum": 133.48527500000004
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_LargestReach_MsPerChunk(BiomeFirst)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_LargestReach_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run BiomeFirst DistanceBlend largest reach ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        6.9082187500000009,
+                        6.86984375,
+                        6.8930375,
+                        6.91185,
+                        6.893625,
+                        6.8854375,
+                        6.9363625,
+                        7.299756250000001,
+                        6.93894375,
+                        7.24974375,
+                        6.9116687500000009,
+                        7.13731875,
+                        7.02293125,
+                        6.884975000000001,
+                        6.8867,
+                        6.9026000000000009,
+                        6.87864375,
+                        6.8910375,
+                        6.88368125,
+                        6.8594875
+                    ],
+                    "Min": 6.8594875,
+                    "Max": 7.299756250000001,
+                    "Median": 6.8981125,
+                    "Average": 6.9522931250000019,
+                    "StandardDeviation": 0.12371611731380493,
+                    "Sum": 139.04586250000004
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_PerMethod_MsPerChunk(TerrainFirst,None)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_PerMethod_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainFirst None ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        2.72696875,
+                        2.7790875,
+                        2.7518812500000005,
+                        2.73555625,
+                        2.7555875000000005,
+                        2.7297000000000004,
+                        2.74219375,
+                        2.75078125,
+                        2.7624250000000005,
+                        2.7821000000000004,
+                        2.74878125,
+                        2.8393562500000004,
+                        2.811925,
+                        2.80689375,
+                        2.9760875,
+                        2.8634625000000004,
+                        2.7960937500000004,
+                        2.7693812500000005,
+                        2.75084375,
+                        2.7646625
+                    ],
+                    "Min": 2.72696875,
+                    "Max": 2.9760875,
+                    "Median": 2.76354375,
+                    "Average": 2.7821884375,
+                    "StandardDeviation": 0.05670948503099345,
+                    "Sum": 55.64376875
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_PerMethod_MsPerChunk(TerrainFirst,DistanceBlend)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_PerMethod_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainFirst DistanceBlend ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        4.64051875,
+                        4.6575875,
+                        4.6289875,
+                        4.641768750000001,
+                        4.7041312500000009,
+                        4.658575,
+                        4.6351562500000009,
+                        4.6448375,
+                        4.65293125,
+                        4.679143750000001,
+                        4.64649375,
+                        4.6368125000000008,
+                        4.70174375,
+                        4.657075,
+                        4.66925,
+                        4.6865000000000009,
+                        4.685625,
+                        4.68025,
+                        4.684093750000001,
+                        4.71276875
+                    ],
+                    "Min": 4.6289875,
+                    "Max": 4.71276875,
+                    "Median": 4.65808125,
+                    "Average": 4.6652125,
+                    "StandardDeviation": 0.024535680093615756,
+                    "Sum": 93.30425
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_PerMethod_MsPerChunk(TerrainFirst,DistortedBoundary)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_PerMethod_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainFirst DistortedBoundary ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        4.32145625,
+                        4.3212875,
+                        4.379575,
+                        4.31069375,
+                        4.35000625,
+                        4.340925,
+                        4.3087375,
+                        4.41988125,
+                        4.2930375000000009,
+                        4.3067875,
+                        4.323575,
+                        4.31119375,
+                        4.31881875,
+                        4.307875,
+                        4.32754375,
+                        4.3129687500000009,
+                        4.314256250000001,
+                        4.31755,
+                        4.3152437500000009,
+                        4.30600625
+                    ],
+                    "Min": 4.2930375000000009,
+                    "Max": 4.41988125,
+                    "Median": 4.316396875000001,
+                    "Average": 4.3253709375,
+                    "StandardDeviation": 0.02829137631382515,
+                    "Sum": 86.50741875
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_PerMethod_MsPerChunk(TerrainFirst,ParameterSpaceWeighting)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_PerMethod_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainFirst ParameterSpaceWeighting ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        2.8310750000000004,
+                        2.83768125,
+                        2.8406000000000004,
+                        2.8279062500000005,
+                        2.83369375,
+                        2.82613125,
+                        2.8391312500000005,
+                        2.89169375,
+                        2.8700437500000004,
+                        2.85224375,
+                        2.8373625000000004,
+                        2.83808125,
+                        2.834725,
+                        2.8213625,
+                        2.82414375,
+                        2.85175,
+                        2.8613625000000004,
+                        2.8814562500000004,
+                        2.8537875,
+                        2.83176875
+                    ],
+                    "Min": 2.8213625,
+                    "Max": 2.89169375,
+                    "Median": 2.83788125,
+                    "Average": 2.8443,
+                    "StandardDeviation": 0.01874516708547831,
+                    "Sum": 56.886
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_PerMethod_MsPerChunk(BiomeFirst,None)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_PerMethod_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run BiomeFirst None ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        1.94121875,
+                        1.934125,
+                        1.9386562500000005,
+                        1.93031875,
+                        1.94645625,
+                        1.9384625000000005,
+                        1.939975,
+                        1.9290125,
+                        1.93293125,
+                        1.9272375,
+                        1.92604375,
+                        1.93015,
+                        1.93510625,
+                        1.92764375,
+                        1.96959375,
+                        1.9358,
+                        1.93329375,
+                        1.92768125,
+                        1.932575,
+                        1.93164375
+                    ],
+                    "Min": 1.92604375,
+                    "Max": 1.96959375,
+                    "Median": 1.9331125,
+                    "Average": 1.93539625,
+                    "StandardDeviation": 0.009404261085406964,
+                    "Sum": 38.707925
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_PerMethod_MsPerChunk(BiomeFirst,DistanceBlend)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_PerMethod_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run BiomeFirst DistanceBlend ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        5.102250000000001,
+                        5.0848125,
+                        5.0824,
+                        5.10743125,
+                        5.09578125,
+                        5.08765625,
+                        5.08289375,
+                        5.0983,
+                        5.11344375,
+                        5.086037500000001,
+                        5.07415,
+                        5.09471875,
+                        5.1181125000000009,
+                        5.4428125000000009,
+                        5.447443750000001,
+                        5.1605875,
+                        5.14464375,
+                        5.1685187500000009,
+                        5.1112875,
+                        5.11181875
+                    ],
+                    "Min": 5.07415,
+                    "Max": 5.447443750000001,
+                    "Median": 5.1048406250000009,
+                    "Average": 5.140755000000001,
+                    "StandardDeviation": 0.10442945867082368,
+                    "Sum": 102.81510000000005
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_PerMethod_MsPerChunk(BiomeFirst,DistortedBoundary)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_PerMethod_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run BiomeFirst DistortedBoundary ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        6.02576875,
+                        6.008956250000001,
+                        5.993375,
+                        5.986800000000001,
+                        6.00619375,
+                        6.00760625,
+                        5.9924437500000009,
+                        6.10000625,
+                        6.0123750000000009,
+                        6.06588125,
+                        6.06265625,
+                        6.0600812500000009,
+                        6.0374,
+                        5.995443750000001,
+                        6.00235,
+                        5.99729375,
+                        5.99585,
+                        5.9919875000000009,
+                        5.9846312500000009,
+                        5.98933125
+                    ],
+                    "Min": 5.9846312500000009,
+                    "Max": 6.10000625,
+                    "Median": 6.004271875000001,
+                    "Average": 6.015821562500002,
+                    "StandardDeviation": 0.031625426718650168,
+                    "Sum": 120.31643125000004
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_PerMethod_MsPerChunk(BiomeFirst,ParameterSpaceWeighting)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_PerMethod_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run BiomeFirst ParameterSpaceWeighting ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        2.190175,
+                        2.1841500000000004,
+                        2.1833750000000005,
+                        2.183525,
+                        2.19294375,
+                        2.1819625,
+                        2.40825625,
+                        2.18563125,
+                        2.1875750000000004,
+                        2.1846187500000004,
+                        2.18780625,
+                        2.1849375,
+                        2.18668125,
+                        2.1834000000000004,
+                        2.1856,
+                        2.19088125,
+                        2.19056875,
+                        2.2049250000000004,
+                        2.1850375,
+                        2.18629375
+                    ],
+                    "Min": 2.1819625,
+                    "Max": 2.40825625,
+                    "Median": 2.1859625,
+                    "Average": 2.1984171875,
+                    "StandardDeviation": 0.0483904249824329,
+                    "Sum": 43.96834374999999
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_PerMethod_WithFlora_MsPerChunk(TerrainFirst,None)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_PerMethod_WithFlora_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainFirst None flora ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        2.83766875,
+                        2.87204375,
+                        2.8553875,
+                        2.86175625,
+                        2.84153125,
+                        2.8403875000000005,
+                        2.8494375,
+                        2.8523375,
+                        2.85658125,
+                        2.8498312500000004,
+                        2.8519125,
+                        2.861575,
+                        2.8524000000000004,
+                        2.84405,
+                        2.8405875000000004,
+                        2.90955625,
+                        2.9013500000000005,
+                        2.8860625,
+                        2.9696437500000005,
+                        2.8633625
+                    ],
+                    "Min": 2.83766875,
+                    "Max": 2.9696437500000005,
+                    "Median": 2.85389375,
+                    "Average": 2.864873125000001,
+                    "StandardDeviation": 0.03069130036931275,
+                    "Sum": 57.297462500000019
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_PerMethod_WithFlora_MsPerChunk(TerrainFirst,DistanceBlend)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_PerMethod_WithFlora_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainFirst DistanceBlend flora ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        5.238925,
+                        5.25975,
+                        5.24125625,
+                        5.2397125,
+                        5.2107875,
+                        5.222300000000001,
+                        5.225325000000001,
+                        5.2341375,
+                        5.21481875,
+                        5.210662500000001,
+                        5.2191937500000009,
+                        5.2630625,
+                        5.3349625000000009,
+                        5.282337500000001,
+                        5.246943750000001,
+                        5.240575000000001,
+                        5.261443750000001,
+                        5.27416875,
+                        5.2835375,
+                        5.242575
+                    ],
+                    "Min": 5.210662500000001,
+                    "Max": 5.3349625000000009,
+                    "Median": 5.240915625,
+                    "Average": 5.2473237500000009,
+                    "StandardDeviation": 0.029651685936996076,
+                    "Sum": 104.946475
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_PerMethod_WithFlora_MsPerChunk(TerrainFirst,DistortedBoundary)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_PerMethod_WithFlora_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainFirst DistortedBoundary flora ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        4.58510625,
+                        4.522325,
+                        4.545325,
+                        4.55100625,
+                        4.4869125,
+                        4.4957875000000009,
+                        4.485087500000001,
+                        4.4855375,
+                        4.497156250000001,
+                        4.49283125,
+                        4.48218125,
+                        4.488925,
+                        4.5599375,
+                        4.48911875,
+                        4.5040375,
+                        4.4744375000000009,
+                        4.55426875,
+                        4.613700000000001,
+                        4.50170625,
+                        4.495825
+                    ],
+                    "Min": 4.4744375000000009,
+                    "Max": 4.613700000000001,
+                    "Median": 4.496490625,
+                    "Average": 4.515560625,
+                    "StandardDeviation": 0.03804523936935969,
+                    "Sum": 90.3112125
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_PerMethod_WithFlora_MsPerChunk(TerrainFirst,ParameterSpaceWeighting)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_PerMethod_WithFlora_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainFirst ParameterSpaceWeighting flora ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        3.0134125000000004,
+                        2.96465625,
+                        2.97319375,
+                        2.97014375,
+                        2.9680875,
+                        2.99285625,
+                        2.98011875,
+                        2.99029375,
+                        3.4269125000000004,
+                        3.0091375,
+                        2.9814625,
+                        2.96795,
+                        2.9718750000000004,
+                        2.9754625000000005,
+                        2.9808000000000005,
+                        3.0055375,
+                        2.9758500000000005,
+                        2.98726875,
+                        2.9763375,
+                        2.99341875
+                    ],
+                    "Min": 2.96465625,
+                    "Max": 3.4269125000000004,
+                    "Median": 2.980459375,
+                    "Average": 3.00523875,
+                    "StandardDeviation": 0.09769816607637784,
+                    "Sum": 60.10477500000001
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_PerMethod_WithFlora_MsPerChunk(BiomeFirst,None)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_PerMethod_WithFlora_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run BiomeFirst None flora ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        2.05864375,
+                        2.0547625000000004,
+                        2.05195,
+                        2.05284375,
+                        2.2289875,
+                        2.05358125,
+                        2.0560375,
+                        2.052725,
+                        2.06815625,
+                        2.048925,
+                        2.06223125,
+                        2.0559125000000004,
+                        2.0569687500000004,
+                        2.0641375,
+                        2.05169375,
+                        2.05433125,
+                        2.05455625,
+                        2.0538250000000004,
+                        2.0545125,
+                        2.05433125
+                    ],
+                    "Min": 2.048925,
+                    "Max": 2.2289875,
+                    "Median": 2.0545343750000004,
+                    "Average": 2.064455625,
+                    "StandardDeviation": 0.03800207256375137,
+                    "Sum": 41.2891125
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_PerMethod_WithFlora_MsPerChunk(BiomeFirst,DistanceBlend)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_PerMethod_WithFlora_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run BiomeFirst DistanceBlend flora ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        5.48459375,
+                        5.4825187500000009,
+                        5.49366875,
+                        5.4814375,
+                        5.46773125,
+                        5.4833875,
+                        5.483562500000001,
+                        5.46674375,
+                        5.487256250000001,
+                        5.5146875,
+                        5.4845875,
+                        5.4921125,
+                        5.47605,
+                        5.48774375,
+                        5.474868750000001,
+                        5.66213125,
+                        5.4729625,
+                        5.4853125,
+                        5.4763625000000009,
+                        5.48129375
+                    ],
+                    "Min": 5.46674375,
+                    "Max": 5.66213125,
+                    "Median": 5.483475,
+                    "Average": 5.491950625,
+                    "StandardDeviation": 0.04031153307464402,
+                    "Sum": 109.8390125
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_PerMethod_WithFlora_MsPerChunk(BiomeFirst,DistortedBoundary)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_PerMethod_WithFlora_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run BiomeFirst DistortedBoundary flora ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        6.45543125,
+                        6.4619437500000009,
+                        6.438075,
+                        6.4476375,
+                        6.458375,
+                        6.46828125,
+                        6.4815625,
+                        6.5372312500000009,
+                        6.45418125,
+                        6.4446062500000009,
+                        6.4690062500000009,
+                        6.44799375,
+                        6.44098125,
+                        6.445062500000001,
+                        6.456437500000001,
+                        6.4588,
+                        6.455418750000001,
+                        6.43416875,
+                        6.4504,
+                        6.44726875
+                    ],
+                    "Min": 6.43416875,
+                    "Max": 6.5372312500000009,
+                    "Median": 6.4548000000000009,
+                    "Average": 6.457643125,
+                    "StandardDeviation": 0.02131368782430379,
+                    "Sum": 129.1528625
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_PerMethod_WithFlora_MsPerChunk(BiomeFirst,ParameterSpaceWeighting)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_PerMethod_WithFlora_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run BiomeFirst ParameterSpaceWeighting flora ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        2.31843125,
+                        2.37444375,
+                        2.3501125000000004,
+                        2.364625,
+                        2.34873125,
+                        2.359875,
+                        2.3834500000000005,
+                        2.338725,
+                        2.34575625,
+                        2.332425,
+                        2.3580625,
+                        2.3324937500000004,
+                        2.3228750000000004,
+                        2.3220187500000004,
+                        2.3193562500000004,
+                        2.3275125,
+                        2.3185625,
+                        2.317475,
+                        2.3168812500000004,
+                        2.31904375
+                    ],
+                    "Min": 2.3168812500000004,
+                    "Max": 2.3834500000000005,
+                    "Median": 2.332459375,
+                    "Average": 2.3385428125,
+                    "StandardDeviation": 0.02036042186247548,
+                    "Sum": 46.77085625
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_SnowAndStrata_MsPerChunk(TerrainFirst)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_SnowAndStrata_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainFirst DistanceBlend snow strata ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        5.491075,
+                        5.490325,
+                        5.48595625,
+                        5.49005,
+                        5.496756250000001,
+                        5.50163125,
+                        5.48924375,
+                        5.490575000000001,
+                        5.4898125,
+                        5.506468750000001,
+                        5.48708125,
+                        5.492675,
+                        5.49425,
+                        5.4967875,
+                        5.517075,
+                        5.50375,
+                        5.493275000000001,
+                        5.49414375,
+                        5.4885375000000009,
+                        5.49649375
+                    ],
+                    "Min": 5.48595625,
+                    "Max": 5.517075,
+                    "Median": 5.492975,
+                    "Average": 5.494798125000001,
+                    "StandardDeviation": 0.0073634074939443,
+                    "Sum": 109.8959625
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_SnowAndStrata_MsPerChunk(BiomeFirst)",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_SnowAndStrata_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run BiomeFirst DistanceBlend snow strata ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        5.79166875,
+                        5.63,
+                        6.00663125,
+                        5.64718125,
+                        5.625981250000001,
+                        5.636762500000001,
+                        5.63883125,
+                        5.61684375,
+                        5.62158125,
+                        5.6248812500000009,
+                        5.621225,
+                        5.623975000000001,
+                        5.6326,
+                        5.61705625,
+                        5.60053125,
+                        5.6143375,
+                        5.61888125,
+                        5.7243375,
+                        5.73765,
+                        5.66158125
+                    ],
+                    "Min": 5.60053125,
+                    "Max": 6.00663125,
+                    "Median": 5.627990625000001,
+                    "Average": 5.6646268750000019,
+                    "StandardDeviation": 0.09157595675645086,
+                    "Sum": 113.29253750000004
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ChunkGenerationBenchmark.ChunkJob_Run_TerrainFirst_MsPerChunk",
+            "ClassName": "Engine.Tests.Performance.ChunkGenerationBenchmark",
+            "MethodName": "ChunkJob_Run_TerrainFirst_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "ChunkJob.Run TerrainFirst ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        2.498500000000001,
+                        2.5281000000000004,
+                        2.514999999999999,
+                        2.501900000000001,
+                        2.4971999999999996,
+                        2.504400000000001,
+                        2.502200000000002,
+                        2.4842999999999977,
+                        2.564100000000004,
+                        2.5356000000000025,
+                        2.5549000000000037,
+                        2.5191000000000018,
+                        2.5202000000000028,
+                        2.5274,
+                        2.642000000000003,
+                        2.5893000000000017,
+                        2.525000000000006,
+                        2.4985,
+                        2.5249999999999988,
+                        2.488799999999998
+                    ],
+                    "Min": 2.4842999999999977,
+                    "Max": 2.642000000000003,
+                    "Median": 2.519650000000002,
+                    "Average": 2.526075000000001,
+                    "StandardDeviation": 0.036831275772094548,
+                    "Sum": 50.52150000000002
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ColliderMeshBenchmark.CMeshBuildJob_Run_AirPartition_MsPerPartition",
+            "ClassName": "Engine.Tests.Performance.ColliderMeshBenchmark",
+            "MethodName": "CMeshBuildJob_Run_AirPartition_MsPerPartition",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "CMeshBuildJob.Run air ms/partition",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        0.028000000000000026,
+                        0.023499999999999856,
+                        0.019999999999999578,
+                        0.018199999999999773,
+                        0.017199999999999887,
+                        0.01650000000000018,
+                        0.01570000000000027,
+                        0.015800000000000037,
+                        0.015300000000000314,
+                        0.014800000000000148,
+                        0.015200000000000104,
+                        0.02100000000000035,
+                        0.01499999999999968,
+                        0.014600000000000169,
+                        0.014600000000000169,
+                        0.01429999999999998,
+                        0.014600000000000169,
+                        0.01440000000000019,
+                        0.01429999999999998,
+                        0.014899999999999914
+                    ],
+                    "Min": 0.01429999999999998,
+                    "Max": 0.028000000000000026,
+                    "Median": 0.015250000000000208,
+                    "Average": 0.01689500000000004,
+                    "StandardDeviation": 0.0035418180359809137,
+                    "Sum": 0.3379000000000008
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ColliderMeshBenchmark.CMeshBuildJob_Run_CavePartitions_MsPerPartition(True)",
+            "ClassName": "Engine.Tests.Performance.ColliderMeshBenchmark",
+            "MethodName": "CMeshBuildJob_Run_CavePartitions_MsPerPartition",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "CMeshBuildJob.Run cave partitions caves on ms/partition",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        0.5262,
+                        0.52408125,
+                        0.52418125,
+                        0.5242,
+                        0.5278625,
+                        0.52115625,
+                        0.5259312500000001,
+                        0.52704375,
+                        0.525525,
+                        0.5210125,
+                        0.52244375,
+                        0.5364125000000001,
+                        0.52048125,
+                        0.518675,
+                        0.518225,
+                        0.52705,
+                        0.5210875,
+                        0.52573125,
+                        0.51971875,
+                        0.5321687500000001
+                    ],
+                    "Min": 0.518225,
+                    "Max": 0.5364125000000001,
+                    "Median": 0.524190625,
+                    "Average": 0.524459375,
+                    "StandardDeviation": 0.004383888515419289,
+                    "Sum": 10.4891875
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ColliderMeshBenchmark.CMeshBuildJob_Run_CavePartitions_MsPerPartition(False)",
+            "ClassName": "Engine.Tests.Performance.ColliderMeshBenchmark",
+            "MethodName": "CMeshBuildJob_Run_CavePartitions_MsPerPartition",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "CMeshBuildJob.Run cave partitions caves off ms/partition",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        0.36260625,
+                        0.375325,
+                        0.3642875000000001,
+                        0.3631375,
+                        0.370275,
+                        0.36156875,
+                        0.37091875,
+                        0.364975,
+                        0.36010000000000005,
+                        0.3756375,
+                        0.3619625,
+                        0.3639062500000001,
+                        0.3694875,
+                        0.3604875,
+                        0.3656875,
+                        0.36085,
+                        0.3593812500000001,
+                        0.3663125000000001,
+                        0.3613625000000001,
+                        0.35941875
+                    ],
+                    "Min": 0.3593812500000001,
+                    "Max": 0.3756375,
+                    "Median": 0.363521875,
+                    "Average": 0.3648843750000001,
+                    "StandardDeviation": 0.004868960401422977,
+                    "Sum": 7.2976875
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ColliderMeshBenchmark.CMeshBuildJob_Run_ForestSpecies_MsPerPartition",
+            "ClassName": "Engine.Tests.Performance.ColliderMeshBenchmark",
+            "MethodName": "CMeshBuildJob_Run_ForestSpecies_MsPerPartition",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "CMeshBuildJob.Run forest species ms/partition",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        0.6999000000000001,
+                        0.704775,
+                        0.698725,
+                        0.6957,
+                        0.7034250000000001,
+                        0.7010000000000001,
+                        0.6978500000000001,
+                        0.7072125,
+                        0.701725,
+                        0.69715,
+                        0.7070625,
+                        0.69825,
+                        0.7095625,
+                        0.7014375,
+                        0.6971875000000001,
+                        0.7046125000000001,
+                        0.7012,
+                        0.6987875,
+                        0.70865,
+                        0.6980500000000001
+                    ],
+                    "Min": 0.6957,
+                    "Max": 0.7095625,
+                    "Median": 0.7011000000000001,
+                    "Average": 0.7016131250000001,
+                    "StandardDeviation": 0.004052924243293345,
+                    "Sum": 14.032262500000002
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ColliderMeshBenchmark.CMeshBuildJob_Run_SolidPartition_MsPerPartition",
+            "ClassName": "Engine.Tests.Performance.ColliderMeshBenchmark",
+            "MethodName": "CMeshBuildJob_Run_SolidPartition_MsPerPartition",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "CMeshBuildJob.Run solid ms/partition",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        0.4492000000000001,
+                        0.44200000000000019,
+                        0.4429000000000003,
+                        0.44,
+                        0.43889999999999987,
+                        0.4395000000000002,
+                        0.43849999999999947,
+                        0.4353999999999996,
+                        0.4407999999999994,
+                        0.4395000000000007,
+                        0.4451000000000001,
+                        0.4512000000000001,
+                        0.44369999999999978,
+                        0.46560000000000026,
+                        0.4429999999999996,
+                        0.438600000000001,
+                        0.44099999999999897,
+                        0.4435000000000002,
+                        0.460799999999999,
+                        0.48579999999999937
+                    ],
+                    "Min": 0.4353999999999996,
+                    "Max": 0.48579999999999937,
+                    "Median": 0.44245000000000025,
+                    "Average": 0.4462499999999999,
+                    "StandardDeviation": 0.01165450556651791,
+                    "Sum": 8.924999999999998
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.ColliderMeshBenchmark.CMeshBuildJob_Run_SurfacePartition_MsPerPartition",
+            "ClassName": "Engine.Tests.Performance.ColliderMeshBenchmark",
+            "MethodName": "CMeshBuildJob_Run_SurfacePartition_MsPerPartition",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "CMeshBuildJob.Run surface ms/partition",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        0.4931000000000001,
+                        0.5125000000000002,
+                        0.5529000000000002,
+                        0.5984000000000003,
+                        0.5233999999999996,
+                        0.4950000000000001,
+                        0.4953000000000003,
+                        0.4905999999999997,
+                        0.48939999999999986,
+                        0.4898999999999996,
+                        0.49629999999999976,
+                        0.4907000000000004,
+                        0.6176000000000004,
+                        0.5030999999999999,
+                        0.5050000000000008,
+                        0.4939,
+                        0.5130999999999997,
+                        0.5047999999999995,
+                        0.4980999999999991,
+                        0.4962
+                    ],
+                    "Min": 0.48939999999999986,
+                    "Max": 0.6176000000000004,
+                    "Median": 0.4971999999999994,
+                    "Average": 0.512965,
+                    "StandardDeviation": 0.034953430089191658,
+                    "Sum": 10.2593
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.FrustumCullingBenchmark.IsVisible_OneBufferOfPages",
+            "ClassName": "Engine.Tests.Performance.FrustumCullingBenchmark",
+            "MethodName": "IsVisible_OneBufferOfPages",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "FrustumCulling.IsVisible 1024 pages us",
+                    "Unit": 1,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        2251.1,
+                        2256.300000000001,
+                        2246.699999999999,
+                        2300.2999999999984,
+                        2239.799999999999,
+                        2246.9,
+                        2263.000000000002,
+                        2269.6000000000004,
+                        2253.5999999999985,
+                        2353.6000000000004,
+                        3304.7999999999965,
+                        3247.5000000000023,
+                        3260.7,
+                        3317.300000000003,
+                        3279.499999999998,
+                        3313.600000000001,
+                        3326.799999999999,
+                        3326.3000000000034,
+                        2870.6999999999994,
+                        2297.399999999996
+                    ],
+                    "Min": 2239.799999999999,
+                    "Max": 3326.799999999999,
+                    "Median": 2326.9499999999994,
+                    "Average": 2711.274999999999,
+                    "StandardDeviation": 496.1504589083844,
+                    "Sum": 54225.499999999985
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.LightJobBenchmark.LightJob_Run_ForestSpecies_MsPerChunk",
+            "ClassName": "Engine.Tests.Performance.LightJobBenchmark",
+            "MethodName": "LightJob_Run_ForestSpecies_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "LightJob.Run forest species ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        1.0204125,
+                        1.0222625,
+                        1.0393875000000002,
+                        1.0283875,
+                        1.0131750000000002,
+                        1.020375,
+                        1.0174125,
+                        1.0153875,
+                        1.0118875,
+                        1.01615,
+                        1.0108000000000002,
+                        1.01535,
+                        1.01425,
+                        1.0518375,
+                        1.0375125,
+                        1.0267375,
+                        1.0092875000000002,
+                        1.0234,
+                        1.0096,
+                        1.010025
+                    ],
+                    "Min": 1.0092875000000002,
+                    "Max": 1.0518375,
+                    "Median": 1.0167812500000005,
+                    "Average": 1.0206818749999998,
+                    "StandardDeviation": 0.01103755696120635,
+                    "Sum": 20.4136375
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.LightJobBenchmark.LightJob_Run_LavaPockets_MsPerChunk",
+            "ClassName": "Engine.Tests.Performance.LightJobBenchmark",
+            "MethodName": "LightJob_Run_LavaPockets_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "LightJob.Run lava pockets ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        0.970275,
+                        0.9875,
+                        0.9835625,
+                        0.99045,
+                        0.977025,
+                        1.146075,
+                        1.0671125000000002,
+                        1.023425,
+                        0.9917625,
+                        1.0192125,
+                        0.997725,
+                        1.0056125,
+                        0.9875375,
+                        0.9828375,
+                        0.9874375,
+                        0.985325,
+                        0.9984,
+                        0.9845,
+                        0.9841,
+                        0.9839625
+                    ],
+                    "Min": 0.970275,
+                    "Max": 1.146075,
+                    "Median": 0.98751875,
+                    "Average": 1.0026918750000005,
+                    "StandardDeviation": 0.038874401176055107,
+                    "Sum": 20.053837500000005
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.LightJobBenchmark.LightJob_Run_NaturalTerrain_MsPerChunk",
+            "ClassName": "Engine.Tests.Performance.LightJobBenchmark",
+            "MethodName": "LightJob_Run_NaturalTerrain_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "LightJob.Run natural terrain ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        0.7632625000000001,
+                        0.74485,
+                        0.7665125,
+                        0.755175,
+                        0.7495,
+                        0.7576875000000001,
+                        0.7454125,
+                        0.7667625,
+                        0.7539125,
+                        0.7474500000000001,
+                        0.787375,
+                        0.7476625,
+                        0.760225,
+                        0.7495125,
+                        0.7570375,
+                        0.7679375,
+                        0.7525875000000001,
+                        0.75805,
+                        0.7601375,
+                        0.7440625000000001
+                    ],
+                    "Min": 0.7440625000000001,
+                    "Max": 0.787375,
+                    "Median": 0.75610625,
+                    "Average": 0.7567556250000002,
+                    "StandardDeviation": 0.010149429228871693,
+                    "Sum": 15.135112500000004
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.LightJobBenchmark.LightJob_Run_WorstCase_MsPerChunk",
+            "ClassName": "Engine.Tests.Performance.LightJobBenchmark",
+            "MethodName": "LightJob_Run_WorstCase_MsPerChunk",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "LightJob.Run worst case ms/chunk",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        8.9178125,
+                        9.025525,
+                        9.2363,
+                        9.091325000000002,
+                        9.4425875,
+                        9.407575,
+                        8.9131,
+                        8.8987,
+                        9.0999,
+                        8.907087500000002,
+                        8.9313125,
+                        8.890825000000002,
+                        8.90925,
+                        8.9321125,
+                        8.979112500000002,
+                        9.057125,
+                        8.848875,
+                        8.8962375,
+                        8.878075,
+                        8.912387500000002
+                    ],
+                    "Min": 8.848875,
+                    "Max": 9.4425875,
+                    "Median": 8.9245625,
+                    "Average": 9.008761250000005,
+                    "StandardDeviation": 0.16700362935333905,
+                    "Sum": 180.17522500000005
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.PageAllocatorBenchmark.TryAllocPages_FillBuffer_ThenReleaseAll",
+            "ClassName": "Engine.Tests.Performance.PageAllocatorBenchmark",
+            "MethodName": "TryAllocPages_FillBuffer_ThenReleaseAll",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "PageAllocator fill+release 1 buffer ms",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        0.47080000000000057,
+                        0.4664999999999999,
+                        0.45950000000000026,
+                        0.4676999999999998,
+                        0.48050000000000017,
+                        0.4492999999999992,
+                        0.4474,
+                        0.4431999999999992,
+                        0.4474,
+                        0.4452999999999996,
+                        0.4432000000000009,
+                        0.4416000000000011,
+                        0.4512000000000001,
+                        0.4451999999999998,
+                        0.4448000000000008,
+                        0.4467999999999997,
+                        0.44179999999999888,
+                        0.5398000000000014,
+                        0.4438999999999993,
+                        0.4459999999999998
+                    ],
+                    "Min": 0.4416000000000011,
+                    "Max": 0.5398000000000014,
+                    "Median": 0.44709999999999985,
+                    "Average": 0.4560950000000001,
+                    "StandardDeviation": 0.022069310705140164,
+                    "Sum": 9.1219
+                }
+            ]
+        },
+        {
+            "Name": "Engine.Tests.Performance.UnsafeIntervalListBenchmark.Set_10kRandomEdits_ChunkSizedList",
+            "ClassName": "Engine.Tests.Performance.UnsafeIntervalListBenchmark",
+            "MethodName": "Set_10kRandomEdits_ChunkSizedList",
+            "Version": "1",
+            "Categories": [
+                "Performance"
+            ],
+            "SampleGroups": [
+                {
+                    "Name": "UnsafeIntervalList.Set 10k edits ms",
+                    "Unit": 2,
+                    "IncreaseIsBetter": false,
+                    "Samples": [
+                        10.107099999999996,
+                        10.069000000000005,
+                        10.0355,
+                        10.116100000000005,
+                        10.072500000000006,
+                        10.081900000000005,
+                        10.145199999999989,
+                        10.0672,
+                        10.130800000000008,
+                        10.130600000000016,
+                        10.07420000000002,
+                        10.125200000000009,
+                        10.1241,
+                        10.050999999999988,
+                        10.198499999999996,
+                        10.280200000000008,
+                        10.150900000000008,
+                        10.231000000000025,
+                        10.182800000000017,
+                        10.114000000000005
+                    ],
+                    "Min": 10.0355,
+                    "Max": 10.280200000000008,
+                    "Median": 10.1201,
+                    "Average": 10.124390000000004,
+                    "StandardDeviation": 0.060366214888796659,
+                    "Sum": 202.48780000000009
+                }
+            ]
+        }
+    ]
+}
