@@ -17,6 +17,7 @@ MonoBehaviour:
   UnderBlock: {fileID: 11400000, guid: 79377b51b078b354282e41ab801a29a6, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   SnowTopBlock: {fileID: 0}
+  FreezesWater: 0
   StrataBlock: {fileID: 11400000, guid: eeed6c09b1b96c04faeab22d816e1b62, type: 2}
   BeachBlock: {fileID: 11400000, guid: b5df436b2cc46cf419e666fccd2d96b3, type: 2}
   BeachHeight: 3
@@ -61,16 +62,6 @@ MonoBehaviour:
     SpeciesStructure: {fileID: 0}
     SpeciesTree: {fileID: 11400000, guid: c73c2f7daa34413885de5c63d4e01264, type: 2}
     Probability: 0.0025
-    RequiresSurfaceFromSameBiome: 0
-    MinHeightAboveWater: 1
-    DensityNoise: 0
-    DensityInfluence: 1
-    MinStackHeight: 1
-    MaxStackHeight: 1
-  - SpeciesVoxel: {fileID: 0}
-    SpeciesStructure: {fileID: 0}
-    SpeciesTree: {fileID: 11400000, guid: e0b80b74beb141ae9a55c0d9d88cb810, type: 2}
-    Probability: 0.00025
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
     DensityNoise: 0

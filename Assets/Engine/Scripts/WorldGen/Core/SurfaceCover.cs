@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Noise;
@@ -10,7 +10,8 @@ namespace Engine.Scripts.WorldGen.Core{
     /// <summary>
     ///     Snow, ice, strata and beaches of a column, pure functions of the world position. The effective temperature falls with
     ///     the height above the water and carries a little noise, so snow lines and ice edges are ragged. Dry columns and
-    ///     the water surface share the freeze temperature, so snow on a shore meets the ice.
+    ///     the water surface share the freeze temperature, so in a biome with both a snow block and <c>freezesWater</c>
+    ///     snow on a shore meets the ice.
     /// </summary>
     public static class SurfaceCover{
         /// <summary>Spacing in blocks of the world-aligned probe lattice on which beaches look for water.</summary>
@@ -58,17 +59,23 @@ namespace Engine.Scripts.WorldGen.Core{
             return EffectiveTemperature(temperature, height, freezeNoise, cfg) < cfg.FreezeTemperature;
         }
 
-        /// <summary>The water surface (y = WaterLevel − 1) above the column freezes to ice.</summary>
-        public static bool WaterFreezes(int x, int z, float temperature, in WorldGenConfig cfg){
-            if (!cfg.EnableClimateOverrides) return false;
+        /// <summary>
+        ///     The water surface (y = WaterLevel − 1) above the column of hard biome <paramref name="def" /> freezes to
+        ///     ice. Biomes without <c>freezesWater</c> never do. The chunk job passes the hard biome rather than the
+        ///     dithered surface pick, so the ice ends in a line where the biome changes.
+        /// </summary>
+        public static bool WaterFreezes(int x, int z, float temperature, in Biome.BiomeDef def, in WorldGenConfig cfg){
+            if (!cfg.EnableClimateOverrides || def.freezesWater == 0) return false;
             return EffectiveTemperature(x, z, temperature, cfg.WaterLevel - 1, cfg) < cfg.FreezeTemperature;
         }
 
         /// <summary>
-        ///     <see cref="WaterFreezes(int,int,float,in WorldGenConfig)" /> with the column's <see cref="FreezeNoise" />.
+        ///     <see cref="WaterFreezes(int,int,float,in Biome.BiomeDef,in WorldGenConfig)" /> with the column's
+        ///     <see cref="FreezeNoise" />.
         /// </summary>
-        public static bool WaterFreezes(float temperature, float freezeNoise, in WorldGenConfig cfg){
-            if (!cfg.EnableClimateOverrides) return false;
+        public static bool WaterFreezes(float temperature, float freezeNoise, in Biome.BiomeDef def,
+            in WorldGenConfig cfg){
+            if (!cfg.EnableClimateOverrides || def.freezesWater == 0) return false;
             return EffectiveTemperature(temperature, cfg.WaterLevel - 1, freezeNoise, cfg) < cfg.FreezeTemperature;
         }
 

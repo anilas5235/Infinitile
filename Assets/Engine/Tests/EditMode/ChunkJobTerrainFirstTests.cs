@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Utils.Extensions;
@@ -92,6 +92,7 @@ namespace Engine.Tests.EditMode{
             a.topBlock = TopA;
             a.underBlock = UnderA;
             a.stoneBlock = TestFixtures.Stone;
+            a.freezesWater = 1;
             _config.WorldGen.Biomes[0] = a;
             Biome.BiomeDef b = _config.WorldGen.Biomes[1];
             b.topBlock = TopB;
@@ -270,7 +271,7 @@ namespace Engine.Tests.EditMode{
                     Height = 100, HeightF = 100f, Biome = 0, SurfaceSource = 0, FloraSource = -1,
                     TopBlock = TopA, UnderBlock = UnderA, StoneBlock = TestFixtures.Stone,
                     Temperature = 0.1f, Humidity = 0.5f,
-                    Frozen = SurfaceCover.WaterFreezes(x, z, 0.1f, _config.WorldGen) ? (byte)1 : (byte)0
+                    Frozen = SurfaceCover.WaterFreezes(x, z, 0.1f, _config.WorldGen.Biomes[0], _config.WorldGen) ? (byte)1 : (byte)0
                 };
         }
 
@@ -288,6 +289,37 @@ namespace Engine.Tests.EditMode{
             ChunkJob.FillTerrain(_vox, _columns, ref _config);
             Assert.AreEqual(TestFixtures.Water, _vox[ChunkSize.Flatten(3, surface, 4)], "overrides off: no ice");
             Assert.AreEqual(TestFixtures.Air, _vox[ChunkSize.Flatten(3, surface + 1, 4)]);
+        }
+
+        [Test]
+        public void ApplySurfaceCover_IceFollowsTheHardBiome(){
+            // The surface pick dithers along blend borders; the ice follows the hard biome, so its edge is a line.
+            // Only biome 0 has FreezesWater; every column's surface pick is the other biome.
+            UseTerrainFirst(climateOverrides: true);
+            ColdFloodedColumns();
+            for (int x = 0; x < ChunkWidth; x++)
+            for (int z = 0; z < ChunkDepth; z++){
+                int i = ChunkJob.GetColumnIdx(x, z, ChunkDepth);
+                ChunkColumn col = _columns[i];
+                col.Biome = (ushort)(x < ChunkWidth / 2 ? 0 : 1);
+                col.SurfaceSource = 1 - col.Biome;
+                col.Frozen = 0;
+                _columns[i] = col;
+            }
+
+            ChunkJob.ApplySurfaceCover(_columns, int3.zero, _config.WorldGen, default);
+
+            int frozen = 0;
+            for (int x = 0; x < ChunkWidth; x++)
+            for (int z = 0; z < ChunkDepth; z++){
+                ChunkColumn col = _columns[ChunkJob.GetColumnIdx(x, z, ChunkDepth)];
+                bool wanted = col.Biome == 0 &&
+                              SurfaceCover.WaterFreezes(x, z, col.Temperature, _config.WorldGen.Biomes[0], _config.WorldGen);
+                Assert.AreEqual(wanted, col.Frozen == 1, $"column ({x}, {z}), hard biome {col.Biome}");
+                frozen += col.Frozen;
+            }
+
+            Assert.Greater(frozen, 0, "some cold water of the freezing biome freezes");
         }
     }
 }

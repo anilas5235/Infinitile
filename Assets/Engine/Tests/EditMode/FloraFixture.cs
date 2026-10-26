@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Engine.Scripts.Jobs.Chunk;
@@ -464,7 +464,10 @@ namespace Engine.Tests.EditMode{
                 ushort beachUnder = beach ? fixture.Ids[b.BeachBlock] : under;
                 ushort stone = b ? fixture.Ids[b.StoneBlock] : (ushort)0;
                 int shift = SurfaceCover.StrataShift(wx, wz, cfg);
-                bool frozen = SurfaceCover.WaterFreezes(wx, wz, t, cfg);
+                // Ice follows the hard biome, as in the chunk job.
+                int hard = Region.HardBiome[i];
+                Biome.BiomeDef waterDef = source >= 0 && hard >= 0 ? cfg.Biomes[hard] : default;
+                bool frozen = SurfaceCover.WaterFreezes(wx, wz, t, waterDef, cfg);
                 for (int y = 0; y < ChunkHeight; y++){
                     ushort v = y < h - 4 ? stone : y < h - 2 ? under : y < h ? beachUnder : y == h ? top : y < waterLevel ? TestFixtures.Water : TestFixtures.Air;
                     if (v == stone && def.strataBlock != 0 && SurfaceCover.InStrataBand(y, shift, cfg.StrataPeriod, cfg.StrataThickness))

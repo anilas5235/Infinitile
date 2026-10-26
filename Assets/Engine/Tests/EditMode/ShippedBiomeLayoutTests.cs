@@ -1,4 +1,5 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
@@ -34,6 +35,24 @@ namespace Engine.Tests.EditMode{
             WorldGenSettings settings = LoadShipped();
             Assert.AreEqual(BlendMethod.DistanceBlend, settings.MaterialMethod);
             Assert.AreEqual(BlendMethod.DistanceBlend, settings.HeightMethod);
+        }
+
+        [Test]
+        public void ShippedBiomes_OnlyColdBiomesTakeSnowAndIce(){
+            // Snow and ice stay in the biomes that want them (DEC-65); a cold Plains column stays green.
+            string[] cold = { "Mountain", "Snow" };
+            List<Biome> biomes = LoadShipped().Biomes.Biomes;
+            foreach (Biome biome in biomes){
+                Assert.IsNotNull(biome, "BiomeSet entry");
+                bool wanted = System.Array.IndexOf(cold, biome.name) >= 0;
+                Assert.AreEqual(wanted, biome.FreezesWater, $"{biome.name}: FreezesWater");
+                if (!wanted) Assert.IsNull(biome.SnowTopBlock, $"{biome.name}: SnowTopBlock");
+            }
+
+            // Mountain keeps its snow line (GEN-35); the Snow biome is white through its own top block.
+            Biome mountain = biomes.Find(b => b.name == "Mountain");
+            Assert.IsNotNull(mountain, "Mountain");
+            Assert.IsNotNull(mountain.SnowTopBlock, "Mountain: SnowTopBlock");
         }
 
         [TestCase(GenArchitecture.TerrainFirst)]

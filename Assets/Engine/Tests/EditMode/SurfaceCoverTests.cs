@@ -6,13 +6,14 @@ using NUnit.Framework;
 namespace Engine.Tests.EditMode{
     /// <summary>
     ///     The snow, ice and strata rules of <see cref="SurfaceCover" />: the effective temperature falls with the
-    ///     height, snow needs a dry column and a snow block, a shore column at the water surface is snowy exactly where
-    ///     the water freezes, the freeze noise makes the edge ragged, and the strata bands wrap below zero.
+    ///     height, snow needs a dry column and a snow block, ice needs a biome whose water freezes, a shore column at the
+    ///     water surface is snowy exactly where the water freezes, the freeze noise makes the edge ragged, and the strata
+    ///     bands wrap below zero.
     /// </summary>
     public class SurfaceCoverTests{
         private const int WaterLevel = 124;
 
-        private static readonly Biome.BiomeDef Snowy = new(){ snowTopBlock = FloraFixture.Snow };
+        private static readonly Biome.BiomeDef Snowy = new(){ snowTopBlock = FloraFixture.Snow, freezesWater = 1 };
 
         private static WorldGenConfig Config(float noiseAmplitude){
             // Only the scalar fields SurfaceCover reads; nothing to dispose.
@@ -54,7 +55,15 @@ namespace Engine.Tests.EditMode{
             Assert.IsTrue(SurfaceCover.IsSnowCovered(0, 0, .5f, 250, Snowy, cfg), "warm biome, high peak");
             cfg.EnableClimateOverrides = false;
             Assert.IsFalse(SurfaceCover.IsSnowCovered(0, 0, .1f, WaterLevel - 1, Snowy, cfg), "overrides off");
-            Assert.IsFalse(SurfaceCover.WaterFreezes(0, 0, .1f, cfg), "overrides off");
+            Assert.IsFalse(SurfaceCover.WaterFreezes(0, 0, .1f, Snowy, cfg), "overrides off");
+        }
+
+        [Test]
+        public void WaterFreezes_OnlyInBiomesWhoseWaterFreezes(){
+            WorldGenConfig cfg = Config(0f);
+            Assert.IsTrue(SurfaceCover.WaterFreezes(0, 0, .1f, Snowy, cfg), "cold biome");
+            Assert.IsFalse(SurfaceCover.WaterFreezes(0, 0, .1f, default, cfg), "biome without freezesWater");
+            Assert.IsFalse(SurfaceCover.WaterFreezes(.1f, 0f, default, cfg), "biome without freezesWater, noise given");
         }
 
         [Test]
@@ -65,7 +74,7 @@ namespace Engine.Tests.EditMode{
             for (int x = -300; x < 300; x += 7)
             for (int z = -300; z < 300; z += 11)
             for (float t = .14f; t < .27f; t += .02f){
-                bool ice = SurfaceCover.WaterFreezes(x, z, t, cfg);
+                bool ice = SurfaceCover.WaterFreezes(x, z, t, Snowy, cfg);
                 Assert.AreEqual(ice, SurfaceCover.IsSnowCovered(x, z, t, WaterLevel - 1, Snowy, cfg), $"({x},{z}) t {t}");
                 if (ice) frozen++;
                 else open++;
@@ -81,14 +90,14 @@ namespace Engine.Tests.EditMode{
             WorldGenConfig cfg = Config(.04f);
             int frozen = 0, n = 0;
             for (int x = 0; x < 2000; x += 5, n++)
-                if (SurfaceCover.WaterFreezes(x, 17, cfg.FreezeTemperature, cfg))
+                if (SurfaceCover.WaterFreezes(x, 17, cfg.FreezeTemperature, Snowy, cfg))
                     frozen++;
             Assert.Greater(frozen, n / 10);
             Assert.Less(frozen, n - n / 10);
 
             cfg.FreezeNoiseAmplitude = 0f;
-            Assert.IsTrue(SurfaceCover.WaterFreezes(5, 17, cfg.FreezeTemperature - 1e-4f, cfg));
-            Assert.IsFalse(SurfaceCover.WaterFreezes(5, 17, cfg.FreezeTemperature, cfg));
+            Assert.IsTrue(SurfaceCover.WaterFreezes(5, 17, cfg.FreezeTemperature - 1e-4f, Snowy, cfg));
+            Assert.IsFalse(SurfaceCover.WaterFreezes(5, 17, cfg.FreezeTemperature, Snowy, cfg));
         }
 
         [Test]
