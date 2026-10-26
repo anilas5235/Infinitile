@@ -12,19 +12,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7f45a94d2e634c16a6e55fc59e032951, type: 3}
   m_Name: LogOak
   m_EditorClassIdentifier: 
+  package: {fileID: 0}
   textureMode: 1
   meshLayer: 0
-  voxelType: 0
   alwaysRenderAllFaces: 0
   depthFadeDistance: -1
+  surfaceAlpha: 1
   glow: 0
+  lightAttenuation: 15
+  lightEmission: {x: 0, y: 0, z: 0}
+  usePostProcess: 0
   postProcess:
     postProcessColor: {r: 0, g: 0, b: 0, a: 0}
     contrast: 0
     saturation: 0
     enableFog: 0
+    fogColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
     fogDensity: 0.01
+    depthDarkening: 0
   shape: {fileID: 11400000, guid: 4f233acb5e735874f81d54b07e03336a, type: 2}
+  facing: 1
+  topBottom: 0
   top: {fileID: 2800000, guid: 43861e3c2d19d754fa0362e9daffa275, type: 3}
   bottom: {fileID: 2800000, guid: 43861e3c2d19d754fa0362e9daffa275, type: 3}
   front: {fileID: 0}

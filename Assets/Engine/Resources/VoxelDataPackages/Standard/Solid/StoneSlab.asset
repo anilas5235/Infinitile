@@ -12,19 +12,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7f45a94d2e634c16a6e55fc59e032951, type: 3}
   m_Name: StoneSlab
   m_EditorClassIdentifier: 
+  package: {fileID: 0}
   textureMode: 0
   meshLayer: 0
   alwaysRenderAllFaces: 0
   depthFadeDistance: -1
+  surfaceAlpha: 1
   glow: 0
+  lightAttenuation: 15
+  lightEmission: {x: 0, y: 0, z: 0}
   usePostProcess: 0
   postProcess:
     postProcessColor: {r: 0, g: 0, b: 0, a: 0}
     contrast: 0
     saturation: 0
     enableFog: 0
+    fogColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
     fogDensity: 0.01
+    depthDarkening: 0
   shape: {fileID: 11400000, guid: 8ebda3cfe4d7a854fa6c77a5fe0fef65, type: 2}
+  facing: 0
+  topBottom: 1
   top: {fileID: 0}
   bottom: {fileID: 0}
   front: {fileID: 0}
