@@ -1,5 +1,6 @@
 using System;
 using Engine.Scripts.WorldGen.Settings;
+using VoxelSo = Engine.Scripts.VoxelConfig.Data.Voxel.Voxel;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -72,16 +73,17 @@ namespace Engine.Editor.WorldGen{
 
         /// <summary>
         ///     Builds the Burst config of <paramref name="baseSettings" /> with these knobs, through a transient clone,
-        ///     so the asset stays untouched. The caller owns and disposes the result. Throws like
-        ///     <see cref="WorldGenSettings.ToConfig" /> on invalid settings.
+        ///     so the asset stays untouched, with block ids from <paramref name="voxelId" /> (null leaves them 0).
+        ///     The caller owns and disposes the result. Throws like <see cref="WorldGenSettings.ToConfig" /> on
+        ///     invalid settings.
         /// </summary>
-        public WorldGenConfig BuildConfig(WorldGenSettings baseSettings, int seed){
+        public WorldGenConfig BuildConfig(WorldGenSettings baseSettings, int seed, Func<VoxelSo, ushort> voxelId = null){
             WorldGenSettings clone = Object.Instantiate(baseSettings);
             clone.hideFlags = HideFlags.HideAndDontSave;
             clone.name = baseSettings.name + " (preview B)";
             try{
                 ApplyTo(clone);
-                return clone.ToConfig(seed);
+                return clone.ToConfigWithVoxelIds(seed, voxelId);
             }
             finally{
                 Object.DestroyImmediate(clone);

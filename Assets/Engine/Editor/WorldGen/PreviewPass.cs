@@ -15,7 +15,10 @@ using BlendWeights = Engine.Scripts.WorldGen.Blending.BlendWeights;
 using Object = UnityEngine.Object;
 
 namespace Engine.Editor.WorldGen{
-    /// <summary>The views of the preview. Offset, Amp and Jaggedness exist in Terrain-first only.</summary>
+    /// <summary>
+    ///     The views of the preview. Offset, Amp and Jaggedness exist in Terrain-first only; the cave volume is
+    ///     sampled only on request and at one sample per block.
+    /// </summary>
     internal enum PreviewView{
         Height,
         HardBiome,
@@ -28,7 +31,11 @@ namespace Engine.Editor.WorldGen{
         PeaksValleys,
         Offset,
         Amp,
-        Jaggedness
+        Jaggedness,
+        CaveVolume,
+        CavernMask,
+        EntranceMask,
+        LavaMask
     }
 
     /// <summary>Display options shared by every pass.</summary>
@@ -43,6 +50,12 @@ namespace Engine.Editor.WorldGen{
 
         /// <summary>Density noise (<see cref="FloraDensity" />) the flora view shades its ground with; -1 = none.</summary>
         public int DensityOverlay;
+
+        /// <summary>
+        ///     Sample the carved voxels per column (a full voxel generation of the region without flora); taken only
+        ///     at one sample per block.
+        /// </summary>
+        public bool CaveVolume;
     }
 
     /// <summary>
@@ -57,6 +70,7 @@ namespace Engine.Editor.WorldGen{
 
         public readonly string Label;
         private WorldGenConfig _config; // owned; rebuilt per build
+        private readonly LocalVoxelIds _voxelIds = new(); // the cave volume tells blocks from air by id
 
         // --- Sampled buffers (Persistent, Size² each) ----------------------------------------------------------------
         public NativeArray<WorldFields> Fields;
@@ -69,6 +83,10 @@ namespace Engine.Editor.WorldGen{
         public NativeArray<byte> Clamped;
         public NativeArray<float3> TerrainParams;
         public NativeArray<float> MaxWeight;
+        public NativeArray<float> CavernMask;
+        public NativeArray<float> EntranceMask;
+        public NativeArray<float> LavaMask;
+        public NativeArray<int> CaveVolume;
         private NativeArray<int> _edges;
         private NativeArray<Color32> _biomeColors;
         private readonly NativeArray<Color32>[] _pixels = new NativeArray<Color32>[ViewCount];
@@ -89,6 +107,15 @@ namespace Engine.Editor.WorldGen{
         public float MeanMaxWeight { get; private set; }
         public float2 AmpRange { get; private set; }
         public float2 JaggednessRange { get; private set; }
+
+        /// <summary>The last build sampled the cave volume.</summary>
+        public bool CaveVolumeSampled { get; private set; }
+
+        public int MaxCaveVolume { get; private set; }
+        public long TotalCaveVolume { get; private set; }
+
+        /// <summary>Share of the columns inside each cave mask: cavern, entrance, lava.</summary>
+        public float3 MaskShares { get; private set; }
         public List<BiomeBoundaryStats.PairLength> Boundaries { get; private set; } = new();
 
         /// <summary>Flora species id → name of the last build (element 0 = "none").</summary>
@@ -119,7 +146,9 @@ namespace Engine.Editor.WorldGen{
             handle = default;
             DisposeConfig();
             try{
-                _config = overrides != null ? overrides.BuildConfig(asset, seed) : asset.ToConfig(seed);
+                _config = overrides != null
+                    ? overrides.BuildConfig(asset, seed, _voxelIds.Id)
+                    : asset.ToConfigWithVoxelIds(seed, _voxelIds.Id);
                 Error = null;
             }
             catch (Exception e){
@@ -150,8 +179,13 @@ namespace Engine.Editor.WorldGen{
                 SurfaceSource = SurfaceSource,
                 FloraSpecies = FloraSpecies,
                 Clamped = Clamped,
-                TerrainParams = TerrainParams // zero in Biome-first
+                TerrainParams = TerrainParams, // zero in Biome-first
+                CavernMask = CavernMask,
+                EntranceMask = EntranceMask,
+                LavaMask = LavaMask
             };
+            CaveVolumeSampled = options.CaveVolume && stride == 1;
+            if (CaveVolumeSampled) buffers.CaveVolume = CaveVolume;
             JobHandle sampled = WorldGenApi.SampleRegion(request, ref buffers);
 
             int overlay = math.clamp(options.DensityOverlay, -1, 3);
@@ -189,7 +223,14 @@ namespace Engine.Editor.WorldGen{
                 FloraView = _pixels[(int)PreviewView.Flora],
                 ClimateView = _pixels[(int)PreviewView.Climate],
                 ErosionView = _pixels[(int)PreviewView.Erosion],
-                PvView = _pixels[(int)PreviewView.PeaksValleys]
+                PvView = _pixels[(int)PreviewView.PeaksValleys],
+                CavernMask = CavernMask,
+                EntranceMask = EntranceMask,
+                LavaMask = LavaMask,
+                MaskThresholds = MaskThresholds(),
+                CavernView = _pixels[(int)PreviewView.CavernMask],
+                EntranceView = _pixels[(int)PreviewView.EntranceMask],
+                LavaView = _pixels[(int)PreviewView.LavaMask]
             }.Schedule(size * size, 64, sampled);
 
             // Boundaries of the dominant material biome, the class the surface blocks follow.
@@ -201,6 +242,7 @@ namespace Engine.Editor.WorldGen{
         /// <summary>After the scheduled handle completed: uploads the textures and computes the statistics.</summary>
         public void Finish(WorldGenSettings asset){
             FillTerrainParamViews(asset.WaterLevel);
+            FillCaveVolumeView();
             for (int v = 0; v < ViewCount; v++){
                 EnsureTexture(ref _textures[v], Size);
                 _textures[v].SetPixelData(_pixels[v], 0);
@@ -210,10 +252,13 @@ namespace Engine.Editor.WorldGen{
             int count = Size * Size;
             int clamped = 0;
             double weight = 0;
+            int3 masked = int3.zero;
+            float3 thresholds = MaskThresholds();
             Dictionary<ushort, int> flora = new();
             for (int i = 0; i < count; i++){
                 clamped += Clamped[i];
                 weight += MaxWeight[i];
+                masked += math.select(int3.zero, 1, new float3(CavernMask[i], EntranceMask[i], LavaMask[i]) > thresholds);
                 ushort species = FloraSpecies[i];
                 if (species == 0) continue;
                 flora.TryGetValue(species, out int n);
@@ -222,6 +267,7 @@ namespace Engine.Editor.WorldGen{
 
             ClampedShare = count > 0 ? clamped / (float)count : 0f;
             MeanMaxWeight = count > 0 ? (float)(weight / count) : 0f;
+            MaskShares = count > 0 ? (float3)masked / count : float3.zero;
             FloraCounts = new List<(ushort, int)>();
             foreach (KeyValuePair<ushort, int> pair in flora) FloraCounts.Add((pair.Key, pair.Value));
             FloraCounts.Sort((a, b) => b.count != a.count ? b.count.CompareTo(a.count) : a.species.CompareTo(b.species));
@@ -278,6 +324,41 @@ namespace Engine.Editor.WorldGen{
             }
         }
 
+        /// <summary>Thresholds of the cavern, entrance and lava masks.</summary>
+        private float3 MaskThresholds(){
+            return new float3(_config.Caves.CavernMaskThreshold, _config.Caves.EntranceThreshold, _config.Caves.LavaMaskThreshold);
+        }
+
+        /// <summary>
+        ///     Carved voxels per column on a black-to-yellow scale up to the largest column in the view; dark blue
+        ///     where the volume was not sampled. Main-thread conversion of at most 512² pixels.
+        /// </summary>
+        private void FillCaveVolumeView(){
+            NativeArray<Color32> pixels = _pixels[(int)PreviewView.CaveVolume];
+            int count = Size * Size;
+            MaxCaveVolume = 0;
+            TotalCaveVolume = 0;
+            if (!CaveVolumeSampled){
+                Color32 none = new(20, 24, 48, 255);
+                for (int i = 0; i < count; i++) pixels[i] = none;
+                return;
+            }
+
+            for (int i = 0; i < count; i++){
+                MaxCaveVolume = math.max(MaxCaveVolume, CaveVolume[i]);
+                TotalCaveVolume += CaveVolume[i];
+            }
+
+            float scale = 1f / math.max(1, MaxCaveVolume);
+            for (int i = 0; i < count; i++){
+                float v = math.sqrt(CaveVolume[i] * scale); // square root, so thin tunnels still show
+                pixels[i] = CaveVolume[i] == 0
+                    ? new Color32(0, 0, 0, 255)
+                    : new Color32((byte)math.round(math.lerp(60f, 255f, v)), (byte)math.round(math.lerp(20f, 230f, v)),
+                        (byte)math.round(math.lerp(20f, 60f, v)), 255);
+            }
+        }
+
         /// <summary>Stable colour of a flora species id (also used for the legend).</summary>
         public static Color32 SpeciesColor(ushort species){
             return ViewJob.SpeciesColor(species);
@@ -296,6 +377,10 @@ namespace Engine.Editor.WorldGen{
             Clamped = new NativeArray<byte>(count, Allocator.Persistent);
             TerrainParams = new NativeArray<float3>(count, Allocator.Persistent);
             MaxWeight = new NativeArray<float>(count, Allocator.Persistent);
+            CavernMask = new NativeArray<float>(count, Allocator.Persistent);
+            EntranceMask = new NativeArray<float>(count, Allocator.Persistent);
+            LavaMask = new NativeArray<float>(count, Allocator.Persistent);
+            CaveVolume = new NativeArray<int>(count, Allocator.Persistent);
             _edges = new NativeArray<int>(BiomeBoundaryStats.Side * BiomeBoundaryStats.Side, Allocator.Persistent);
             _biomeColors = new NativeArray<Color32>(BiomeSet.MaxBiomes, Allocator.Persistent);
             for (int v = 0; v < ViewCount; v++) _pixels[v] = new NativeArray<Color32>(count, Allocator.Persistent);
@@ -313,6 +398,10 @@ namespace Engine.Editor.WorldGen{
             if (Clamped.IsCreated) Clamped.Dispose();
             if (TerrainParams.IsCreated) TerrainParams.Dispose();
             if (MaxWeight.IsCreated) MaxWeight.Dispose();
+            if (CavernMask.IsCreated) CavernMask.Dispose();
+            if (EntranceMask.IsCreated) EntranceMask.Dispose();
+            if (LavaMask.IsCreated) LavaMask.Dispose();
+            if (CaveVolume.IsCreated) CaveVolume.Dispose();
             if (_edges.IsCreated) _edges.Dispose();
             if (_biomeColors.IsCreated) _biomeColors.Dispose();
             for (int v = 0; v < ViewCount; v++)
@@ -391,6 +480,13 @@ namespace Engine.Editor.WorldGen{
             [WriteOnly] public NativeArray<Color32> ClimateView;
             [WriteOnly] public NativeArray<Color32> ErosionView;
             [WriteOnly] public NativeArray<Color32> PvView;
+            [ReadOnly] public NativeArray<float> CavernMask;
+            [ReadOnly] public NativeArray<float> EntranceMask;
+            [ReadOnly] public NativeArray<float> LavaMask;
+            public float3 MaskThresholds; // cavern, entrance, lava
+            [WriteOnly] public NativeArray<Color32> CavernView;
+            [WriteOnly] public NativeArray<Color32> EntranceView;
+            [WriteOnly] public NativeArray<Color32> LavaView;
 
             public void Execute(int index){
                 HardView[index] = BiomeColor(HardBiome[index]);
@@ -427,6 +523,17 @@ namespace Engine.Editor.WorldGen{
                 ErosionView[index] = new Color32(e, e, e, 255);
                 byte pv = (byte)math.round(math.saturate((f.PV + 1f) * 0.5f) * 255f);
                 PvView[index] = new Color32(pv, pv, pv, 255);
+
+                CavernView[index] = MaskColor(CavernMask[index], MaskThresholds.x, new float3(1f, .6f, .15f));
+                EntranceView[index] = MaskColor(EntranceMask[index], MaskThresholds.y, new float3(.3f, 1f, .35f));
+                LavaView[index] = MaskColor(LavaMask[index], MaskThresholds.z, new float3(1f, .25f, .1f));
+            }
+
+            /// <summary>Grey of the mask value (−1…1); above the threshold tinted with <paramref name="tint" />.</summary>
+            private static Color32 MaskColor(float value, float threshold, float3 tint){
+                float g = math.saturate((value + 1f) * 0.5f);
+                float3 rgb = value > threshold ? tint * (0.45f + 0.55f * g) : new float3(g * 0.6f);
+                return new Color32((byte)math.round(rgb.x * 255f), (byte)math.round(rgb.y * 255f), (byte)math.round(rgb.z * 255f), 255);
             }
 
             /// <summary>

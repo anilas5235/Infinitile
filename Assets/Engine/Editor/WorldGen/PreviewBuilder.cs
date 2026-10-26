@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Classify;
+using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Burst;
@@ -15,7 +16,8 @@ namespace Engine.Editor.WorldGen{
     /// <summary>
     ///     Build scheduling of the world-generation preview. Collects change requests and, once asked, rebuilds the
     ///     Burst configs (so edits take effect) and schedules pass A, in compare mode pass B over the same region and
-    ///     seed, and the distribution plane of A. <see cref="Update" /> applies the results when the jobs are done.
+    ///     seed, the distribution plane of A and, when asked, the cross-section. <see cref="Update" /> applies the
+    ///     results when the jobs are done. A change to the cross-section alone rebuilds only the cross-section.
     /// </summary>
     internal sealed class PreviewBuilder : IDisposable{
         internal const int DistributionResolution = 256;
@@ -33,15 +35,29 @@ namespace Engine.Editor.WorldGen{
             public PreviewViewOptions Options;
             public float3 Probe; // C, E, PV of the distribution plane and the spline plots
             public float ProbeHeight; // normalised h of the distribution plane, Terrain-first only
+            public SliceRequest? Slice; // null: no cross-section
+        }
+
+        /// <summary>A vertical slice of configuration A: <see cref="Width" /> columns from <see cref="Start" />.</summary>
+        internal struct SliceRequest{
+            public SliceAxis Axis;
+            public int Coordinate;
+            public int Start;
+            public int Width;
+            public int YMin;
+            public int YMax;
+            public bool Flora;
         }
 
         private bool _stale = true;
+        private bool _sliceStale = true;
         private double _lastChangeTime; // EditorApplication.timeSinceStartup of the last MarkStale
         private bool _inProgress;
         private JobHandle _handle;
         private WorldGenSettings _asset; // the asset of the running build
         private bool _scheduledA;
         private bool _scheduledB;
+        private bool _scheduledSlice;
 
         private Texture2D _distributionTexture;
         private NativeArray<Color32> _jobDistributionPixels;
@@ -49,6 +65,7 @@ namespace Engine.Editor.WorldGen{
 
         internal PreviewPass PassA{ get; } = new("A");
         internal PreviewPass PassB{ get; } = new("B");
+        internal PreviewSlice Slice{ get; } = new();
 
         /// <summary>The classifier's T x F plane of A at the probe values.</summary>
         internal Texture2D DistributionTexture => _distributionTexture;
@@ -58,7 +75,7 @@ namespace Engine.Editor.WorldGen{
         internal bool InProgress => _inProgress;
 
         /// <summary>Stale, idle, and no change has come in for <see cref="RebuildDebounceSeconds" />.</summary>
-        internal bool AutoBuildDue => _stale && !_inProgress &&
+        internal bool AutoBuildDue => (_stale || _sliceStale) && !_inProgress &&
                                       EditorApplication.timeSinceStartup - _lastChangeTime >= RebuildDebounceSeconds;
 
         /// <summary>Raised when a build has been applied, or when a stale build had no pass to schedule.</summary>
@@ -68,12 +85,20 @@ namespace Engine.Editor.WorldGen{
             Complete(false); // a running build still reads the configs and buffers
             PassA.Dispose();
             PassB.Dispose();
+            Slice.Dispose();
             PreviewPass.DestroyTexture(ref _distributionTexture);
         }
 
-        /// <summary>Marks the views stale and records the time of the change.</summary>
+        /// <summary>Marks the views and the cross-section stale and records the time of the change.</summary>
         internal void MarkStale(){
             _stale = true;
+            _sliceStale = true;
+            _lastChangeTime = EditorApplication.timeSinceStartup;
+        }
+
+        /// <summary>Marks only the cross-section stale (its position or range changed).</summary>
+        internal void MarkSliceStale(){
+            _sliceStale = true;
             _lastChangeTime = EditorApplication.timeSinceStartup;
         }
 
@@ -84,34 +109,26 @@ namespace Engine.Editor.WorldGen{
 
         /// <summary>
         ///     Rebuilds the Burst configs and schedules the passes of <paramref name="request" /> if the views are
-        ///     stale and no build is running. The spline plots are recomputed synchronously (a few thousand spline
-        ///     evaluations).
+        ///     stale and no build is running, and the cross-section if it or the views are stale. The spline plots are
+        ///     recomputed synchronously (a few thousand spline evaluations).
         /// </summary>
         internal void Schedule(in Request request){
-            if (_inProgress || !_stale) return;
-            _stale = false;
+            if (_inProgress || !_stale && !_sliceStale) return;
+            bool views = _stale;
+            _stale = _sliceStale = false;
             WorldGenSettings asset = request.Asset;
             if (!asset) return;
 
-            Plots = SplinePlots.Compute(asset.Splines, request.Probe, PlotSamples, out string plotsError);
-            PlotsError = plotsError;
-
             JobHandle handle = default;
-            _scheduledA = PassA.Schedule(asset, null, request.Seed, request.Origin, request.ViewSize, request.Stride,
-                request.Options, out JobHandle a);
-            if (_scheduledA){
-                handle = JobHandle.CombineDependencies(handle, a,
-                    ScheduleDistribution(asset, request.Probe, request.ProbeHeight));
+            _scheduledA = _scheduledB = _scheduledSlice = false;
+            if (request.Slice is{ } slice && Slice.Schedule(asset, request.Seed, slice.Axis, slice.Coordinate, slice.Start,
+                    slice.Width, slice.YMin, slice.YMax, slice.Flora, out JobHandle s)){
+                _scheduledSlice = true;
+                handle = s;
             }
 
-            _scheduledB = false;
-            if (request.ConfigB != null && PassB.Schedule(asset, request.ConfigB, request.Seed, request.Origin,
-                    request.ViewSize, request.Stride, request.Options, out JobHandle b)){
-                _scheduledB = true;
-                handle = JobHandle.CombineDependencies(handle, b);
-            }
-
-            if (!_scheduledA && !_scheduledB){
+            if (views) ScheduleViews(request, ref handle);
+            if (!_scheduledA && !_scheduledB && !_scheduledSlice){
                 Finished?.Invoke();
                 return;
             }
@@ -119,6 +136,25 @@ namespace Engine.Editor.WorldGen{
             _asset = asset;
             _handle = handle;
             _inProgress = true;
+        }
+
+        private void ScheduleViews(in Request request, ref JobHandle handle){
+            WorldGenSettings asset = request.Asset;
+            Plots = SplinePlots.Compute(asset.Splines, request.Probe, PlotSamples, out string plotsError);
+            PlotsError = plotsError;
+
+            _scheduledA = PassA.Schedule(asset, null, request.Seed, request.Origin, request.ViewSize, request.Stride,
+                request.Options, out JobHandle a);
+            if (_scheduledA){
+                handle = JobHandle.CombineDependencies(handle, a,
+                    ScheduleDistribution(asset, request.Probe, request.ProbeHeight));
+            }
+
+            if (request.ConfigB != null && PassB.Schedule(asset, request.ConfigB, request.Seed, request.Origin,
+                    request.ViewSize, request.Stride, request.Options, out JobHandle b)){
+                _scheduledB = true;
+                handle = JobHandle.CombineDependencies(handle, b);
+            }
         }
 
         private JobHandle ScheduleDistribution(WorldGenSettings asset, float3 probe, float probeHeight){
@@ -156,6 +192,7 @@ namespace Engine.Editor.WorldGen{
                     }
 
                     if (_scheduledB) PassB.Finish(_asset);
+                    if (_scheduledSlice) Slice.Finish();
                 }
             }
 

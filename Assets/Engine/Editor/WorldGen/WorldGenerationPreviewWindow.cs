@@ -17,7 +17,8 @@ namespace Engine.Editor.WorldGen{
     ///         Terrain-first Offset/Amp/J), the clamped share and the biome-pair boundary list. An A/B compare mode
     ///         shows the same view and seed for A and a preview-only configuration B layered on the asset, plus a
     ///         difference view. 1D plots show every spline level at the probe C/E/PV. The tree species gallery
-    ///         shows the variants of a species for a row of seeds (side and top view).
+    ///         shows the variants of a species for a row of seeds (side and top view). The cross-section mode shows a
+    ///         top-view layer (also cave volume and the cave masks) with a vertical slice of the final voxels.
     ///     </para>
     /// </summary>
     public partial class WorldGenerationPreviewWindow : EditorWindow{
@@ -487,7 +488,8 @@ namespace Engine.Editor.WorldGen{
                     EditorGUIUtility.labelWidth = 0f;
 
                     GUILayout.Space(20f);
-                    DrawCompareToggle();
+                    DrawCrossSectionToggle();
+                    if (!_crossSection) DrawCompareToggle();
 
                     GUILayout.FlexibleSpace();
                 }
@@ -498,7 +500,9 @@ namespace Engine.Editor.WorldGen{
                     $"A: {PassA?.Description} · drag a view to pan · 1 sample per block up to 512, then every {stride}th column",
                     EditorStyles.miniLabel);
 
-                if (_compare) DrawCompareViews();
+                if (!_crossSection) wantsMouseMove = false;
+                if (_crossSection) DrawCrossSectionViews();
+                else if (_compare) DrawCompareViews();
                 else DrawGrid();
             }
             EditorGUILayout.EndVertical();
@@ -543,11 +547,18 @@ namespace Engine.Editor.WorldGen{
                 PreviewView.Jaggedness => pass.TerrainFirst
                     ? $"Jaggedness ({pass.JaggednessRange.x:0.#}..{pass.JaggednessRange.y:0.#})"
                     : "Jaggedness (Terrain-first only)",
+                PreviewView.CaveVolume => pass.CaveVolumeSampled
+                    ? $"Cave volume (max {pass.MaxCaveVolume} per column, {pass.TotalCaveVolume:N0} carved voxels)"
+                    : "Cave volume (needs one sample per block: extent 512 or less)",
+                PreviewView.CavernMask => $"Cavern mask (orange = halls may form, {pass.MaskShares.x:P1})",
+                PreviewView.EntranceMask => $"Entrance mask (green = worms may break the surface, {pass.MaskShares.y:P1})",
+                PreviewView.LavaMask => $"Lava mask (red = lava floor, {pass.MaskShares.z:P1})",
                 _ => view.ToString()
             };
         }
 
-        private void DrawView(string title, Texture2D texture, bool allowPan, float fixedSize = 0f){
+        /// <summary>Draws a square view and returns the rect it was drawn in.</summary>
+        private Rect DrawView(string title, Texture2D texture, bool allowPan, float fixedSize = 0f){
             EditorGUILayout.BeginVertical();
             {
                 if (title != null) EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
@@ -563,8 +574,9 @@ namespace Engine.Editor.WorldGen{
                 EditorGUI.DrawRect(rect, new Color(0.1f, 0.1f, 0.1f, 1f));
                 if (texture) GUI.DrawTexture(rect, texture, ScaleMode.ScaleToFit, false);
                 if (allowPan) HandlePanInput(rect);
+                EditorGUILayout.EndVertical();
+                return rect;
             }
-            EditorGUILayout.EndVertical();
         }
 
         private void HandlePanInput(Rect viewRect){
@@ -572,7 +584,7 @@ namespace Engine.Editor.WorldGen{
             if (e == null) return;
 
             switch (e.type){
-                case EventType.MouseDown when e.button == 0 && viewRect.Contains(e.mousePosition):
+                case EventType.MouseDown when e.button == 0 && !e.shift && viewRect.Contains(e.mousePosition): // shift+click places the slice
                     _isDragging = true;
                     _dragStartMouse = e.mousePosition;
                     _dragStartOffset = _worldOffset;
@@ -643,10 +655,12 @@ namespace Engine.Editor.WorldGen{
                     ShowHumidity = _showHumidity,
                     Hillshade = _hillshade,
                     Exaggeration = _exaggeration,
-                    DensityOverlay = _densityOverlay
+                    DensityOverlay = _densityOverlay,
+                    CaveVolume = CaveVolumeShown
                 },
                 Probe = new float3(_planeContinental, _planeErosion, _planePV),
-                ProbeHeight = _planeHeight
+                ProbeHeight = _planeHeight,
+                Slice = SliceRequest()
             });
         }
 
