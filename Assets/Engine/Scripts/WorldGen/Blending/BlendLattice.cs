@@ -203,10 +203,18 @@ namespace Engine.Scripts.WorldGen.Blending{
             if (biomeFirst && cfg.HeightMethod == BlendMethod.DistortedBoundary)
                 Add(cfg.HeightKernel, ref warpedStride, ref warpedReach, ref warpedTaps);
 
+            // Biome-first heights blend, so a water probe outside the lattice evaluates every tap; the lattice then
+            // spans the probe cells too.
+            int2 latticeMin = minColumn, latticeMax = maxColumn;
+            if (biomeFirst && cache.WaterProbes.IsCreated){
+                latticeMin = cache.WaterProbeOrigin * SurfaceCover.WaterProbeStride;
+                latticeMax = (cache.WaterProbeOrigin + cache.WaterProbeSize - 1) * SurfaceCover.WaterProbeStride;
+            }
+
             if (Worthwhile(unwarpedStride, unwarpedTaps, columnStep))
-                cache.Unwarped = BlendLattice.Build(minColumn, maxColumn, unwarpedReach, unwarpedStride, false, cfg, allocator);
+                cache.Unwarped = BlendLattice.Build(latticeMin, latticeMax, unwarpedReach, unwarpedStride, false, cfg, allocator);
             if (Worthwhile(warpedStride, warpedTaps, columnStep))
-                cache.Warped = BlendLattice.Build(minColumn, maxColumn, warpedReach, warpedStride, true, cfg, allocator);
+                cache.Warped = BlendLattice.Build(latticeMin, latticeMax, warpedReach, warpedStride, true, cfg, allocator);
             return cache;
         }
 

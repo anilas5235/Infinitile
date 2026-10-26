@@ -39,10 +39,17 @@ namespace Engine.Scripts.WorldGen.Caves{
         ///     (<see cref="SurfaceCover.NearWater(int,int,int,in WorldGenConfig,in BlendCache)" />).
         /// </summary>
         public static bool IsEntrance(int x, int z, int height, in WorldGenConfig cfg, in BlendCache cache){
-            ref readonly CaveConfig c = ref cfg.Caves;
-            if (Submerged(height, cfg)) return false;
-            if (CaveMasks.Entrance(x, z, cfg) <= c.EntranceThreshold) return false;
-            return c.EntranceWaterDistance <= 0 || !SurfaceCover.NearWater(x, z, c.EntranceWaterDistance, cfg, cache);
+            if (!InEntranceMask(x, z, height, cfg)) return false;
+            int r = cfg.Caves.EntranceWaterDistance;
+            return r <= 0 || !SurfaceCover.NearWater(x, z, r, cfg, cache);
+        }
+
+        /// <summary>
+        ///     The dry column (x, z) with top block <paramref name="height" /> lies in the entrance mask; the water test
+        ///     of <see cref="IsEntrance" /> left out.
+        /// </summary>
+        public static bool InEntranceMask(int x, int z, int height, in WorldGenConfig cfg){
+            return !Submerged(height, cfg) && CaveMasks.Entrance(x, z, cfg) > cfg.Caves.EntranceThreshold;
         }
 
         /// <summary>

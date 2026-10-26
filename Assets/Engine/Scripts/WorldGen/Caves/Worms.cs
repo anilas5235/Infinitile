@@ -28,7 +28,7 @@ namespace Engine.Scripts.WorldGen.Caves{
         /// <summary>Step at which the branch leaves, −1 for none (and on a branch).</summary>
         public int BranchStep;
 
-        /// <summary>A worm that starts in an entrance aims down while it is above this y; int.MaxValue for others.</summary>
+        /// <summary>A worm that starts in the entrance mask aims down while it is above this y; int.MaxValue for others.</summary>
         public int DescendAbove;
     }
 
@@ -88,8 +88,10 @@ namespace Engine.Scripts.WorldGen.Caves{
         /// <summary>
         ///     Starts worm <paramref name="k" /> of <paramref name="cell" />; false when the cell has no such worm or its
         ///     start column has no room for one (surface − Cover below the lowest start height outside an entrance).
-        ///     A worm in an entrance starts up to <c>EntranceStartDepth</c> below the surface and aims down until it is
-        ///     <c>Cover</c> below it, so the opening leads into the rock.
+        ///     A worm in the entrance mask starts up to <c>EntranceStartDepth</c> below the surface and aims down until it
+        ///     is <c>Cover</c> below it, so the opening leads into the rock. The start leaves out the water test of the
+        ///     entrance: starts lie up to <c>WormPadding</c> away, beyond the block's probes, and the column limits keep
+        ///     the worm <c>Cover</c> deep wherever water is near.
         /// </summary>
         public static bool Begin(int2 cell, int k, in WorldGenConfig cfg, in BlendCache cache, out Worm worm){
             ref readonly CaveConfig c = ref cfg.Caves;
@@ -98,7 +100,7 @@ namespace Engine.Scripts.WorldGen.Caves{
             uint hash = WormHash(cell, k, cfg);
             int2 column = StartColumn(cell, k, cfg);
             int surface = CaveColumns.SurfaceY(column.x, column.y, cfg, cache);
-            bool entrance = CaveColumns.IsEntrance(column.x, column.y, surface, cfg, cache);
+            bool entrance = CaveColumns.InEntranceMask(column.x, column.y, surface, cfg);
             int y;
             if (entrance){
                 y = surface - (int)(Roll(hash, RollY) * (c.EntranceStartDepth + 1));

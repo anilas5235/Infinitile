@@ -492,7 +492,7 @@ namespace Engine.Tests.EditMode{
             // 8 × 8 chunks with ~27 % water and entrance columns: no carved voxel touches water or ice, nothing is
             // carved at y ≤ 2 and y 0 is bedrock, carving above surface − Cover happens only in entrance columns
             // (caverns and pockets never come that close, worms only there), and lava lies only at or below LavaLevel
-            // inside the lava mask, where no carved voxel at that depth holds air. Worms rarely start in an entrance,
+            // inside the lava mask, where no carved voxel at that depth holds air. Worms rarely start in the entrance mask,
             // so a second run widens the mask and fills every cell with worms to open some.
             if (moreEntrances){
                 _settings.Caves.EntranceThreshold = 0f;
