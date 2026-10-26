@@ -68,14 +68,4 @@ MonoBehaviour:
     DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
-  - SpeciesVoxel: {fileID: 0}
-    SpeciesStructure: {fileID: 0}
-    SpeciesTree: {fileID: 11400000, guid: e0b80b74beb141ae9a55c0d9d88cb810, type: 2}
-    Probability: 0.00025
-    RequiresSurfaceFromSameBiome: 0
-    MinHeightAboveWater: 1
-    DensityNoise: 0
-    DensityInfluence: 1
-    MinStackHeight: 1
-    MaxStackHeight: 1
   RepresentativeColor: {r: 0.9899782, g: 1, b: 0, a: 1}
