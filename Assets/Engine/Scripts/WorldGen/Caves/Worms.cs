@@ -120,7 +120,9 @@ namespace Engine.Scripts.WorldGen.Caves{
             int extraSteps = 0;
             if (entrance){
                 y = surface - (int)(Roll(hash, RollY) * (c.EntranceStartDepth + 1));
-                worm.ShaftAbove = surface - c.Cover - (int)math.ceil(c.WormMaxRadius);
+                // The shaft steps straight down without the bounce of Next and ends one voxel below ShaftAbove, so
+                // it ends at WormMinY at the lowest.
+                worm.ShaftAbove = math.max(surface - c.Cover - (int)math.ceil(c.WormMaxRadius), c.WormMinY + 1);
                 worm.DescendAbove = math.min(worm.ShaftAbove, c.CavernBandMax);
                 worm.Pitch = -c.WormMaxPitch;
                 extraSteps = math.max(y - worm.ShaftAbove, 0) +

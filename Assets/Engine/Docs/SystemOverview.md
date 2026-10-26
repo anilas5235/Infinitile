@@ -99,6 +99,8 @@ The world generator (see `Docs/WorldGenerationPipeline.md`):
 - `WorldGen/Blending` — `BlendWeights`, the blend methods, blend lattice and surface pick
 - `WorldGen/Settings` — `WorldGenSettings`, `BiomeSet`, `TerrainSplineSet`, the Burst mirror `WorldGenConfig`, canonical JSON
 - `WorldGen/Flora` — flora rules and placement
+- `WorldGen/Caves` — column limits, caverns, worm tunnels, lava pockets, ore veins and the bottom layer, with pure
+  per-voxel references (`CaveCarving`, `OreVeins.Apply`)
 
 ## Core systems and what they do
 
