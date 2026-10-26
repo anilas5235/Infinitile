@@ -1034,6 +1034,15 @@ Docs/                                 WorldGenSpec.html (this file; outside Asse
 <li><b>Idea:</b> dither in coarser cells, e.g. 2 × 2 columns sharing one roll, or narrow B. This is decided by eye once trees, groves and details (G2–G4) cover the ground.</li>
 <li><b>Acceptance if scheduled:</b> the same metrics as GEN-32 to GEN-34 (patch share, no Snow–Desert borders), and a user review of tour shots before and after.</li>
 </ul>
+<!-- ============================================================ -->
+<h3>16.11 Shape-aware light and AO for partial blocks</h3>
+<p class="small">Recorded 2026-10-26 (Phase O review; ROT-05 leaves shape-accurate handling out of the phase). Not scheduled.</p>
+<ul class="tight">
+<li><b>Observation:</b> since DEC-62, a neighbour's face next to the empty half of a slab is drawn. The slab itself has light attenuation 15, so the smooth light (LGT-09) skips it as opaque and takes the face's corner light only from the voxels around the slab. Where those are opaque too, the corner falls back to the slab's own light, which is 0, and the face is dark although light reaches it through the empty half. The AO bits (<code>is_solid</code>, mesh layer Solid) also count the slab as a full block, so the faces around it are shaded as if it filled the cell. Colliders are full cubes as well (ROT-05).</li>
+<li><b>Idea:</b> treat partial shapes (voxels without the occluder flag) as open for light: give them an attenuation below 15 so the light BFS stores light in them, or let <code>corner_light</code> and <code>is_solid</code> use the occluder flag instead of the attenuation and the mesh layer. Shape-accurate colliders would be a separate step.</li>
+<li><b>Costs and risks:</b> a light change touches LGT-11 (an edit must equal a full recomputation) and the light baselines; letting light into slabs also lets sky light pass under a row of slabs. The occluder flag is also set on full cubes of other layers (water, leaves), so the AO rule would need both the Solid layer and the flag; the shading next to slabs changes, so it needs a before/after review.</li>
+<li><b>Acceptance if scheduled:</b> a wall face next to the empty half of a slab between opaque blocks is lit like the open air in front of it; full cubes look exactly as before; LightTests and the light benchmarks pass within PERF-03.</li>
+</ul>
 
 <h2 id="s17">17 · Generation improvements (Phase G)</h2>
 <p>Planned on 2026-10-24, started the same day. Goal: a world that looks less uniform. There will be more tree kinds, several variants of each kind, crowns that differ voxel by voxel, groves and clearings, ground details and patchy beaches. Generation defects such as grass under water are fixed as well. The decisions behind this section are DEC-30…36 (§17.8). All rules of Part I keep applying, in particular R3 (pure functions of world position), R5 (the user sets the design values), VEG-01…06 (flora pick and anchor spacing), PERF-03 / PERF-04 and the seam test TST-03.</p>
