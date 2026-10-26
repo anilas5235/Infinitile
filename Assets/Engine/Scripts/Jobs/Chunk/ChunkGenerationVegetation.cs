@@ -74,15 +74,18 @@ namespace Engine.Scripts.Jobs.Chunk{
         /// <summary>
         ///     Stamps the flora of <paramref name="grid" /> into <paramref name="vox" />. A flora voxel replaces only a
         ///     voxel of a lower <see cref="FloraVoxelClass" />. Anchors are stamped in world (x, then z) order, so each
-        ///     voxel gets the same value as in a whole-world stamp, whichever chunk holds it.
+        ///     voxel gets the same value as in a whole-world stamp, whichever chunk holds it. A plant or anchor whose
+        ///     ground the cave passes carved is left out (a tree when a voxel under its trunk is carved); the test is
+        ///     the pure cave evaluation at those voxels, so every chunk that holds part of a tree decides alike.
         /// </summary>
         /// <param name="vox">Voxel buffer of the chunk after <see cref="FillTerrain" />.</param>
         /// <param name="chunkColumns">Per-column data from <c>PrepareChunkMaps</c>.</param>
         /// <param name="grid">Flora grid from the same <c>PrepareChunkMaps</c> call.</param>
+        /// <param name="caves">Cave data with the ground probes of <c>RegisterCaveProbes</c>; default without caves.</param>
         /// <param name="chunkWordPos">World-space origin (in voxels) of the chunk.</param>
         /// <param name="config">Generator configuration with the flora tables.</param>
         public static void PlaceVegetation(NativeArray<ushort> vox, NativeArray<ChunkColumn> chunkColumns,
-            in FloraGrid grid, int3 chunkWordPos, ref GeneratorConfig config){
+            in FloraGrid grid, ref CaveColumnData caves, int3 chunkWordPos, ref GeneratorConfig config){
             ref WorldGenConfig cfg = ref config.WorldGen;
             if (!cfg.HasFlora) return;
 
@@ -92,7 +95,8 @@ namespace Engine.Scripts.Jobs.Chunk{
                 ChunkColumn col = chunkColumns[GetColumnIdx(x, z, ChunkDepth)];
                 if (col.FloraSpecies == 0) continue;
                 FloraRuleDef d = cfg.FloraRules[grid.Rule[grid.Index(x, z)]];
-                if (d.MultiBlock == 0) Put(vox, x, col.Height + 1, z, d.Voxel, d.VoxelClass, cfg);
+                if (d.MultiBlock != 0 || GroundCarved(ref caves, x, col.Height, z, chunkWordPos, cfg, grid.Cache)) continue;
+                Put(vox, x, col.Height + 1, z, d.Voxel, d.VoxelClass, cfg);
             }
 
             // Multi-block anchors in chunk ± reach, world order.
@@ -109,6 +113,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                     int variant = TreeShape.PickVariant(wx, wz, cfg, d.Tree);
                     TreeRoll roll = TreeShape.Roll(wx, wz, cfg.Seed, variant, cfg.TreeVariants[variant]);
                     if (grid.Anchor[g] == 2) roll.Narrow();
+                    if (TrunkGroundCarved(ref caves, roll, x, z, baseY - 1 - roll.Sink, chunkWordPos, cfg, grid.Cache)) continue;
                     tree.Clear();
                     TreeShape.Build(new int3(wx, baseY, wz), roll, cfg.TreeVariants[variant], cfg.Seed, ref tree);
                     for (int i = 0; i < tree.Length; i++){
@@ -116,6 +121,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                         Put(vox, x + v.Offset.x, baseY + v.Offset.y, z + v.Offset.z, v.Voxel, v.Class, cfg);
                     }
                 }
+                else if (GroundCarved(ref caves, x, baseY - 1, z, chunkWordPos, cfg, grid.Cache)) continue;
                 else if (d.Structure >= 0){
                     FloraStructureDef structure = cfg.FloraStructures[d.Structure];
                     for (int i = structure.Start; i < structure.Start + structure.Count; i++){
@@ -131,6 +137,17 @@ namespace Engine.Scripts.Jobs.Chunk{
             }
 
             tree.Dispose();
+        }
+
+        /// <summary>Some voxel under the trunk of <paramref name="roll" /> (anchor (x, z), at <paramref name="y" />) is carved.</summary>
+        private static bool TrunkGroundCarved(ref CaveColumnData caves, in TreeRoll roll, int x, int z, int y, int3 chunkWordPos,
+            in WorldGenConfig cfg, in BlendCache cache){
+            if (!caves.IsCreated) return false;
+            int4 box = UnderTrunk(roll);
+            for (int fx = x + box.x; fx <= x + box.z; fx++)
+            for (int fz = z + box.y; fz <= z + box.w; fz++)
+                if (GroundCarved(ref caves, fx, y, fz, chunkWordPos, cfg, cache)) return true;
+            return false;
         }
 
         /// <summary>Writes <paramref name="voxel" /> at a chunk-local position if it lies in the chunk and outranks the voxel there.</summary>

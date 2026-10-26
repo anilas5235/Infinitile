@@ -70,10 +70,20 @@ namespace Engine.Scripts.Jobs.Chunk{
             ApplySurfaceCover(columns, origin, config.WorldGen, floraGrid.Cache);
 
             FillTerrain(vox, columns, ref config);
+            CaveColumnData caves = default;
+            if (config.WorldGen.Caves.Enabled){
+                caves = new CaveColumnData(floraGrid.Padding, Allocator.Temp);
+                PrepareCaveColumns(ref caves, columns, origin, config.WorldGen, floraGrid.Cache);
+                if (flora) RegisterCaveProbes(ref caves, floraGrid, columns, origin, config.WorldGen);
+                CarveCaverns(vox, caves, origin, config.WorldGen);
+                CarveWorms(vox, ref caves, origin, config.WorldGen, floraGrid.Cache);
+            }
+
             ApplyBottomLayer(vox, origin, config.WorldGen);
 
-            if (flora) PlaceVegetation(vox, columns, floraGrid, origin, ref config);
+            if (flora) PlaceVegetation(vox, columns, floraGrid, ref caves, origin, ref config);
 
+            caves.Dispose();
             floraGrid.Dispose();
         }
 
