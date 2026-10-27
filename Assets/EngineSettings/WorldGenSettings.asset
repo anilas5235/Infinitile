@@ -179,7 +179,6 @@ MonoBehaviour:
   Caves:
     Enabled: 1
     Cover: 8
-    WaterCover: 6
     CavernWavelength: 96
     CavernVerticalWavelength: 48
     CavernThreshold: 0.45

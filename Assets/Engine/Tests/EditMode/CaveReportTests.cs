@@ -102,7 +102,7 @@ namespace Engine.Tests.EditMode{
 
                 // The halls alone: carved into a copy that is solid up to the surface and empty above it.
                 CaveColumnData caves = new(0, Allocator.Temp);
-                ChunkJob.PrepareCaveColumns(ref caves, columns, origin, cfg, default);
+                ChunkJob.PrepareCaveColumns(ref caves, columns, cfg);
                 ChunkJob.CarveCaverns(halls, caves, origin, cfg);
                 for (int x = 0; x < ChunkWidth; x++)
                 for (int z = 0; z < ChunkDepth; z++){

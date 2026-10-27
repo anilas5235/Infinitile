@@ -40,8 +40,9 @@ skips carved ground]
   pass looks up voxel names.
 - **Column limits** (`CaveColumns`, `PrepareCaveColumns`): halls (and the lava pockets with them) carve only up to
   `Cover` (8) below the surface; worms may carve up to the top block of a column, so a worm that wanders up breaks
-  the surface. Where the column or one of its 8 neighbours lies under water, both limits are `WaterCover` (6) below
-  the lowest of the 9 heights, so no cave drains a lake or floods. Nothing carves at or below the floor (y 2).
+  the surface, under water as well. Nothing carves above the top block, and water and ice lie only above it, so no
+  water voxel is ever carved; water does not flow, so a lake whose bed a worm opens hangs over the cave. Nothing
+  carves at or below the floor (y 2).
 - **Halls** (`Caverns`, `CarveCaverns`): a hall noise and a pillar noise (seeded 3D simplex after Gustavson) on a
   world-aligned 4 × 4 × 4 lattice, interpolated trilinearly at every voxel of the hall band in the columns whose
   cavern mask (wavelength 384) is open. The band runs from `CavernBandMin` (4, just above the bedrock) to
@@ -56,8 +57,7 @@ skips carved ground]
   radius) of it, in full, and carves the steps whose sphere touches it. There is no buffer, so no cap can drop a
   worm. A worm that starts in the entrance mask (wavelength 96, threshold 0.7) starts just below the surface, goes
   straight down in its start column until its sphere lies below `Cover`, so the opening is a vertical pit that leads
-  down, then walks on at random. The start tests only the mask and a dry column: starts lie up to `WormPadding`
-  away, and the column limits keep every worm `WaterCover` deep wherever water is near. Only a start in the mask
+  down, then walks on at random. The start tests only the mask and a dry column. Only a start in the mask
   reads the exact surface height; the others take their depth range from the unblended height
   (`WorldSampler.SampleUnblendedHeight`, the hard biome's height in Biome-first), which saves a blend of every
   kernel tap per start; a start that lands above the exact surface carves nothing there.

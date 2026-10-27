@@ -48,7 +48,7 @@ namespace Engine.Tests.Performance{
                     NativeArray<ChunkColumn> columns = new(Columns, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
                     ChunkJob.GenerateVoxels(ref config, origin, vox, columns, false);
                     CaveColumnData caves = new(0, Allocator.Temp);
-                    ChunkJob.PrepareCaveColumns(ref caves, columns, origin, config.WorldGen, default);
+                    ChunkJob.PrepareCaveColumns(ref caves, columns, config.WorldGen);
                     for (int x = 0; x < ChunkWidth; x++)
                     for (int z = 0; z < ChunkDepth; z++)
                         CavernTop[i * Columns + ChunkJob.GetColumnIdx(x, z, ChunkDepth)] = caves.CavernTop[caves.Index(x, z)];

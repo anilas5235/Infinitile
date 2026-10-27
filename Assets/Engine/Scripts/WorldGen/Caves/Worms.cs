@@ -266,8 +266,7 @@ namespace Engine.Scripts.WorldGen.Caves{
         ///     outside an entrance; outside the entrance mask the surface is the unblended height).
         ///     A worm in the entrance mask starts up to <c>EntranceStartDepth</c> below the surface and goes straight
         ///     down until its sphere lies below <c>Cover</c>, so the opening is a vertical pit that leads down rather
-        ///     than a sloped scrape. The start does not test for water: starts lie up to <c>WormPadding</c> away, and
-        ///     the column limits keep every worm <c>WaterCover</c> deep wherever water is near.
+        ///     than a sloped scrape. A submerged column gets no entrance start.
         /// </summary>
         public static WormAnchor Anchor(int2 cell, int k, in WorldGenConfig cfg, in BlendCache cache){
             ref readonly CaveConfig c = ref cfg.Caves;

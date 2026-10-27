@@ -449,11 +449,9 @@ namespace Engine.Tests.EditMode{
             WorldGenConfig cfg = _config.WorldGen;
             ref readonly CaveConfig c = ref cfg.Caves;
             List<(int2 start, Worm worm)> entrances = WormsIn(new int2(-2, -2), new int2(2, 2), cfg)
-                .Where(w => w.worm.ShaftAbove != int.MaxValue &&
-                            CaveColumns.Limits(w.start.x, w.start.y, cfg, default).Worm ==
-                            CaveColumns.SurfaceY(w.start.x, w.start.y, cfg, default))
+                .Where(w => w.worm.ShaftAbove != int.MaxValue)
                 .ToList();
-            TestContext.WriteLine($"{entrances.Count} dry entrance worms");
+            TestContext.WriteLine($"{entrances.Count} entrance worms");
             Assert.GreaterOrEqual(entrances.Count, 5, "the area has entrance worms");
 
             int2[] chunkList = entrances.Select(e => ChunkOf(e.start.x, e.start.y)).Distinct().ToArray();
@@ -601,7 +599,8 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void Rules_Over64ChunksWithCoasts([Values(false, true)] bool moreEntrances){
-            // 8 × 8 chunks with ~27 % water and entrance columns: no carved voxel touches water or ice, nothing is
+            // 8 × 8 chunks with ~27 % water and entrance columns: every submerged column keeps its water and ice (no
+            // water voxel is carved; a cave may open a lake bed, and the water then hangs over it), nothing is
             // carved at y ≤ 2 and y 0 is bedrock, whatever is carved above surface − Cover lies in a worm (caverns and
             // pockets never come that close; checked on a sample of the columns, since the pure walk is slow), and lava
             // lies only at or below LavaLevel, where no carved voxel holds air. Worms rarely start in the entrance mask,
@@ -627,11 +626,17 @@ namespace Engine.Tests.EditMode{
                 if (failures++ < 12) report.Add(message);
             }
 
-            int3[] faces = { new(1, 0, 0), new(-1, 0, 0), new(0, 1, 0), new(0, -1, 0), new(0, 0, 1), new(0, 0, -1) };
             for (int x = area.Origin.x; x < area.Origin.x + 8 * ChunkWidth; x++)
             for (int z = area.Origin.y; z < area.Origin.y + 8 * ChunkDepth; z++){
                 int h = area.Height(x, z);
-                if (CaveColumns.Submerged(h, cfg)) wet++;
+                if (CaveColumns.Submerged(h, cfg)){
+                    wet++;
+                    for (int y = h + 1; y < cfg.WaterLevel; y++){
+                        ushort v = area[x, y, z];
+                        if (v != water && (ice == 0 || v != ice)) Fail($"({x},{y},{z}) is {v}, not water");
+                    }
+                }
+
                 if (area[x, 0, z] != bedrock) Fail($"({x},0,{z}) is {area[x, 0, z]}, not bedrock");
                 int highest = int.MinValue;
                 bool inMask = LavaPockets.MaskOpen(CaveMasks.Lava(x, z, cfg), c);
@@ -648,12 +653,6 @@ namespace Engine.Tests.EditMode{
                     highest = y;
                     if (voxel == 0 && y <= c.LavaLevel) Fail($"({x},{y},{z}) air at the lava level");
                     if (y <= CaveColumns.Floor) Fail($"({x},{y},{z}) carved in the bottom layer");
-                    foreach (int3 f in faces){
-                        int3 n = new int3(x, y, z) + f;
-                        if (!area.Contains(n.x, n.z) || n.y < 0 || n.y >= ChunkHeight) continue;
-                        ushort v = area[n.x, n.y, n.z];
-                        if (v == water || (ice != 0 && v == ice)) Fail($"({x},{y},{z}) carved next to water at {n}");
-                    }
                 }
 
                 if (highest == int.MinValue) continue;

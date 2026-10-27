@@ -12,12 +12,11 @@ namespace Engine.Scripts.WorldGen.Caves{
     }
 
     /// <summary>
-    ///     How close to the surface the cave passes may carve in a column, a pure function of the column and the
-    ///     terrain heights around it. Caverns (and the lava pockets with them) keep <c>Cover</c> blocks of rock; worms
-    ///     may carve up to the top block, so a worm that wanders up breaks the surface. Next to a submerged column
-    ///     every pass keeps <c>WaterCover</c> blocks below the lowest surface of the column's 3 × 3 neighbourhood, so
-    ///     no carved voxel touches a water voxel: water fills y &lt; WaterLevel only above the top block of a submerged
-    ///     column, and a carved voxel lies at least one block below every neighbouring top block.
+    ///     How close to the surface the cave passes may carve in a column, a pure function of the column's height.
+    ///     Caverns (and the lava pockets with them) keep <c>Cover</c> blocks of rock; worms may carve up to the top
+    ///     block, so a worm that wanders up breaks the surface, under water as well. No pass carves above the top
+    ///     block, and water and ice lie only above it, so no water voxel is ever carved; water does not flow, so a
+    ///     lake whose bed a worm opens hangs over the cave.
     /// </summary>
     public static class CaveColumns{
         /// <summary>The bottom layer: no pass carves y ≤ 2.</summary>
@@ -51,36 +50,14 @@ namespace Engine.Scripts.WorldGen.Caves{
             return !Submerged(height, cfg) && CaveMasks.Entrance(x, z, cfg) > cfg.Caves.EntranceThreshold;
         }
 
-        /// <summary>
-        ///     Limits of a column with top block <paramref name="height" />, the lowest top block
-        ///     <paramref name="lowest" /> of its 3 × 3 neighbourhood and whether one of those columns is submerged.
-        /// </summary>
-        public static CaveLimits Limits(int height, int lowest, bool wet, in WorldGenConfig cfg){
-            ref readonly CaveConfig c = ref cfg.Caves;
-            CaveLimits limits = new(){
-                Cavern = height - c.Cover,
-                Worm = height
-            };
-            if (!wet) return limits;
-            int dry = lowest - c.WaterCover;
-            limits.Cavern = math.min(limits.Cavern, dry);
-            limits.Worm = math.min(limits.Worm, dry);
-            return limits;
+        /// <summary>Limits of a column with top block <paramref name="height" />.</summary>
+        public static CaveLimits Limits(int height, in WorldGenConfig cfg){
+            return new CaveLimits{ Cavern = height - cfg.Caves.Cover, Worm = height };
         }
 
-        /// <summary>Limits of column (x, z), sampling the heights of its 3 × 3 neighbourhood.</summary>
+        /// <summary>Limits of column (x, z), sampling its height.</summary>
         public static CaveLimits Limits(int x, int z, in WorldGenConfig cfg, in BlendCache cache){
-            int height = 0, lowest = int.MaxValue;
-            bool wet = false;
-            for (int dx = -1; dx <= 1; dx++)
-            for (int dz = -1; dz <= 1; dz++){
-                int h = SurfaceY(x + dx, z + dz, cfg, cache);
-                if (dx == 0 && dz == 0) height = h;
-                lowest = math.min(lowest, h);
-                wet |= Submerged(h, cfg);
-            }
-
-            return Limits(height, lowest, wet, cfg);
+            return Limits(SurfaceY(x, z, cfg, cache), cfg);
         }
     }
 }

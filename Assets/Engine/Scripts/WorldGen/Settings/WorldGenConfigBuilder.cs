@@ -169,7 +169,6 @@ namespace Engine.Scripts.WorldGen.Settings{
             caves = new CaveConfig{
                 Enabled = s.Enabled,
                 Cover = math.max(s.Cover, 0),
-                WaterCover = math.max(s.WaterCover, 1),
                 CavernWavelength = new float2(s.CavernWavelength, s.CavernVerticalWavelength),
                 CavernThreshold = s.CavernThreshold,
                 CavernEdgeRise = math.max(s.CavernEdgeRise, 0f),

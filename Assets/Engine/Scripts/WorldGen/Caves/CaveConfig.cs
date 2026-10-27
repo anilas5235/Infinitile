@@ -14,7 +14,6 @@ namespace Engine.Scripts.WorldGen.Caves{
 
         // --- Cover --------------------------------------------------------------------------------------------------
         public int Cover;
-        public int WaterCover;
 
         // --- Caverns ------------------------------------------------------------------------------------------------
         /// <summary>Wavelengths of the cavern noise in blocks: (horizontal, vertical).</summary>

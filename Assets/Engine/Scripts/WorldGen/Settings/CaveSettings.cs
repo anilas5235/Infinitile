@@ -21,11 +21,6 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Min(0)]
         public int Cover = 8;
 
-        [Tooltip("Next to submerged columns, carving stays this many blocks below the lowest surface of the column's 3×3 "
-                 + "neighbourhood, so no carved voxel touches water.")]
-        [Min(1)]
-        public int WaterCover = 6;
-
         [Header("Caverns")]
         [Tooltip("Horizontal wavelength of the cavern noise in blocks.")]
         public float CavernWavelength = 96f;

@@ -92,37 +92,15 @@ namespace Engine.Scripts.Jobs.Chunk{
     ///     or volume that contains it. Each pass is its own non-inlined method.
     /// </summary>
     internal partial struct ChunkJob{
-        /// <summary>
-        ///     Carving limits of the block's columns, from their heights and those of the ring one column around the
-        ///     block (sampled here).
-        /// </summary>
+        /// <summary>Carving limits of the block's columns, from their heights.</summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
         internal static void PrepareCaveColumns(ref CaveColumnData caves, NativeArray<ChunkColumn> chunkColumns,
-            int3 origin, in WorldGenConfig cfg, in BlendCache cache){
-            const int w = ChunkWidth + 2;
-            NativeArray<int> heights = new(w * (ChunkDepth + 2), Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-            for (int x = -1; x <= ChunkWidth; x++)
-            for (int z = -1; z <= ChunkDepth; z++){
-                bool inside = x >= 0 && x < ChunkWidth && z >= 0 && z < ChunkDepth;
-                heights[(z + 1) * w + x + 1] = inside
-                    ? chunkColumns[GetColumnIdx(x, z, ChunkDepth)].Height
-                    : CaveColumns.SurfaceY(origin.x + x, origin.z + z, cfg, cache);
-            }
-
+            in WorldGenConfig cfg){
             int maxWorm = int.MinValue;
             for (int x = 0; x < ChunkWidth; x++)
             for (int z = 0; z < ChunkDepth; z++){
-                int lowest = int.MaxValue;
-                bool wet = false;
-                for (int dx = -1; dx <= 1; dx++)
-                for (int dz = -1; dz <= 1; dz++){
-                    int h = heights[(z + dz + 1) * w + x + dx + 1];
-                    lowest = math.min(lowest, h);
-                    wet |= CaveColumns.Submerged(h, cfg);
-                }
-
-                int height = heights[(z + 1) * w + x + 1];
-                CaveLimits limits = CaveColumns.Limits(height, lowest, wet, cfg);
+                int height = chunkColumns[GetColumnIdx(x, z, ChunkDepth)].Height;
+                CaveLimits limits = CaveColumns.Limits(height, cfg);
                 int g = caves.Index(x, z);
                 caves.Height[g] = height;
                 caves.CavernTop[g] = limits.Cavern;
@@ -131,7 +109,6 @@ namespace Engine.Scripts.Jobs.Chunk{
             }
 
             caves.MaxWormTop = maxWorm;
-            heights.Dispose();
         }
 
         /// <summary>

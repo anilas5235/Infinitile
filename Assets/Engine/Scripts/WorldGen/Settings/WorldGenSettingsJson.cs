@@ -124,7 +124,6 @@ namespace Engine.Scripts.WorldGen.Settings{
             return new Dictionary<string, object>{
                 ["Enabled"] = c.Enabled,
                 ["Cover"] = c.Cover,
-                ["WaterCover"] = c.WaterCover,
                 ["CavernWavelength"] = c.CavernWavelength,
                 ["CavernVerticalWavelength"] = c.CavernVerticalWavelength,
                 ["CavernThreshold"] = c.CavernThreshold,

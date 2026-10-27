@@ -74,7 +74,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             if (config.WorldGen.Caves.Enabled){
                 PlaceOres(vox, origin, config.WorldGen);
                 caves = new CaveColumnData(floraGrid.Padding, Allocator.Temp);
-                PrepareCaveColumns(ref caves, columns, origin, config.WorldGen, floraGrid.Cache);
+                PrepareCaveColumns(ref caves, columns, config.WorldGen);
                 if (flora) RegisterCaveProbes(ref caves, floraGrid, columns, origin, config.WorldGen);
                 CarveCaverns(vox, caves, origin, config.WorldGen);
                 CarveWorms(vox, ref caves, origin, config.WorldGen, floraGrid.Cache);
