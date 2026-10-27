@@ -185,7 +185,8 @@ MonoBehaviour:
     CavernVerticalWavelength: 48
     CavernThreshold: 0.45
     CavernEdgeRise: 0.6
-    CavernBandMin: 20
+    CavernFloorRise: -0.15
+    CavernBandMin: 4
     CavernBandMax: 90
     CavernMaskWavelength: 384
     CavernMaskThreshold: 0.35
