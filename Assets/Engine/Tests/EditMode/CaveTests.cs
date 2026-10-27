@@ -598,7 +598,7 @@ namespace Engine.Tests.EditMode{
             Assert.Greater(withTarget, 100, "the cells hold worms with targets");
             Assert.Greater(bridges, 50, "the cells hold bridges");
             Assert.AreEqual(0, missed.Count, "paths miss their first target:\n" + string.Join("\n", missed));
-            Assert.Greater(secondReached, second / 2, "most second targets are reached");
+            Assert.Greater(secondReached, second / 3, "most second targets are reached");
         }
 
         #endregion

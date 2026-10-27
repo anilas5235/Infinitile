@@ -48,7 +48,14 @@ namespace Engine.Scripts.WorldGen.Caves{
         /// <summary>Column (x, z) the worm steers towards while it is above <see cref="DescendAbove" />: where its descent ends.</summary>
         public float2 DescendTowards;
 
-        /// <summary>Point the path steers towards while <see cref="TargetsLeft" /> is positive: the aim of another worm.</summary>
+        /// <summary>
+        ///     Step after which the path steers at its targets: the shaft plus <see cref="Worms.TrunkSteps" /> for a
+        ///     primary worm, whose first steps other worms aim at and so must not depend on its own targets; 0 for a
+        ///     bridge and a branch.
+        /// </summary>
+        public int SteerFrom;
+
+        /// <summary>Point the path steers towards while <see cref="TargetsLeft" /> is positive: a point on the trunk of another worm.</summary>
         public float3 Target;
 
         /// <summary>The target after <see cref="Target" /> when <see cref="TargetsLeft" /> is 2.</summary>
@@ -81,16 +88,33 @@ namespace Engine.Scripts.WorldGen.Caves{
         public int DescendAbove;
 
         /// <summary>
-        ///     Centre other worms aim at: the first sphere of a free worm, the bottom of the shaft of an entrance
-        ///     worm. A path that gets within its radius plus <c>WormMinRadius</c> of it opens into that worm.
+        ///     Centre of the first sphere of a free worm, the bottom of the shaft of an entrance worm: the start of the
+        ///     trunk other worms aim at, and the point their choice of targets measures.
         /// </summary>
         public float3 Aim;
+
+        /// <summary>
+        ///     Starts of the 3 × 3 cells the worm steers at, nearest first (<see cref="Worms.Steering" />), each
+        ///     <see cref="Worms.PackPick" />ed, −1 for none; <see cref="Found" /> is −1 until they are computed.
+        /// </summary>
+        public int Pick0;
+
+        public int Pick1;
+        public int Pick2;
+        public int Found;
+
+        /// <summary>Column the worm steers at while it descends: where the descent ends on the way to its first pick.</summary>
+        public float2 DescendTowards;
+
+        /// <summary>The picks and the descent are computed.</summary>
+        public bool Steered => Found >= 0;
     }
 
     /// <summary>
     ///     The anchors of the primary worms of a range of cells, computed once per block so that the targets of each
-    ///     worm need no second surface lookup. The default (no table) makes <see cref="Worms.Begin" /> compute every
-    ///     anchor it needs on demand.
+    ///     worm need no second surface lookup, with the steering of all but the outer ring of cells (whose 3 × 3 the
+    ///     table does not hold). The default (no table) makes <see cref="Worms.Begin" /> compute every anchor it needs
+    ///     on demand.
     /// </summary>
     public struct WormAnchors{
         public NativeArray<WormAnchor> Table;
@@ -107,6 +131,16 @@ namespace Engine.Scripts.WorldGen.Caves{
             for (int k = 0; k < Worms.PrimariesPerCell; k++){
                 int2 cell = new(cx, cz);
                 anchors.Table[anchors.Index(cell, k)] = Worms.Anchor(cell, k, cfg, cache);
+            }
+
+            for (int cx = first.x + 1; cx < last.x; cx++)
+            for (int cz = first.y + 1; cz < last.y; cz++)
+            for (int k = 0; k < Worms.PrimariesPerCell; k++){
+                int2 cell = new(cx, cz);
+                WormAnchor a = anchors.Get(cell, k);
+                if (!a.Present) continue;
+                Worms.Steering(cell, k, ref a, cfg, cache, anchors);
+                anchors.Table[anchors.Index(cell, k)] = a;
             }
 
             return anchors;
@@ -139,7 +173,9 @@ namespace Engine.Scripts.WorldGen.Caves{
     ///     (<c>WormTargets</c> of them, its branch takes the next), with its length extended to reach the first, and
     ///     each cell with a worm sends a bridge worm to the nearest start of its +x and +z neighbour cells
     ///     (<c>WormBridges</c>). A start in the cavern mask descends to the top of the cavern band first, where the
-    ///     halls are.
+    ///     halls are. The first <see cref="TrunkSteps" /> steps of a primary worm, its trunk, do not steer at its
+    ///     targets, so they follow from its anchor alone; the worms that aim at it aim at hashed points along the
+    ///     trunk, and its bridges leave from such points, so the tunnels meet along the trunk instead of at one point.
     /// </summary>
     public static class Worms{
         private const int RollColumnX = 0;
@@ -151,8 +187,12 @@ namespace Engine.Scripts.WorldGen.Caves{
         private const int RollBranch = 6;
         private const int RollBranchStep = 7;
         private const int RollBranchSide = 8;
+        private const int RollTrunkStep = 9;
 
-        /// <summary>Worms a start cell rolls for: one roll per possible worm, each present with WormsPerCell / 2.</summary>
+        /// <summary>
+        ///     Worms a start cell rolls for: slot k is present with chance WormsPerCell − k (clamped to 0…1), so a cell
+        ///     holds the whole part of WormsPerCell and one more with the fraction as its chance.
+        /// </summary>
         public const int PrimariesPerCell = 2;
 
         /// <summary>Slot of the bridge to the +x neighbour cell.</summary>
@@ -183,20 +223,51 @@ namespace Engine.Scripts.WorldGen.Caves{
         public const int TargetSlack = 16;
 
         /// <summary>
+        ///     Share of the slope at the largest pitch a target may lie above or below its worm: steeper starts are
+        ///     left out, since a worm that has to climb more than it walks circles up or down under its target.
+        /// </summary>
+        public const float TargetSlopeShare = .6f;
+
+        /// <summary>
+        ///     Spread of the hashed factor (1…1 + this) on the estimated way to a target, so that the worms around one
+        ///     start do not all pick it as their nearest and meet at one point.
+        /// </summary>
+        public const float TargetSpread = .5f;
+
+        /// <summary>
+        ///     Cosine of the angle from the first target within which a later target counts as the same direction and
+        ///     its way counts double, so the later targets lead the worm into other directions.
+        /// </summary>
+        public const float TargetSameDirection = .5f;
+
+        /// <summary>
+        ///     Steps of the trunk of a primary worm: its path after its shaft and before it steers at its targets, along
+        ///     which other worms arrive and its bridges leave.
+        /// </summary>
+        public const int TrunkSteps = 16;
+
+        /// <summary>
         ///     Worm <paramref name="k" /> of start cell <paramref name="cell" /> may exist: a primary slot (0, 1) by its
         ///     roll, a bridge slot (2, 3) when bridges are on and the cell has a primary worm to leave from.
         ///     <see cref="Begin" /> still returns false when the start has no room or a bridge no target.
         /// </summary>
         public static bool Present(int2 cell, int k, in WorldGenConfig cfg){
-            if (k < PrimariesPerCell) return Hash.Hash01(cell.x, k, cell.y, cfg.Seed, HashSalts.WormCount) < .5f * cfg.Caves.WormsPerCell;
-            return cfg.Caves.WormBridges && BridgeSource(cell, cfg) >= 0;
+            if (k < PrimariesPerCell)
+                return Hash.Hash01(cell.x, k, cell.y, cfg.Seed, HashSalts.WormCount) < math.saturate(cfg.Caves.WormsPerCell - k);
+            return cfg.Caves.WormBridges && BridgeSource(cell, k, cfg) >= 0;
         }
 
-        /// <summary>Primary slot the bridges of <paramref name="cell" /> leave from, −1 when the cell rolls no worm.</summary>
-        public static int BridgeSource(int2 cell, in WorldGenConfig cfg){
-            for (int k = 0; k < PrimariesPerCell; k++)
-                if (Present(cell, k, cfg))
-                    return k;
+        /// <summary>
+        ///     Primary slot bridge <paramref name="k" /> of <paramref name="cell" /> leaves from: the first present
+        ///     worm for the +x bridge, the last for the +z bridge, so a cell with two worms sends one from each; −1
+        ///     when the cell rolls no worm.
+        /// </summary>
+        public static int BridgeSource(int2 cell, int k, in WorldGenConfig cfg){
+            for (int i = 0; i < PrimariesPerCell; i++){
+                int j = k == BridgeZ ? PrimariesPerCell - 1 - i : i;
+                if (Present(cell, j, cfg)) return j;
+            }
+
             return -1;
         }
 
@@ -217,7 +288,7 @@ namespace Engine.Scripts.WorldGen.Caves{
         ///     bridge starts in the column of its source.
         /// </summary>
         public static int2 StartColumn(int2 cell, int k, in WorldGenConfig cfg){
-            if (k >= PrimariesPerCell) k = math.max(BridgeSource(cell, cfg), 0);
+            if (k >= PrimariesPerCell) k = math.max(BridgeSource(cell, k, cfg), 0);
             int size = cfg.Caves.WormCellSize;
             uint hash = WormHash(cell, k, cfg);
             return cell * size + new int2((int)(RollBits(hash, RollColumnX) % (uint)size),
@@ -277,11 +348,146 @@ namespace Engine.Scripts.WorldGen.Caves{
 
             a.Aim = new float3(a.Column.x + .5f, aimY + .5f, a.Column.y + .5f);
             a.Present = true;
+            a.Found = -1;
             return a;
         }
 
+        /// <summary>Anchor of worm <paramref name="k" /> of <paramref name="cell" />, from the table when it holds the cell.</summary>
         private static WormAnchor Lookup(int2 cell, int k, in WorldGenConfig cfg, in BlendCache cache, in WormAnchors anchors){
             return anchors.Has(cell) ? anchors.Get(cell, k) : Anchor(cell, k, cfg, cache);
+        }
+
+        /// <summary>The anchor with its <see cref="Steering" />, computed when the table does not hold it.</summary>
+        private static WormAnchor LookupSteered(int2 cell, int k, in WorldGenConfig cfg, in BlendCache cache, in WormAnchors anchors){
+            WormAnchor a = Lookup(cell, k, cfg, cache, anchors);
+            if (a.Present && !a.Steered) Steering(cell, k, ref a, cfg, cache, anchors);
+            return a;
+        }
+
+        /// <summary>Pick of start <paramref name="j" /> of the cell (<paramref name="dx" />, <paramref name="dz" />) away, −1…1 each.</summary>
+        public static int PackPick(int dx, int dz, int j){
+            return ((dx + 1) * 3 + dz + 1) * PrimariesPerCell + j;
+        }
+
+        /// <summary>Cell offset and slot of a <see cref="PackPick" />ed pick.</summary>
+        public static void UnpackPick(int pick, out int2 offset, out int j){
+            int idx = pick / PrimariesPerCell;
+            offset = new int2(idx / 3 - 1, idx % 3 - 1);
+            j = pick % PrimariesPerCell;
+        }
+
+        /// <summary>
+        ///     Fills the steering of anchor <paramref name="a" /> of worm <paramref name="k" /> of <paramref name="cell" />:
+        ///     its picks, the other starts of the 3 × 3 cells within <see cref="TargetReach" /> and
+        ///     <see cref="TargetSlopeShare" /> of the point where its steering begins (the end of its descent, else its
+        ///     aim), by the estimated way there times a hashed factor of 1…1 + <see cref="TargetSpread" />: the first
+        ///     is the nearest by that measure, and for the later ones the way of a start in the direction of the first
+        ///     counts double, so the worm leaves in other directions after it. A descent ends where a path at the
+        ///     largest pitch, headed for the first pick (or along the start yaw), gets below the band top; the worm
+        ///     steers at that column while it descends, so it comes out of the descent on its way.
+        /// </summary>
+        public static void Steering(int2 cell, int k, ref WormAnchor a, in WorldGenConfig cfg, in BlendCache cache, in WormAnchors anchors){
+            ref readonly CaveConfig c = ref cfg.Caves;
+            uint hash = WormHash(cell, k, cfg);
+            float3 origin = SteerOrigin(a);
+
+            // The first pick: the nearest other start by the spread way.
+            int found = 0, p0 = -1, p1 = -1, p2 = -1;
+            float3 t0 = default;
+            float c0 = float.MaxValue, c1 = float.MaxValue, c2 = float.MaxValue;
+            for (int dx = -1; dx <= 1; dx++)
+            for (int dz = -1; dz <= 1; dz++)
+            for (int j = 0; j < PrimariesPerCell; j++){
+                if (dx == 0 && dz == 0 && j == k) continue;
+                WormAnchor o = Lookup(cell + new int2(dx, dz), j, cfg, cache, anchors);
+                if (!o.Present) continue;
+                float cost = TargetCost(origin, o.Aim, hash, dx, dz, j, c);
+                if (cost == float.MaxValue) continue;
+                found = math.min(found + 1, MaxTargets + 1);
+                if (cost < c0){
+                    c0 = cost;
+                    t0 = o.Aim;
+                    p0 = PackPick(dx, dz, j);
+                }
+            }
+
+            // The later picks: the next nearest, with the way of a start in the first pick's direction doubled.
+            if (found > 1){
+                float2 dir0 = math.normalizesafe((t0 - origin).xz);
+                for (int dx = -1; dx <= 1; dx++)
+                for (int dz = -1; dz <= 1; dz++)
+                for (int j = 0; j < PrimariesPerCell; j++){
+                    if (dx == 0 && dz == 0 && j == k) continue;
+                    int pick = PackPick(dx, dz, j);
+                    if (pick == p0) continue;
+                    WormAnchor o = Lookup(cell + new int2(dx, dz), j, cfg, cache, anchors);
+                    if (!o.Present) continue;
+                    float cost = TargetCost(origin, o.Aim, hash, dx, dz, j, c);
+                    if (cost == float.MaxValue) continue;
+                    if (math.dot(dir0, math.normalizesafe((o.Aim - origin).xz)) > TargetSameDirection) cost *= 2f;
+                    if (cost < c1){
+                        c2 = c1; p2 = p1;
+                        c1 = cost; p1 = pick;
+                    }
+                    else if (cost < c2){
+                        c2 = cost; p2 = pick;
+                    }
+                }
+            }
+
+            a.Pick0 = p0;
+            a.Pick1 = p1;
+            a.Pick2 = p2;
+            a.Found = found;
+
+            a.DescendTowards = a.Aim.xz;
+            if (Descends(a)){
+                float yaw = Roll(hash, RollYaw) * 2f * math.PI;
+                float2 heading = new(math.cos(yaw), math.sin(yaw));
+                float2 dir = found > 0 ? math.normalizesafe((t0 - a.Aim).xz, heading) : heading;
+                a.DescendTowards = a.Aim.xz + dir * ((a.Aim.y - a.DescendAbove) / Slope(c));
+            }
+        }
+
+        /// <summary>Steps of the shaft of an entrance worm, straight down from its start to its aim; 0 for a free worm.</summary>
+        private static int ShaftSteps(in WormAnchor a){
+            return a.Entrance ? math.max(a.Y - a.ShaftAbove + 1, 0) : 0;
+        }
+
+        /// <summary>The worm descends to the cavern band before it steers at its targets.</summary>
+        private static bool Descends(in WormAnchor a){
+            return a.DescendAbove != int.MaxValue && a.Aim.y > a.DescendAbove;
+        }
+
+        /// <summary>Point the worm's targets are measured from: the end of its descent, else its aim.</summary>
+        private static float3 SteerOrigin(in WormAnchor a){
+            return Descends(a) ? new float3(a.Aim.x, a.DescendAbove - .5f, a.Aim.z) : a.Aim;
+        }
+
+        /// <summary>
+        ///     Position of worm <paramref name="k" /> of <paramref name="cell" /> (anchor <paramref name="a" />) after
+        ///     its shaft and <paramref name="steps" /> steps of its trunk, which follow from the anchor alone.
+        /// </summary>
+        public static float3 TrunkPoint(int2 cell, int k, in WormAnchor a, int steps, in WorldGenConfig cfg){
+            Worm worm = default;
+            BeginTrunk(cell, k, a, cfg, ref worm);
+            steps += ShaftSteps(a);
+            worm.Length = steps + 1;
+            for (int i = 0; i < steps && Next(ref worm, cfg.Caves); i++){ }
+
+            return worm.Position;
+        }
+
+        /// <summary>
+        ///     Point on the trunk of the start <paramref name="target" /> (worm <paramref name="tk" /> of
+        ///     <paramref name="tcell" />) a worm with hash <paramref name="hash" /> aims at for its target
+        ///     <paramref name="slot" />: a hashed step of the trunk, or the aim itself when that point lies out of reach
+        ///     or too steep from <paramref name="origin" />.
+        /// </summary>
+        private static float3 Arrival(int2 tcell, int tk, in WormAnchor target, uint hash, int slot, float3 origin, in WorldGenConfig cfg){
+            int steps = (int)(Hash.Hash32(slot, 0, hash, HashSalts.WormTarget) % (uint)(TrunkSteps + 1));
+            float3 point = TrunkPoint(tcell, tk, target, steps, cfg);
+            return TargetCost(origin, point, cfg.Caves) == float.MaxValue ? target.Aim : point;
         }
 
         /// <summary>Starts worm <paramref name="k" /> of <paramref name="cell" />, computing every anchor it needs.</summary>
@@ -292,9 +498,10 @@ namespace Engine.Scripts.WorldGen.Caves{
         /// <summary>
         ///     Starts worm <paramref name="k" /> of <paramref name="cell" />; false when the slot holds no worm (see
         ///     <see cref="Anchor" />, and a bridge whose neighbour cell has no start in reach or whose target the source
-        ///     worm steers at already). A primary worm takes the nearest other starts of its 3 × 3 cells as targets,
-        ///     its length extended to reach the first; its branch takes the next one. A bridge starts at its source's
-        ///     aim with the nearest start of the neighbour cell as its one target and the length to reach it.
+        ///     worm steers at already). A primary worm takes the picks of its anchor as targets (see
+        ///     <see cref="Steering" /> and <see cref="BeginPrimary" />), its length extended to reach the first; its
+        ///     branch takes the next one. A bridge starts at a hashed point of its source's trunk with a hashed trunk
+        ///     point of the nearest start of the neighbour cell as its one target and the length to reach it.
         ///     <paramref name="anchors" /> may hold the anchors of the cells, else they are computed.
         /// </summary>
         public static bool Begin(int2 cell, int k, in WorldGenConfig cfg, in BlendCache cache, in WormAnchors anchors, out Worm worm){
@@ -302,127 +509,139 @@ namespace Engine.Scripts.WorldGen.Caves{
             worm = default;
             if (!Present(cell, k, cfg)) return false;
             if (k < PrimariesPerCell){
-                WormAnchor self = Lookup(cell, k, cfg, cache, anchors);
+                WormAnchor self = LookupSteered(cell, k, cfg, cache, anchors);
                 if (!self.Present) return false;
-                BeginPrimary(cell, k, self, cfg, cache, anchors, out worm);
+                BeginPrimary(cell, k, self, cfg, cache, anchors, out worm, out _);
                 return true;
             }
 
-            int source = BridgeSource(cell, cfg);
-            WormAnchor from = Lookup(cell, source, cfg, cache, anchors);
+            int source = BridgeSource(cell, k, cfg);
+            WormAnchor from = LookupSteered(cell, source, cfg, cache, anchors);
             if (!from.Present) return false;
-            int2 neighbour = cell + (k == BridgeX ? new int2(1, 0) : new int2(0, 1));
+            int2 offset = k == BridgeX ? new int2(1, 0) : new int2(0, 1);
+            int2 neighbour = cell + offset;
             float best = float.MaxValue;
-            float3 target = default;
+            int pick = -1;
+            WormAnchor target = default;
             for (int j = 0; j < PrimariesPerCell; j++){
                 WormAnchor a = Lookup(neighbour, j, cfg, cache, anchors);
                 if (!a.Present) continue;
                 float cost = TargetCost(from.Aim, a.Aim, c);
                 if (cost < best){
                     best = cost;
-                    target = a.Aim;
+                    pick = PackPick(offset.x, offset.y, j);
+                    target = a;
                 }
             }
 
             if (best == float.MaxValue) return false;
-            BeginPrimary(cell, source, from, cfg, cache, anchors, out Worm primary);
-            if (primary.TargetsLeft > 0 && math.all(primary.Target == target)) return false;
-            if (primary.TargetsLeft > 1 && math.all(primary.NextTarget == target)) return false;
-            if (primary.BranchStep >= 0 && primary.BranchTargets > 0 && math.all(primary.BranchTarget == target)) return false;
+            BeginPrimary(cell, source, from, cfg, cache, anchors, out _, out int3 picks);
+            if (math.any(picks == pick)) return false;
 
             uint hash = WormHash(cell, k, cfg);
-            float3 d = target - from.Aim;
-            worm.Position = from.Aim;
+            float3 start = TrunkPoint(cell, source, from, 1 + (int)(RollBits(hash, RollTrunkStep) % (uint)TrunkSteps), cfg);
+            target = LookupSteered(neighbour, pick % PrimariesPerCell, cfg, cache, anchors);
+            float3 aim = Arrival(neighbour, pick % PrimariesPerCell, target, hash, 0, start, cfg);
+            float3 d = aim - start;
+            worm.Position = start;
             worm.Origin = from.Aim.xz;
             worm.Yaw = math.atan2(d.z, d.x);
             worm.Pitch = math.clamp(math.atan2(d.y, math.length(d.xz)), -c.WormMaxPitch, c.WormMaxPitch);
             worm.Hash = hash;
-            worm.Length = StepsTo(from.Aim, target, c);
+            worm.Length = StepsTo(start, aim, c);
             worm.BranchStep = -1;
             worm.ShaftAbove = int.MaxValue;
             worm.DescendAbove = int.MaxValue;
-            worm.Target = target;
+            worm.SteerFrom = 0;
+            worm.Target = aim;
             worm.TargetsLeft = 1;
             SetRadius(ref worm, 0, c);
             return true;
         }
 
+        /// <summary>
+        ///     Starts primary worm <paramref name="k" /> at its steered anchor <paramref name="self" />: its targets are
+        ///     the <see cref="Arrival" /> points on the trunks of its picks, the first <c>WormTargets</c> on the main
+        ///     path and the next one for the branch. <paramref name="picks" /> returns the picks those targets came
+        ///     from (−1 for none): the main targets in x and y, the branch pick in z when the worm branches.
+        /// </summary>
         private static void BeginPrimary(int2 cell, int k, in WormAnchor self, in WorldGenConfig cfg, in BlendCache cache,
-            in WormAnchors anchors, out Worm worm){
+            in WormAnchors anchors, out Worm worm, out int3 picks){
             ref readonly CaveConfig c = ref cfg.Caves;
             worm = default;
+            picks = -1;
             uint hash = WormHash(cell, k, cfg);
+            BeginTrunk(cell, k, self, cfg, ref worm);
+            int shaft = ShaftSteps(self);
+            worm.SteerFrom = shaft + TrunkSteps;
 
-            // The nearest other starts of the 3 × 3 cells, by estimated path length, closest first.
-            int found = 0;
-            float3 t0 = default, t1 = default, t2 = default;
-            float c0 = float.MaxValue, c1 = float.MaxValue, c2 = float.MaxValue;
-            for (int dx = -1; dx <= 1; dx++)
-            for (int dz = -1; dz <= 1; dz++)
-            for (int j = 0; j < PrimariesPerCell; j++){
-                if (dx == 0 && dz == 0 && j == k) continue;
-                int2 other = cell + new int2(dx, dz);
-                WormAnchor a = Lookup(other, j, cfg, cache, anchors);
-                if (!a.Present) continue;
-                float cost = TargetCost(self.Aim, a.Aim, c);
-                if (cost == float.MaxValue) continue;
-                found = math.min(found + 1, MaxTargets + 1);
-                if (cost < c0){
-                    c2 = c1; t2 = t1;
-                    c1 = c0; t1 = t0;
-                    c0 = cost; t0 = a.Aim;
-                }
-                else if (cost < c1){
-                    c2 = c1; t2 = t1;
-                    c1 = cost; t1 = a.Aim;
-                }
-                else if (cost < c2){
-                    c2 = cost; t2 = a.Aim;
-                }
+            int targets = math.min(c.WormTargets, self.Found);
+            float3 origin = SteerOrigin(self);
+            if (targets > 0){
+                worm.Target = Arrival(cell, self.Pick0, 0, origin, hash, cfg, cache, anchors);
+                picks.x = self.Pick0;
             }
 
-            int targets = math.min(c.WormTargets, found);
-            worm.Target = t0;
-            worm.NextTarget = t1;
+            if (targets > 1){
+                worm.NextTarget = Arrival(cell, self.Pick1, 1, origin, hash, cfg, cache, anchors);
+                picks.y = self.Pick1;
+            }
+
             worm.TargetsLeft = targets;
-            if (found > targets){
-                worm.BranchTarget = targets == 0 ? t0 : targets == 1 ? t1 : t2;
-                worm.BranchTargets = 1;
-            }
-
-            worm.ShaftAbove = self.ShaftAbove;
-            worm.DescendAbove = self.DescendAbove;
-            worm.Position = new float3(self.Column.x + .5f, math.max(self.Y, c.WormMinY) + .5f, self.Column.y + .5f);
-            worm.Origin = worm.Position.xz;
-            worm.Pitch = self.Entrance ? -c.WormMaxPitch : (Roll(hash, RollPitch) * 2f - 1f) * .5f * c.WormMaxPitch;
-            worm.Yaw = Roll(hash, RollYaw) * 2f * math.PI;
-            worm.Hash = hash;
-
-            // A descent to the cavern band ends where a path at the largest pitch, headed for the first target (or
-            // along the start yaw), gets below the band top; the worm steers at that column while it descends, so it
-            // comes out of the descent on its way to the target.
-            float3 from = self.Aim;
-            int descent = 0;
-            if (self.DescendAbove != int.MaxValue && self.Aim.y > self.DescendAbove){
-                float2 heading = new(math.cos(worm.Yaw), math.sin(worm.Yaw));
-                float2 dir = targets > 0 ? math.normalizesafe((t0 - self.Aim).xz, heading) : heading;
-                float drop = self.Aim.y - self.DescendAbove;
-                from = new float3(self.Aim.xz + dir * (drop / Slope(c)), self.DescendAbove - .5f).xzy;
-                descent = (int)math.ceil(TargetStepsPerBlock * drop / Climb(c)) + TargetSlack;
-            }
-
-            worm.DescendTowards = from.xz;
+            int branchPick = targets == 0 ? self.Pick0 : targets == 1 ? self.Pick1 : self.Pick2;
+            if (self.Found > targets) worm.BranchTargets = 1;
 
             // The length covers the shaft and the descent, then the larger of the rolled length and the way to the
-            // first target.
-            int shaft = self.Entrance ? math.max(self.Y - self.ShaftAbove + 1, 0) : 0;
+            // first target, with the part of the trunk beyond the descent and the way it may lead off.
+            float3 from = Descends(self) ? new float3(self.DescendTowards, self.DescendAbove - .5f).xzy : self.Aim;
+            int descent = Descends(self) ? (int)math.ceil(TargetStepsPerBlock * (self.Aim.y - self.DescendAbove) / Climb(c)) + TargetSlack : 0;
+            int trunk = math.max(TrunkSteps - descent, 0);
             int rolled = c.WormLength.x + (int)(RollBits(hash, RollLength) % (uint)(c.WormLength.y - c.WormLength.x + 1));
-            int steer = targets > 0 ? StepsTo(from, t0, c) : 0;
+            int steer = targets > 0 ? trunk + (int)math.ceil(TargetStepsPerBlock * trunk) + StepsTo(from, worm.Target, c) : 0;
             worm.Length = shaft + descent + math.max(rolled, steer);
             worm.BranchStep = worm.Length >= 2 && Roll(hash, RollBranch) < c.WormBranchChance
                 ? 1 + (int)(RollBits(hash, RollBranchStep) % (uint)(worm.Length - 1))
                 : -1;
+            if (worm.BranchStep >= 0 && worm.BranchTargets > 0){
+                worm.BranchTarget = Arrival(cell, branchPick, 2, origin, hash, cfg, cache, anchors);
+                picks.z = branchPick;
+            }
+            else{
+                worm.BranchTargets = 0;
+            }
+        }
+
+        /// <summary>
+        ///     The start state of primary worm <paramref name="k" /> of <paramref name="cell" /> at anchor
+        ///     <paramref name="a" />, shared by the worm and the walk of its trunk: position, heading, hash, shaft,
+        ///     descent and radius, no targets.
+        /// </summary>
+        private static void BeginTrunk(int2 cell, int k, in WormAnchor a, in WorldGenConfig cfg, ref Worm worm){
+            ref readonly CaveConfig c = ref cfg.Caves;
+            uint hash = WormHash(cell, k, cfg);
+            worm.Position = new float3(a.Column.x + .5f, math.max(a.Y, c.WormMinY) + .5f, a.Column.y + .5f);
+            worm.Origin = worm.Position.xz;
+            worm.Pitch = a.Entrance ? -c.WormMaxPitch : (Roll(hash, RollPitch) * 2f - 1f) * .5f * c.WormMaxPitch;
+            worm.Yaw = Roll(hash, RollYaw) * 2f * math.PI;
+            worm.Hash = hash;
+            worm.ShaftAbove = a.ShaftAbove;
+            worm.DescendAbove = a.DescendAbove;
+            worm.DescendTowards = a.DescendTowards;
+            worm.Length = int.MaxValue;
+            worm.BranchStep = -1;
             SetRadius(ref worm, 0, c);
+        }
+
+        /// <summary>
+        ///     <see cref="Arrival(int2,int,in WormAnchor,uint,int,float3,in WorldGenConfig)" /> on the trunk of pick
+        ///     <paramref name="pick" /> of <paramref name="cell" />, whose anchor comes from the table or is computed.
+        /// </summary>
+        private static float3 Arrival(int2 cell, int pick, int slot, float3 origin, uint hash, in WorldGenConfig cfg,
+            in BlendCache cache, in WormAnchors anchors){
+            UnpackPick(pick, out int2 offset, out int j);
+            int2 tcell = cell + offset;
+            WormAnchor target = LookupSteered(tcell, j, cfg, cache, anchors);
+            return Arrival(tcell, j, target, hash, slot, origin, cfg);
         }
 
         /// <summary>Blocks a worm climbs or descends per step at its largest pitch, at least 0.1.</summary>
@@ -437,13 +656,24 @@ namespace Engine.Scripts.WorldGen.Caves{
 
         /// <summary>
         ///     Estimated path length from <paramref name="from" /> to <paramref name="to" />: the horizontal distance
-        ///     plus the climb at the largest pitch; float.MaxValue when the target lies beyond <see cref="TargetReach" />.
+        ///     plus the climb at the largest pitch; float.MaxValue when the target lies beyond <see cref="TargetReach" />
+        ///     or steeper than <see cref="TargetSlopeShare" /> of the largest pitch.
         /// </summary>
         private static float TargetCost(float3 from, float3 to, in CaveConfig c){
             float3 d = to - from;
             float flat = math.length(d.xz);
-            if (flat > TargetReach * c.WormReach) return float.MaxValue;
+            if (flat > TargetReach * c.WormReach || math.abs(d.y) > TargetSlopeShare * Slope(c) * flat) return float.MaxValue;
             return flat + math.abs(d.y) / Climb(c);
+        }
+
+        /// <summary>
+        ///     <see cref="TargetCost(float3,float3,in CaveConfig)" /> times the hashed factor of worm <paramref name="hash" />
+        ///     for the start (<paramref name="dx" />, <paramref name="dz" />, <paramref name="j" />) of its 3 × 3 cells.
+        /// </summary>
+        private static float TargetCost(float3 from, float3 to, uint hash, int dx, int dz, int j, in CaveConfig c){
+            float cost = TargetCost(from, to, c);
+            if (cost == float.MaxValue) return cost;
+            return cost * (1f + TargetSpread * Hash.Hash01((dx + 1) * 3 + dz + 1, j, hash, HashSalts.WormTarget));
         }
 
         /// <summary>Steps granted to walk from <paramref name="from" /> to <paramref name="to" />.</summary>
@@ -454,14 +684,15 @@ namespace Engine.Scripts.WorldGen.Caves{
 
         /// <summary>
         ///     Most steps one slot of a cell walks with its branch: the shaft and a descent from the top of the world,
-        ///     the way from the end of that descent to the farthest target or the longest rolled length, and a branch
-        ///     that walks the way to its own target or half the rest.
+        ///     the trunk and the way from the end of that descent to the farthest target or the longest rolled length,
+        ///     and a branch that walks the way to its own target or half the rest.
         /// </summary>
         public static int MaxSteps(in CaveConfig c){
             float drop = ChunkHeight / Slope(c), climb = ChunkHeight / Climb(c);
             int descent = (int)math.ceil(TargetStepsPerBlock * climb) + TargetSlack;
             int toTarget = (int)math.ceil(TargetStepsPerBlock * math.max(TargetReach * c.WormReach + drop, climb)) + TargetSlack;
-            int main = c.Cover + (int)math.ceil(c.WormMaxRadius) + 1 + descent + math.max(c.WormLength.y, toTarget);
+            int trunk = TrunkSteps + (int)math.ceil(TargetStepsPerBlock * TrunkSteps);
+            int main = c.Cover + (int)math.ceil(c.WormMaxRadius) + 1 + descent + math.max(c.WormLength.y, trunk + toTarget);
             return main + math.max(main / 2, toTarget);
         }
 
@@ -479,6 +710,7 @@ namespace Engine.Scripts.WorldGen.Caves{
             branch.Yaw += (Roll(parent.Hash, RollBranchSide) < .5f ? .5f : -.5f) * math.PI;
             branch.YawRate = 0f;
             branch.PitchRate = 0f;
+            branch.SteerFrom = 0;
             branch.Target = parent.BranchTarget;
             branch.NextTarget = default;
             branch.TargetsLeft = parent.BranchTargets;
@@ -501,7 +733,8 @@ namespace Engine.Scripts.WorldGen.Caves{
         ///     <see cref="Worm.DescendTowards" /> while the worm is above <see cref="Worm.DescendAbove" />), the pitch
         ///     relaxes towards the target (towards down while the worm is above <see cref="Worm.DescendAbove" />,
         ///     towards level without a target) and stays within ±<c>WormMaxPitch</c>, and the worm bounces off
-        ///     <c>WormMinY</c>. A target the sphere has reached gives way to the next. An entrance worm above
+        ///     <c>WormMinY</c>. A target the sphere has reached gives way to the next. The targets steer the path only
+        ///     after <see cref="Worm.SteerFrom" /> steps, the trunk of a primary worm. An entrance worm above
         ///     <see cref="Worm.ShaftAbove" /> steps straight down instead. False when the path ends: its length is used
         ///     up or the next step would leave <c>WormReach</c> of the start.
         /// </summary>
@@ -530,7 +763,7 @@ namespace Engine.Scripts.WorldGen.Caves{
                 target = -c.WormMaxPitch;
                 Steer(ref worm, worm.DescendTowards - worm.Position.xz, c);
             }
-            else if (worm.TargetsLeft > 0){
+            else if (worm.TargetsLeft > 0 && step > worm.SteerFrom){
                 // The descent is over once the worm is below the band top; a target above it may lead back up.
                 worm.DescendAbove = int.MaxValue;
                 float3 d = worm.Target - worm.Position;
@@ -588,6 +821,8 @@ namespace Engine.Scripts.WorldGen.Caves{
         ///     signed angle from the heading to it, from their cross and dot products, so one atan2 does the wrap.
         /// </summary>
         private static void Steer(ref Worm worm, float2 d, in CaveConfig c){
+            // Over the point itself the direction means nothing; the worm keeps its heading.
+            if (math.lengthsq(d) < 1f) return;
             math.sincos(worm.Yaw, out float hz, out float hx);
             worm.Yaw += c.WormSteer * math.atan2(hx * d.y - hz * d.x, hx * d.x + hz * d.y);
         }
@@ -617,7 +852,7 @@ namespace Engine.Scripts.WorldGen.Caves{
             int3 voxel = new(x, y, z);
             int padding = c.WormPadding;
             int2 first = Cell(new int2(x, z) - padding, cfg), last = Cell(new int2(x, z) + padding, cfg);
-            WormAnchors anchors = WormAnchors.Create(first - 1, last + 1, cfg, cache, Allocator.Temp);
+            WormAnchors anchors = WormAnchors.Create(first - 2, last + 2, cfg, cache, Allocator.Temp);
             bool covers = false;
             for (int cx = first.x; cx <= last.x && !covers; cx++)
             for (int cz = first.y; cz <= last.y && !covers; cz++)

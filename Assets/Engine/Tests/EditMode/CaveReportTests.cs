@@ -149,8 +149,10 @@ namespace Engine.Tests.EditMode{
 
                 // Worms that start inside an entrance, and the links between worms, over the same area.
                 int entranceWorms = 0, worms = 0, alone = 0, targets = 0, reached = 0, bridges = 0, bridgesReached = 0;
+                int spirals = 0;
+                Dictionary<float3, int> arrivals = new();
                 int2 firstCell = Worms.Cell(new int2(-Size / 2), cfg), lastCell = Worms.Cell(new int2(Size / 2 - 1), cfg);
-                WormAnchors anchors = WormAnchors.Create(firstCell - 1, lastCell + 1, cfg, default, Allocator.Temp);
+                WormAnchors anchors = WormAnchors.Create(firstCell - 2, lastCell + 2, cfg, default, Allocator.Temp);
                 for (int cx = firstCell.x; cx <= lastCell.x; cx++)
                 for (int cz = firstCell.y; cz <= lastCell.y; cz++)
                 for (int k = 0; k < Worms.MaxPerCell; k++){
@@ -158,6 +160,7 @@ namespace Engine.Tests.EditMode{
                     if (k >= Worms.PrimariesPerCell){
                         bridges++;
                         if (Reaches(worm, worm.Target, cfg.Caves)) bridgesReached++;
+                        Arrive(arrivals, worm.Target);
                         continue;
                     }
 
@@ -167,7 +170,14 @@ namespace Engine.Tests.EditMode{
                     int wanted = worm.TargetsLeft + (worm.BranchStep >= 0 ? worm.BranchTargets : 0);
                     targets += wanted;
                     reached += wanted - Unreached(worm, cfg.Caves);
+                    if (worm.TargetsLeft > 0) Arrive(arrivals, worm.Target);
+                    if (worm.TargetsLeft > 1) Arrive(arrivals, worm.NextTarget);
+                    if (worm.BranchStep >= 0 && worm.BranchTargets > 0) Arrive(arrivals, worm.BranchTarget);
+                    if (Spirals(worm, cfg.Caves)) spirals++;
                 }
+
+                int busiest = arrivals.Count == 0 ? 0 : arrivals.Values.Max();
+                int crowded = arrivals.Values.Count(n => n >= 3);
 
                 anchors.Dispose();
 
@@ -180,6 +190,9 @@ namespace Engine.Tests.EditMode{
                                   $"{sum[Openings] / km2:F0} columns open to the sky per km²");
                 report.AppendLine($"links: {worms - alone} of {worms} worms steer at other starts ({alone} have none in reach), " +
                                   $"{reached} of {targets} targets reached; {bridges} bridges, {bridgesReached} reach their target");
+                report.AppendLine($"junctions: {arrivals.Count} arrival points for {worms} starts, at most {busiest} arrivals at one point, " +
+                                  $"{100.0 * crowded / math.max(arrivals.Count, 1):F1} % of the points take 3 or more; " +
+                                  $"{spirals} worms spiral ({100.0 * spirals / math.max(worms, 1):F1} %)");
                 long carved = Enumerable.Range(0, Bands).Sum(b => sum[CarvedBand + b]);
                 report.AppendLine($"carved {carved} voxels, {100.0 * sum[Halls] / carved:F1} % of them in halls; " +
                                   $"lava {sum[Lava]} voxels ({100.0 * sum[Lava] / carved:F1} % of the carved)");
@@ -206,6 +219,30 @@ namespace Engine.Tests.EditMode{
                 config.Voxels.Dispose();
             }
         }
+
+        private static void Arrive(Dictionary<float3, int> arrivals, float3 target){
+            arrivals[target] = arrivals.GetValueOrDefault(target) + 1;
+        }
+
+        /// <summary>
+        ///     The worm's path (without its branch) has a window of <see cref="SpiralSteps" /> steps that climbs or
+        ///     drops <see cref="SpiralRise" /> blocks or more while its ends lie within <see cref="SpiralFootprint" />
+        ///     blocks horizontally: a worm circling up or down.
+        /// </summary>
+        private static bool Spirals(Worm worm, in CaveConfig c){
+            List<float3> path = new(){ worm.Position };
+            while (Worms.Next(ref worm, c)) path.Add(worm.Position);
+            for (int i = SpiralSteps; i < path.Count; i++){
+                float3 d = path[i] - path[i - SpiralSteps];
+                if (math.abs(d.y) >= SpiralRise && math.lengthsq(d.xz) <= SpiralFootprint * SpiralFootprint) return true;
+            }
+
+            return false;
+        }
+
+        private const int SpiralSteps = 24;
+        private const float SpiralRise = 10f;
+        private const float SpiralFootprint = 6f;
 
         /// <summary>Some step of the worm (without its branch) opens into the worm that starts at <paramref name="target" />.</summary>
         private static bool Reaches(Worm worm, float3 target, in CaveConfig c){

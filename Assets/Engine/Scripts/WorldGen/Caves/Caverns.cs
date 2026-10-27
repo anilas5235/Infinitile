@@ -50,19 +50,20 @@ namespace Engine.Scripts.WorldGen.Caves{
 
         /// <summary>Hall threshold at height <paramref name="y" /> in a column whose mask raises it by <paramref name="raise" />.</summary>
         public static float Threshold(int y, float raise, in CaveConfig c){
-            return BandThreshold(y, c.CavernBandMin, c.CavernBandMax, c.CavernThreshold, c.CavernEdgeRise) + raise;
+            return BandThreshold(y, c.CavernBandMin, c.CavernBandMax, c.CavernThreshold, c.CavernEdgeRise, c.CavernFloorRise) + raise;
         }
 
         /// <summary>
         ///     <paramref name="threshold" /> at height <paramref name="y" />, rising by <paramref name="rise" /> times the
         ///     square of the distance from the middle of the band <paramref name="min" />…<paramref name="max" />
-        ///     (1 at its edges).
+        ///     (1 at its edges) in the upper half, and by <paramref name="floorRise" /> times it in the lower half: a
+        ///     negative floor rise opens the halls widest at the floor.
         /// </summary>
-        public static float BandThreshold(int y, int min, int max, float threshold, float rise){
+        public static float BandThreshold(int y, int min, int max, float threshold, float rise, float floorRise){
             float mid = .5f * (min + max);
             float half = math.max(.5f * (max - min), .5f);
             float t = (y - mid) / half;
-            return threshold + rise * t * t;
+            return threshold + (t < 0f ? floorRise : rise) * t * t;
         }
 
         /// <summary>Hall noise at lattice point (x, y, z), a multiple of <see cref="LatticeStep" />.</summary>

@@ -130,6 +130,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["CavernVerticalWavelength"] = c.CavernVerticalWavelength,
                 ["CavernThreshold"] = c.CavernThreshold,
                 ["CavernEdgeRise"] = c.CavernEdgeRise,
+                ["CavernFloorRise"] = c.CavernFloorRise,
                 ["CavernBandMin"] = c.CavernBandMin,
                 ["CavernBandMax"] = c.CavernBandMax,
                 ["CavernMaskWavelength"] = c.CavernMaskWavelength,

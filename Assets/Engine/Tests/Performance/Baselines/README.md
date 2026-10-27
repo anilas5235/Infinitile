@@ -622,37 +622,44 @@ all layers together +20 % / +15 %. Water covers every column around the spawn, s
 solid points are cave walls below the surface, which are rarely visible; occlusion culling for them is recorded as an
 idea in the spec, not built. Collider build time: see the `CMeshBuildJob cave partitions` rows above.
 
-## 2026-10-27 — linked worms (`2026-10-27-phaseK-links-editmode-baseline.json`)
+## 2026-10-27 — linked worms, tuned (`2026-10-27-phaseK-links-editmode-baseline.json`)
 
-Same machine and settings as above. Worms now steer towards the nearest other worm starts of their 3 × 3 cells
-(two targets, the branch takes the third) with their length extended to reach the first, each cell sends bridge
-worms to its +x and +z neighbour cells, and a start in the cavern mask above the band descends to the band top
-first (spec DEC-74). Caves are on in every `ChunkJob` row, so every one of them pays for the longer walks: a chunk
-with the shipped settings now walks 42.3 worms (27.1 primary worms and the bridges) and 7907 steps instead of 27.1
-worms and 4622 steps, of which 88 carve into it; in the worst case 73.8 worms, 13602 steps, 193 carving. The walk
-itself got cheaper per step on the way (the two jitter rolls share one hash, the radius knots are rolled once per
-knot instead of per step, the steering wraps its angle with one `atan2`), which took the first measurement of the
-links from 9299 steps and 6.52 ms down to this file.
+Same machine and settings as above. Worms now steer towards other worm starts of their 3 × 3 cells (two targets,
+the branch takes the third) with their length extended to reach the first, each cell sends bridge worms to its +x
+and +z neighbour cells, and a start in the cavern mask above the band descends to the band top first (spec DEC-74).
+The play-test tuning of DEC-75 is in this recording too: the targets are spread by a hashed factor and prefer other
+directions, starts steeper than 60 % of the largest pitch are left out, every cell holds a worm (a second in 20 %),
+the first 16 steps of a worm form a trunk whose hashed points the other worms aim at and the bridges leave from, and
+the hall band reaches down to y 4 with a negative floor rise. Caves are on in every `ChunkJob` row, so every one of
+them pays for the links: a chunk with the shipped settings walks 32.3 worms (27.1 primary worms and the bridges)
+and 6542 steps instead of 27.1 worms and 4622 steps, of which 163 carve into it; in the worst case 59.6 worms,
+11940 steps, 204 carving. The first recording of the links (before the tuning) walked 42.3 worms and 7907 steps per
+chunk, since every cell sent two bridges then (2879 over the report area, 1206 now that steep ones are left out),
+and measured 6.42 / 5.78 ms on the caves-on rows and 7.71 / 7.45 on the worst case; the tuning costs about +0.35 ms
+Terrain-first and +0.55 ms Biome-first on top of that, the taller hall band (lattice 1.19 ms against 1.03) and the
+trunk walks of the arrival points (up to three per worm, two per bridge, 16 steps each).
 
 | Sample group | Median | Min | Max | Previous baseline | Change (median) |
 |---|---|---|---|---|---|
-| ChunkJob.Run TerrainFirst DistanceBlend caves on ms/chunk | 6.42 ms | 6.35 ms | 6.62 ms | 5.83 ms | +10 % |
-| ChunkJob.Run BiomeFirst DistanceBlend caves on ms/chunk | 5.78 ms | 5.75 ms | 5.83 ms | 5.06 ms | +14 % |
-| ChunkJob.Run TerrainFirst DistanceBlend caves off ms/chunk | 4.66 ms | 4.61 ms | 4.71 ms | 4.66 ms | 0 % |
-| ChunkJob.Run BiomeFirst DistanceBlend caves off ms/chunk | 2.74 ms | 2.71 ms | 2.76 ms | 2.74 ms | 0 % |
-| ChunkJob.Run TerrainFirst DistanceBlend cave worst case ms/chunk | 7.71 ms | 7.65 ms | 8.01 ms | 6.83 ms | +13 % |
-| ChunkJob.Run BiomeFirst DistanceBlend cave worst case ms/chunk | 7.45 ms | 7.39 ms | 7.56 ms | 6.09 ms | +22 % |
-| ChunkJob.Run TerrainFirst None ms/chunk | 3.46 ms | 3.43 ms | 3.62 ms | 2.89 ms | +20 % |
-| ChunkJob.Run BiomeFirst None ms/chunk | 2.65 ms | 2.63 ms | 2.68 ms | 2.06 ms | +29 % |
-| ChunkJob.Run TerrainFirst DistanceBlend ms/chunk | 5.42 ms | 5.39 ms | 5.47 ms | 4.87 ms | +11 % |
-| ChunkJob.Run BiomeFirst DistanceBlend ms/chunk | 5.02 ms | 4.98 ms | 5.08 ms | 4.02 ms | +25 % |
+| ChunkJob.Run TerrainFirst DistanceBlend caves on ms/chunk | 6.76 ms | 6.68 ms | 6.95 ms | 5.83 ms | +16 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves on ms/chunk | 6.33 ms | 6.24 ms | 6.81 ms | 5.06 ms | +25 % |
+| ChunkJob.Run TerrainFirst DistanceBlend caves off ms/chunk | 4.85 ms | 4.74 ms | 5.39 ms | 4.66 ms | +4 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves off ms/chunk | 2.86 ms | 2.80 ms | 3.20 ms | 2.74 ms | +4 % |
+| ChunkJob.Run TerrainFirst DistanceBlend cave worst case ms/chunk | 8.38 ms | 8.28 ms | 8.58 ms | 6.83 ms | +23 % |
+| ChunkJob.Run BiomeFirst DistanceBlend cave worst case ms/chunk | 8.45 ms | 8.32 ms | 8.57 ms | 6.09 ms | +39 % |
+| ChunkJob.Run TerrainFirst None ms/chunk | 3.80 ms | 3.74 ms | 4.13 ms | 2.89 ms | +31 % |
+| ChunkJob.Run BiomeFirst None ms/chunk | 2.81 ms | 2.76 ms | 3.11 ms | 2.06 ms | +36 % |
+| ChunkJob.Run TerrainFirst DistanceBlend ms/chunk | 5.80 ms | 5.73 ms | 6.94 ms | 4.87 ms | +19 % |
+| ChunkJob.Run BiomeFirst DistanceBlend ms/chunk | 5.54 ms | 5.45 ms | 5.85 ms | 4.02 ms | +38 % |
+| CarveCaverns lattice ms/chunk | 1.19 ms | 1.16 ms | 1.46 ms | 1.03 ms | +15 % |
 
-Every `ChunkJob` row with caves grew by about the same +0.5–0.6 ms (Terrain-first) / +0.6–1.0 ms (Biome-first): the
-extra walked steps, and in Biome-first the anchors of the cells one beyond the padding (about 30 more unblended height
-reads per chunk). The percentages are largest on the cheap rows (`None`, `ParameterSpaceWeighting`, +18–29 %); the
-DistanceBlend rows are +5–13 % Terrain-first and +14–25 % Biome-first. The caves-off rows, meshing, light, culling
-and the interval-list rows are within ±7 %. The `ChunkJob.Run TerrainFirst ms/chunk` row (3.14 ms) compares with the 2.73–2.74 ms of the focused
-runs noted above, not with the bimodal 4.63 of the previous file.
+Every `ChunkJob` row with caves grew by about +0.9 ms (Terrain-first) / +1.0–1.5 ms (Biome-first) over the baseline
+before the links: the extra walked steps and the arrival trunks, in Biome-first the anchors of the cells two beyond
+the padding (unblended height reads), and the taller hall band. The percentages are largest on the cheap rows
+(`None`, `ParameterSpaceWeighting`, +31–36 %); the DistanceBlend rows are +16–23 % Terrain-first and +25–39 %
+Biome-first. The caves-off rows, meshing, light, culling and the interval-list rows are within ±7 % of the links
+recording, except `CMeshBuildJob.Run solid` (+18 %), which does not touch the changed code. The
+`ChunkJob.Run TerrainFirst ms/chunk` row (3.17 ms) compares with the 2.73–2.74 ms of the focused runs noted above.
 
 ## Re-running
 

@@ -23,6 +23,7 @@ namespace Engine.Scripts.WorldGen.Caves{
 
         public float CavernThreshold;
         public float CavernEdgeRise;
+        public float CavernFloorRise;
         public int CavernBandMin;
         public int CavernBandMax;
         public float CavernMaskWavelength;

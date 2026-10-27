@@ -26,7 +26,7 @@ namespace Engine.Scripts.WorldGen.Caves{
         /// <summary>Pocket threshold at height <paramref name="y" /> in a column whose mask raises it by <paramref name="raise" />.</summary>
         public static float Threshold(int y, float raise, in CaveConfig c){
             return Caverns.BandThreshold(y, c.LavaPocketBandMin, c.LavaPocketBandMax, c.LavaPocketThreshold,
-                c.LavaPocketEdgeRise) + raise;
+                c.LavaPocketEdgeRise, c.LavaPocketEdgeRise) + raise;
         }
 
         /// <summary>Pocket noise at voxel (x, y, z).</summary>

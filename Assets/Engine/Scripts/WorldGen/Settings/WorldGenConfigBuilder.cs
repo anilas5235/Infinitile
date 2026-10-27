@@ -174,6 +174,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 CavernWavelength = new float2(s.CavernWavelength, s.CavernVerticalWavelength),
                 CavernThreshold = s.CavernThreshold,
                 CavernEdgeRise = math.max(s.CavernEdgeRise, 0f),
+                CavernFloorRise = s.CavernFloorRise,
                 CavernBandMin = math.max(s.CavernBandMin, BottomLayer.Height),
                 CavernBandMax = s.CavernBandMax,
                 CavernMaskWavelength = s.CavernMaskWavelength,

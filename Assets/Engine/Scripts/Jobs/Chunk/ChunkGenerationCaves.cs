@@ -346,8 +346,8 @@ namespace Engine.Scripts.Jobs.Chunk{
         ///     Worm tunnels (<see cref="Worms" />): walks every worm whose start lies within <c>WormPadding</c> of the
         ///     block or its ring, with its branch, and carves each step's sphere into the block below the column limits.
         ///     Steps near a ground probe of the ring are recorded for the flora test. Nothing is buffered: the walk
-        ///     carves as it goes, so no cap can drop a worm. The anchors of the cells one beyond the range are
-        ///     computed once, since every worm steers at starts of its neighbour cells.
+        ///     carves as it goes, so no cap can drop a worm. The anchors of the cells two beyond the range are
+        ///     computed once, since every worm steers at starts of its neighbour cells, which steer at theirs.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
         internal static void CarveWorms(NativeArray<ushort> vox, ref CaveColumnData caves, int3 origin, in WorldGenConfig cfg,
@@ -356,7 +356,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             int padding = c.WormPadding + caves.Padding;
             int2 min = origin.xz - padding, max = origin.xz + new int2(ChunkWidth - 1, ChunkDepth - 1) + padding;
             int2 firstCell = Worms.Cell(min, cfg), lastCell = Worms.Cell(max, cfg);
-            WormAnchors anchors = WormAnchors.Create(firstCell - 1, lastCell + 1, cfg, cache, Allocator.Temp);
+            WormAnchors anchors = WormAnchors.Create(firstCell - 2, lastCell + 2, cfg, cache, Allocator.Temp);
             for (int cx = firstCell.x; cx <= lastCell.x; cx++)
             for (int cz = firstCell.y; cz <= lastCell.y; cz++)
             for (int k = 0; k < Worms.MaxPerCell; k++){

@@ -40,12 +40,16 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Range(-1f, 1f)]
         public float CavernThreshold = .45f;
 
-        [Tooltip("How far the threshold rises towards the top and bottom of the band, so halls close off there.")]
+        [Tooltip("How far the threshold rises towards the top of the band, so halls close off under it.")]
         [Min(0f)]
         public float CavernEdgeRise = .6f;
 
-        [Tooltip("Lowest y a hall may carve.")]
-        public int CavernBandMin = 20;
+        [Tooltip("How far the threshold rises towards the bottom of the band; negative values lower it, so the halls "
+                 + "open widest on the floor.")]
+        public float CavernFloorRise = -.15f;
+
+        [Tooltip("Lowest y a hall may carve; the bedrock floor stays.")]
+        public int CavernBandMin = 4;
 
         [Tooltip("Highest y a hall may carve.")]
         public int CavernBandMax = 90;
@@ -72,7 +76,8 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Min(1)]
         public int WormCellSize = 64;
 
-        [Tooltip("Mean number of worms per start cell (0…2): each cell holds 0, 1 or 2 worms.")]
+        [Tooltip("Mean number of worms per start cell (0…2): every cell holds the whole part, and one more with the "
+                 + "fraction as its chance, so from 1 up no cell is empty.")]
         [Range(0f, 2f)]
         public float WormsPerCell = 1.2f;
 
@@ -122,8 +127,9 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Min(3)]
         public int WormMinY = 3;
 
-        [Tooltip("Other worm starts (of the 3×3 cells around it, nearest first) a worm steers towards, one after the other; "
-                 + "its length grows to reach the first, and its branch takes the next one. 0 lets worms wander alone.")]
+        [Tooltip("Other worm starts (of the 3×3 cells around it, near ones first, the later ones in other directions) a "
+                 + "worm steers towards, one after the other; its length grows to reach the first, and its branch takes the "
+                 + "next one. Starts too steep to walk at are left out. 0 lets worms wander alone.")]
         [Range(0, 2)]
         public int WormTargets = 2;
 
@@ -132,8 +138,9 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Range(0f, 1f)]
         public float WormSteer = .25f;
 
-        [Tooltip("Each cell with a worm also sends a short bridge worm to the nearest start of its +x and +z neighbour "
-                 + "cells, so the tunnels of neighbouring cells link up.")]
+        [Tooltip("Each cell with a worm also sends a short bridge worm from its first worm's start to the nearest start of "
+                 + "its +x neighbour cell and from its last worm's start to that of its +z neighbour, so the tunnels of "
+                 + "neighbouring cells link up.")]
         public bool WormBridges = true;
 
         [Header("Entrances")]
