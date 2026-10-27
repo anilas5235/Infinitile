@@ -41,7 +41,7 @@ namespace Engine.Scripts.WorldGen.Caves{
             CaveLimits limits = CaveColumns.Limits(x, z, cfg, default);
             bool carved = Caverns.Carves(x, y, z, limits.Cavern, cfg) || LavaPockets.Carves(x, y, z, limits.Cavern, cfg)
                           || (y >= c.WormMinY && y <= limits.Worm && Worms.Covers(x, y, z, cfg, default));
-            if (carved) kind = LavaPockets.Fills(x, y, z, cfg) ? Lava : Air;
+            if (carved) kind = LavaPockets.Fills(y, c) ? Lava : Air;
         }
     }
 }

@@ -78,12 +78,12 @@ namespace Engine.Tests.EditMode{
         }
 
         /// <summary>
-        ///     Worms may break the surface of column (x, z) with top block <paramref name="height" />. Tests that check
-        ///     surface blocks of the chunk job skip these columns and keep caves on; elsewhere the caves keep a cover of
-        ///     rock, so the surface blocks are those of the uncarved column.
+        ///     A worm carved the top block of column (x, z) with top block <paramref name="height" />. Tests that check
+        ///     surface blocks of the chunk job skip these columns and keep caves on; elsewhere the surface blocks are
+        ///     those of the uncarved column.
         /// </summary>
-        internal static bool CaveEntrance(int x, int z, int height, in WorldGenConfig cfg){
-            return cfg.Caves.Enabled && CaveColumns.IsEntrance(x, z, height, cfg, default);
+        internal static bool SurfaceCarved(int x, int z, int height, in WorldGenConfig cfg){
+            return cfg.Caves.Enabled && CaveCarving.IsCarved(x, height, z, cfg);
         }
 
         /// <summary>

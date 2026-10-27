@@ -16,7 +16,8 @@ namespace Engine.Scripts.WorldGen.Settings{
         public bool Enabled = true;
 
         [Header("Cover")]
-        [Tooltip("Caverns, and worms outside an entrance, carve nothing closer than this many blocks below the surface.")]
+        [Tooltip("Caverns and lava pockets carve nothing closer than this many blocks below the surface, and worms start "
+                 + "below it; a worm may still wander up and break the surface.")]
         [Min(0)]
         public int Cover = 8;
 
@@ -24,10 +25,6 @@ namespace Engine.Scripts.WorldGen.Settings{
                  + "neighbourhood, so no carved voxel touches water.")]
         [Min(1)]
         public int WaterCover = 6;
-
-        [Tooltip("No entrance opens within this many blocks of a submerged column; probed on a lattice every 4 blocks.")]
-        [Min(0)]
-        public int EntranceWaterDistance = 16;
 
         [Header("Caverns")]
         [Tooltip("Horizontal wavelength of the cavern noise in blocks.")]
@@ -158,7 +155,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Tooltip("Voxel of the lava pockets and of the cave floor below the lava level.")]
         public Voxel LavaVoxel;
 
-        [Tooltip("Carved voxels at or below this y become lava inside the lava mask.")]
+        [Tooltip("Carved voxels at or below this y become lava, in every column.")]
         public int LavaLevel = 5;
 
         [Tooltip("Wavelength of the 2D lava mask in blocks.")]

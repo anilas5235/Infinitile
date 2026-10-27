@@ -71,7 +71,7 @@ namespace Engine.Tests.EditMode{
                     int h = math.min(columns[ChunkJob.GetColumnIdx(x, z, ChunkDepth)].Height, ChunkHeight - 1);
                     if (LavaPockets.MaskOpen(CaveMasks.Lava(wx, wz, cfg), c)) Counts[o + LavaMask]++;
                     if (Caverns.MaskOpen(CaveMasks.Cavern(wx, wz, cfg), c)) Counts[o + CavernMask]++;
-                    if (CaveColumns.IsEntrance(wx, wz, h, cfg, default)) Counts[o + EntranceMask]++;
+                    if (CaveColumns.InEntranceMask(wx, wz, h, cfg)) Counts[o + EntranceMask]++;
                     ushort top = vox[ChunkSize.Flatten(x, h, z)];
                     if (top == 0 || top == c.LavaVoxel) Counts[o + Openings]++;
 

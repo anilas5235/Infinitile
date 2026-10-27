@@ -170,7 +170,6 @@ namespace Engine.Scripts.WorldGen.Settings{
                 Enabled = s.Enabled,
                 Cover = math.max(s.Cover, 0),
                 WaterCover = math.max(s.WaterCover, 1),
-                EntranceWaterDistance = math.max(s.EntranceWaterDistance, 0),
                 CavernWavelength = new float2(s.CavernWavelength, s.CavernVerticalWavelength),
                 CavernThreshold = s.CavernThreshold,
                 CavernEdgeRise = math.max(s.CavernEdgeRise, 0f),

@@ -13,10 +13,11 @@ namespace Engine.Scripts.WorldGen.Caves{
 
     /// <summary>
     ///     How close to the surface the cave passes may carve in a column, a pure function of the column and the
-    ///     terrain heights around it. Caverns, and worms outside an entrance, keep <c>Cover</c> blocks of rock. Next to
-    ///     a submerged column every pass keeps <c>WaterCover</c> blocks below the lowest surface of the column's 3 × 3
-    ///     neighbourhood, so no carved voxel touches a water voxel: water fills y &lt; WaterLevel only above the top
-    ///     block of a submerged column, and a carved voxel lies at least one block below every neighbouring top block.
+    ///     terrain heights around it. Caverns (and the lava pockets with them) keep <c>Cover</c> blocks of rock; worms
+    ///     may carve up to the top block, so a worm that wanders up breaks the surface. Next to a submerged column
+    ///     every pass keeps <c>WaterCover</c> blocks below the lowest surface of the column's 3 × 3 neighbourhood, so
+    ///     no carved voxel touches a water voxel: water fills y &lt; WaterLevel only above the top block of a submerged
+    ///     column, and a carved voxel lies at least one block below every neighbouring top block.
     /// </summary>
     public static class CaveColumns{
         /// <summary>The bottom layer: no pass carves y ≤ 2.</summary>
@@ -43,35 +44,22 @@ namespace Engine.Scripts.WorldGen.Caves{
         }
 
         /// <summary>
-        ///     Worms may break the surface of the dry column (x, z) with top block <paramref name="height" />: it lies in
-        ///     the entrance mask and no water probe lies within <c>EntranceWaterDistance</c>
-        ///     (<see cref="SurfaceCover.NearWater(int,int,int,in WorldGenConfig,in BlendCache)" />).
-        /// </summary>
-        public static bool IsEntrance(int x, int z, int height, in WorldGenConfig cfg, in BlendCache cache){
-            if (!InEntranceMask(x, z, height, cfg)) return false;
-            int r = cfg.Caves.EntranceWaterDistance;
-            return r <= 0 || !SurfaceCover.NearWater(x, z, r, cfg, cache);
-        }
-
-        /// <summary>
-        ///     The dry column (x, z) with top block <paramref name="height" /> lies in the entrance mask; the water test
-        ///     of <see cref="IsEntrance" /> left out.
+        ///     The dry column (x, z) with top block <paramref name="height" /> lies in the entrance mask, where worms
+        ///     start near the surface with a shaft (<see cref="Worms.Anchor" />).
         /// </summary>
         public static bool InEntranceMask(int x, int z, int height, in WorldGenConfig cfg){
             return !Submerged(height, cfg) && CaveMasks.Entrance(x, z, cfg) > cfg.Caves.EntranceThreshold;
         }
 
         /// <summary>
-        ///     Limits of column (x, z) with top block <paramref name="height" />, the lowest top block
+        ///     Limits of a column with top block <paramref name="height" />, the lowest top block
         ///     <paramref name="lowest" /> of its 3 × 3 neighbourhood and whether one of those columns is submerged.
         /// </summary>
-        public static CaveLimits Limits(int x, int z, int height, int lowest, bool wet, in WorldGenConfig cfg,
-            in BlendCache cache){
+        public static CaveLimits Limits(int height, int lowest, bool wet, in WorldGenConfig cfg){
             ref readonly CaveConfig c = ref cfg.Caves;
-            int covered = height - c.Cover;
             CaveLimits limits = new(){
-                Cavern = covered,
-                Worm = !wet && IsEntrance(x, z, height, cfg, cache) ? height : covered
+                Cavern = height - c.Cover,
+                Worm = height
             };
             if (!wet) return limits;
             int dry = lowest - c.WaterCover;
@@ -92,7 +80,7 @@ namespace Engine.Scripts.WorldGen.Caves{
                 wet |= Submerged(h, cfg);
             }
 
-            return Limits(x, z, height, lowest, wet, cfg, cache);
+            return Limits(height, lowest, wet, cfg);
         }
     }
 }

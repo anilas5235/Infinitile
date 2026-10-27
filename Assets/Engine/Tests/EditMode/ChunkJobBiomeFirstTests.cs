@@ -230,7 +230,7 @@ namespace Engine.Tests.EditMode{
                 for (int x = 0; x < ChunkWidth; x += 5)
                 for (int z = 0; z < ChunkDepth; z += 3){
                     ColumnSample s = WorldSampler.SampleColumn(7 * ChunkWidth + x, -3 * ChunkDepth + z, _config.WorldGen);
-                    if (TestFixtures.CaveEntrance(7 * ChunkWidth + x, -3 * ChunkDepth + z, s.ColumnHeight, _config.WorldGen)) continue;
+                    if (TestFixtures.SurfaceCarved(7 * ChunkWidth + x, -3 * ChunkDepth + z, s.ColumnHeight, _config.WorldGen)) continue;
                     checkedColumns++;
                     Biome.BiomeDef def = _config.WorldGen.Biomes[s.SurfaceSource];
                     Assert.AreEqual(def.topBlock, chunk.GetVoxel(new int3(x, s.ColumnHeight, z)), $"top ({x},{z})");

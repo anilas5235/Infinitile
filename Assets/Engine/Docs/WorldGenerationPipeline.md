@@ -38,12 +38,10 @@ skips carved ground]
 - **Settings**: `CaveSettings` (the `Caves` section of `WorldGenSettings`, in `ToCanonicalJson`) with its Burst mirror
   `CaveConfig` on `WorldGenConfig`. The water, ice, lava, ore and bedrock ids are resolved into the config, so no
   pass looks up voxel names.
-- **Column limits** (`CaveColumns`, `PrepareCaveColumns`): halls and worms carve only up to `Cover` (8) below the
-  surface. Where the column or one of its 8 neighbours lies under water, both limits are `WaterCover` (6) below the
-  lowest of the 9 heights, so no cave drains a lake or floods. Inside the entrance mask (wavelength 96, threshold 0.7),
-  with no water within `EntranceWaterDistance` (16) blocks, worms may carve up to the surface, so the rare openings
-  appear there. Nothing carves at or below the floor (y 2). In Biome-first the blend lattice spans the water probe
-  cells as well, since a probe outside it would evaluate every blend tap.
+- **Column limits** (`CaveColumns`, `PrepareCaveColumns`): halls (and the lava pockets with them) carve only up to
+  `Cover` (8) below the surface; worms may carve up to the top block of a column, so a worm that wanders up breaks
+  the surface. Where the column or one of its 8 neighbours lies under water, both limits are `WaterCover` (6) below
+  the lowest of the 9 heights, so no cave drains a lake or floods. Nothing carves at or below the floor (y 2).
 - **Halls** (`Caverns`, `CarveCaverns`): a hall noise and a pillar noise (seeded 3D simplex after Gustavson) on a
   world-aligned 4 × 4 × 4 lattice, interpolated trilinearly at every voxel of the hall band in the columns whose
   cavern mask (wavelength 384) is open. The band runs from `CavernBandMin` (4, just above the bedrock) to
@@ -56,14 +54,13 @@ skips carved ground]
   nothing, carve a sphere whose radius changes smoothly, may branch once (after the shaft), and stay within
   `WormReach` (128) of their start. A block walks every worm that starts within `WormPadding` (reach + largest
   radius) of it, in full, and carves the steps whose sphere touches it. There is no buffer, so no cap can drop a
-  worm. A worm that starts in the entrance mask starts just below the surface, goes straight down in its start
-  column until its sphere lies below `Cover` (outside the mask nothing above surface − `Cover` is carved, so a
-  sloped start would end in a dead-end pit), then walks on at random. The start tests only the
-  mask and a dry column, not the water distance: starts lie up to `WormPadding` away, beyond the block's water
-  probes, and the column limits keep the worm `Cover` deep wherever water is near. Only a start in the mask reads
-  the exact surface height; the others take their depth range from the unblended height
+  worm. A worm that starts in the entrance mask (wavelength 96, threshold 0.7) starts just below the surface, goes
+  straight down in its start column until its sphere lies below `Cover`, so the opening is a vertical pit that leads
+  down, then walks on at random. The start tests only the mask and a dry column: starts lie up to `WormPadding`
+  away, and the column limits keep every worm `WaterCover` deep wherever water is near. Only a start in the mask
+  reads the exact surface height; the others take their depth range from the unblended height
   (`WorldSampler.SampleUnblendedHeight`, the hard biome's height in Biome-first), which saves a blend of every
-  kernel tap per start.
+  kernel tap per start; a start that lands above the exact surface carves nothing there.
 - **Worm count**: slot k of a cell is present with chance `WormsPerCell` − k, so a cell holds the whole part of
   `WormsPerCell` and one more with the fraction as its chance (1.2: one worm in every cell, a second in 20 % of them).
 - **Connectors** (`WormAnchor`, `WormAnchors`, `Worms.LinkTarget`, `Worms.HallTarget`): so that no tunnel lies
@@ -92,8 +89,9 @@ skips carved ground]
   pass records which of them a sphere carves, and `PlaceVegetation` skips plants and tree anchors whose ground is
   carved (halls and pockets are tested directly).
 - **Lava** (`LavaPockets`, `FillLava`): inside the lava mask (wavelength 256), flat pockets of a squashed 3D noise in
-  the low band, below each column's hall limit, with lava at or below `LavaLevel` (5) and air above. Every voxel the
-  halls and worms carved at or below `LavaLevel` inside the mask becomes lava too.
+  the low band, below each column's hall limit, with lava at or below `LavaLevel` (5) and air above. In every
+  column, inside the mask or not, every voxel the halls and worms carved at or below `LavaLevel` becomes lava too,
+  so a hall that reaches the bottom of the band has a lava floor.
 - **Ores** (`OreVeins`, `PlaceOres`): 16³ cells hold a hashed number of vein seeds per ore rule (mean
   `VeinsPerCell`). A vein is a hashed random walk of `VeinSize` voxels that replaces only the rule's host within its
   y range, rules in list order. The pass runs before the carving, so caves expose the ores. The shipped table has

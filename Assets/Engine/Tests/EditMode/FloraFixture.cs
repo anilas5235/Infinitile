@@ -492,8 +492,9 @@ namespace Engine.Tests.EditMode{
                     _voxels[Flat(x, y, z)] = v;
                 }
 
-                // Outside entrances the caves keep Cover blocks of rock, below the band the comparisons look at.
-                if (cfg.Caves.Enabled && (cfg.Caves.Cover <= 5 || CaveColumns.IsEntrance(wx, wz, h, cfg, probes)))
+                // Where a worm breaks the surface the top blocks are carved; elsewhere the halls keep Cover blocks of
+                // rock, below the band the comparisons look at.
+                if (cfg.Caves.Enabled && (cfg.Caves.Cover <= 5 || TestFixtures.SurfaceCarved(wx, wz, h, cfg)))
                     for (int y = math.max(0, h - 5); y <= h; y++)
                         Carve(new int3(wx, y, wz));
             }

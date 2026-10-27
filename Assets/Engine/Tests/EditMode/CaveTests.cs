@@ -440,10 +440,9 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void EntranceWorm_ShaftLeadsFromItsStartBelowTheCover(){
-            // Outside the entrance mask nothing above surface − Cover is carved, so an entrance worm goes straight down
-            // in its start column until its sphere lies below the cover; a sloped start left the opening a dead end.
-            // With the mask wide open and every cell full, the start column of each dry entrance worm is air from the
-            // start down to the shaft bottom.
+            // An entrance worm goes straight down in its start column until its sphere lies below the cover, so the
+            // opening is a vertical pit. With the mask wide open and every cell full, the start column of each dry
+            // entrance worm is air from the start down to the shaft bottom.
             _settings.Caves.EntranceThreshold = 0f;
             _settings.Caves.WormsPerCell = 2f;
             _config = Build();
@@ -603,9 +602,9 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void Rules_Over64ChunksWithCoasts([Values(false, true)] bool moreEntrances){
             // 8 × 8 chunks with ~27 % water and entrance columns: no carved voxel touches water or ice, nothing is
-            // carved at y ≤ 2 and y 0 is bedrock, carving above surface − Cover happens only in entrance columns
-            // (caverns and pockets never come that close, worms only there), and lava lies only at or below LavaLevel
-            // inside the lava mask, where no carved voxel at that depth holds air. Worms rarely start in the entrance mask,
+            // carved at y ≤ 2 and y 0 is bedrock, whatever is carved above surface − Cover lies in a worm (caverns and
+            // pockets never come that close; checked on a sample of the columns, since the pure walk is slow), and lava
+            // lies only at or below LavaLevel, where no carved voxel holds air. Worms rarely start in the entrance mask,
             // so a second run widens the mask and fills every cell with worms to open some.
             if (moreEntrances){
                 _settings.Caves.EntranceThreshold = 0f;
@@ -621,7 +620,7 @@ namespace Engine.Tests.EditMode{
             Assert.AreNotEqual(0, lavaVoxel, "lava resolves through the id table");
             Area area = GenerateArea(_config, new int2(-2, 2), new int2(8, 8), true);
 
-            int carved = 0, wet = 0, openings = 0, lava = 0, lavaColumns = 0;
+            int carved = 0, wet = 0, openings = 0, lava = 0, lavaColumns = 0, aboveCover = 0, sampled = 0;
             List<string> report = new();
             int failures = 0;
             void Fail(string message){
@@ -641,13 +640,13 @@ namespace Engine.Tests.EditMode{
                     ushort voxel = area[x, y, z];
                     if (voxel == lavaVoxel){
                         lava++;
-                        if (y > c.LavaLevel || !inMask) Fail($"({x},{y},{z}) lava above LavaLevel or outside the mask");
+                        if (y > c.LavaLevel) Fail($"({x},{y},{z}) lava above LavaLevel");
                     }
 
                     if (y > h || !area.IsHole(voxel)) continue;
                     carved++;
                     highest = y;
-                    if (voxel == 0 && inMask && y <= c.LavaLevel) Fail($"({x},{y},{z}) air at the lava level inside the mask");
+                    if (voxel == 0 && y <= c.LavaLevel) Fail($"({x},{y},{z}) air at the lava level");
                     if (y <= CaveColumns.Floor) Fail($"({x},{y},{z}) carved in the bottom layer");
                     foreach (int3 f in faces){
                         int3 n = new int3(x, y, z) + f;
@@ -659,13 +658,18 @@ namespace Engine.Tests.EditMode{
 
                 if (highest == int.MinValue) continue;
                 if (highest == h) openings++;
-                if (highest > h - c.Cover && !CaveColumns.IsEntrance(x, z, h, cfg, default))
-                    Fail($"({x},{highest},{z}) carved above surface {h} − Cover outside the entrances");
+                if (highest <= h - c.Cover) continue;
+                aboveCover++;
+                if (aboveCover % 16 != 1) continue;
+                sampled++;
+                if (!Worms.Covers(x, highest, z, cfg, default))
+                    Fail($"({x},{highest},{z}) carved above surface {h} − Cover by no worm");
             }
 
             int columns = 64 * Columns;
             string counts = $"{carved} carved voxels ({lava} lava), {wet * 100f / columns:F1} % submerged columns, " +
-                            $"{lavaColumns * 100f / columns:F1} % in the lava mask, {openings} columns open to the sky";
+                            $"{lavaColumns * 100f / columns:F1} % in the lava mask, {openings} columns open to the sky, " +
+                            $"{aboveCover} columns carved above the cover ({sampled} checked against the worms)";
             TestContext.WriteLine(counts);
             Assert.AreEqual(0, failures, counts + "\n" + string.Join("\n", report));
             Assert.Greater(wet, columns / 10, "the area has coasts; " + counts);

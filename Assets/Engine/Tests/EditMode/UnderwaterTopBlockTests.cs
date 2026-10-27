@@ -184,8 +184,8 @@ namespace Engine.Tests.EditMode{
                     int h = math.clamp(region.ColumnHeight[i], 0, MaxTerrainHeight);
                     int source = region.SurfaceSource[i];
                     string where = $"({origin.x + x},{origin.y + z}) h={h}";
-                    // Caves stay on; entrance columns, where worms may break the surface, are skipped.
-                    if (TestFixtures.CaveEntrance(origin.x + x, origin.y + z, h, _config.WorldGen)) continue;
+                    // Caves stay on; columns whose top block a worm carved are skipped.
+                    if (TestFixtures.SurfaceCarved(origin.x + x, origin.y + z, h, _config.WorldGen)) continue;
                     Assert.AreEqual(ExpectedTop(h, source), data.GetVoxel(new int3(x, h, z)), where + " top");
                     Assert.AreEqual(_config.WorldGen.Biomes[source].underBlock, data.GetVoxel(new int3(x, h - 1, z)),
                         where + " under");

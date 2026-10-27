@@ -5,9 +5,9 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Caves{
     /// <summary>
-    ///     Lava at the bottom of the world, inside the 2D lava mask (<see cref="CaveMasks.Lava" />): flat pockets that a
-    ///     squashed 3D noise carves in a low band whether or not a cave reaches them, and every carved voxel at or below
-    ///     <c>LavaLevel</c>, so a pocket or a deep cave has a lava floor under an air gap. The pockets follow the halls'
+    ///     Lava at the bottom of the world: inside the 2D lava mask (<see cref="CaveMasks.Lava" />), flat pockets that a
+    ///     squashed 3D noise carves in a low band whether or not a cave reaches them, and everywhere every carved voxel
+    ///     at or below <c>LavaLevel</c>, so a pocket or a deep cave has a lava floor under an air gap. The pockets follow the halls'
     ///     threshold that rises towards both edges of the band (the depth fade of Infinitile v0.3.0,
     ///     ChunkGenerationCavesOres.CarveCaves, which also filled carved voxels below y 5 with lava) and shrink towards
     ///     the edge of the mask like the halls. Without a lava voxel there are neither pockets nor lava.
@@ -53,10 +53,9 @@ namespace Engine.Scripts.WorldGen.Caves{
             return Noise(x, y, z, cfg) > Threshold(y, MaskRaise(mask, c), c);
         }
 
-        /// <summary>A carved voxel at height <paramref name="y" /> of column (x, z) holds lava rather than air.</summary>
-        public static bool Fills(int x, int y, int z, in WorldGenConfig cfg){
-            ref readonly CaveConfig c = ref cfg.Caves;
-            return y <= c.LavaLevel && MaskOpen(CaveMasks.Lava(x, z, cfg), c);
+        /// <summary>A carved voxel at height <paramref name="y" /> holds lava rather than air, in every column.</summary>
+        public static bool Fills(int y, in CaveConfig c){
+            return c.LavaVoxel != 0 && y <= c.LavaLevel;
         }
     }
 }

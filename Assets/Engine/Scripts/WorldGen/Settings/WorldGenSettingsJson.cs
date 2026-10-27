@@ -125,7 +125,6 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["Enabled"] = c.Enabled,
                 ["Cover"] = c.Cover,
                 ["WaterCover"] = c.WaterCover,
-                ["EntranceWaterDistance"] = c.EntranceWaterDistance,
                 ["CavernWavelength"] = c.CavernWavelength,
                 ["CavernVerticalWavelength"] = c.CavernVerticalWavelength,
                 ["CavernThreshold"] = c.CavernThreshold,

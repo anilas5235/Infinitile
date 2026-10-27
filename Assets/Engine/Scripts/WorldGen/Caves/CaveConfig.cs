@@ -15,7 +15,6 @@ namespace Engine.Scripts.WorldGen.Caves{
         // --- Cover --------------------------------------------------------------------------------------------------
         public int Cover;
         public int WaterCover;
-        public int EntranceWaterDistance;
 
         // --- Caverns ------------------------------------------------------------------------------------------------
         /// <summary>Wavelengths of the cavern noise in blocks: (horizontal, vertical).</summary>

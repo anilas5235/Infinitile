@@ -265,10 +265,9 @@ namespace Engine.Scripts.WorldGen.Caves{
         ///     no such worm or its start column has no room for one (surface − Cover below the lowest start height
         ///     outside an entrance; outside the entrance mask the surface is the unblended height).
         ///     A worm in the entrance mask starts up to <c>EntranceStartDepth</c> below the surface and goes straight
-        ///     down until its sphere lies below <c>Cover</c> (outside the mask nothing above it is carved, so a sloped
-        ///     start left the opening a dead end). The start leaves out the water test of the entrance: starts lie up
-        ///     to <c>WormPadding</c> away, beyond the block's probes, and the column limits keep the worm <c>Cover</c>
-        ///     deep wherever water is near.
+        ///     down until its sphere lies below <c>Cover</c>, so the opening is a vertical pit that leads down rather
+        ///     than a sloped scrape. The start does not test for water: starts lie up to <c>WormPadding</c> away, and
+        ///     the column limits keep every worm <c>WaterCover</c> deep wherever water is near.
         /// </summary>
         public static WormAnchor Anchor(int2 cell, int k, in WorldGenConfig cfg, in BlendCache cache){
             ref readonly CaveConfig c = ref cfg.Caves;
@@ -277,8 +276,8 @@ namespace Engine.Scripts.WorldGen.Caves{
             uint hash = WormHash(cell, k, cfg);
             a.Column = StartColumn(cell, k, cfg);
             // Only a start in the entrance mask needs the exact surface, for its opening. The depth range of the others
-            // takes the unblended height, which in Biome-first saves a blend of every kernel tap per start; the column
-            // limits still keep those worms Cover below the exact surface.
+            // takes the unblended height, which in Biome-first saves a blend of every kernel tap per start; a start that
+            // lands above the exact surface carves nothing there, since nothing above the top block is carved.
             bool inMask = CaveMasks.Entrance(a.Column.x, a.Column.y, cfg) > c.EntranceThreshold;
             int surface = inMask
                 ? CaveColumns.SurfaceY(a.Column.x, a.Column.y, cfg, cache)
