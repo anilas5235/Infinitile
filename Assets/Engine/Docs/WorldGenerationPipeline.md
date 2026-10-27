@@ -49,6 +49,11 @@ skips carved ground]
   `CavernBandMax` (90); the threshold rises towards the top of the band (`CavernEdgeRise`) and falls towards its
   floor (`CavernFloorRise`, negative), so halls close off at the top and open widest on the floor, and it rises over
   the 0.1 of mask value above its threshold, so halls close before the mask edge instead of ending in a wall.
+  The hall noise is shaped (`Caverns.HallNoise`): two warp noises (`CavernWarpWavelength` 64) shift the position the
+  cavern simplex is sampled at along x and z by up to `CavernWarpAmplitude` (20) blocks, so a hall is twisted and
+  leans into overhangs, and a detail octave (`CavernDetailWavelength` 28, amplitude `CavernDetailAmplitude` 0.3)
+  folded at its zero crossings (`CavernDetailRidged`, `Caverns.Ridge`: 1 − 2|n| − 0.3, centred on 0) is added, so
+  the walls have bays, crevices and fins. Five noise fields per lattice point instead of two; 0 turns each off.
   Pillars keep rock where the pillar noise is high.
 - **Worms** (`Worms`, `CarveWorms`): random worms start in 64 × 64 cells (`WormsPerCell` 1.2, at most 2 random
   worms, each with 2 connectors, see below), walk in steps of one block with damped yaw and pitch jitter and steer at

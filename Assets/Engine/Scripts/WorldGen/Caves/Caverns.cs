@@ -10,6 +10,12 @@ namespace Engine.Scripts.WorldGen.Caves{
     ///     Infinitile v0.3.0, ChunkGenerationCavesOres.CarveCaves, applied to both edges). A 2D mask limits halls to part
     ///     of the area, and inside a hall a vertically stretched second noise leaves pillars of stone standing.
     ///     <para>
+    ///         The hall noise is not the plain field: two warp noises shift the position it is sampled at along x and
+    ///         z, so a hall is twisted and leans into overhangs instead of being an ellipsoid, and a detail octave with
+    ///         a short wavelength is added to it, folded at its zero crossings (<see cref="Ridge" />), so the walls have
+    ///         bays, crevices and fins instead of smooth bumps. Both are settings and 0 turns each off.
+    ///     </para>
+    ///     <para>
     ///         Both noises are sampled on a world-aligned lattice every <see cref="LatticeStep" /> blocks and
     ///         interpolated trilinearly, so a voxel's value does not depend on the block that evaluates it.
     ///     </para>
@@ -71,10 +77,46 @@ namespace Engine.Scripts.WorldGen.Caves{
             return threshold + (t < 0f ? floorRise : rise) * t * t;
         }
 
-        /// <summary>Hall noise at lattice point (x, y, z), a multiple of <see cref="LatticeStep" />.</summary>
+        /// <summary>
+        ///     Mean of 1 − 2|n| over the 3D simplex field (its mean |n| is 0.35, measured over 200 000 points), which
+        ///     <see cref="Ridge" /> subtracts so that the folded detail is centred on 0 like the plain octave.
+        /// </summary>
+        public const float RidgeMean = .3f;
+
+        /// <summary>
+        ///     Detail value <paramref name="n" /> folded at its zero crossings: 1 − 2|n| − <see cref="RidgeMean" />, a
+        ///     ridge of 0.7 where n crosses 0 (a crevice cut into the wall) down to −1.3 at its extremes (a fin of stone).
+        /// </summary>
+        public static float Ridge(float n){
+            return 1f - 2f * math.abs(n) - RidgeMean;
+        }
+
+        /// <summary>
+        ///     Hall noise at lattice point (x, y, z), a multiple of <see cref="LatticeStep" />: the cavern simplex sampled
+        ///     at the position the warp noises shift along x and z by up to <see cref="CaveConfig.CavernWarpAmplitude" />
+        ///     blocks, plus the detail octave at the same shifted position, scaled by
+        ///     <see cref="CaveConfig.CavernDetailAmplitude" /> and folded by <see cref="Ridge" /> when ridged. The vertical
+        ///     wavelengths of the warp and the detail follow the ratio of the cavern wavelengths.
+        /// </summary>
         public static float HallNoise(int x, int y, int z, in WorldGenConfig cfg){
-            float2 w = cfg.Caves.CavernWavelength;
-            return SeededSimplex.Noise(new float3(x / w.x, y / w.y, z / w.x), cfg.Seed, HashSalts.CavernNoise);
+            ref readonly CaveConfig c = ref cfg.Caves;
+            float2 w = c.CavernWavelength;
+            float vertical = w.y / w.x;
+            float3 p = new(x, y, z);
+            if (c.CavernWarpAmplitude > 0f){
+                float3 q = p / new float3(c.CavernWarpWavelength, c.CavernWarpWavelength * vertical, c.CavernWarpWavelength);
+                p.x += c.CavernWarpAmplitude * SeededSimplex.Noise(q, cfg.Seed, HashSalts.CavernWarpX);
+                p.z += c.CavernWarpAmplitude * SeededSimplex.Noise(q, cfg.Seed, HashSalts.CavernWarpZ);
+            }
+
+            float hall = SeededSimplex.Noise(p / new float3(w.x, w.y, w.x), cfg.Seed, HashSalts.CavernNoise);
+            if (c.CavernDetailAmplitude > 0f){
+                float d = c.CavernDetailWavelength;
+                float detail = SeededSimplex.Noise(p / new float3(d, d * vertical, d), cfg.Seed, HashSalts.CavernDetail);
+                hall += c.CavernDetailAmplitude * (c.CavernDetailRidged ? Ridge(detail) : detail);
+            }
+
+            return hall;
         }
 
         /// <summary>Pillar noise at lattice point (x, y, z), a multiple of <see cref="LatticeStep" />.</summary>

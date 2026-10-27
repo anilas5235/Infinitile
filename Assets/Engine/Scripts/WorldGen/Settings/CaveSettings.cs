@@ -63,6 +63,27 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Range(-1f, 1f)]
         public float PillarThreshold = .55f;
 
+        [Tooltip("Horizontal wavelength in blocks of the detail octave added to the cavern noise (bays, alcoves, bumpy "
+                 + "walls and ceilings); its vertical wavelength follows the cavern ratio.")]
+        public float CavernDetailWavelength = 28f;
+
+        [Tooltip("Amplitude of the detail octave against the cavern noise range of −1…1; 0 turns it off.")]
+        [Min(0f)]
+        public float CavernDetailAmplitude = .3f;
+
+        [Tooltip("Fold the detail octave at its zero crossings (ridged noise), so the walls get fins and crevices "
+                 + "instead of smooth bumps.")]
+        public bool CavernDetailRidged = true;
+
+        [Tooltip("Wavelength in blocks of the warp that bends the cavern noise; its vertical wavelength follows the "
+                 + "cavern ratio.")]
+        public float CavernWarpWavelength = 64f;
+
+        [Tooltip("How far in blocks the warp shifts the cavern noise along x and z (twisted, asymmetric halls with "
+                 + "overhangs); 0 turns it off.")]
+        [Min(0f)]
+        public float CavernWarpAmplitude = 20f;
+
         [Header("Worms")]
         [Tooltip("Edge of a worm start cell in blocks.")]
         [Min(1)]
@@ -213,6 +234,8 @@ namespace Engine.Scripts.WorldGen.Settings{
             yield return (nameof(CavernMaskWavelength), CavernMaskWavelength);
             yield return (nameof(PillarWavelength), PillarWavelength);
             yield return (nameof(PillarVerticalWavelength), PillarVerticalWavelength);
+            yield return (nameof(CavernDetailWavelength), CavernDetailWavelength);
+            yield return (nameof(CavernWarpWavelength), CavernWarpWavelength);
             yield return (nameof(EntranceWavelength), EntranceWavelength);
             yield return (nameof(LavaMaskWavelength), LavaMaskWavelength);
             yield return (nameof(LavaPocketWavelength), LavaPocketWavelength);

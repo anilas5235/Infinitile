@@ -191,6 +191,11 @@ MonoBehaviour:
     PillarWavelength: 12
     PillarVerticalWavelength: 96
     PillarThreshold: 0.55
+    CavernDetailWavelength: 28
+    CavernDetailAmplitude: 0.3
+    CavernDetailRidged: 1
+    CavernWarpWavelength: 64
+    CavernWarpAmplitude: 20
     WormCellSize: 64
     WormsPerCell: 1.2
     WormStartMinY: 20

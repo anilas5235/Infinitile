@@ -696,6 +696,34 @@ changed code (the hall band is the same as in the previous recording): that is t
 recordings, and the ChunkJob deltas of a few percent are within it. Meshing, culling, the page allocator and the
 interval-list rows are within ±7 %.
 
+## 2026-10-27 — hall shapes (`2026-10-27-phaseK-shapes-editmode-baseline.json`)
+
+Same machine and settings as above, Editor focused. The hall noise is shaped (spec DEC-79): two warp noises shift the
+position the cavern simplex is sampled at along x and z by up to 20 blocks, and a detail octave (wavelength 28,
+amplitude 0.3) folded at its zero crossings is added before the threshold. A lattice point costs five noise fields
+instead of two; the lattice, the band, the mask and the pillars are unchanged.
+
+| Sample group | Median | Min | Max | Previous baseline | Change (median) |
+|---|---|---|---|---|---|
+| CarveCaverns lattice ms/chunk | 1.68 ms | 1.64 ms | 1.72 ms | 1.32 ms | +27 % |
+| CarveCaverns per voxel ms/chunk | 19.41 ms | 19.32 ms | 22.66 ms | 7.13 ms | +172 % |
+| ChunkJob.Run TerrainFirst DistanceBlend caves on ms/chunk | 6.35 ms | 6.22 ms | 6.45 ms | 6.67 ms | −5 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves on ms/chunk | 4.90 ms | 4.88 ms | 7.21 ms | 6.02 ms | −18 % |
+| ChunkJob.Run TerrainFirst DistanceBlend caves off ms/chunk | 4.70 ms | 4.66 ms | 4.89 ms | 4.87 ms | −3 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves off ms/chunk | 2.78 ms | 2.74 ms | 2.80 ms | 2.79 ms | −0 % |
+| ChunkJob.Run TerrainFirst DistanceBlend cave worst case ms/chunk | 8.04 ms | 7.94 ms | 8.43 ms | 8.20 ms | −2 % |
+| ChunkJob.Run BiomeFirst DistanceBlend cave worst case ms/chunk | 7.06 ms | 6.83 ms | 7.86 ms | 7.68 ms | −8 % |
+| ChunkJob.Run TerrainFirst DistanceBlend ms/chunk | 5.37 ms | 5.32 ms | 8.00 ms | 5.62 ms | −5 % |
+| ChunkJob.Run BiomeFirst DistanceBlend ms/chunk | 4.18 ms | 4.15 ms | 4.24 ms | 4.98 ms | −16 % |
+| LightJob.Run natural terrain ms/chunk | 0.85 ms | 0.81 ms | 1.04 ms | 0.77 ms | +11 % |
+| UnsafeIntervalList.Set 10k edits ms | 16.20 ms | 10.52 ms | 20.90 ms | 10.57 ms | +53 % |
+
+The three extra fields cost the lattice 0.36 ms per worst-case chunk; per voxel they would cost 12 ms, which confirms
+the lattice (CAV-11). Every `ChunkJob` row reads flat or faster, the Biome-first rows by 15–19 % across the board
+(flora, snow and the blend rows that do not touch the caves as well), so this pair of recordings is noisier than the
+cave change: the lattice is one pass of the caves-on rows and its +0.36 ms lies inside that spread. The light rows
+read +4–11 % and the interval-list row +53 % with its minimum at the previous median, the usual noise of those rows.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the

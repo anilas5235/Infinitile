@@ -404,6 +404,58 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void HallNoise_WarpShiftsAndDetailRoughensThePlainField(){
+            // With the warp and the detail off the hall noise is the plain cavern simplex; the warp alone samples that
+            // field at a shifted position (the same values, moved), the ridged detail alone adds a folded octave that is
+            // centred on 0, so the carved volume stays near the plain field's.
+            _config = Build();
+            WorldGenConfig cfg = _config.WorldGen;
+            CaveConfig c = cfg.Caves;
+            Assert.Greater(c.CavernDetailAmplitude, 0f, "the shipped settings use the detail octave");
+            Assert.Greater(c.CavernWarpAmplitude, 0f, "the shipped settings use the warp");
+            Assert.IsTrue(c.CavernDetailRidged, "the shipped settings fold the detail");
+
+            WorldGenConfig plain = cfg;
+            plain.Caves.CavernDetailAmplitude = 0f;
+            plain.Caves.CavernWarpAmplitude = 0f;
+            WorldGenConfig warped = plain;
+            warped.Caves.CavernWarpAmplitude = c.CavernWarpAmplitude;
+            WorldGenConfig rough = plain;
+            rough.Caves.CavernDetailAmplitude = c.CavernDetailAmplitude;
+
+            System.Random random = new(11);
+            int n = 4096, moved = 0, roughened = 0;
+            double plainSum = 0, roughSum = 0, foldSum = 0;
+            float foldMin = float.MaxValue, foldMax = float.MinValue;
+            for (int i = 0; i < n; i++){
+                int x = random.Next(-100000, 100000), y = random.Next(4, 90), z = random.Next(-100000, 100000);
+                float2 w = c.CavernWavelength;
+                float expected = Engine.Scripts.WorldGen.Noise.SeededSimplex.Noise(new float3(x / w.x, y / w.y, z / w.x),
+                    cfg.Seed, Engine.Scripts.WorldGen.Core.HashSalts.CavernNoise);
+                float p = Caverns.HallNoise(x, y, z, plain), s = Caverns.HallNoise(x, y, z, warped),
+                    r = Caverns.HallNoise(x, y, z, rough);
+                Assert.AreEqual(expected, p, 0f, $"plain hall noise at ({x},{y},{z})");
+                Assert.LessOrEqual(math.abs(s), 1f, $"the warped field keeps the simplex range at ({x},{y},{z})");
+                if (s != p) moved++;
+                if (r != p) roughened++;
+                float fold = (r - p) / c.CavernDetailAmplitude;
+                foldMin = math.min(foldMin, fold);
+                foldMax = math.max(foldMax, fold);
+                plainSum += p;
+                roughSum += r;
+                foldSum += fold;
+            }
+
+            TestContext.WriteLine($"{moved} of {n} points moved by the warp, {roughened} roughened; folded detail " +
+                                  $"{foldMin:F2}…{foldMax:F2}, mean {foldSum / n:F3}; plain mean {plainSum / n:F3}, rough mean {roughSum / n:F3}");
+            Assert.Greater(moved, n * 9 / 10, "the warp shifts the field almost everywhere");
+            Assert.Greater(roughened, n * 9 / 10, "the detail changes the field almost everywhere");
+            Assert.LessOrEqual(foldMax, 1f - Caverns.RidgeMean + 1e-4f, "the fold peaks at its ridge");
+            Assert.GreaterOrEqual(foldMin, -1f - Caverns.RidgeMean - 1e-4f, "the fold bottoms out at the extremes");
+            Assert.AreEqual(0.0, foldSum / n, .05, "the folded detail is centred on 0");
+        }
+
+        [Test]
         public void Worm_CrossingFourChunks_IsCarvedAlongItsPath(){
             // The centre voxel of every step lies inside its sphere (radius ≥ 1.5), so it is carved wherever the column
             // limits allow, in each chunk the worm passes through.

@@ -32,6 +32,21 @@ namespace Engine.Scripts.WorldGen.Caves{
 
         public float PillarThreshold;
 
+        /// <summary>Horizontal wavelength in blocks of the detail octave of the hall noise; vertical by the cavern ratio.</summary>
+        public float CavernDetailWavelength;
+
+        /// <summary>Amplitude of the detail octave; 0 leaves the hall noise plain.</summary>
+        public float CavernDetailAmplitude;
+
+        /// <summary>The detail octave is folded at its zero crossings (<see cref="Caverns.Ridge" />).</summary>
+        [MarshalAs(UnmanagedType.U1)] public bool CavernDetailRidged;
+
+        /// <summary>Wavelength in blocks of the warp of the hall noise; vertical by the cavern ratio.</summary>
+        public float CavernWarpWavelength;
+
+        /// <summary>Shift of the hall noise along x and z in blocks; 0 leaves it unwarped.</summary>
+        public float CavernWarpAmplitude;
+
         // --- Worms --------------------------------------------------------------------------------------------------
         public int WormCellSize;
         public float WormsPerCell;

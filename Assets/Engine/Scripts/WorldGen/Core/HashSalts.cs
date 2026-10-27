@@ -115,6 +115,15 @@ namespace Engine.Scripts.WorldGen.Core{
         /// <summary>3D noise of the stone pillars inside a hall.</summary>
         public const uint PillarNoise = 0x07294B5Fu;
 
+        /// <summary>3D detail octave of the halls.</summary>
+        public const uint CavernDetail = 0xB3C5D7E9u;
+
+        /// <summary>Shift of the hall noise along x.</summary>
+        public const uint CavernWarpX = 0xC4D6E8FAu;
+
+        /// <summary>Shift of the hall noise along z.</summary>
+        public const uint CavernWarpZ = 0xD5E7F90Bu;
+
         /// <summary>Number of worms of a start cell (one roll per possible worm).</summary>
         public const uint WormCount = 0x183A5C60u;
 
