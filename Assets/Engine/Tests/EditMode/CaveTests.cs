@@ -5,6 +5,7 @@ using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Caves;
+using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
@@ -653,8 +654,9 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void Rules_Over64ChunksWithCoasts([Values(false, true)] bool moreEntrances){
-            // 8 × 8 chunks with ~27 % water and entrance columns: every submerged column keeps its water and ice (no
-            // water voxel is carved; a cave may open a lake bed, and the water then hangs over it), nothing is
+            // 8 × 8 chunks on a coast (a fifth to a half of the columns submerged) with entrance columns: every
+            // submerged column keeps its water and ice (no water voxel is carved; a cave may open a lake bed, and the
+            // water then hangs over it), nothing is
             // carved at y ≤ 2 and y 0 is bedrock, whatever is carved above surface − Cover lies in a worm (caverns and
             // pockets never come that close; checked on a sample of the columns, since the pure walk is slow), and lava
             // lies only at or below LavaLevel, where no carved voxel holds air. Worms rarely start in the entrance mask,
@@ -671,7 +673,8 @@ namespace Engine.Tests.EditMode{
             Assert.AreNotEqual(0, water, "water resolves through the id table");
             Assert.AreNotEqual(0, bedrock, "bedrock resolves through the id table");
             Assert.AreNotEqual(0, lavaVoxel, "lava resolves through the id table");
-            Area area = GenerateArea(_config, new int2(-2, 2), new int2(8, 8), true);
+            int2 coast = CoastalChunks(cfg, 8);
+            Area area = GenerateArea(_config, coast, new int2(8, 8), true);
 
             int carved = 0, wet = 0, openings = 0, lava = 0, lavaColumns = 0, aboveCover = 0, sampled = 0;
             List<string> report = new();
@@ -720,7 +723,7 @@ namespace Engine.Tests.EditMode{
             }
 
             int columns = 64 * Columns;
-            string counts = $"{carved} carved voxels ({lava} lava), {wet * 100f / columns:F1} % submerged columns, " +
+            string counts = $"chunks {coast} + 8 × 8: {carved} carved voxels ({lava} lava), {wet * 100f / columns:F1} % submerged columns, " +
                             $"{lavaColumns * 100f / columns:F1} % in the lava mask, {openings} columns open to the sky, " +
                             $"{aboveCover} columns carved above the cover ({sampled} checked against the worms)";
             TestContext.WriteLine(counts);
@@ -729,6 +732,44 @@ namespace Engine.Tests.EditMode{
             Assert.Greater(carved, 10000, "the area holds caves; " + counts);
             Assert.Greater(lava, 1000, "the area holds lava; " + counts);
             if (moreEntrances) Assert.Greater(openings, 0, "some entrance opens to the sky; " + counts);
+        }
+
+        /// <summary>
+        ///     Origin chunk of the <paramref name="chunks" /> × <paramref name="chunks" /> chunk area nearest the world
+        ///     origin in which a fifth to a half of the columns are submerged, from a height sample at stride 8 over
+        ///     ±2048 blocks. The shipped heights are placeholders the user tunes, so the area follows them instead of
+        ///     pinning one that the next tuning may dry up or drown.
+        /// </summary>
+        private static int2 CoastalChunks(in WorldGenConfig cfg, int chunks){
+            const int stride = 8, half = 2048;
+            int n = 2 * half / stride, window = chunks * ChunkWidth / stride, perChunk = ChunkWidth / stride;
+            RegionBuffers buffers = new(){ ColumnHeight = new NativeArray<int>(n * n, Allocator.TempJob) };
+            try{
+                WorldGenRequest request = new(){ Config = cfg, Origin = new int2(-half, -half), Size = new int2(n, n), Stride = stride };
+                WorldGenApi.SampleRegion(request, ref buffers).Complete();
+                int2 best = default;
+                float bestDistance = float.MaxValue;
+                for (int wx = 0; wx + window <= n; wx += perChunk)
+                for (int wz = 0; wz + window <= n; wz += perChunk){
+                    int wet = 0;
+                    for (int ix = wx; ix < wx + window; ix++)
+                    for (int iz = wz; iz < wz + window; iz++)
+                        if (CaveColumns.Submerged(buffers.ColumnHeight[iz * n + ix], cfg)) wet++;
+                    float share = wet / (float)(window * window);
+                    if (share < .2f || share > .5f) continue;
+                    int2 chunk = new((wx * stride - half) / ChunkWidth, (wz * stride - half) / ChunkDepth);
+                    float distance = math.length((float2)chunk + chunks * .5f);
+                    if (distance >= bestDistance) continue;
+                    bestDistance = distance;
+                    best = chunk;
+                }
+
+                Assert.Less(bestDistance, float.MaxValue, "some 8 × 8 chunk area within ±2048 blocks has a coast");
+                return best;
+            }
+            finally{
+                buffers.ColumnHeight.Dispose();
+            }
         }
 
         [Test]
