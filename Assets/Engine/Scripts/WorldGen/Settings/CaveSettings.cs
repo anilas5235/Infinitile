@@ -127,21 +127,20 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Min(3)]
         public int WormMinY = 3;
 
-        [Tooltip("Other worm starts (of the 3×3 cells around it, near ones first, the later ones in other directions) a "
-                 + "worm steers towards, one after the other; its length grows to reach the first, and its branch takes the "
-                 + "next one. Starts too steep to walk at are left out. 0 lets worms wander alone.")]
-        [Range(0, 2)]
-        public int WormTargets = 2;
+        [Tooltip("Every worm sends a connector worm from a random point of its path to a random point of the path of the "
+                 + "nearest other worm of the 3×3 cells around it (within 75 % of the reach, not too steep), so no tunnel "
+                 + "lies alone.")]
+        public bool WormLinks = true;
 
-        [Tooltip("Share of the turn towards its target a worm takes per step (0…1); lower values keep more of the random "
-                 + "bends but need more steps to arrive.")]
+        [Tooltip("Every worm sends a connector worm from a random point of its path to the nearest region of the cavern "
+                 + "mask within 75 % of the reach, aiming a few blocks above the floor of the cavern band, where the halls "
+                 + "open widest.")]
+        public bool WormHallLinks = true;
+
+        [Tooltip("Share of the turn towards its target a connector worm takes per step (0…1); lower values keep more of "
+                 + "the random bends but need more steps to arrive.")]
         [Range(0f, 1f)]
         public float WormSteer = .25f;
-
-        [Tooltip("Each cell with a worm also sends a short bridge worm from its first worm's start to the nearest start of "
-                 + "its +x neighbour cell and from its last worm's start to that of its +z neighbour, so the tunnels of "
-                 + "neighbouring cells link up.")]
-        public bool WormBridges = true;
 
         [Header("Entrances")]
         [Tooltip("Wavelength of the 2D entrance mask in blocks.")]

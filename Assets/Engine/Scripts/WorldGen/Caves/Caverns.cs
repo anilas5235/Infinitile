@@ -48,6 +48,11 @@ namespace Engine.Scripts.WorldGen.Caves{
             return mask > c.CavernMaskThreshold;
         }
 
+        /// <summary>The column's mask lets halls form at their full size: <see cref="MaskRaise" /> is 0 there.</summary>
+        public static bool MaskFull(float mask, in CaveConfig c){
+            return mask >= c.CavernMaskThreshold + MaskFade;
+        }
+
         /// <summary>Hall threshold at height <paramref name="y" /> in a column whose mask raises it by <paramref name="raise" />.</summary>
         public static float Threshold(int y, float raise, in CaveConfig c){
             return BandThreshold(y, c.CavernBandMin, c.CavernBandMax, c.CavernThreshold, c.CavernEdgeRise, c.CavernFloorRise) + raise;

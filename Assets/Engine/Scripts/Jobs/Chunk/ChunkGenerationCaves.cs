@@ -343,11 +343,12 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
-        ///     Worm tunnels (<see cref="Worms" />): walks every worm whose start lies within <c>WormPadding</c> of the
-        ///     block or its ring, with its branch, and carves each step's sphere into the block below the column limits.
-        ///     Steps near a ground probe of the ring are recorded for the flora test. Nothing is buffered: the walk
-        ///     carves as it goes, so no cap can drop a worm. The anchors of the cells two beyond the range are
-        ///     computed once, since every worm steers at starts of its neighbour cells, which steer at theirs.
+        ///     Worm tunnels (<see cref="Worms" />): walks every random worm whose start lies within <c>WormPadding</c>
+        ///     of the block or its ring, with its branch and its connectors, and carves each step's sphere into the
+        ///     block below the column limits. Steps near a ground probe of the ring are recorded for the flora test.
+        ///     Nothing is buffered: the walk carves as it goes, so no cap can drop a worm. The anchors of the cells one
+        ///     beyond the range are computed once, since every link chooses among the starts of its neighbour cells.
+        ///     The walk of a worm records its state at the steps its connectors leave at, so they need no second walk.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
         internal static void CarveWorms(NativeArray<ushort> vox, ref CaveColumnData caves, int3 origin, in WorldGenConfig cfg,
@@ -356,29 +357,48 @@ namespace Engine.Scripts.Jobs.Chunk{
             int padding = c.WormPadding + caves.Padding;
             int2 min = origin.xz - padding, max = origin.xz + new int2(ChunkWidth - 1, ChunkDepth - 1) + padding;
             int2 firstCell = Worms.Cell(min, cfg), lastCell = Worms.Cell(max, cfg);
-            WormAnchors anchors = WormAnchors.Create(firstCell - 2, lastCell + 2, cfg, cache, Allocator.Temp);
+            WormAnchors anchors = WormAnchors.Create(firstCell - 1, lastCell + 1, cfg, cache, Allocator.Temp);
             for (int cx = firstCell.x; cx <= lastCell.x; cx++)
             for (int cz = firstCell.y; cz <= lastCell.y; cz++)
-            for (int k = 0; k < Worms.MaxPerCell; k++){
+            for (int k = 0; k < Worms.PrimariesPerCell; k++){
                 int2 cell = new(cx, cz);
                 if (!Worms.Present(cell, k, cfg)) continue;
                 int2 start = Worms.StartColumn(cell, k, cfg);
                 if (math.any(start < min) || math.any(start > max)) continue;
                 if (!Worms.Begin(cell, k, cfg, cache, anchors, out Worm worm)) continue;
+                // The state at a port step, or the last state when the path ends before it: what Worms.Begin walks to.
+                int linkSlot = Worms.LinkSlot(k), hallSlot = Worms.HallLinkSlot(k);
+                int linkStep = Worms.PortStep(cell, linkSlot, worm, cfg), hallStep = Worms.PortStep(cell, hallSlot, worm, cfg);
+                Worm link = worm, hall = worm;
                 Worm branch = default;
                 bool branched = false;
                 do{
                     CarveStep(vox, ref caves, worm, origin, c);
+                    if (worm.Step <= linkStep) link = worm;
+                    if (worm.Step <= hallStep) hall = worm;
                     if (worm.Step == worm.BranchStep) branched = Worms.Branch(worm, c, out branch);
                 } while (Worms.Next(ref worm, c));
 
-                if (!branched) continue;
-                do{
-                    CarveStep(vox, ref caves, branch, origin, c);
-                } while (Worms.Next(ref branch, c));
+                if (branched)
+                    do{
+                        CarveStep(vox, ref caves, branch, origin, c);
+                    } while (Worms.Next(ref branch, c));
+
+                CarveConnector(vox, ref caves, cell, linkSlot, link, origin, cfg, cache, anchors);
+                CarveConnector(vox, ref caves, cell, hallSlot, hall, origin, cfg, cache, anchors);
             }
 
             anchors.Dispose();
+        }
+
+        /// <summary>The connector in slot <paramref name="k" /> of <paramref name="cell" /> that leaves its worm at <paramref name="port" />, when it exists.</summary>
+        private static void CarveConnector(NativeArray<ushort> vox, ref CaveColumnData caves, int2 cell, int k, in Worm port, int3 origin,
+            in WorldGenConfig cfg, in BlendCache cache, in WormAnchors anchors){
+            if (!Worms.Present(cell, k, cfg)) return;
+            if (!Worms.Begin(cell, k, port, cfg, cache, anchors, out Worm worm)) return;
+            do{
+                CarveStep(vox, ref caves, worm, origin, cfg.Caves);
+            } while (Worms.Next(ref worm, cfg.Caves));
         }
 
         private static void CarveStep(NativeArray<ushort> vox, ref CaveColumnData caves, in Worm worm, int3 origin,

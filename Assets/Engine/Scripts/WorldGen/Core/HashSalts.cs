@@ -130,7 +130,7 @@ namespace Engine.Scripts.WorldGen.Core{
         /// <summary>Radius at one radius knot of a worm.</summary>
         public const uint WormRadius = 0x5C7EA0A4u;
 
-        /// <summary>Preference of a worm for one of the starts it may steer at.</summary>
+        /// <summary>Preference of a connector worm for one of the starts it may link to.</summary>
         public const uint WormTarget = 0xB2E40600u;
 
         /// <summary>3D noise of the lava pockets.</summary>

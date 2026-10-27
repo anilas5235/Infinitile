@@ -443,7 +443,7 @@ namespace Engine.Tests.EditMode{
             // Outside the entrance mask nothing above surface − Cover is carved, so an entrance worm goes straight down
             // in its start column until its sphere lies below the cover; a sloped start left the opening a dead end.
             // With the mask wide open and every cell full, the start column of each dry entrance worm is air from the
-            // start down to the shaft bottom, and the descent then reaches the top of the cavern band or its reach.
+            // start down to the shaft bottom.
             _settings.Caves.EntranceThreshold = 0f;
             _settings.Caves.WormsPerCell = 2f;
             _config = Build();
@@ -459,7 +459,6 @@ namespace Engine.Tests.EditMode{
 
             int2[] chunkList = entrances.Select(e => ChunkOf(e.start.x, e.start.y)).Distinct().ToArray();
             Blocks blocks = Generate(_config, chunkList.Select(k => new int3(k.x * ChunkWidth, 0, k.y * ChunkDepth)).ToArray(), false);
-            int reachedBand = 0;
             foreach ((int2 start, Worm worm) in entrances){
                 int2 chunk = ChunkOf(start.x, start.y);
                 int b = Array.IndexOf(chunkList, chunk);
@@ -468,12 +467,7 @@ namespace Engine.Tests.EditMode{
                     ushort voxel = blocks.Voxel(b, start.x - chunk.x * ChunkWidth, y, start.y - chunk.y * ChunkDepth);
                     Assert.AreEqual(0, voxel, $"shaft of the worm at {start} is closed at y {y} (start {top}, bottom {worm.ShaftAbove})");
                 }
-
-                if (Walk(worm, c).Min(s => s.Position.y) <= worm.DescendAbove + 1) reachedBand++;
             }
-
-            TestContext.WriteLine($"{reachedBand} of {entrances.Count} descend to y {c.CavernBandMax} or below the shaft");
-            Assert.Greater(reachedBand, entrances.Count / 2, "most entrance worms descend to the cavern band");
         }
 
         [Test]
@@ -547,58 +541,59 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void Worms_ReachTheirTargets(){
-            // No tunnel lies alone: a worm steers towards the nearest other starts of its 3 × 3 cells and its length
-            // grows to reach the first, so every worm with a target opens into it; its branch takes the next one and
-            // the bridges of a cell reach the nearest start of the +x and +z neighbour cells. Every bridge and every
-            // first target must arrive; the later ones are reported.
+        public void Connectors_LeaveTheirWormAndReachTheirTargets(){
+            // No tunnel lies alone: every random worm sends a link from a hashed point of its path to a hashed point of
+            // the path of the nearest other worm, and a hall link to the nearest region of the cavern mask; each has
+            // the length to arrive and ends there. Every connector must start on its worm's path after the shaft,
+            // must not branch, and must reach its target.
             _config = Build();
             WorldGenConfig cfg = _config.WorldGen;
             ref readonly CaveConfig c = ref cfg.Caves;
-            int primaries = 0, withTarget = 0, alone = 0, first = 0, second = 0, secondReached = 0, branch = 0, branchReached = 0;
-            int bridges = 0, bridgesReached = 0;
+            int worms = 0, alone = 0, links = 0, linksReached = 0, halls = 0, hallsReached = 0, noHall = 0;
             List<string> missed = new();
             for (int cx = -8; cx < 8; cx++)
             for (int cz = -8; cz < 8; cz++)
             for (int k = 0; k < Worms.MaxPerCell; k++){
                 int2 cell = new(cx, cz);
-                if (!Worms.Begin(cell, k, cfg, default, out Worm worm)) continue;
+                if (!Worms.Begin(cell, k, cfg, default, out Worm worm)){
+                    if (k < Worms.PrimariesPerCell || !Worms.Present(cell, k, cfg)) continue;
+                    if (Worms.IsHallLink(k)) noHall++;
+                    else alone++;
+                    continue;
+                }
+
+                if (k < Worms.PrimariesPerCell){
+                    worms++;
+                    Assert.IsFalse(worm.HasTarget, $"worm {k} of {cell} steers at a target");
+                    continue;
+                }
+
+                Assert.IsTrue(worm.HasTarget, $"connector {k} of {cell} has no target");
+                Assert.IsTrue(Worms.Begin(cell, Worms.Source(k), cfg, default, out Worm source), "the connector's worm exists");
+                (List<Worm> path, _) = Paths(source, c);
+                Assert.IsTrue(path.Skip(source.Shaft).Any(s => math.all(s.Position == worm.Position)),
+                    $"connector {k} of {cell} starts at {worm.Position}, off its worm's path");
                 (List<Worm> main, List<Worm> fork) = Paths(worm, c);
-                if (k >= Worms.PrimariesPerCell){
-                    bridges++;
-                    Assert.AreEqual(1, worm.TargetsLeft, $"bridge {k} of {cell} has one target");
-                    if (Reaches(main, worm.Target, c)) bridgesReached++;
-                    else missed.Add($"bridge {k} of cell {cell} from {worm.Position} misses {worm.Target} in {main.Count} steps");
-                    continue;
+                Assert.AreEqual(0, fork.Count, $"connector {k} of {cell} branches");
+                bool reached = Reaches(main, worm.Target, c);
+                if (Worms.IsHallLink(k)){
+                    halls++;
+                    if (reached) hallsReached++;
+                }
+                else{
+                    links++;
+                    if (reached) linksReached++;
                 }
 
-                primaries++;
-                if (worm.TargetsLeft == 0){
-                    alone++;
-                    continue;
-                }
-
-                withTarget++;
-                if (Reaches(main, worm.Target, c)) first++;
-                else missed.Add($"worm {k} of cell {cell} from {worm.Position} misses {worm.Target} in {main.Count} steps");
-                if (worm.TargetsLeft > 1){
-                    second++;
-                    if (Reaches(main, worm.NextTarget, c)) secondReached++;
-                }
-
-                if (fork.Count > 0 && worm.BranchTargets > 0){
-                    branch++;
-                    if (Reaches(fork, worm.BranchTarget, c)) branchReached++;
-                }
+                if (!reached) missed.Add($"connector {k} of cell {cell} from {worm.Position} misses {worm.Target} in {main.Count} steps");
             }
 
-            TestContext.WriteLine($"{primaries} worms: {withTarget} with a target ({alone} without one in reach), first target reached " +
-                                  $"by {first}, second by {secondReached} of {second}, branch target by {branchReached} of {branch}; " +
-                                  $"{bridges} bridges, {bridgesReached} reach their target");
-            Assert.Greater(withTarget, 100, "the cells hold worms with targets");
-            Assert.Greater(bridges, 50, "the cells hold bridges");
-            Assert.AreEqual(0, missed.Count, "paths miss their first target:\n" + string.Join("\n", missed));
-            Assert.Greater(secondReached, second / 3, "most second targets are reached");
+            TestContext.WriteLine($"{worms} worms: {links} link to another worm ({alone} have none in reach), {linksReached} reach it; " +
+                                  $"{halls} link to a hall ({noHall} have none in reach), {hallsReached} reach it");
+            Assert.Greater(worms, 100, "the cells hold worms");
+            Assert.Greater(links, 100, "the worms link to each other");
+            Assert.Greater(halls, 50, "the worms link to halls");
+            Assert.AreEqual(0, missed.Count, "connectors miss their target:\n" + string.Join("\n", missed));
         }
 
         #endregion

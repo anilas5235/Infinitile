@@ -147,33 +147,41 @@ namespace Engine.Tests.EditMode{
                 long columns = (long)Size * Size;
                 double km2 = columns / 1e6;
 
-                // Worms that start inside an entrance, and the links between worms, over the same area.
-                int entranceWorms = 0, worms = 0, alone = 0, targets = 0, reached = 0, bridges = 0, bridgesReached = 0;
-                int spirals = 0;
-                Dictionary<float3, int> arrivals = new();
+                // Worms that start inside an entrance, and the connectors between worms and to halls, over the same area.
+                int entranceWorms = 0, worms = 0, alone = 0, links = 0, linksReached = 0, halls = 0, hallsReached = 0, noHall = 0;
+                int spirals = 0, connectorSpirals = 0;
+                Dictionary<int3, int> arrivals = new();
                 int2 firstCell = Worms.Cell(new int2(-Size / 2), cfg), lastCell = Worms.Cell(new int2(Size / 2 - 1), cfg);
-                WormAnchors anchors = WormAnchors.Create(firstCell - 2, lastCell + 2, cfg, default, Allocator.Temp);
+                WormAnchors anchors = WormAnchors.Create(firstCell - 1, lastCell + 1, cfg, default, Allocator.Temp);
                 for (int cx = firstCell.x; cx <= lastCell.x; cx++)
                 for (int cz = firstCell.y; cz <= lastCell.y; cz++)
                 for (int k = 0; k < Worms.MaxPerCell; k++){
-                    if (!Worms.Begin(new int2(cx, cz), k, cfg, default, anchors, out Worm worm)) continue;
-                    if (k >= Worms.PrimariesPerCell){
-                        bridges++;
-                        if (Reaches(worm, worm.Target, cfg.Caves)) bridgesReached++;
-                        Arrive(arrivals, worm.Target);
+                    int2 cell = new(cx, cz);
+                    if (!Worms.Begin(cell, k, cfg, default, anchors, out Worm worm)){
+                        if (k < Worms.PrimariesPerCell || !Worms.Present(cell, k, cfg)) continue;
+                        if (Worms.IsHallLink(k)) noHall++;
+                        else alone++;
                         continue;
                     }
 
-                    worms++;
-                    if (worm.ShaftAbove != int.MaxValue) entranceWorms++;
-                    if (worm.TargetsLeft == 0) alone++;
-                    int wanted = worm.TargetsLeft + (worm.BranchStep >= 0 ? worm.BranchTargets : 0);
-                    targets += wanted;
-                    reached += wanted - Unreached(worm, cfg.Caves);
-                    if (worm.TargetsLeft > 0) Arrive(arrivals, worm.Target);
-                    if (worm.TargetsLeft > 1) Arrive(arrivals, worm.NextTarget);
-                    if (worm.BranchStep >= 0 && worm.BranchTargets > 0) Arrive(arrivals, worm.BranchTarget);
-                    if (Spirals(worm, cfg.Caves)) spirals++;
+                    if (k < Worms.PrimariesPerCell){
+                        worms++;
+                        if (worm.ShaftAbove != int.MaxValue) entranceWorms++;
+                        if (Spirals(worm, cfg.Caves)) spirals++;
+                        continue;
+                    }
+
+                    bool reached = Reaches(worm, worm.Target, cfg.Caves);
+                    if (Spirals(worm, cfg.Caves)) connectorSpirals++;
+                    if (Worms.IsHallLink(k)){
+                        halls++;
+                        if (reached) hallsReached++;
+                    }
+                    else{
+                        links++;
+                        if (reached) linksReached++;
+                        Arrive(arrivals, worm.Target);
+                    }
                 }
 
                 int busiest = arrivals.Count == 0 ? 0 : arrivals.Values.Max();
@@ -188,11 +196,12 @@ namespace Engine.Tests.EditMode{
                                   $"entrance columns {100.0 * sum[EntranceMask] / columns:F2} %");
                 report.AppendLine($"entrances: {entranceWorms / km2:F1} entrance worms per km² ({entranceWorms} of {worms} worms), " +
                                   $"{sum[Openings] / km2:F0} columns open to the sky per km²");
-                report.AppendLine($"links: {worms - alone} of {worms} worms steer at other starts ({alone} have none in reach), " +
-                                  $"{reached} of {targets} targets reached; {bridges} bridges, {bridgesReached} reach their target");
-                report.AppendLine($"junctions: {arrivals.Count} arrival points for {worms} starts, at most {busiest} arrivals at one point, " +
-                                  $"{100.0 * crowded / math.max(arrivals.Count, 1):F1} % of the points take 3 or more; " +
-                                  $"{spirals} worms spiral ({100.0 * spirals / math.max(worms, 1):F1} %)");
+                report.AppendLine($"links: {links} of {worms} worms link to another worm ({alone} have none in reach), {linksReached} reach it; " +
+                                  $"{halls} link to a hall ({noHall} have none in reach), {hallsReached} reach it");
+                report.AppendLine($"junctions: the link ends lie in {arrivals.Count} cells of {ArrivalCell} blocks, at most {busiest} in one cell, " +
+                                  $"{100.0 * crowded / math.max(arrivals.Count, 1):F1} % of the cells take 3 or more; " +
+                                  $"{spirals} worms spiral ({100.0 * spirals / math.max(worms, 1):F1} %), {connectorSpirals} connectors " +
+                                  $"({100.0 * connectorSpirals / math.max(links + halls, 1):F1} %)");
                 long carved = Enumerable.Range(0, Bands).Sum(b => sum[CarvedBand + b]);
                 report.AppendLine($"carved {carved} voxels, {100.0 * sum[Halls] / carved:F1} % of them in halls; " +
                                   $"lava {sum[Lava]} voxels ({100.0 * sum[Lava] / carved:F1} % of the carved)");
@@ -220,12 +229,16 @@ namespace Engine.Tests.EditMode{
             }
         }
 
-        private static void Arrive(Dictionary<float3, int> arrivals, float3 target){
-            arrivals[target] = arrivals.GetValueOrDefault(target) + 1;
+        /// <summary>Edge of the cells the link ends are counted in, so ends a few blocks apart count as one junction.</summary>
+        private const int ArrivalCell = 8;
+
+        private static void Arrive(Dictionary<int3, int> arrivals, float3 target){
+            int3 cell = (int3)math.floor(target / ArrivalCell);
+            arrivals[cell] = arrivals.GetValueOrDefault(cell) + 1;
         }
 
         /// <summary>
-        ///     The worm's path (without its branch) has a window of <see cref="SpiralSteps" /> steps that climbs or
+        ///     The path (without its branch) has a window of <see cref="SpiralSteps" /> steps that climbs or
         ///     drops <see cref="SpiralRise" /> blocks or more while its ends lie within <see cref="SpiralFootprint" />
         ///     blocks horizontally: a worm circling up or down.
         /// </summary>
@@ -252,20 +265,6 @@ namespace Engine.Tests.EditMode{
             } while (Worms.Next(ref worm, c));
 
             return false;
-        }
-
-        /// <summary>Targets of the worm and its branch that no step of the path reaches.</summary>
-        private static int Unreached(Worm worm, in CaveConfig c){
-            int missed = 0;
-            if (worm.TargetsLeft > 0 && !Reaches(worm, worm.Target, c)) missed++;
-            if (worm.TargetsLeft > 1 && !Reaches(worm, worm.NextTarget, c)) missed++;
-            if (worm.BranchStep < 0 || worm.BranchTargets == 0) return missed;
-            Worm parent = worm;
-            while (parent.Step < parent.BranchStep && Worms.Next(ref parent, c)){ }
-
-            if (parent.Step == parent.BranchStep && Worms.Branch(parent, c, out Worm branch) && !Reaches(branch, branch.Target, c))
-                missed++;
-            return missed;
         }
 
         private static string Runs(long[] sum, int histogram, long columns){
