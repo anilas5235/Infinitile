@@ -129,9 +129,10 @@ namespace Engine.Tests.EditMode{
                 return id;
             }
 
+            WorldGenConfig worldGen = shipped.ToConfigWithVoxelIds(TestFixtures.Seed, Id); // first: a throw leaves no map behind
             GeneratorConfig config = new(){
                 Voxels = new NativeHashMap<FixedString32Bytes, Voxel.VoxelDef>(1, Allocator.Persistent),
-                WorldGen = shipped.ToConfigWithVoxelIds(TestFixtures.Seed, Id)
+                WorldGen = worldGen
             };
             const int chunksPerSide = Size / ChunkWidth;
             NativeArray<int> counts = new(chunksPerSide * chunksPerSide * Stride, Allocator.Persistent);

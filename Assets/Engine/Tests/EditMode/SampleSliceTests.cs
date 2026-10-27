@@ -37,9 +37,10 @@ namespace Engine.Tests.EditMode{
             Assert.IsNotNull(settings, ShippedSettingsPath);
             Assert.IsTrue(settings.Caves.Enabled, "the shipped settings have caves on");
             // Generation reads only the world-gen config; the job safety system still wants the voxel map constructed.
+            WorldGenConfig worldGen = settings.ToConfigWithVoxelIds(TestFixtures.Seed, Id); // first: a throw leaves no map behind
             _config = new GeneratorConfig{
                 Voxels = new NativeHashMap<FixedString32Bytes, Voxel.VoxelDef>(1, Allocator.Persistent),
-                WorldGen = settings.ToConfigWithVoxelIds(TestFixtures.Seed, Id)
+                WorldGen = worldGen
             };
             Assert.AreNotEqual(0, _config.WorldGen.Caves.BedrockVoxel, "bedrock resolves through the id table");
 

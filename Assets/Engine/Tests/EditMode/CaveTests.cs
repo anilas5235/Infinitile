@@ -48,9 +48,11 @@ namespace Engine.Tests.EditMode{
 
         private GeneratorConfig Build(){
             // Generation reads only the world-gen config; the job safety system still wants the voxel map constructed.
+            // The config comes first, so a build that throws leaves no map behind.
+            WorldGenConfig worldGen = _settings.ToConfigWithVoxelIds(TestFixtures.Seed, Id);
             return new GeneratorConfig{
                 Voxels = new NativeHashMap<FixedString32Bytes, Voxel.VoxelDef>(1, Allocator.Persistent),
-                WorldGen = _settings.ToConfigWithVoxelIds(TestFixtures.Seed, Id)
+                WorldGen = worldGen
             };
         }
 

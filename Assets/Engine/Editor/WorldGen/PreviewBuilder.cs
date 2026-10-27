@@ -159,8 +159,8 @@ namespace Engine.Editor.WorldGen{
 
         private JobHandle ScheduleDistribution(WorldGenSettings asset, float3 probe, float probeHeight){
             WorldGenConfig config = PassA.Config;
-            _jobDistributionPixels = new NativeArray<Color32>(DistributionResolution * DistributionResolution, Allocator.Persistent);
-            _jobDistributionColors = new NativeArray<Color32>(Mathf.Max(1, config.BiomeCount), Allocator.Persistent);
+            _jobDistributionPixels = new NativeArray<Color32>(DistributionResolution * DistributionResolution, Allocator.Domain);
+            _jobDistributionColors = new NativeArray<Color32>(Mathf.Max(1, config.BiomeCount), Allocator.Domain);
             for (int i = 0; i < config.BiomeCount; i++){
                 Biome biome = asset.Biomes.Biomes[i];
                 _jobDistributionColors[i] = biome ? (Color32)biome.RepresentativeColor : new Color32(0, 0, 0, 255);

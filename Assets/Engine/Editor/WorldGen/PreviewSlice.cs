@@ -77,8 +77,8 @@ namespace Engine.Editor.WorldGen{
             int2 origin = axis == SliceAxis.X ? new int2(start, coordinate) : new int2(coordinate, start);
             int2 size = axis == SliceAxis.X ? new int2(width, 1) : new int2(1, width);
             WorldGenRequest request = new(){ Config = _config, Origin = origin, Size = size, Stride = 1 };
-            _jobVoxels = new NativeArray<ushort>(width * (yMax - yMin + 1), Allocator.Persistent);
-            _jobHeights = new NativeArray<int>(width, Allocator.Persistent);
+            _jobVoxels = new NativeArray<ushort>(width * (yMax - yMin + 1), Allocator.Domain);
+            _jobHeights = new NativeArray<int>(width, Allocator.Domain);
             RegionBuffers buffers = new(){ ColumnHeight = _jobHeights };
             JobHandle heights = WorldGenApi.SampleRegion(request, ref buffers);
             JobHandle voxels = WorldGenApi.SampleSlice(request, axis, coordinate, yMin, yMax, ref _jobVoxels, flora);

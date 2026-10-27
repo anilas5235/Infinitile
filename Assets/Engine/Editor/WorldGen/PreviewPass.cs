@@ -72,7 +72,7 @@ namespace Engine.Editor.WorldGen{
         private WorldGenConfig _config; // owned; rebuilt per build
         private readonly LocalVoxelIds _voxelIds = new(); // the cave volume tells blocks from air by id
 
-        // --- Sampled buffers (Persistent, Size² each) ----------------------------------------------------------------
+        // --- Sampled buffers (Domain, Size² each) ----------------------------------------------------------------
         public NativeArray<WorldFields> Fields;
         public NativeArray<float> Height;
         public NativeArray<int> HardBiome;
@@ -367,23 +367,23 @@ namespace Engine.Editor.WorldGen{
         private void EnsureBuffers(int count){
             if (Height.IsCreated && Height.Length == count) return;
             DisposeBuffers();
-            Fields = new NativeArray<WorldFields>(count, Allocator.Persistent);
-            Height = new NativeArray<float>(count, Allocator.Persistent);
-            HardBiome = new NativeArray<int>(count, Allocator.Persistent);
-            DominantBiome = new NativeArray<int>(count, Allocator.Persistent);
-            MaterialWeights = new NativeArray<BlendWeights>(count, Allocator.Persistent);
-            SurfaceSource = new NativeArray<int>(count, Allocator.Persistent);
-            FloraSpecies = new NativeArray<ushort>(count, Allocator.Persistent);
-            Clamped = new NativeArray<byte>(count, Allocator.Persistent);
-            TerrainParams = new NativeArray<float3>(count, Allocator.Persistent);
-            MaxWeight = new NativeArray<float>(count, Allocator.Persistent);
-            CavernMask = new NativeArray<float>(count, Allocator.Persistent);
-            EntranceMask = new NativeArray<float>(count, Allocator.Persistent);
-            LavaMask = new NativeArray<float>(count, Allocator.Persistent);
-            CaveVolume = new NativeArray<int>(count, Allocator.Persistent);
-            _edges = new NativeArray<int>(BiomeBoundaryStats.Side * BiomeBoundaryStats.Side, Allocator.Persistent);
-            _biomeColors = new NativeArray<Color32>(BiomeSet.MaxBiomes, Allocator.Persistent);
-            for (int v = 0; v < ViewCount; v++) _pixels[v] = new NativeArray<Color32>(count, Allocator.Persistent);
+            Fields = new NativeArray<WorldFields>(count, Allocator.Domain);
+            Height = new NativeArray<float>(count, Allocator.Domain);
+            HardBiome = new NativeArray<int>(count, Allocator.Domain);
+            DominantBiome = new NativeArray<int>(count, Allocator.Domain);
+            MaterialWeights = new NativeArray<BlendWeights>(count, Allocator.Domain);
+            SurfaceSource = new NativeArray<int>(count, Allocator.Domain);
+            FloraSpecies = new NativeArray<ushort>(count, Allocator.Domain);
+            Clamped = new NativeArray<byte>(count, Allocator.Domain);
+            TerrainParams = new NativeArray<float3>(count, Allocator.Domain);
+            MaxWeight = new NativeArray<float>(count, Allocator.Domain);
+            CavernMask = new NativeArray<float>(count, Allocator.Domain);
+            EntranceMask = new NativeArray<float>(count, Allocator.Domain);
+            LavaMask = new NativeArray<float>(count, Allocator.Domain);
+            CaveVolume = new NativeArray<int>(count, Allocator.Domain);
+            _edges = new NativeArray<int>(BiomeBoundaryStats.Side * BiomeBoundaryStats.Side, Allocator.Domain);
+            _biomeColors = new NativeArray<Color32>(BiomeSet.MaxBiomes, Allocator.Domain);
+            for (int v = 0; v < ViewCount; v++) _pixels[v] = new NativeArray<Color32>(count, Allocator.Domain);
             HasResult = false;
         }
 
