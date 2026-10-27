@@ -28,7 +28,7 @@ MonoBehaviour:
   LambdaErosion: 1
   LambdaPV: 0.5
   LambdaHeight: 1
-  HeightMin: 40
+  HeightMin: 50
   HeightMax: 250
   WaterLevel: 124
   WaterVoxel: {fileID: 11400000, guid: 7b0b0eaca79300d468e0f7c8c0b8d1f3, type: 2}
@@ -212,6 +212,9 @@ MonoBehaviour:
     WormTurnDamping: 0.8
     WormBranchChance: 0.25
     WormMinY: 3
+    WormLinks: 1
+    WormHallLinks: 1
+    WormSteer: 0.25
     EntranceWavelength: 96
     EntranceThreshold: 0.7
     EntranceStartDepth: 4
