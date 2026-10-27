@@ -724,6 +724,36 @@ the lattice (CAV-11). Every `ChunkJob` row reads flat or faster, the Biome-first
 cave change: the lattice is one pass of the caves-on rows and its +0.36 ms lies inside that spread. The light rows
 read +4–11 % and the interval-list row +53 % with its minimum at the previous median, the usual noise of those rows.
 
+## 2026-10-27 — hall cell skips (`2026-10-27-phaseK-skips-editmode-baseline.json`)
+
+Same machine and settings as above, Editor focused; the before-run of this change in the same Editor session read the
+cave rows at 1.67 / 6.33 / 4.91 / 8.06 / 6.96 ms, the shapes baseline within 1 %. The hall pass of the chunk skips what
+cannot carve without changing a voxel: a column whose raised threshold lies above every lattice value of the chunk, and
+a lattice cell whose eight hall corners all lie below the lowest threshold of its four heights (the trilinear
+interpolation never exceeds its corners by more than a margin of 1e-4), and it interpolates the pillar noise only at
+voxels whose hall opens. The chunk-against-pure-reference test and the carved counts of the benchmark are unchanged.
+
+| Sample group | Median | Min | Max | Previous baseline | Change (median) |
+|---|---|---|---|---|---|
+| CarveCaverns lattice ms/chunk | 1.13 ms | 1.11 ms | 1.35 ms | 1.68 ms | −33 % |
+| CarveCaverns per voxel ms/chunk | 19.51 ms | 19.37 ms | 23.78 ms | 19.41 ms | +1 % |
+| ChunkJob.Run TerrainFirst DistanceBlend caves on ms/chunk | 6.22 ms | 6.19 ms | 6.27 ms | 6.35 ms | −2 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves on ms/chunk | 4.74 ms | 4.73 ms | 4.79 ms | 4.90 ms | −3 % |
+| ChunkJob.Run TerrainFirst DistanceBlend caves off ms/chunk | 4.75 ms | 4.72 ms | 7.85 ms | 4.70 ms | +1 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves off ms/chunk | 2.75 ms | 2.74 ms | 2.81 ms | 2.78 ms | −1 % |
+| ChunkJob.Run TerrainFirst DistanceBlend cave worst case ms/chunk | 7.50 ms | 7.47 ms | 7.60 ms | 8.04 ms | −7 % |
+| ChunkJob.Run BiomeFirst DistanceBlend cave worst case ms/chunk | 6.39 ms | 6.35 ms | 9.72 ms | 7.06 ms | −9 % |
+| ChunkJob.Run TerrainFirst DistanceBlend ms/chunk | 5.21 ms | 5.18 ms | 7.01 ms | 5.37 ms | −3 % |
+| ChunkJob.Run BiomeFirst DistanceBlend ms/chunk | 4.00 ms | 3.99 ms | 4.90 ms | 4.18 ms | −4 % |
+| LightJob.Run natural terrain ms/chunk | 0.78 ms | 0.77 ms | 0.80 ms | 0.85 ms | −8 % |
+| UnsafeIntervalList.Set 10k edits ms | 10.36 ms | 10.27 ms | 10.82 ms | 16.20 ms | −36 % |
+
+The hall pass of a worst-case chunk (mask open everywhere) costs 1.13 ms instead of 1.67, which the worst-case chunk
+rows show as −0.55 ms; the shipped-tuning rows with caves gain about 0.1–0.15 ms, since their mask opens about a
+quarter of the columns. Rows without caves drift −1 to −4 % between the two runs, so the cave rows' gain net of that
+drift is the lattice row's. The interval-list row returns to its usual 10.4 ms from the 16.2 ms outlier of the
+previous entry.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the

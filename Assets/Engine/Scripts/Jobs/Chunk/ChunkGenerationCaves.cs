@@ -247,7 +247,11 @@ namespace Engine.Scripts.Jobs.Chunk{
 
         /// <summary>
         ///     Halls (<see cref="Caverns" />): the hall and pillar noises on a lattice over the columns whose mask is open,
-        ///     interpolated at every voxel of the cavern band up to the column's limit.
+        ///     interpolated at every voxel of the cavern band up to the column's limit. The interpolation never exceeds
+        ///     the corners of its cell by more than <see cref="Caverns.SkipMargin" />, so a column whose raised
+        ///     threshold lies above every lattice value, and a cell whose hall corners all lie below its lowest
+        ///     threshold, are skipped without interpolating; the pillar noise is interpolated only where the hall opens.
+        ///     The voxels carved are the same as without the skips.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
         internal static void CarveCaverns(NativeArray<ushort> vox, in CaveColumnData caves, int3 origin, in WorldGenConfig cfg){
@@ -281,24 +285,39 @@ namespace Engine.Scripts.Jobs.Chunk{
             int3 last = new(Caverns.LatticeFloor(origin.x + hi.x), Caverns.LatticeFloor(yHigh), Caverns.LatticeFloor(origin.z + hi.y));
             int3 n = (last - first) / step + 2;
             NativeArray<float2> lattice = new(n.x * n.y * n.z, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+            float hallMax = float.MinValue;
             for (int ix = 0; ix < n.x; ix++)
             for (int iy = 0; iy < n.y; iy++)
             for (int iz = 0; iz < n.z; iz++){
                 int3 p = first + new int3(ix, iy, iz) * step;
-                lattice[(ix * n.y + iy) * n.z + iz] = new float2(Caverns.HallNoise(p.x, p.y, p.z, cfg),
-                    Caverns.PillarNoise(p.x, p.y, p.z, cfg));
+                float2 noises = new(Caverns.HallNoise(p.x, p.y, p.z, cfg), Caverns.PillarNoise(p.x, p.y, p.z, cfg));
+                lattice[(ix * n.y + iy) * n.z + iz] = noises;
+                hallMax = math.max(hallMax, noises.x);
+            }
+
+            // The lowest unraised threshold of each row of lattice cells (its four heights) and of the whole band.
+            NativeArray<float> cellFloor = new(n.y - 1, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+            float bandFloor = float.MaxValue;
+            for (int iy = 0; iy < n.y - 1; iy++){
+                int y0 = first.y + iy * step;
+                float floor = Caverns.Threshold(y0, 0f, c);
+                for (int y = y0 + 1; y < y0 + step; y++) floor = math.min(floor, Caverns.Threshold(y, 0f, c));
+                cellFloor[iy] = floor;
+                bandFloor = math.min(bandFloor, floor);
             }
 
             for (int x = lo.x; x <= hi.x; x++)
             for (int z = lo.y; z <= hi.y; z++){
                 float r = raise[GetColumnIdx(x, z, ChunkDepth)];
-                if (r < 0f) continue;
+                if (r < 0f || hallMax + Caverns.SkipMargin <= bandFloor + r) continue;
                 int wx = origin.x + x, wz = origin.z + z;
                 int ix = (Caverns.LatticeFloor(wx) - first.x) / step, iz = (Caverns.LatticeFloor(wz) - first.z) / step;
                 float fx = Caverns.LatticeFraction(wx), fz = Caverns.LatticeFraction(wz);
                 int top = math.min(caves.CavernTop[caves.Index(x, z)], c.CavernBandMax);
-                for (int y = yLow; y <= top; y++){
-                    int iy = (Caverns.LatticeFloor(y) - first.y) / step;
+                for (int y = yLow; y <= top;){
+                    int y0 = Caverns.LatticeFloor(y);
+                    int yEnd = math.min(y0 + step - 1, top);
+                    int iy = (y0 - first.y) / step;
                     float2 c000 = lattice[(ix * n.y + iy) * n.z + iz];
                     float2 c100 = lattice[((ix + 1) * n.y + iy) * n.z + iz];
                     float2 c001 = lattice[(ix * n.y + iy) * n.z + iz + 1];
@@ -307,14 +326,22 @@ namespace Engine.Scripts.Jobs.Chunk{
                     float2 c110 = lattice[((ix + 1) * n.y + iy + 1) * n.z + iz];
                     float2 c011 = lattice[(ix * n.y + iy + 1) * n.z + iz + 1];
                     float2 c111 = lattice[((ix + 1) * n.y + iy + 1) * n.z + iz + 1];
-                    float3 f = new(fx, Caverns.LatticeFraction(y), fz);
-                    float2 noises = new(
-                        Caverns.Trilinear(c000.x, c100.x, c001.x, c101.x, c010.x, c110.x, c011.x, c111.x, f),
-                        Caverns.Trilinear(c000.y, c100.y, c001.y, c101.y, c010.y, c110.y, c011.y, c111.y, f));
-                    if (Caverns.Carves(y, r, noises, c)) vox[ChunkSize.Flatten(x, y, z)] = 0;
+                    float cornerMax = math.max(math.max(math.max(c000.x, c100.x), math.max(c001.x, c101.x)),
+                        math.max(math.max(c010.x, c110.x), math.max(c011.x, c111.x)));
+                    if (cornerMax + Caverns.SkipMargin > cellFloor[iy] + r)
+                        for (; y <= yEnd; y++){
+                            float3 f = new(fx, Caverns.LatticeFraction(y), fz);
+                            float hall = Caverns.Trilinear(c000.x, c100.x, c001.x, c101.x, c010.x, c110.x, c011.x, c111.x, f);
+                            if (!Caverns.HallOpen(y, r, hall, c)) continue;
+                            float pillar = Caverns.Trilinear(c000.y, c100.y, c001.y, c101.y, c010.y, c110.y, c011.y, c111.y, f);
+                            if (Caverns.PillarClear(pillar, c)) vox[ChunkSize.Flatten(x, y, z)] = 0;
+                        }
+
+                    y = yEnd + 1;
                 }
             }
 
+            cellFloor.Dispose();
             lattice.Dispose();
             raise.Dispose();
         }

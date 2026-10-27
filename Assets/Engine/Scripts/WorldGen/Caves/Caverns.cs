@@ -164,9 +164,26 @@ namespace Engine.Scripts.WorldGen.Caves{
             return new float2(hall, pillar);
         }
 
+        /// <summary>
+        ///     Interpolated corner values never exceed the corners by more than this (seven lerps of values within ±2,
+        ///     a few ULPs each), so a lattice cell whose hall corners all lie that far below its lowest threshold
+        ///     carves nothing; the chunk pass skips such cells without interpolating them.
+        /// </summary>
+        public const float SkipMargin = 1e-4f;
+
+        /// <summary>The interpolated hall noise <paramref name="hall" /> opens voxel y of a column raised by <paramref name="raise" />.</summary>
+        public static bool HallOpen(int y, float raise, float hall, in CaveConfig c){
+            return hall > Threshold(y, raise, c);
+        }
+
+        /// <summary>The interpolated pillar noise <paramref name="pillar" /> leaves no pillar at the voxel.</summary>
+        public static bool PillarClear(float pillar, in CaveConfig c){
+            return pillar <= c.PillarThreshold;
+        }
+
         /// <summary>A hall carves voxel y of a column with the interpolated noises <paramref name="noises" /> (hall, pillar).</summary>
         public static bool Carves(int y, float raise, float2 noises, in CaveConfig c){
-            return noises.x > Threshold(y, raise, c) && noises.y <= c.PillarThreshold;
+            return HallOpen(y, raise, noises.x, c) && PillarClear(noises.y, c);
         }
 
         /// <summary>
