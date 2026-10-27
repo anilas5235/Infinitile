@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Engine.Scripts.Jobs.Chunk;
+using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Caves;
@@ -48,12 +49,14 @@ namespace Engine.Tests.EditMode{
 
         /// <summary>Generates one chunk with flora and counts it; the halls alone are carved again into a solid copy.</summary>
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
-        private struct ReportJob : IJobParallelFor{
+        private struct ReportJob : ISlicedParallelFor{
             [ReadOnly] public GeneratorConfig Config;
+            public int Offset { get; set; }
             public int ChunksPerSide;
             [NativeDisableParallelForRestriction] public NativeArray<int> Counts;
 
-            public void Execute(int index){
+            public void Execute(int i){
+                int index = Offset + i;
                 GeneratorConfig config = Config;
                 ref WorldGenConfig cfg = ref config.WorldGen;
                 ref CaveConfig c = ref cfg.Caves;
@@ -140,8 +143,8 @@ namespace Engine.Tests.EditMode{
                 WorldGenConfig cfg = config.WorldGen;
                 Assert.IsTrue(cfg.Caves.Enabled, "the shipped settings have caves on");
                 Assert.LessOrEqual(cfg.Caves.Ores.Length, MaxOres);
-                new ReportJob{ Config = config, ChunksPerSide = chunksPerSide, Counts = counts }
-                    .Schedule(chunksPerSide * chunksPerSide, 1).Complete();
+                SlicedParallelFor.Schedule(new ReportJob{ Config = config, ChunksPerSide = chunksPerSide, Counts = counts },
+                    chunksPerSide * chunksPerSide, SlicedParallelFor.ChunksPerSlice).Complete();
 
                 long[] sum = new long[Stride];
                 for (int i = 0; i < counts.Length; i++) sum[i % Stride] += counts[i];

@@ -1,5 +1,6 @@
 using System;
 using Engine.Scripts.Jobs.Chunk;
+using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.WorldGen.Caves;
 using Engine.Scripts.WorldGen.Settings;
@@ -60,7 +61,8 @@ namespace Engine.Scripts.WorldGen.Core{
                 Flora = flora,
                 Voxels = outVoxels
             };
-            return job.Schedule((width + perBlock - 1) / perBlock, 1, dependsOn);
+            int blocks = (width + perBlock - 1) / perBlock;
+            return SlicedParallelFor.Schedule(job, blocks, SlicedParallelFor.ChunksPerSlice, dependsOn);
         }
 
         /// <summary>The cave volume job of <see cref="SampleRegion" />: one chunk-sized block per index.</summary>
@@ -73,7 +75,7 @@ namespace Engine.Scripts.WorldGen.Core{
                 Volume = volume
             };
             int blocks = job.BlocksX * ((request.Size.y + ChunkDepth - 1) / ChunkDepth);
-            return job.Schedule(blocks, 1, dependsOn);
+            return SlicedParallelFor.Schedule(job, blocks, SlicedParallelFor.ChunksPerSlice, dependsOn);
         }
 
         /// <summary>
@@ -81,8 +83,9 @@ namespace Engine.Scripts.WorldGen.Core{
         ///     the chunk job, so both produce the same voxels.
         /// </summary>
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
-        private struct SliceJob : IJobParallelFor{
+        private struct SliceJob : ISlicedParallelFor{
             [ReadOnly] public WorldGenConfig Config;
+            public int Offset { get; set; }
             public SliceAxis Axis;
             public int Coordinate;
             public int Start;
@@ -96,7 +99,8 @@ namespace Engine.Scripts.WorldGen.Core{
             // Blocks write disjoint sample columns.
             [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<ushort> Voxels;
 
-            public void Execute(int block){
+            public void Execute(int index){
+                int block = Offset + index;
                 int first = block * PerBlock;
                 int last = math.min(first + PerBlock, Width) - 1;
                 int along = Start + first * Stride;
@@ -125,8 +129,9 @@ namespace Engine.Scripts.WorldGen.Core{
         ///     every column inside the region.
         /// </summary>
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
-        private struct CaveVolumeJob : IJobParallelFor{
+        private struct CaveVolumeJob : ISlicedParallelFor{
             [ReadOnly] public WorldGenConfig Config;
+            public int Offset { get; set; }
             public int2 Origin;
             public int2 Size;
             public int BlocksX;
@@ -134,7 +139,8 @@ namespace Engine.Scripts.WorldGen.Core{
             // Blocks write disjoint columns.
             [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<int> Volume;
 
-            public void Execute(int block){
+            public void Execute(int index){
+                int block = Offset + index;
                 int2 first = new int2(block % BlocksX, block / BlocksX) * new int2(ChunkWidth, ChunkDepth);
                 int2 last = math.min(first + new int2(ChunkWidth, ChunkDepth), Size) - 1;
 
