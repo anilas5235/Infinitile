@@ -2,6 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Blending;
+using Engine.Scripts.WorldGen.Caves;
 using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Height;
 using Engine.Scripts.WorldGen.Noise;
@@ -86,6 +87,12 @@ namespace Engine.Scripts.WorldGen.Settings{
         ///     <c>WorldGenSettings.WaterLevel</c> for the flora conditions.
         /// </summary>
         public int WaterLevel;
+
+        /// <summary>Voxel id of the water that fills the columns up to <see cref="WaterLevel" />.</summary>
+        public ushort WaterVoxel;
+
+        /// <summary>Voxel id of the frozen water surface.</summary>
+        public ushort IceVoxel;
 
         /// <summary>Run the snow and ice overrides after terrain fill.</summary>
         [MarshalAs(UnmanagedType.U1)] public bool EnableClimateOverrides; // blittable for the Burst direct calls
@@ -206,6 +213,9 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// </summary>
         [ReadOnly] public NativeArray<byte> VoxelClasses;
 
+        /// <summary>Caves, lava, ores and the bedrock floor. Owns its ore rules.</summary>
+        public CaveConfig Caves;
+
         /// <summary>True when at least one active biome has a flora rule.</summary>
         public bool HasFlora => FloraRules.IsCreated && FloraRules.Length > 0;
 
@@ -247,6 +257,7 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (FloraMultiBlockIntervals.IsCreated) FloraMultiBlockIntervals.Dispose();
             if (FloraDenseMultiBlockBiomes.IsCreated) FloraDenseMultiBlockBiomes.Dispose();
             if (VoxelClasses.IsCreated) VoxelClasses.Dispose();
+            Caves.Dispose();
         }
     }
 }

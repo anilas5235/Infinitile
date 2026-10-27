@@ -529,6 +529,231 @@ first run:
 Play-mode flight with the shipped world: 0 of 300 frames allocate; the interval store peaked at 8123 of 17986 pages
 (45 %) and did not grow.
 
+## 2026-10-26 — caves (`2026-10-26-phaseK-editmode-baseline.json`)
+
+Same machine and settings as above. Caves are on everywhere, in the code defaults too, so **every `ChunkJob` row now
+includes them** (halls, worms, lava, ores and bedrock). The cave rows use the shipped cave settings (loaded from the
+shipped `WorldGenSettings` with its ore table and lava voxel) on the placeholder six-biome flora world with
+DistanceBlend:
+- **caves on / off**: the shipped caves, and the same world with caves disabled.
+- **cave worst case**: cavern and lava masks open everywhere and the most worms per cell (2), so every column carves
+  its hall band and lava pockets.
+- **CarveCaverns lattice / per voxel**: the hall pass alone on the 16 worst-case chunks, on the 4 × 4 × 4 lattice and
+  with both noises at every voxel; the column limits are prepared beforehand and not timed. The lattice carves
+  5648 hall voxels per chunk against 5422 per voxel; 9.9 % of the voxels differ.
+- **LightJob lava pockets**: the forest flora world (Terrain-first) with the lava mask open everywhere, 204 lava
+  voxels per chunk.
+- **CMeshBuildJob cave partitions**: the 16 partitions of the scattered caves-on chunks that hold air or lava below
+  their column's highest collision voxel, meshed with caves on and off.
+
+| Sample group | Median | Min | Max | Compared with (same run) | Change (median) |
+|---|---|---|---|---|---|
+| ChunkJob.Run TerrainFirst DistanceBlend caves on ms/chunk | 5.83 ms | 5.80 ms | 6.19 ms | caves off 4.66 ms | +25 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves on ms/chunk | 5.06 ms | 4.88 ms | 5.59 ms | caves off 2.74 ms | +85 % |
+| ChunkJob.Run TerrainFirst DistanceBlend cave worst case ms/chunk | 6.83 ms | 6.72 ms | 9.64 ms | caves off 4.66 ms | +47 % |
+| ChunkJob.Run BiomeFirst DistanceBlend cave worst case ms/chunk | 6.09 ms | 5.92 ms | 7.02 ms | caves off 2.74 ms | +122 % |
+| CarveCaverns lattice ms/chunk | 1.07 ms | 1.05 ms | 1.25 ms | per voxel 5.86 ms | −82 % |
+| LightJob.Run lava pockets ms/chunk | 1.03 ms | 1.00 ms | 1.06 ms | natural terrain 0.79 ms | +31 % |
+| CMeshBuildJob.Run cave partitions caves on ms/partition | 0.55 ms | 0.55 ms | 0.56 ms | caves off 0.36 ms | +53 % |
+
+Worms per chunk (logged by the caves rows): with the shipped settings a chunk walks 27.1 worms, 4622 steps, of which
+63 carve into it; in the worst case 45.1 worms, 7739 steps, 99 carving.
+
+The file was recorded again after the play-test changes (spec DEC-73): entrance worms dig a shaft below the cover,
+`WormsPerCell` went from 0.6 to 1.2, and worm starts outside the entrance mask take the unblended surface height. The
+first recording, with 12.9 worms per chunk and exact start heights everywhere, measured Terrain-first / Biome-first
+caves on 5.65 / 6.01 ms and the worst case 6.82 / 10.62 ms. With 1.2 worms per cell and exact start heights the
+Biome-first rows with a spatial blend grew by 23–34 % (caves on 7.52 ms): each start blended every kernel tap,
+uncached, at about 36 starts per chunk. The unblended height took them 13–21 % below the first recording. Terrain-first
+pays for the extra worms only: +1 % to +9 % on every `ChunkJob` row. In this file the `ChunkJob.Run TerrainFirst
+ms/chunk` row is bimodal (samples at 2.9 and 4.7 ms, median 4.64): the Editor lost focus for part of that test. Two
+runs of the benchmark alone just before measured 2.73 and 2.74 ms; compare with those.
+
+The first full run measured Biome-first DistanceBlend at 11.98 ms with caves on (2.76 off). Most of it was the
+entrance water test at worm starts: a start lies up to 143 blocks from the chunk, beyond its water probes, so each
+start in the entrance mask ran up to 81 uncached Biome-first height samples, in every chunk in reach. Starts now test
+only the entrance mask and a dry column (the column limits still keep every opening 16 blocks from water), and the
+Biome-first blend lattice spans the water probe cells. That brought the row to 6.0 ms. The rest of the gap between the
+architectures comes from height reads, not from carving. Stage by stage (Biome-first / Terrain-first, ms per chunk,
+probe run):
+
+| Stage | Biome-first | Terrain-first |
+|---|---|---|
+| caves off | 2.37 | 4.26 |
+| cache with the wider lattice and the water probes | +0.76 | +0.0 |
+| ores | +0.13 | +0.11 |
+| cave column limits | +0.36 | +0.29 |
+| exact surface height at the worm starts (about 18 per chunk) | +1.25 | +0.0 |
+| halls | +0.10 | +0.14 |
+| worm walking and carving | +0.2 | +0.16 |
+| lava | +0.24 | +0.32 |
+| full | 5.38 | 5.29 |
+
+An uncached Biome-first height blends every tap (about 70 µs); in Terrain-first it is one noise sample. The user kept
+the exact start height, since both architectures now cost about the same with caves.
+
+Regression check, every existing row vs the previous baseline (median):
+- **Terrain-first `ChunkJob` rows: +5 % to +19 %, above the 10 % rule.** The caves cost 0.3–0.6 ms per chunk; the
+  rows without blending grow most in percent (`None` +18 %, `ParameterSpaceWeighting` +18 %). Accepted: the caves are
+  a new feature that every row includes.
+- **Biome-first `ChunkJob` rows: +20 % to +104 %, above the 10 % rule.** Without a spatial blend (`None`,
+  `ParameterSpaceWeighting`) +0.3–0.5 ms (+20–30 %); with DistanceBlend or DistortedBoundary +2.5–3.0 ms (+69–104 %),
+  the height reads above. DistanceBlend 2.51 → 5.11 ms, flora 2.76 → 5.48 ms.
+- **`CMeshBuildJob` solid +36 % (0.33 → 0.44 ms):** the solid partition lies below the surface, where caves now open
+  faces. The other meshing rows, light, culling and interval-list rows are between −13 % and +3 %.
+- `PageAllocator fill+release` −4 %.
+
+Play-mode flight with the shipped world: 0 of 300 frames allocate; the interval store peaked at 11840 of 17986 pages
+(66 %, about 11 of the 17 pages per list; 45 % before the caves) and did not grow. With the play-test changes
+(1.2 worms per cell) it peaked at 11597 pages (64 %).
+
+Points in the render buffers once the world around the spawn (0, 250, 0) is meshed: 169 chunk columns, the player held
+in place, the shipped settings with caves on and off (a temporary probe, not committed):
+
+| Architecture | Layer | Caves off | Caves on | Change |
+|---|---|---|---|---|
+| Terrain-first | solid | 233914 points, 206 partitions | 421520 points, 401 partitions | +80 % |
+| Terrain-first | transparent / foliage | 668171 / 33568 | 668171 / 33568 | 0 |
+| Biome-first | solid | 277286 points, 209 partitions | 468013 points, 425 partitions | +69 % |
+| Biome-first | transparent / foliage | 900761 / 91776 | 900761 / 91776 | 0 |
+
+Per chunk column the solid layer grows from 1384 to 2494 points (Terrain-first) and from 1641 to 2769 (Biome-first);
+all layers together +20 % / +15 %. Water covers every column around the spawn, so it dominates the transparent layer. The extra
+solid points are cave walls below the surface, which are rarely visible; occlusion culling for them is recorded as an
+idea in the spec, not built. Collider build time: see the `CMeshBuildJob cave partitions` rows above.
+
+## 2026-10-27 — linked worms, tuned (`2026-10-27-phaseK-links-editmode-baseline.json`)
+
+Same machine and settings as above. Worms now steer towards other worm starts of their 3 × 3 cells (two targets,
+the branch takes the third) with their length extended to reach the first, each cell sends bridge worms to its +x
+and +z neighbour cells, and a start in the cavern mask above the band descends to the band top first (spec DEC-74).
+The play-test tuning of DEC-75 is in this recording too: the targets are spread by a hashed factor and prefer other
+directions, starts steeper than 60 % of the largest pitch are left out, every cell holds a worm (a second in 20 %),
+the first 16 steps of a worm form a trunk whose hashed points the other worms aim at and the bridges leave from, and
+the hall band reaches down to y 4 with a negative floor rise. Caves are on in every `ChunkJob` row, so every one of
+them pays for the links: a chunk with the shipped settings walks 32.3 worms (27.1 primary worms and the bridges)
+and 6542 steps instead of 27.1 worms and 4622 steps, of which 163 carve into it; in the worst case 59.6 worms,
+11940 steps, 204 carving. The first recording of the links (before the tuning) walked 42.3 worms and 7907 steps per
+chunk, since every cell sent two bridges then (2879 over the report area, 1206 now that steep ones are left out),
+and measured 6.42 / 5.78 ms on the caves-on rows and 7.71 / 7.45 on the worst case; the tuning costs about +0.35 ms
+Terrain-first and +0.55 ms Biome-first on top of that, the taller hall band (lattice 1.19 ms against 1.03) and the
+trunk walks of the arrival points (up to three per worm, two per bridge, 16 steps each).
+
+| Sample group | Median | Min | Max | Previous baseline | Change (median) |
+|---|---|---|---|---|---|
+| ChunkJob.Run TerrainFirst DistanceBlend caves on ms/chunk | 6.76 ms | 6.68 ms | 6.95 ms | 5.83 ms | +16 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves on ms/chunk | 6.33 ms | 6.24 ms | 6.81 ms | 5.06 ms | +25 % |
+| ChunkJob.Run TerrainFirst DistanceBlend caves off ms/chunk | 4.85 ms | 4.74 ms | 5.39 ms | 4.66 ms | +4 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves off ms/chunk | 2.86 ms | 2.80 ms | 3.20 ms | 2.74 ms | +4 % |
+| ChunkJob.Run TerrainFirst DistanceBlend cave worst case ms/chunk | 8.38 ms | 8.28 ms | 8.58 ms | 6.83 ms | +23 % |
+| ChunkJob.Run BiomeFirst DistanceBlend cave worst case ms/chunk | 8.45 ms | 8.32 ms | 8.57 ms | 6.09 ms | +39 % |
+| ChunkJob.Run TerrainFirst None ms/chunk | 3.80 ms | 3.74 ms | 4.13 ms | 2.89 ms | +31 % |
+| ChunkJob.Run BiomeFirst None ms/chunk | 2.81 ms | 2.76 ms | 3.11 ms | 2.06 ms | +36 % |
+| ChunkJob.Run TerrainFirst DistanceBlend ms/chunk | 5.80 ms | 5.73 ms | 6.94 ms | 4.87 ms | +19 % |
+| ChunkJob.Run BiomeFirst DistanceBlend ms/chunk | 5.54 ms | 5.45 ms | 5.85 ms | 4.02 ms | +38 % |
+| CarveCaverns lattice ms/chunk | 1.19 ms | 1.16 ms | 1.46 ms | 1.03 ms | +15 % |
+
+Every `ChunkJob` row with caves grew by about +0.9 ms (Terrain-first) / +1.0–1.5 ms (Biome-first) over the baseline
+before the links: the extra walked steps and the arrival trunks, in Biome-first the anchors of the cells two beyond
+the padding (unblended height reads), and the taller hall band. The percentages are largest on the cheap rows
+(`None`, `ParameterSpaceWeighting`, +31–36 %); the DistanceBlend rows are +16–23 % Terrain-first and +25–39 %
+Biome-first. The caves-off rows, meshing, light, culling and the interval-list rows are within ±7 % of the links
+recording, except `CMeshBuildJob.Run solid` (+18 %), which does not touch the changed code. The
+`ChunkJob.Run TerrainFirst ms/chunk` row (3.17 ms) compares with the 2.73–2.74 ms of the focused runs noted above.
+
+## 2026-10-27 — three layers (`2026-10-27-phaseK-layers-editmode-baseline.json`)
+
+Same machine and settings as above, Editor focused. The worms are restructured into three layers (spec DEC-76): halls,
+random worms that steer at nothing (slots 0 and 1 of a cell, the entrance shafts stay, the descent to the band and the
+trunks are gone), and two connector worms per random worm that leave from hashed steps of its path, a link to a hashed
+point of the nearest other worm's path and a hall link to the nearest fully open hall column of a 32-block lattice.
+The steered targets and the bridges of DEC-74/75 are gone; the hall band (y 4…90) and the stratified worm count stay.
+A chunk with the shipped settings now walks 71.3 worms (two random worms and up to four connectors per cell, the start
+table one cell wider than the range) and 7625 steps, of which 109 carve into it, instead of 32.3 worms, 6542 steps and
+163 carving; in the worst case 135.3 worms, 12382 steps, 177 carving (before 59.6 / 11940 / 204). The trunk walks of the
+arrival points (up to three per worm, two per bridge) are gone, and a connector's walk to its port is recorded while the
+block walks the worm, so the extra worms cost less than the steps suggest.
+
+| Sample group | Median | Min | Max | Previous baseline | Change (median) |
+|---|---|---|---|---|---|
+| ChunkJob.Run TerrainFirst DistanceBlend caves on ms/chunk | 6.67 ms | 6.58 ms | 6.97 ms | 6.76 ms | −1 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves on ms/chunk | 6.02 ms | 5.87 ms | 6.48 ms | 6.33 ms | −5 % |
+| ChunkJob.Run TerrainFirst DistanceBlend caves off ms/chunk | 4.87 ms | 4.84 ms | 5.05 ms | 4.85 ms | +0 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves off ms/chunk | 2.79 ms | 2.76 ms | 2.91 ms | 2.86 ms | −3 % |
+| ChunkJob.Run TerrainFirst DistanceBlend cave worst case ms/chunk | 8.20 ms | 8.16 ms | 8.41 ms | 8.38 ms | −2 % |
+| ChunkJob.Run BiomeFirst DistanceBlend cave worst case ms/chunk | 7.68 ms | 7.62 ms | 7.81 ms | 8.45 ms | −9 % |
+| ChunkJob.Run TerrainFirst None ms/chunk | 3.51 ms | 3.49 ms | 3.53 ms | 3.80 ms | −8 % |
+| ChunkJob.Run BiomeFirst None ms/chunk | 2.64 ms | 2.63 ms | 2.67 ms | 2.81 ms | −6 % |
+| ChunkJob.Run TerrainFirst DistanceBlend ms/chunk | 5.62 ms | 5.59 ms | 5.76 ms | 5.80 ms | −3 % |
+| ChunkJob.Run BiomeFirst DistanceBlend ms/chunk | 4.98 ms | 4.96 ms | 5.01 ms | 5.54 ms | −10 % |
+| CarveCaverns lattice ms/chunk | 1.32 ms | 1.30 ms | 1.35 ms | 1.19 ms | +11 % |
+| LightJob.Run natural terrain ms/chunk | 0.77 ms | 0.75 ms | 0.82 ms | 0.89 ms | −14 % |
+
+Every `ChunkJob` row lies within −10…0 % of the tuned links, so the three layers cost nothing over them; against the
+first phase K recording without links the caves-on rows are +14 % (Terrain-first) / +19 % (Biome-first) and the worst
+case +20 % / +26 %. The two `CarveCaverns` rows read +11–12 % and the light rows −7–14 % although neither touches the
+changed code (the hall band is the same as in the previous recording): that is the run-to-run noise of this pair of
+recordings, and the ChunkJob deltas of a few percent are within it. Meshing, culling, the page allocator and the
+interval-list rows are within ±7 %.
+
+## 2026-10-27 — hall shapes (`2026-10-27-phaseK-shapes-editmode-baseline.json`)
+
+Same machine and settings as above, Editor focused. The hall noise is shaped (spec DEC-79): two warp noises shift the
+position the cavern simplex is sampled at along x and z by up to 20 blocks, and a detail octave (wavelength 28,
+amplitude 0.3) folded at its zero crossings is added before the threshold. A lattice point costs five noise fields
+instead of two; the lattice, the band, the mask and the pillars are unchanged.
+
+| Sample group | Median | Min | Max | Previous baseline | Change (median) |
+|---|---|---|---|---|---|
+| CarveCaverns lattice ms/chunk | 1.68 ms | 1.64 ms | 1.72 ms | 1.32 ms | +27 % |
+| CarveCaverns per voxel ms/chunk | 19.41 ms | 19.32 ms | 22.66 ms | 7.13 ms | +172 % |
+| ChunkJob.Run TerrainFirst DistanceBlend caves on ms/chunk | 6.35 ms | 6.22 ms | 6.45 ms | 6.67 ms | −5 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves on ms/chunk | 4.90 ms | 4.88 ms | 7.21 ms | 6.02 ms | −18 % |
+| ChunkJob.Run TerrainFirst DistanceBlend caves off ms/chunk | 4.70 ms | 4.66 ms | 4.89 ms | 4.87 ms | −3 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves off ms/chunk | 2.78 ms | 2.74 ms | 2.80 ms | 2.79 ms | −0 % |
+| ChunkJob.Run TerrainFirst DistanceBlend cave worst case ms/chunk | 8.04 ms | 7.94 ms | 8.43 ms | 8.20 ms | −2 % |
+| ChunkJob.Run BiomeFirst DistanceBlend cave worst case ms/chunk | 7.06 ms | 6.83 ms | 7.86 ms | 7.68 ms | −8 % |
+| ChunkJob.Run TerrainFirst DistanceBlend ms/chunk | 5.37 ms | 5.32 ms | 8.00 ms | 5.62 ms | −5 % |
+| ChunkJob.Run BiomeFirst DistanceBlend ms/chunk | 4.18 ms | 4.15 ms | 4.24 ms | 4.98 ms | −16 % |
+| LightJob.Run natural terrain ms/chunk | 0.85 ms | 0.81 ms | 1.04 ms | 0.77 ms | +11 % |
+| UnsafeIntervalList.Set 10k edits ms | 16.20 ms | 10.52 ms | 20.90 ms | 10.57 ms | +53 % |
+
+The three extra fields cost the lattice 0.36 ms per worst-case chunk; per voxel they would cost 12 ms, which confirms
+the lattice (CAV-11). Every `ChunkJob` row reads flat or faster, the Biome-first rows by 15–19 % across the board
+(flora, snow and the blend rows that do not touch the caves as well), so this pair of recordings is noisier than the
+cave change: the lattice is one pass of the caves-on rows and its +0.36 ms lies inside that spread. The light rows
+read +4–11 % and the interval-list row +53 % with its minimum at the previous median, the usual noise of those rows.
+
+## 2026-10-27 — hall cell skips (`2026-10-27-phaseK-skips-editmode-baseline.json`)
+
+Same machine and settings as above, Editor focused; the before-run of this change in the same Editor session read the
+cave rows at 1.67 / 6.33 / 4.91 / 8.06 / 6.96 ms, the shapes baseline within 1 %. The hall pass of the chunk skips what
+cannot carve without changing a voxel: a column whose raised threshold lies above every lattice value of the chunk, and
+a lattice cell whose eight hall corners all lie below the lowest threshold of its four heights (the trilinear
+interpolation never exceeds its corners by more than a margin of 1e-4), and it interpolates the pillar noise only at
+voxels whose hall opens. The chunk-against-pure-reference test and the carved counts of the benchmark are unchanged.
+
+| Sample group | Median | Min | Max | Previous baseline | Change (median) |
+|---|---|---|---|---|---|
+| CarveCaverns lattice ms/chunk | 1.13 ms | 1.11 ms | 1.35 ms | 1.68 ms | −33 % |
+| CarveCaverns per voxel ms/chunk | 19.51 ms | 19.37 ms | 23.78 ms | 19.41 ms | +1 % |
+| ChunkJob.Run TerrainFirst DistanceBlend caves on ms/chunk | 6.22 ms | 6.19 ms | 6.27 ms | 6.35 ms | −2 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves on ms/chunk | 4.74 ms | 4.73 ms | 4.79 ms | 4.90 ms | −3 % |
+| ChunkJob.Run TerrainFirst DistanceBlend caves off ms/chunk | 4.75 ms | 4.72 ms | 7.85 ms | 4.70 ms | +1 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves off ms/chunk | 2.75 ms | 2.74 ms | 2.81 ms | 2.78 ms | −1 % |
+| ChunkJob.Run TerrainFirst DistanceBlend cave worst case ms/chunk | 7.50 ms | 7.47 ms | 7.60 ms | 8.04 ms | −7 % |
+| ChunkJob.Run BiomeFirst DistanceBlend cave worst case ms/chunk | 6.39 ms | 6.35 ms | 9.72 ms | 7.06 ms | −9 % |
+| ChunkJob.Run TerrainFirst DistanceBlend ms/chunk | 5.21 ms | 5.18 ms | 7.01 ms | 5.37 ms | −3 % |
+| ChunkJob.Run BiomeFirst DistanceBlend ms/chunk | 4.00 ms | 3.99 ms | 4.90 ms | 4.18 ms | −4 % |
+| LightJob.Run natural terrain ms/chunk | 0.78 ms | 0.77 ms | 0.80 ms | 0.85 ms | −8 % |
+| UnsafeIntervalList.Set 10k edits ms | 10.36 ms | 10.27 ms | 10.82 ms | 16.20 ms | −36 % |
+
+The hall pass of a worst-case chunk (mask open everywhere) costs 1.13 ms instead of 1.67, which the worst-case chunk
+rows show as −0.55 ms; the shipped-tuning rows with caves gain about 0.1–0.15 ms, since their mask opens about a
+quarter of the columns. Rows without caves drift −1 to −4 % between the two runs, so the cave rows' gain net of that
+drift is the lattice row's. The interval-list row returns to its usual 10.4 ms from the 16.2 ms outlier of the
+previous entry.
+
 ## Re-running
 
 With the project open in the Editor (the CLI `unity test` refuses to run while the Editor has the
@@ -537,6 +762,9 @@ project open):
 ```
 unity command run_tests --mode EditMode --filter Engine.Tests.Performance --timeout 600 --result-only
 ```
+
+A run that outlasts the calling shell is cancelled with it. `unity command --detach run_tests -- …` submits the run as
+a job and returns at once; the Editor log reports `[TestResultCollector] Run finished` at the end.
 
 With the Editor closed:
 

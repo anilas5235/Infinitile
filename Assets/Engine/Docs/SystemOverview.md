@@ -99,6 +99,8 @@ The world generator (see `Docs/WorldGenerationPipeline.md`):
 - `WorldGen/Blending` — `BlendWeights`, the blend methods, blend lattice and surface pick
 - `WorldGen/Settings` — `WorldGenSettings`, `BiomeSet`, `TerrainSplineSet`, the Burst mirror `WorldGenConfig`, canonical JSON
 - `WorldGen/Flora` — flora rules and placement
+- `WorldGen/Caves` — column limits, caverns, worm tunnels, lava pockets, ore veins and the bottom layer, with pure
+  per-voxel references (`CaveCarving`, `OreVeins.Apply`)
 
 ## Core systems and what they do
 
@@ -176,6 +178,20 @@ Copies built point data into the target render buffers and prepares page metadat
   editor code lives in this folder; there are no `Editor` folders under `Scripts`.
 - `Engine.Tests.EditMode`, `Engine.Tests.PlayMode`, `Engine.Tests.Performance` (`Assets/Engine/Tests/...`) — the
   test assemblies. Runtime internals they use are exposed with `InternalsVisibleTo` in `Scripts/AssemblyInfo.cs`.
+- EditMode test tiers (`TestTiers`): methods of 5 s or more carry `[Category("Slow")]`, the print-only cave report
+  `[Category("Report")]`, and both are `[Explicit]`, because the Editor's runner cannot leave out a category. A plain
+  run holds only the fast tests (570 tests, about 70 s); with the explicit tests it holds all 678 (about 290 s), which
+  runs before each pull request. With the project open in the Editor, start long runs detached, since a run ends with
+  the shell that waits for it:
+
+  ```
+  unity command --detach run_tests -- --mode EditMode --filter Engine.Tests.EditMode
+  unity command --detach run_tests -- --mode EditMode --filter Engine.Tests.EditMode --include_explicit true
+  unity command --detach run_tests -- --mode EditMode --filter Slow --filter_type category --include_explicit true
+  ```
+
+  The Editor log reports `[TestResultCollector] Run finished`; the results are in
+  `%USERPROFILE%\AppData\LocalLow\DefaultCompany\voxel-game\TestResults.xml`.
 
 ## Important runtime entry points
 

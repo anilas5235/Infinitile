@@ -92,5 +92,69 @@ namespace Engine.Scripts.WorldGen.Core{
 
         /// <summary>Main or alternative leaf voxel of a crown voxel at its world position.</summary>
         public const uint CrownLeafMix = 0x6FB19C18u;
+
+        // --- Caves -----------------------------------------------------------------------------------------------
+        /// <summary>Bedrock or not at y 1.</summary>
+        public const uint BedrockLayer1 = 0xA1C3E519u;
+
+        /// <summary>Bedrock or not at y 2.</summary>
+        public const uint BedrockLayer2 = 0xB2D4F61Au;
+
+        /// <summary>2D mask of the halls.</summary>
+        public const uint CavernMask = 0xC3E5071Bu;
+
+        /// <summary>2D mask of the surface openings.</summary>
+        public const uint EntranceMask = 0xD4F6182Cu;
+
+        /// <summary>2D mask of the lava floor.</summary>
+        public const uint LavaMask = 0xE507293Du;
+
+        /// <summary>3D noise of the halls.</summary>
+        public const uint CavernNoise = 0xF6183A4Eu;
+
+        /// <summary>3D noise of the stone pillars inside a hall.</summary>
+        public const uint PillarNoise = 0x07294B5Fu;
+
+        /// <summary>3D detail octave of the halls.</summary>
+        public const uint CavernDetail = 0xB3C5D7E9u;
+
+        /// <summary>Shift of the hall noise along x.</summary>
+        public const uint CavernWarpX = 0xC4D6E8FAu;
+
+        /// <summary>Shift of the hall noise along z.</summary>
+        public const uint CavernWarpZ = 0xD5E7F90Bu;
+
+        /// <summary>Number of worms of a start cell (one roll per possible worm).</summary>
+        public const uint WormCount = 0x183A5C60u;
+
+        /// <summary>Hash of one worm of a start cell, from which every roll of its path follows.</summary>
+        public const uint Worm = 0x294B6D71u;
+
+        /// <summary>Start position, direction, length and branch rolls of a worm.</summary>
+        public const uint WormStart = 0x3A5C7E82u;
+
+        /// <summary>Yaw and pitch jitter of one worm step.</summary>
+        public const uint WormTurn = 0x4B6D8F93u;
+
+        /// <summary>Radius at one radius knot of a worm.</summary>
+        public const uint WormRadius = 0x5C7EA0A4u;
+
+        /// <summary>Preference of a connector worm for one of the starts it may link to.</summary>
+        public const uint WormTarget = 0xB2E40600u;
+
+        /// <summary>3D noise of the lava pockets.</summary>
+        public const uint LavaPocket = 0x6D8FB1B5u;
+
+        /// <summary>Hash of one 16³ ore cell, from which its vein counts and veins follow.</summary>
+        public const uint OreCell = 0x7EA0C2C6u;
+
+        /// <summary>Number of veins of one ore rule in a cell.</summary>
+        public const uint OreCount = 0x8FB1D3D7u;
+
+        /// <summary>Hash, seed and size of one ore vein.</summary>
+        public const uint OreVein = 0x90C2E4E8u;
+
+        /// <summary>Direction of one step of an ore vein's walk.</summary>
+        public const uint OreStep = 0xA1D3F5F9u;
     }
 }

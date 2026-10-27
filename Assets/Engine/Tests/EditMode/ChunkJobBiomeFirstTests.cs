@@ -80,6 +80,7 @@ namespace Engine.Tests.EditMode{
 
             _config.WorldGen.Dispose();
             _config.WorldGen = s.ToConfig(TestFixtures.Seed);
+            TestFixtures.SetFillVoxels(ref _config.WorldGen);
             Biome.BiomeDef a = _config.WorldGen.Biomes[0];
             a.topBlock = TopA;
             a.underBlock = UnderA;
@@ -224,14 +225,20 @@ namespace Engine.Tests.EditMode{
                 }.Run(jobs.Length);
 
                 Assert.IsTrue(results.TryGetValue(new int2(7, -3), out ChunkVoxelData chunk));
+                // Caves stay on; entrance columns, where worms may break the surface, are skipped.
+                int checkedColumns = 0;
                 for (int x = 0; x < ChunkWidth; x += 5)
                 for (int z = 0; z < ChunkDepth; z += 3){
                     ColumnSample s = WorldSampler.SampleColumn(7 * ChunkWidth + x, -3 * ChunkDepth + z, _config.WorldGen);
+                    if (TestFixtures.SurfaceCarved(7 * ChunkWidth + x, -3 * ChunkDepth + z, s.ColumnHeight, _config.WorldGen)) continue;
+                    checkedColumns++;
                     Biome.BiomeDef def = _config.WorldGen.Biomes[s.SurfaceSource];
                     Assert.AreEqual(def.topBlock, chunk.GetVoxel(new int3(x, s.ColumnHeight, z)), $"top ({x},{z})");
                     Assert.AreEqual(def.underBlock, chunk.GetVoxel(new int3(x, s.ColumnHeight - 1, z)), $"under ({x},{z})");
                     Assert.AreEqual(def.stoneBlock, chunk.GetVoxel(new int3(x, s.ColumnHeight - 5, z)), $"stone ({x},{z})");
                 }
+
+                Assert.Greater(checkedColumns, 0, "some column lies outside the entrances");
             }
             finally{
                 foreach (KeyValue<int2, ChunkVoxelData> kv in results) kv.Value.Dispose();

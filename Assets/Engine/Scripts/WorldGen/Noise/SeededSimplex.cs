@@ -68,5 +68,67 @@ namespace Engine.Scripts.WorldGen.Noise{
             if ((g & 4u) == 0u) return new float2(s0, s1);
             return (g & 1u) == 0u ? new float2(s1, 0f) : new float2(0f, s1);
         }
+
+        // --- 3D ---------------------------------------------------------------------------------------------------
+        private const float SkewF3 = 1f / 3f;
+        private const float UnskewG3 = 1f / 6f;
+
+        /// <summary>Gustavson's value for the 3D kernel (0.6 − r²)⁴ with the 12 cube-edge gradients.</summary>
+        private const float OutputScale3 = 32f;
+
+        /// <summary>
+        ///     Zero-centred 3D simplex noise in [-1, 1] at <paramref name="p" /> (noise units) for one instance, with
+        ///     lattice gradients from the 3D <see cref="Hash.Hash32(int,int,int,uint,uint)" />. Skew, simplex choice and
+        ///     corner kernel after Gustavson (2005), as the 2D <see cref="Noise(float2,uint,uint)" />.
+        /// </summary>
+        public static float Noise(float3 p, uint seed, uint salt){
+            float s = (p.x + p.y + p.z) * SkewF3;
+            float3 cellF = math.floor(p + s);
+            int3 cell = (int3)cellF;
+
+            float t = (cellF.x + cellF.y + cellF.z) * UnskewG3;
+            float3 d0 = p - (cellF - t);
+
+            // The simplex of the cube that holds the point: order the offsets from largest to smallest.
+            int3 step1, step2;
+            if (d0.x >= d0.y){
+                if (d0.y >= d0.z){ step1 = new int3(1, 0, 0); step2 = new int3(1, 1, 0); }
+                else if (d0.x >= d0.z){ step1 = new int3(1, 0, 0); step2 = new int3(1, 0, 1); }
+                else{ step1 = new int3(0, 0, 1); step2 = new int3(1, 0, 1); }
+            }
+            else{
+                if (d0.y < d0.z){ step1 = new int3(0, 0, 1); step2 = new int3(0, 1, 1); }
+                else if (d0.x < d0.z){ step1 = new int3(0, 1, 0); step2 = new int3(0, 1, 1); }
+                else{ step1 = new int3(0, 1, 0); step2 = new int3(1, 1, 0); }
+            }
+
+            float3 d1 = d0 - step1 + UnskewG3;
+            float3 d2 = d0 - step2 + 2f * UnskewG3;
+            float3 d3 = d0 - 1f + 3f * UnskewG3;
+
+            float n = Corner(d0, cell, seed, salt)
+                      + Corner(d1, cell + step1, seed, salt)
+                      + Corner(d2, cell + step2, seed, salt)
+                      + Corner(d3, cell + 1, seed, salt);
+
+            return math.clamp(OutputScale3 * n, -1f, 1f);
+        }
+
+        private static float Corner(float3 d, int3 cell, uint seed, uint salt){
+            float t = 0.6f - math.lengthsq(d);
+            if (t < 0f) return 0f;
+            t *= t;
+            return t * t * math.dot(Gradient3(Hash.Hash32(cell.x, cell.y, cell.z, seed, salt)), d);
+        }
+
+        /// <summary>One of the 12 cube-edge directions (two of ±1, one 0), picked from the top bits of the hash.</summary>
+        private static float3 Gradient3(uint hash){
+            // (hash >> 8) % 12 instead of a power of two keeps all 12 directions equally likely.
+            uint g = (hash >> 8) % 12u;
+            float s0 = (g & 1u) == 0u ? 1f : -1f;
+            float s1 = (g & 2u) == 0u ? 1f : -1f;
+            uint axis = g >> 2; // 0: xy, 1: xz, 2: yz
+            return axis == 0u ? new float3(s0, s1, 0f) : axis == 1u ? new float3(s0, 0f, s1) : new float3(0f, s0, s1);
+        }
     }
 }

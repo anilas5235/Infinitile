@@ -3,6 +3,7 @@ using System.Diagnostics;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.VoxelConfig.Data.Generation;
+using Engine.Scripts.WorldGen.Caves;
 using Engine.Scripts.WorldGen.Settings;
 using NUnit.Framework;
 using Unity.Collections;
@@ -10,6 +11,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.PerformanceTesting;
+using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Tests.Performance{
     /// <summary>
@@ -199,6 +201,94 @@ namespace Engine.Tests.Performance{
             Assert.Greater(_config.WorldGen.FloraPadding, _config.WorldGen.FloraReach);
             UnityEngine.Debug.Log($"largest reach {_config.WorldGen.FloraReach}, padding {_config.WorldGen.FloraPadding}");
             MeasurePerChunk($"ChunkJob.Run {architecture} DistanceBlend largest reach ms/chunk");
+        }
+
+        /// <summary>
+        ///     Typical land with caves: the flora world of <see cref="ChunkJob_Run_PerMethod_WithFlora_MsPerChunk" /> with
+        ///     DistanceBlend and the cave settings, lava, ores and bedrock of the shipped asset. Without caves, the same
+        ///     world has the cave passes switched off, so the difference is their cost. The row moves with the shipped
+        ///     cave tuning.
+        /// </summary>
+        [Test]
+        [Performance]
+        public void ChunkJob_Run_Caves_MsPerChunk(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,
+            [Values(true, false)] bool caves){
+            BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
+            _config = BenchmarkFixtures.CreatePlaceholderGeneratorConfig(architecture, BlendMethod.DistanceBlend,
+                Allocator.Persistent, _created, true);
+            BenchmarkFixtures.UseShippedCaves(ref _config, Allocator.Persistent);
+            _config.WorldGen.Caves.Enabled = caves;
+            if (caves) LogWormSteps(architecture + " shipped caves");
+            MeasurePerChunk($"ChunkJob.Run {architecture} DistanceBlend caves {(caves ? "on" : "off")} ms/chunk");
+        }
+
+        /// <summary>
+        ///     The cave world of <see cref="ChunkJob_Run_Caves_MsPerChunk" /> with the cavern and lava masks open
+        ///     everywhere and the largest worm density, so every chunk carves halls, lava pockets and many worms.
+        /// </summary>
+        [Test]
+        [Performance]
+        public void ChunkJob_Run_CaveWorstCase_MsPerChunk(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
+            _config = BenchmarkFixtures.CreatePlaceholderGeneratorConfig(architecture, BlendMethod.DistanceBlend,
+                Allocator.Persistent, _created, true);
+            BenchmarkFixtures.UseShippedCaves(ref _config, Allocator.Persistent);
+            BenchmarkFixtures.MakeCaveWorstCase(ref _config.WorldGen.Caves);
+            LogWormSteps(architecture + " cave worst case");
+            MeasurePerChunk($"ChunkJob.Run {architecture} DistanceBlend cave worst case ms/chunk");
+        }
+
+        /// <summary>
+        ///     Logs the worm steps the measured chunks walk and those whose sphere box overlaps the chunk, as the worm
+        ///     pass enumerates them: every worm that starts within the padding, with its branch.
+        /// </summary>
+        private void LogWormSteps(string label){
+            WorldGenConfig cfg = _config.WorldGen;
+            ref readonly CaveConfig c = ref cfg.Caves;
+            Random rng = new(42);
+            long walked = 0, carved = 0;
+            int worms = 0;
+            for (int i = 0; i < MethodChunkCount; i++){
+                int2 origin = rng.NextInt2(-1000, 1000) * new int2(ChunkWidth, ChunkDepth);
+                int padding = c.WormPadding + cfg.FloraPadding;
+                int2 min = origin - padding, max = origin + new int2(ChunkWidth - 1,
+                    ChunkDepth - 1) + padding;
+                int2 firstCell = Worms.Cell(min, cfg), lastCell = Worms.Cell(max, cfg);
+                for (int cx = firstCell.x; cx <= lastCell.x; cx++)
+                for (int cz = firstCell.y; cz <= lastCell.y; cz++)
+                for (int k = 0; k < Worms.MaxPerCell; k++){
+                    int2 cell = new(cx, cz);
+                    if (!Worms.Present(cell, k, cfg)) continue;
+                    int2 start = Worms.StartColumn(cell, k, cfg);
+                    if (math.any(start < min) || math.any(start > max)) continue;
+                    if (!Worms.Begin(cell, k, cfg, default, out Worm worm)) continue;
+                    worms++;
+                    Worm branch = default;
+                    bool branched = false;
+                    do{
+                        Count(worm);
+                        if (worm.Step == worm.BranchStep) branched = Worms.Branch(worm, c, out branch);
+                    } while (Worms.Next(ref worm, c));
+
+                    if (!branched) continue;
+                    do{
+                        Count(branch);
+                    } while (Worms.Next(ref branch, c));
+                }
+
+                void Count(in Worm w){
+                    walked++;
+                    float2 lo = w.Position.xz - w.Radius - origin, hi = w.Position.xz + w.Radius - origin;
+                    if (hi.x >= 0 && lo.x < ChunkWidth && hi.y >= 0 &&
+                        lo.y < ChunkDepth)
+                        carved++;
+                }
+            }
+
+            UnityEngine.Debug.Log($"{label}: {(double)worms / MethodChunkCount:F1} worms, {(double)walked / MethodChunkCount:F0} " +
+                                  $"walked and {(double)carved / MethodChunkCount:F0} carving steps per chunk");
         }
 
         private void MeasurePerChunk(string sampleGroup){

@@ -165,7 +165,7 @@ namespace Engine.Editor.WorldGen{
             int count = a.Size * a.Size;
             if (!_diffPixels.IsCreated || _diffPixels.Length != count){
                 if (_diffPixels.IsCreated) _diffPixels.Dispose();
-                _diffPixels = new NativeArray<Color32>(count, Allocator.Persistent);
+                _diffPixels = new NativeArray<Color32>(count, Allocator.Domain);
             }
 
             _diffSigned = _compareView == PreviewView.Height;

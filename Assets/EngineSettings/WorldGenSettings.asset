@@ -28,9 +28,10 @@ MonoBehaviour:
   LambdaErosion: 1
   LambdaPV: 0.5
   LambdaHeight: 1
-  HeightMin: 40
+  HeightMin: 50
   HeightMax: 250
   WaterLevel: 124
+  WaterVoxel: {fileID: 11400000, guid: 7b0b0eaca79300d468e0f7c8c0b8d1f3, type: 2}
   OctaveWavelengths:
   - 512
   - 256
@@ -152,6 +153,7 @@ MonoBehaviour:
     lacunarity: 2
     octaves: 3
   EnableClimateOverrides: 1
+  IceVoxel: {fileID: 11400000, guid: a0254e99cf594614496c8d97c76c38f0, type: 2}
   FreezeTemperature: 0.2
   SnowLapse: 0.6
   FreezeNoiseAmplitude: 0.04
@@ -174,5 +176,125 @@ MonoBehaviour:
   FlowersDensityContrast: 2
   GroundDetailsDensityWavelength: 64
   GroundDetailsDensityContrast: 2
+  Caves:
+    Enabled: 1
+    Cover: 8
+    CavernWavelength: 96
+    CavernVerticalWavelength: 48
+    CavernThreshold: 0.45
+    CavernEdgeRise: 0.6
+    CavernFloorRise: -0.15
+    CavernBandMin: 4
+    CavernBandMax: 90
+    CavernMaskWavelength: 384
+    CavernMaskThreshold: 0.35
+    PillarWavelength: 12
+    PillarVerticalWavelength: 96
+    PillarThreshold: 0.55
+    CavernDetailWavelength: 28
+    CavernDetailAmplitude: 0.3
+    CavernDetailRidged: 1
+    CavernWarpWavelength: 64
+    CavernWarpAmplitude: 20
+    WormCellSize: 64
+    WormsPerCell: 1.2
+    WormStartMinY: 20
+    WormLength:
+      Min: 96
+      Max: 224
+    WormMinRadius: 1.5
+    WormMaxRadius: 4
+    WormRadiusPeriod: 24
+    WormReach: 128
+    WormMaxPitch: 35
+    WormYawJitter: 6
+    WormPitchJitter: 4
+    WormTurnDamping: 0.8
+    WormBranchChance: 0.25
+    WormMinY: 3
+    WormLinks: 1
+    WormHallLinks: 1
+    WormSteer: 0.25
+    EntranceWavelength: 96
+    EntranceThreshold: 0.7
+    EntranceStartDepth: 4
+    LavaVoxel: {fileID: 11400000, guid: b574c546e5456dc4784fdec84feb4e04, type: 2}
+    LavaLevel: 5
+    LavaMaskWavelength: 256
+    LavaMaskThreshold: -0.15
+    LavaPocketWavelength: 32
+    LavaPocketVerticalWavelength: 8
+    LavaPocketThreshold: 0.35
+    LavaPocketEdgeRise: 0.6
+    LavaPocketBandMin: 3
+    LavaPocketBandMax: 10
+    Ores:
+    - Ore: {fileID: 11400000, guid: a2857eb2181196349b551c8869efe5ff, type: 2}
+      Host: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
+      MinY: 10
+      MaxY: 200
+      VeinsPerCell: 3
+      VeinSize:
+        Min: 6
+        Max: 12
+    - Ore: {fileID: 11400000, guid: f1dd5916a4ac94c4cbaf314b2e814339, type: 2}
+      Host: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
+      MinY: 5
+      MaxY: 110
+      VeinsPerCell: 2
+      VeinSize:
+        Min: 4
+        Max: 8
+    - Ore: {fileID: 11400000, guid: ac0dd911051ad1e44b6090ad23559ca3, type: 2}
+      Host: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
+      MinY: 5
+      MaxY: 80
+      VeinsPerCell: 1
+      VeinSize:
+        Min: 4
+        Max: 8
+    - Ore: {fileID: 11400000, guid: 0690ee3ac77bf394fa1f396e1e4f62b3, type: 2}
+      Host: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
+      MinY: 5
+      MaxY: 70
+      VeinsPerCell: 1
+      VeinSize:
+        Min: 3
+        Max: 6
+    - Ore: {fileID: 11400000, guid: 0a2354c21d787ef4fa75b03a4fdecde4, type: 2}
+      Host: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
+      MinY: 3
+      MaxY: 40
+      VeinsPerCell: 0.5
+      VeinSize:
+        Min: 3
+        Max: 6
+    - Ore: {fileID: 11400000, guid: 92566ec39a6572b43bd5d0100cd3e866, type: 2}
+      Host: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
+      MinY: 3
+      MaxY: 20
+      VeinsPerCell: 0.25
+      VeinSize:
+        Min: 2
+        Max: 5
+    - Ore: {fileID: 11400000, guid: 0cbf5a2aff068ea4b80196dec20ed66f, type: 2}
+      Host: {fileID: 11400000, guid: 2a1844411e45fba40a1da565a805687e, type: 2}
+      MinY: 3
+      MaxY: 60
+      VeinsPerCell: 0.25
+      VeinSize:
+        Min: 2
+        Max: 4
+    - Ore: {fileID: 11400000, guid: 6915515f51d140246af59e3858a79add, type: 2}
+      Host: {fileID: 11400000, guid: eeed6c09b1b96c04faeab22d816e1b62, type: 2}
+      MinY: 3
+      MaxY: 255
+      VeinsPerCell: 0.25
+      VeinSize:
+        Min: 2
+        Max: 4
+    BedrockVoxel: {fileID: 11400000, guid: 5f97ffa5334f41d5bd26f9b5015eba49, type: 2}
+    BedrockChance1: 0.5
+    BedrockChance2: 0.25
   Biomes: {fileID: 11400000, guid: f0ebb416c9f7eb0ebd760b80683faf16, type: 2}
   Splines: {fileID: 11400000, guid: 0514b19bf2060874fa278a044246d671, type: 2}

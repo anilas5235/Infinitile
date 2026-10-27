@@ -12,6 +12,11 @@ namespace Player{
         /// </summary>
         [Range(1f, 100f)] public float moveSpeed = 20f;
 
+        /// <summary>
+        ///     Base movement speed in spectator mode, where the player flies through blocks.
+        /// </summary>
+        [Range(1f, 200f)] public float spectatorSpeed = 40f;
+
         [SerializeField] private Camera targetCamera;
         private CharacterController _controller;
         private bool _crouchInput;
@@ -21,6 +26,12 @@ namespace Player{
         private float _pitch; // vertical rotation
         private bool _sprintInput;
         private float _verticalInput; // for up/down movement
+
+        /// <summary>
+        ///     Moves the transform directly instead of through the CharacterController, so the player passes through
+        ///     blocks (spectator mode). The CharacterController must be disabled meanwhile, or it overwrites the move.
+        /// </summary>
+        public bool PassThrough{ get; set; }
 
         private void Update(){
             _verticalInput = 0f;
@@ -42,7 +53,10 @@ namespace Player{
             // Add vertical movement
             moveDirection.y = _verticalInput;
 
-            _controller.Move(moveDirection.normalized * (moveSpeed * speedModifier * Time.deltaTime));
+            float speed = (PassThrough ? spectatorSpeed : moveSpeed) * speedModifier;
+            Vector3 delta = moveDirection.normalized * (speed * Time.deltaTime);
+            if (PassThrough) transform.position += delta;
+            else _controller.Move(delta);
         }
 
         private void OnEnable(){

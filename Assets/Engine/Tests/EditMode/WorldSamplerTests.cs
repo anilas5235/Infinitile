@@ -69,11 +69,18 @@ namespace Engine.Tests.EditMode{
 
         /// <summary>Config for <paramref name="architecture" />; Terrain-first gets the placeholder splines.</summary>
         private WorldGenConfig Config(int seed, GenArchitecture architecture, params Biome[] biomes){
+            return Config(seed, architecture, BlendMethod.None, biomes);
+        }
+
+        /// <summary>Config with <paramref name="blend" /> for the material and the height stage.</summary>
+        private WorldGenConfig Config(int seed, GenArchitecture architecture, BlendMethod blend, params Biome[] biomes){
             BiomeSet set = Create<BiomeSet>("Set");
             set.Biomes.AddRange(biomes);
             WorldGenSettings s = Create<WorldGenSettings>("WG");
             s.Biomes = set;
             s.Architecture = architecture;
+            s.MaterialMethod = blend;
+            s.HeightMethod = blend;
             if (architecture == GenArchitecture.TerrainFirst){
                 s.Splines = Create<TerrainSplineSet>("Splines");
                 s.Splines.ResetToPlaceholders();
@@ -131,6 +138,30 @@ namespace Engine.Tests.EditMode{
             BiomeFirstHeight.Sample(p, w, cfg, out float hDirect, out float uDirect);
             Assert.AreEqual(hDirect, hPointer);
             Assert.AreEqual(uDirect, uPointer);
+        }
+
+        [Test]
+        public void UnblendedHeight_IsTheHeightWithoutTheSpatialBlend(){
+            // Terrain-first has no height blend, so the unblended height is the height; Biome-first takes the hard
+            // biome alone, which is the height of the same world without blending and differs where the blend acts.
+            Biome[] biomes = PlaceholderBiomes();
+            WorldGenConfig tf = Config(7, GenArchitecture.TerrainFirst, BlendMethod.DistanceBlend, biomes);
+            WorldGenConfig bf = Config(7, GenArchitecture.BiomeFirst, BlendMethod.DistanceBlend, biomes);
+            WorldGenConfig bfNone = Config(7, GenArchitecture.BiomeFirst, BlendMethod.None, biomes);
+            int differ = 0;
+            for (int x = -1024; x < 1024; x += 37)
+            for (int z = -1024; z < 1024; z += 41){
+                WorldSampler.SampleUnblendedHeight(x, z, tf, out float tfUnblended);
+                WorldSampler.SampleHeight(x, z, tf, default, out float tfHeight);
+                Assert.AreEqual(tfHeight, tfUnblended, $"Terrain-first at ({x}, {z})");
+                WorldSampler.SampleUnblendedHeight(x, z, bf, out float bfUnblended);
+                WorldSampler.SampleHeight(x, z, bfNone, default, out float bfHard);
+                Assert.AreEqual(bfHard, bfUnblended, $"Biome-first at ({x}, {z})");
+                WorldSampler.SampleHeight(x, z, bf, default, out float bfBlended);
+                if (bfBlended != bfUnblended) differ++;
+            }
+
+            Assert.Greater(differ, 0, "the Biome-first blend changes some heights");
         }
 
         private NativeArray<T> Alloc<T>(int count) where T : unmanaged{

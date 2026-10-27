@@ -31,7 +31,7 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
-        ///     Generates all voxel data for a given chunk (terrain, vegetation).
+        ///     Generates all voxel data for a given chunk (terrain, caves, vegetation).
         /// </summary>
         private void GenerateChunkData(int2 chunkPos, out ChunkVoxelData voxelData){
             int surfaceArea = ChunkSize.x * ChunkSize.z;
@@ -41,20 +41,51 @@ namespace Engine.Scripts.Jobs.Chunk{
             NativeArray<ushort> chunkVoxels = new(VoxelsPerChunk, Allocator.Temp);
             NativeArray<ChunkColumn> chunkColumns = new(surfaceArea, Allocator.Temp);
 
-            FloraGrid floraGrid = new(Config.WorldGen.FloraPadding, Allocator.Temp);
-
-            PrepareChunkMaps(ref Config, ref chunkWorldPos, chunkColumns, ref floraGrid);
-            DecideFlora(ref floraGrid, chunkColumns, chunkWorldPos, Config.WorldGen);
-            ApplySurfaceCover(chunkColumns, chunkWorldPos, Config.WorldGen, floraGrid.Cache);
-
-            FillTerrain(chunkVoxels, chunkColumns, ref Config);
-
-            PlaceVegetation(chunkVoxels, chunkColumns, floraGrid, chunkWorldPos, ref Config);
+            GenerateVoxels(ref Config, chunkWorldPos, chunkVoxels, chunkColumns, true);
 
             WriteToChunkData(chunkVoxels, out voxelData);
 
             chunkVoxels.Dispose();
             chunkColumns.Dispose();
+        }
+
+        /// <summary>
+        ///     The voxels of one chunk-sized block at <paramref name="origin" /> (a multiple of the chunk size is not
+        ///     required: every pass is a function of world coordinates), in pass order: column maps, flora decisions,
+        ///     surface cover, terrain fill, the ores and cave passes, the bottom layer, then the vegetation. Shared by the chunk
+        ///     job and the region queries (slices, cave volume), so they see the same world.
+        /// </summary>
+        /// <param name="vox">Chunk-sized voxel buffer, written completely.</param>
+        /// <param name="columns">Chunk-sized column buffer, written completely.</param>
+        /// <param name="flora">
+        ///     Decide and place the vegetation; without it the flora ring is not sampled and the columns keep no flora
+        ///     species.
+        /// </param>
+        internal static void GenerateVoxels(ref GeneratorConfig config, int3 origin, NativeArray<ushort> vox,
+            NativeArray<ChunkColumn> columns, bool flora){
+            FloraGrid floraGrid = new(flora ? config.WorldGen.FloraPadding : 0, Allocator.Temp);
+
+            PrepareChunkMaps(ref config, ref origin, columns, ref floraGrid);
+            if (flora) DecideFlora(ref floraGrid, columns, origin, config.WorldGen);
+            ApplySurfaceCover(columns, origin, config.WorldGen, floraGrid.Cache);
+
+            FillTerrain(vox, columns, ref config);
+            CaveColumnData caves = default;
+            if (config.WorldGen.Caves.Enabled){
+                PlaceOres(vox, origin, config.WorldGen);
+                caves = new CaveColumnData(floraGrid.Padding, Allocator.Temp);
+                PrepareCaveColumns(ref caves, columns, config.WorldGen);
+                if (flora) RegisterCaveProbes(ref caves, floraGrid, columns, origin, config.WorldGen);
+                CarveCaverns(vox, caves, origin, config.WorldGen);
+                CarveWorms(vox, ref caves, origin, config.WorldGen, floraGrid.Cache);
+                FillLava(vox, caves, origin, config.WorldGen);
+            }
+
+            ApplyBottomLayer(vox, origin, config.WorldGen);
+
+            if (flora) PlaceVegetation(vox, columns, floraGrid, ref caves, origin, ref config);
+
+            caves.Dispose();
             floraGrid.Dispose();
         }
 

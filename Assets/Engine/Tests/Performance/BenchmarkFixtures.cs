@@ -4,6 +4,7 @@ using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Data.Internal;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
+using Engine.Scripts.WorldGen.Caves;
 using Engine.Scripts.WorldGen.Flora;
 using System.Collections.Generic;
 using Engine.Scripts.Data;
@@ -38,6 +39,17 @@ namespace Engine.Tests.Performance{
 
         internal const int Seed = 1337;
 
+        // Cave voxels of UseShippedCaves, above the placeholder flora ids (6…16).
+        internal const ushort CaveLava = 17;
+        internal const ushort CaveOre = 18;
+        internal const ushort CaveBedrock = 19;
+        internal const int CaveTypeCount = 20;
+
+        /// <summary>Host of the shipped ore rules whose host is not the stone: no voxel has this id.</summary>
+        private const ushort UnusedHost = ushort.MaxValue;
+
+        private const string ShippedSettingsPath = "Assets/EngineSettings/WorldGenSettings.asset";
+
         internal static GeneratorConfig CreateGeneratorConfig(Allocator allocator){
             // One Biome-first biome at offset 100 with a small amplitude keeps the surface near y = 100 for the
             // tests that fill terrain here; block ids are patched in because no registry exists in the fixture.
@@ -65,6 +77,8 @@ namespace Engine.Tests.Performance{
                 def.underBlock = Dirt;
                 def.stoneBlock = Stone;
                 worldGen.Biomes[0] = def;
+                worldGen.WaterVoxel = Water;
+                worldGen.IceVoxel = Ice;
 
                 NativeHashMap<FixedString32Bytes, Voxel.VoxelDef> voxels = new(VoxelTypeCount, allocator);
                 voxels.Add("std:air", new Voxel.VoxelDef{ Id = Air, MeshLayer = MeshLayer.Air });
@@ -176,6 +190,8 @@ namespace Engine.Tests.Performance{
                 config.WorldGen.Biomes[b] = def;
             }
 
+            config.WorldGen.WaterVoxel = Water;
+            config.WorldGen.IceVoxel = Ice;
             return config;
         }
 
@@ -364,6 +380,67 @@ namespace Engine.Tests.Performance{
             b.OctaveWeights = weights;
             b.Jaggedness = j;
             return b;
+        }
+
+        /// <summary>
+        ///     Gives a config the cave settings of the shipped asset with its lava, ore rules and bedrock. The lava, every
+        ///     ore and the bedrock take the ids <see cref="CaveLava" />, <see cref="CaveOre" /> and <see cref="CaveBedrock" />,
+        ///     the shipped stone host becomes <see cref="Stone" />, and the other hosts an id no voxel has, so their veins
+        ///     are walked but write nothing. Rows that use it move with the shipped cave tuning.
+        /// </summary>
+        internal static void UseShippedCaves(ref GeneratorConfig config, Allocator allocator){
+            WorldGenSettings shipped = AssetDatabase.LoadAssetAtPath<WorldGenSettings>(ShippedSettingsPath);
+            Assert.IsNotNull(shipped, ShippedSettingsPath);
+            CaveSettings caves = shipped.Caves;
+            Assert.IsNotNull(caves.LavaVoxel, "the shipped caves have lava");
+            HashSet<Voxel> ores = new();
+            foreach (OreRule rule in caves.Ores) ores.Add(rule.Ore);
+
+            ushort Id(Voxel v){
+                if (!v) return 0;
+                if (v == caves.LavaVoxel) return CaveLava;
+                if (v == caves.BedrockVoxel) return CaveBedrock;
+                if (ores.Contains(v)) return CaveOre;
+                return v.name == "Stone" ? Stone : UnusedHost;
+            }
+
+            WorldGenConfig source = shipped.ToConfigWithVoxelIds(Seed, Id, allocator);
+            try{
+                CaveConfig c = source.Caves;
+                c.Ores = new NativeArray<OreRuleDef>(source.Caves.Ores, allocator);
+                config.WorldGen.Caves.Dispose();
+                config.WorldGen.Caves = c;
+            }
+            finally{
+                source.Dispose();
+            }
+        }
+
+        /// <summary>
+        ///     Cave worst case: the cavern and lava masks open everywhere and the largest worm density the settings
+        ///     allow, so every chunk holds halls, lava pockets and as many worms as can reach it.
+        /// </summary>
+        internal static void MakeCaveWorstCase(ref CaveConfig caves){
+            caves.CavernMaskThreshold = -1f;
+            caves.LavaMaskThreshold = -1f;
+            caves.WormsPerCell = Worms.PrimariesPerCell;
+        }
+
+        /// <summary>
+        ///     Render definitions of the fixture voxels and the cave voxels of <see cref="UseShippedCaves" />, with the
+        ///     mesh layer and collision of the shipped lava.
+        /// </summary>
+        internal static VoxelEngineRenderGenData CreateCaveRenderGenData(Allocator allocator){
+            Voxel lava = AssetDatabase.LoadAssetAtPath<WorldGenSettings>(ShippedSettingsPath).Caves.LavaVoxel;
+            VoxelEngineRenderGenData data = CreateRenderGenData(allocator);
+            NativeArray<Voxel.VoxelDef> defs = new(CaveTypeCount, allocator);
+            NativeArray<Voxel.VoxelDef>.Copy(data.VoxelRenderDefs, defs, VoxelTypeCount);
+            data.VoxelRenderDefs.Dispose();
+            defs[CaveLava] = new Voxel.VoxelDef{ Id = CaveLava, MeshLayer = lava.meshLayer, Collision = lava.collision };
+            defs[CaveOre] = new Voxel.VoxelDef{ Id = CaveOre, MeshLayer = MeshLayer.Solid, Collision = true };
+            defs[CaveBedrock] = new Voxel.VoxelDef{ Id = CaveBedrock, MeshLayer = MeshLayer.Solid, Collision = true };
+            data.VoxelRenderDefs = defs;
+            return data;
         }
 
         /// <summary>

@@ -68,6 +68,9 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Tooltip("Water surface level in world Y. Water fills every column up to this level.")]
         public int WaterLevel = 124;
 
+        [Tooltip("Voxel that fills every column up to the water level.")]
+        public VoxelConfig.Data.Voxel.Voxel WaterVoxel;
+
         [Tooltip("Wavelength of detail octave i in blocks. Length = K.")]
         public float[] OctaveWavelengths ={ 512f, 256f, 128f, 64f, 32f, 16f };
 
@@ -151,6 +154,9 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Header("Snow and ice")]
         [Tooltip("Run the snow and ice overrides after terrain fill.")]
         public bool EnableClimateOverrides = true;
+
+        [Tooltip("Voxel of the frozen water surface.")]
+        public VoxelConfig.Data.Voxel.Voxel IceVoxel;
 
         [Tooltip("Water freezes and dry columns take their biome's snow block where the effective temperature lies below this.")]
         [Range(0f, 1f)]
@@ -238,6 +244,10 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Min(0f)]
         public float GroundDetailsDensityContrast = 2f;
 
+        [Header("Caves")]
+        [Tooltip("Caves, lava, ores and the bedrock floor below the surface.")]
+        public CaveSettings Caves = new();
+
         [Header("Assets")]
         [Tooltip("Active biomes. Indices in jobs are indices into this set.")]
         public BiomeSet Biomes;
@@ -264,6 +274,9 @@ namespace Engine.Scripts.WorldGen.Settings{
                 Debug.LogWarning($"{name}: {field} must be positive and finite, got {value}.", this);
             foreach ((string field, float value) in InvalidBlendStrengths(HeightMethod))
                 Debug.LogWarning($"{name}: {field} is invalid for the selected blend method, got {value}.", this);
+            if (Caves != null)
+                foreach ((string field, string problem) in Caves.InvalidRanges())
+                    Debug.LogWarning($"{name}: Caves.{field} {problem}.", this);
         }
 
         /// <summary>
@@ -286,6 +299,9 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (!IsPositiveFinite(FlowersDensityWavelength)) yield return (nameof(FlowersDensityWavelength), FlowersDensityWavelength);
             if (!IsPositiveFinite(GroundDetailsDensityWavelength))
                 yield return (nameof(GroundDetailsDensityWavelength), GroundDetailsDensityWavelength);
+            if (Caves != null)
+                foreach ((string field, float value) in Caves.InvalidScales())
+                    yield return (nameof(Caves) + "." + field, value);
             // Not a divisor, but 0 flattens every climate field and a negative value mirrors the world.
             if (!IsPositiveFinite(ClimateFrequencyScale)) yield return (nameof(ClimateFrequencyScale), ClimateFrequencyScale);
 

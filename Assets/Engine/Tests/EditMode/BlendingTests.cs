@@ -487,6 +487,8 @@ namespace Engine.Tests.EditMode{
                 yield return new TestCaseData(GenArchitecture.BiomeFirst, material, height);
         }
 
+        [Category(TestTiers.Slow)]
+        [Explicit(TestTiers.SlowReason)]
         [TestCaseSource(nameof(StageCombinations))]
         public void WeightsAreNormalisedForEveryMethodAndStage(GenArchitecture architecture, BlendMethod material, BlendMethod height){
             // Σ w = 1 ± 1e−5 and w ≥ 0 for both stages; inactive slots stay zero.
@@ -526,6 +528,8 @@ namespace Engine.Tests.EditMode{
 
         // --- Lattice cache vs pure sampler ----------------------------------------------------------------------------
 
+        [Category(TestTiers.Slow)]
+        [Explicit(TestTiers.SlowReason)]
         [Test]
         public void CachedLatticeIsBitIdenticalToThePureSampler(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,

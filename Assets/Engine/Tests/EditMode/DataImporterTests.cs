@@ -284,11 +284,16 @@ namespace Engine.Tests.EditMode{
         public void ShippedWorldGenSettings_EveryTreeSpeciesGrows_AndPicksEveryVariant(){
             // The same 4096² area at stride 8: every shipped tree species is planted somewhere. The variant pick is a
             // hash of the anchor, so every variant is checked at all sampled columns; rare species (boulders) have
-            // too few anchors in the sample to pick each of their variants there.
+            // too few anchors in the sample to pick each of their variants there. A species the stride-8 sample
+            // misses (a boulder every 25 000 to 100 000 columns, a few expected in the sample) gets a second pass at
+            // stride 1 over the 512² window where the biome of its most likely rule covers the most sampled columns.
             LoadPackages();
             WorldGenConfig cfg = ShippedConfig(out WorldGenSettings settings);
             const int n = 512;
-            RegionBuffers buffers = new(){ FloraSpecies = new NativeArray<ushort>(n * n, Allocator.TempJob) };
+            RegionBuffers buffers = new(){
+                FloraSpecies = new NativeArray<ushort>(n * n, Allocator.TempJob),
+                HardBiome = new NativeArray<int>(n * n, Allocator.TempJob)
+            };
             try{
                 WorldGenRequest request = new(){ Config = cfg, Origin = new int2(-2048, -2048), Size = new int2(n, n), Stride = 8 };
                 WorldGenApi.SampleRegion(request, ref buffers).Complete();
@@ -305,11 +310,19 @@ namespace Engine.Tests.EditMode{
                 }
 
                 string[] names = settings.FloraSpeciesNames();
+                List<string> passes = new();
+                for (int t = 0; t < grown.Length; t++){
+                    if (grown[t] > 0) continue;
+                    int2 origin = DensestWindow(cfg, LikeliestBiome(cfg, t), buffers.HardBiome, request, n / 8);
+                    grown[t] = CountTree(cfg, treeOf, t, origin, n);
+                    passes.Add($"{settings.ActiveBiomes()[LikeliestBiome(cfg, t)].name} window at {origin} at stride 1 for tree {t}");
+                }
+
                 string summary = string.Join(", ", treeOf.Select(kv => {
                     TreeSpeciesDef s = cfg.TreeSpecies[kv.Value];
                     return $"{names[kv.Key]}: {grown[kv.Value]} grown, " +
                            string.Join("/", Enumerable.Range(s.VariantStart, s.VariantCount).Select(v => picks[v]));
-                }));
+                })) + (passes.Count > 0 ? "; " + string.Join(", ", passes) : "");
                 TestContext.WriteLine(summary);
                 Assert.AreEqual(cfg.TreeSpecies.Length, treeOf.Count, "every tree species has a rule");
                 for (int t = 0; t < grown.Length; t++) Assert.Greater(grown[t], 0, $"tree species {t} never grows ({summary})");
@@ -317,7 +330,65 @@ namespace Engine.Tests.EditMode{
             }
             finally{
                 buffers.FloraSpecies.Dispose();
+                buffers.HardBiome.Dispose();
                 cfg.Dispose();
+            }
+        }
+
+        /// <summary>Biome whose rule for tree species <paramref name="tree" /> has the highest probability.</summary>
+        private static int LikeliestBiome(in WorldGenConfig cfg, int tree){
+            int best = -1;
+            float probability = -1f;
+            for (int b = 0; b < cfg.Biomes.Length; b++){
+                Biome.BiomeDef def = cfg.Biomes[b];
+                for (int r = def.floraRuleStart; r < def.floraRuleStart + def.floraRuleCount; r++){
+                    FloraRuleDef rule = cfg.FloraRules[r];
+                    if (rule.Tree != tree || rule.Probability <= probability) continue;
+                    probability = rule.Probability;
+                    best = b;
+                }
+            }
+
+            Assert.GreaterOrEqual(best, 0, $"tree species {tree} has a rule in some biome");
+            return best;
+        }
+
+        /// <summary>
+        ///     Block origin of the <paramref name="window" /> × <paramref name="window" /> sample window (in samples of
+        ///     <paramref name="request" />) in which <paramref name="biome" /> is the hard biome of the most columns.
+        /// </summary>
+        private static int2 DensestWindow(in WorldGenConfig cfg, int biome, NativeArray<int> hardBiome, in WorldGenRequest request,
+            int window){
+            int n = request.Size.x, best = -1;
+            int2 origin = default;
+            for (int wx = 0; wx + window <= n; wx += window)
+            for (int wz = 0; wz + window <= n; wz += window){
+                int count = 0;
+                for (int ix = wx; ix < wx + window; ix++)
+                for (int iz = wz; iz < wz + window; iz++)
+                    if (hardBiome[iz * n + ix] == biome) count++;
+                if (count <= best) continue;
+                best = count;
+                origin = request.Origin + new int2(wx, wz) * request.Stride;
+            }
+
+            Assert.Greater(best, 0, $"biome {biome} is the hard biome of some sampled column");
+            return origin;
+        }
+
+        /// <summary>Columns of the <paramref name="size" />² block window at <paramref name="origin" /> that grow tree species <paramref name="tree" />.</summary>
+        private static int CountTree(in WorldGenConfig cfg, Dictionary<int, int> treeOf, int tree, int2 origin, int size){
+            RegionBuffers buffers = new(){ FloraSpecies = new NativeArray<ushort>(size * size, Allocator.TempJob) };
+            try{
+                WorldGenRequest request = new(){ Config = cfg, Origin = origin, Size = new int2(size, size), Stride = 1 };
+                WorldGenApi.SampleRegion(request, ref buffers).Complete();
+                int count = 0;
+                for (int i = 0; i < size * size; i++)
+                    if (treeOf.TryGetValue(buffers.FloraSpecies[i], out int t) && t == tree) count++;
+                return count;
+            }
+            finally{
+                buffers.FloraSpecies.Dispose();
             }
         }
     }

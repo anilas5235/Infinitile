@@ -212,6 +212,8 @@ namespace Engine.Tests.EditMode{
 
         #region Periodicity
 
+        [Category(TestTiers.Slow)]
+        [Explicit(TestTiers.SlowReason)]
         [Test]
         public void DetailOctavesAndPeak_HaveNoSecondaryAutocorrelationPeak(){
             for (int i = 0; i < _wavelengths.Length; i++){
@@ -225,6 +227,8 @@ namespace Engine.Tests.EditMode{
                 p => PeakNoise.Sample(p, PeakNoise.DefaultWavelength, Seed));
         }
 
+        [Category(TestTiers.Slow)]
+        [Explicit(TestTiers.SlowReason)]
         [Test]
         public void Fields_HaveNoSecondaryAutocorrelationPeak(){
             // Base-octave scales as in CreateClimate. Each field is evaluated through its own noise instance (the continental

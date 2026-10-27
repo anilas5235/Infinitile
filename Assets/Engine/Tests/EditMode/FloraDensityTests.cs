@@ -141,6 +141,8 @@ namespace Engine.Tests.EditMode{
             Assert.Greater(full, 1000, "columns with a high noise factor");
         }
 
+        [Category(TestTiers.Slow)]
+        [Explicit(TestTiers.SlowReason)]
         [Test]
         public void PreFilter_HoldsEveryMultiBlockCandidate(){
             // Dense rules on every noise, probabilities that exceed 1 where the noises are high.

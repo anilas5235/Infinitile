@@ -1,4 +1,4 @@
-using Engine.Scripts.Data;
+﻿using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
@@ -6,6 +6,7 @@ using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Data.Internal;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
+using Engine.Scripts.WorldGen.Caves;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -54,6 +55,7 @@ namespace Engine.Tests.EditMode{
                 def.underBlock = Dirt;
                 def.stoneBlock = Stone;
                 worldGen.Biomes[0] = def;
+                SetFillVoxels(ref worldGen);
 
                 NativeHashMap<FixedString32Bytes, Voxel.VoxelDef> voxels = new(VoxelTypeCount, allocator);
                 voxels.Add("std:air", new Voxel.VoxelDef{ Id = Air, MeshLayer = MeshLayer.Air });
@@ -73,6 +75,24 @@ namespace Engine.Tests.EditMode{
                 Object.DestroyImmediate(set);
                 Object.DestroyImmediate(settings);
             }
+        }
+
+        /// <summary>
+        ///     A worm carved the top block of column (x, z) with top block <paramref name="height" />. Tests that check
+        ///     surface blocks of the chunk job skip these columns and keep caves on; elsewhere the surface blocks are
+        ///     those of the uncarved column.
+        /// </summary>
+        internal static bool SurfaceCarved(int x, int z, int height, in WorldGenConfig cfg){
+            return cfg.Caves.Enabled && CaveCarving.IsCarved(x, height, z, cfg);
+        }
+
+        /// <summary>
+        ///     Sets the water and ice ids of a config built without an id table (<c>ToConfig(seed, null)</c>) to the
+        ///     fixture's <see cref="Water" /> and <see cref="Ice" />.
+        /// </summary>
+        internal static void SetFillVoxels(ref WorldGenConfig cfg){
+            cfg.WaterVoxel = Water;
+            cfg.IceVoxel = Ice;
         }
 
         /// <summary>

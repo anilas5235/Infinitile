@@ -33,6 +33,7 @@ namespace Player{
         private void FixedUpdate(){
             if (destruct){
                 if (!GetLookAtVoxelPos(out Vector3Int voxelWorldPos, out _)) return;
+                if (IsUnbreakable(VoxelWorld.Instance.GetVoxel(voxelWorldPos.Int3()))) return;
                 VoxelWorld.Instance.SetVoxel(0, voxelWorldPos);
             }
             else if (place){
@@ -42,6 +43,12 @@ namespace Player{
                     hitInfo.point, _camera.transform.forward);
                 VoxelWorld.Instance.SetVoxel(id, voxelWorldPos);
             }
+        }
+
+        /// <summary>True when the voxel (or the base of a turned variant) is flagged unbreakable.</summary>
+        private static bool IsUnbreakable(ushort id){
+            return DataImporter.Instance.VoxelRegistry.TryGet(id, out Engine.Scripts.VoxelConfig.Data.Voxel.Voxel so) &&
+                   so.unbreakable;
         }
 
         private void OnEnable(){
