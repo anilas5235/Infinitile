@@ -455,11 +455,8 @@ namespace Engine.Scripts.Render{
                 request.Reset(partition);
                 request.CollectLists(_voxelLists, _lightLists);
 
-                if (!request.IsValid){
-                    VoxelEngineLogger.Error<VoxelWorldRenderer>(
-                        $"Skipping partition {partition} due to missing neighbor data.");
-                    continue;
-                }
+                // A chunk of the 3 x 3 neighbourhood was unloaded since the request; the relight re-requests the build.
+                if (!request.IsValid) continue;
 
                 PointBuilderHandler handler = _pointBuilderHandlers[i];
                 try{

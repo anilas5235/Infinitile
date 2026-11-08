@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using Engine.Scripts.Behaviour;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.ColliderBake;
@@ -14,6 +15,7 @@ using NUnit.Framework;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.TestTools;
 using static Engine.Scripts.Utils.VoxelConstants;
 using Object = UnityEngine.Object;
@@ -260,6 +262,67 @@ namespace Engine.Tests.PlayMode{
             for (int y = 0; y < PartitionsPerChunk; y++)
                 Assert.IsFalse(pool.IsPartitionActive(new int3(target.x, y, target.z)), $"partition {y} must be reclaimed");
             Assert.AreEqual(1, evictions, "ChunkEvicted must be raised exactly once");
+        }
+
+        [UnityTest]
+        [Timeout(120000)]
+        public IEnumerator PartitionBuild_WithUnloadedNeighbour_IsDroppedWithoutError(){
+            // Guards the flaky UnloadChunk tests: a partition build queued before a neighbouring chunk was unloaded
+            // finds no voxel or light lists for it. The renderer must drop that build quietly (the neighbour's
+            // relight requests it again); an error log fails whichever test happens to be running.
+            VoxelWorld world = VoxelWorld.Instance;
+            VoxelWorldRenderer renderer = VoxelWorldRenderer.Instance;
+            Assert.IsNotNull(renderer, "VoxelWorldRenderer missing in scene");
+            Dictionary<int2, IntervalRange> voxelLists =
+                PlayModeFixtures.GetPrivateField<Dictionary<int2, IntervalRange>>(renderer, "_voxelLists");
+            Dictionary<int2, IntervalRange> lightLists =
+                PlayModeFixtures.GetPrivateField<Dictionary<int2, IntervalRange>>(renderer, "_lightLists");
+            HashSet<int3> pendingBuilds = PlayModeFixtures.GetPrivateField<HashSet<int3>>(renderer, "_pendingBuildSet");
+            Type rendererType = typeof(VoxelWorldRenderer);
+            MethodInfo updatePartitions = PlayModeFixtures.GetPrivateMethod(rendererType, "UpdatePartitions");
+            MethodInfo startBuilds = PlayModeFixtures.GetPrivateMethod(rendererType, "StartPendingPartitionBuilds");
+            MethodInfo completeBuilds = PlayModeFixtures.GetPrivateMethod(rendererType, "CompleteFinishedPartitionBuilds");
+
+            // Every chunk of the +x neighbour's 3 x 3 neighbourhood (the focus chunk included) needs voxel and light
+            // lists, as when the mesh scheduler requests a build, so after the unload its builds lack exactly the
+            // focus chunk.
+            int2 target;
+            int2 neighbour;
+            float deadline = Time.realtimeSinceStartup + 60f;
+            while (true){
+                target = world.Focus.Pos.xz;
+                neighbour = target + new int2(1, 0);
+                bool ready = world.ChunkManager.IsChunkLoaded(target);
+                for (int x = -1; x <= 1 && ready; x++)
+                for (int z = -1; z <= 1 && ready; z++){
+                    int2 chunk = neighbour + new int2(x, z);
+                    ready = voxelLists.ContainsKey(chunk) && lightLists.ContainsKey(chunk);
+                }
+
+                if (ready) break;
+                if (Time.realtimeSinceStartup > deadline) Assert.Fail("the +x neighbour's 3 x 3 chunks have no render lists");
+                yield return null;
+            }
+
+            // One frame: unload the focus chunk, then queue builds of the neighbour's partitions, as if the mesh
+            // scheduler had requested them just before the unload.
+            world.ChunkManager.UnloadChunk(target);
+            Assert.IsFalse(voxelLists.ContainsKey(target), "the renderer must release the unloaded chunk's lists");
+            HashSet<int3> partitions = new();
+            for (int y = 0; y < PartitionsPerChunk; y++) partitions.Add(new int3(neighbour.x, y, neighbour.y));
+            updatePartitions.Invoke(renderer, new object[]{ partitions });
+            Assert.IsTrue(pendingBuilds.IsSupersetOf(partitions), "the neighbour's builds must be queued");
+
+            // Pump the renderer until those builds are dequeued (in-flight slots free up as read-backs finish).
+            // Without the fix the dequeue logs "Neighbor voxel data ... not found", and the test runner fails the
+            // test on that unexpected error by itself.
+            for (int i = 0; i < 4096 && pendingBuilds.Overlaps(partitions); i++){
+                AsyncGPUReadback.WaitAllRequests();
+                completeBuilds.Invoke(renderer, null);
+                startBuilds.Invoke(renderer, null);
+            }
+
+            Assert.IsFalse(pendingBuilds.Overlaps(partitions), "the queued builds were never dequeued");
         }
 
         #endregion
