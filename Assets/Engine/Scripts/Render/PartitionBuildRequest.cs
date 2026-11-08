@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Engine.Scripts.Utils.Logger;
 using Unity.Mathematics;
 using static Engine.Scripts.Utils.VoxelConstants;
 
@@ -67,7 +66,11 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     Collects the voxel data and light lists of all required neighboring chunks.
+        ///     Collects the voxel data and light lists of all required neighboring chunks and sets
+        ///     <see cref="IsValid" />. A chunk without voxel or light lists (unloaded after the build was requested)
+        ///     makes the request invalid. The caller drops an invalid request without logging: unloading a chunk
+        ///     invalidates the light of its lit neighbours, and their relight flags their partitions for remeshing,
+        ///     which requests the build again.
         /// </summary>
         /// <param name="voxelLists">Dictionary mapping chunk positions to their voxel interval lists.</param>
         /// <param name="lightLists">Dictionary mapping chunk positions to their light interval lists.</param>
@@ -78,17 +81,7 @@ namespace Engine.Scripts.Render{
             for (int i = 0; i < RequiredChunks.Length; i++){
                 int2 chunkPos = mainChunkPos + RequiredChunks[i];
                 bool success = voxelLists.TryGetValue(chunkPos, out _voxelLists[i]);
-                if (!success){
-                    VoxelEngineLogger.Error<PartitionBuildRequest>(
-                        $"Neighbor voxel data for partition {Partition} not found at {chunkPos}.");
-                }
-
                 bool lit = lightLists.TryGetValue(chunkPos, out _lightLists[i]);
-                if (!lit){
-                    VoxelEngineLogger.Error<PartitionBuildRequest>(
-                        $"Neighbor light for partition {Partition} not found at {chunkPos}.");
-                }
-
                 IsValid &= success && lit;
             }
         }
