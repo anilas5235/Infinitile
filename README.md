@@ -117,6 +117,9 @@ The world generation specification is [Docs/WorldGenSpec.html](Docs/WorldGenSpec
 engine rules (Part E), the engine cleanup, implemented ideas and planned generation improvements (Part II, §15–17) and the research tooling (Part III). It
 lives outside `Assets` so Unity does not import it.
 
+How the owner and the coordinating agent organise a spec phase (roles, branches, briefs, Editor rules, proofs) is
+in [Docs/CoordinatorWorkflow.md](Docs/CoordinatorWorkflow.md).
+
 Each document includes visual diagrams showing data flow and component interactions.
 
 ## License
