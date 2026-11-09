@@ -21,11 +21,11 @@ MonoBehaviour:
   StrataBlock: {fileID: 11400000, guid: eeed6c09b1b96c04faeab22d816e1b62, type: 2}
   BeachBlock: {fileID: 11400000, guid: b5df436b2cc46cf419e666fccd2d96b3, type: 2}
   BeachHeight: 3
-  TargetHumidity: 0.1
-  TargetTemperature: 0.9
+  TargetHumidity: 0.12
+  TargetTemperature: 0.72
   TargetContinental: 0.45
-  TargetErosion: 0.6
-  TargetPV: 0
+  TargetErosion: 0.65
+  TargetPV: -0.2
   TargetHeight: 0.45
   HeightOffset: 134
   HeightAmplitude: 8

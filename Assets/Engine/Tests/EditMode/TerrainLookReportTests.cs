@@ -24,7 +24,7 @@ namespace Engine.Tests.EditMode{
     ///     water darkened. It prints values and sets no limits.
     ///     <para>
     ///         Every configuration is a transient copy of the shipped settings (biomes and splines copied as well), so
-    ///         the assets are never written. <see cref="Candidates" /> holds the tuning candidates of 2026-11-09.
+    ///         the assets are never written. <see cref="Candidates" /> lists the configurations.
     ///     </para>
     /// </summary>
     [Category(TestTiers.Report)]
@@ -47,162 +47,14 @@ namespace Engine.Tests.EditMode{
 
         // --- Candidates ---------------------------------------------------------------------------------------------
 
-        /// <summary>The configurations by name; "A" is the shipped asset unchanged.</summary>
+        /// <summary>
+        ///     The configurations by name; "Shipped" is the asset unchanged. To compare a tuning idea, add an entry that
+        ///     changes the copy (fields, <c>Splines.FromJson</c>, biome targets via <see cref="BiomeOf" />). The
+        ///     candidates B, C and D of 2026-11-09 are in the commit that added this test; C is now the shipped asset.
+        /// </summary>
         private static readonly Dictionary<string, Action<WorldGenSettings>> Candidates = new(){
-            ["A"] = _ => { },
-            ["B"] = s => {
-                ReliefB(s);
-                OceanFix(s);
-                ClimateTargetsB(s);
-            },
-            ["C"] = s => {
-                ReliefC(s);
-                OceanFix(s);
-                ClimateTargetsB(s);
-            },
-            ["D"] = s => {
-                ReliefB(s);
-                OceanFix(s);
-            }
+            ["Shipped"] = _ => { }
         };
-
-        /// <summary>Splines with their knots inside the field ranges actually reached (E p5–p95 0.27–0.74, C p95 0.68).</summary>
-        internal const string SplinesB = @"{
-  ""Notes"": ""Tuning 2026-11-09 (candidate B): knots inside the reached field ranges, coast at C 0.36, relief and ridges inland."",
-  ""Offset"": {""Axis"": ""C"", ""Points"": [
-    {""X"": 0.05, ""Value"": 78},
-    {""X"": 0.2, ""Value"": 100},
-    {""X"": 0.3, ""Value"": 114},
-    {""X"": 0.36, ""Value"": 123},
-    {""X"": 0.42, ""Value"": {""Axis"": ""E"", ""Points"": [
-      {""X"": 0.3, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": -1, ""Value"": 124}, {""X"": 0, ""Value"": 133}, {""X"": 1, ""Value"": 146}]}},
-      {""X"": 0.5, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": -1, ""Value"": 125}, {""X"": 0, ""Value"": 130}, {""X"": 1, ""Value"": 137}]}},
-      {""X"": 0.7, ""Value"": 129}]}},
-    {""X"": 0.55, ""Value"": {""Axis"": ""E"", ""Points"": [
-      {""X"": 0.3, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": -1, ""Value"": 127}, {""X"": 0, ""Value"": 148}, {""X"": 1, ""Value"": 178}]}},
-      {""X"": 0.5, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": -1, ""Value"": 127}, {""X"": 0, ""Value"": 139}, {""X"": 1, ""Value"": 156}]}},
-      {""X"": 0.7, ""Value"": 136}]}},
-    {""X"": 0.7, ""Value"": {""Axis"": ""E"", ""Points"": [
-      {""X"": 0.3, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": -1, ""Value"": 134}, {""X"": 0, ""Value"": 168}, {""X"": 1, ""Value"": 200}]}},
-      {""X"": 0.5, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": -1, ""Value"": 134}, {""X"": 0, ""Value"": 152}, {""X"": 1, ""Value"": 176}]}},
-      {""X"": 0.7, ""Value"": 145}]}}]},
-  ""Amp"": {""Axis"": ""C"", ""Points"": [
-    {""X"": 0.1, ""Value"": 8},
-    {""X"": 0.33, ""Value"": 3},
-    {""X"": 0.42, ""Value"": {""Axis"": ""E"", ""Points"": [{""X"": 0.3, ""Value"": 14}, {""X"": 0.5, ""Value"": 9}, {""X"": 0.7, ""Value"": 5}]}},
-    {""X"": 0.6, ""Value"": {""Axis"": ""E"", ""Points"": [{""X"": 0.3, ""Value"": 24}, {""X"": 0.5, ""Value"": 14}, {""X"": 0.7, ""Value"": 7}]}},
-    {""X"": 0.75, ""Value"": {""Axis"": ""E"", ""Points"": [{""X"": 0.3, ""Value"": 30}, {""X"": 0.7, ""Value"": 10}]}}]},
-  ""Jaggedness"": {""Axis"": ""C"", ""Points"": [
-    {""X"": 0.45, ""Value"": 0},
-    {""X"": 0.55, ""Value"": {""Axis"": ""E"", ""Points"": [
-      {""X"": 0.3, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": 0, ""Value"": 0}, {""X"": 1, ""Value"": 30}]}},
-      {""X"": 0.5, ""Value"": 0}]}},
-    {""X"": 0.7, ""Value"": {""Axis"": ""E"", ""Points"": [
-      {""X"": 0.3, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": -0.5, ""Value"": 5}, {""X"": 1, ""Value"": 55}]}},
-      {""X"": 0.5, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": 0, ""Value"": 0}, {""X"": 1, ""Value"": 20}]}},
-      {""X"": 0.65, ""Value"": 0}]}}]}
-}";
-
-        /// <summary>Candidate C: higher and sharper mountains, deeper sea, larger continents and erosion zones.</summary>
-        internal const string SplinesC = @"{
-  ""Notes"": ""Tuning 2026-11-09 (candidate C): dramatic relief, deep sea, mountains to about 240."",
-  ""Offset"": {""Axis"": ""C"", ""Points"": [
-    {""X"": 0.05, ""Value"": 66},
-    {""X"": 0.2, ""Value"": 92},
-    {""X"": 0.3, ""Value"": 112},
-    {""X"": 0.36, ""Value"": 123},
-    {""X"": 0.42, ""Value"": {""Axis"": ""E"", ""Points"": [
-      {""X"": 0.3, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": -1, ""Value"": 124}, {""X"": 0, ""Value"": 136}, {""X"": 1, ""Value"": 155}]}},
-      {""X"": 0.5, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": -1, ""Value"": 125}, {""X"": 0, ""Value"": 131}, {""X"": 1, ""Value"": 140}]}},
-      {""X"": 0.7, ""Value"": 129}]}},
-    {""X"": 0.55, ""Value"": {""Axis"": ""E"", ""Points"": [
-      {""X"": 0.3, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": -1, ""Value"": 126}, {""X"": 0, ""Value"": 158}, {""X"": 1, ""Value"": 200}]}},
-      {""X"": 0.5, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": -1, ""Value"": 127}, {""X"": 0, ""Value"": 143}, {""X"": 1, ""Value"": 165}]}},
-      {""X"": 0.7, ""Value"": 138}]}},
-    {""X"": 0.7, ""Value"": {""Axis"": ""E"", ""Points"": [
-      {""X"": 0.3, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": -1, ""Value"": 135}, {""X"": 0, ""Value"": 178}, {""X"": 1, ""Value"": 205}]}},
-      {""X"": 0.5, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": -1, ""Value"": 135}, {""X"": 0, ""Value"": 160}, {""X"": 1, ""Value"": 190}]}},
-      {""X"": 0.7, ""Value"": 150}]}}]},
-  ""Amp"": {""Axis"": ""C"", ""Points"": [
-    {""X"": 0.1, ""Value"": 12},
-    {""X"": 0.33, ""Value"": 3},
-    {""X"": 0.42, ""Value"": {""Axis"": ""E"", ""Points"": [{""X"": 0.3, ""Value"": 18}, {""X"": 0.5, ""Value"": 10}, {""X"": 0.7, ""Value"": 5}]}},
-    {""X"": 0.6, ""Value"": {""Axis"": ""E"", ""Points"": [{""X"": 0.3, ""Value"": 30}, {""X"": 0.5, ""Value"": 16}, {""X"": 0.7, ""Value"": 8}]}},
-    {""X"": 0.75, ""Value"": {""Axis"": ""E"", ""Points"": [{""X"": 0.3, ""Value"": 34}, {""X"": 0.7, ""Value"": 12}]}}]},
-  ""Jaggedness"": {""Axis"": ""C"", ""Points"": [
-    {""X"": 0.42, ""Value"": 0},
-    {""X"": 0.55, ""Value"": {""Axis"": ""E"", ""Points"": [
-      {""X"": 0.3, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": -0.2, ""Value"": 0}, {""X"": 1, ""Value"": 45}]}},
-      {""X"": 0.5, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": 0.2, ""Value"": 0}, {""X"": 1, ""Value"": 15}]}}]}},
-    {""X"": 0.7, ""Value"": {""Axis"": ""E"", ""Points"": [
-      {""X"": 0.3, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": -0.5, ""Value"": 10}, {""X"": 1, ""Value"": 60}]}},
-      {""X"": 0.5, ""Value"": {""Axis"": ""PV"", ""Points"": [{""X"": 0, ""Value"": 0}, {""X"": 1, ""Value"": 30}]}},
-      {""X"": 0.65, ""Value"": 0}]}}]}
-}";
-
-        /// <summary>Relief of B: the splines above, rougher detail octaves and wider ridges.</summary>
-        private static void ReliefB(WorldGenSettings s){
-            s.Splines.FromJson(SplinesB);
-            s.GlobalOctaveWeights = new[]{ 1f, 0.55f, 0.3f, 0.17f, 0.1f, 0.05f };
-            s.PeakWavelength = 256f;
-        }
-
-        /// <summary>Relief of C: dramatic splines, larger continents and erosion zones, ridges as in B.</summary>
-        private static void ReliefC(WorldGenSettings s){
-            s.Splines.FromJson(SplinesC);
-            s.GlobalOctaveWeights = new[]{ 1f, 0.55f, 0.3f, 0.17f, 0.1f, 0.05f };
-            s.PeakWavelength = 288f;
-            s.continentalLayer.baseNoise.scale = 3200f;
-            s.erosionProfile.scale = 1600f;
-        }
-
-        /// <summary>
-        ///     Ocean wins where the ground is under water: height decides (λ_h 1 → 4) and Ocean's climate targets move to
-        ///     the field medians, so no climate dimension keeps it out of the sea.
-        /// </summary>
-        private static void OceanFix(WorldGenSettings s){
-            s.LambdaHeight = 4f;
-            Biome ocean = BiomeOf(s, "Ocean");
-            ocean.TargetHumidity = 0.35f;
-            ocean.TargetContinental = 0.28f;
-            ocean.TargetHeight = 0.3f;
-        }
-
-        /// <summary>
-        ///     Climate targets inside the reached field ranges (T p5–p95 0.22–0.79, F 0.06–0.60), mountains by height,
-        ///     and climate zones about 1.6 times larger.
-        /// </summary>
-        private static void ClimateTargetsB(WorldGenSettings s){
-            s.temperatureProfile.scale = 1400f;
-            s.humidityProfile.scale = 1100f;
-            Biome plains = BiomeOf(s, "Plains");
-            plains.TargetHumidity = 0.3f;
-            plains.TargetErosion = 0.6f;
-            plains.TargetHeight = 0.45f;
-            Biome forest = BiomeOf(s, "Forest");
-            forest.TargetHumidity = 0.5f;
-            forest.TargetErosion = 0.5f;
-            forest.TargetHeight = 0.45f;
-            Biome desert = BiomeOf(s, "Desert");
-            desert.TargetTemperature = 0.72f;
-            desert.TargetHumidity = 0.12f;
-            desert.TargetErosion = 0.65f;
-            desert.TargetPV = -0.2f;
-            desert.TargetHeight = 0.45f;
-            Biome mountain = BiomeOf(s, "Mountain");
-            mountain.TargetHumidity = 0.3f;
-            mountain.TargetContinental = 0.62f;
-            mountain.TargetErosion = 0.3f;
-            mountain.TargetPV = 0.5f;
-            mountain.TargetHeight = 0.7f;
-            Biome snow = BiomeOf(s, "Snow");
-            snow.TargetTemperature = 0.12f;
-            snow.TargetHumidity = 0.3f;
-            snow.TargetContinental = 0.55f;
-            snow.TargetErosion = 0.5f;
-            snow.TargetPV = 0f;
-            snow.TargetHeight = 0.45f;
-        }
 
         private static IEnumerable<string> CandidateNames => Candidates.Keys;
 

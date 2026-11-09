@@ -27,7 +27,7 @@ MonoBehaviour:
   LambdaContinental: 2
   LambdaErosion: 1
   LambdaPV: 0.5
-  LambdaHeight: 1
+  LambdaHeight: 4
   HeightMin: 50
   HeightMax: 250
   WaterLevel: 124
@@ -41,27 +41,27 @@ MonoBehaviour:
   - 16
   GlobalOctaveWeights:
   - 1
-  - 0.5
-  - 0.25
-  - 0.125
-  - 0.0625
-  - 0.03125
-  PeakWavelength: 192
+  - 0.55
+  - 0.3
+  - 0.17
+  - 0.1
+  - 0.05
+  PeakWavelength: 288
   WGain: 1.6
   ClimateFrequencyScale: 0.85
   temperatureProfile:
-    scale: 900
+    scale: 1400
     persistance: 0.5
     lacunarity: 2
     octaves: 3
   humidityProfile:
-    scale: 700
+    scale: 1100
     persistance: 0.5
     lacunarity: 2
     octaves: 3
   continentalLayer:
     baseNoise:
-      scale: 2500
+      scale: 3200
       persistance: 0.5
       lacunarity: 2
       octaves: 5
@@ -143,7 +143,7 @@ MonoBehaviour:
   ContinentalHumidityInfluence: 0.4
   ContinentalTemperatureInfluence: 0.6
   erosionProfile:
-    scale: 1200
+    scale: 1600
     persistance: 0.5
     lacunarity: 2
     octaves: 4

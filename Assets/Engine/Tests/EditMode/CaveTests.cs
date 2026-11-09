@@ -503,7 +503,8 @@ namespace Engine.Tests.EditMode{
             _config = Build();
             WorldGenConfig cfg = _config.WorldGen;
             ref readonly CaveConfig c = ref cfg.Caves;
-            List<(int2 start, Worm worm)> entrances = WormsIn(new int2(-2, -2), new int2(2, 2), cfg)
+            // The cells lie on land in the shipped world (x 640–959, z 320–639); a start under water is never an entrance.
+            List<(int2 start, Worm worm)> entrances = WormsIn(new int2(10, 5), new int2(14, 9), cfg)
                 .Where(w => w.worm.ShaftAbove != int.MaxValue)
                 .ToList();
             TestContext.WriteLine($"{entrances.Count} entrance worms");
