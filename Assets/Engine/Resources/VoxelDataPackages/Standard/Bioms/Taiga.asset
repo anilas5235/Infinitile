@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73ce5c2ac5ec3364a915ef3d1b97af22, type: 3}
   m_Name: Taiga
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.VoxelConfig.Data.Generation.Biome
-  TopBlock: {fileID: 11400000, guid: 2e8eca1efe0447d4b845f277ce2ada8f, type: 2}
+  TopBlock: {fileID: 11400000, guid: fa38cc6053913e60f815722b37aa5c94, type: 2}
   UnderwaterTopBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
   UnderBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
@@ -43,6 +43,7 @@ MonoBehaviour:
     SpeciesTree: {fileID: 11400000, guid: 848dca3f23de4e129f80781ec35e85fe, type: 2}
     Probability: 0.03
     RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
     MinHeightAboveWater: 1
     DensityNoise: 0
     DensityInfluence: 1
@@ -53,16 +54,29 @@ MonoBehaviour:
     SpeciesTree: {fileID: 11400000, guid: 338081b0e08f4e0db216d7faed96a3ad, type: 2}
     Probability: 0.002
     RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
     MinHeightAboveWater: 1
     DensityNoise: 0
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 11400000, guid: 1653fb421732b40f15db13b9cd478b0c, type: 2}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 0}
+    Probability: 0.1
+    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
+    MinHeightAboveWater: 1
+    DensityNoise: 2
     DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 11400000, guid: 466912d6d4209014096d5dcfcf466b37, type: 2}
     SpeciesStructure: {fileID: 0}
     SpeciesTree: {fileID: 0}
-    Probability: 0.15
+    Probability: 0.08
     RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
     MinHeightAboveWater: 1
     DensityNoise: 1
     DensityInfluence: 1
@@ -73,6 +87,7 @@ MonoBehaviour:
     SpeciesTree: {fileID: 0}
     Probability: 0.01
     RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
     MinHeightAboveWater: 1
     DensityNoise: 3
     DensityInfluence: 1
@@ -83,6 +98,7 @@ MonoBehaviour:
     SpeciesTree: {fileID: 11400000, guid: b63902cc64d597f4ab8d6519895c2ea0, type: 2}
     Probability: 0.001
     RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
     MinHeightAboveWater: 1
     DensityNoise: 0
     DensityInfluence: 1
@@ -93,6 +109,7 @@ MonoBehaviour:
     SpeciesTree: {fileID: 0}
     Probability: 0.005
     RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
     MinHeightAboveWater: 1
     DensityNoise: 3
     DensityInfluence: 1

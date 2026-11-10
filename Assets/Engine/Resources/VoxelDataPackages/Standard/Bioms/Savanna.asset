@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73ce5c2ac5ec3364a915ef3d1b97af22, type: 3}
   m_Name: Savanna
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.VoxelConfig.Data.Generation.Biome
-  TopBlock: {fileID: 11400000, guid: 2e8eca1efe0447d4b845f277ce2ada8f, type: 2}
+  TopBlock: {fileID: 11400000, guid: fc6fd7c9f9e5d4ece5862e15801580a6, type: 2}
   UnderwaterTopBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
   UnderBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
@@ -38,21 +38,23 @@ MonoBehaviour:
   - 0.03
   Jaggedness: 0
   FloraRules:
+  - SpeciesVoxel: {fileID: 11400000, guid: 6eb8f68ebf89897c220771c664c07acc, type: 2}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 0}
+    Probability: 0.25
+    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
+    MinHeightAboveWater: 1
+    DensityNoise: 1
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 11400000, guid: 970fe84b79e76ed42a636f8d60feca7d, type: 2}
     SpeciesStructure: {fileID: 0}
     SpeciesTree: {fileID: 0}
-    Probability: 0.35
+    Probability: 0.1
     RequiresSurfaceFromSameBiome: 0
-    MinHeightAboveWater: 1
-    DensityNoise: 1
-    DensityInfluence: 1
-    MinStackHeight: 1
-    MaxStackHeight: 1
-  - SpeciesVoxel: {fileID: 11400000, guid: 466912d6d4209014096d5dcfcf466b37, type: 2}
-    SpeciesStructure: {fileID: 0}
-    SpeciesTree: {fileID: 0}
-    Probability: 0.05
-    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
     MinHeightAboveWater: 1
     DensityNoise: 1
     DensityInfluence: 1
@@ -60,21 +62,12 @@ MonoBehaviour:
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 0}
     SpeciesStructure: {fileID: 0}
-    SpeciesTree: {fileID: 11400000, guid: 83ab9e9b61f2918449f313873a4e5be6, type: 2}
-    Probability: 0.002
+    SpeciesTree: {fileID: 11400000, guid: fa5ba25b08dfe1e5bcea82aa0b313ec1, type: 2}
+    Probability: 0.003
     RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
     MinHeightAboveWater: 1
     DensityNoise: 0
-    DensityInfluence: 1
-    MinStackHeight: 1
-    MaxStackHeight: 1
-  - SpeciesVoxel: {fileID: 0}
-    SpeciesStructure: {fileID: 0}
-    SpeciesTree: {fileID: 11400000, guid: b6248174d5a343c581689da2c5ee5813, type: 2}
-    Probability: 0.004
-    RequiresSurfaceFromSameBiome: 0
-    MinHeightAboveWater: 1
-    DensityNoise: 1
     DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
@@ -83,6 +76,7 @@ MonoBehaviour:
     SpeciesTree: {fileID: 0}
     Probability: 0.002
     RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
     MinHeightAboveWater: 1
     DensityNoise: 3
     DensityInfluence: 1

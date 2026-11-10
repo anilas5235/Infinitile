@@ -22,7 +22,7 @@ MonoBehaviour:
     TrunkWidth: 1
     MaxLean: 0
     CrownShape: 2
-    LeafVoxel: {fileID: 11400000, guid: f40ca8ec657e32349900f989d0ebd529, type: 2}
+    LeafVoxel: {fileID: 11400000, guid: 471e060de8c2b035ee2aa0b48f440d86, type: 2}
     AltLeafVoxel: {fileID: 0}
     CrownRadius:
       Min: 1
@@ -62,7 +62,7 @@ MonoBehaviour:
     TrunkWidth: 1
     MaxLean: 0
     CrownShape: 2
-    LeafVoxel: {fileID: 11400000, guid: f40ca8ec657e32349900f989d0ebd529, type: 2}
+    LeafVoxel: {fileID: 11400000, guid: 471e060de8c2b035ee2aa0b48f440d86, type: 2}
     AltLeafVoxel: {fileID: 0}
     CrownRadius:
       Min: 2

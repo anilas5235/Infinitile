@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73ce5c2ac5ec3364a915ef3d1b97af22, type: 3}
   m_Name: Badlands
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.VoxelConfig.Data.Generation.Biome
-  TopBlock: {fileID: 11400000, guid: 9cf114b1c56383b448012d6a5b9d8b72, type: 2}
+  TopBlock: {fileID: 11400000, guid: 4b68ebaffc51483a003d9dd66e7c1219, type: 2}
   UnderwaterTopBlock: {fileID: 11400000, guid: 9cf114b1c56383b448012d6a5b9d8b72, type: 2}
-  UnderBlock: {fileID: 11400000, guid: eeed6c09b1b96c04faeab22d816e1b62, type: 2}
-  StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
+  UnderBlock: {fileID: 11400000, guid: 4b68ebaffc51483a003d9dd66e7c1219, type: 2}
+  StoneBlock: {fileID: 11400000, guid: 4b68ebaffc51483a003d9dd66e7c1219, type: 2}
   SnowTopBlock: {fileID: 0}
   FreezesWater: 0
-  StrataBlock: {fileID: 11400000, guid: eeed6c09b1b96c04faeab22d816e1b62, type: 2}
+  StrataBlock: {fileID: 11400000, guid: 4fcceb7dbd423749516542b36c0a015d, type: 2}
   BeachBlock: {fileID: 11400000, guid: 9cf114b1c56383b448012d6a5b9d8b72, type: 2}
   BeachHeight: 3
   TargetHumidity: 0.08
