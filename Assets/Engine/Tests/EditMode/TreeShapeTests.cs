@@ -394,7 +394,7 @@ namespace Engine.Tests.EditMode{
             // Every variant of the shipped species over 200 anchors: a face-connected trunk on the anchor that reaches
             // its crown (none for trunk 0), leaves only with a crown or branch clusters, a cone or tiered crown not
             // below its minimum base, arms of a crownless trunk below its top, and no voxel beyond the reach or below
-            // the hang layer.
+            // the hang layer (one below the anchor, lowered by the sink of a boulder).
             TreeVariant variant = _fixture.ShippedVariant(name);
             TreeVariantDef v = Def(variant);
             ushort trunk = variant.TrunkVoxel ? _fixture.Ids[variant.TrunkVoxel] : (ushort)0;
@@ -428,7 +428,7 @@ namespace Engine.Tests.EditMode{
 
                 foreach (int3 p in voxels.Keys){
                     Assert.LessOrEqual(math.max(math.abs(p.x), math.abs(p.z)), v.Reach, $"{at}: voxel {p} beyond reach {v.Reach}");
-                    Assert.GreaterOrEqual(p.y, -1, $"{at}: voxel {p} below the hang layer");
+                    Assert.GreaterOrEqual(p.y, -1 - r.Sink, $"{at}: voxel {p} below the hang layer of a shape sunk by {r.Sink}");
                 }
 
                 int top = voxels.Keys.Max(p => p.y);

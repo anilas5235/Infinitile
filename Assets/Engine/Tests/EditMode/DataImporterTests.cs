@@ -278,6 +278,37 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void ShippedWorldGenSettings_BouldersSitAThirdToAHalfInTheGround(){
+            // Every variant of the boulder species the shipped biomes plant has one radius and one sink depth, and the
+            // sink is a third to a half of the boulder's height (2 r + 1): no boulder rests on its lowest voxel.
+            WorldGenSettings settings = AssetDatabase.LoadAssetAtPath<WorldGenSettings>(ShippedSettingsPath);
+            Assert.IsNotNull(settings, ShippedSettingsPath);
+            HashSet<TreeSpecies> boulders = new();
+            foreach (Biome biome in settings.Biomes.Biomes)
+            foreach (FloraRule rule in biome.FloraRules)
+                if (rule.SpeciesTree && rule.SpeciesTree.name.StartsWith("Boulder")) boulders.Add(rule.SpeciesTree);
+            Assert.AreEqual(4, boulders.Count, "Boulder, BoulderGrey, BoulderMossy, BoulderRed");
+            foreach (TreeSpecies species in boulders){
+                bool small = false, large = false;
+                foreach (TreeVariant v in species.Variants){
+                    string id = $"{species.name} {v.Name}";
+                    Assert.AreEqual(0, v.TrunkHeight.Max, $"{id}: no trunk");
+                    Assert.AreEqual(CrownShape.Round, v.CrownShape, $"{id}: round");
+                    Assert.AreEqual(1, v.CrownBase, $"{id}: lowest layer on the ground before sinking");
+                    Assert.AreEqual(v.CrownRadius.Min, v.CrownRadius.Max, $"{id}: one radius");
+                    Assert.AreEqual(v.Sink.Min, v.Sink.Max, $"{id}: one sink depth");
+                    int height = 2 * v.CrownRadius.Max + 1, sink = v.Sink.Max;
+                    Assert.GreaterOrEqual(3 * sink, height, $"{id}: at least a third of {height} blocks in the ground");
+                    Assert.LessOrEqual(2 * sink, height, $"{id}: at most half of {height} blocks in the ground");
+                    small |= v.CrownRadius.Max == 1;
+                    large |= v.CrownRadius.Max == 2;
+                }
+
+                Assert.IsTrue(small && large, $"{species.name}: a small and a large variant");
+            }
+        }
+
+        [Test]
         public void ShippedWorldGenSettings_MountainSprucesGrowOnItsMeadow(){
             // The Mountain is bare stone with a meadow block: in a 4096² area at stride 8 its ground carries spruces,
             // all of them below their tree line. Without the meadow its tree rule never grows on its own ground.

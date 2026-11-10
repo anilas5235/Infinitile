@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: BoulderRed
   m_EditorClassIdentifier: Engine.Runtime::Engine.Scripts.VoxelConfig.Data.Generation.TreeSpecies
   Variants:
-  - Name: RedSandstone
+  - Name: RedSandstoneSmall
     Weight: 1
     TrunkVoxel: {fileID: 0}
     TrunkHeight:
@@ -27,6 +27,50 @@ MonoBehaviour:
     AltLeafVoxel: {fileID: 0}
     CrownRadius:
       Min: 1
+      Max: 1
+    CrownTopRadius:
+      Min: 0
+      Max: 0
+    CrownHeight:
+      Min: 0
+      Max: 0
+    CrownBase: 1
+    CrownMinBase: 0
+    BranchChance: 1
+    BranchCount:
+      Min: 0
+      Max: 0
+    BranchStyle: 0
+    BranchLength:
+      Min: 1
+      Max: 2
+    BranchBandMin: 0.5
+    BranchBandMax: 0.9
+    BranchLeafRadius:
+      Min: 0
+      Max: 0
+    HoleChance: 0.1
+    BumpChance: 0.15
+    HangChance: 0
+    AltLeafChance: 0
+    Sink:
+      Min: 1
+      Max: 1
+    SpacingRadius: 3
+  - Name: RedSandstoneLarge
+    Weight: 1
+    TrunkVoxel: {fileID: 0}
+    TrunkHeight:
+      Min: 0
+      Max: 0
+    TrunkWidth: 1
+    MaxLean: 0
+    Lying: 0
+    CrownShape: 1
+    LeafVoxel: {fileID: 11400000, guid: eeed6c09b1b96c04faeab22d816e1b62, type: 2}
+    AltLeafVoxel: {fileID: 0}
+    CrownRadius:
+      Min: 2
       Max: 2
     CrownTopRadius:
       Min: 0
@@ -54,10 +98,10 @@ MonoBehaviour:
     HangChance: 0
     AltLeafChance: 0
     Sink:
-      Min: 0
-      Max: 1
+      Min: 2
+      Max: 2
     SpacingRadius: 3
-  - Name: BrownClay
+  - Name: BrownClaySmall
     Weight: 1
     TrunkVoxel: {fileID: 0}
     TrunkHeight:
@@ -71,6 +115,50 @@ MonoBehaviour:
     AltLeafVoxel: {fileID: 0}
     CrownRadius:
       Min: 1
+      Max: 1
+    CrownTopRadius:
+      Min: 0
+      Max: 0
+    CrownHeight:
+      Min: 0
+      Max: 0
+    CrownBase: 1
+    CrownMinBase: 0
+    BranchChance: 1
+    BranchCount:
+      Min: 0
+      Max: 0
+    BranchStyle: 0
+    BranchLength:
+      Min: 1
+      Max: 2
+    BranchBandMin: 0.5
+    BranchBandMax: 0.9
+    BranchLeafRadius:
+      Min: 0
+      Max: 0
+    HoleChance: 0.1
+    BumpChance: 0.15
+    HangChance: 0
+    AltLeafChance: 0
+    Sink:
+      Min: 1
+      Max: 1
+    SpacingRadius: 3
+  - Name: BrownClayLarge
+    Weight: 1
+    TrunkVoxel: {fileID: 0}
+    TrunkHeight:
+      Min: 0
+      Max: 0
+    TrunkWidth: 1
+    MaxLean: 0
+    Lying: 0
+    CrownShape: 1
+    LeafVoxel: {fileID: 11400000, guid: d47e3da2e55678e694c98341f4038760, type: 2}
+    AltLeafVoxel: {fileID: 0}
+    CrownRadius:
+      Min: 2
       Max: 2
     CrownTopRadius:
       Min: 0
@@ -98,6 +186,6 @@ MonoBehaviour:
     HangChance: 0
     AltLeafChance: 0
     Sink:
-      Min: 0
-      Max: 1
+      Min: 2
+      Max: 2
     SpacingRadius: 3
