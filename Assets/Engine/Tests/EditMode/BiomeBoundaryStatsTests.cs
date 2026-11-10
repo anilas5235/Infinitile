@@ -92,14 +92,15 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void DefaultBiomeSet_FlagsDesertSnow(){
+        public void DefaultBiomeSet_PairsNameShippedBiomes(){
+            // The Desert–Snow pair left with the Snow biome (2026-11-10); any pair kept must name biomes of the set.
             BiomeSet asset = UnityEditor.AssetDatabase.LoadAssetAtPath<BiomeSet>("Assets/EngineSettings/BiomeSet_Default.asset");
             Assert.IsNotNull(asset);
-            int desert = System.Array.IndexOf(asset.Names(), "Desert");
-            int snow = System.Array.IndexOf(asset.Names(), "Snow");
-            Assert.GreaterOrEqual(desert, 0);
-            Assert.GreaterOrEqual(snow, 0);
-            Assert.IsTrue(asset.IsImplausible(desert, snow));
+            Assert.AreEqual(-1, System.Array.IndexOf(asset.Names(), "Snow"));
+            foreach (BiomePair pair in asset.ImplausibleNeighbours){
+                Assert.IsTrue(asset.Biomes.Contains(pair.First), "First");
+                Assert.IsTrue(asset.Biomes.Contains(pair.Second), "Second");
+            }
         }
     }
 }

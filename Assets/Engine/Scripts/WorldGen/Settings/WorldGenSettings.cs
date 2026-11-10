@@ -65,6 +65,11 @@ namespace Engine.Scripts.WorldGen.Settings{
 
         public float HeightMax = 250f;
 
+        [Tooltip("Band below HeightMax in which H bends smoothly towards HeightMax instead of being cut flat there " +
+                 "(blocks, 0 = hard clamp). H above HeightMax − band is compressed and never reaches HeightMax.")]
+        [Min(0f)]
+        public float HeightSoftBand;
+
         [Tooltip("Water surface level in world Y. Water fills every column up to this level.")]
         public int WaterLevel = 124;
 
@@ -268,6 +273,8 @@ namespace Engine.Scripts.WorldGen.Settings{
                 Debug.LogWarning($"{name}: GlobalOctaveWeights ({GlobalOctaveWeights.Length}) and OctaveWavelengths ({OctaveWavelengths.Length}) differ in length.", this);
             if (HeightMin >= HeightMax)
                 Debug.LogWarning($"{name}: HeightMin must be below HeightMax.", this);
+            if (!(HeightSoftBand >= 0f) || HeightSoftBand > HeightMax - HeightMin)
+                Debug.LogWarning($"{name}: HeightSoftBand must lie in [0, HeightMax − HeightMin], got {HeightSoftBand}.", this);
             if (TreeSpacingRadius < 0)
                 Debug.LogWarning($"{name}: TreeSpacingRadius must not be negative, got {TreeSpacingRadius}.", this);
             foreach ((string field, float value) in InvalidScales())

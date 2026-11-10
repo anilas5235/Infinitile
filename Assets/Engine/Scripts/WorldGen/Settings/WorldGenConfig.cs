@@ -80,6 +80,9 @@ namespace Engine.Scripts.WorldGen.Settings{
         // --- Height -------------------------------------------------------------------------------------------------
         public float HeightMin;
         public float HeightMax;
+
+        /// <summary>Band below <see cref="HeightMax" /> of the soft limit (<see cref="Height.HeightLimit" />); 0 clamps hard.</summary>
+        public float HeightSoftBand;
         public float PeakWavelength;
 
         /// <summary>

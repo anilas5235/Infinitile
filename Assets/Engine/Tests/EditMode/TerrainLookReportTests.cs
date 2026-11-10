@@ -51,10 +51,37 @@ namespace Engine.Tests.EditMode{
         ///     The configurations by name; "Shipped" is the asset unchanged. To compare a tuning idea, add an entry that
         ///     changes the copy (fields, <c>Splines.FromJson</c>, biome targets via <see cref="BiomeOf" />). The
         ///     candidates B, C and D of 2026-11-09 are in the commit that added this test; C is now the shipped asset.
+        ///     "HardClamp" is the shipped asset with the hard clamp at HeightMax of before 2026-11-10; "Landform" and
+        ///     "LandformStrong" are the biome–terrain fit candidates of 2026-11-10 (lowland biomes with own landforms).
         /// </summary>
         private static readonly Dictionary<string, Action<WorldGenSettings>> Candidates = new(){
-            ["Shipped"] = _ => { }
+            ["Shipped"] = _ => { },
+            ["HardClamp"] = s => s.HeightSoftBand = 0f,
+            ["Landform"] = Landform,
+            ["LandformStrong"] = s => {
+                Landform(s);
+                s.LambdaErosion = 1.5f;
+                s.LambdaPV = 1f;
+            }
         };
+
+        /// <summary>
+        ///     Lowland biomes with landforms of their own instead of the same terrain targets: Plains low and flat
+        ///     (high E, low PV), Forest on rolling hills (lower E, higher PV, a little higher), Desert flat at mid height.
+        /// </summary>
+        private static void Landform(WorldGenSettings s){
+            Biome plains = BiomeOf(s, "Plains");
+            plains.TargetErosion = .68f;
+            plains.TargetPV = -.45f;
+            plains.TargetHeight = .4f;
+            Biome forest = BiomeOf(s, "Forest");
+            forest.TargetErosion = .4f;
+            forest.TargetPV = .2f;
+            forest.TargetHeight = .5f;
+            Biome desert = BiomeOf(s, "Desert");
+            desert.TargetErosion = .68f;
+            desert.TargetPV = -.3f;
+        }
 
         private static IEnumerable<string> CandidateNames => Candidates.Keys;
 
@@ -230,6 +257,7 @@ namespace Engine.Tests.EditMode{
                 long implausible = edges.Where(kv => settings.Biomes.IsImplausible(kv.Key.Item1, kv.Key.Item2))
                     .Sum(kv => (long)kv.Value);
                 sb.AppendLine($"borders implausible {implausible * Stride} blocks");
+                Fit(sb, settings, cfg, fields, height, hard, surface, clamped, request.Origin);
 
                 TestContext.WriteLine(sb.ToString());
                 Directory.CreateDirectory(OutDir);
@@ -250,6 +278,68 @@ namespace Engine.Tests.EditMode{
                 buffers.TerrainParams.Dispose();
                 cfg.Dispose();
             }
+        }
+
+        /// <summary>
+        ///     Biome–terrain fit: per hard biome, the ground height and land slope percentiles and the share of its land
+        ///     columns in each relief class (flat slope &lt; .3, hilly &lt; 1, steep) and height band (low &lt; 140,
+        ///     mid &lt; 180, high), the snow-covered share of its surface, and the unclamped H of clamped columns.
+        /// </summary>
+        private static void Fit(StringBuilder sb, WorldGenSettings settings, in WorldGenConfig cfg, WorldFields[] fields, float[] height,
+            int[] hard, int[] surface, byte[] clamped, int2 origin){
+            string[] names = settings.Biomes.Names();
+            float water = cfg.WaterLevel;
+            List<float> over = new();
+            for (int i = 0; i < height.Length; i++){
+                if (clamped[i] == 0 || height[i] < cfg.WaterLevel) continue;
+                float2 p = origin + new float2(i % Size, i / Size) * Stride;
+                Engine.Scripts.WorldGen.Height.TerrainFirstHeight.Sample(p, fields[i], cfg, out float3 _, out float _,
+                    out float unclamped);
+                over.Add(unclamped);
+            }
+
+            sb.AppendLine("clamp   " + (over.Count > 0 ? Pct("unclamped H above Hmax", over) : "no column above Hmax") +
+                          $"; columns at Hmax {100.0 * AtMax(height, cfg.HeightMax) / height.Length:F2} %");
+            for (int b = 0; b < names.Length; b++){
+                List<float> h = new(), slope = new();
+                int[] relief = new int[3], band = new int[3];
+                int count = 0, snow = 0, surfaceCount = 0;
+                // The test config resolves no voxel ids, so the snow block is read from the asset.
+                bool snowy = settings.Biomes.Biomes[b].SnowTopBlock != null;
+                for (int z = 0; z < Size - 1; z++)
+                for (int x = 0; x < Size - 1; x++){
+                    int i = z * Size + x;
+                    if (surface[i] == b && height[i] >= water){
+                        surfaceCount++;
+                        int2 w = origin + new int2(x, z) * Stride;
+                        int top = (int)math.floor(height[i]);
+                        if (snowy && cfg.EnableClimateOverrides && top + 1 >= cfg.WaterLevel &&
+                            Engine.Scripts.WorldGen.Core.SurfaceCover.EffectiveTemperature(w.x, w.y, fields[i].T, top, cfg) <
+                            cfg.FreezeTemperature) snow++;
+                    }
+
+                    if (hard[i] != b) continue;
+                    count++;
+                    h.Add(height[i]);
+                    if (height[i] < water) continue;
+                    float gx = (height[i + 1] - height[i]) / Stride, gz = (height[i + Size] - height[i]) / Stride;
+                    float s = math.sqrt(gx * gx + gz * gz);
+                    slope.Add(s);
+                    relief[s < .3f ? 0 : s < 1f ? 1 : 2]++;
+                    band[height[i] < 140f ? 0 : height[i] < 180f ? 1 : 2]++;
+                }
+
+                if (count == 0) continue;
+                int land = math.max(1, slope.Count);
+                sb.AppendLine($"fit     {names[b],-8} " + Pct("H", h) + " | " + Pct("slope", slope) +
+                              $" | flat/hilly/steep {100 * relief[0] / land}/{100 * relief[1] / land}/{100 * relief[2] / land} %" +
+                              $" | low/mid/high {100 * band[0] / land}/{100 * band[1] / land}/{100 * band[2] / land} %" +
+                              $" | snow {100.0 * snow / math.max(1, surfaceCount):F1} % of its dry surface");
+            }
+        }
+
+        private static int AtMax(float[] height, float max){
+            return height.Count(h => h >= max);
         }
 
         private static string Pct(string label, IEnumerable<float> values){

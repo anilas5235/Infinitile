@@ -21,7 +21,7 @@ namespace Engine.Scripts.WorldGen.Height{
 
         /// <summary>
         ///     H at world position <paramref name="p" /> with fields <paramref name="f" />. <paramref name="height" />
-        ///     is clamped to [Hmin, Hmax], <paramref name="unclamped" /> is H before the clamp.
+        ///     is limited to [Hmin, Hmax] (<see cref="HeightLimit" />), <paramref name="unclamped" /> is H before that.
         /// </summary>
         public static void Sample(in float2 p, in WorldFields f, in WorldGenConfig cfg,
             out float3 terrainParams, out float height, out float unclamped){
@@ -38,7 +38,7 @@ namespace Engine.Scripts.WorldGen.Height{
             if (terrainParams.z != 0f) h += terrainParams.z * PeakNoise.Sample(p, cfg.PeakWavelength, cfg.Seed);
 
             unclamped = h;
-            height = math.clamp(h, cfg.HeightMin, cfg.HeightMax);
+            height = HeightLimit.Apply(h, cfg);
         }
     }
 }

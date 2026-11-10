@@ -22,8 +22,8 @@ namespace Engine.Scripts.WorldGen.Height{
     public static class BiomeFirstHeight{
         /// <summary>
         ///     H at world position <paramref name="p" /> for the height-stage <paramref name="weights" />.
-        ///     <paramref name="height" /> is H clamped to [Hmin, Hmax]; <paramref name="unclamped" /> is H before the
-        ///     clamp, so the clamp engaged exactly when the two differ. Burst direct-call entry point.
+        ///     <paramref name="height" /> is H limited to [Hmin, Hmax] (<see cref="HeightLimit" />);
+        ///     <paramref name="unclamped" /> is H before that. Burst direct-call entry point.
         /// </summary>
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
         public static void Sample(in float2 p, in BlendWeights weights, in WorldGenConfig cfg,
@@ -57,14 +57,14 @@ namespace Engine.Scripts.WorldGen.Height{
             if (jaggedness != 0f) h += jaggedness * PeakNoise.Sample(p, cfg.PeakWavelength, cfg.Seed);
 
             unclamped = h;
-            height = math.clamp(h, cfg.HeightMin, cfg.HeightMax);
+            height = HeightLimit.Apply(h, cfg);
         }
 
         /// <inheritdoc cref="Sample(in float2,in BlendWeights,in WorldGenConfig,out float,out float)" />
         /// <param name="clamped">Whether the clamp to [Hmin, Hmax] engaged.</param>
         public static float Sample(in float2 p, in BlendWeights weights, in WorldGenConfig cfg, out bool clamped){
             Sample(p, weights, cfg, out float height, out float unclamped);
-            clamped = height != unclamped;
+            clamped = HeightLimit.Exceeds(unclamped, cfg);
             return height;
         }
     }

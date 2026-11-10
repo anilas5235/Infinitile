@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Engine.Scripts.Utils;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Core;
@@ -26,7 +27,9 @@ namespace Engine.Scripts.WorldGen.Flora{
     ///         <item>
     ///             Multi-block species only: every candidate has a spacing radius (a tree's from its variant, rolled
     ///             first, otherwise r_tree). A column is an anchor if no candidate at distance ≤ max(r_a, r_b) has a
-    ///             higher <see cref="HashSalts.TreePriority" /> hash; otherwise it carries no plant.
+    ///             higher <see cref="HashSalts.TreePriority" /> hash; otherwise it carries no plant. An anchor whose
+    ///             plant would reach above the world top (<see cref="FitsBelowWorldTop" />) carries none either, and
+    ///             still keeps its neighbours away.
     ///         </item>
     ///     </list>
     /// </summary>
@@ -251,11 +254,39 @@ namespace Engine.Scripts.WorldGen.Flora{
             FloraRuleDef d = cfg.FloraRules[rule];
             if (d.MultiBlock != 0){
                 if (!IsAnchor(x, z, SpacingRadius(x, z, rule, cfg), cfg, cache)) return;
+                if (!FitsBelowWorldTop(x, z, rule, s.ColumnHeight, cfg)) return;
                 if (d.Tree >= 0 && !TreeFits(x, z, rule, cfg, cache)) return;
             }
 
             species = d.Species;
             source = biome;
+        }
+
+        /// <summary>
+        ///     True when the multi-block plant of rule <paramref name="rule" /> anchored on the column with top block
+        ///     <paramref name="columnHeight" /> stays below the world top (y &lt; <see cref="VoxelConstants.ChunkHeight" />):
+        ///     a tree up to <see cref="TreeShape.TopOffset" />, a structure up to its highest voxel, a stack up to its
+        ///     rolled height. Otherwise the anchor carries nothing rather than a plant cut off at the top.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool FitsBelowWorldTop(int x, int z, int rule, int columnHeight, in WorldGenConfig cfg){
+            FloraRuleDef d = cfg.FloraRules[rule];
+            int top;
+            if (d.Tree >= 0){
+                int variant = TreeShape.PickVariant(x, z, cfg, d.Tree);
+                TreeVariantDef v = cfg.TreeVariants[variant];
+                top = TreeShape.TopOffset(x, z, TreeShape.Roll(x, z, cfg.Seed, variant, v), v, cfg.Seed);
+            }
+            else if (d.Structure >= 0){
+                FloraStructureDef structure = cfg.FloraStructures[d.Structure];
+                top = 0;
+                for (int i = structure.Start; i < structure.Start + structure.Count; i++)
+                    top = math.max(top, cfg.FloraVoxels[i].Offset.y);
+            }
+            else top = StackHeight(x, z, cfg, d) - 1;
+
+            // Offsets count from the block above the top block.
+            return columnHeight + 1 + top < VoxelConstants.ChunkHeight;
         }
 
         /// <summary>False for an anchor whose lying trunk fits nowhere (<see cref="LyingFit" /> 0); other trees always fit.</summary>

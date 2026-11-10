@@ -220,13 +220,41 @@ namespace Engine.Scripts.WorldGen.Flora{
             }
         }
 
-        private static void BuildStanding(int3 anchorBase, in TreeRoll r, in TreeVariantDef v, uint seed, ref NativeList<FloraVoxel> output){
-            // Vertical layout: the crown's lowest layer lies CrownBase above the trunk top, its top layer at least one
-            // above the trunk top and not below CrownMinBase; the trunk reaches the crown.
-            int trunkTop = r.TrunkHeight - 1;
-            int crownTop = 0, crownBottom = 0, fullBottom = 0, height = 0;
+        /// <summary>
+        ///     Offset y of the highest voxel <see cref="Build" /> can make for <paramref name="r" /> at anchor column
+        ///     (x, z): the trunk top, the crown top and the branch tips with their clusters, one more above a crown or
+        ///     cluster where the variant has bumps (one may rise above its top layer), minus the sink. An upper bound
+        ///     that is reached unless the noise drops or does not bump the top voxels.
+        /// </summary>
+        public static int TopOffset(int x, int z, in TreeRoll r, in TreeVariantDef v, uint seed){
+            if (r.Lying) return -r.Sink;
             bool hasCrown = v.Crown != CrownShape.None;
-            if (hasCrown){
+            Layout(r, v, out int trunkTop, out int crownTop, out int crownBottom, out int _, out int _);
+            int bump = v.BumpChance > 0f ? 1 : 0;
+            int top = trunkTop;
+            if (hasCrown) top = math.max(top, crownTop + bump);
+            for (int b = 0; b < r.BranchCount && r.TrunkHeight > 0; b++){
+                BranchRolls(x, z, seed, b, trunkTop, hasCrown, crownBottom, v, out int startY, out int2 _, out int length,
+                    out int cluster);
+                // Every branch step rises one layer; a cluster is a round crown of radius `cluster` around the tip.
+                top = math.max(top, startY + length + (cluster > 0 ? cluster + bump : 0));
+            }
+
+            return top - r.Sink;
+        }
+
+        /// <summary>
+        ///     Vertical layout of a standing tree: the crown's lowest layer lies CrownBase above the trunk top, its top
+        ///     layer at least one above the trunk top and not below CrownMinBase; the trunk reaches the crown.
+        /// </summary>
+        private static void Layout(in TreeRoll r, in TreeVariantDef v, out int trunkTop, out int crownTop,
+            out int crownBottom, out int fullBottom, out int height){
+            trunkTop = r.TrunkHeight - 1;
+            crownTop = 0;
+            crownBottom = 0;
+            fullBottom = 0;
+            height = 0;
+            if (v.Crown != CrownShape.None){
                 fullBottom = trunkTop + v.CrownBase;
                 height = r.CrownHeight;
                 if (height <= 0){
@@ -243,6 +271,31 @@ namespace Engine.Scripts.WorldGen.Flora{
                 crownBottom = math.max(fullBottom, v.CrownMinBase);
                 if (r.TrunkHeight > 0) trunkTop = math.max(trunkTop, crownBottom - 1);
             }
+        }
+
+        /// <summary>
+        ///     The rolls of branch <paramref name="b" /> of the tree at anchor column (x, z): start layer, direction,
+        ///     length and cluster radius, with the start raised so the tip reaches the crown and an arm on a bare trunk
+        ///     shortened to end below the trunk top.
+        /// </summary>
+        private static void BranchRolls(int x, int z, uint seed, int b, int trunkTop, bool hasCrown, int crownBottom,
+            in TreeVariantDef v, out int startY, out int2 dir, out int length, out int cluster){
+            int salt = RollBranchBase + b * RollsPerBranch;
+            int2 band = trunkTop * v.BranchBand / 1000;
+            startY = RollRange(x, z, seed, salt, band);
+            uint dirHash = Hash.Hash32(x, z, seed, HashSalts.TreeShape(salt + 1));
+            dir = v.Branches == BranchStyle.Arm ? Direction4(dirHash) : Direction8(dirHash);
+            length = RollRange(x, z, seed, salt + 2, v.BranchLength);
+            cluster = RollRange(x, z, seed, salt + 3, v.ClusterRadius);
+            // Both styles rise one layer per length step, so the tip ends in the crown's lowest layer or higher.
+            if (hasCrown) startY = math.max(startY, crownBottom - length);
+            // An arm on a bare trunk ends at least one block below the trunk top, so the trunk stays the tallest column.
+            else if (v.Branches == BranchStyle.Arm) length = math.clamp(trunkTop - 1 - startY, 0, length);
+        }
+
+        private static void BuildStanding(int3 anchorBase, in TreeRoll r, in TreeVariantDef v, uint seed, ref NativeList<FloraVoxel> output){
+            bool hasCrown = v.Crown != CrownShape.None;
+            Layout(r, v, out int trunkTop, out int crownTop, out int crownBottom, out int fullBottom, out int height);
 
             // Trunk, leaning over its rolled height and straight above it.
             int rolledTop = math.max(r.TrunkHeight - 1, 1);
@@ -284,17 +337,8 @@ namespace Engine.Scripts.WorldGen.Flora{
 
             // Branches.
             for (int b = 0; b < r.BranchCount && r.TrunkHeight > 0; b++){
-                int salt = RollBranchBase + b * RollsPerBranch;
-                int2 band = trunkTop * v.BranchBand / 1000;
-                int startY = RollRange(anchorBase.x, anchorBase.z, seed, salt, band);
-                uint dirHash = Hash.Hash32(anchorBase.x, anchorBase.z, seed, HashSalts.TreeShape(salt + 1));
-                int2 dir = v.Branches == BranchStyle.Arm ? Direction4(dirHash) : Direction8(dirHash);
-                int length = RollRange(anchorBase.x, anchorBase.z, seed, salt + 2, v.BranchLength);
-                int cluster = RollRange(anchorBase.x, anchorBase.z, seed, salt + 3, v.ClusterRadius);
-                // Both styles rise one layer per length step, so the tip ends in the crown's lowest layer or higher.
-                if (hasCrown) startY = math.max(startY, crownBottom - length);
-                // An arm on a bare trunk ends at least one block below the trunk top, so the trunk stays the tallest column.
-                else if (v.Branches == BranchStyle.Arm) length = math.clamp(trunkTop - 1 - startY, 0, length);
+                BranchRolls(anchorBase.x, anchorBase.z, seed, b, trunkTop, hasCrown, crownBottom, v, out int startY,
+                    out int2 dir, out int length, out int cluster);
 
                 // Start on the trunk voxel that faces the branch direction.
                 int2 column = r.LeanDirection * RoundDiv(r.Lean * math.min(startY, rolledTop), rolledTop);

@@ -36,6 +36,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["LambdaHeight"] = s.LambdaHeight,
                 ["HeightMin"] = s.HeightMin,
                 ["HeightMax"] = s.HeightMax,
+                ["HeightSoftBand"] = s.HeightSoftBand,
                 ["WaterLevel"] = s.WaterLevel,
                 ["WaterVoxel"] = VoxelName(s.WaterVoxel),
                 ["IceVoxel"] = VoxelName(s.IceVoxel),

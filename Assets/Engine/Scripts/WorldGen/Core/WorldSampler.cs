@@ -120,7 +120,7 @@ namespace Engine.Scripts.WorldGen.Core{
                 s.SurfaceSource = SurfacePick.Pick(x, z, cfg.Seed, HashSalts.SurfacePick, s.MaterialWeights, biomeCount);
             }
 
-            s.Clamped = s.Height != unclamped;
+            s.Clamped = HeightLimit.Exceeds(unclamped, cfg);
             s.ColumnHeight = (int)math.floor(s.Height);
 
             s.FloraSpecies = 0;

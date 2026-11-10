@@ -176,7 +176,8 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
-        ///     <see cref="FloraGrid.Anchor" /> code of the anchor at (x, z): 2 when it is a tree whose wide or leaning
+        ///     <see cref="FloraGrid.Anchor" /> code of the anchor at (x, z): 0 when its plant would reach above the world
+        ///     top (<see cref="FloraPlacement.FitsBelowWorldTop" />); 2 when it is a tree whose wide or leaning
         ///     trunk stands on ground that is not flat within 1 block (<see cref="TreeShape.Footprint" />), so it is
         ///     built 1 wide and straight; for a lying trunk its <see cref="FloraPlacement.LyingFit" />; 1 otherwise.
         ///     The heights are the sampler's, so every chunk decides the same.
@@ -184,6 +185,8 @@ namespace Engine.Scripts.Jobs.Chunk{
         private static byte AnchorFit(in FloraGrid grid, NativeArray<ChunkColumn> chunkColumns, int x, int z, int3 chunkWordPos,
             in WorldGenConfig cfg){
             int rule = grid.Rule[grid.Index(x, z)];
+            if (!FloraPlacement.FitsBelowWorldTop(chunkWordPos.x + x, chunkWordPos.z + z, rule, grid.Height[grid.Index(x, z)], cfg))
+                return 0;
             int variant = FloraPlacement.Variant(chunkWordPos.x + x, chunkWordPos.z + z, rule, cfg);
             if (variant < 0) return 1;
             TreeRoll roll = TreeShape.Roll(chunkWordPos.x + x, chunkWordPos.z + z, cfg.Seed, variant, cfg.TreeVariants[variant]);
