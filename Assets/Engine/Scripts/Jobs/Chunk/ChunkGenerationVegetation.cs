@@ -73,7 +73,9 @@ namespace Engine.Scripts.Jobs.Chunk{
     internal partial struct ChunkJob{
         /// <summary>
         ///     Stamps the flora of <paramref name="grid" /> into <paramref name="vox" />. A flora voxel replaces only a
-        ///     voxel of a lower <see cref="FloraVoxelClass" />. Anchors are stamped in world (x, then z) order, so each
+        ///     voxel of a lower <see cref="FloraVoxelClass" />; a solid one (trunk, stone) also replaces water and ice.
+        ///     On a column under water a plant that is not solid starts on the water surface (y = WaterLevel), so the
+        ///     water below it stays whole. Anchors are stamped in world (x, then z) order, so each
         ///     voxel gets the same value as in a whole-world stamp, whichever chunk holds it. A plant or anchor whose
         ///     ground the cave passes carved is left out (a tree when a voxel under its trunk is carved); the test is
         ///     the pure cave evaluation at those voxels, so every chunk that holds part of a tree decides alike.
@@ -96,7 +98,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                 if (col.FloraSpecies == 0) continue;
                 FloraRuleDef d = cfg.FloraRules[grid.Rule[grid.Index(x, z)]];
                 if (d.MultiBlock != 0 || GroundCarved(ref caves, x, col.Height, z, chunkWordPos, cfg, grid.Cache)) continue;
-                Put(vox, x, col.Height + 1, z, d.Voxel, d.VoxelClass, cfg);
+                Put(vox, x, math.max(col.Height + 1, cfg.WaterLevel), z, d.Voxel, d.VoxelClass, cfg);
             }
 
             // Multi-block anchors in chunk ± reach, world order.
@@ -130,8 +132,9 @@ namespace Engine.Scripts.Jobs.Chunk{
                     }
                 }
                 else{
-                    // A stacked voxel (cactus) stays on its column.
+                    // A stacked voxel (cactus) stays on its column; one that is not solid starts above the water.
                     int height = FloraPlacement.StackHeight(wx, wz, cfg, d);
+                    if (d.VoxelClass != FloraVoxelClass.Solid) baseY = math.max(baseY, cfg.WaterLevel);
                     for (int k = 0; k < height; k++) Put(vox, x, baseY + k, z, d.Voxel, d.VoxelClass, cfg);
                 }
             }
@@ -150,11 +153,18 @@ namespace Engine.Scripts.Jobs.Chunk{
             return false;
         }
 
-        /// <summary>Writes <paramref name="voxel" /> at a chunk-local position if it lies in the chunk and outranks the voxel there.</summary>
+        /// <summary>
+        ///     Writes <paramref name="voxel" /> at a chunk-local position if it lies in the chunk and outranks the voxel
+        ///     there. A solid flora voxel also takes the place of water and ice, so a trunk or a boulder standing in
+        ///     water is whole; leaves and plants never replace water.
+        /// </summary>
         private static void Put(NativeArray<ushort> vox, int x, int y, int z, ushort voxel, byte cls, in WorldGenConfig cfg){
             if (!InChunk(x, y, z)) return;
             int idx = ChunkSize.Flatten(x, y, z);
-            if (cfg.VoxelClassOf(vox[idx]) < cls) vox[idx] = voxel;
+            ushort current = vox[idx];
+            if (cfg.VoxelClassOf(current) < cls ||
+                (cls == FloraVoxelClass.Solid && current != 0 && (current == cfg.WaterVoxel || current == cfg.IceVoxel)))
+                vox[idx] = voxel;
         }
     }
 }

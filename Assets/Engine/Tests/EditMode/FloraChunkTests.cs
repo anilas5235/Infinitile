@@ -269,6 +269,74 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void ChunkJob_WaterPlantsStandInWholeWater(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            // Rules with a negative MinHeightAboveWater: single-block plants sit on the water surface, trunks and
+            // stacked solids replace the water they stand in, and no cell between the ground and the water surface is
+            // air, a plant or leaves. Columns deeper than the minimum carry no plant. The chunk job equals the
+            // whole-world stamp.
+            FloraRule Wet(FloraRule rule, bool waterOnly = false){
+                rule.MinHeightAboveWater = -2;
+                rule.RequiresWaterGround = waterOnly;
+                return rule;
+            }
+
+            _biomes = new[]{
+                _fixture.MakeBiome("Marsh", .25f, 122f, 8f, _fixture.GrassSo, Wet(FloraFixture.Rule(_fixture.TuftSo, .4f), true),
+                    FloraFixture.Rule(_fixture.FlowerSo, .2f), Wet(FloraFixture.Rule(_fixture.Grove, .06f))),
+                _fixture.MakeBiome("Dunes", .75f, 123f, 8f, _fixture.SandSo, Wet(FloraFixture.Rule(_fixture.CactusSo, .03f, 1, 3)),
+                    Wet(FloraFixture.Rule(_fixture.TuftSo, .2f)), Wet(FloraFixture.Rule(_fixture.Pine, .03f)))
+            };
+            WorldGenSettings s = _fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes);
+            _config = _fixture.GeneratorConfig(s);
+            int2 originChunk = new(1, 2), chunks = new(4, 4);
+            ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
+            int waterLevel = _config.WorldGen.WaterLevel;
+
+            Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
+            try{
+                List<string> report = new();
+                int mismatches = CompareVoxels(reference, chunkData, report);
+                Assert.AreEqual(0, mismatches, "chunk voxels differ from the whole-world stamp:\n" + string.Join("\n", report));
+
+                int onWater = 0, trunksInWater = 0, shallow = 0, deep = 0;
+                for (int x = reference.Origin.x; x < reference.Origin.x + reference.Size.x; x++)
+                for (int z = reference.Origin.y; z < reference.Origin.y + reference.Size.y; z++){
+                    int h = reference.SurfaceAt(x, z);
+                    int above = h + 1 - waterLevel;
+                    if (above >= 0) continue;
+                    ushort surface = VoxelAt(chunkData, new int3(x, waterLevel, z));
+                    bool plant = surface is FloraFixture.Tuft or FloraFixture.Flower;
+                    if (above < -2){
+                        deep++;
+                        Assert.IsFalse(plant, $"({x},{z}) plant on water {-above} deep");
+                    }
+                    else{
+                        shallow++;
+                        if (plant) onWater++;
+                    }
+
+                    for (int y = h + 1; y < waterLevel; y++){
+                        ushort v = VoxelAt(chunkData, new int3(x, y, z));
+                        bool water = v is TestFixtures.Water or TestFixtures.Ice;
+                        bool solid = v != TestFixtures.Air && _fixture.ClassOf(v) == FloraVoxelClass.Solid;
+                        Assert.IsTrue(water || solid, $"({x},{y},{z}) holds {v} below the water surface");
+                        if (!water) trunksInWater++;
+                    }
+                }
+
+                string counts = $"{architecture}: shallow {shallow}, deep {deep}, plants on water {onWater}, trunk voxels in water {trunksInWater}";
+                TestContext.WriteLine(counts);
+                Assert.Greater(deep, 0, "the area has water deeper than the minimum; " + counts);
+                Assert.Greater(onWater, 20, "plants sit on shallow water; " + counts);
+                Assert.Greater(trunksInWater, 0, "trunks stand in shallow water; " + counts);
+            }
+            finally{
+                Release(results);
+            }
+        }
+
+        [Test]
         public void ChunkJob_TreesCrossingChunkBordersAreComplete(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,
             [Values(BlendMethod.None, BlendMethod.DistanceBlend)] BlendMethod method, [Values(false, true)] bool shippedSpecies){

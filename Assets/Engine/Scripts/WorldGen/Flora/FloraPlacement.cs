@@ -68,7 +68,7 @@ namespace Engine.Scripts.WorldGen.Flora{
             FloraRuleDef d = cfg.FloraRules[rule];
             // Optionally only on ground of the same biome.
             if (d.RequiresSurfaceFromSameBiome != 0 && s.SurfaceSource != biome) return -1;
-            if (!GroundAllows(s, d.MinHeightAboveWater, cfg)) return -1;
+            if (!GroundAllows(s, d.MinHeightAboveWater, d.WaterGround, cfg)) return -1;
             // Beach columns carry only beach-ground rules, and those grow nowhere else.
             if ((cfg.Biomes[s.SurfaceSource].beachHeight | d.BeachGround) != 0 && !BeachAllows(x, z, d.BeachGround, s, cfg, cache)) return -1;
             // Snow keeps trees and cacti but carries no ground plants.
@@ -156,14 +156,17 @@ namespace Engine.Scripts.WorldGen.Flora{
 
         /// <summary>
         ///     The column has solid ground (the surface source's top block), is not clamped at Hmax, and its
-        ///     top face lies at least <paramref name="minHeightAboveWater" /> blocks above the water surface, never below.
+        ///     top face lies at least <paramref name="minHeightAboveWater" /> blocks above the water surface. A negative
+        ///     minimum admits columns with up to that many blocks of water above the ground; with
+        ///     <paramref name="waterGround" /> only those pass.
         /// </summary>
-        public static bool GroundAllows(in ColumnSample s, int minHeightAboveWater, in WorldGenConfig cfg){
+        public static bool GroundAllows(in ColumnSample s, int minHeightAboveWater, byte waterGround, in WorldGenConfig cfg){
             if (s.SurfaceSource < 0 || cfg.Biomes[s.SurfaceSource].floraGround == 0) return false;
             if (s.Clamped && s.Height >= cfg.HeightMax) return false;
-            // Water fills y < WaterLevel, so the top face of the block at h_int is h_int + 1 - WaterLevel above it.
+            // Water fills y < WaterLevel, so the top face of the block at h_int is h_int + 1 - WaterLevel above it
+            // (negative: that many water blocks above the ground).
             int aboveWater = s.ColumnHeight + 1 - cfg.WaterLevel;
-            return aboveWater >= math.max(minHeightAboveWater, 0);
+            return aboveWater >= minHeightAboveWater && (waterGround == 0 || aboveWater < 0);
         }
 
         /// <summary>True when the rule <paramref name="rule" /> exists and is a multi-block species.</summary>

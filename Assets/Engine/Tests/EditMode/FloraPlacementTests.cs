@@ -127,7 +127,8 @@ namespace Engine.Tests.EditMode{
         [TestCase(0)]
         [TestCase(-3)]
         public void MinHeightAboveWater_PlantsExactlyWhereTheTopFaceIsHighEnough(int minHeight){
-            // heightAboveWater = h_int + 1 − WaterLevel; a negative minimum counts as 0 (never below water).
+            // heightAboveWater = h_int + 1 − WaterLevel; a negative minimum admits that many blocks of water above
+            // the ground.
             // Probability 1: every column rolls the rule, so the ground condition alone decides.
             FloraRule rule = FloraFixture.Rule(_fixture.TuftSo, 1f);
             rule.MinHeightAboveWater = minHeight;
@@ -137,7 +138,7 @@ namespace Engine.Tests.EditMode{
             int planted = 0, bare = 0;
             for (int i = 0; i < r.FloraSpecies.Length; i++){
                 int above = r.ColumnHeight[i] + 1 - WaterLevel;
-                bool expected = above >= math.max(minHeight, 0);
+                bool expected = above >= minHeight;
                 Assert.AreEqual(expected, r.FloraSpecies[i] != 0, $"column {i}: h = {r.ColumnHeight[i]}");
                 if (expected) planted++;
                 else bare++;
@@ -145,6 +146,34 @@ namespace Engine.Tests.EditMode{
 
             Assert.Greater(planted, 0);
             Assert.Greater(bare, 0, "the shore straddles the threshold");
+        }
+
+        [Test]
+        public void RequiresWaterGround_PlantsOnlyUnderWaterAsDeepAsTheMinimum(){
+            // A water-ground rule passes on columns with 1 … −MinHeightAboveWater blocks of water above the ground and
+            // nowhere on land; the land rule of the same biome never grows in water.
+            FloraRule reed = FloraFixture.Rule(_fixture.TuftSo, .5f);
+            reed.MinHeightAboveWater = -2;
+            reed.RequiresWaterGround = true;
+            FloraRule flower = FloraFixture.Rule(_fixture.FlowerSo, .5f);
+            Biome shore = _fixture.MakeBiome("Shore", .5f, 124f, 8f, _fixture.GrassSo, reed, flower);
+            Use(GenArchitecture.BiomeFirst, BlendMethod.None, shore);
+            RegionSample r = Region(Origin, Size);
+            int reeds = 0, flowers = 0, deep = 0;
+            for (int i = 0; i < r.FloraSpecies.Length; i++){
+                int x = r.Origin.x + i % r.Size.x, z = r.Origin.y + i / r.Size.x;
+                int above = r.ColumnHeight[i] + 1 - WaterLevel;
+                bool first = Hash.Hash01(x, z, _cfg.Seed, HashSalts.FloraSpecies) < _cfg.FloraRules[0].CumulativeEnd;
+                ushort expected = first ? above is < 0 and >= -2 ? (ushort)1 : (ushort)0 : above >= 1 ? (ushort)2 : (ushort)0;
+                Assert.AreEqual(expected, r.FloraSpecies[i], $"({x},{z}): {above} above water");
+                if (expected == 1) reeds++;
+                if (expected == 2) flowers++;
+                if (above < -2) deep++;
+            }
+
+            Assert.Greater(reeds, 0, "the shore has shallow water");
+            Assert.Greater(flowers, 0, "the shore has land");
+            Assert.Greater(deep, 0, "the shore has water deeper than the minimum");
         }
 
         // --- Columns without flora -----------------------------------------------------------------------------------

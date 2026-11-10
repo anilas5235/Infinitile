@@ -44,7 +44,8 @@ MonoBehaviour:
     Probability: 0.008
     RequiresSurfaceFromSameBiome: 0
     RequiresBeachGround: 0
-    MinHeightAboveWater: 1
+    MinHeightAboveWater: -2
+    RequiresWaterGround: 0
     DensityNoise: 0
     DensityInfluence: 1
     MinStackHeight: 1
@@ -143,7 +144,8 @@ MonoBehaviour:
     Probability: 0.3
     RequiresSurfaceFromSameBiome: 0
     RequiresBeachGround: 1
-    MinHeightAboveWater: 1
+    MinHeightAboveWater: 0
+    RequiresWaterGround: 0
     DensityNoise: 2
     DensityInfluence: 1
     MinStackHeight: 1
@@ -167,6 +169,18 @@ MonoBehaviour:
     RequiresBeachGround: 1
     MinHeightAboveWater: 1
     DensityNoise: 3
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 11400000, guid: db98f7eae87a93b0738de66b37941f0e, type: 2}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 0}
+    Probability: 0.25
+    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
+    MinHeightAboveWater: -2
+    RequiresWaterGround: 1
+    DensityNoise: 2
     DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1

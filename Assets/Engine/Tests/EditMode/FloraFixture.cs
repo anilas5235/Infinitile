@@ -507,7 +507,8 @@ namespace Engine.Tests.EditMode{
                 int wx = Origin.x + x, wz = Origin.y + z;
                 FloraRule rule = RuleAt(biomes, species, wx, wz, out int i);
                 if (rule == null || rule.IsMultiBlock || Carved(new int3(wx, ColumnTop(i), wz))) continue;
-                Put(fixture, new int3(wx, ColumnTop(i) + 1, wz), fixture.Ids[rule.SpeciesVoxel]);
+                // On a column under water the plant sits on the water surface.
+                Put(fixture, new int3(wx, math.max(ColumnTop(i) + 1, waterLevel), wz), fixture.Ids[rule.SpeciesVoxel]);
             }
 
             // Anchors in world order: x, then z.
@@ -564,6 +565,8 @@ namespace Engine.Tests.EditMode{
                 else{
                     int span = rule.MaxStackHeight - rule.MinStackHeight + 1;
                     int height = rule.MinStackHeight + (int)(Hash.Hash32(wx, wz, cfg.Seed, HashSalts.FloraStackHeight) % (uint)span);
+                    // A stack that is not solid starts above the water.
+                    if (fixture.ClassOf(fixture.Ids[rule.SpeciesVoxel]) != FloraVoxelClass.Solid) basePos.y = math.max(basePos.y, waterLevel);
                     for (int k = 0; k < height; k++){
                         footprint.Add(basePos + new int3(0, k, 0));
                         Put(fixture, basePos + new int3(0, k, 0), fixture.Ids[rule.SpeciesVoxel]);
@@ -648,7 +651,11 @@ namespace Engine.Tests.EditMode{
             Stamped.Add(world);
             if (world.y <= SurfaceAt(world.x, world.z)) Carve(world);
             int idx = Flat(world.x - Origin.x, world.y, world.z - Origin.y);
-            if (fixture.ClassOf(_voxels[idx]) < fixture.ClassOf(voxel)) _voxels[idx] = voxel;
+            // A solid flora voxel also replaces water and ice; leaves and plants never do.
+            byte cls = fixture.ClassOf(voxel);
+            ushort current = _voxels[idx];
+            if (fixture.ClassOf(current) < cls ||
+                (cls == FloraVoxelClass.Solid && current is TestFixtures.Water or TestFixtures.Ice)) _voxels[idx] = voxel;
         }
 
         internal ushort this[int3 world] => _voxels[Flat(world.x - Origin.x, world.y, world.z - Origin.y)];

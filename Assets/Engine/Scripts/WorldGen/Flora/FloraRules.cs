@@ -30,8 +30,11 @@ namespace Engine.Scripts.WorldGen.Flora{
         [Tooltip("When true, the plant grows only on beach columns; rules without it never grow there.")]
         public bool RequiresBeachGround;
 
-        [Tooltip("Minimum height of the top block's upper face above the water surface, in blocks (default 1).")]
+        [Tooltip("Minimum height of the top block's upper face above the water surface, in blocks (default 1). Negative: the plant may stand in water that many blocks deep (-2 = up to two blocks of water above its ground); a single-block plant then sits on the water surface, a trunk or stone replaces the water.")]
         public int MinHeightAboveWater = 1;
+
+        [Tooltip("When true, the plant grows only on columns under water (as deep as a negative MinHeightAboveWater allows); rules without it grow on land and, with a negative minimum, in water.")]
+        public bool RequiresWaterGround;
 
         [Tooltip("Density noise whose groves and clearings this rule follows (WorldGenSettings flora density).")]
         public FloraDensity DensityNoise;
@@ -101,7 +104,11 @@ namespace Engine.Scripts.WorldGen.Flora{
         /// <summary>1 for trees, structures and stacks above one block: anchor spacing applies.</summary>
         public byte MultiBlock;
 
+        /// <summary>Smallest height of the top face above the water surface; negative = that many blocks of water above the ground.</summary>
         public int MinHeightAboveWater;
+
+        /// <summary>1 when the plant grows only on columns under water.</summary>
+        public byte WaterGround;
 
         /// <summary>Index into <c>WorldGenConfig.FloraStructures</c>, or -1.</summary>
         public int Structure;

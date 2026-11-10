@@ -92,6 +92,7 @@ namespace Engine.Scripts.WorldGen.Flora{
                             BeachGround = rule.RequiresBeachGround ? (byte)1 : (byte)0,
                             MultiBlock = rule.IsMultiBlock ? (byte)1 : (byte)0,
                             MinHeightAboveWater = rule.MinHeightAboveWater,
+                            WaterGround = rule.RequiresWaterGround ? (byte)1 : (byte)0,
                             Structure = -1,
                             Tree = -1,
                             MinStackHeight = math.max(1, math.min(rule.MinStackHeight, rule.MaxStackHeight)),

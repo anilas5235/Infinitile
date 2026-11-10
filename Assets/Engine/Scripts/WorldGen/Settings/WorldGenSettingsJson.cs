@@ -200,6 +200,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                         ["RequiresSurfaceFromSameBiome"] = rule.RequiresSurfaceFromSameBiome,
                         ["RequiresBeachGround"] = rule.RequiresBeachGround,
                         ["MinHeightAboveWater"] = rule.MinHeightAboveWater,
+                        ["RequiresWaterGround"] = rule.RequiresWaterGround,
                         ["DensityNoise"] = rule.DensityNoise.ToString(),
                         ["DensityInfluence"] = rule.DensityInfluence,
                         ["MinStackHeight"] = rule.MinStackHeight,
