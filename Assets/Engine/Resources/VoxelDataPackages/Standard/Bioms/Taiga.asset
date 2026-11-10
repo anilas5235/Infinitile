@@ -112,7 +112,7 @@ MonoBehaviour:
     DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
-  - SpeciesVoxel: {fileID: 11400000, guid: 10218f21e1d9ac948ac6846e1469b188, type: 2}
+  - SpeciesVoxel: {fileID: 11400000, guid: ad4d203a2cf19f544b576099a0c1ce6d, type: 2}
     SpeciesStructure: {fileID: 0}
     SpeciesTree: {fileID: 0}
     Probability: 0.005
