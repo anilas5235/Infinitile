@@ -103,6 +103,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: db98f7eae87a93b0738de66b37941f0e, type: 2}
   - {fileID: 11400000, guid: 6eb8f68ebf89897c220771c664c07acc, type: 2}
   - {fileID: 11400000, guid: 06f8b56ea000ac7383ba4481f9ccb7c1, type: 2}
+  - {fileID: 11400000, guid: 1c847176684746b4ad8eb910fcffa5cd, type: 2}
+  - {fileID: 11400000, guid: 0a43f8b3c0ae4374829fa549723b5796, type: 2}
   biomes:
   - {fileID: 11400000, guid: c81cc6b7ac616da47b2c83f5b1cb1f75, type: 2}
   - {fileID: 11400000, guid: b56e988584e3a2a45bd91098ebd3fdc7, type: 2}

@@ -205,8 +205,8 @@ namespace Engine.Tests.EditMode{
                 }
 
                 // DeadTree is out of every biome since 2026-11-10.
-                Assert.AreEqual(10, cfg.TreeSpecies.Length,
-                    "Oak, Birch, Bush, Spruce, Cactus, Boulder, FallenLog, JungleTree, Acacia, Willow");
+                Assert.AreEqual(11, cfg.TreeSpecies.Length,
+                    "Oak, Birch, Bush, Spruce, Cactus, Boulder, FallenLog, JungleTree, Acacia, Willow, BushSwamp");
                 for (int i = 0; i < cfg.TreeVariants.Length; i++){
                     TreeVariantDef v = cfg.TreeVariants[i];
                     if (v.TrunkHeight.y > 0) Assert.AreNotEqual(0, v.TrunkVoxel, $"variant {i}: trunk voxel");
@@ -235,6 +235,9 @@ namespace Engine.Tests.EditMode{
                 Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:Reeds")));
                 Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:Fern")));
                 Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:GrassFTallDry")));
+                // Round 2 (2026-11-10): the Swamp's own bush leaves and grass plant.
+                Assert.AreEqual(FloraVoxelClass.Leaves, cfg.VoxelClassOf(Id("std:LeavesBushSwamp")));
+                Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:GrassFSwamp")));
                 Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:StoneGrey")), "boulders never replace terrain");
                 Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:Water")), "water is never overwritten");
             }

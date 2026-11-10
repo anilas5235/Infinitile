@@ -1,4 +1,4 @@
-"""Generator of the tiles in Assets/Engine/Resources/Artwork/KenneyDerived (batch of 2026-11-10): HSV recolours of
+"""Generator of the tiles in Assets/Engine/Resources/Artwork/KenneyDerived (batches of 2026-11-10): HSV recolours of
 Kenney Voxel Pack tiles (CC0) plus moss composites, 128x128. Needs Pillow.
 Usage: python Docs/Tools/make_tiles.py <project root> <out dir>
 Writes every tile and a contact sheet (_sheet.png) to <out dir>; copy the tiles you want into KenneyDerived. The opaque
@@ -45,7 +45,7 @@ tiles = {}
 GRASS = {  # name: (hue, sat, val)
     'dry': (52, .72, .90),      # Savanna: yellow-olive
     'jungle': (128, 1.05, .80),  # Jungle: deep green
-    'taiga': (150, .70, .66),   # Taiga: cold blue-green
+    'taiga': (138, .80, .56),   # Taiga: dark fir green (round 2: darker and greener than the first 150 / .70 / .66)
     'swamp': (84, .72, .68),    # Swamp: murky olive
 }
 for n, (h, s, v) in GRASS.items():
@@ -106,6 +106,9 @@ tiles['fern'] = recolour(load('grass2'), GREEN, 132, 1.0, .72)
 tiles['reeds'] = recolour(load('grass4'), GREEN, 88, .75, .70)
 tiles['grass_tall_dry'] = recolour(load('grass3'), GREEN, 52, .70, 1.0)
 tiles['grass_tall_jungle'] = recolour(load('grass3'), GREEN, 126, 1.05, .80)
+# Swamp (round 2): its own bush leaves (yellow moss green, lighter than the willow's leaves_swamp) and a dark sedge tuft.
+tiles['leaves_bush_swamp_transparent'] = recolour(load('leaves_transparent'), GREEN, 72, .92, .90)
+tiles['grass_swamp'] = recolour(load('grass1'), GREEN, 100, 1.0, .62)
 
 for name, im in tiles.items():
     im.save(os.path.join(OUT, name + '.png'))
