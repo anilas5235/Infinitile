@@ -25,9 +25,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: eeed6c09b1b96c04faeab22d816e1b62, type: 2}
   BeachBlock: {fileID: 11400000, guid: 9cf114b1c56383b448012d6a5b9d8b72, type: 2}
   BeachHeight: 3
-  TargetHumidity: 0.08
-  TargetTemperature: 0.76
-  TargetContinental: 0.55
+  TargetHumidity: 0.03
+  TargetTemperature: 0.7
+  TargetContinental: 0.64
   TargetErosion: 0.3
   TargetPV: 0.4
   TargetHeight: 0.56
