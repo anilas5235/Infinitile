@@ -119,6 +119,32 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void StrataBand_CountsThePeriodsUpwards_AlsoBelowZero(){
+            // One number per period: constant across a band and the gap above it, one more per period upwards.
+            for (int shift = -9; shift <= 9; shift += 3)
+            for (int y = -30; y < 60; y++){
+                int band = SurfaceCover.StrataBand(y, shift, 7);
+                Assert.AreEqual((int)System.Math.Floor((y + shift) / 7.0), band, $"y {y} shift {shift}");
+                // The band starts where the phase is 0.
+                if (SurfaceCover.InStrataBand(y, shift, 7, 1))
+                    Assert.AreEqual(band - 1, SurfaceCover.StrataBand(y - 1, shift, 7), $"y {y} shift {shift}: a new band starts");
+            }
+
+            Assert.AreEqual(0, SurfaceCover.StrataBand(40, 2, 0), "period 0");
+        }
+
+        [Test]
+        public void StrataBlockOf_CyclesThroughThePalette(){
+            Biome.BiomeDef one = new(){ strataBlock = 5 };
+            Biome.BiomeDef three = new(){ strataBlock = 5, strataBlock1 = 6, strataBlock2 = 7, strataCount = 3 };
+            ushort[] cycle = { 5, 6, 7 };
+            for (int band = -7; band < 9; band++){
+                Assert.AreEqual(5, one.StrataBlockOf(band), $"band {band}: no palette");
+                Assert.AreEqual(cycle[((band % 3) + 3) % 3], three.StrataBlockOf(band), $"band {band}");
+            }
+        }
+
+        [Test]
         public void StrataShift_StaysWithinTheAmplitudeAndVaries(){
             WorldGenConfig cfg = Config(0f);
             int min = int.MaxValue, max = int.MinValue;

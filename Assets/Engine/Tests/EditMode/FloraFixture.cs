@@ -487,7 +487,7 @@ namespace Engine.Tests.EditMode{
                 for (int y = 0; y < ChunkHeight; y++){
                     ushort v = y < h - 4 ? stone : y < h - 2 ? under : y < h ? beachUnder : y == h ? top : y < waterLevel ? TestFixtures.Water : TestFixtures.Air;
                     if (v == stone && def.strataBlock != 0 && SurfaceCover.InStrataBand(y, shift, cfg.StrataPeriod, cfg.StrataThickness))
-                        v = def.strataBlock;
+                        v = def.StrataBlockOf(SurfaceCover.StrataBand(y, shift, cfg.StrataPeriod));
                     if (frozen && y == waterLevel - 1 && v == TestFixtures.Water) v = TestFixtures.Ice;
                     _voxels[Flat(x, y, z)] = v;
                 }

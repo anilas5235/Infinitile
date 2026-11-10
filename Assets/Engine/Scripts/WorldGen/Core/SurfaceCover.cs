@@ -188,5 +188,16 @@ namespace Engine.Scripts.WorldGen.Core{
             if (phase < 0) phase += period;
             return phase < thickness;
         }
+
+        /// <summary>
+        ///     Number of the strata period voxel <paramref name="y" /> lies in: ⌊(y + shift) / period⌋, one more for
+        ///     every band upwards. A biome with a band palette picks the band's block by it. 0 for a period of 0.
+        /// </summary>
+        public static int StrataBand(int y, int shift, int period){
+            if (period <= 0) return 0;
+            int t = y + shift;
+            int band = t / period;
+            return t % period < 0 ? band - 1 : band;
+        }
     }
 }

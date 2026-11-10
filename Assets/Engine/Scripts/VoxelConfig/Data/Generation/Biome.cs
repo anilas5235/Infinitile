@@ -33,6 +33,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
         [Tooltip("Replaces the stone block in horizontal bands (WorldGenSettings strata). Empty: uniform stone.")]
         [SerializeField] public Voxel.Voxel StrataBlock;
 
+        [Tooltip("Further band blocks (at most three): the bands then cycle through StrataBlock and these, from the "
+                 + "bottom up. Empty: every band is the StrataBlock.")]
+        [SerializeField] public Voxel.Voxel[] StrataPalette;
+
         [Tooltip("Top block of beach columns just above the water surface, and the two blocks under it. Beaches are "
                  + "patchy (WorldGenSettings beaches). Empty: the biome has no beaches.")]
         [SerializeField] public Voxel.Voxel BeachBlock;
@@ -95,6 +99,19 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
             def.stoneBlock = voxelId(StoneBlock);
             def.snowTopBlock = SnowTopBlock ? voxelId(SnowTopBlock) : (ushort)0;
             def.strataBlock = StrataBlock ? voxelId(StrataBlock) : (ushort)0;
+            // The band palette: the strata block first, then the further blocks that are set.
+            def.strataCount = StrataBlock ? (byte)1 : (byte)0;
+            if (StrataBlock && StrataPalette != null)
+                foreach (Voxel.Voxel band in StrataPalette){
+                    if (!band || def.strataCount >= BiomeDef.MaxStrataBlocks) continue;
+                    ushort id = voxelId(band);
+                    switch (def.strataCount++){
+                        case 1: def.strataBlock1 = id; break;
+                        case 2: def.strataBlock2 = id; break;
+                        default: def.strataBlock3 = id; break;
+                    }
+                }
+
             def.beachBlock = BeachBlock ? voxelId(BeachBlock) : (ushort)0;
             return def;
         }
@@ -140,8 +157,17 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
             /// <summary>1 when the water surface over the biome's columns may freeze to ice.</summary>
             public byte freezesWater;
 
-            /// <summary>Block of the strata bands in the stone; 0 = uniform stone.</summary>
+            /// <summary>Most blocks a band palette holds.</summary>
+            public const int MaxStrataBlocks = 4;
+
+            /// <summary>Block of the strata bands in the stone (the first of the palette); 0 = uniform stone.</summary>
             public ushort strataBlock;
+
+            /// <summary>Further blocks of the band palette, used up to <see cref="strataCount" />.</summary>
+            public ushort strataBlock1, strataBlock2, strataBlock3;
+
+            /// <summary>Number of blocks the bands cycle through; 0 or 1 = every band is <see cref="strataBlock" />.</summary>
+            public byte strataCount;
 
             /// <summary>Top block of a beach column and the two blocks under it; 0 without a registry.</summary>
             public ushort beachBlock;
@@ -172,6 +198,22 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
             /// <summary>1 when a flora rule of the biome follows a density noise: its intervals are computed per column.</summary>
             public byte floraDensity;
+
+            /// <summary>
+            ///     Block of strata band number <paramref name="band" /> (<c>SurfaceCover.StrataBand</c>, any integer):
+            ///     the palette repeats from the bottom up.
+            /// </summary>
+            public readonly ushort StrataBlockOf(int band){
+                if (strataCount <= 1) return strataBlock;
+                int i = band % strataCount;
+                if (i < 0) i += strataCount;
+                return i switch{
+                    0 => strataBlock,
+                    1 => strataBlock1,
+                    2 => strataBlock2,
+                    _ => strataBlock3
+                };
+            }
 
             public void Dispose(){ }
         }

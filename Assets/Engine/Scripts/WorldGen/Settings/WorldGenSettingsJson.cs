@@ -188,6 +188,14 @@ namespace Engine.Scripts.WorldGen.Settings{
             return list;
         }
 
+        private static List<object> StrataPalette(Biome b){
+            List<object> palette = new();
+            if (b.StrataPalette != null)
+                foreach (VoxelConfig.Data.Voxel.Voxel band in b.StrataPalette)
+                    palette.Add(VoxelName(band));
+            return palette;
+        }
+
         private static Dictionary<string, object> BiomeTree(Biome b){
             List<object> flora = new();
             if (b.FloraRules != null)
@@ -216,6 +224,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["SnowTopBlock"] = VoxelName(b.SnowTopBlock),
                 ["FreezesWater"] = b.FreezesWater,
                 ["StrataBlock"] = VoxelName(b.StrataBlock),
+                ["StrataPalette"] = StrataPalette(b),
                 ["BeachBlock"] = VoxelName(b.BeachBlock),
                 ["BeachHeight"] = b.BeachHeight,
                 ["TargetTemperature"] = b.TargetTemperature,

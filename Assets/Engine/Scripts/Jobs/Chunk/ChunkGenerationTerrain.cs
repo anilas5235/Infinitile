@@ -288,6 +288,11 @@ namespace Engine.Scripts.Jobs.Chunk{
 
                 int gy = col.Height;
                 bool strata = col.StrataBlock != 0 && strataPeriod > 0 && strataThickness > 0;
+                // A biome with a band palette cycles through its blocks from band to band.
+                Biome.BiomeDef bands = default;
+                if (strata && col.SurfaceSource >= 0 && col.SurfaceSource < config.WorldGen.BiomeCount)
+                    bands = config.WorldGen.Biomes[col.SurfaceSource];
+                bool palette = bands.strataCount > 1;
 
                 for (int y = 0; y < ChunkHeight; y++){
                     ushort v;
@@ -299,7 +304,7 @@ namespace Engine.Scripts.Jobs.Chunk{
 
                     // Strata bands replace the stone block wherever it lies, top and under included.
                     if (strata && v == st && SurfaceCover.InStrataBand(y, col.StrataShift, strataPeriod, strataThickness))
-                        v = col.StrataBlock;
+                        v = palette ? bands.StrataBlockOf(SurfaceCover.StrataBand(y, col.StrataShift, strataPeriod)) : col.StrataBlock;
 
                     vox[ChunkSize.Flatten(x, y, z)] = v;
                 }

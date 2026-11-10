@@ -269,6 +269,67 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void ChunkJob_StrataPaletteCyclesFromBandToBand(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            // A biome with a band palette: every band is one block of the palette, the next band upwards the next
+            // block, and the chunk job equals the whole-world stamp. The other biome keeps its single strata block;
+            // empty palette entries and those beyond the fourth block are skipped.
+            _biomes = _fixture.DefaultBiomes();
+            _biomes[0].StrataBlock = _fixture.GraniteSo;
+            _biomes[0].StrataPalette = new[]{ _fixture.SnowSo, null, _fixture.GlassSo };
+            _biomes[1].StrataBlock = _fixture.GraniteSo;
+            WorldGenSettings s = _fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes);
+            s.StrataPeriod = 3;
+            s.StrataThickness = 2;
+            _config = _fixture.GeneratorConfig(s);
+            WorldGenConfig cfg = _config.WorldGen;
+            Assert.AreEqual(3, cfg.Biomes[0].strataCount, "the empty entry is skipped");
+            Assert.AreEqual(1, cfg.Biomes[1].strataCount);
+            _biomes[1].StrataPalette = new[]{ _fixture.SnowSo, _fixture.GlassSo, _fixture.SandSo, _fixture.DirtSo };
+            Assert.AreEqual(4, _biomes[1].ToStruct(v => _fixture.Ids[v]).strataCount, "at most four blocks");
+            _biomes[1].StrataPalette = null;
+
+            int2 originChunk = new(1, 2), chunks = new(3, 3);
+            ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
+            Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
+            try{
+                List<string> report = new();
+                int mismatches = CompareVoxels(reference, chunkData, report);
+                Assert.AreEqual(0, mismatches, "chunk voxels differ from the whole-world stamp:\n" + string.Join("\n", report));
+
+                ushort[] palette = { FloraFixture.Granite, FloraFixture.Snow, FloraFixture.Glass };
+                int[] seen = new int[3];
+                int plain = 0;
+                for (int x = reference.Origin.x; x < reference.Origin.x + reference.Size.x; x += 3)
+                for (int z = reference.Origin.y; z < reference.Origin.y + reference.Size.y; z += 3){
+                    int source = reference.Region.SurfaceSource[reference.Region.Index(x, z)];
+                    int shift = SurfaceCover.StrataShift(x, z, cfg);
+                    int h = reference.SurfaceAt(x, z);
+                    // Deep stone only: below the top, under and beach blocks.
+                    for (int y = h - 40; y < h - 4; y++){
+                        ushort v = VoxelAt(chunkData, new int3(x, y, z));
+                        int t = y + shift;
+                        int phase = (t % 3 + 3) % 3, band = (t - phase) / 3;
+                        ushort expected = phase >= 2 ? TestFixtures.Stone
+                            : source == 0 ? palette[(band % 3 + 3) % 3]
+                            : FloraFixture.Granite;
+                        Assert.AreEqual(expected, v, $"({x},{y},{z}) biome {source}, band {band}, phase {phase}");
+                        if (phase >= 2) continue;
+                        if (source == 0) seen[(band % 3 + 3) % 3]++;
+                        else plain++;
+                    }
+                }
+
+                TestContext.WriteLine($"{architecture}: palette bands {seen[0]} / {seen[1]} / {seen[2]}, single-block bands {plain}");
+                Assert.IsTrue(seen.All(n => n > 0), "every block of the palette occurs");
+                Assert.Greater(plain, 0, "the biome without a palette keeps its strata block");
+            }
+            finally{
+                Release(results);
+            }
+        }
+
+        [Test]
         public void ChunkJob_WaterPlantsStandInWholeWater(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
             // Rules with a negative MinHeightAboveWater: single-block plants sit on the water surface, trunks and
