@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Core;
@@ -73,6 +75,47 @@ namespace Engine.Tests.EditMode{
             finally{
                 foreach (Object o in owned) Object.DestroyImmediate(o);
             }
+        }
+
+        /// <summary>
+        ///     Candidates from <c>Temp/tuning-candidates.txt</c>, so a tuning round needs no recompile. One candidate per
+        ///     line: <c>Name: Jungle.TargetHeight=0.48; Mountain.TargetPV=0.6; Settings.LambdaHeight=4</c>. The part before
+        ///     the dot is a biome name or <c>Settings</c>, the part after it a float or int field. Lines starting with #
+        ///     and empty lines are skipped; without the file the test reports nothing.
+        /// </summary>
+        [Test]
+        public void TerrainLook_ReportCandidateFile(){
+            string file = Path.Combine(Directory.GetCurrentDirectory(), "Temp", "tuning-candidates.txt");
+            if (!File.Exists(file)) Assert.Ignore($"No candidate file at {file}");
+            foreach (string raw in File.ReadAllLines(file)){
+                string line = raw.Trim();
+                if (line.Length == 0 || line[0] == '#') continue;
+                int colon = line.IndexOf(':');
+                Assert.Greater(colon, 0, line);
+                List<Object> owned = new();
+                WorldGenSettings settings = CloneShipped(owned);
+                try{
+                    foreach (string assignment in line[(colon + 1)..].Split(';', StringSplitOptions.RemoveEmptyEntries))
+                        Assign(settings, assignment.Trim());
+                    Report(line[..colon].Trim(), settings);
+                }
+                finally{
+                    foreach (Object o in owned) Object.DestroyImmediate(o);
+                }
+            }
+        }
+
+        /// <summary>Sets <c>Target.Field=value</c> on a biome of <paramref name="settings" /> or on the settings themselves.</summary>
+        private static void Assign(WorldGenSettings settings, string assignment){
+            if (assignment.Length == 0) return;
+            string[] sides = assignment.Split('=');
+            string[] path = sides[0].Trim().Split('.');
+            Assert.IsTrue(sides.Length == 2 && path.Length == 2, assignment);
+            object target = path[0] == "Settings" ? settings : BiomeOf(settings, path[0]);
+            FieldInfo field = target.GetType().GetField(path[1], BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.IsNotNull(field, assignment);
+            float value = float.Parse(sides[1].Trim(), CultureInfo.InvariantCulture);
+            field.SetValue(target, field.FieldType == typeof(int) ? (object)(int)value : value);
         }
 
         /// <summary>A copy of the shipped settings with copies of its biome set, biomes and splines.</summary>
@@ -224,6 +267,16 @@ namespace Engine.Tests.EditMode{
                                   $"{names[b]} {patchCount[b]} patches, {100.0 * smallCells[b] / cells[b]:F0} % mini, " +
                                   $"{100.0 * mediumCells[b] / cells[b]:F0} % < 256², " +
                                   $"largest {largest[b] * Stride * Stride / 1e6:F2} km²")));
+
+                // High ground by height alone: what a biome that takes every column above a line could look like.
+                foreach (float line in new[]{ 170f, 180f, 190f }){
+                    int[] high = height.Select(h => h >= line ? 0 : -1).ToArray();
+                    Patches(high, 1, out int[] highCount, out int[] _, out int[] highCells, out int[] highLargest,
+                        out int[] highMedium);
+                    sb.AppendLine($"high    H ≥ {line:F0}: {100.0 * highCells[0] / n:F1} % of all, {highCount[0]} patches, " +
+                                  $"{100.0 * highMedium[0] / math.max(1, highCells[0]):F0} % < 256², " +
+                                  $"largest {highLargest[0] * Stride * Stride / 1e6:F2} km²");
+                }
 
                 // Boundaries of the dominant material biome, implausible pairs flagged.
                 Dictionary<(int, int), int> edges = BorderEdges(dominant, biomeCount);

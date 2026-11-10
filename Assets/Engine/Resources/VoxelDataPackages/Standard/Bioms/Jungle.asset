@@ -24,9 +24,9 @@ MonoBehaviour:
   TargetHumidity: 0.55
   TargetTemperature: 0.78
   TargetContinental: 0.5
-  TargetErosion: 0.35
-  TargetPV: 0.3
-  TargetHeight: 0.55
+  TargetErosion: 0.5
+  TargetPV: 0
+  TargetHeight: 0.48
   HeightOffset: 140
   HeightAmplitude: 9
   OctaveWeights:
