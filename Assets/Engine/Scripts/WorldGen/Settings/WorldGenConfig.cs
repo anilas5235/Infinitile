@@ -102,7 +102,9 @@ namespace Engine.Scripts.WorldGen.Settings{
 
         // --- Snow, ice, strata and beaches (SurfaceCover) ----------------------------------------------------------
         public float FreezeTemperature;
-        public float SnowLapse;
+        public float SnowLineHeight;
+        public float SnowLineNoiseAmplitude;
+        public float SnowLineNoiseWavelength;
         public float FreezeNoiseAmplitude;
         public float FreezeNoiseWavelength;
         public int StrataPeriod;

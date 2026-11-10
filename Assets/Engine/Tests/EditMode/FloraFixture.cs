@@ -475,7 +475,7 @@ namespace Engine.Tests.EditMode{
                 ushort top = b ? fixture.Ids[h + 1 < waterLevel ? wet : b.TopBlock] : (ushort)0;
                 bool beach = b && b.BeachBlock && SurfaceCover.IsBeach(wx, wz, h, def, cfg, probes);
                 if (beach) top = fixture.Ids[b.BeachBlock];
-                if (b && SurfaceCover.IsSnowCovered(wx, wz, t, h, def, cfg)) top = def.snowTopBlock;
+                if (b && SurfaceCover.IsSnowCovered(wx, wz, h, def, cfg)) top = def.snowTopBlock;
                 ushort under = b ? fixture.Ids[b.UnderBlock] : (ushort)0;
                 ushort beachUnder = beach ? fixture.Ids[b.BeachBlock] : under;
                 ushort stone = b ? fixture.Ids[b.StoneBlock] : (ushort)0;

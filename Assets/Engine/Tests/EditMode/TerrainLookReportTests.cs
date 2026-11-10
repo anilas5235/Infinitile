@@ -291,8 +291,7 @@ namespace Engine.Tests.EditMode{
                         int2 w = origin + new int2(x, z) * Stride;
                         int top = (int)math.floor(height[i]);
                         if (snowy && cfg.EnableClimateOverrides && top + 1 >= cfg.WaterLevel &&
-                            Engine.Scripts.WorldGen.Core.SurfaceCover.EffectiveTemperature(w.x, w.y, fields[i].T, top, cfg) <
-                            cfg.FreezeTemperature) snow++;
+                            top + 1 >= Engine.Scripts.WorldGen.Core.SurfaceCover.SnowLine(w.x, w.y, cfg)) snow++;
                     }
 
                     if (hard[i] != b) continue;

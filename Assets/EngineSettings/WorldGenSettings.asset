@@ -156,7 +156,9 @@ MonoBehaviour:
   EnableClimateOverrides: 1
   IceVoxel: {fileID: 11400000, guid: a0254e99cf594614496c8d97c76c38f0, type: 2}
   FreezeTemperature: 0.2
-  SnowLapse: 0.45
+  SnowLineHeight: 210
+  SnowLineNoiseAmplitude: 6
+  SnowLineNoiseWavelength: 48
   FreezeNoiseAmplitude: 0.04
   FreezeNoiseWavelength: 24
   StrataPeriod: 7

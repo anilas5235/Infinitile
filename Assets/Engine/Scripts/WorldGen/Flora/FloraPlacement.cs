@@ -73,7 +73,7 @@ namespace Engine.Scripts.WorldGen.Flora{
             if ((cfg.Biomes[s.SurfaceSource].beachHeight | d.BeachGround) != 0 && !BeachAllows(x, z, d.BeachGround, s, cfg, cache)) return -1;
             // Snow keeps trees and cacti but carries no ground plants.
             if (d.MultiBlock == 0 &&
-                SurfaceCover.IsSnowCovered(x, z, s.Fields.T, s.ColumnHeight, cfg.Biomes[s.SurfaceSource], cfg)) return -1;
+                SurfaceCover.IsSnowCovered(x, z, s.ColumnHeight, cfg.Biomes[s.SurfaceSource], cfg)) return -1;
 
             source = biome;
             return rule;

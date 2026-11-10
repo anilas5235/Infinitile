@@ -15,8 +15,11 @@ namespace Engine.Scripts.WorldGen.Core{
         public const uint WeirdnessNoise = 0x70C2AD07u;
         public const uint PeakNoise = 0x81D3BE08u;
 
-        /// <summary>Noise on the effective temperature of the snow and ice overrides.</summary>
+        /// <summary>Noise on the effective temperature of the ice override.</summary>
         public const uint FreezeNoise = 0x3C8E6913u;
+
+        /// <summary>Wobble of the snow line.</summary>
+        public const uint SnowLineNoise = 0x5EA08B15u;
 
         /// <summary>Rise and fall of the strata bands.</summary>
         public const uint StrataNoise = 0x4D9F7A14u;

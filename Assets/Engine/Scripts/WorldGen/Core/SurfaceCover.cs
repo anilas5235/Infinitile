@@ -8,30 +8,35 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Core{
     /// <summary>
-    ///     Snow, ice, strata and beaches of a column, pure functions of the world position. The effective temperature falls with
-    ///     the height above the water and carries a little noise, so snow lines and ice edges are ragged. Dry columns and
-    ///     the water surface share the freeze temperature, so in a biome with both a snow block and <c>freezesWater</c>
-    ///     snow on a shore meets the ice.
+    ///     Snow, ice, strata and beaches of a column, pure functions of the world position. Snow caps the peaks: a dry
+    ///     column of a biome with a snow block takes it above the snow line, a height that wobbles a few blocks with a
+    ///     low noise. Ice follows the climate: the water of a <c>freezesWater</c> biome freezes where its temperature,
+    ///     plus a little noise, lies below the freeze temperature.
     /// </summary>
     public static class SurfaceCover{
         /// <summary>Spacing in blocks of the world-aligned probe lattice on which beaches look for water.</summary>
         public const int WaterProbeStride = 4;
 
-        /// <summary>
-        ///     Temperature <paramref name="temperature" /> lowered by <c>SnowLapse</c> times the normalised height of the
-        ///     top face above the water surface, plus the freeze noise.
-        /// </summary>
-        public static float EffectiveTemperature(int x, int z, float temperature, int height, in WorldGenConfig cfg){
-            return EffectiveTemperature(temperature, height, FreezeNoise(x, z, cfg), cfg);
+        /// <summary>Temperature <paramref name="temperature" /> of the water surface plus the freeze noise.</summary>
+        public static float EffectiveTemperature(int x, int z, float temperature, in WorldGenConfig cfg){
+            return EffectiveTemperature(temperature, FreezeNoise(x, z, cfg), cfg);
         }
 
         /// <summary>
-        ///     <see cref="EffectiveTemperature(int,int,float,int,in WorldGenConfig)" /> with the column's
-        ///     <see cref="FreezeNoise" /> already evaluated, so snow and ice of one column share it.
+        ///     <see cref="EffectiveTemperature(int,int,float,in WorldGenConfig)" /> with the column's
+        ///     <see cref="FreezeNoise" /> already evaluated.
         /// </summary>
-        public static float EffectiveTemperature(float temperature, int height, float freezeNoise, in WorldGenConfig cfg){
-            float above = math.saturate((height + 1 - cfg.WaterLevel) / math.max(1f, cfg.HeightMax - cfg.WaterLevel));
-            return temperature - cfg.SnowLapse * above + cfg.FreezeNoiseAmplitude * freezeNoise;
+        public static float EffectiveTemperature(float temperature, float freezeNoise, in WorldGenConfig cfg){
+            return temperature + cfg.FreezeNoiseAmplitude * freezeNoise;
+        }
+
+        /// <summary>
+        ///     Snow line at column (<paramref name="x" />, <paramref name="z" />): <c>SnowLineHeight</c> plus
+        ///     <c>SnowLineNoiseAmplitude</c> times one octave of noise in −1…1, so the snow edge is no straight contour.
+        /// </summary>
+        public static float SnowLine(int x, int z, in WorldGenConfig cfg){
+            float n = SeededSimplex.Noise(new float2(x, z) / cfg.SnowLineNoiseWavelength, cfg.Seed, HashSalts.SnowLineNoise);
+            return cfg.SnowLineHeight + cfg.SnowLineNoiseAmplitude * n;
         }
 
         /// <summary>The unscaled freeze noise of column (<paramref name="x" />, <paramref name="z" />), in −1…1.</summary>
@@ -41,22 +46,14 @@ namespace Engine.Scripts.WorldGen.Core{
 
         /// <summary>
         ///     The dry column (top block at <paramref name="height" />) takes the snow block of its surface biome
-        ///     <paramref name="def" />. Biomes without a snow block never do.
+        ///     <paramref name="def" />: its top face (y = height + 1) reaches the column's <see cref="SnowLine" />.
+        ///     Biomes without a snow block never do; columns below the lowest snow line skip the noise.
         /// </summary>
-        public static bool IsSnowCovered(int x, int z, float temperature, int height, in Biome.BiomeDef def,
-            in WorldGenConfig cfg){
+        public static bool IsSnowCovered(int x, int z, int height, in Biome.BiomeDef def, in WorldGenConfig cfg){
             if (!MayBeSnowCovered(height, def, cfg)) return false;
-            return EffectiveTemperature(x, z, temperature, height, cfg) < cfg.FreezeTemperature;
-        }
-
-        /// <summary>
-        ///     <see cref="IsSnowCovered(int,int,float,int,in Biome.BiomeDef,in WorldGenConfig)" /> with the column's
-        ///     <see cref="FreezeNoise" />.
-        /// </summary>
-        public static bool IsSnowCovered(float temperature, int height, float freezeNoise, in Biome.BiomeDef def,
-            in WorldGenConfig cfg){
-            if (!MayBeSnowCovered(height, def, cfg)) return false;
-            return EffectiveTemperature(temperature, height, freezeNoise, cfg) < cfg.FreezeTemperature;
+            float top = height + 1;
+            if (top < cfg.SnowLineHeight - cfg.SnowLineNoiseAmplitude) return false;
+            return top >= SnowLine(x, z, cfg);
         }
 
         /// <summary>
@@ -66,7 +63,7 @@ namespace Engine.Scripts.WorldGen.Core{
         /// </summary>
         public static bool WaterFreezes(int x, int z, float temperature, in Biome.BiomeDef def, in WorldGenConfig cfg){
             if (!cfg.EnableClimateOverrides || def.freezesWater == 0) return false;
-            return EffectiveTemperature(x, z, temperature, cfg.WaterLevel - 1, cfg) < cfg.FreezeTemperature;
+            return EffectiveTemperature(x, z, temperature, cfg) < cfg.FreezeTemperature;
         }
 
         /// <summary>
@@ -76,7 +73,7 @@ namespace Engine.Scripts.WorldGen.Core{
         public static bool WaterFreezes(float temperature, float freezeNoise, in Biome.BiomeDef def,
             in WorldGenConfig cfg){
             if (!cfg.EnableClimateOverrides || def.freezesWater == 0) return false;
-            return EffectiveTemperature(temperature, cfg.WaterLevel - 1, freezeNoise, cfg) < cfg.FreezeTemperature;
+            return EffectiveTemperature(temperature, freezeNoise, cfg) < cfg.FreezeTemperature;
         }
 
         private static bool MayBeSnowCovered(int height, in Biome.BiomeDef def, in WorldGenConfig cfg){
