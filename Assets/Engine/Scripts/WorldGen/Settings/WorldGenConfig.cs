@@ -33,6 +33,9 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// <summary>B_mat in blocks (DistanceBlend only; the material-stage DistortedBoundary is a one-hot warp).</summary>
         public float MaterialBlendWidth;
 
+        /// <summary>Wavelength in blocks of the border noise of the surface pick (<c>SurfacePick.PickPatchy</c>); 0 = white noise.</summary>
+        public float MaterialBorderWavelength;
+
         /// <summary>σ_mat in normalised parameter units (method 4).</summary>
         public float MaterialSigma;
 

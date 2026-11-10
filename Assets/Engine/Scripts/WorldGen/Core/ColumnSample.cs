@@ -39,7 +39,7 @@ namespace Engine.Scripts.WorldGen.Core{
         /// <summary>Height-stage weights; Biome-first only, one-hot otherwise.</summary>
         public BlendWeights HeightWeights;
 
-        /// <summary>Biome whose top/under blocks the column uses: the dithered surface pick when a material method is active, otherwise the hard class.</summary>
+        /// <summary>Biome whose top/under blocks the column uses: the surface pick (border noise over the material weights) when a material method is active, otherwise the hard class.</summary>
         public int SurfaceSource;
 
         /// <summary>

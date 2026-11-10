@@ -105,6 +105,74 @@ namespace Engine.Tests.EditMode{
             }
         }
 
+        /// <summary>
+        ///     The surface material at block resolution: 1024² columns around <see cref="CloseUpCentre" />, once with the
+        ///     per-block mix (<c>MaterialBorderWavelength</c> 0) and once as shipped. Writes
+        ///     <c>Border_Dither_surface.png</c> and <c>Border_Shipped_surface.png</c> and prints for either one the
+        ///     columns whose material differs from the dominant one, the neighbour pairs of different material (the
+        ///     border length) and the columns that differ from all four neighbours (speckles).
+        /// </summary>
+        [Test]
+        public void TerrainLook_BorderCloseUp(){
+            foreach (string variant in new[]{ "Dither", "Shipped" }){
+                List<Object> owned = new();
+                WorldGenSettings settings = CloneShipped(owned);
+                try{
+                    if (variant == "Dither") settings.MaterialBorderWavelength = 0f;
+                    CloseUp(variant, settings);
+                }
+                finally{
+                    foreach (Object o in owned) Object.DestroyImmediate(o);
+                }
+            }
+        }
+
+        /// <summary>Centre of the close-up of <see cref="TerrainLook_BorderCloseUp" /> in blocks.</summary>
+        private static readonly int2 CloseUpCentre = new(0, 0);
+
+        private static void CloseUp(string variant, WorldGenSettings settings){
+            WorldGenConfig cfg = settings.ToConfig(TestFixtures.Seed);
+            int n = Size * Size;
+            RegionBuffers buffers = new(){
+                Height = new NativeArray<float>(n, Allocator.TempJob),
+                DominantMaterialBiome = new NativeArray<int>(n, Allocator.TempJob),
+                SurfaceSource = new NativeArray<int>(n, Allocator.TempJob)
+            };
+            try{
+                WorldGenRequest request = new(){
+                    Config = cfg, Origin = CloseUpCentre - new int2(Size / 2, Size / 2), Size = new int2(Size, Size), Stride = 1
+                };
+                WorldGenApi.SampleRegion(request, ref buffers).Complete();
+                float[] height = buffers.Height.ToArray();
+                int[] dominant = buffers.DominantMaterialBiome.ToArray();
+                int[] surface = buffers.SurfaceSource.ToArray();
+                int minority = 0, pairs = 0, speckles = 0;
+                for (int z = 1; z < Size - 1; z++)
+                for (int x = 1; x < Size - 1; x++){
+                    int i = z * Size + x, s = surface[i];
+                    if (s != dominant[i]) minority++;
+                    if (s != surface[i + 1]) pairs++;
+                    if (s != surface[i + Size]) pairs++;
+                    if (s != surface[i + 1] && s != surface[i - 1] && s != surface[i + Size] && s != surface[i - Size]) speckles++;
+                }
+
+                string line = $"=== border close-up {variant}: {Size}² blocks around ({CloseUpCentre.x}, {CloseUpCentre.y}), " +
+                              $"border wavelength {settings.MaterialBorderWavelength:F0}: not the dominant material " +
+                              $"{100.0 * minority / n:F2} %, neighbour pairs of different material {pairs}, single columns {speckles}";
+                TestContext.WriteLine(line);
+                Directory.CreateDirectory(OutDir);
+                File.WriteAllText(Path.Combine(OutDir, $"Border_{variant}_stats.txt"), line);
+                Color32[] colors = settings.Biomes.Biomes.Select(b => (Color32)b.RepresentativeColor).ToArray();
+                WritePng($"Border_{variant}_surface.png", BiomeView(surface, colors, height, cfg.WaterLevel));
+            }
+            finally{
+                buffers.Height.Dispose();
+                buffers.DominantMaterialBiome.Dispose();
+                buffers.SurfaceSource.Dispose();
+                cfg.Dispose();
+            }
+        }
+
         /// <summary>Sets <c>Target.Field=value</c> on a biome of <paramref name="settings" /> or on the settings themselves.</summary>
         private static void Assign(WorldGenSettings settings, string assignment){
             if (assignment.Length == 0) return;

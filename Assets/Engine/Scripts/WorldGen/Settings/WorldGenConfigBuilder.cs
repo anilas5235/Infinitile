@@ -70,6 +70,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 Architecture = settings.Architecture,
                 MaterialMethod = settings.MaterialMethod,
                 MaterialBlendWidth = settings.MaterialBlendWidth,
+                MaterialBorderWavelength = settings.MaterialBorderWavelength,
                 MaterialSigma = settings.MaterialSigma,
                 HeightMethod = heightMethod,
                 HeightBlendWidth = settings.HeightBlendWidth,

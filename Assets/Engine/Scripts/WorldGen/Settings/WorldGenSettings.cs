@@ -28,6 +28,11 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Tooltip("B_mat: material blend width in blocks (DistanceBlend only; material-stage DistortedBoundary is a one-hot warp).")]
         public float MaterialBlendWidth = 32f;
 
+        [Tooltip("Wavelength in blocks of the border noise: inside a blend zone the surface material follows this noise, " +
+                 "so two materials meet in tongues and patches of about half this size. 0: a per-block mix (white noise).")]
+        [Min(0f)]
+        public float MaterialBorderWavelength = 28f;
+
         [Tooltip("σ_mat: material blend width in normalised parameter units (ParameterSpaceWeighting).")]
         public float MaterialSigma = 0.04f;
 
@@ -363,6 +368,9 @@ namespace Engine.Scripts.WorldGen.Settings{
             bool heightUsed = biomeFirst && heightMethod != BlendMethod.None;
             if (MaterialMethod == BlendMethod.DistanceBlend && !IsPositiveFinite(MaterialBlendWidth))
                 yield return (nameof(MaterialBlendWidth), MaterialBlendWidth);
+            // 0 is allowed: the per-block mix.
+            if (MaterialMethod != BlendMethod.None && !(MaterialBorderWavelength >= 0f && !float.IsInfinity(MaterialBorderWavelength)))
+                yield return (nameof(MaterialBorderWavelength), MaterialBorderWavelength);
             if (heightUsed && heightMethod is BlendMethod.DistanceBlend or BlendMethod.DistortedBoundary && !IsPositiveFinite(HeightBlendWidth))
                 yield return (nameof(HeightBlendWidth), HeightBlendWidth);
             if (MaterialMethod == BlendMethod.ParameterSpaceWeighting && !IsPositiveFinite(MaterialSigma))

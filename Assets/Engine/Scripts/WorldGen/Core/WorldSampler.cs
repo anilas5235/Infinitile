@@ -16,7 +16,7 @@ namespace Engine.Scripts.WorldGen.Core{
     ///     <para>
     ///         Terrain-first: spline height, then 6D classification (<see cref="TerrainFirstHeight" />). Biome-first:
     ///         5D classification, then the height composed from the biome parameters (<see cref="BiomeFirstHeight" />).
-    ///         Both then apply the per-stage blend methods (<see cref="BlendMethods" />), the dithered surface pick
+    ///         Both then apply the per-stage blend methods (<see cref="BlendMethods" />), the noise-thresholded surface pick
     ///         (<see cref="SurfacePick" />) and the flora decision (<see cref="FloraPlacement" />).
     ///     </para>
     ///     <para>
@@ -110,14 +110,14 @@ namespace Engine.Scripts.WorldGen.Core{
             }
 
             if (cfg.MaterialMethod == BlendMethod.None){
-                // One-hot weights: argmax and the dithered pick are the hard class itself, so skip both.
+                // One-hot weights: argmax and the surface pick are the hard class itself, so skip both.
                 s.DominantMaterialBiome = s.HardBiome;
                 s.SurfaceSource = s.HardBiome;
             }
             else{
                 s.DominantMaterialBiome = biomeCount > 0 ? s.MaterialWeights.ArgMax(biomeCount) : -1;
-                // Dithered surface pick from the material weights.
-                s.SurfaceSource = SurfacePick.Pick(x, z, cfg.Seed, HashSalts.SurfacePick, s.MaterialWeights, biomeCount);
+                // Surface pick from the material weights; the border noise makes two materials meet in patches.
+                s.SurfaceSource = SurfacePick.PickPatchy(x, z, cfg.Seed, cfg.MaterialBorderWavelength, s.MaterialWeights, biomeCount);
             }
 
             s.Clamped = HeightLimit.Exceeds(unclamped, cfg);

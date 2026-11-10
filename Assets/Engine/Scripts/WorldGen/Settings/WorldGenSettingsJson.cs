@@ -21,6 +21,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["Architecture"] = s.Architecture,
                 ["MaterialMethod"] = s.MaterialMethod,
                 ["MaterialBlendWidth"] = s.MaterialBlendWidth,
+                ["MaterialBorderWavelength"] = s.MaterialBorderWavelength,
                 ["MaterialSigma"] = s.MaterialSigma,
                 ["HeightMethod"] = s.HeightMethod,
                 ["HeightBlendWidth"] = s.HeightBlendWidth,

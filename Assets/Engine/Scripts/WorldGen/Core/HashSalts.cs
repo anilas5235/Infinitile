@@ -69,6 +69,12 @@ namespace Engine.Scripts.WorldGen.Core{
         /// <summary>Surface source pick.</summary>
         public const uint SurfacePick = 0xE739140Eu;
 
+        /// <summary>Broad octave of the border noise of the surface pick.</summary>
+        public const uint MaterialBorder = 0x3C91A7D4u;
+
+        /// <summary>Detail octave of the border noise of the surface pick.</summary>
+        public const uint MaterialBorderDetail = 0x9E2F60B3u;
+
         /// <summary>Which biome's flora rules a column uses.</summary>
         public const uint FloraBiome = 0xF84A250Fu;
 
