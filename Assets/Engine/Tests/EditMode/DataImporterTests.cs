@@ -253,6 +253,31 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void ShippedWorldGenSettings_TreesStopAtTheTreeLineAndNeedSoil(){
+            // Every tree, bush and fallen log rule of the shipped biomes ends at the tree line and needs soil;
+            // boulders, cacti and single-block plants carry neither flag. The highest tree line lies below the
+            // lowest snow line.
+            WorldGenSettings settings = AssetDatabase.LoadAssetAtPath<WorldGenSettings>(ShippedSettingsPath);
+            Assert.IsNotNull(settings, ShippedSettingsPath);
+            Assert.Greater(settings.TreeLineHeight, 0f);
+            Assert.Less(settings.TreeLineHeight + settings.TreeLineNoiseAmplitude,
+                settings.SnowLineHeight - settings.SnowLineNoiseAmplitude);
+            int trees = 0, others = 0;
+            foreach (Biome biome in settings.Biomes.Biomes)
+            foreach (FloraRule rule in biome.FloraRules){
+                string species = rule.SpeciesTree ? rule.SpeciesTree.name : "";
+                bool tree = species.Length > 0 && !species.StartsWith("Boulder") && species != "Cactus";
+                Assert.AreEqual(tree, rule.StopsAtTreeLine, $"{biome.name}: {species} StopsAtTreeLine");
+                Assert.AreEqual(tree, rule.RequiresSoil, $"{biome.name}: {species} RequiresSoil");
+                if (tree) trees++;
+                else others++;
+            }
+
+            Assert.AreEqual(20, trees, "tree rules of the shipped biomes");
+            Assert.Greater(others, 20);
+        }
+
+        [Test]
         public void ShippedWorldGenSettings_EveryLandBiomeCarriesFlora(){
             // Flora is visible for all land biomes. A 4096² area at stride 8: every biome with
             // flora rules that supplies the surface somewhere also has planted columns.

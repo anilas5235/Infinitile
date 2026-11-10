@@ -21,6 +21,9 @@ namespace Engine.Scripts.WorldGen.Core{
         /// <summary>Wobble of the snow line.</summary>
         public const uint SnowLineNoise = 0x5EA08B15u;
 
+        /// <summary>Wobble of the tree line.</summary>
+        public const uint TreeLineNoise = 0x7B3D5E26u;
+
         /// <summary>Rise and fall of the strata bands.</summary>
         public const uint StrataNoise = 0x4D9F7A14u;
 

@@ -132,6 +132,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                 floraRuleCount = 0,
                 // Plants need solid ground; the mesh layer of the top block decides, no registry needed.
                 floraGround = TopBlock && TopBlock.meshLayer == Mesh.MeshLayer.Solid ? (byte)1 : (byte)0,
+                // Bare stone: the top block is the stone block itself.
+                soilGround = TopBlock && TopBlock != StoneBlock ? (byte)1 : (byte)0,
                 freezesWater = FreezesWater ? (byte)1 : (byte)0,
                 beachHeight = BeachBlock ? (byte)Mathf.Clamp(BeachHeight, 0, 255) : (byte)0,
                 beachFloraGround = BeachBlock && BeachBlock.meshLayer == Mesh.MeshLayer.Solid ? (byte)1 : (byte)0
@@ -195,6 +197,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
             /// <summary>1 when the top block is solid ground that carries plants.</summary>
             public byte floraGround;
+
+            /// <summary>1 when the top block is soil (not the biome's stone block): ground for flora rules that need soil.</summary>
+            public byte soilGround;
 
             /// <summary>1 when a flora rule of the biome follows a density noise: its intervals are computed per column.</summary>
             public byte floraDensity;

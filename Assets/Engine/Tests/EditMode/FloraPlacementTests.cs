@@ -176,6 +176,110 @@ namespace Engine.Tests.EditMode{
             Assert.Greater(deep, 0, "the shore has water deeper than the minimum");
         }
 
+        [Test]
+        public void StopsAtTreeLine_EndsTheRuleAtTheLine_OtherRulesContinue(){
+            // Two plants roll half of the columns each: the one that stops at the tree line grows exactly on the
+            // columns below their tree line, the other one everywhere.
+            FloraRule tree = FloraFixture.Rule(_fixture.TuftSo, .5f);
+            tree.StopsAtTreeLine = true;
+            FloraRule rock = FloraFixture.Rule(_fixture.FlowerSo, .5f);
+            Biome slope = _fixture.MakeBiome("Slope", .5f, 195f, 30f, _fixture.GrassSo, tree, rock);
+            Use(GenArchitecture.BiomeFirst, BlendMethod.None, slope);
+            Assert.AreEqual(195f, _cfg.TreeLineHeight);
+            Assert.AreEqual(1, _cfg.FloraRules[0].TreeLine);
+            Assert.AreEqual(FloraRuleDef.CheckTreeLine, _cfg.FloraRules[0].GroundChecks);
+            Assert.AreEqual(0, _cfg.FloraRules[1].GroundChecks);
+            RegionSample r = Region(Origin, Size);
+            int below = 0, above = 0, rocksAbove = 0;
+            for (int i = 0; i < r.FloraSpecies.Length; i++){
+                int x = r.Origin.x + i % r.Size.x, z = r.Origin.y + i / r.Size.x;
+                bool first = Hash.Hash01(x, z, _cfg.Seed, HashSalts.FloraSpecies) < _cfg.FloraRules[0].CumulativeEnd;
+                bool high = SurfaceCover.AboveTreeLine(x, z, r.ColumnHeight[i], _cfg);
+                ushort expected = first ? high ? (ushort)0 : (ushort)1 : (ushort)2;
+                Assert.AreEqual(expected, r.FloraSpecies[i], $"({x},{z}): h = {r.ColumnHeight[i]}");
+                if (!first && high) rocksAbove++;
+                if (!first) continue;
+                if (high) above++;
+                else below++;
+            }
+
+            Assert.Greater(below, 100, "the slope has ground below the tree line");
+            Assert.Greater(above, 100, "the slope has ground above the tree line");
+            Assert.Greater(rocksAbove, 100, "rules without the flag continue above it");
+        }
+
+        [Test]
+        public void StopsAtTreeLine_HeightZero_TurnsTheLineOff(){
+            FloraRule tree = FloraFixture.Rule(_fixture.TuftSo, 1f);
+            tree.StopsAtTreeLine = true;
+            Biome slope = _fixture.MakeBiome("Slope", .5f, 195f, 30f, _fixture.GrassSo, tree);
+            WorldGenSettings s = _fixture.Settings(GenArchitecture.BiomeFirst, BlendMethod.None, slope);
+            s.TreeLineHeight = 0f;
+            _cfg = _fixture.ToConfig(s);
+            RegionSample r = Region(Origin, Size);
+            Assert.IsTrue(r.ColumnHeight.Any(h => h > 205), "the slope reaches above the usual tree line");
+            Assert.IsTrue(r.FloraSpecies.All(sp => sp == 1));
+        }
+
+        [Test]
+        public void RequiresSoil_NeverOnBareStone(){
+            // A biome whose top block is its stone block is bare stone: rules that need soil grow nowhere on it, the
+            // others everywhere.
+            FloraRule tree = FloraFixture.Rule(_fixture.FlowerSo, .5f);
+            tree.RequiresSoil = true;
+            Biome rock = _fixture.MakeBiome("Rock", .5f, 150f, 8f, _fixture.StoneSo, tree, FloraFixture.Rule(_fixture.TuftSo, .5f));
+            Use(GenArchitecture.BiomeFirst, BlendMethod.None, rock);
+            Assert.AreEqual(0, _cfg.Biomes[0].soilGround);
+            Assert.AreEqual(1, _cfg.FloraRules[0].Soil);
+            Assert.AreEqual(FloraRuleDef.CheckSoil, _cfg.FloraRules[0].GroundChecks);
+            RegionSample r = Region(Origin, Size);
+            int tufts = 0;
+            for (int i = 0; i < r.FloraSpecies.Length; i++){
+                Assert.AreNotEqual(1, r.FloraSpecies[i], $"column {i}");
+                if (r.FloraSpecies[i] == 2) tufts++;
+            }
+
+            Assert.Greater(tufts, r.FloraSpecies.Length / 3, "plants without the flag grow on stone");
+
+            // The same rules on grass: the soil rule grows.
+            _cfg.Dispose();
+            tree = FloraFixture.Rule(_fixture.FlowerSo, .5f);
+            tree.RequiresSoil = true;
+            Use(GenArchitecture.BiomeFirst, BlendMethod.None,
+                _fixture.MakeBiome("Meadow", .5f, 150f, 8f, _fixture.GrassSo, tree, FloraFixture.Rule(_fixture.TuftSo, .5f)));
+            Assert.AreEqual(1, _cfg.Biomes[0].soilGround);
+            r = Region(Origin, Size);
+            Assert.Greater(r.FloraSpecies.Count(sp => sp == 1), r.FloraSpecies.Length / 3);
+        }
+
+        [Test]
+        public void RequiresSoil_NeverOnSnowCoveredColumns(){
+            // Above the snow line a multi-block rule stays unless it needs soil. The region lists a multi-block
+            // species at its anchor columns only, so the anchors are counted.
+            FloraRule tree = FloraFixture.Rule(_fixture.CactusSo, .5f, 1, 3);
+            tree.RequiresSoil = true;
+            FloraRule rock = FloraFixture.Rule(_fixture.GlassSo, .5f, 1, 2);
+            Biome peak = _fixture.MakeBiome("Peak", .5f, 210f, 24f, _fixture.GrassSo, tree, rock);
+            peak.SnowTopBlock = _fixture.SnowSo;
+            Use(GenArchitecture.BiomeFirst, BlendMethod.None, peak);
+            RegionSample r = Region(Origin, Size);
+            int snowy = 0, green = 0, rocksOnSnow = 0;
+            for (int i = 0; i < r.FloraSpecies.Length; i++){
+                int x = r.Origin.x + i % r.Size.x, z = r.Origin.y + i / r.Size.x;
+                bool snow = SurfaceCover.IsSnowCovered(x, z, r.ColumnHeight[i], _cfg.Biomes[0], _cfg);
+                if (snow) snowy++;
+                if (r.FloraSpecies[i] == 1){
+                    Assert.IsFalse(snow, $"({x},{z}): h = {r.ColumnHeight[i]}");
+                    green++;
+                }
+                else if (r.FloraSpecies[i] == 2 && snow) rocksOnSnow++;
+            }
+
+            Assert.Greater(snowy, 1000, "the peak has snow");
+            Assert.Greater(green, 20, "the soil rule grows below the snow line");
+            Assert.Greater(rocksOnSnow, 20, "multi-block rules without the flag stay on snow");
+        }
+
         // --- Columns without flora -----------------------------------------------------------------------------------
 
         [Test]

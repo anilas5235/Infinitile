@@ -31,6 +31,27 @@ namespace Engine.Scripts.WorldGen.Core{
         }
 
         /// <summary>
+        ///     Tree line at column (<paramref name="x" />, <paramref name="z" />): <c>TreeLineHeight</c> plus
+        ///     <c>TreeLineNoiseAmplitude</c> times one octave of noise in −1…1, so the forest edge is no straight contour.
+        /// </summary>
+        public static float TreeLine(int x, int z, in WorldGenConfig cfg){
+            float n = SeededSimplex.Noise(new float2(x, z) / cfg.TreeLineNoiseWavelength, cfg.Seed, HashSalts.TreeLineNoise);
+            return cfg.TreeLineHeight + cfg.TreeLineNoiseAmplitude * n;
+        }
+
+        /// <summary>
+        ///     The top face (y = height + 1) of the column reaches its <see cref="TreeLine" />: flora rules that stop at
+        ///     the tree line do not grow there. A tree line height of 0 turns it off; columns below the lowest line skip
+        ///     the noise.
+        /// </summary>
+        public static bool AboveTreeLine(int x, int z, int height, in WorldGenConfig cfg){
+            if (cfg.TreeLineHeight <= 0f) return false;
+            float top = height + 1;
+            if (top < cfg.TreeLineHeight - cfg.TreeLineNoiseAmplitude) return false;
+            return top >= TreeLine(x, z, cfg);
+        }
+
+        /// <summary>
         ///     Snow line at column (<paramref name="x" />, <paramref name="z" />): <c>SnowLineHeight</c> plus
         ///     <c>SnowLineNoiseAmplitude</c> times one octave of noise in −1…1, so the snow edge is no straight contour.
         /// </summary>

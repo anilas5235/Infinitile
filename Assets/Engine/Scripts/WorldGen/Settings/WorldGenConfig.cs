@@ -105,6 +105,12 @@ namespace Engine.Scripts.WorldGen.Settings{
         public float SnowLineHeight;
         public float SnowLineNoiseAmplitude;
         public float SnowLineNoiseWavelength;
+
+        /// <summary>Tree line in blocks (<c>SurfaceCover.TreeLine</c>); 0 = none.</summary>
+        public float TreeLineHeight;
+
+        public float TreeLineNoiseAmplitude;
+        public float TreeLineNoiseWavelength;
         public float FreezeNoiseAmplitude;
         public float FreezeNoiseWavelength;
         public int StrataPeriod;

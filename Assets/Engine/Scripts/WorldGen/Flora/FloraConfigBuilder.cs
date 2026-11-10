@@ -93,6 +93,11 @@ namespace Engine.Scripts.WorldGen.Flora{
                             MultiBlock = rule.IsMultiBlock ? (byte)1 : (byte)0,
                             MinHeightAboveWater = rule.MinHeightAboveWater,
                             WaterGround = rule.RequiresWaterGround ? (byte)1 : (byte)0,
+                            TreeLine = rule.StopsAtTreeLine ? (byte)1 : (byte)0,
+                            Soil = rule.RequiresSoil ? (byte)1 : (byte)0,
+                            GroundChecks = (byte)((rule.RequiresBeachGround ? FloraRuleDef.CheckBeach : 0) |
+                                                  (rule.StopsAtTreeLine ? FloraRuleDef.CheckTreeLine : 0) |
+                                                  (rule.RequiresSoil ? FloraRuleDef.CheckSoil : 0)),
                             Structure = -1,
                             Tree = -1,
                             MinStackHeight = math.max(1, math.min(rule.MinStackHeight, rule.MaxStackHeight)),

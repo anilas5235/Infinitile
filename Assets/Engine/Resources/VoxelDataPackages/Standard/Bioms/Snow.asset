@@ -64,6 +64,8 @@ MonoBehaviour:
     Probability: 0.004
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    StopsAtTreeLine: 1
+    RequiresSoil: 1
     DensityNoise: 0
     DensityInfluence: 1
     MinStackHeight: 1

@@ -46,6 +46,8 @@ MonoBehaviour:
     RequiresBeachGround: 0
     MinHeightAboveWater: -2
     RequiresWaterGround: 0
+    StopsAtTreeLine: 1
+    RequiresSoil: 1
     DensityNoise: 0
     DensityInfluence: 1
     MinStackHeight: 1
@@ -57,6 +59,8 @@ MonoBehaviour:
     RequiresSurfaceFromSameBiome: 0
     RequiresBeachGround: 0
     MinHeightAboveWater: 1
+    StopsAtTreeLine: 1
+    RequiresSoil: 1
     DensityNoise: 1
     DensityInfluence: 1
     MinStackHeight: 1
@@ -134,6 +138,8 @@ MonoBehaviour:
     RequiresSurfaceFromSameBiome: 0
     RequiresBeachGround: 0
     MinHeightAboveWater: 1
+    StopsAtTreeLine: 1
+    RequiresSoil: 1
     DensityNoise: 0
     DensityInfluence: 1
     MinStackHeight: 1
@@ -157,6 +163,8 @@ MonoBehaviour:
     RequiresSurfaceFromSameBiome: 0
     RequiresBeachGround: 1
     MinHeightAboveWater: 1
+    StopsAtTreeLine: 1
+    RequiresSoil: 1
     DensityNoise: 0
     DensityInfluence: 1
     MinStackHeight: 1

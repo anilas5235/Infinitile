@@ -25,6 +25,9 @@ namespace Engine.Tests.EditMode{
                 SnowLineHeight = 210f,
                 SnowLineNoiseAmplitude = 6f,
                 SnowLineNoiseWavelength = 48f,
+                TreeLineHeight = 195f,
+                TreeLineNoiseAmplitude = 8f,
+                TreeLineNoiseWavelength = 64f,
                 FreezeNoiseAmplitude = noiseAmplitude,
                 FreezeNoiseWavelength = 24f,
                 StrataWarpAmplitude = 4f,
@@ -79,6 +82,37 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(210f, SurfaceCover.SnowLine(5, 9, cfg));
             Assert.IsTrue(SurfaceCover.IsSnowCovered(5, 9, 209, Snowy, cfg), "top face at 210");
             Assert.IsFalse(SurfaceCover.IsSnowCovered(5, 9, 208, Snowy, cfg), "top face at 209");
+        }
+
+        [Test]
+        public void TreeLine_WobblesWithinTheAmplitude_AndZeroTurnsItOff(){
+            // Like the snow line: no straight contour, within ±amplitude, and a column is above the line exactly
+            // where its top face reaches it. It has its own noise, not the snow line's.
+            WorldGenConfig cfg = Config(0f);
+            float min = float.MaxValue, max = float.MinValue;
+            int apart = 0;
+            for (int x = -600; x < 600; x += 7)
+            for (int z = -600; z < 600; z += 11){
+                float line = SurfaceCover.TreeLine(x, z, cfg);
+                min = System.Math.Min(min, line);
+                max = System.Math.Max(max, line);
+                for (int h = 180; h <= 206; h++)
+                    Assert.AreEqual(h + 1 >= line, SurfaceCover.AboveTreeLine(x, z, h, cfg), $"({x},{z}) h {h} line {line}");
+                float snow = (SurfaceCover.SnowLine(x, z, cfg) - 210f) / 6f;
+                if (System.Math.Abs((line - 195f) / 8f - snow) > .25f) apart++;
+            }
+
+            Assert.GreaterOrEqual(min, 187f);
+            Assert.LessOrEqual(max, 203f);
+            Assert.Greater(max - min, 8f, "the line rises and falls");
+            Assert.Greater(apart, 1000, "the tree line does not follow the snow line noise");
+
+            cfg.TreeLineNoiseAmplitude = 0f;
+            Assert.AreEqual(195f, SurfaceCover.TreeLine(5, 9, cfg));
+            Assert.IsTrue(SurfaceCover.AboveTreeLine(5, 9, 194, cfg), "top face at 195");
+            Assert.IsFalse(SurfaceCover.AboveTreeLine(5, 9, 193, cfg), "top face at 194");
+            cfg.TreeLineHeight = 0f;
+            Assert.IsFalse(SurfaceCover.AboveTreeLine(5, 9, 250, cfg), "height 0: no tree line");
         }
 
         [Test]

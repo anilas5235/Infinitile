@@ -36,6 +36,12 @@ namespace Engine.Scripts.WorldGen.Flora{
         [Tooltip("When true, the plant grows only on columns under water (as deep as a negative MinHeightAboveWater allows); rules without it grow on land and, with a negative minimum, in water.")]
         public bool RequiresWaterGround;
 
+        [Tooltip("When true, the plant grows only below the tree line (WorldGenSettings tree line). For trees and bushes; grass and rocks continue higher.")]
+        public bool StopsAtTreeLine;
+
+        [Tooltip("When true, the plant never grows on a snow-covered column or on bare stone (ground of a biome whose top block is its stone block).")]
+        public bool RequiresSoil;
+
         [Tooltip("Density noise whose groves and clearings this rule follows (WorldGenSettings flora density).")]
         public FloraDensity DensityNoise;
 
@@ -109,6 +115,20 @@ namespace Engine.Scripts.WorldGen.Flora{
 
         /// <summary>1 when the plant grows only on columns under water.</summary>
         public byte WaterGround;
+
+        /// <summary>1 when the plant grows only below the tree line.</summary>
+        public byte TreeLine;
+
+        /// <summary>1 when the plant grows neither on snow-covered columns nor on bare stone.</summary>
+        public byte Soil;
+
+        /// <summary>
+        ///     The ground conditions the roll tests with one call: <see cref="CheckBeach" /> (<see cref="BeachGround" />),
+        ///     <see cref="CheckTreeLine" /> (<see cref="TreeLine" />) and <see cref="CheckSoil" /> (<see cref="Soil" />).
+        /// </summary>
+        public byte GroundChecks;
+
+        public const byte CheckBeach = 1, CheckTreeLine = 2, CheckSoil = 4;
 
         /// <summary>Index into <c>WorldGenConfig.FloraStructures</c>, or -1.</summary>
         public int Structure;

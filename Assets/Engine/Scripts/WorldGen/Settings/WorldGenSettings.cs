@@ -178,6 +178,18 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Tooltip("Wavelength of the snow line noise in blocks.")]
         public float SnowLineNoiseWavelength = 48f;
 
+        [Tooltip("Tree line in blocks: flora rules with Stops At Tree Line grow only where the top face of their column " +
+                 "lies below this height, plus the tree line noise. Keep it below the snow line. 0: no tree line.")]
+        [Min(0f)]
+        public float TreeLineHeight = 195f;
+
+        [Tooltip("Amplitude in blocks of the noise on the tree line, so the forest edge is no straight contour.")]
+        [Min(0f)]
+        public float TreeLineNoiseAmplitude = 8f;
+
+        [Tooltip("Wavelength of the tree line noise in blocks.")]
+        public float TreeLineNoiseWavelength = 64f;
+
         [Tooltip("Amplitude of the noise on the effective temperature; it makes ice edges ragged.")]
         [Min(0f)]
         public float FreezeNoiseAmplitude = 0.04f;
@@ -307,6 +319,8 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (!IsPositiveFinite(FreezeNoiseWavelength)) yield return (nameof(FreezeNoiseWavelength), FreezeNoiseWavelength);
             if (!IsPositiveFinite(SnowLineNoiseWavelength))
                 yield return (nameof(SnowLineNoiseWavelength), SnowLineNoiseWavelength);
+            if (!IsPositiveFinite(TreeLineNoiseWavelength))
+                yield return (nameof(TreeLineNoiseWavelength), TreeLineNoiseWavelength);
             if (!IsPositiveFinite(StrataWarpWavelength)) yield return (nameof(StrataWarpWavelength), StrataWarpWavelength);
             if (!IsPositiveFinite(BeachWavelength)) yield return (nameof(BeachWavelength), BeachWavelength);
             if (!IsPositiveFinite(TreesDensityWavelength)) yield return (nameof(TreesDensityWavelength), TreesDensityWavelength);
