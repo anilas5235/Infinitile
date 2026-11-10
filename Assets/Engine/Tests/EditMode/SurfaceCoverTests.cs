@@ -5,10 +5,9 @@ using NUnit.Framework;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     The snow, ice and strata rules of <see cref="SurfaceCover" />: the effective temperature falls with the
-    ///     height, snow needs a dry column and a snow block, ice needs a biome whose water freezes, a shore column at the
-    ///     water surface is snowy exactly where the water freezes, the freeze noise makes the edge ragged, and the strata
-    ///     bands wrap below zero.
+    ///     The snow, ice and strata rules of <see cref="SurfaceCover" />: snow caps the columns above a noisy snow line
+    ///     and needs a dry column and a snow block, ice needs a biome whose water freezes, the freeze noise makes the ice
+    ///     edge ragged, and the strata bands wrap below zero.
     /// </summary>
     public class SurfaceCoverTests{
         private const int WaterLevel = 124;
@@ -23,7 +22,9 @@ namespace Engine.Tests.EditMode{
                 HeightMax = 256f,
                 EnableClimateOverrides = true,
                 FreezeTemperature = .2f,
-                SnowLapse = .45f,
+                SnowLineHeight = 210f,
+                SnowLineNoiseAmplitude = 6f,
+                SnowLineNoiseWavelength = 48f,
                 FreezeNoiseAmplitude = noiseAmplitude,
                 FreezeNoiseWavelength = 24f,
                 StrataWarpAmplitude = 4f,
@@ -32,30 +33,52 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void EffectiveTemperature_FallsWithHeight(){
+        public void EffectiveTemperature_IsTheTemperaturePlusTheFreezeNoise(){
             WorldGenConfig cfg = Config(0f);
-            Assert.AreEqual(.5f, SurfaceCover.EffectiveTemperature(3, 7, .5f, WaterLevel - 1, cfg), 1e-6f, "at the water surface");
-            Assert.AreEqual(.5f, SurfaceCover.EffectiveTemperature(3, 7, .5f, 40, cfg), 1e-6f, "under water");
-            Assert.AreEqual(.5f - cfg.SnowLapse, SurfaceCover.EffectiveTemperature(3, 7, .5f, 255, cfg), 1e-6f, "at HeightMax");
-            float previous = float.MaxValue;
-            for (int h = WaterLevel - 1; h < 256; h++){
-                float t = SurfaceCover.EffectiveTemperature(3, 7, .5f, h, cfg);
-                Assert.LessOrEqual(t, previous, $"h {h}");
-                previous = t;
-            }
+            Assert.AreEqual(.5f, SurfaceCover.EffectiveTemperature(3, 7, .5f, cfg), 1e-6f, "no noise");
+            cfg = Config(.04f);
+            float noise = SurfaceCover.FreezeNoise(3, 7, cfg);
+            Assert.AreEqual(.5f + .04f * noise, SurfaceCover.EffectiveTemperature(3, 7, .5f, cfg), 1e-6f);
         }
 
         [Test]
-        public void IsSnowCovered_NeedsDryColumnSnowBlockAndOverrides(){
+        public void IsSnowCovered_OnlyAboveTheSnowLine_NeedsSnowBlockAndOverrides(){
             WorldGenConfig cfg = Config(0f);
-            Assert.IsTrue(SurfaceCover.IsSnowCovered(0, 0, .1f, WaterLevel - 1, Snowy, cfg), "cold shore");
-            Assert.IsFalse(SurfaceCover.IsSnowCovered(0, 0, .1f, WaterLevel - 2, Snowy, cfg), "under water");
-            Assert.IsFalse(SurfaceCover.IsSnowCovered(0, 0, .1f, WaterLevel + 10, default, cfg), "no snow block");
-            Assert.IsFalse(SurfaceCover.IsSnowCovered(0, 0, .5f, WaterLevel + 10, Snowy, cfg), "warm lowland");
-            Assert.IsTrue(SurfaceCover.IsSnowCovered(0, 0, .5f, 250, Snowy, cfg), "warm biome, high peak");
+            Assert.IsTrue(SurfaceCover.IsSnowCovered(0, 0, 230, Snowy, cfg), "peak above the highest snow line");
+            Assert.IsFalse(SurfaceCover.IsSnowCovered(0, 0, 190, Snowy, cfg), "slope below the lowest snow line");
+            Assert.IsFalse(SurfaceCover.IsSnowCovered(0, 0, WaterLevel - 1, Snowy, cfg), "shore");
+            Assert.IsFalse(SurfaceCover.IsSnowCovered(0, 0, 230, default, cfg), "no snow block");
+            cfg.SnowLineHeight = WaterLevel - 20f;
+            Assert.IsFalse(SurfaceCover.IsSnowCovered(0, 0, WaterLevel - 2, Snowy, cfg), "under water");
+            cfg = Config(0f);
             cfg.EnableClimateOverrides = false;
-            Assert.IsFalse(SurfaceCover.IsSnowCovered(0, 0, .1f, WaterLevel - 1, Snowy, cfg), "overrides off");
+            Assert.IsFalse(SurfaceCover.IsSnowCovered(0, 0, 230, Snowy, cfg), "overrides off");
             Assert.IsFalse(SurfaceCover.WaterFreezes(0, 0, .1f, Snowy, cfg), "overrides off");
+        }
+
+        [Test]
+        public void SnowLine_WobblesWithinTheAmplitude_AndDecidesTheSnowEdge(){
+            // The line is no straight contour: it varies over the world, stays within ±amplitude, and a column is
+            // snowy exactly where its top face reaches the line.
+            WorldGenConfig cfg = Config(0f);
+            float min = float.MaxValue, max = float.MinValue;
+            for (int x = -600; x < 600; x += 7)
+            for (int z = -600; z < 600; z += 11){
+                float line = SurfaceCover.SnowLine(x, z, cfg);
+                min = System.Math.Min(min, line);
+                max = System.Math.Max(max, line);
+                for (int h = 200; h <= 220; h++)
+                    Assert.AreEqual(h + 1 >= line, SurfaceCover.IsSnowCovered(x, z, h, Snowy, cfg), $"({x},{z}) h {h} line {line}");
+            }
+
+            Assert.GreaterOrEqual(min, 204f);
+            Assert.LessOrEqual(max, 216f);
+            Assert.Greater(max - min, 6f, "the line rises and falls");
+
+            cfg.SnowLineNoiseAmplitude = 0f;
+            Assert.AreEqual(210f, SurfaceCover.SnowLine(5, 9, cfg));
+            Assert.IsTrue(SurfaceCover.IsSnowCovered(5, 9, 209, Snowy, cfg), "top face at 210");
+            Assert.IsFalse(SurfaceCover.IsSnowCovered(5, 9, 208, Snowy, cfg), "top face at 209");
         }
 
         [Test]
@@ -64,24 +87,6 @@ namespace Engine.Tests.EditMode{
             Assert.IsTrue(SurfaceCover.WaterFreezes(0, 0, .1f, Snowy, cfg), "cold biome");
             Assert.IsFalse(SurfaceCover.WaterFreezes(0, 0, .1f, default, cfg), "biome without freezesWater");
             Assert.IsFalse(SurfaceCover.WaterFreezes(.1f, 0f, default, cfg), "biome without freezesWater, noise given");
-        }
-
-        [Test]
-        public void ShoreColumn_IsSnowyExactlyWhereTheWaterFreezes(){
-            // A dry column at the water surface next to ice: same rule, so no grass strip between snow and ice.
-            WorldGenConfig cfg = Config(.04f);
-            int frozen = 0, open = 0;
-            for (int x = -300; x < 300; x += 7)
-            for (int z = -300; z < 300; z += 11)
-            for (float t = .14f; t < .27f; t += .02f){
-                bool ice = SurfaceCover.WaterFreezes(x, z, t, Snowy, cfg);
-                Assert.AreEqual(ice, SurfaceCover.IsSnowCovered(x, z, t, WaterLevel - 1, Snowy, cfg), $"({x},{z}) t {t}");
-                if (ice) frozen++;
-                else open++;
-            }
-
-            Assert.Greater(frozen, 0);
-            Assert.Greater(open, 0);
         }
 
         [Test]

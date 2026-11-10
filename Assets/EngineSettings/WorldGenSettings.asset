@@ -23,13 +23,14 @@ MonoBehaviour:
   WarpWavelength: 96
   WarpOctaves: 2
   LambdaTemperature: 1.5
-  LambdaHumidity: 1
+  LambdaHumidity: 1.5
   LambdaContinental: 2
   LambdaErosion: 1
   LambdaPV: 0.5
-  LambdaHeight: 1
+  LambdaHeight: 4
   HeightMin: 50
-  HeightMax: 250
+  HeightMax: 240
+  HeightSoftBand: 32
   WaterLevel: 124
   WaterVoxel: {fileID: 11400000, guid: 7b0b0eaca79300d468e0f7c8c0b8d1f3, type: 2}
   OctaveWavelengths:
@@ -41,27 +42,27 @@ MonoBehaviour:
   - 16
   GlobalOctaveWeights:
   - 1
-  - 0.5
-  - 0.25
-  - 0.125
-  - 0.0625
-  - 0.03125
-  PeakWavelength: 192
+  - 0.55
+  - 0.3
+  - 0.17
+  - 0.1
+  - 0.05
+  PeakWavelength: 288
   WGain: 1.6
   ClimateFrequencyScale: 0.85
   temperatureProfile:
-    scale: 900
+    scale: 2000
     persistance: 0.5
     lacunarity: 2
     octaves: 3
   humidityProfile:
-    scale: 700
+    scale: 1600
     persistance: 0.5
     lacunarity: 2
     octaves: 3
   continentalLayer:
     baseNoise:
-      scale: 2500
+      scale: 3200
       persistance: 0.5
       lacunarity: 2
       octaves: 5
@@ -143,7 +144,7 @@ MonoBehaviour:
   ContinentalHumidityInfluence: 0.4
   ContinentalTemperatureInfluence: 0.6
   erosionProfile:
-    scale: 1200
+    scale: 1600
     persistance: 0.5
     lacunarity: 2
     octaves: 4
@@ -155,7 +156,9 @@ MonoBehaviour:
   EnableClimateOverrides: 1
   IceVoxel: {fileID: 11400000, guid: a0254e99cf594614496c8d97c76c38f0, type: 2}
   FreezeTemperature: 0.2
-  SnowLapse: 0.6
+  SnowLineHeight: 210
+  SnowLineNoiseAmplitude: 6
+  SnowLineNoiseWavelength: 48
   FreezeNoiseAmplitude: 0.04
   FreezeNoiseWavelength: 24
   StrataPeriod: 7

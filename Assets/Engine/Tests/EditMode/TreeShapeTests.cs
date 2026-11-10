@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Engine.Scripts.Utils;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Core;
@@ -399,7 +400,7 @@ namespace Engine.Tests.EditMode{
             ushort trunk = variant.TrunkVoxel ? _fixture.Ids[variant.TrunkVoxel] : (ushort)0;
             bool leafy = v.Crown != CrownShape.None || v.ClusterRadius.y > 0;
             bool tapered = v.Crown is CrownShape.Cone or CrownShape.Tiered;
-            int lowest = int.MaxValue, highest = 0;
+            int lowest = int.MaxValue, highest = 0, slack = 0;
             long count = 0;
             for (int s = 0; s < Seeds; s++){
                 uint seed = (uint)(1000 + s * 7919);
@@ -431,13 +432,77 @@ namespace Engine.Tests.EditMode{
                 }
 
                 int top = voxels.Keys.Max(p => p.y);
+                // TopOffset bounds the shape from above (the world-top test of the flora placement relies on it).
+                int bound = TreeShape.TopOffset(x, z, r, v, seed);
+                Assert.LessOrEqual(top, bound, $"{at}: voxel above TopOffset {bound}");
+                slack = math.max(slack, bound - top);
                 lowest = math.min(lowest, top);
                 highest = math.max(highest, top);
                 count += voxels.Count;
             }
 
             TestContext.WriteLine($"{name}: reach {v.Reach}, spacing {v.SpacingRadius}, top layer {lowest}…{highest}, " +
-                                  $"{count / (float)Seeds:F1} voxels per tree");
+                                  $"{count / (float)Seeds:F1} voxels per tree, TopOffset slack ≤ {slack}");
+            Assert.LessOrEqual(slack, 3, $"{name}: TopOffset is a loose bound");
+        }
+
+        [Test]
+        public void FitsBelowWorldTop_TreeStructureStack_NeverCutAtTheWorldTop(){
+            // An anchor carries its plant only when the highest voxel stays below ChunkHeight; one block higher it
+            // carries nothing (2026-11-10: no trees cut off at the world top).
+            Biome b = _fixture.MakeBiome("B", .5f, 150f, 8f, _fixture.GrassSo, FloraFixture.Rule(_fixture.Grove, .2f),
+                FloraFixture.Rule(_fixture.Tree, .2f), FloraFixture.Rule(_fixture.CactusSo, .2f, 1, 4));
+            _cfg = _fixture.ToConfig(_fixture.Settings(GenArchitecture.TerrainFirst, BlendMethod.None, b));
+            int[] kinds = new int[3];
+            NativeList<FloraVoxel> list = new(256, Allocator.Temp);
+            try{
+                for (int rule = 0; rule < _cfg.FloraRules.Length; rule++){
+                    FloraRuleDef d = _cfg.FloraRules[rule];
+                    if (d.MultiBlock == 0) continue;
+                    for (int i = 0; i < 100; i++){
+                        int x = i * 31 - 1500, z = i * 17 + 40;
+                        // The highest voxel the stamping writes, relative to the block above the top block.
+                        int top;
+                        if (d.Tree >= 0){
+                            int variant = TreeShape.PickVariant(x, z, _cfg, d.Tree);
+                            TreeRoll roll = TreeShape.Roll(x, z, _cfg.Seed, variant, _cfg.TreeVariants[variant]);
+                            list.Clear();
+                            TreeShape.Build(new int3(x, 0, z), roll, _cfg.TreeVariants[variant], _cfg.Seed, ref list);
+                            top = int.MinValue;
+                            foreach (FloraVoxel fv in list) top = math.max(top, fv.Offset.y);
+                            kinds[0]++;
+                        }
+                        else if (d.Structure >= 0){
+                            FloraStructureDef s = _cfg.FloraStructures[d.Structure];
+                            top = 0;
+                            for (int k = s.Start; k < s.Start + s.Count; k++) top = math.max(top, _cfg.FloraVoxels[k].Offset.y);
+                            kinds[1]++;
+                        }
+                        else{
+                            top = FloraPlacement.StackHeight(x, z, _cfg, d) - 1;
+                            kinds[2]++;
+                        }
+
+                        // The highest column height that still fits: its plant lies wholly below the world top.
+                        int highest = -1;
+                        for (int h = VoxelConstants.ChunkHeight - 1; h >= VoxelConstants.ChunkHeight - 64; h--)
+                            if (FloraPlacement.FitsBelowWorldTop(x, z, rule, h, _cfg)){
+                                highest = h;
+                                break;
+                            }
+
+                        Assert.GreaterOrEqual(highest, 0, $"rule {rule} at ({x},{z}): fits nowhere in the top 64 blocks");
+                        Assert.Less(highest + 1 + top, VoxelConstants.ChunkHeight, $"rule {rule} at ({x},{z}): cut at the top");
+                        Assert.LessOrEqual(VoxelConstants.ChunkHeight - 1 - (highest + 1 + top), 3,
+                            $"rule {rule} at ({x},{z}): refused far below the top");
+                    }
+                }
+            }
+            finally{
+                list.Dispose();
+            }
+
+            Assert.That(kinds, Has.All.GreaterThan(0), "tree, structure and stack all tested");
         }
 
         // --- Variant pick and spacing -------------------------------------------------------------------------------

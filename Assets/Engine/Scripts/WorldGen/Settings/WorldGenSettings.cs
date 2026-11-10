@@ -65,6 +65,11 @@ namespace Engine.Scripts.WorldGen.Settings{
 
         public float HeightMax = 250f;
 
+        [Tooltip("Band below HeightMax in which H bends smoothly towards HeightMax instead of being cut flat there " +
+                 "(blocks, 0 = hard clamp). H above HeightMax − band is compressed and never reaches HeightMax.")]
+        [Min(0f)]
+        public float HeightSoftBand;
+
         [Tooltip("Water surface level in world Y. Water fills every column up to this level.")]
         public int WaterLevel = 124;
 
@@ -158,15 +163,22 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Tooltip("Voxel of the frozen water surface.")]
         public VoxelConfig.Data.Voxel.Voxel IceVoxel;
 
-        [Tooltip("Water freezes and dry columns take their biome's snow block where the effective temperature lies below this.")]
+        [Tooltip("Water of a biome with Freezes Water turns to ice where the effective temperature lies below this.")]
         [Range(0f, 1f)]
         public float FreezeTemperature = 0.2f;
 
-        [Tooltip("Drop of the effective temperature from the water surface up to HeightMax, so high peaks carry snow.")]
-        [Min(0f)]
-        public float SnowLapse = 0.45f;
+        [Tooltip("Snow line in blocks: dry columns of a biome with a snow block take it where their top face reaches this " +
+                 "height, plus the snow line noise. Snow caps the peaks only.")]
+        public float SnowLineHeight = 210f;
 
-        [Tooltip("Amplitude of the noise on the effective temperature; it makes snow lines and ice edges ragged.")]
+        [Tooltip("Amplitude in blocks of the noise on the snow line, so its edge is no straight contour.")]
+        [Min(0f)]
+        public float SnowLineNoiseAmplitude = 6f;
+
+        [Tooltip("Wavelength of the snow line noise in blocks.")]
+        public float SnowLineNoiseWavelength = 48f;
+
+        [Tooltip("Amplitude of the noise on the effective temperature; it makes ice edges ragged.")]
         [Min(0f)]
         public float FreezeNoiseAmplitude = 0.04f;
 
@@ -268,6 +280,8 @@ namespace Engine.Scripts.WorldGen.Settings{
                 Debug.LogWarning($"{name}: GlobalOctaveWeights ({GlobalOctaveWeights.Length}) and OctaveWavelengths ({OctaveWavelengths.Length}) differ in length.", this);
             if (HeightMin >= HeightMax)
                 Debug.LogWarning($"{name}: HeightMin must be below HeightMax.", this);
+            if (!(HeightSoftBand >= 0f) || HeightSoftBand > HeightMax - HeightMin)
+                Debug.LogWarning($"{name}: HeightSoftBand must lie in [0, HeightMax − HeightMin], got {HeightSoftBand}.", this);
             if (TreeSpacingRadius < 0)
                 Debug.LogWarning($"{name}: TreeSpacingRadius must not be negative, got {TreeSpacingRadius}.", this);
             foreach ((string field, float value) in InvalidScales())
@@ -291,6 +305,8 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (!IsPositiveFinite(PeakWavelength)) yield return (nameof(PeakWavelength), PeakWavelength);
             if (!IsPositiveFinite(WarpWavelength)) yield return (nameof(WarpWavelength), WarpWavelength);
             if (!IsPositiveFinite(FreezeNoiseWavelength)) yield return (nameof(FreezeNoiseWavelength), FreezeNoiseWavelength);
+            if (!IsPositiveFinite(SnowLineNoiseWavelength))
+                yield return (nameof(SnowLineNoiseWavelength), SnowLineNoiseWavelength);
             if (!IsPositiveFinite(StrataWarpWavelength)) yield return (nameof(StrataWarpWavelength), StrataWarpWavelength);
             if (!IsPositiveFinite(BeachWavelength)) yield return (nameof(BeachWavelength), BeachWavelength);
             if (!IsPositiveFinite(TreesDensityWavelength)) yield return (nameof(TreesDensityWavelength), TreesDensityWavelength);

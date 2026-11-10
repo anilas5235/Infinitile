@@ -40,6 +40,9 @@ namespace Engine.Scripts.WorldGen.Settings{
                 float.IsInfinity(settings.HeightMax))
                 throw new InvalidOperationException(
                     $"{name}: HeightMin ({settings.HeightMin}) must be finite and below HeightMax ({settings.HeightMax}).");
+            if (!(settings.HeightSoftBand >= 0f) || settings.HeightSoftBand > settings.HeightMax - settings.HeightMin)
+                throw new InvalidOperationException(
+                    $"{name}: HeightSoftBand ({settings.HeightSoftBand}) must lie in [0, HeightMax − HeightMin].");
             if (settings.TreeSpacingRadius < 0)
                 throw new InvalidOperationException(
                     $"{name}: TreeSpacingRadius must not be negative, got {settings.TreeSpacingRadius}.");
@@ -82,13 +85,16 @@ namespace Engine.Scripts.WorldGen.Settings{
                 LambdaHeight = settings.LambdaHeight,
                 HeightMin = settings.HeightMin,
                 HeightMax = settings.HeightMax,
+                HeightSoftBand = settings.HeightSoftBand,
                 PeakWavelength = settings.PeakWavelength,
                 WaterLevel = settings.WaterLevel,
                 WaterVoxel = Id(settings.WaterVoxel, voxelId),
                 IceVoxel = Id(settings.IceVoxel, voxelId),
                 EnableClimateOverrides = settings.EnableClimateOverrides,
                 FreezeTemperature = settings.FreezeTemperature,
-                SnowLapse = settings.SnowLapse,
+                SnowLineHeight = settings.SnowLineHeight,
+                SnowLineNoiseAmplitude = settings.SnowLineNoiseAmplitude,
+                SnowLineNoiseWavelength = settings.SnowLineNoiseWavelength,
                 FreezeNoiseAmplitude = settings.FreezeNoiseAmplitude,
                 FreezeNoiseWavelength = settings.FreezeNoiseWavelength,
                 StrataPeriod = settings.StrataPeriod,

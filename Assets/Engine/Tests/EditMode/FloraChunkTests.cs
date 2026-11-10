@@ -215,7 +215,8 @@ namespace Engine.Tests.EditMode{
         public void ChunkJob_SnowStrataAndIceMatchTheRegionApi(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
             // Snow tops, strata bands and ice of the chunk job equal the whole-world stamp, and snowy columns carry
-            // no single-block plants. A high freeze temperature brings snow and ice into the test area.
+            // no single-block plants. A high freeze temperature brings ice and a low snow line brings snow into the test
+            // area.
             _biomes = _fixture.DefaultBiomes();
             foreach (Biome b in _biomes){
                 b.SnowTopBlock = _fixture.SnowSo;
@@ -225,6 +226,7 @@ namespace Engine.Tests.EditMode{
 
             WorldGenSettings s = _fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes);
             s.FreezeTemperature = .5f;
+            s.SnowLineHeight = s.WaterLevel + 12f;
             s.StrataPeriod = 3;
             s.StrataThickness = 1;
             _config = _fixture.GeneratorConfig(s);
@@ -233,7 +235,6 @@ namespace Engine.Tests.EditMode{
 
             int waterLevel = _config.WorldGen.WaterLevel;
             int snowy = 0, bare = 0, ice = 0, strata = 0;
-            float coldest = float.MaxValue;
             for (int x = reference.Origin.x; x < reference.Origin.x + reference.Size.x; x++)
             for (int z = reference.Origin.y; z < reference.Origin.y + reference.Size.y; z++){
                 int h = reference.SurfaceAt(x, z);
@@ -244,17 +245,12 @@ namespace Engine.Tests.EditMode{
                 }
                 else if (h + 1 >= waterLevel) bare++;
 
-                if (h + 1 >= waterLevel){
-                    int i = reference.Region.Index(x, z);
-                    coldest = math.min(coldest, SurfaceCover.EffectiveTemperature(x, z, reference.Region.Fields[i].T, h, _config.WorldGen));
-                }
-
                 if (reference[new int3(x, waterLevel - 1, z)] == TestFixtures.Ice) ice++;
                 for (int y = math.max(0, h - 5); y <= h; y++)
                     if (reference[new int3(x, y, z)] == FloraFixture.Granite) strata++;
             }
 
-            string counts = $"{architecture}: snowy {snowy}, bare dry {bare}, ice {ice}, strata voxels {strata}, coldest dry {coldest:F3}";
+            string counts = $"{architecture}: snowy {snowy}, bare dry {bare}, ice {ice}, strata voxels {strata}";
             TestContext.WriteLine(counts);
             Assert.Greater(snowy, 0, "the area has snow; " + counts);
             Assert.Greater(bare, 0, "the area has dry columns without snow");

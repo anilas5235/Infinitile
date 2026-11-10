@@ -176,7 +176,8 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
-        ///     <see cref="FloraGrid.Anchor" /> code of the anchor at (x, z): 2 when it is a tree whose wide or leaning
+        ///     <see cref="FloraGrid.Anchor" /> code of the anchor at (x, z): 0 when its plant would reach above the world
+        ///     top (<see cref="FloraPlacement.FitsBelowWorldTop" />); 2 when it is a tree whose wide or leaning
         ///     trunk stands on ground that is not flat within 1 block (<see cref="TreeShape.Footprint" />), so it is
         ///     built 1 wide and straight; for a lying trunk its <see cref="FloraPlacement.LyingFit" />; 1 otherwise.
         ///     The heights are the sampler's, so every chunk decides the same.
@@ -184,6 +185,8 @@ namespace Engine.Scripts.Jobs.Chunk{
         private static byte AnchorFit(in FloraGrid grid, NativeArray<ChunkColumn> chunkColumns, int x, int z, int3 chunkWordPos,
             in WorldGenConfig cfg){
             int rule = grid.Rule[grid.Index(x, z)];
+            if (!FloraPlacement.FitsBelowWorldTop(chunkWordPos.x + x, chunkWordPos.z + z, rule, grid.Height[grid.Index(x, z)], cfg))
+                return 0;
             int variant = FloraPlacement.Variant(chunkWordPos.x + x, chunkWordPos.z + z, rule, cfg);
             if (variant < 0) return 1;
             TreeRoll roll = TreeShape.Roll(chunkWordPos.x + x, chunkWordPos.z + z, cfg.Seed, variant, cfg.TreeVariants[variant]);
@@ -226,9 +229,8 @@ namespace Engine.Scripts.Jobs.Chunk{
                     Biome.BiomeDef def = cfg.Biomes[col.SurfaceSource];
                     // Ice follows the hard biome, not the dithered surface pick, so its edge is a line.
                     Biome.BiomeDef waterDef = cfg.Biomes[col.Biome];
-                    // Snow line and ice edge of the column share one evaluation of the freeze noise, which most biomes
-                    // (no snow block, open water) skip.
-                    bool cold = cfg.EnableClimateOverrides && (def.snowTopBlock != 0 || waterDef.freezesWater != 0);
+                    // Only biomes whose water freezes evaluate the freeze noise.
+                    bool cold = cfg.EnableClimateOverrides && waterDef.freezesWater != 0;
                     float freezeNoise = cold ? SurfaceCover.FreezeNoise(wx, wz, cfg) : 0f;
                     // Snow covers a beach like any dry column; the beach block stays under it.
                     if (def.beachBlock != 0 && SurfaceCover.IsBeach(wx, wz, col.Height, def, cfg, cache)){
@@ -236,7 +238,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                         col.BeachBlock = def.beachBlock;
                     }
 
-                    if (SurfaceCover.IsSnowCovered(col.Temperature, col.Height, freezeNoise, def, cfg))
+                    if (SurfaceCover.IsSnowCovered(wx, wz, col.Height, def, cfg))
                         col.TopBlock = def.snowTopBlock;
                     if (def.strataBlock != 0) col.StrataShift = SurfaceCover.StrataShift(wx, wz, cfg);
                     col.Frozen = SurfaceCover.WaterFreezes(col.Temperature, freezeNoise, waterDef, cfg) ? (byte)1 : (byte)0;

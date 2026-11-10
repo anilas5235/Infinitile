@@ -12,17 +12,162 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73ce5c2ac5ec3364a915ef3d1b97af22, type: 3}
   m_Name: Swamp
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.VoxelConfig.Data.Generation.Biome
-  TopBlock: {fileID: 11400000, guid: 2e8eca1efe0447d4b845f277ce2ada8f, type: 2}
-  UnderwaterTopBlock: {fileID: 0}
+  TopBlock: {fileID: 11400000, guid: c65a98430aabac12d43726aee43c0ed4, type: 2}
+  UnderwaterTopBlock: {fileID: 11400000, guid: 4c5d16a533e33ceca25a4271e39d70aa, type: 2}
   UnderBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   SnowTopBlock: {fileID: 0}
   FreezesWater: 0
-  StrataBlock: {fileID: 0}
-  BeachBlock: {fileID: 11400000, guid: b5df436b2cc46cf419e666fccd2d96b3, type: 2}
+  StrataBlock: {fileID: 11400000, guid: afe093b663ba4bb0244bb56edb4319f2, type: 2}
+  BeachBlock: {fileID: 11400000, guid: 4c5d16a533e33ceca25a4271e39d70aa, type: 2}
   BeachHeight: 3
-  TargetHumidity: 1
-  TargetTemperature: 0.8
-  TargetContinental: 0.3
-  TargetHeight: 0.3
-  RepresentativeColor: {r: 0.5450981, g: 0.2705882, b: 0.07450981, a: 1}
+  TargetHumidity: 0.55
+  TargetTemperature: 0.55
+  TargetContinental: 0.45
+  TargetErosion: 0.7
+  TargetPV: -0.5
+  TargetHeight: 0.43
+  HeightOffset: 126
+  HeightAmplitude: 3
+  OctaveWeights:
+  - 1
+  - 0.6
+  - 0.35
+  - 0.15
+  - 0.06
+  - 0.03
+  Jaggedness: 0
+  FloraRules:
+  - SpeciesVoxel: {fileID: 0}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 11400000, guid: a7b3a57f2c0a068bbff8eeb047110adc, type: 2}
+    Probability: 0.008
+    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
+    MinHeightAboveWater: 1
+    DensityNoise: 0
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 0}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 11400000, guid: b6248174d5a343c581689da2c5ee5813, type: 2}
+    Probability: 0.004
+    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
+    MinHeightAboveWater: 1
+    DensityNoise: 1
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 11400000, guid: 466912d6d4209014096d5dcfcf466b37, type: 2}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 0}
+    Probability: 0.2
+    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
+    MinHeightAboveWater: 1
+    DensityNoise: 1
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 11400000, guid: db98f7eae87a93b0738de66b37941f0e, type: 2}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 0}
+    Probability: 0.08
+    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
+    MinHeightAboveWater: 1
+    DensityNoise: 2
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 11400000, guid: 1653fb421732b40f15db13b9cd478b0c, type: 2}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 0}
+    Probability: 0.05
+    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
+    MinHeightAboveWater: 1
+    DensityNoise: 2
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 11400000, guid: f3e242d96a2285f479f427eec035c4e0, type: 2}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 0}
+    Probability: 0.02
+    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
+    MinHeightAboveWater: 1
+    DensityNoise: 3
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 11400000, guid: c2d66ad6eaf4a614881874103b307da0, type: 2}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 0}
+    Probability: 0.01
+    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
+    MinHeightAboveWater: 1
+    DensityNoise: 3
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 11400000, guid: e6d981db5e09cd946b1114166c2521ed, type: 2}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 0}
+    Probability: 0.01
+    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
+    MinHeightAboveWater: 1
+    DensityNoise: 3
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 0}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 11400000, guid: b63902cc64d597f4ab8d6519895c2ea0, type: 2}
+    Probability: 0.001
+    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
+    MinHeightAboveWater: 1
+    DensityNoise: 0
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 11400000, guid: db98f7eae87a93b0738de66b37941f0e, type: 2}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 0}
+    Probability: 0.3
+    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 1
+    MinHeightAboveWater: 1
+    DensityNoise: 2
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 0}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 11400000, guid: a7b3a57f2c0a068bbff8eeb047110adc, type: 2}
+    Probability: 0.006
+    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 1
+    MinHeightAboveWater: 1
+    DensityNoise: 0
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 11400000, guid: f3e242d96a2285f479f427eec035c4e0, type: 2}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 0}
+    Probability: 0.01
+    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 1
+    MinHeightAboveWater: 1
+    DensityNoise: 3
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  RepresentativeColor: {r: 0.42, g: 0.33, b: 0.18, a: 1}

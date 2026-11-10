@@ -80,6 +80,9 @@ namespace Engine.Scripts.WorldGen.Settings{
         // --- Height -------------------------------------------------------------------------------------------------
         public float HeightMin;
         public float HeightMax;
+
+        /// <summary>Band below <see cref="HeightMax" /> of the soft limit (<see cref="Height.HeightLimit" />); 0 clamps hard.</summary>
+        public float HeightSoftBand;
         public float PeakWavelength;
 
         /// <summary>
@@ -99,7 +102,9 @@ namespace Engine.Scripts.WorldGen.Settings{
 
         // --- Snow, ice, strata and beaches (SurfaceCover) ----------------------------------------------------------
         public float FreezeTemperature;
-        public float SnowLapse;
+        public float SnowLineHeight;
+        public float SnowLineNoiseAmplitude;
+        public float SnowLineNoiseWavelength;
         public float FreezeNoiseAmplitude;
         public float FreezeNoiseWavelength;
         public int StrataPeriod;

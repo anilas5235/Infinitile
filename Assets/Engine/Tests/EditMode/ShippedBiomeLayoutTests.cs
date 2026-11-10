@@ -39,8 +39,9 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void ShippedBiomes_OnlyColdBiomesTakeSnowAndIce(){
-            // Snow and ice stay in the biomes that want them (DEC-65); a cold Plains column stays green.
-            string[] cold = { "Mountain", "Snow" };
+            // Snow and ice stay in the biomes that want them (DEC-65); a cold Plains column stays green. Since the
+            // tuning of 2026-11-10 the Snow biome is out of the shipped set and only Mountain carries snow.
+            string[] cold = { "Mountain" };
             List<Biome> biomes = LoadShipped().Biomes.Biomes;
             foreach (Biome biome in biomes){
                 Assert.IsNotNull(biome, "BiomeSet entry");
@@ -49,7 +50,7 @@ namespace Engine.Tests.EditMode{
                 if (!wanted) Assert.IsNull(biome.SnowTopBlock, $"{biome.name}: SnowTopBlock");
             }
 
-            // Mountain keeps its snow line (GEN-35); the Snow biome is white through its own top block.
+            // Mountain keeps its snow line (GEN-35).
             Biome mountain = biomes.Find(b => b.name == "Mountain");
             Assert.IsNotNull(mountain, "Mountain");
             Assert.IsNotNull(mountain.SnowTopBlock, "Mountain: SnowTopBlock");
