@@ -51,37 +51,14 @@ namespace Engine.Tests.EditMode{
         ///     The configurations by name; "Shipped" is the asset unchanged. To compare a tuning idea, add an entry that
         ///     changes the copy (fields, <c>Splines.FromJson</c>, biome targets via <see cref="BiomeOf" />). The
         ///     candidates B, C and D of 2026-11-09 are in the commit that added this test; C is now the shipped asset.
-        ///     "HardClamp" is the shipped asset with the hard clamp at HeightMax of before 2026-11-10; "Landform" and
-        ///     "LandformStrong" are the biome–terrain fit candidates of 2026-11-10 (lowland biomes with own landforms).
+        ///     "HardClamp" is the shipped asset with the hard clamp at HeightMax of before 2026-11-10. The biome–terrain fit
+        ///     candidates "Landform" / "LandformStrong" of 2026-11-10 are in commit d8ce664; Landform is in the shipped
+        ///     ten-biome set since.
         /// </summary>
         private static readonly Dictionary<string, Action<WorldGenSettings>> Candidates = new(){
             ["Shipped"] = _ => { },
-            ["HardClamp"] = s => s.HeightSoftBand = 0f,
-            ["Landform"] = Landform,
-            ["LandformStrong"] = s => {
-                Landform(s);
-                s.LambdaErosion = 1.5f;
-                s.LambdaPV = 1f;
-            }
+            ["HardClamp"] = s => s.HeightSoftBand = 0f
         };
-
-        /// <summary>
-        ///     Lowland biomes with landforms of their own instead of the same terrain targets: Plains low and flat
-        ///     (high E, low PV), Forest on rolling hills (lower E, higher PV, a little higher), Desert flat at mid height.
-        /// </summary>
-        private static void Landform(WorldGenSettings s){
-            Biome plains = BiomeOf(s, "Plains");
-            plains.TargetErosion = .68f;
-            plains.TargetPV = -.45f;
-            plains.TargetHeight = .4f;
-            Biome forest = BiomeOf(s, "Forest");
-            forest.TargetErosion = .4f;
-            forest.TargetPV = .2f;
-            forest.TargetHeight = .5f;
-            Biome desert = BiomeOf(s, "Desert");
-            desert.TargetErosion = .68f;
-            desert.TargetPV = -.3f;
-        }
 
         private static IEnumerable<string> CandidateNames => Candidates.Keys;
 
