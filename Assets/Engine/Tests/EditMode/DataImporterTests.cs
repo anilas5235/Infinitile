@@ -278,6 +278,57 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void ShippedWorldGenSettings_MountainSprucesGrowOnItsMeadow(){
+            // The Mountain is bare stone with a meadow block: in a 4096² area at stride 8 its ground carries spruces,
+            // all of them below their tree line. Without the meadow its tree rule never grows on its own ground.
+            LoadPackages();
+            WorldGenConfig cfg = ShippedConfig(out WorldGenSettings settings);
+            const int n = 512;
+            RegionBuffers buffers = new(){
+                SurfaceSource = new NativeArray<int>(n * n, Allocator.TempJob),
+                ColumnHeight = new NativeArray<int>(n * n, Allocator.TempJob),
+                FloraSpecies = new NativeArray<ushort>(n * n, Allocator.TempJob)
+            };
+            try{
+                List<Biome> biomes = settings.ActiveBiomes().ToList();
+                int mountain = biomes.FindIndex(b => b.name == "Mountain");
+                Assert.GreaterOrEqual(mountain, 0);
+                Assert.AreEqual(biomes[mountain].StoneBlock, biomes[mountain].TopBlock, "the Mountain's own ground is stone");
+                Assert.IsNotNull(biomes[mountain].MeadowBlock, "meadow block");
+                Assert.AreNotEqual(biomes[mountain].StoneBlock, biomes[mountain].MeadowBlock);
+                Assert.AreEqual(0, cfg.Biomes[mountain].soilGround);
+                Assert.AreEqual(Id(biomes[mountain].MeadowBlock.GetFullName().ToString()), cfg.Biomes[mountain].meadowBlock);
+                int spruce = System.Array.IndexOf(settings.FloraSpeciesNames(), "Spruce");
+                Assert.Greater(spruce, 0, "Spruce species id");
+
+                WorldGenRequest request = new(){ Config = cfg, Origin = new int2(-2048, -2048), Size = new int2(n, n), Stride = 8 };
+                WorldGenApi.SampleRegion(request, ref buffers).Complete();
+                int ground = 0, meadow = 0, spruces = 0;
+                for (int i = 0; i < n * n; i++){
+                    if (buffers.SurfaceSource[i] != mountain) continue;
+                    int x = request.Origin.x + i % n * request.Stride, z = request.Origin.y + i / n * request.Stride;
+                    ground++;
+                    bool isMeadow = SurfaceCover.IsMeadow(x, z, buffers.ColumnHeight[i], cfg.Biomes[mountain], cfg);
+                    if (isMeadow) meadow++;
+                    if (buffers.FloraSpecies[i] != spruce) continue;
+                    Assert.IsTrue(isMeadow, $"({x},{z}) h {buffers.ColumnHeight[i]}: spruce off the meadow");
+                    spruces++;
+                }
+
+                TestContext.WriteLine($"Mountain ground {ground} sampled columns, meadow {meadow}, spruce anchors {spruces}");
+                Assert.Greater(meadow, ground / 10, "a good part of the Mountain lies below the tree line");
+                Assert.Less(meadow, ground, "rock above the tree line");
+                Assert.Greater(spruces, 0, "spruces on Mountain ground");
+            }
+            finally{
+                buffers.SurfaceSource.Dispose();
+                buffers.ColumnHeight.Dispose();
+                buffers.FloraSpecies.Dispose();
+                cfg.Dispose();
+            }
+        }
+
+        [Test]
         public void ShippedWorldGenSettings_EveryLandBiomeCarriesFlora(){
             // Flora is visible for all land biomes. A 4096² area at stride 8: every biome with
             // flora rules that supplies the surface somewhere also has planted columns.

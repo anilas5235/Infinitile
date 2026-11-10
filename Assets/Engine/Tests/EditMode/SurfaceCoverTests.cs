@@ -114,6 +114,32 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void IsMeadow_LiesBelowTheTreeLine_OnDryColumnsOfABiomeWithAMeadow(){
+            // The meadow ends exactly where the column's top face reaches its tree line; columns under water and
+            // biomes without a meadow block have none. Without a tree line every dry column is meadow.
+            WorldGenConfig cfg = Config(0f);
+            Biome.BiomeDef alp = new(){ meadowBlock = TestFixtures.Grass, meadowGround = 1 };
+            int meadow = 0, rock = 0;
+            for (int x = -600; x < 600; x += 13)
+            for (int z = -600; z < 600; z += 17)
+            for (int h = 184; h <= 204; h++){
+                bool below = h + 1 < SurfaceCover.TreeLine(x, z, cfg);
+                Assert.AreEqual(below, SurfaceCover.IsMeadow(x, z, h, alp, cfg), $"({x},{z}) h {h}");
+                Assert.IsFalse(SurfaceCover.IsMeadow(x, z, h, default, cfg), "no meadow block");
+                if (below) meadow++;
+                else rock++;
+            }
+
+            Assert.Greater(meadow, 1000);
+            Assert.Greater(rock, 1000);
+            Assert.IsTrue(SurfaceCover.IsMeadow(5, 9, WaterLevel - 1, alp, cfg), "top face at the water surface");
+            Assert.IsFalse(SurfaceCover.IsMeadow(5, 9, WaterLevel - 2, alp, cfg), "under water");
+            Assert.IsFalse(SurfaceCover.IsMeadow(5, 9, 240, alp, cfg), "far above the line");
+            cfg.TreeLineHeight = 0f;
+            Assert.IsTrue(SurfaceCover.IsMeadow(5, 9, 240, alp, cfg), "no tree line: meadow everywhere");
+        }
+
+        [Test]
         public void TreeLine_WobblesWithinTheAmplitude_AndZeroTurnsItOff(){
             // Like the snow line: no straight contour, within ±amplitude, and a column is above the line exactly
             // where its top face reaches it. It has its own noise, not the snow line's.

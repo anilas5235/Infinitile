@@ -391,6 +391,76 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void ChunkJob_MeadowCoversAStoneBiomeBelowTheTreeLine(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            // A stone biome with a meadow block and a low tree line: its dry columns carry the meadow block exactly
+            // below their tree line and stone above it, and its soil rule (a tree) stands on meadow only. The other
+            // biome and columns under water keep their blocks. The chunk job equals the whole-world stamp.
+            FloraRule grove = FloraFixture.Rule(_fixture.Grove, .06f);
+            grove.RequiresSoil = true;
+            grove.StopsAtTreeLine = true;
+            _biomes = new[]{
+                _fixture.MakeBiome("Alp", .25f, 138f, 10f, _fixture.StoneSo, grove, FloraFixture.Rule(_fixture.TuftSo, .2f)),
+                _fixture.MakeBiome("Dunes", .75f, 138f, 6f, _fixture.SandSo, FloraFixture.Rule(_fixture.CactusSo, .03f, 1, 3))
+            };
+            _biomes[0].MeadowBlock = _fixture.GrassSo;
+            WorldGenSettings s = _fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes);
+            // The Terrain-first test area lies lower than the Biome-first one.
+            s.TreeLineHeight = s.WaterLevel + (architecture == GenArchitecture.TerrainFirst ? 5f : 12f);
+            s.TreeLineNoiseAmplitude = 4f;
+            s.TreeLineNoiseWavelength = 24f;
+            _config = _fixture.GeneratorConfig(s);
+            WorldGenConfig cfg = _config.WorldGen;
+            int waterLevel = cfg.WaterLevel;
+            int2 originChunk = new(1, 2), chunks = new(4, 4);
+            ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
+            Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
+            try{
+                List<string> report = new();
+                int mismatches = CompareVoxels(reference, chunkData, report);
+                Assert.AreEqual(0, mismatches, "chunk voxels differ from the whole-world stamp:\n" + string.Join("\n", report));
+
+                int meadow = 0, rock = 0, other = 0, wet = 0, trunks = 0;
+                for (int x = reference.Origin.x; x < reference.Origin.x + reference.Size.x; x++)
+                for (int z = reference.Origin.y; z < reference.Origin.y + reference.Size.y; z++){
+                    int source = reference.Region.SurfaceSource[reference.Region.Index(x, z)];
+                    int h = reference.SurfaceAt(x, z);
+                    ushort top = VoxelAt(chunkData, new int3(x, h, z));
+                    bool high = SurfaceCover.AboveTreeLine(x, z, h, cfg);
+                    if (h + 1 < waterLevel){
+                        Assert.AreEqual(TestFixtures.Dirt, top, $"({x},{z}) under water");
+                        wet++;
+                        continue;
+                    }
+
+                    if (source != 0){
+                        Assert.AreEqual(FloraFixture.Sand, top, $"({x},{z}) biome without a meadow");
+                        other++;
+                        continue;
+                    }
+
+                    Assert.AreEqual(high ? TestFixtures.Stone : TestFixtures.Grass, top, $"({x},{z}) h {h}");
+                    if (high) rock++;
+                    else meadow++;
+                    // A trunk stands on meadow, never on the rock.
+                    if (VoxelAt(chunkData, new int3(x, h + 1, z)) != FloraFixture.Log) continue;
+                    Assert.IsFalse(high, $"({x},{z}) trunk above the tree line");
+                    trunks++;
+                }
+
+                string counts = $"{architecture}: meadow {meadow}, rock {rock}, other biome {other}, under water {wet}, trunks on meadow {trunks}";
+                TestContext.WriteLine(counts);
+                Assert.Greater(meadow, 50, counts);
+                Assert.Greater(rock, 50, counts);
+                Assert.Greater(other, 50, counts);
+                Assert.Greater(trunks, 0, counts);
+            }
+            finally{
+                Release(results);
+            }
+        }
+
+        [Test]
         public void ChunkJob_WaterPlantsStandInWholeWater(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
             // Rules with a negative MinHeightAboveWater: single-block plants sit on the water surface, trunks and

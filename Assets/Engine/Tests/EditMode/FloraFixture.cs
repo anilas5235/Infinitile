@@ -479,6 +479,9 @@ namespace Engine.Tests.EditMode{
                 else if (b && b.ForestFloorBlock && h + 1 >= waterLevel &&
                          FloraPlacement.DensityFactor(wx, wz, (int)FloraDensity.Trees, cfg) >= b.ForestFloorDensity)
                     top = fixture.Ids[b.ForestFloorBlock];
+                // A stone biome carries its meadow block below the tree line.
+                else if (b && b.MeadowBlock && h + 1 >= waterLevel && !SurfaceCover.AboveTreeLine(wx, wz, h, cfg))
+                    top = fixture.Ids[b.MeadowBlock];
                 if (b && SurfaceCover.IsSnowCovered(wx, wz, h, def, cfg)) top = def.snowTopBlock;
                 ushort under = b ? fixture.Ids[b.UnderBlock] : (ushort)0;
                 ushort beachUnder = beach ? fixture.Ids[b.BeachBlock] : under;

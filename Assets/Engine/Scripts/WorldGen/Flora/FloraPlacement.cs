@@ -126,8 +126,8 @@ namespace Engine.Scripts.WorldGen.Flora{
         /// <summary>
         ///     The ground conditions of <see cref="FloraRuleDef.GroundChecks" />. A beach-ground rule passes on beach
         ///     columns (<see cref="SurfaceCover.IsBeach" />) whose beach block carries plants, other rules only off the
-        ///     beach. A rule that needs soil passes on ground of a biome with a soil top block that is not
-        ///     snow-covered; a rule that stops at the tree line below the column's tree line
+        ///     beach. A rule that needs soil passes on ground of a biome with a soil top block, or on its meadow
+        ///     (<see cref="SurfaceCover.IsMeadow" />), that is not snow-covered; a rule that stops at the tree line below the column's tree line
         ///     (<see cref="SurfaceCover.AboveTreeLine" />). A separate method, so the roll stays small.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -141,7 +141,8 @@ namespace Engine.Scripts.WorldGen.Flora{
             }
 
             if ((checks & FloraRuleDef.CheckSoil) != 0 &&
-                (def.soilGround == 0 || SurfaceCover.IsSnowCovered(x, z, s.ColumnHeight, def, cfg))) return false;
+                ((def.soilGround == 0 && !SurfaceCover.IsMeadow(x, z, s.ColumnHeight, def, cfg)) ||
+                 SurfaceCover.IsSnowCovered(x, z, s.ColumnHeight, def, cfg))) return false;
             return (checks & FloraRuleDef.CheckTreeLine) == 0 || !SurfaceCover.AboveTreeLine(x, z, s.ColumnHeight, cfg);
         }
 

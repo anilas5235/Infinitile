@@ -253,6 +253,38 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void RequiresSoil_GrowsOnTheMeadowOfAStoneBiome_BelowTheTreeLineOnly(){
+            // Bare stone with a meadow block: a rule that needs soil (and does not itself stop at the tree line)
+            // grows exactly on the columns below their tree line, where the meadow lies; the other rule everywhere.
+            FloraRule tree = FloraFixture.Rule(_fixture.FlowerSo, .5f);
+            tree.RequiresSoil = true;
+            Biome alp = _fixture.MakeBiome("Alp", .5f, 195f, 30f, _fixture.StoneSo, tree, FloraFixture.Rule(_fixture.TuftSo, .5f));
+            alp.MeadowBlock = _fixture.GrassSo;
+            Use(GenArchitecture.BiomeFirst, BlendMethod.None, alp);
+            Assert.AreEqual(0, _cfg.Biomes[0].soilGround, "the top block is the stone block");
+            Assert.AreEqual(1, _cfg.Biomes[0].meadowGround);
+            Assert.AreEqual(TestFixtures.Grass, _cfg.Biomes[0].meadowBlock);
+            RegionSample r = Region(Origin, Size);
+            int below = 0, above = 0, tuftsAbove = 0;
+            for (int i = 0; i < r.FloraSpecies.Length; i++){
+                int x = r.Origin.x + i % r.Size.x, z = r.Origin.y + i / r.Size.x;
+                bool first = Hash.Hash01(x, z, _cfg.Seed, HashSalts.FloraSpecies) < _cfg.FloraRules[0].CumulativeEnd;
+                bool high = SurfaceCover.AboveTreeLine(x, z, r.ColumnHeight[i], _cfg);
+                Assert.AreEqual(!high, SurfaceCover.IsMeadow(x, z, r.ColumnHeight[i], _cfg.Biomes[0], _cfg));
+                ushort expected = first ? high ? (ushort)0 : (ushort)1 : (ushort)2;
+                Assert.AreEqual(expected, r.FloraSpecies[i], $"({x},{z}): h = {r.ColumnHeight[i]}");
+                if (!first && high) tuftsAbove++;
+                if (!first) continue;
+                if (high) above++;
+                else below++;
+            }
+
+            Assert.Greater(below, 100, "the slope has meadow below the tree line");
+            Assert.Greater(above, 100, "the slope has rock above the tree line");
+            Assert.Greater(tuftsAbove, 100, "rules without the flag grow on the rock");
+        }
+
+        [Test]
         public void RequiresSoil_NeverOnSnowCoveredColumns(){
             // Above the snow line a multi-block rule stays unless it needs soil. The region lists a multi-block
             // species at its anchor columns only, so the anchors are counted.

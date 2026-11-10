@@ -64,6 +64,17 @@ namespace Engine.Scripts.WorldGen.Core{
         }
 
         /// <summary>
+        ///     Meadow: a dry column of a biome with a meadow block whose top face lies below the column's
+        ///     <see cref="TreeLine" />. It takes the meadow block as its top block and is soil for flora rules that need
+        ///     soil, so trees return to the lower slopes of a stone biome. With the tree line turned off every dry
+        ///     column of the biome is meadow.
+        /// </summary>
+        public static bool IsMeadow(int x, int z, int height, in Biome.BiomeDef def, in WorldGenConfig cfg){
+            if (def.meadowGround == 0 || height + 1 < cfg.WaterLevel) return false;
+            return !AboveTreeLine(x, z, height, cfg);
+        }
+
+        /// <summary>
         ///     Snow line at column (<paramref name="x" />, <paramref name="z" />): <c>SnowLineHeight</c> plus
         ///     <c>SnowLineNoiseAmplitude</c> times one octave of noise in −1…1, so the snow edge is no straight contour.
         /// </summary>

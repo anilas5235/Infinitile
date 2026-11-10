@@ -44,6 +44,11 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
         [Tooltip("Factor of the tree density noise (0…2, mean 1) from which the forest floor block lies. Higher: smaller patches.")]
         [Range(0f, 2f)] [SerializeField] public float ForestFloorDensity = 1.5f;
 
+        [Tooltip("Meadow: replaces the top block on dry columns below the tree line (WorldGenSettings tree line), so a "
+                 + "biome of bare stone carries grass and trees on its lower slopes and rock above. The meadow is soil "
+                 + "for flora rules that need soil. Empty: none. Beaches, forest floor, snow and underwater ground keep their blocks.")]
+        [SerializeField] public Voxel.Voxel MeadowBlock;
+
         [Tooltip("Top block of beach columns just above the water surface, and the two blocks under it. Beaches are "
                  + "patchy (WorldGenSettings beaches). Empty: the biome has no beaches.")]
         [SerializeField] public Voxel.Voxel BeachBlock;
@@ -106,6 +111,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
             def.stoneBlock = voxelId(StoneBlock);
             def.snowTopBlock = SnowTopBlock ? voxelId(SnowTopBlock) : (ushort)0;
             def.forestFloorBlock = ForestFloorBlock ? voxelId(ForestFloorBlock) : (ushort)0;
+            def.meadowBlock = MeadowBlock ? voxelId(MeadowBlock) : (ushort)0;
             def.strataBlock = StrataBlock ? voxelId(StrataBlock) : (ushort)0;
             // The band palette: the strata block first, then the further blocks that are set.
             def.strataCount = StrataBlock ? (byte)1 : (byte)0;
@@ -142,6 +148,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                 floraGround = TopBlock && TopBlock.meshLayer == Mesh.MeshLayer.Solid ? (byte)1 : (byte)0,
                 // Bare stone: the top block is the stone block itself.
                 soilGround = TopBlock && TopBlock != StoneBlock ? (byte)1 : (byte)0,
+                meadowGround = MeadowBlock ? (byte)1 : (byte)0,
                 freezesWater = FreezesWater ? (byte)1 : (byte)0,
                 forestFloorDensity = ForestFloorDensity,
                 beachHeight = BeachBlock ? (byte)Mathf.Clamp(BeachHeight, 0, 255) : (byte)0,
@@ -188,6 +195,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
             /// <summary>Tree density factor from which the forest floor block lies.</summary>
             public float forestFloorDensity;
+
+            /// <summary>Top block of dry columns below the tree line (<c>SurfaceCover.IsMeadow</c>); 0 = none, or no registry.</summary>
+            public ushort meadowBlock;
+
+            /// <summary>1 when the biome has a meadow block: its dry columns below the tree line are soil.</summary>
+            public byte meadowGround;
 
             /// <summary>Largest beach height h_b,max in blocks; 0 = the biome has no beaches.</summary>
             public byte beachHeight;
