@@ -205,8 +205,9 @@ namespace Engine.Tests.EditMode{
                 }
 
                 // DeadTree is out of every biome since 2026-11-10.
-                Assert.AreEqual(11, cfg.TreeSpecies.Length,
-                    "Oak, Birch, Bush, Spruce, Cactus, Boulder, FallenLog, JungleTree, Acacia, Willow, BushSwamp");
+                Assert.AreEqual(14, cfg.TreeSpecies.Length,
+                    "Oak, Birch, Bush, Spruce, Cactus, Boulder, FallenLog, JungleTree, Acacia, Willow, BushSwamp, " +
+                    "BoulderGrey, BoulderMossy, BoulderRed");
                 for (int i = 0; i < cfg.TreeVariants.Length; i++){
                     TreeVariantDef v = cfg.TreeVariants[i];
                     if (v.TrunkHeight.y > 0) Assert.AreNotEqual(0, v.TrunkVoxel, $"variant {i}: trunk voxel");
