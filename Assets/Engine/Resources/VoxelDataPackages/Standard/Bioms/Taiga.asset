@@ -19,6 +19,8 @@ MonoBehaviour:
   SnowTopBlock: {fileID: 0}
   FreezesWater: 0
   StrataBlock: {fileID: 11400000, guid: 2a1844411e45fba40a1da565a805687e, type: 2}
+  ForestFloorBlock: {fileID: 11400000, guid: bbb451d8a64e696787d97450e75d860d, type: 2}
+  ForestFloorDensity: 1.5
   BeachBlock: {fileID: 11400000, guid: b5df436b2cc46cf419e666fccd2d96b3, type: 2}
   BeachHeight: 3
   TargetHumidity: 0.35

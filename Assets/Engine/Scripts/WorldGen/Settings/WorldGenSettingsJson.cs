@@ -230,6 +230,8 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["FreezesWater"] = b.FreezesWater,
                 ["StrataBlock"] = VoxelName(b.StrataBlock),
                 ["StrataPalette"] = StrataPalette(b),
+                ["ForestFloorBlock"] = VoxelName(b.ForestFloorBlock),
+                ["ForestFloorDensity"] = b.ForestFloorDensity,
                 ["BeachBlock"] = VoxelName(b.BeachBlock),
                 ["BeachHeight"] = b.BeachHeight,
                 ["TargetTemperature"] = b.TargetTemperature,

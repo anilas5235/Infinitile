@@ -475,6 +475,10 @@ namespace Engine.Tests.EditMode{
                 ushort top = b ? fixture.Ids[h + 1 < waterLevel ? wet : b.TopBlock] : (ushort)0;
                 bool beach = b && b.BeachBlock && SurfaceCover.IsBeach(wx, wz, h, def, cfg, probes);
                 if (beach) top = fixture.Ids[b.BeachBlock];
+                // Dense forest stands on the forest floor block; beaches and underwater ground keep theirs.
+                else if (b && b.ForestFloorBlock && h + 1 >= waterLevel &&
+                         FloraPlacement.DensityFactor(wx, wz, (int)FloraDensity.Trees, cfg) >= b.ForestFloorDensity)
+                    top = fixture.Ids[b.ForestFloorBlock];
                 if (b && SurfaceCover.IsSnowCovered(wx, wz, h, def, cfg)) top = def.snowTopBlock;
                 ushort under = b ? fixture.Ids[b.UnderBlock] : (ushort)0;
                 ushort beachUnder = beach ? fixture.Ids[b.BeachBlock] : under;

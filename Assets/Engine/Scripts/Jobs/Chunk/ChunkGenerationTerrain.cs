@@ -212,7 +212,7 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
-        ///     Beach and snow top blocks, strata shift and frozen water surface of every chunk column, from the sampled
+        ///     Beach, forest floor and snow top blocks, strata shift and frozen water surface of every chunk column, from the sampled
         ///     temperature, height and surface biome (the hard biome for the ice). Called after <see cref="PrepareChunkMaps(ref GeneratorConfig,ref int3,NativeArray{ChunkColumn},ref FloraGrid)" />
         ///     rather than from it: inside it, even as a separate loop, this code made Burst compile the sampling slower
         ///     (Terrain-first DistanceBlend about a third slower).
@@ -237,6 +237,8 @@ namespace Engine.Scripts.Jobs.Chunk{
                         col.TopBlock = def.beachBlock;
                         col.BeachBlock = def.beachBlock;
                     }
+                    else if (def.forestFloorBlock != 0 && SurfaceCover.IsForestFloor(wx, wz, col.Height, def, cfg))
+                        col.TopBlock = def.forestFloorBlock;
 
                     if (SurfaceCover.IsSnowCovered(wx, wz, col.Height, def, cfg))
                         col.TopBlock = def.snowTopBlock;

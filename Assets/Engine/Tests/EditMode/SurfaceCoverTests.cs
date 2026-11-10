@@ -28,6 +28,8 @@ namespace Engine.Tests.EditMode{
                 TreeLineHeight = 195f,
                 TreeLineNoiseAmplitude = 8f,
                 TreeLineNoiseWavelength = 64f,
+                FloraDensityWavelength = new Unity.Mathematics.float4(96f, 48f, 24f, 64f),
+                FloraDensityContrast = new Unity.Mathematics.float4(2f),
                 FreezeNoiseAmplitude = noiseAmplitude,
                 FreezeNoiseWavelength = 24f,
                 StrataWarpAmplitude = 4f,
@@ -82,6 +84,33 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(210f, SurfaceCover.SnowLine(5, 9, cfg));
             Assert.IsTrue(SurfaceCover.IsSnowCovered(5, 9, 209, Snowy, cfg), "top face at 210");
             Assert.IsFalse(SurfaceCover.IsSnowCovered(5, 9, 208, Snowy, cfg), "top face at 209");
+        }
+
+        [Test]
+        public void IsForestFloor_FollowsTheTreeDensityNoise_OnDryColumnsOnly(){
+            // The floor lies exactly where the tree density factor reaches the biome's threshold; a higher threshold
+            // gives less of it, and columns under water or biomes without the block have none.
+            WorldGenConfig cfg = Config(0f);
+            Biome.BiomeDef forest = new(){ forestFloorBlock = FloraFixture.Granite, forestFloorDensity = 1.5f };
+            Biome.BiomeDef sparse = new(){ forestFloorBlock = FloraFixture.Granite, forestFloorDensity = 1.9f };
+            int floor = 0, open = 0, sparseFloor = 0;
+            for (int x = -600; x < 600; x += 7)
+            for (int z = -600; z < 600; z += 11){
+                float density = Engine.Scripts.WorldGen.Flora.FloraPlacement.DensityFactor(x, z, 0, cfg);
+                bool expected = density >= 1.5f;
+                Assert.AreEqual(expected, SurfaceCover.IsForestFloor(x, z, 150, forest, cfg), $"({x},{z}) density {density}");
+                Assert.AreEqual(expected, SurfaceCover.IsForestFloor(x, z, WaterLevel - 1, forest, cfg), "top face at the water surface");
+                Assert.IsFalse(SurfaceCover.IsForestFloor(x, z, WaterLevel - 2, forest, cfg), "under water");
+                Assert.IsFalse(SurfaceCover.IsForestFloor(x, z, 150, default, cfg), "no forest floor block");
+                if (expected) floor++;
+                else open++;
+                if (SurfaceCover.IsForestFloor(x, z, 150, sparse, cfg)) sparseFloor++;
+            }
+
+            Assert.Greater(floor, 1000, "dense forest");
+            Assert.Greater(open, floor, "most of the biome keeps its top block");
+            Assert.Less(sparseFloor, floor * 3 / 4, "a higher threshold shrinks the patches");
+            Assert.Greater(sparseFloor, 0);
         }
 
         [Test]

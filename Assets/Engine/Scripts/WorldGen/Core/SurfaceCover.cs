@@ -1,6 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Blending;
+using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Noise;
 using Unity.Collections;
 using Engine.Scripts.WorldGen.Settings;
@@ -28,6 +29,17 @@ namespace Engine.Scripts.WorldGen.Core{
         /// </summary>
         public static float EffectiveTemperature(float temperature, float freezeNoise, in WorldGenConfig cfg){
             return temperature + cfg.FreezeNoiseAmplitude * freezeNoise;
+        }
+
+        /// <summary>
+        ///     Forest floor: a dry column of a biome with a forest floor block where the tree density noise
+        ///     (<see cref="FloraPlacement.DensityFactor(int,int,int,in WorldGenConfig)" /> of
+        ///     <see cref="FloraDensity.Trees" />) reaches the biome's <c>forestFloorDensity</c>. The noise is the one
+        ///     the tree rules follow, so the floor lies under the groves.
+        /// </summary>
+        public static bool IsForestFloor(int x, int z, int height, in Biome.BiomeDef def, in WorldGenConfig cfg){
+            if (def.forestFloorBlock == 0 || height + 1 < cfg.WaterLevel) return false;
+            return FloraPlacement.DensityFactor(x, z, (int)FloraDensity.Trees, cfg) >= def.forestFloorDensity;
         }
 
         /// <summary>

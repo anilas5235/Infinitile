@@ -330,6 +330,67 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void ChunkJob_ForestFloorLiesWhereTheForestIsDense(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            // A biome with a forest floor block: its dry columns carry the block exactly where the tree density noise
+            // reaches the threshold; columns of the other biome and columns under water keep their blocks. The chunk
+            // job equals the whole-world stamp.
+            _biomes = new[]{
+                _fixture.MakeBiome("Meadow", .25f, 121f, 8f, _fixture.GrassSo, FloraFixture.Rule(_fixture.TuftSo, .2f),
+                    FloraFixture.Rule(_fixture.Grove, .04f)),
+                _fixture.MakeBiome("Dunes", .75f, 124f, 6f, _fixture.SandSo, FloraFixture.Rule(_fixture.CactusSo, .03f, 1, 3))
+            };
+            _biomes[0].ForestFloorBlock = _fixture.GraniteSo;
+            _biomes[0].ForestFloorDensity = 1.2f;
+            WorldGenSettings s = _fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes);
+            s.TreesDensityWavelength = 24f;
+            _config = _fixture.GeneratorConfig(s);
+            WorldGenConfig cfg = _config.WorldGen;
+            int waterLevel = cfg.WaterLevel;
+            int2 originChunk = new(1, 2), chunks = new(4, 4);
+            ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
+            Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
+            try{
+                List<string> report = new();
+                int mismatches = CompareVoxels(reference, chunkData, report);
+                Assert.AreEqual(0, mismatches, "chunk voxels differ from the whole-world stamp:\n" + string.Join("\n", report));
+
+                int floor = 0, grass = 0, wet = 0, other = 0;
+                for (int x = reference.Origin.x; x < reference.Origin.x + reference.Size.x; x++)
+                for (int z = reference.Origin.y; z < reference.Origin.y + reference.Size.y; z++){
+                    int source = reference.Region.SurfaceSource[reference.Region.Index(x, z)];
+                    int h = reference.SurfaceAt(x, z);
+                    ushort top = VoxelAt(chunkData, new int3(x, h, z));
+                    // A trunk or a cactus replaces nothing at the top block itself.
+                    bool dense = FloraPlacement.DensityFactor(x, z, (int)FloraDensity.Trees, cfg) >= 1.2f;
+                    if (source != 0){
+                        Assert.AreNotEqual(FloraFixture.Granite, top, $"({x},{z}) biome without a forest floor");
+                        other++;
+                    }
+                    else if (h + 1 < waterLevel){
+                        Assert.AreEqual(TestFixtures.Dirt, top, $"({x},{z}) under water");
+                        wet++;
+                    }
+                    else{
+                        Assert.AreEqual(dense ? FloraFixture.Granite : TestFixtures.Grass, top, $"({x},{z}) h {h}");
+                        if (dense) floor++;
+                        else grass++;
+                    }
+                }
+
+                string counts = $"{architecture}: forest floor {floor}, grass {grass}, under water {wet}, other biome {other}";
+                TestContext.WriteLine(counts);
+                Assert.Greater(floor, 100, counts);
+                Assert.Greater(grass, 100, counts);
+                Assert.Greater(wet, 0, counts);
+                Assert.Greater(other, 100, counts);
+            }
+            finally{
+                Release(results);
+            }
+        }
+
+        [Test]
         public void ChunkJob_WaterPlantsStandInWholeWater(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
             // Rules with a negative MinHeightAboveWater: single-block plants sit on the water surface, trunks and
