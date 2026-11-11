@@ -662,6 +662,63 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void ChunkJob_BouldersSinkFromTheLowestGroundUnderThem(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            // The shipped boulders on hills: the sink depth of each counts from the lowest ground under its body, so
+            // its lowest layer lies the variant's sink below that ground and the downhill side shows no more of the
+            // boulder than flat ground does. The chunks agree with the whole-world stamp, also across chunk borders.
+            TreeSpecies boulder = _fixture.ShippedSpecies("Boulder");
+            _biomes = new[]{
+                _fixture.MakeBiome("Rocks", .5f, 150f, 30f, _fixture.GrassSo, FloraFixture.Rule(boulder, .08f), FloraFixture.Rule(_fixture.TuftSo, .3f))
+            };
+            _config = _fixture.GeneratorConfig(_fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes));
+            WorldGenConfig cfg = _config.WorldGen;
+            int2 originChunk = new(1, 2), chunks = new(3, 3);
+            ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
+
+            int onSlope = 0, onFlat = 0, deepest = 0;
+            foreach ((int2 column, List<int3> footprint) in reference.Anchors){
+                if (!reference.SlopeSink.TryGetValue(column, out int slope)) continue;
+                int variant = reference.TreeVariants[column];
+                TreeVariantDef v = cfg.TreeVariants[variant];
+                TreeRoll roll = TreeShape.Roll(column.x, column.y, cfg.Seed, variant, v);
+                int lowest = int.MaxValue;
+                for (int dx = -roll.CrownRadius; dx <= roll.CrownRadius; dx++)
+                for (int dz = -roll.CrownRadius; dz <= roll.CrownRadius; dz++)
+                    if (dx * dx + dz * dz <= roll.CrownRadius * (roll.CrownRadius + 1))
+                        lowest = math.min(lowest, reference.SurfaceAt(column.x + dx, column.y + dz));
+                Assert.AreEqual(reference.SurfaceAt(column.x, column.y) - lowest, slope, $"extra sink of the boulder at {column}");
+
+                // Body of 2r + 1 layers from CrownBase 1; a bump may add one layer on top, a hole may drop the lowest.
+                int height = 2 * roll.CrownRadius + 1;
+                int bottom = footprint.Min(p => p.y), top = footprint.Max(p => p.y);
+                Assert.GreaterOrEqual(bottom, lowest + 1 - roll.Sink, $"lowest layer of the boulder at {column}");
+                Assert.LessOrEqual(bottom, lowest + 2 - roll.Sink, $"lowest layer of the boulder at {column}");
+                Assert.LessOrEqual(top, lowest + height - roll.Sink + (v.BumpChance > 0f ? 1 : 0), $"top of the boulder at {column}");
+                // A third to a half of the body lies below the lowest ground under it.
+                Assert.GreaterOrEqual(3 * roll.Sink, height, $"at least a third in the ground at {column}");
+                Assert.LessOrEqual(2 * roll.Sink, height, $"at most half in the ground at {column}");
+                if (slope > 0) onSlope++;
+                else onFlat++;
+                deepest = math.max(deepest, slope);
+            }
+
+            TestContext.WriteLine($"{architecture}: boulders on a slope {onSlope}, on flat ground {onFlat}, largest drop under one {deepest}");
+            Assert.Greater(onSlope, 5, "boulders on a slope");
+            Assert.Greater(onFlat, 0, "boulders on flat ground");
+
+            Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
+            try{
+                List<string> report = new();
+                int mismatches = CompareVoxels(reference, chunkData, report);
+                Assert.AreEqual(0, mismatches, "chunk voxels differ from the whole-world stamp:\n" + string.Join("\n", report));
+            }
+            finally{
+                Release(results);
+            }
+        }
+
+        [Test]
         public void ChunkJob_TreesDoNotDependOnTheChunkOrder(){
             // Mixed variant radii and trees across chunk borders: generating the chunks in reverse order gives the
             // same voxels in every chunk.

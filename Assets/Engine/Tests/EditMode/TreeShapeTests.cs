@@ -189,6 +189,37 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void Shapes_UnderBody_IsTheColumnsOfASunkRoundBody([Values(1, 2, 3)] int radius){
+            // A boulder without crown noise (no holes, no bumps) covers exactly the columns its sink depth is measured over; only a sunk,
+            // standing shape with a crown takes the rule.
+            TreeVariant variant = new(){
+                LeafVoxel = _fixture.GraniteSo, TrunkHeight = new IntRange(0, 0), CrownShape = CrownShape.Round,
+                CrownRadius = new IntRange(radius, radius), CrownBase = 1, HoleChance = 0f, BumpChance = 0f, Sink = new IntRange(1, 1)
+            };
+            TreeVariantDef v = Def(variant);
+            TreeRoll roll = TreeShape.Roll(12, -7, 7u, 0, v);
+            Assert.IsTrue(TreeShape.SinksToLowestGround(roll), "a sunk boulder");
+            HashSet<int2> body = new(Stamp(new int3(12, 100, -7), roll, v, 7u).Keys.Select(p => p.xz));
+            HashSet<int2> under = new();
+            for (int dx = -radius - 1; dx <= radius + 1; dx++)
+            for (int dz = -radius - 1; dz <= radius + 1; dz++)
+                if (TreeShape.UnderBody(roll, dx, dz))
+                    under.Add(new int2(dx, dz));
+            CollectionAssert.AreEquivalent(body, under);
+            Assert.Greater(under.Count, 1, "more than the anchor column");
+
+            TreeRoll level = roll;
+            level.Sink = 0;
+            Assert.IsFalse(TreeShape.SinksToLowestGround(level), "a shape that is not sunk keeps its anchor height");
+            TreeRoll lying = roll;
+            lying.Lying = true;
+            Assert.IsFalse(TreeShape.SinksToLowestGround(lying), "a lying trunk");
+            TreeRoll bare = roll;
+            bare.CrownRadius = 0;
+            Assert.IsFalse(TreeShape.SinksToLowestGround(bare), "a shape without a body");
+        }
+
+        [Test]
         public void Shapes_LyingTrunk_IsALineAlongXOrZ_TwoLongWhenNarrowed(){
             // Length 3–6 along one of the 4 axis directions from the anchor at y 0; crown and branches are ignored.
             TreeVariant variant = new(){

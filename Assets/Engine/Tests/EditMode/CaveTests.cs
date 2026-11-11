@@ -903,6 +903,19 @@ namespace Engine.Tests.EditMode{
                     int variant = TreeShape.PickVariant(wx, wz, cfg, d.Tree);
                     TreeRoll roll = TreeShape.Roll(wx, wz, cfg.Seed, variant, cfg.TreeVariants[variant]);
                     if (blocks.Anchor[col] == 2) roll.Narrow();
+                    if (TreeShape.SinksToLowestGround(roll)){
+                        // A sunk shape counts its sink depth from the lowest ground under its body.
+                        int lowest = h;
+                        for (int dx = -roll.CrownRadius; dx <= roll.CrownRadius; dx++)
+                        for (int dz = -roll.CrownRadius; dz <= roll.CrownRadius; dz++){
+                            if (!TreeShape.UnderBody(roll, dx, dz)) continue;
+                            WorldSampler.SampleColumn(wx + dx, wz + dz, cfg, out ColumnSample under);
+                            lowest = math.min(lowest, math.clamp(under.ColumnHeight, 0, MaxTerrainHeight));
+                        }
+
+                        roll.Sink += h - lowest;
+                    }
+
                     // The voxels under the trunk, as the vegetation pass tests them.
                     int4 box = roll.Lying ? TreeShape.Footprint(roll) : new int4(0, 0, roll.Width - 1, roll.Width - 1);
                     a.Ground = new int3(wx, h - roll.Sink, wz);

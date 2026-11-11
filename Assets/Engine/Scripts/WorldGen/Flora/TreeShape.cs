@@ -200,6 +200,24 @@ namespace Engine.Scripts.WorldGen.Flora{
         }
 
         /// <summary>
+        ///     True for a sunk standing shape with a crown (a boulder). Its sink depth counts from the lowest ground
+        ///     under its body (<see cref="UnderBody" />), not from the anchor column: the caller adds the drop from
+        ///     the anchor's top block to that ground to <see cref="TreeRoll.Sink" />, so on a slope the downhill side
+        ///     lies as deep in the ground as on flat ground.
+        /// </summary>
+        public static bool SinksToLowestGround(in TreeRoll r){
+            return r.Sink > 0 && !r.Lying && r.CrownRadius > 0;
+        }
+
+        /// <summary>
+        ///     Column (dx, dz) from the anchor lies under the widest layer of a round body of the rolled crown radius
+        ///     r: dx² + dz² ≤ r² + r, the crown test of a round crown at its middle layer.
+        /// </summary>
+        public static bool UnderBody(in TreeRoll r, int dx, int dz){
+            return dx * dx + dz * dz <= r.CrownRadius * r.CrownRadius + r.CrownRadius;
+        }
+
+        /// <summary>
         ///     Appends the voxels of the tree to <paramref name="output" />, offsets relative to
         ///     <paramref name="anchorBase" />: the anchor column at its top block + 1, in world coordinates (the crown
         ///     noise hashes world positions). The list may hold duplicates; stamping resolves them by voxel class.

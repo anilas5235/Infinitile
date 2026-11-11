@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.WorldGen.Blending;
+using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Collections;
@@ -115,6 +117,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                     int variant = TreeShape.PickVariant(wx, wz, cfg, d.Tree);
                     TreeRoll roll = TreeShape.Roll(wx, wz, cfg.Seed, variant, cfg.TreeVariants[variant]);
                     if (grid.Anchor[g] == 2) roll.Narrow();
+                    SinkToLowestGround(ref roll, grid, chunkColumns, x, z, chunkWordPos, cfg);
                     if (TrunkGroundCarved(ref caves, roll, x, z, baseY - 1 - roll.Sink, chunkWordPos, cfg, grid.Cache)) continue;
                     tree.Clear();
                     TreeShape.Build(new int3(wx, baseY, wz), roll, cfg.TreeVariants[variant], cfg.Seed, ref tree);
@@ -140,6 +143,34 @@ namespace Engine.Scripts.Jobs.Chunk{
             }
 
             tree.Dispose();
+        }
+
+        /// <summary>
+        ///     On a slope a sunk shape (<see cref="TreeShape.SinksToLowestGround" />, a boulder) sinks further: by the
+        ///     drop from the anchor's top block to the lowest top block under its body, so its downhill side lies as
+        ///     deep in the ground as on flat ground. The heights are the sampler's, so every chunk that holds part of
+        ///     the shape decides alike; (x, z) is the chunk-local anchor column, which may lie in the ring around the chunk.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void SinkToLowestGround(ref TreeRoll roll, in FloraGrid grid, NativeArray<ChunkColumn> chunkColumns,
+            int x, int z, int3 chunkWordPos, in WorldGenConfig cfg){
+            if (!TreeShape.SinksToLowestGround(roll)) return;
+            int anchor = grid.Height[grid.Index(x, z)], lowest = anchor, r = roll.CrownRadius;
+            for (int dx = -r; dx <= r; dx++)
+            for (int dz = -r; dz <= r; dz++){
+                if ((dx == 0 && dz == 0) || !TreeShape.UnderBody(roll, dx, dz)) continue;
+                int fx = x + dx, fz = z + dz, h;
+                if (fx >= 0 && fx < ChunkWidth && fz >= 0 && fz < ChunkDepth)
+                    h = chunkColumns[GetColumnIdx(fx, fz, ChunkDepth)].Height;
+                else{
+                    WorldSampler.SampleCore(chunkWordPos.x + fx, chunkWordPos.z + fz, cfg, grid.Cache, out ColumnSample s);
+                    h = math.clamp(s.ColumnHeight, 0, MaxTerrainHeight);
+                }
+
+                lowest = math.min(lowest, h);
+            }
+
+            roll.Sink += anchor - lowest;
         }
 
         /// <summary>Some voxel under the trunk of <paramref name="roll" /> (anchor (x, z), at <paramref name="y" />) is carved.</summary>

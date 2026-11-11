@@ -132,7 +132,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             for (int z = -reach; z < ChunkDepth + reach; z++){
                 int g = grid.Index(x, z);
                 if (grid.Anchor[g] == 0) continue;
-                AnchorGround(grid, x, z, origin, cfg, out int4 box, out int y);
+                AnchorGround(grid, chunkColumns, x, z, origin, cfg, out int4 box, out int y);
                 for (int fx = x + box.x; fx <= x + box.z; fx++)
                 for (int fz = z + box.y; fz <= z + box.w; fz++)
                     AddProbe(ref caves, fx, fz, y);
@@ -150,8 +150,8 @@ namespace Engine.Scripts.Jobs.Chunk{
         ///     The voxels an anchor stands on: for a tree the columns under its trunk (relative to the anchor) at the
         ///     height under the trunk's lowest voxel, otherwise the anchor's own top block.
         /// </summary>
-        private static void AnchorGround(in FloraGrid grid, int x, int z, int3 origin, in WorldGenConfig cfg,
-            out int4 box, out int y){
+        private static void AnchorGround(in FloraGrid grid, NativeArray<ChunkColumn> chunkColumns, int x, int z, int3 origin,
+            in WorldGenConfig cfg, out int4 box, out int y){
             int g = grid.Index(x, z);
             FloraRuleDef d = cfg.FloraRules[grid.Rule[g]];
             box = int4.zero;
@@ -161,6 +161,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             int variant = TreeShape.PickVariant(wx, wz, cfg, d.Tree);
             TreeRoll roll = TreeShape.Roll(wx, wz, cfg.Seed, variant, cfg.TreeVariants[variant]);
             if (grid.Anchor[g] == 2) roll.Narrow();
+            SinkToLowestGround(ref roll, grid, chunkColumns, x, z, origin, cfg);
             box = UnderTrunk(roll);
             y -= roll.Sink;
         }

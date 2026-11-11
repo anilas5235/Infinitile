@@ -435,6 +435,12 @@ namespace Engine.Tests.EditMode{
         /// <summary>Tree anchors in <see cref="Anchors" /> whose wide or leaning trunk fell back to a narrow, upright one.</summary>
         internal readonly HashSet<int2> Narrowed = new();
 
+        /// <summary>
+        ///     Blocks a sunk shape (a boulder) in <see cref="Anchors" /> sits deeper than its variant's sink: its anchor
+        ///     height minus the lowest ground under its body.
+        /// </summary>
+        internal readonly Dictionary<int2, int> SlopeSink = new();
+
         /// <summary>Anchors (world column) left out because their ground is carved.</summary>
         internal readonly HashSet<int2> OnCarvedGround = new();
 
@@ -546,6 +552,18 @@ namespace Engine.Tests.EditMode{
                             throw new InvalidOperationException($"The region reports a lying trunk at ({wx}, {wz}) that fits nowhere.");
                     }
 
+                    int slope = -1;
+                    if (TreeShape.SinksToLowestGround(roll)){
+                        // A sunk shape counts its sink depth from the lowest ground under its body.
+                        int lowest = ColumnTop(i);
+                        for (int dx = -roll.CrownRadius; dx <= roll.CrownRadius; dx++)
+                        for (int dz = -roll.CrownRadius; dz <= roll.CrownRadius; dz++)
+                            if (TreeShape.UnderBody(roll, dx, dz))
+                                lowest = math.min(lowest, ColumnTop(Region.Index(wx + dx, wz + dz)));
+                        slope = ColumnTop(i) - lowest;
+                        roll.Sink += slope;
+                    }
+
                     if (TrunkGroundCarved(wx, ColumnTop(i) - roll.Sink, wz, roll)){
                         OnCarvedGround.Add(new int2(wx, wz));
                         Narrowed.Remove(new int2(wx, wz));
@@ -560,6 +578,7 @@ namespace Engine.Tests.EditMode{
                     }
 
                     TreeVariants[new int2(wx, wz)] = variant;
+                    if (slope >= 0) SlopeSink[new int2(wx, wz)] = slope;
                 }
                 else if (rule.SpeciesStructure){
                     foreach (StructurePart part in rule.SpeciesStructure.parts)
@@ -584,6 +603,7 @@ namespace Engine.Tests.EditMode{
                 else{
                     TreeVariants.Remove(new int2(wx, wz));
                     Narrowed.Remove(new int2(wx, wz));
+                    SlopeSink.Remove(new int2(wx, wz));
                 }
             }
 
