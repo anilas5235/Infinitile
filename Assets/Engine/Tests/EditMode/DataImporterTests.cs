@@ -339,6 +339,12 @@ namespace Engine.Tests.EditMode{
                 Assert.AreEqual(biomes[mountain].StoneBlock, biomes[mountain].TopBlock, "the Mountain's own ground is stone");
                 Assert.IsNotNull(biomes[mountain].MeadowBlock, "meadow block");
                 Assert.AreNotEqual(biomes[mountain].StoneBlock, biomes[mountain].MeadowBlock);
+                // Tour 2 (2026-11-11): the steps of a meadow slope show stone and no dirt. The meadow block has the
+                // Mountain's stone tile below and a stone side with the grass rim, and the block under it is stone.
+                Voxel meadowVoxel = biomes[mountain].MeadowBlock;
+                Assert.AreEqual(biomes[mountain].StoneBlock, biomes[mountain].UnderBlock, "stone under the meadow");
+                Assert.AreEqual(biomes[mountain].StoneBlock.all, meadowVoxel.bottom, "meadow block: stone tile below");
+                Assert.AreEqual("stone_grass_taiga", meadowVoxel.side ? meadowVoxel.side.name : null, "meadow block: stone side");
                 Assert.AreEqual(0, cfg.Biomes[mountain].soilGround);
                 Assert.AreEqual(Id(biomes[mountain].MeadowBlock.GetFullName().ToString()), cfg.Biomes[mountain].meadowBlock);
                 int spruce = System.Array.IndexOf(settings.FloraSpeciesNames(), "Spruce");

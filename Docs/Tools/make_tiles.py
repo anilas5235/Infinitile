@@ -54,6 +54,8 @@ for n, (h, s, v) in GRASS.items():
 # Needle litter (podzol) for the Taiga forest floor.
 tiles['litter_top'] = recolour(load('grass_top'), GREEN, 26, .80, .58)
 tiles['dirt_litter'] = recolour(load('dirt_grass'), GREEN, 26, .80, .58)
+# Mountain meadow (tour 2, 2026-11-11): Taiga grass on stone, so the step sides of a slope show stone and no dirt.
+tiles['stone_grass_taiga'] = recolour(load('stone_grass'), GREEN, *GRASS['taiga'])
 
 # --- Earth and stone ------------------------------------------------------------------------------------------------
 tiles['mud'] = recolour(load('dirt'), ALL, 24, .75, .52)

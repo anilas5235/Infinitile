@@ -19,7 +19,7 @@ MonoBehaviour:
   SnowTopBlock: {fileID: 11400000, guid: dda8a6f1ece6d0243a39b247a2bd2a75, type: 2}
   FreezesWater: 1
   StrataBlock: {fileID: 11400000, guid: 2a1844411e45fba40a1da565a805687e, type: 2}
-  MeadowBlock: {fileID: 11400000, guid: fa38cc6053913e60f815722b37aa5c94, type: 2}
+  MeadowBlock: {fileID: 11400000, guid: 87c154a10b3d49b784bb1a879ff4c314, type: 2}
   BeachBlock: {fileID: 0}
   BeachHeight: 3
   TargetHumidity: 0.3
