@@ -273,8 +273,20 @@ namespace Engine.Tests.EditMode{
                 else others++;
             }
 
-            Assert.AreEqual(20, trees, "tree rules of the shipped biomes");
+            Assert.AreEqual(19, trees, "tree rules of the shipped biomes");
             Assert.Greater(others, 20);
+        }
+
+        [Test]
+        public void ShippedWorldGenSettings_TaigaTreesAreSpruces(){
+            // The only standing tree of the Taiga is the Spruce (no Birch, whose lime crowns stood out there); its
+            // other tree species are the fallen log and the mossy boulder.
+            WorldGenSettings settings = AssetDatabase.LoadAssetAtPath<WorldGenSettings>(ShippedSettingsPath);
+            Assert.IsNotNull(settings, ShippedSettingsPath);
+            Biome taiga = settings.Biomes.Biomes.Find(b => b.name == "Taiga");
+            Assert.IsNotNull(taiga, "Taiga");
+            List<string> species = taiga.FloraRules.Where(r => r.SpeciesTree).Select(r => r.SpeciesTree.name).ToList();
+            CollectionAssert.AreEquivalent(new[]{ "Spruce", "FallenLog", "BoulderMossy" }, species);
         }
 
         [Test]
