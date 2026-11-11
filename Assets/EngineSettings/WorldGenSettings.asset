@@ -23,7 +23,7 @@ MonoBehaviour:
   WarpWavelength: 96
   WarpOctaves: 2
   LambdaTemperature: 1.5
-  LambdaHumidity: 1.5
+  LambdaHumidity: 2
   LambdaContinental: 2
   LambdaErosion: 1
   LambdaPV: 0.5

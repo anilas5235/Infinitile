@@ -22,8 +22,8 @@ MonoBehaviour:
   MeadowBlock: {fileID: 11400000, guid: 87c154a10b3d49b784bb1a879ff4c314, type: 2}
   BeachBlock: {fileID: 0}
   BeachHeight: 3
-  TargetHumidity: 0.3
-  TargetTemperature: 0.35
+  TargetHumidity: 0.5
+  TargetTemperature: 0.25
   TargetContinental: 0.62
   TargetErosion: 0.3
   TargetPV: 0.5

@@ -30,7 +30,7 @@ MonoBehaviour:
   TargetContinental: 0.64
   TargetErosion: 0.3
   TargetPV: 0.4
-  TargetHeight: 0.56
+  TargetHeight: 0.64
   HeightOffset: 160
   HeightAmplitude: 18
   OctaveWeights:

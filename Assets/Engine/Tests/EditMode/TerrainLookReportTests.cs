@@ -356,6 +356,7 @@ namespace Engine.Tests.EditMode{
                     .Sum(kv => (long)kv.Value);
                 sb.AppendLine($"borders implausible {implausible * Stride} blocks");
                 Fit(sb, settings, cfg, fields, height, hard, surface, clamped, request.Origin);
+                foreach ((string name, int4 box) in Windows) Window(sb, name, box, names, height, hard, surface, request.Origin, water);
 
                 TestContext.WriteLine(sb.ToString());
                 Directory.CreateDirectory(OutDir);
@@ -433,6 +434,66 @@ namespace Engine.Tests.EditMode{
                               $" | low/mid/high {100 * band[0] / land}/{100 * band[1] / land}/{100 * band[2] / land} %" +
                               $" | snow {100.0 * snow / math.max(1, surfaceCount):F1} % of its dry surface");
             }
+        }
+
+        /// <summary>
+        ///     Places the world tour of 2026-11-11 named (x0, z0, x1, z1 in blocks, both ends included): the area the tour
+        ///     flew over, the steep west Jungle, the Savanna that was a shallow sea, and the two Badlands spots with
+        ///     Mountain ground on them.
+        /// </summary>
+        private static readonly (string, int4)[] Windows ={
+            ("Tour", new int4(-1280, -1280, 1280, 1280)),
+            ("WestJungle", new int4(-1280, -1152, -960, -576)),
+            ("SouthWestSavanna", new int4(-768, -704, -640, -256)),
+            ("BadlandsMeadow", new int4(896, 640, 1088, 1024)),
+            ("BadlandsCap", new int4(1216, -704, 1344, -576))
+        };
+
+        /// <summary>
+        ///     One window of the sampled area: per hard biome its share, ground height percentiles and the share of its
+        ///     columns under water, then the surface source shares and the columns whose surface comes from another
+        ///     biome than the hard one (from 0.5 % of the window).
+        /// </summary>
+        private static void Window(StringBuilder sb, string name, int4 box, string[] names, float[] height, int[] hard, int[] surface,
+            int2 origin, float water){
+            int count = names.Length, total = 0;
+            List<float>[] h = Enumerable.Range(0, count).Select(_ => new List<float>()).ToArray();
+            int[] wet = new int[count], surf = new int[count], surfWet = new int[count];
+            Dictionary<(int, int), int> cross = new();
+            for (int z = 0; z < Size; z++)
+            for (int x = 0; x < Size; x++){
+                int2 w = origin + new int2(x, z) * Stride;
+                if (w.x < box.x || w.x > box.z || w.y < box.y || w.y > box.w) continue;
+                int i = z * Size + x, b = hard[i], s = surface[i];
+                if (b < 0 || s < 0) continue;
+                total++;
+                h[b].Add(height[i]);
+                surf[s]++;
+                if (height[i] < water){
+                    wet[b]++;
+                    surfWet[s]++;
+                }
+
+                if (s == b) continue;
+                cross.TryGetValue((b, s), out int c);
+                cross[(b, s)] = c + 1;
+            }
+
+            if (total == 0) return;
+            sb.AppendLine($"window  {name} x {box.x}…{box.z}, z {box.y}…{box.w}: hard " + string.Join(", ",
+                Enumerable.Range(0, count).Where(b => h[b].Count > 0).OrderByDescending(b => h[b].Count).Select(b => {
+                    float[] v = h[b].ToArray();
+                    Array.Sort(v);
+                    float P(double p) => v[math.min(v.Length - 1, (int)(p * v.Length))];
+                    return $"{names[b]} {100.0 * v.Length / total:F1} % (H {P(0.05):F0}/{P(0.5):F0}/{P(0.95):F0}, max {v[^1]:F0}, " +
+                           $"under water {100.0 * wet[b] / v.Length:F0} %)";
+                })));
+            sb.AppendLine($"window  {name} surface " + string.Join(", ",
+                Enumerable.Range(0, count).Where(b => surf[b] > 0).OrderByDescending(b => surf[b])
+                    .Select(b => $"{names[b]} {100.0 * surf[b] / total:F1} % (under water {100.0 * surfWet[b] / surf[b]:F0} %)")) +
+                          "; surface of another biome: " + string.Join(", ",
+                              cross.Where(kv => kv.Value * 200 >= total).OrderByDescending(kv => kv.Value)
+                                  .Select(kv => $"{names[kv.Key.Item2]} on {names[kv.Key.Item1]} {100.0 * kv.Value / total:F1} %")));
         }
 
         private static int AtMax(float[] height, float max){
