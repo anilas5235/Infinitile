@@ -21,9 +21,10 @@ namespace Engine.Tests.EditMode{
     ///     What the terrain of a configuration looks like over 4096² columns around the origin (seed 1337, the game's):
     ///     the climate field percentiles, the spline outputs, the ground height distribution, the relief (slopes and
     ///     the height range of 64-block windows), the biome area shares, the mini-biome share and patch counts, the
-    ///     land biomes under water and the implausible neighbour pairs. It also writes three maps per configuration
-    ///     to <c>Temp/tuning-captures</c>: height with hillshade, hard biome, and surface source with the columns under
-    ///     water darkened. It prints values and sets no limits.
+    ///     land biomes under water and the implausible neighbour pairs, the connected areas of high ground (how many,
+    ///     how large) and the Mountain patches by size. It also writes four maps per configuration to
+    ///     <c>Temp/tuning-captures</c>: height with hillshade, hard biome, surface source with the columns under water
+    ///     darkened, and the high ground with the Mountain biome marked. It prints values and sets no limits.
     ///     <para>
     ///         Every configuration is a transient copy of the shipped settings (biomes and splines copied as well), so
     ///         the assets are never written. <see cref="Candidates" /> lists the configurations.
@@ -55,7 +56,8 @@ namespace Engine.Tests.EditMode{
         ///     candidates B, C and D of 2026-11-09 are in the commit that added this test; C is now the shipped asset.
         ///     "HardClamp" is the shipped asset with the hard clamp at HeightMax of before 2026-11-10. The biome–terrain fit
         ///     candidates "Landform" / "LandformStrong" of 2026-11-10 are in commit d8ce664; Landform is in the shipped
-        ///     ten-biome set since.
+        ///     ten-biome set since. The massif candidates A, B and C of 2026-11-12 went through the candidate file
+        ///     (<see cref="TerrainLook_ReportCandidateFile" />, splines as JSON); A is the shipped asset since.
         /// </summary>
         private static readonly Dictionary<string, Action<WorldGenSettings>> Candidates = new(){
             ["Shipped"] = _ => { },
@@ -80,8 +82,11 @@ namespace Engine.Tests.EditMode{
         /// <summary>
         ///     Candidates from <c>Temp/tuning-candidates.txt</c>, so a tuning round needs no recompile. One candidate per
         ///     line: <c>Name: Jungle.TargetHeight=0.48; Mountain.TargetPV=0.6; Settings.LambdaHeight=4</c>. The part before
-        ///     the dot is a biome name or <c>Settings</c>, the part after it a float or int field. Lines starting with #
-        ///     and empty lines are skipped; without the file the test reports nothing.
+        ///     the dot is a biome name or <c>Settings</c>, the part after it a float, int or bool field, which may be nested
+        ///     or an array element (<c>Settings.erosionProfile.scale=2400</c>, <c>Settings.GlobalOctaveWeights[1]=0.4</c>).
+        ///     <c>Splines=file.json</c> loads the splines from a file in the JSON form of <see cref="TerrainSplineSet" />
+        ///     (relative to <c>Temp</c>). Lines starting with # and empty lines are skipped; without the file the test
+        ///     reports nothing.
         /// </summary>
         [Test]
         public void TerrainLook_ReportCandidateFile(){
@@ -102,6 +107,110 @@ namespace Engine.Tests.EditMode{
                 finally{
                     foreach (Object o in owned) Object.DestroyImmediate(o);
                 }
+            }
+        }
+
+        /// <summary>
+        ///     The inputs of the Terrain-first height of every sampled column, for trying spline and target candidates
+        ///     outside Unity before they get a report. One dump per line of <c>Temp/tuning-dump.txt</c>:
+        ///     <c>Name@stride@seed: assignments</c> with the assignments of <see cref="TerrainLook_ReportCandidateFile" />
+        ///     (stride and seed are optional, 4 and the game's seed by default; the area is 1024² samples around the
+        ///     origin). Writes <c>Name_fields.bin</c> (float arrays one after another: T, F, C, E, PV, the detail octaves
+        ///     N_i unweighted, the peak noise P, the limited height H, the hard biome index) and <c>Name_fields.json</c>
+        ///     (what the arrays are, the splines, biome targets, λ and height limits). Without the file nothing is written.
+        /// </summary>
+        [Test]
+        public void TerrainLook_DumpFields(){
+            string file = Path.Combine(Directory.GetCurrentDirectory(), "Temp", "tuning-dump.txt");
+            if (!File.Exists(file)) Assert.Ignore($"No dump file at {file}");
+            foreach (string raw in File.ReadAllLines(file)){
+                string line = raw.Trim();
+                if (line.Length == 0 || line[0] == '#') continue;
+                int colon = line.IndexOf(':');
+                Assert.Greater(colon, 0, line);
+                string[] head = line[..colon].Trim().Split('@');
+                int stride = head.Length > 1 ? int.Parse(head[1], CultureInfo.InvariantCulture) : Stride;
+                int seed = head.Length > 2 ? int.Parse(head[2], CultureInfo.InvariantCulture) : TestFixtures.Seed;
+                List<Object> owned = new();
+                WorldGenSettings settings = CloneShipped(owned);
+                try{
+                    foreach (string assignment in line[(colon + 1)..].Split(';', StringSplitOptions.RemoveEmptyEntries))
+                        Assign(settings, assignment.Trim());
+                    Dump(head[0], settings, stride, seed);
+                }
+                finally{
+                    foreach (Object o in owned) Object.DestroyImmediate(o);
+                }
+            }
+        }
+
+        private static void Dump(string name, WorldGenSettings settings, int stride, int seed){
+            WorldGenConfig cfg = settings.ToConfig(seed);
+            int n = Size * Size;
+            RegionBuffers buffers = new(){
+                Fields = new NativeArray<WorldFields>(n, Allocator.TempJob),
+                Height = new NativeArray<float>(n, Allocator.TempJob),
+                HardBiome = new NativeArray<int>(n, Allocator.TempJob)
+            };
+            try{
+                int2 origin = new(-Size * stride / 2, -Size * stride / 2);
+                WorldGenRequest request = new(){ Config = cfg, Origin = origin, Size = new int2(Size, Size), Stride = stride };
+                WorldGenApi.SampleRegion(request, ref buffers).Complete();
+                WorldFields[] fields = buffers.Fields.ToArray();
+                int octaves = cfg.OctaveCount;
+                string[] arrays = new[]{ "T", "F", "C", "E", "PV" }.Concat(Enumerable.Range(0, octaves).Select(i => $"N{i}"))
+                    .Concat(new[]{ "P", "H", "Hard" }).ToArray();
+                float[] data = new float[arrays.Length * n];
+                for (int i = 0; i < n; i++){
+                    WorldFields f = fields[i];
+                    float2 p = origin + new float2(i % Size, i / Size) * stride;
+                    data[i] = f.T;
+                    data[n + i] = f.F;
+                    data[2 * n + i] = f.C;
+                    data[3 * n + i] = f.E;
+                    data[4 * n + i] = f.PV;
+                    for (int o = 0; o < octaves; o++)
+                        data[(5 + o) * n + i] = DetailOctaves.Sample(o, p, cfg.OctaveWavelengths[o], cfg.Seed);
+                    data[(5 + octaves) * n + i] = PeakNoise.Sample(p, cfg.PeakWavelength, cfg.Seed);
+                    data[(6 + octaves) * n + i] = buffers.Height[i];
+                    data[(7 + octaves) * n + i] = buffers.HardBiome[i];
+                }
+
+                byte[] bytes = new byte[data.Length * sizeof(float)];
+                Buffer.BlockCopy(data, 0, bytes, 0, bytes.Length);
+                Directory.CreateDirectory(OutDir);
+                File.WriteAllBytes(Path.Combine(OutDir, $"{name}_fields.bin"), bytes);
+                Dictionary<string, object> meta = new(){
+                    ["Arrays"] = arrays,
+                    ["Size"] = Size,
+                    ["Stride"] = stride,
+                    ["Seed"] = seed,
+                    ["Origin"] = new[]{ origin.x, origin.y },
+                    ["WaterLevel"] = cfg.WaterLevel,
+                    ["HeightMin"] = settings.HeightMin,
+                    ["HeightMax"] = settings.HeightMax,
+                    ["HeightSoftBand"] = settings.HeightSoftBand,
+                    ["GlobalOctaveWeights"] = settings.GlobalOctaveWeights,
+                    ["Lambda"] = new[]{
+                        settings.LambdaTemperature, settings.LambdaHumidity, settings.LambdaContinental, settings.LambdaErosion,
+                        settings.LambdaPV, settings.LambdaHeight
+                    },
+                    ["Biomes"] = settings.Biomes.Biomes.Select(b => (object)new Dictionary<string, object>{
+                        ["Name"] = b.name,
+                        ["Target"] = new[]{
+                            b.TargetTemperature, b.TargetHumidity, b.TargetContinental, b.TargetErosion, b.TargetPV, b.TargetHeight
+                        }
+                    }).ToList(),
+                    ["Splines"] = settings.Splines.ToTree()
+                };
+                File.WriteAllText(Path.Combine(OutDir, $"{name}_fields.json"), CanonicalJson.Serialize(meta));
+                TestContext.WriteLine($"dump {name}: {Size}² samples, stride {stride}, seed {seed}, {arrays.Length} arrays");
+            }
+            finally{
+                buffers.Fields.Dispose();
+                buffers.Height.Dispose();
+                buffers.HardBiome.Dispose();
+                cfg.Dispose();
             }
         }
 
@@ -173,17 +282,58 @@ namespace Engine.Tests.EditMode{
             }
         }
 
-        /// <summary>Sets <c>Target.Field=value</c> on a biome of <paramref name="settings" /> or on the settings themselves.</summary>
+        /// <summary>
+        ///     Sets <c>Target.Field=value</c> on a biome of <paramref name="settings" /> or on the settings themselves
+        ///     (nested fields and array elements included), or loads the splines for <c>Splines=file</c>.
+        /// </summary>
         private static void Assign(WorldGenSettings settings, string assignment){
             if (assignment.Length == 0) return;
             string[] sides = assignment.Split('=');
+            Assert.AreEqual(2, sides.Length, assignment);
             string[] path = sides[0].Trim().Split('.');
-            Assert.IsTrue(sides.Length == 2 && path.Length == 2, assignment);
+            string value = sides[1].Trim();
+            if (path.Length == 1 && path[0] == "Splines"){
+                string file = Path.IsPathRooted(value) ? value : Path.Combine(Directory.GetCurrentDirectory(), "Temp", value);
+                settings.Splines.FromJson(File.ReadAllText(file));
+                return;
+            }
+
+            Assert.GreaterOrEqual(path.Length, 2, assignment);
             object target = path[0] == "Settings" ? settings : BiomeOf(settings, path[0]);
-            FieldInfo field = target.GetType().GetField(path[1], BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            SetPath(target, path, 1, value, assignment);
+        }
+
+        /// <summary>
+        ///     Sets the member <paramref name="path" />[<paramref name="at" />…] of <paramref name="target" /> and
+        ///     returns the target, so a value type on the way is written back into its owner.
+        /// </summary>
+        private static object SetPath(object target, string[] path, int at, string value, string assignment){
+            string token = path[at];
+            int index = -1, bracket = token.IndexOf('[');
+            if (bracket >= 0){
+                index = int.Parse(token[(bracket + 1)..token.IndexOf(']')], CultureInfo.InvariantCulture);
+                token = token[..bracket];
+            }
+
+            FieldInfo field = target.GetType().GetField(token, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             Assert.IsNotNull(field, assignment);
-            float value = float.Parse(sides[1].Trim(), CultureInfo.InvariantCulture);
-            field.SetValue(target, field.FieldType == typeof(int) ? (object)(int)value : value);
+            bool last = at == path.Length - 1;
+            if (index >= 0){
+                System.Collections.IList list = (System.Collections.IList)field.GetValue(target);
+                Assert.IsNotNull(list, assignment);
+                list[index] = last ? ParseValue(value, list[index].GetType()) : SetPath(list[index], path, at + 1, value, assignment);
+                return target;
+            }
+
+            field.SetValue(target,
+                last ? ParseValue(value, field.FieldType) : SetPath(field.GetValue(target), path, at + 1, value, assignment));
+            return target;
+        }
+
+        private static object ParseValue(string value, Type type){
+            if (type == typeof(bool)) return value is "1" or "true";
+            float number = float.Parse(value, CultureInfo.InvariantCulture);
+            return type == typeof(int) ? (int)number : number;
         }
 
         /// <summary>A copy of the shipped settings with copies of its biome set, biomes and splines.</summary>
@@ -337,13 +487,18 @@ namespace Engine.Tests.EditMode{
                                   $"largest {largest[b] * Stride * Stride / 1e6:F2} km²")));
 
                 // High ground by height alone: what a biome that takes every column above a line could look like.
-                foreach (float line in new[]{ 170f, 180f, 190f }){
+                foreach (float line in new[]{ 170f, 180f, 190f, 210f }){
                     int[] high = height.Select(h => h >= line ? 0 : -1).ToArray();
-                    Patches(high, 1, out int[] highCount, out int[] _, out int[] highCells, out int[] highLargest,
-                        out int[] highMedium);
-                    sb.AppendLine($"high    H ≥ {line:F0}: {100.0 * highCells[0] / n:F1} % of all, {highCount[0]} patches, " +
-                                  $"{100.0 * highMedium[0] / math.max(1, highCells[0]):F0} % < 256², " +
-                                  $"largest {highLargest[0] * Stride * Stride / 1e6:F2} km²");
+                    sb.AppendLine($"high    H ≥ {line:F0}: " + Areas(PatchSizes(high, 1)[0], n));
+                }
+
+                int mountain = Array.IndexOf(names, "Mountain");
+                if (mountain >= 0){
+                    sb.AppendLine("ranges  Mountain: " + Areas(PatchSizes(hard, biomeCount)[mountain], n));
+                    // Mountain and high ground as one mask: the massifs as seen in game (stone or high).
+                    int[] massif = new int[n];
+                    for (int i = 0; i < n; i++) massif[i] = hard[i] == mountain || height[i] >= 180f ? 0 : -1;
+                    sb.AppendLine("ranges  Mountain or H ≥ 180: " + Areas(PatchSizes(massif, 1)[0], n));
                 }
 
                 // Boundaries of the dominant material biome, implausible pairs flagged.
@@ -366,6 +521,7 @@ namespace Engine.Tests.EditMode{
                 WritePng($"{candidate}_height.png", HeightView(height, water, cfg.HeightMin, cfg.HeightMax));
                 WritePng($"{candidate}_hard.png", BiomeView(hard, colors, null, water));
                 WritePng($"{candidate}_surface.png", BiomeView(surface, colors, height, water));
+                WritePng($"{candidate}_high.png", HighView(height, hard, mountain, water));
             }
             finally{
                 buffers.Fields.Dispose();
@@ -519,11 +675,20 @@ namespace Engine.Tests.EditMode{
         /// <summary>4-connected single-biome patches: count, cells in patches below the mini size, cells, largest patch.</summary>
         private static void Patches(int[] biome, int count, out int[] patches, out int[] small, out int[] cells,
             out int[] largest, out int[] medium){
-            medium = new int[count];
-            patches = new int[count];
-            small = new int[count];
-            cells = new int[count];
-            largest = new int[count];
+            List<int>[] sizes = PatchSizes(biome, count);
+            patches = sizes.Select(s => s.Count).ToArray();
+            cells = sizes.Select(s => s.Sum()).ToArray();
+            largest = sizes.Select(s => s.Count > 0 ? s[0] : 0).ToArray();
+            small = sizes.Select(s => s.Where(size => size < SmallPatchCells).Sum()).ToArray();
+            medium = sizes.Select(s => s.Where(size => size < MediumPatchCells).Sum()).ToArray();
+        }
+
+        /// <summary>
+        ///     The sizes in cells of the 4-connected patches of every id in [0, <paramref name="count" />), largest
+        ///     first. Cells with another value belong to no patch.
+        /// </summary>
+        private static List<int>[] PatchSizes(int[] biome, int count){
+            List<int>[] sizes = Enumerable.Range(0, count).Select(_ => new List<int>()).ToArray();
             bool[] seen = new bool[biome.Length];
             Stack<int> stack = new();
             for (int start = 0; start < biome.Length; start++){
@@ -542,11 +707,7 @@ namespace Engine.Tests.EditMode{
                     if (z < Size - 1) Visit(i + Size);
                 }
 
-                patches[b]++;
-                cells[b] += size;
-                largest[b] = math.max(largest[b], size);
-                if (size < SmallPatchCells) small[b] += size;
-                if (size < MediumPatchCells) medium[b] += size;
+                sizes[b].Add(size);
                 continue;
 
                 void Visit(int j){
@@ -555,6 +716,40 @@ namespace Engine.Tests.EditMode{
                     stack.Push(j);
                 }
             }
+
+            foreach (List<int> list in sizes) list.Sort((a, b) => b.CompareTo(a));
+            return sizes;
+        }
+
+        /// <summary>Upper bounds in km² of the size classes of <see cref="Areas" />; the last class is open.</summary>
+        private static readonly double[] AreaClasses ={ 0.01, 0.0655, 0.25, 1 };
+
+        /// <summary>
+        ///     The connected areas of one kind, from their sizes in cells (largest first): share of the
+        ///     <paramref name="total" /> cells, how many, the largest five in km², the share the three largest hold, the
+        ///     share in areas below 256 × 256 blocks, and per size class (below 0.01 km², below 256², below 0.25 km²,
+        ///     below 1 km², from 1 km²) the number of areas and their share of the kind's area.
+        /// </summary>
+        private static string Areas(List<int> sizes, int total){
+            const double km2 = Stride * Stride / 1e6;
+            long cells = sizes.Sum(s => (long)s);
+            if (cells == 0) return "none";
+            int[] classCount = new int[AreaClasses.Length + 1];
+            long[] classCells = new long[AreaClasses.Length + 1];
+            foreach (int size in sizes){
+                int c = 0;
+                while (c < AreaClasses.Length && size * km2 >= AreaClasses[c]) c++;
+                classCount[c]++;
+                classCells[c] += size;
+            }
+
+            string[] labels ={ "< 0.01", "< 256²", "< 0.25", "< 1", "≥ 1 km²" };
+            return $"{100.0 * cells / total:F1} % of all ({cells * km2:F2} km²), {sizes.Count} areas, largest " +
+                   string.Join(" / ", sizes.Take(5).Select(s => (s * km2).ToString("F2", CultureInfo.InvariantCulture))) +
+                   $" km², three largest hold {100.0 * sizes.Take(3).Sum(s => (long)s) / cells:F0} %, " +
+                   $"{100.0 * sizes.Where(s => s < MediumPatchCells).Sum(s => (long)s) / cells:F0} % < 256²; by size: " +
+                   string.Join(", ", Enumerable.Range(0, labels.Length)
+                       .Select(c => $"{labels[c]}: {classCount[c]} ({100.0 * classCells[c] / cells:F0} %)"));
         }
 
         private static Dictionary<(int, int), int> BorderEdges(int[] biome, int count){
@@ -603,6 +798,34 @@ namespace Engine.Tests.EditMode{
                         : math.lerp(new float3(0.6f, 0.6f, 0.6f), new float3(1f, 1f, 1f), (t - 0.75f) / 0.25f);
                 }
 
+                c *= shade;
+                px[i] = new Color32((byte)(math.saturate(c.x) * 255), (byte)(math.saturate(c.y) * 255),
+                    (byte)(math.saturate(c.z) * 255), 255);
+            }
+
+            return px;
+        }
+
+        /// <summary>
+        ///     The high ground on a grey hillshade: Mountain columns red (dark red below 180), other columns from 180 up
+        ///     yellow, every column from 210 up (the snow line) white, water blue.
+        /// </summary>
+        private static Color32[] HighView(float[] height, int[] hard, int mountain, float water){
+            Color32[] px = new Color32[height.Length];
+            float3 light = math.normalize(new float3(-1f, 1.41421f, 1f));
+            for (int z = 0; z < Size; z++)
+            for (int x = 0; x < Size; x++){
+                int i = z * Size + x;
+                float h = height[i];
+                float hx = height[z * Size + math.min(x + 1, Size - 1)] - height[z * Size + math.max(x - 1, 0)];
+                float hz = height[math.min(z + 1, Size - 1) * Size + x] - height[math.max(z - 1, 0) * Size + x];
+                float shade = 0.45f + 0.55f * math.saturate(math.dot(math.normalize(new float3(-hx, 2f * Stride, -hz)), light));
+                float3 c = h < water ? new float3(0.35f, 0.5f, 0.7f)
+                    : h >= 210f ? new float3(1f, 1f, 1f)
+                    : hard[i] == mountain ? h >= 180f ? new float3(0.9f, 0.25f, 0.2f) : new float3(0.55f, 0.15f, 0.25f)
+                    : h >= 180f ? new float3(0.95f, 0.8f, 0.2f)
+                    : new float3(0.62f, 0.62f, 0.62f);
+                if (h < water) shade = 1f;
                 c *= shade;
                 px[i] = new Color32((byte)(math.saturate(c.x) * 255), (byte)(math.saturate(c.y) * 255),
                     (byte)(math.saturate(c.z) * 255), 255);

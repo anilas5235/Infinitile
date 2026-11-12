@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 39448e70d8b984c4fa860ece129255a5, type: 3}
   m_Name: TerrainSplineSet_Default
   m_EditorClassIdentifier: Engine.Runtime::Engine.Scripts.WorldGen.Settings.TerrainSplineSet
-  Notes: 'Tuning 2026-11-09 (candidate C): dramatic relief, deep sea, mountains to about 240.'
+  Notes: 'Tuning 2026-11-12 (massifs, A): high ground follows C and E, PV shapes the ridges.'
   OffsetRoot: 0
-  AmpRoot: 10
-  JaggednessRoot: 14
+  AmpRoot: 15
+  JaggednessRoot: 21
   Splines:
   - Name: Offset
     Axis: 0
@@ -36,12 +36,15 @@ MonoBehaviour:
     - X: 0.42
       Value: 0
       Child: 1
-    - X: 0.55
+    - X: 0.5
       Value: 0
       Child: 4
-    - X: 0.7
+    - X: 0.59
       Value: 0
       Child: 7
+    - X: 0.7
+      Value: 0
+      Child: 11
   - Name: 'Offset[0.42]'
     Axis: 1
     Interpolation: 0
@@ -81,7 +84,7 @@ MonoBehaviour:
     - X: 1
       Value: 140
       Child: -1
-  - Name: 'Offset[0.55]'
+  - Name: 'Offset[0.5]'
     Axis: 1
     Interpolation: 0
     Points:
@@ -92,9 +95,9 @@ MonoBehaviour:
       Value: 0
       Child: 6
     - X: 0.7
-      Value: 138
+      Value: 136
       Child: -1
-  - Name: 'Offset[0.55][0.3]'
+  - Name: 'Offset[0.5][0.3]'
     Axis: 2
     Interpolation: 0
     Points:
@@ -102,38 +105,134 @@ MonoBehaviour:
       Value: 126
       Child: -1
     - X: 0
-      Value: 158
+      Value: 150
       Child: -1
     - X: 1
-      Value: 200
+      Value: 170
       Child: -1
-  - Name: 'Offset[0.55][0.5]'
+  - Name: 'Offset[0.5][0.5]'
     Axis: 2
     Interpolation: 0
     Points:
     - X: -1
-      Value: 127
+      Value: 126
       Child: -1
     - X: 0
-      Value: 143
+      Value: 140
       Child: -1
     - X: 1
-      Value: 165
+      Value: 156
+      Child: -1
+  - Name: 'Offset[0.59]'
+    Axis: 1
+    Interpolation: 0
+    Points:
+    - X: 0.31
+      Value: 0
+      Child: 8
+    - X: 0.41
+      Value: 0
+      Child: 9
+    - X: 0.55
+      Value: 0
+      Child: 10
+    - X: 0.7
+      Value: 140
+      Child: -1
+  - Name: 'Offset[0.59][0.31]'
+    Axis: 2
+    Interpolation: 0
+    Points:
+    - X: -1
+      Value: 184
+      Child: -1
+    - X: -0.5
+      Value: 184
+      Child: -1
+    - X: 0
+      Value: 186
+      Child: -1
+    - X: 0.5
+      Value: 190
+      Child: -1
+    - X: 1
+      Value: 196
+      Child: -1
+  - Name: 'Offset[0.59][0.41]'
+    Axis: 2
+    Interpolation: 0
+    Points:
+    - X: -1
+      Value: 140
+      Child: -1
+    - X: 0
+      Value: 158
+      Child: -1
+    - X: 1
+      Value: 176
+      Child: -1
+  - Name: 'Offset[0.59][0.55]'
+    Axis: 2
+    Interpolation: 0
+    Points:
+    - X: -1
+      Value: 130
+      Child: -1
+    - X: 0
+      Value: 145
+      Child: -1
+    - X: 1
+      Value: 158
       Child: -1
   - Name: 'Offset[0.7]'
     Axis: 1
     Interpolation: 0
     Points:
-    - X: 0.3
+    - X: 0.31
       Value: 0
-      Child: 8
-    - X: 0.5
+      Child: 12
+    - X: 0.41
       Value: 0
-      Child: 9
+      Child: 13
+    - X: 0.55
+      Value: 0
+      Child: 14
     - X: 0.7
       Value: 150
       Child: -1
-  - Name: 'Offset[0.7][0.3]'
+  - Name: 'Offset[0.7][0.31]'
+    Axis: 2
+    Interpolation: 0
+    Points:
+    - X: -1
+      Value: 186
+      Child: -1
+    - X: -0.5
+      Value: 186
+      Child: -1
+    - X: 0
+      Value: 188
+      Child: -1
+    - X: 0.5
+      Value: 194
+      Child: -1
+    - X: 1
+      Value: 200
+      Child: -1
+  - Name: 'Offset[0.7][0.41]'
+    Axis: 2
+    Interpolation: 0
+    Points:
+    - X: -1
+      Value: 150
+      Child: -1
+    - X: 0
+      Value: 166
+      Child: -1
+    - X: 1
+      Value: 180
+      Child: -1
+  - Name: 'Offset[0.7][0.55]'
     Axis: 2
     Interpolation: 0
     Points:
@@ -141,23 +240,10 @@ MonoBehaviour:
       Value: 135
       Child: -1
     - X: 0
-      Value: 178
+      Value: 152
       Child: -1
     - X: 1
-      Value: 205
-      Child: -1
-  - Name: 'Offset[0.7][0.5]'
-    Axis: 2
-    Interpolation: 0
-    Points:
-    - X: -1
-      Value: 135
-      Child: -1
-    - X: 0
-      Value: 160
-      Child: -1
-    - X: 1
-      Value: 190
+      Value: 165
       Child: -1
   - Name: Amp
     Axis: 0
@@ -171,13 +257,13 @@ MonoBehaviour:
       Child: -1
     - X: 0.42
       Value: 0
-      Child: 11
-    - X: 0.6
+      Child: 16
+    - X: 0.59
       Value: 0
-      Child: 12
+      Child: 17
     - X: 0.75
       Value: 0
-      Child: 13
+      Child: 19
   - Name: 'Amp[0.42]'
     Axis: 1
     Interpolation: 0
@@ -191,28 +277,69 @@ MonoBehaviour:
     - X: 0.7
       Value: 5
       Child: -1
-  - Name: 'Amp[0.6]'
+  - Name: 'Amp[0.59]'
     Axis: 1
     Interpolation: 0
     Points:
-    - X: 0.3
-      Value: 30
-      Child: -1
+    - X: 0.31
+      Value: 0
+      Child: 18
     - X: 0.5
       Value: 16
       Child: -1
     - X: 0.7
       Value: 8
       Child: -1
+  - Name: 'Amp[0.59][0.31]'
+    Axis: 2
+    Interpolation: 0
+    Points:
+    - X: -1
+      Value: 6
+      Child: -1
+    - X: -0.5
+      Value: 10
+      Child: -1
+    - X: 0
+      Value: 18
+      Child: -1
+    - X: 0.5
+      Value: 24
+      Child: -1
+    - X: 1
+      Value: 28
+      Child: -1
   - Name: 'Amp[0.75]'
     Axis: 1
     Interpolation: 0
     Points:
-    - X: 0.3
-      Value: 34
+    - X: 0.31
+      Value: 0
+      Child: 20
+    - X: 0.5
+      Value: 18
       Child: -1
     - X: 0.7
       Value: 12
+      Child: -1
+  - Name: 'Amp[0.75][0.31]'
+    Axis: 2
+    Interpolation: 0
+    Points:
+    - X: -1
+      Value: 6
+      Child: -1
+    - X: -0.5
+      Value: 10
+      Child: -1
+    - X: 0
+      Value: 20
+      Child: -1
+    - X: 0.5
+      Value: 26
+      Child: -1
+    - X: 1
+      Value: 30
       Child: -1
   - Name: Jaggedness
     Axis: 0
@@ -221,33 +348,26 @@ MonoBehaviour:
     - X: 0.42
       Value: 0
       Child: -1
-    - X: 0.55
+    - X: 0.5
       Value: 0
-      Child: 15
+      Child: 22
+    - X: 0.59
+      Value: 0
+      Child: 25
     - X: 0.7
       Value: 0
-      Child: 18
-  - Name: 'Jaggedness[0.55]'
+      Child: 28
+  - Name: 'Jaggedness[0.5]'
     Axis: 1
     Interpolation: 0
     Points:
-    - X: 0.3
+    - X: 0.31
       Value: 0
-      Child: 16
-    - X: 0.5
+      Child: 23
+    - X: 0.41
       Value: 0
-      Child: 17
-  - Name: 'Jaggedness[0.55][0.3]'
-    Axis: 2
-    Interpolation: 0
-    Points:
-    - X: -0.2
-      Value: 0
-      Child: -1
-    - X: 1
-      Value: 45
-      Child: -1
-  - Name: 'Jaggedness[0.55][0.5]'
+      Child: 24
+  - Name: 'Jaggedness[0.5][0.31]'
     Axis: 2
     Interpolation: 0
     Points:
@@ -255,32 +375,72 @@ MonoBehaviour:
       Value: 0
       Child: -1
     - X: 1
-      Value: 15
+      Value: 18
+      Child: -1
+  - Name: 'Jaggedness[0.5][0.41]'
+    Axis: 2
+    Interpolation: 0
+    Points:
+    - X: 0.4
+      Value: 0
+      Child: -1
+    - X: 1
+      Value: 8
+      Child: -1
+  - Name: 'Jaggedness[0.59]'
+    Axis: 1
+    Interpolation: 0
+    Points:
+    - X: 0.31
+      Value: 0
+      Child: 26
+    - X: 0.41
+      Value: 0
+      Child: 27
+  - Name: 'Jaggedness[0.59][0.31]'
+    Axis: 2
+    Interpolation: 0
+    Points:
+    - X: -1
+      Value: 20
+      Child: -1
+    - X: 1
+      Value: 70
+      Child: -1
+  - Name: 'Jaggedness[0.59][0.41]'
+    Axis: 2
+    Interpolation: 0
+    Points:
+    - X: 0.2
+      Value: 0
+      Child: -1
+    - X: 1
+      Value: 8
       Child: -1
   - Name: 'Jaggedness[0.7]'
     Axis: 1
     Interpolation: 0
     Points:
-    - X: 0.3
+    - X: 0.31
       Value: 0
-      Child: 19
-    - X: 0.5
+      Child: 29
+    - X: 0.41
       Value: 0
-      Child: 20
+      Child: 30
     - X: 0.65
       Value: 0
       Child: -1
-  - Name: 'Jaggedness[0.7][0.3]'
+  - Name: 'Jaggedness[0.7][0.31]'
     Axis: 2
     Interpolation: 0
     Points:
-    - X: -0.5
-      Value: 10
+    - X: -1
+      Value: 25
       Child: -1
     - X: 1
-      Value: 60
+      Value: 85
       Child: -1
-  - Name: 'Jaggedness[0.7][0.5]'
+  - Name: 'Jaggedness[0.7][0.41]'
     Axis: 2
     Interpolation: 0
     Points:
@@ -288,5 +448,5 @@ MonoBehaviour:
       Value: 0
       Child: -1
     - X: 1
-      Value: 30
+      Value: 10
       Child: -1
