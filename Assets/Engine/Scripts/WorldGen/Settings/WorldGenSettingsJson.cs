@@ -21,6 +21,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["Architecture"] = s.Architecture,
                 ["MaterialMethod"] = s.MaterialMethod,
                 ["MaterialBlendWidth"] = s.MaterialBlendWidth,
+                ["MaterialBorderWavelength"] = s.MaterialBorderWavelength,
                 ["MaterialSigma"] = s.MaterialSigma,
                 ["HeightMethod"] = s.HeightMethod,
                 ["HeightBlendWidth"] = s.HeightBlendWidth,
@@ -57,6 +58,9 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["SnowLineHeight"] = s.SnowLineHeight,
                 ["SnowLineNoiseAmplitude"] = s.SnowLineNoiseAmplitude,
                 ["SnowLineNoiseWavelength"] = s.SnowLineNoiseWavelength,
+                ["TreeLineHeight"] = s.TreeLineHeight,
+                ["TreeLineNoiseAmplitude"] = s.TreeLineNoiseAmplitude,
+                ["TreeLineNoiseWavelength"] = s.TreeLineNoiseWavelength,
                 ["FreezeNoiseAmplitude"] = s.FreezeNoiseAmplitude,
                 ["FreezeNoiseWavelength"] = s.FreezeNoiseWavelength,
                 ["StrataPeriod"] = s.StrataPeriod,
@@ -188,6 +192,14 @@ namespace Engine.Scripts.WorldGen.Settings{
             return list;
         }
 
+        private static List<object> StrataPalette(Biome b){
+            List<object> palette = new();
+            if (b.StrataPalette != null)
+                foreach (VoxelConfig.Data.Voxel.Voxel band in b.StrataPalette)
+                    palette.Add(VoxelName(band));
+            return palette;
+        }
+
         private static Dictionary<string, object> BiomeTree(Biome b){
             List<object> flora = new();
             if (b.FloraRules != null)
@@ -200,6 +212,9 @@ namespace Engine.Scripts.WorldGen.Settings{
                         ["RequiresSurfaceFromSameBiome"] = rule.RequiresSurfaceFromSameBiome,
                         ["RequiresBeachGround"] = rule.RequiresBeachGround,
                         ["MinHeightAboveWater"] = rule.MinHeightAboveWater,
+                        ["RequiresWaterGround"] = rule.RequiresWaterGround,
+                        ["StopsAtTreeLine"] = rule.StopsAtTreeLine,
+                        ["RequiresSoil"] = rule.RequiresSoil,
                         ["DensityNoise"] = rule.DensityNoise.ToString(),
                         ["DensityInfluence"] = rule.DensityInfluence,
                         ["MinStackHeight"] = rule.MinStackHeight,
@@ -215,6 +230,10 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["SnowTopBlock"] = VoxelName(b.SnowTopBlock),
                 ["FreezesWater"] = b.FreezesWater,
                 ["StrataBlock"] = VoxelName(b.StrataBlock),
+                ["StrataPalette"] = StrataPalette(b),
+                ["ForestFloorBlock"] = VoxelName(b.ForestFloorBlock),
+                ["ForestFloorDensity"] = b.ForestFloorDensity,
+                ["MeadowBlock"] = VoxelName(b.MeadowBlock),
                 ["BeachBlock"] = VoxelName(b.BeachBlock),
                 ["BeachHeight"] = b.BeachHeight,
                 ["TargetTemperature"] = b.TargetTemperature,

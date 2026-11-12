@@ -21,6 +21,9 @@ namespace Engine.Scripts.WorldGen.Core{
         /// <summary>Wobble of the snow line.</summary>
         public const uint SnowLineNoise = 0x5EA08B15u;
 
+        /// <summary>Wobble of the tree line.</summary>
+        public const uint TreeLineNoise = 0x7B3D5E26u;
+
         /// <summary>Rise and fall of the strata bands.</summary>
         public const uint StrataNoise = 0x4D9F7A14u;
 
@@ -65,6 +68,12 @@ namespace Engine.Scripts.WorldGen.Core{
         // --- Per-column random decisions --------------------------------------------------------------------------
         /// <summary>Surface source pick.</summary>
         public const uint SurfacePick = 0xE739140Eu;
+
+        /// <summary>Broad octave of the border noise of the surface pick.</summary>
+        public const uint MaterialBorder = 0x3C91A7D4u;
+
+        /// <summary>Detail octave of the border noise of the surface pick.</summary>
+        public const uint MaterialBorderDetail = 0x9E2F60B3u;
 
         /// <summary>Which biome's flora rules a column uses.</summary>
         public const uint FloraBiome = 0xF84A250Fu;

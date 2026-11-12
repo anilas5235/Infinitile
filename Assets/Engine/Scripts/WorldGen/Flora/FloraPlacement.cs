@@ -68,10 +68,11 @@ namespace Engine.Scripts.WorldGen.Flora{
             FloraRuleDef d = cfg.FloraRules[rule];
             // Optionally only on ground of the same biome.
             if (d.RequiresSurfaceFromSameBiome != 0 && s.SurfaceSource != biome) return -1;
-            if (!GroundAllows(s, d.MinHeightAboveWater, cfg)) return -1;
-            // Beach columns carry only beach-ground rules, and those grow nowhere else.
-            if ((cfg.Biomes[s.SurfaceSource].beachHeight | d.BeachGround) != 0 && !BeachAllows(x, z, d.BeachGround, s, cfg, cache)) return -1;
-            // Snow keeps trees and cacti but carries no ground plants.
+            if (!GroundAllows(s, d.MinHeightAboveWater, d.WaterGround, cfg)) return -1;
+            // Beach columns carry only beach-ground rules, and those grow nowhere else; trees end at the tree line
+            // and need soil (no snow cover, no bare stone). One test and one call for all of them.
+            if ((cfg.Biomes[s.SurfaceSource].beachHeight | d.GroundChecks) != 0 && !SpecialGroundAllows(x, z, d.GroundChecks, s, cfg, cache)) return -1;
+            // Snow keeps cacti and rocks but carries no ground plants.
             if (d.MultiBlock == 0 &&
                 SurfaceCover.IsSnowCovered(x, z, s.ColumnHeight, cfg.Biomes[s.SurfaceSource], cfg)) return -1;
 
@@ -123,16 +124,26 @@ namespace Engine.Scripts.WorldGen.Flora{
         }
 
         /// <summary>
-        ///     A rule with <paramref name="beachGround" /> passes on beach columns (<see cref="SurfaceCover.IsBeach" />)
-        ///     whose beach block carries plants, other rules only off the beach. A separate method, so the roll stays small.
+        ///     The ground conditions of <see cref="FloraRuleDef.GroundChecks" />. A beach-ground rule passes on beach
+        ///     columns (<see cref="SurfaceCover.IsBeach" />) whose beach block carries plants, other rules only off the
+        ///     beach. A rule that needs soil passes on ground of a biome with a soil top block, or on its meadow
+        ///     (<see cref="SurfaceCover.IsMeadow" />), that is not snow-covered; a rule that stops at the tree line below the column's tree line
+        ///     (<see cref="SurfaceCover.AboveTreeLine" />). A separate method, so the roll stays small.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static bool BeachAllows(int x, int z, byte beachGround, in ColumnSample s, in WorldGenConfig cfg,
+        private static bool SpecialGroundAllows(int x, int z, byte checks, in ColumnSample s, in WorldGenConfig cfg,
             in BlendCache cache){
             Biome.BiomeDef def = cfg.Biomes[s.SurfaceSource];
-            bool beach = SurfaceCover.IsBeach(x, z, s.ColumnHeight, def, cfg, cache);
-            if (beachGround == 0) return !beach;
-            return beach && def.beachFloraGround != 0;
+            bool beachGround = (checks & FloraRuleDef.CheckBeach) != 0;
+            if (def.beachHeight != 0 || beachGround){
+                bool beach = SurfaceCover.IsBeach(x, z, s.ColumnHeight, def, cfg, cache);
+                if (beachGround ? !(beach && def.beachFloraGround != 0) : beach) return false;
+            }
+
+            if ((checks & FloraRuleDef.CheckSoil) != 0 &&
+                ((def.soilGround == 0 && !SurfaceCover.IsMeadow(x, z, s.ColumnHeight, def, cfg)) ||
+                 SurfaceCover.IsSnowCovered(x, z, s.ColumnHeight, def, cfg))) return false;
+            return (checks & FloraRuleDef.CheckTreeLine) == 0 || !SurfaceCover.AboveTreeLine(x, z, s.ColumnHeight, cfg);
         }
 
         private static float ColumnProbability(in FloraRuleDef d, float4 factor){
@@ -156,14 +167,17 @@ namespace Engine.Scripts.WorldGen.Flora{
 
         /// <summary>
         ///     The column has solid ground (the surface source's top block), is not clamped at Hmax, and its
-        ///     top face lies at least <paramref name="minHeightAboveWater" /> blocks above the water surface, never below.
+        ///     top face lies at least <paramref name="minHeightAboveWater" /> blocks above the water surface. A negative
+        ///     minimum admits columns with up to that many blocks of water above the ground; with
+        ///     <paramref name="waterGround" /> only those pass.
         /// </summary>
-        public static bool GroundAllows(in ColumnSample s, int minHeightAboveWater, in WorldGenConfig cfg){
+        public static bool GroundAllows(in ColumnSample s, int minHeightAboveWater, byte waterGround, in WorldGenConfig cfg){
             if (s.SurfaceSource < 0 || cfg.Biomes[s.SurfaceSource].floraGround == 0) return false;
             if (s.Clamped && s.Height >= cfg.HeightMax) return false;
-            // Water fills y < WaterLevel, so the top face of the block at h_int is h_int + 1 - WaterLevel above it.
+            // Water fills y < WaterLevel, so the top face of the block at h_int is h_int + 1 - WaterLevel above it
+            // (negative: that many water blocks above the ground).
             int aboveWater = s.ColumnHeight + 1 - cfg.WaterLevel;
-            return aboveWater >= math.max(minHeightAboveWater, 0);
+            return aboveWater >= minHeightAboveWater && (waterGround == 0 || aboveWater < 0);
         }
 
         /// <summary>True when the rule <paramref name="rule" /> exists and is a multi-block species.</summary>

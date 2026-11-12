@@ -21,12 +21,12 @@ MonoBehaviour:
   StrataBlock: {fileID: 11400000, guid: afe093b663ba4bb0244bb56edb4319f2, type: 2}
   BeachBlock: {fileID: 11400000, guid: b5df436b2cc46cf419e666fccd2d96b3, type: 2}
   BeachHeight: 3
-  TargetHumidity: 0.55
-  TargetTemperature: 0.78
-  TargetContinental: 0.5
-  TargetErosion: 0.35
-  TargetPV: 0.3
-  TargetHeight: 0.55
+  TargetHumidity: 0.62
+  TargetTemperature: 0.84
+  TargetContinental: 0.44
+  TargetErosion: 0.6
+  TargetPV: -0.2
+  TargetHeight: 0.4
   HeightOffset: 140
   HeightAmplitude: 9
   OctaveWeights:
@@ -45,6 +45,8 @@ MonoBehaviour:
     RequiresSurfaceFromSameBiome: 0
     RequiresBeachGround: 0
     MinHeightAboveWater: 1
+    StopsAtTreeLine: 1
+    RequiresSoil: 1
     DensityNoise: 0
     DensityInfluence: 1
     MinStackHeight: 1
@@ -56,6 +58,8 @@ MonoBehaviour:
     RequiresSurfaceFromSameBiome: 0
     RequiresBeachGround: 0
     MinHeightAboveWater: 1
+    StopsAtTreeLine: 1
+    RequiresSoil: 1
     DensityNoise: 1
     DensityInfluence: 1
     MinStackHeight: 1
@@ -133,7 +137,20 @@ MonoBehaviour:
     RequiresSurfaceFromSameBiome: 0
     RequiresBeachGround: 0
     MinHeightAboveWater: 1
+    StopsAtTreeLine: 1
+    RequiresSoil: 1
     DensityNoise: 0
+    DensityInfluence: 1
+    MinStackHeight: 1
+    MaxStackHeight: 1
+  - SpeciesVoxel: {fileID: 0}
+    SpeciesStructure: {fileID: 0}
+    SpeciesTree: {fileID: 11400000, guid: dca061bd895b4c2c87359a9e323624d7, type: 2}
+    Probability: 0.00002
+    RequiresSurfaceFromSameBiome: 0
+    RequiresBeachGround: 0
+    MinHeightAboveWater: 1
+    DensityNoise: 3
     DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1

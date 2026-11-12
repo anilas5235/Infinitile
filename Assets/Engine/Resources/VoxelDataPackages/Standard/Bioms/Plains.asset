@@ -26,7 +26,7 @@ MonoBehaviour:
   TargetContinental: 0.45
   TargetErosion: 0.68
   TargetPV: -0.45
-  TargetHeight: 0.4
+  TargetHeight: 0.47
   HeightOffset: 136
   HeightAmplitude: 6
   OctaveWeights:
@@ -100,6 +100,8 @@ MonoBehaviour:
     RequiresSurfaceFromSameBiome: 0
     RequiresBeachGround: 0
     MinHeightAboveWater: 1
+    StopsAtTreeLine: 1
+    RequiresSoil: 1
     DensityNoise: 0
     DensityInfluence: 1
     MinStackHeight: 1
@@ -111,6 +113,8 @@ MonoBehaviour:
     RequiresSurfaceFromSameBiome: 0
     RequiresBeachGround: 0
     MinHeightAboveWater: 1
+    StopsAtTreeLine: 1
+    RequiresSoil: 1
     DensityNoise: 0
     DensityInfluence: 1
     MinStackHeight: 1
@@ -122,6 +126,8 @@ MonoBehaviour:
     RequiresSurfaceFromSameBiome: 0
     RequiresBeachGround: 0
     MinHeightAboveWater: 1
+    StopsAtTreeLine: 1
+    RequiresSoil: 1
     DensityNoise: 1
     DensityInfluence: 1
     MinStackHeight: 1
@@ -144,6 +150,8 @@ MonoBehaviour:
     RequiresSurfaceFromSameBiome: 0
     RequiresBeachGround: 0
     MinHeightAboveWater: 1
+    StopsAtTreeLine: 1
+    RequiresSoil: 1
     DensityNoise: 0
     DensityInfluence: 1
     MinStackHeight: 1

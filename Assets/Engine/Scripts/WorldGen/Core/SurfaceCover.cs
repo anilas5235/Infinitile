@@ -1,6 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Blending;
+using Engine.Scripts.WorldGen.Flora;
 using Engine.Scripts.WorldGen.Noise;
 using Unity.Collections;
 using Engine.Scripts.WorldGen.Settings;
@@ -28,6 +29,49 @@ namespace Engine.Scripts.WorldGen.Core{
         /// </summary>
         public static float EffectiveTemperature(float temperature, float freezeNoise, in WorldGenConfig cfg){
             return temperature + cfg.FreezeNoiseAmplitude * freezeNoise;
+        }
+
+        /// <summary>
+        ///     Forest floor: a dry column of a biome with a forest floor block where the tree density noise
+        ///     (<see cref="FloraPlacement.DensityFactor(int,int,int,in WorldGenConfig)" /> of
+        ///     <see cref="FloraDensity.Trees" />) reaches the biome's <c>forestFloorDensity</c>. The noise is the one
+        ///     the tree rules follow, so the floor lies under the groves.
+        /// </summary>
+        public static bool IsForestFloor(int x, int z, int height, in Biome.BiomeDef def, in WorldGenConfig cfg){
+            if (def.forestFloorBlock == 0 || height + 1 < cfg.WaterLevel) return false;
+            return FloraPlacement.DensityFactor(x, z, (int)FloraDensity.Trees, cfg) >= def.forestFloorDensity;
+        }
+
+        /// <summary>
+        ///     Tree line at column (<paramref name="x" />, <paramref name="z" />): <c>TreeLineHeight</c> plus
+        ///     <c>TreeLineNoiseAmplitude</c> times one octave of noise in −1…1, so the forest edge is no straight contour.
+        /// </summary>
+        public static float TreeLine(int x, int z, in WorldGenConfig cfg){
+            float n = SeededSimplex.Noise(new float2(x, z) / cfg.TreeLineNoiseWavelength, cfg.Seed, HashSalts.TreeLineNoise);
+            return cfg.TreeLineHeight + cfg.TreeLineNoiseAmplitude * n;
+        }
+
+        /// <summary>
+        ///     The top face (y = height + 1) of the column reaches its <see cref="TreeLine" />: flora rules that stop at
+        ///     the tree line do not grow there. A tree line height of 0 turns it off; columns below the lowest line skip
+        ///     the noise.
+        /// </summary>
+        public static bool AboveTreeLine(int x, int z, int height, in WorldGenConfig cfg){
+            if (cfg.TreeLineHeight <= 0f) return false;
+            float top = height + 1;
+            if (top < cfg.TreeLineHeight - cfg.TreeLineNoiseAmplitude) return false;
+            return top >= TreeLine(x, z, cfg);
+        }
+
+        /// <summary>
+        ///     Meadow: a dry column of a biome with a meadow block whose top face lies below the column's
+        ///     <see cref="TreeLine" />. It takes the meadow block as its top block and is soil for flora rules that need
+        ///     soil, so trees return to the lower slopes of a stone biome. With the tree line turned off every dry
+        ///     column of the biome is meadow.
+        /// </summary>
+        public static bool IsMeadow(int x, int z, int height, in Biome.BiomeDef def, in WorldGenConfig cfg){
+            if (def.meadowGround == 0 || height + 1 < cfg.WaterLevel) return false;
+            return !AboveTreeLine(x, z, height, cfg);
         }
 
         /// <summary>
@@ -187,6 +231,17 @@ namespace Engine.Scripts.WorldGen.Core{
             int phase = (y + shift) % period;
             if (phase < 0) phase += period;
             return phase < thickness;
+        }
+
+        /// <summary>
+        ///     Number of the strata period voxel <paramref name="y" /> lies in: ⌊(y + shift) / period⌋, one more for
+        ///     every band upwards. A biome with a band palette picks the band's block by it. 0 for a period of 0.
+        /// </summary>
+        public static int StrataBand(int y, int shift, int period){
+            if (period <= 0) return 0;
+            int t = y + shift;
+            int band = t / period;
+            return t % period < 0 ? band - 1 : band;
         }
     }
 }

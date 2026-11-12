@@ -269,6 +269,266 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void ChunkJob_StrataPaletteCyclesFromBandToBand(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            // A biome with a band palette: every band is one block of the palette, the next band upwards the next
+            // block, and the chunk job equals the whole-world stamp. The other biome keeps its single strata block;
+            // empty palette entries and those beyond the fourth block are skipped.
+            _biomes = _fixture.DefaultBiomes();
+            _biomes[0].StrataBlock = _fixture.GraniteSo;
+            _biomes[0].StrataPalette = new[]{ _fixture.SnowSo, null, _fixture.GlassSo };
+            _biomes[1].StrataBlock = _fixture.GraniteSo;
+            WorldGenSettings s = _fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes);
+            s.StrataPeriod = 3;
+            s.StrataThickness = 2;
+            _config = _fixture.GeneratorConfig(s);
+            WorldGenConfig cfg = _config.WorldGen;
+            Assert.AreEqual(3, cfg.Biomes[0].strataCount, "the empty entry is skipped");
+            Assert.AreEqual(1, cfg.Biomes[1].strataCount);
+            _biomes[1].StrataPalette = new[]{ _fixture.SnowSo, _fixture.GlassSo, _fixture.SandSo, _fixture.DirtSo };
+            Assert.AreEqual(4, _biomes[1].ToStruct(v => _fixture.Ids[v]).strataCount, "at most four blocks");
+            _biomes[1].StrataPalette = null;
+
+            int2 originChunk = new(1, 2), chunks = new(3, 3);
+            ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
+            Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
+            try{
+                List<string> report = new();
+                int mismatches = CompareVoxels(reference, chunkData, report);
+                Assert.AreEqual(0, mismatches, "chunk voxels differ from the whole-world stamp:\n" + string.Join("\n", report));
+
+                ushort[] palette = { FloraFixture.Granite, FloraFixture.Snow, FloraFixture.Glass };
+                int[] seen = new int[3];
+                int plain = 0;
+                for (int x = reference.Origin.x; x < reference.Origin.x + reference.Size.x; x += 3)
+                for (int z = reference.Origin.y; z < reference.Origin.y + reference.Size.y; z += 3){
+                    int source = reference.Region.SurfaceSource[reference.Region.Index(x, z)];
+                    int shift = SurfaceCover.StrataShift(x, z, cfg);
+                    int h = reference.SurfaceAt(x, z);
+                    // Deep stone only: below the top, under and beach blocks.
+                    for (int y = h - 40; y < h - 4; y++){
+                        ushort v = VoxelAt(chunkData, new int3(x, y, z));
+                        int t = y + shift;
+                        int phase = (t % 3 + 3) % 3, band = (t - phase) / 3;
+                        ushort expected = phase >= 2 ? TestFixtures.Stone
+                            : source == 0 ? palette[(band % 3 + 3) % 3]
+                            : FloraFixture.Granite;
+                        Assert.AreEqual(expected, v, $"({x},{y},{z}) biome {source}, band {band}, phase {phase}");
+                        if (phase >= 2) continue;
+                        if (source == 0) seen[(band % 3 + 3) % 3]++;
+                        else plain++;
+                    }
+                }
+
+                TestContext.WriteLine($"{architecture}: palette bands {seen[0]} / {seen[1]} / {seen[2]}, single-block bands {plain}");
+                Assert.IsTrue(seen.All(n => n > 0), "every block of the palette occurs");
+                Assert.Greater(plain, 0, "the biome without a palette keeps its strata block");
+            }
+            finally{
+                Release(results);
+            }
+        }
+
+        [Test]
+        public void ChunkJob_ForestFloorLiesWhereTheForestIsDense(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            // A biome with a forest floor block: its dry columns carry the block exactly where the tree density noise
+            // reaches the threshold; columns of the other biome and columns under water keep their blocks. The chunk
+            // job equals the whole-world stamp.
+            _biomes = new[]{
+                _fixture.MakeBiome("Meadow", .25f, 121f, 8f, _fixture.GrassSo, FloraFixture.Rule(_fixture.TuftSo, .2f),
+                    FloraFixture.Rule(_fixture.Grove, .04f)),
+                _fixture.MakeBiome("Dunes", .75f, 124f, 6f, _fixture.SandSo, FloraFixture.Rule(_fixture.CactusSo, .03f, 1, 3))
+            };
+            _biomes[0].ForestFloorBlock = _fixture.GraniteSo;
+            _biomes[0].ForestFloorDensity = 1.2f;
+            WorldGenSettings s = _fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes);
+            s.TreesDensityWavelength = 24f;
+            _config = _fixture.GeneratorConfig(s);
+            WorldGenConfig cfg = _config.WorldGen;
+            int waterLevel = cfg.WaterLevel;
+            int2 originChunk = new(1, 2), chunks = new(4, 4);
+            ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
+            Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
+            try{
+                List<string> report = new();
+                int mismatches = CompareVoxels(reference, chunkData, report);
+                Assert.AreEqual(0, mismatches, "chunk voxels differ from the whole-world stamp:\n" + string.Join("\n", report));
+
+                int floor = 0, grass = 0, wet = 0, other = 0;
+                for (int x = reference.Origin.x; x < reference.Origin.x + reference.Size.x; x++)
+                for (int z = reference.Origin.y; z < reference.Origin.y + reference.Size.y; z++){
+                    int source = reference.Region.SurfaceSource[reference.Region.Index(x, z)];
+                    int h = reference.SurfaceAt(x, z);
+                    ushort top = VoxelAt(chunkData, new int3(x, h, z));
+                    // A trunk or a cactus replaces nothing at the top block itself.
+                    bool dense = FloraPlacement.DensityFactor(x, z, (int)FloraDensity.Trees, cfg) >= 1.2f;
+                    if (source != 0){
+                        Assert.AreNotEqual(FloraFixture.Granite, top, $"({x},{z}) biome without a forest floor");
+                        other++;
+                    }
+                    else if (h + 1 < waterLevel){
+                        Assert.AreEqual(TestFixtures.Dirt, top, $"({x},{z}) under water");
+                        wet++;
+                    }
+                    else{
+                        Assert.AreEqual(dense ? FloraFixture.Granite : TestFixtures.Grass, top, $"({x},{z}) h {h}");
+                        if (dense) floor++;
+                        else grass++;
+                    }
+                }
+
+                string counts = $"{architecture}: forest floor {floor}, grass {grass}, under water {wet}, other biome {other}";
+                TestContext.WriteLine(counts);
+                Assert.Greater(floor, 100, counts);
+                Assert.Greater(grass, 100, counts);
+                Assert.Greater(wet, 0, counts);
+                Assert.Greater(other, 100, counts);
+            }
+            finally{
+                Release(results);
+            }
+        }
+
+        [Test]
+        public void ChunkJob_MeadowCoversAStoneBiomeBelowTheTreeLine(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            // A stone biome with a meadow block and a low tree line: its dry columns carry the meadow block exactly
+            // below their tree line and stone above it, and its soil rule (a tree) stands on meadow only. The other
+            // biome and columns under water keep their blocks. The chunk job equals the whole-world stamp.
+            FloraRule grove = FloraFixture.Rule(_fixture.Grove, .06f);
+            grove.RequiresSoil = true;
+            grove.StopsAtTreeLine = true;
+            _biomes = new[]{
+                _fixture.MakeBiome("Alp", .25f, 138f, 10f, _fixture.StoneSo, grove, FloraFixture.Rule(_fixture.TuftSo, .2f)),
+                _fixture.MakeBiome("Dunes", .75f, 138f, 6f, _fixture.SandSo, FloraFixture.Rule(_fixture.CactusSo, .03f, 1, 3))
+            };
+            _biomes[0].MeadowBlock = _fixture.GrassSo;
+            WorldGenSettings s = _fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes);
+            // The Terrain-first test area lies lower than the Biome-first one.
+            s.TreeLineHeight = s.WaterLevel + (architecture == GenArchitecture.TerrainFirst ? 5f : 12f);
+            s.TreeLineNoiseAmplitude = 4f;
+            s.TreeLineNoiseWavelength = 24f;
+            _config = _fixture.GeneratorConfig(s);
+            WorldGenConfig cfg = _config.WorldGen;
+            int waterLevel = cfg.WaterLevel;
+            int2 originChunk = new(1, 2), chunks = new(4, 4);
+            ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
+            Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
+            try{
+                List<string> report = new();
+                int mismatches = CompareVoxels(reference, chunkData, report);
+                Assert.AreEqual(0, mismatches, "chunk voxels differ from the whole-world stamp:\n" + string.Join("\n", report));
+
+                int meadow = 0, rock = 0, other = 0, wet = 0, trunks = 0;
+                for (int x = reference.Origin.x; x < reference.Origin.x + reference.Size.x; x++)
+                for (int z = reference.Origin.y; z < reference.Origin.y + reference.Size.y; z++){
+                    int source = reference.Region.SurfaceSource[reference.Region.Index(x, z)];
+                    int h = reference.SurfaceAt(x, z);
+                    ushort top = VoxelAt(chunkData, new int3(x, h, z));
+                    bool high = SurfaceCover.AboveTreeLine(x, z, h, cfg);
+                    if (h + 1 < waterLevel){
+                        Assert.AreEqual(TestFixtures.Dirt, top, $"({x},{z}) under water");
+                        wet++;
+                        continue;
+                    }
+
+                    if (source != 0){
+                        Assert.AreEqual(FloraFixture.Sand, top, $"({x},{z}) biome without a meadow");
+                        other++;
+                        continue;
+                    }
+
+                    Assert.AreEqual(high ? TestFixtures.Stone : TestFixtures.Grass, top, $"({x},{z}) h {h}");
+                    if (high) rock++;
+                    else meadow++;
+                    // A trunk stands on meadow, never on the rock.
+                    if (VoxelAt(chunkData, new int3(x, h + 1, z)) != FloraFixture.Log) continue;
+                    Assert.IsFalse(high, $"({x},{z}) trunk above the tree line");
+                    trunks++;
+                }
+
+                string counts = $"{architecture}: meadow {meadow}, rock {rock}, other biome {other}, under water {wet}, trunks on meadow {trunks}";
+                TestContext.WriteLine(counts);
+                Assert.Greater(meadow, 50, counts);
+                Assert.Greater(rock, 50, counts);
+                Assert.Greater(other, 50, counts);
+                Assert.Greater(trunks, 0, counts);
+            }
+            finally{
+                Release(results);
+            }
+        }
+
+        [Test]
+        public void ChunkJob_WaterPlantsStandInWholeWater(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            // Rules with a negative MinHeightAboveWater: single-block plants sit on the water surface, trunks and
+            // stacked solids replace the water they stand in, and no cell between the ground and the water surface is
+            // air, a plant or leaves. Columns deeper than the minimum carry no plant. The chunk job equals the
+            // whole-world stamp.
+            FloraRule Wet(FloraRule rule, bool waterOnly = false){
+                rule.MinHeightAboveWater = -2;
+                rule.RequiresWaterGround = waterOnly;
+                return rule;
+            }
+
+            _biomes = new[]{
+                _fixture.MakeBiome("Marsh", .25f, 122f, 8f, _fixture.GrassSo, Wet(FloraFixture.Rule(_fixture.TuftSo, .4f), true),
+                    FloraFixture.Rule(_fixture.FlowerSo, .2f), Wet(FloraFixture.Rule(_fixture.Grove, .06f))),
+                _fixture.MakeBiome("Dunes", .75f, 123f, 8f, _fixture.SandSo, Wet(FloraFixture.Rule(_fixture.CactusSo, .03f, 1, 3)),
+                    Wet(FloraFixture.Rule(_fixture.TuftSo, .2f)), Wet(FloraFixture.Rule(_fixture.Pine, .03f)))
+            };
+            WorldGenSettings s = _fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes);
+            _config = _fixture.GeneratorConfig(s);
+            int2 originChunk = new(1, 2), chunks = new(4, 4);
+            ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
+            int waterLevel = _config.WorldGen.WaterLevel;
+
+            Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
+            try{
+                List<string> report = new();
+                int mismatches = CompareVoxels(reference, chunkData, report);
+                Assert.AreEqual(0, mismatches, "chunk voxels differ from the whole-world stamp:\n" + string.Join("\n", report));
+
+                int onWater = 0, trunksInWater = 0, shallow = 0, deep = 0;
+                for (int x = reference.Origin.x; x < reference.Origin.x + reference.Size.x; x++)
+                for (int z = reference.Origin.y; z < reference.Origin.y + reference.Size.y; z++){
+                    int h = reference.SurfaceAt(x, z);
+                    int above = h + 1 - waterLevel;
+                    if (above >= 0) continue;
+                    ushort surface = VoxelAt(chunkData, new int3(x, waterLevel, z));
+                    bool plant = surface is FloraFixture.Tuft or FloraFixture.Flower;
+                    if (above < -2){
+                        deep++;
+                        Assert.IsFalse(plant, $"({x},{z}) plant on water {-above} deep");
+                    }
+                    else{
+                        shallow++;
+                        if (plant) onWater++;
+                    }
+
+                    for (int y = h + 1; y < waterLevel; y++){
+                        ushort v = VoxelAt(chunkData, new int3(x, y, z));
+                        bool water = v is TestFixtures.Water or TestFixtures.Ice;
+                        bool solid = v != TestFixtures.Air && _fixture.ClassOf(v) == FloraVoxelClass.Solid;
+                        Assert.IsTrue(water || solid, $"({x},{y},{z}) holds {v} below the water surface");
+                        if (!water) trunksInWater++;
+                    }
+                }
+
+                string counts = $"{architecture}: shallow {shallow}, deep {deep}, plants on water {onWater}, trunk voxels in water {trunksInWater}";
+                TestContext.WriteLine(counts);
+                Assert.Greater(deep, 0, "the area has water deeper than the minimum; " + counts);
+                Assert.Greater(onWater, 20, "plants sit on shallow water; " + counts);
+                Assert.Greater(trunksInWater, 0, "trunks stand in shallow water; " + counts);
+            }
+            finally{
+                Release(results);
+            }
+        }
+
+        [Test]
         public void ChunkJob_TreesCrossingChunkBordersAreComplete(
             [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture,
             [Values(BlendMethod.None, BlendMethod.DistanceBlend)] BlendMethod method, [Values(false, true)] bool shippedSpecies){
@@ -389,6 +649,63 @@ namespace Engine.Tests.EditMode{
                 Assert.AreEqual(0, reference.Stamped.Count(p => reference[p] == FloraFixture.Log), "no fallen log stands");
                 Assert.Less(reference.Narrowed.Count, reference.Anchors.Count, "some log lies at its rolled length");
             }
+
+            Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
+            try{
+                List<string> report = new();
+                int mismatches = CompareVoxels(reference, chunkData, report);
+                Assert.AreEqual(0, mismatches, "chunk voxels differ from the whole-world stamp:\n" + string.Join("\n", report));
+            }
+            finally{
+                Release(results);
+            }
+        }
+
+        [Test]
+        public void ChunkJob_BouldersSinkFromTheLowestGroundUnderThem(
+            [Values(GenArchitecture.TerrainFirst, GenArchitecture.BiomeFirst)] GenArchitecture architecture){
+            // The shipped boulders on hills: the sink depth of each counts from the lowest ground under its body, so
+            // its lowest layer lies the variant's sink below that ground and the downhill side shows no more of the
+            // boulder than flat ground does. The chunks agree with the whole-world stamp, also across chunk borders.
+            TreeSpecies boulder = _fixture.ShippedSpecies("Boulder");
+            _biomes = new[]{
+                _fixture.MakeBiome("Rocks", .5f, 150f, 30f, _fixture.GrassSo, FloraFixture.Rule(boulder, .08f), FloraFixture.Rule(_fixture.TuftSo, .3f))
+            };
+            _config = _fixture.GeneratorConfig(_fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes));
+            WorldGenConfig cfg = _config.WorldGen;
+            int2 originChunk = new(1, 2), chunks = new(3, 3);
+            ReferenceWorld reference = new(_fixture, _biomes, _config, originChunk, chunks);
+
+            int onSlope = 0, onFlat = 0, deepest = 0;
+            foreach ((int2 column, List<int3> footprint) in reference.Anchors){
+                if (!reference.SlopeSink.TryGetValue(column, out int slope)) continue;
+                int variant = reference.TreeVariants[column];
+                TreeVariantDef v = cfg.TreeVariants[variant];
+                TreeRoll roll = TreeShape.Roll(column.x, column.y, cfg.Seed, variant, v);
+                int lowest = int.MaxValue;
+                for (int dx = -roll.CrownRadius; dx <= roll.CrownRadius; dx++)
+                for (int dz = -roll.CrownRadius; dz <= roll.CrownRadius; dz++)
+                    if (dx * dx + dz * dz <= roll.CrownRadius * (roll.CrownRadius + 1))
+                        lowest = math.min(lowest, reference.SurfaceAt(column.x + dx, column.y + dz));
+                Assert.AreEqual(reference.SurfaceAt(column.x, column.y) - lowest, slope, $"extra sink of the boulder at {column}");
+
+                // Body of 2r + 1 layers from CrownBase 1; a bump may add one layer on top, a hole may drop the lowest.
+                int height = 2 * roll.CrownRadius + 1;
+                int bottom = footprint.Min(p => p.y), top = footprint.Max(p => p.y);
+                Assert.GreaterOrEqual(bottom, lowest + 1 - roll.Sink, $"lowest layer of the boulder at {column}");
+                Assert.LessOrEqual(bottom, lowest + 2 - roll.Sink, $"lowest layer of the boulder at {column}");
+                Assert.LessOrEqual(top, lowest + height - roll.Sink + (v.BumpChance > 0f ? 1 : 0), $"top of the boulder at {column}");
+                // A third to a half of the body lies below the lowest ground under it.
+                Assert.GreaterOrEqual(3 * roll.Sink, height, $"at least a third in the ground at {column}");
+                Assert.LessOrEqual(2 * roll.Sink, height, $"at most half in the ground at {column}");
+                if (slope > 0) onSlope++;
+                else onFlat++;
+                deepest = math.max(deepest, slope);
+            }
+
+            TestContext.WriteLine($"{architecture}: boulders on a slope {onSlope}, on flat ground {onFlat}, largest drop under one {deepest}");
+            Assert.Greater(onSlope, 5, "boulders on a slope");
+            Assert.Greater(onFlat, 0, "boulders on flat ground");
 
             Dictionary<int2, ChunkVoxelData> chunkData = RunChunks(originChunk, chunks, out NativeParallelHashMap<int2, ChunkVoxelData> results);
             try{

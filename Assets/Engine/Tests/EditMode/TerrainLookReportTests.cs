@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Core;
@@ -73,6 +75,115 @@ namespace Engine.Tests.EditMode{
             finally{
                 foreach (Object o in owned) Object.DestroyImmediate(o);
             }
+        }
+
+        /// <summary>
+        ///     Candidates from <c>Temp/tuning-candidates.txt</c>, so a tuning round needs no recompile. One candidate per
+        ///     line: <c>Name: Jungle.TargetHeight=0.48; Mountain.TargetPV=0.6; Settings.LambdaHeight=4</c>. The part before
+        ///     the dot is a biome name or <c>Settings</c>, the part after it a float or int field. Lines starting with #
+        ///     and empty lines are skipped; without the file the test reports nothing.
+        /// </summary>
+        [Test]
+        public void TerrainLook_ReportCandidateFile(){
+            string file = Path.Combine(Directory.GetCurrentDirectory(), "Temp", "tuning-candidates.txt");
+            if (!File.Exists(file)) Assert.Ignore($"No candidate file at {file}");
+            foreach (string raw in File.ReadAllLines(file)){
+                string line = raw.Trim();
+                if (line.Length == 0 || line[0] == '#') continue;
+                int colon = line.IndexOf(':');
+                Assert.Greater(colon, 0, line);
+                List<Object> owned = new();
+                WorldGenSettings settings = CloneShipped(owned);
+                try{
+                    foreach (string assignment in line[(colon + 1)..].Split(';', StringSplitOptions.RemoveEmptyEntries))
+                        Assign(settings, assignment.Trim());
+                    Report(line[..colon].Trim(), settings);
+                }
+                finally{
+                    foreach (Object o in owned) Object.DestroyImmediate(o);
+                }
+            }
+        }
+
+        /// <summary>
+        ///     The surface material at block resolution: 1024² columns around <see cref="CloseUpCentre" />, once with the
+        ///     per-block mix (<c>MaterialBorderWavelength</c> 0) and once as shipped. Writes
+        ///     <c>Border_Dither_surface.png</c> and <c>Border_Shipped_surface.png</c> and prints for either one the
+        ///     columns whose material differs from the dominant one, the neighbour pairs of different material (the
+        ///     border length) and the columns that differ from all four neighbours (speckles).
+        /// </summary>
+        [Test]
+        public void TerrainLook_BorderCloseUp(){
+            foreach (string variant in new[]{ "Dither", "Shipped" }){
+                List<Object> owned = new();
+                WorldGenSettings settings = CloneShipped(owned);
+                try{
+                    if (variant == "Dither") settings.MaterialBorderWavelength = 0f;
+                    CloseUp(variant, settings);
+                }
+                finally{
+                    foreach (Object o in owned) Object.DestroyImmediate(o);
+                }
+            }
+        }
+
+        /// <summary>Centre of the close-up of <see cref="TerrainLook_BorderCloseUp" /> in blocks.</summary>
+        private static readonly int2 CloseUpCentre = new(0, 0);
+
+        private static void CloseUp(string variant, WorldGenSettings settings){
+            WorldGenConfig cfg = settings.ToConfig(TestFixtures.Seed);
+            int n = Size * Size;
+            RegionBuffers buffers = new(){
+                Height = new NativeArray<float>(n, Allocator.TempJob),
+                DominantMaterialBiome = new NativeArray<int>(n, Allocator.TempJob),
+                SurfaceSource = new NativeArray<int>(n, Allocator.TempJob)
+            };
+            try{
+                WorldGenRequest request = new(){
+                    Config = cfg, Origin = CloseUpCentre - new int2(Size / 2, Size / 2), Size = new int2(Size, Size), Stride = 1
+                };
+                WorldGenApi.SampleRegion(request, ref buffers).Complete();
+                float[] height = buffers.Height.ToArray();
+                int[] dominant = buffers.DominantMaterialBiome.ToArray();
+                int[] surface = buffers.SurfaceSource.ToArray();
+                int minority = 0, pairs = 0, speckles = 0;
+                for (int z = 1; z < Size - 1; z++)
+                for (int x = 1; x < Size - 1; x++){
+                    int i = z * Size + x, s = surface[i];
+                    if (s != dominant[i]) minority++;
+                    if (s != surface[i + 1]) pairs++;
+                    if (s != surface[i + Size]) pairs++;
+                    if (s != surface[i + 1] && s != surface[i - 1] && s != surface[i + Size] && s != surface[i - Size]) speckles++;
+                }
+
+                string line = $"=== border close-up {variant}: {Size}² blocks around ({CloseUpCentre.x}, {CloseUpCentre.y}), " +
+                              $"border wavelength {settings.MaterialBorderWavelength:F0}: not the dominant material " +
+                              $"{100.0 * minority / n:F2} %, neighbour pairs of different material {pairs}, single columns {speckles}";
+                TestContext.WriteLine(line);
+                Directory.CreateDirectory(OutDir);
+                File.WriteAllText(Path.Combine(OutDir, $"Border_{variant}_stats.txt"), line);
+                Color32[] colors = settings.Biomes.Biomes.Select(b => (Color32)b.RepresentativeColor).ToArray();
+                WritePng($"Border_{variant}_surface.png", BiomeView(surface, colors, height, cfg.WaterLevel));
+            }
+            finally{
+                buffers.Height.Dispose();
+                buffers.DominantMaterialBiome.Dispose();
+                buffers.SurfaceSource.Dispose();
+                cfg.Dispose();
+            }
+        }
+
+        /// <summary>Sets <c>Target.Field=value</c> on a biome of <paramref name="settings" /> or on the settings themselves.</summary>
+        private static void Assign(WorldGenSettings settings, string assignment){
+            if (assignment.Length == 0) return;
+            string[] sides = assignment.Split('=');
+            string[] path = sides[0].Trim().Split('.');
+            Assert.IsTrue(sides.Length == 2 && path.Length == 2, assignment);
+            object target = path[0] == "Settings" ? settings : BiomeOf(settings, path[0]);
+            FieldInfo field = target.GetType().GetField(path[1], BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.IsNotNull(field, assignment);
+            float value = float.Parse(sides[1].Trim(), CultureInfo.InvariantCulture);
+            field.SetValue(target, field.FieldType == typeof(int) ? (object)(int)value : value);
         }
 
         /// <summary>A copy of the shipped settings with copies of its biome set, biomes and splines.</summary>
@@ -225,6 +336,16 @@ namespace Engine.Tests.EditMode{
                                   $"{100.0 * mediumCells[b] / cells[b]:F0} % < 256², " +
                                   $"largest {largest[b] * Stride * Stride / 1e6:F2} km²")));
 
+                // High ground by height alone: what a biome that takes every column above a line could look like.
+                foreach (float line in new[]{ 170f, 180f, 190f }){
+                    int[] high = height.Select(h => h >= line ? 0 : -1).ToArray();
+                    Patches(high, 1, out int[] highCount, out int[] _, out int[] highCells, out int[] highLargest,
+                        out int[] highMedium);
+                    sb.AppendLine($"high    H ≥ {line:F0}: {100.0 * highCells[0] / n:F1} % of all, {highCount[0]} patches, " +
+                                  $"{100.0 * highMedium[0] / math.max(1, highCells[0]):F0} % < 256², " +
+                                  $"largest {highLargest[0] * Stride * Stride / 1e6:F2} km²");
+                }
+
                 // Boundaries of the dominant material biome, implausible pairs flagged.
                 Dictionary<(int, int), int> edges = BorderEdges(dominant, biomeCount);
                 long total = edges.Values.Sum();
@@ -235,6 +356,7 @@ namespace Engine.Tests.EditMode{
                     .Sum(kv => (long)kv.Value);
                 sb.AppendLine($"borders implausible {implausible * Stride} blocks");
                 Fit(sb, settings, cfg, fields, height, hard, surface, clamped, request.Origin);
+                foreach ((string name, int4 box) in Windows) Window(sb, name, box, names, height, hard, surface, request.Origin, water);
 
                 TestContext.WriteLine(sb.ToString());
                 Directory.CreateDirectory(OutDir);
@@ -312,6 +434,66 @@ namespace Engine.Tests.EditMode{
                               $" | low/mid/high {100 * band[0] / land}/{100 * band[1] / land}/{100 * band[2] / land} %" +
                               $" | snow {100.0 * snow / math.max(1, surfaceCount):F1} % of its dry surface");
             }
+        }
+
+        /// <summary>
+        ///     Places the world tour of 2026-11-11 named (x0, z0, x1, z1 in blocks, both ends included): the area the tour
+        ///     flew over, the steep west Jungle, the Savanna that was a shallow sea, and the two Badlands spots with
+        ///     Mountain ground on them.
+        /// </summary>
+        private static readonly (string, int4)[] Windows ={
+            ("Tour", new int4(-1280, -1280, 1280, 1280)),
+            ("WestJungle", new int4(-1280, -1152, -960, -576)),
+            ("SouthWestSavanna", new int4(-768, -704, -640, -256)),
+            ("BadlandsMeadow", new int4(896, 640, 1088, 1024)),
+            ("BadlandsCap", new int4(1216, -704, 1344, -576))
+        };
+
+        /// <summary>
+        ///     One window of the sampled area: per hard biome its share, ground height percentiles and the share of its
+        ///     columns under water, then the surface source shares and the columns whose surface comes from another
+        ///     biome than the hard one (from 0.5 % of the window).
+        /// </summary>
+        private static void Window(StringBuilder sb, string name, int4 box, string[] names, float[] height, int[] hard, int[] surface,
+            int2 origin, float water){
+            int count = names.Length, total = 0;
+            List<float>[] h = Enumerable.Range(0, count).Select(_ => new List<float>()).ToArray();
+            int[] wet = new int[count], surf = new int[count], surfWet = new int[count];
+            Dictionary<(int, int), int> cross = new();
+            for (int z = 0; z < Size; z++)
+            for (int x = 0; x < Size; x++){
+                int2 w = origin + new int2(x, z) * Stride;
+                if (w.x < box.x || w.x > box.z || w.y < box.y || w.y > box.w) continue;
+                int i = z * Size + x, b = hard[i], s = surface[i];
+                if (b < 0 || s < 0) continue;
+                total++;
+                h[b].Add(height[i]);
+                surf[s]++;
+                if (height[i] < water){
+                    wet[b]++;
+                    surfWet[s]++;
+                }
+
+                if (s == b) continue;
+                cross.TryGetValue((b, s), out int c);
+                cross[(b, s)] = c + 1;
+            }
+
+            if (total == 0) return;
+            sb.AppendLine($"window  {name} x {box.x}…{box.z}, z {box.y}…{box.w}: hard " + string.Join(", ",
+                Enumerable.Range(0, count).Where(b => h[b].Count > 0).OrderByDescending(b => h[b].Count).Select(b => {
+                    float[] v = h[b].ToArray();
+                    Array.Sort(v);
+                    float P(double p) => v[math.min(v.Length - 1, (int)(p * v.Length))];
+                    return $"{names[b]} {100.0 * v.Length / total:F1} % (H {P(0.05):F0}/{P(0.5):F0}/{P(0.95):F0}, max {v[^1]:F0}, " +
+                           $"under water {100.0 * wet[b] / v.Length:F0} %)";
+                })));
+            sb.AppendLine($"window  {name} surface " + string.Join(", ",
+                Enumerable.Range(0, count).Where(b => surf[b] > 0).OrderByDescending(b => surf[b])
+                    .Select(b => $"{names[b]} {100.0 * surf[b] / total:F1} % (under water {100.0 * surfWet[b] / surf[b]:F0} %)")) +
+                          "; surface of another biome: " + string.Join(", ",
+                              cross.Where(kv => kv.Value * 200 >= total).OrderByDescending(kv => kv.Value)
+                                  .Select(kv => $"{names[kv.Key.Item2]} on {names[kv.Key.Item1]} {100.0 * kv.Value / total:F1} %")));
         }
 
         private static int AtMax(float[] height, float max){

@@ -435,6 +435,12 @@ namespace Engine.Tests.EditMode{
         /// <summary>Tree anchors in <see cref="Anchors" /> whose wide or leaning trunk fell back to a narrow, upright one.</summary>
         internal readonly HashSet<int2> Narrowed = new();
 
+        /// <summary>
+        ///     Blocks a sunk shape (a boulder) in <see cref="Anchors" /> sits deeper than its variant's sink: its anchor
+        ///     height minus the lowest ground under its body.
+        /// </summary>
+        internal readonly Dictionary<int2, int> SlopeSink = new();
+
         /// <summary>Anchors (world column) left out because their ground is carved.</summary>
         internal readonly HashSet<int2> OnCarvedGround = new();
 
@@ -475,6 +481,13 @@ namespace Engine.Tests.EditMode{
                 ushort top = b ? fixture.Ids[h + 1 < waterLevel ? wet : b.TopBlock] : (ushort)0;
                 bool beach = b && b.BeachBlock && SurfaceCover.IsBeach(wx, wz, h, def, cfg, probes);
                 if (beach) top = fixture.Ids[b.BeachBlock];
+                // Dense forest stands on the forest floor block; beaches and underwater ground keep theirs.
+                else if (b && b.ForestFloorBlock && h + 1 >= waterLevel &&
+                         FloraPlacement.DensityFactor(wx, wz, (int)FloraDensity.Trees, cfg) >= b.ForestFloorDensity)
+                    top = fixture.Ids[b.ForestFloorBlock];
+                // A stone biome carries its meadow block below the tree line.
+                else if (b && b.MeadowBlock && h + 1 >= waterLevel && !SurfaceCover.AboveTreeLine(wx, wz, h, cfg))
+                    top = fixture.Ids[b.MeadowBlock];
                 if (b && SurfaceCover.IsSnowCovered(wx, wz, h, def, cfg)) top = def.snowTopBlock;
                 ushort under = b ? fixture.Ids[b.UnderBlock] : (ushort)0;
                 ushort beachUnder = beach ? fixture.Ids[b.BeachBlock] : under;
@@ -487,7 +500,7 @@ namespace Engine.Tests.EditMode{
                 for (int y = 0; y < ChunkHeight; y++){
                     ushort v = y < h - 4 ? stone : y < h - 2 ? under : y < h ? beachUnder : y == h ? top : y < waterLevel ? TestFixtures.Water : TestFixtures.Air;
                     if (v == stone && def.strataBlock != 0 && SurfaceCover.InStrataBand(y, shift, cfg.StrataPeriod, cfg.StrataThickness))
-                        v = def.strataBlock;
+                        v = def.StrataBlockOf(SurfaceCover.StrataBand(y, shift, cfg.StrataPeriod));
                     if (frozen && y == waterLevel - 1 && v == TestFixtures.Water) v = TestFixtures.Ice;
                     _voxels[Flat(x, y, z)] = v;
                 }
@@ -507,7 +520,8 @@ namespace Engine.Tests.EditMode{
                 int wx = Origin.x + x, wz = Origin.y + z;
                 FloraRule rule = RuleAt(biomes, species, wx, wz, out int i);
                 if (rule == null || rule.IsMultiBlock || Carved(new int3(wx, ColumnTop(i), wz))) continue;
-                Put(fixture, new int3(wx, ColumnTop(i) + 1, wz), fixture.Ids[rule.SpeciesVoxel]);
+                // On a column under water the plant sits on the water surface.
+                Put(fixture, new int3(wx, math.max(ColumnTop(i) + 1, waterLevel), wz), fixture.Ids[rule.SpeciesVoxel]);
             }
 
             // Anchors in world order: x, then z.
@@ -538,6 +552,18 @@ namespace Engine.Tests.EditMode{
                             throw new InvalidOperationException($"The region reports a lying trunk at ({wx}, {wz}) that fits nowhere.");
                     }
 
+                    int slope = -1;
+                    if (TreeShape.SinksToLowestGround(roll)){
+                        // A sunk shape counts its sink depth from the lowest ground under its body.
+                        int lowest = ColumnTop(i);
+                        for (int dx = -roll.CrownRadius; dx <= roll.CrownRadius; dx++)
+                        for (int dz = -roll.CrownRadius; dz <= roll.CrownRadius; dz++)
+                            if (TreeShape.UnderBody(roll, dx, dz))
+                                lowest = math.min(lowest, ColumnTop(Region.Index(wx + dx, wz + dz)));
+                        slope = ColumnTop(i) - lowest;
+                        roll.Sink += slope;
+                    }
+
                     if (TrunkGroundCarved(wx, ColumnTop(i) - roll.Sink, wz, roll)){
                         OnCarvedGround.Add(new int2(wx, wz));
                         Narrowed.Remove(new int2(wx, wz));
@@ -552,6 +578,7 @@ namespace Engine.Tests.EditMode{
                     }
 
                     TreeVariants[new int2(wx, wz)] = variant;
+                    if (slope >= 0) SlopeSink[new int2(wx, wz)] = slope;
                 }
                 else if (rule.SpeciesStructure){
                     foreach (StructurePart part in rule.SpeciesStructure.parts)
@@ -564,6 +591,8 @@ namespace Engine.Tests.EditMode{
                 else{
                     int span = rule.MaxStackHeight - rule.MinStackHeight + 1;
                     int height = rule.MinStackHeight + (int)(Hash.Hash32(wx, wz, cfg.Seed, HashSalts.FloraStackHeight) % (uint)span);
+                    // A stack that is not solid starts above the water.
+                    if (fixture.ClassOf(fixture.Ids[rule.SpeciesVoxel]) != FloraVoxelClass.Solid) basePos.y = math.max(basePos.y, waterLevel);
                     for (int k = 0; k < height; k++){
                         footprint.Add(basePos + new int3(0, k, 0));
                         Put(fixture, basePos + new int3(0, k, 0), fixture.Ids[rule.SpeciesVoxel]);
@@ -574,6 +603,7 @@ namespace Engine.Tests.EditMode{
                 else{
                     TreeVariants.Remove(new int2(wx, wz));
                     Narrowed.Remove(new int2(wx, wz));
+                    SlopeSink.Remove(new int2(wx, wz));
                 }
             }
 
@@ -648,7 +678,11 @@ namespace Engine.Tests.EditMode{
             Stamped.Add(world);
             if (world.y <= SurfaceAt(world.x, world.z)) Carve(world);
             int idx = Flat(world.x - Origin.x, world.y, world.z - Origin.y);
-            if (fixture.ClassOf(_voxels[idx]) < fixture.ClassOf(voxel)) _voxels[idx] = voxel;
+            // A solid flora voxel also replaces water and ice; leaves and plants never do.
+            byte cls = fixture.ClassOf(voxel);
+            ushort current = _voxels[idx];
+            if (fixture.ClassOf(current) < cls ||
+                (cls == FloraVoxelClass.Solid && current is TestFixtures.Water or TestFixtures.Ice)) _voxels[idx] = voxel;
         }
 
         internal ushort this[int3 world] => _voxels[Flat(world.x - Origin.x, world.y, world.z - Origin.y)];

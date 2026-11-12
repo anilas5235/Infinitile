@@ -19,14 +19,15 @@ MonoBehaviour:
   SnowTopBlock: {fileID: 11400000, guid: dda8a6f1ece6d0243a39b247a2bd2a75, type: 2}
   FreezesWater: 1
   StrataBlock: {fileID: 11400000, guid: 2a1844411e45fba40a1da565a805687e, type: 2}
+  MeadowBlock: {fileID: 11400000, guid: 87c154a10b3d49b784bb1a879ff4c314, type: 2}
   BeachBlock: {fileID: 0}
   BeachHeight: 3
-  TargetHumidity: 0.3
-  TargetTemperature: 0.35
+  TargetHumidity: 0.5
+  TargetTemperature: 0.25
   TargetContinental: 0.62
   TargetErosion: 0.3
   TargetPV: 0.5
-  TargetHeight: 0.7
+  TargetHeight: 0.85
   HeightOffset: 165
   HeightAmplitude: 22
   OctaveWeights:
@@ -74,13 +75,15 @@ MonoBehaviour:
     Probability: 0.01
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
+    StopsAtTreeLine: 1
+    RequiresSoil: 1
     DensityNoise: 0
     DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 0}
     SpeciesStructure: {fileID: 0}
-    SpeciesTree: {fileID: 11400000, guid: 2904966c836544142994d7f63d04d07b, type: 2}
+    SpeciesTree: {fileID: 11400000, guid: 3d1702b628234c74a66115671b80e8b9, type: 2}
     Probability: 0.00004
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1

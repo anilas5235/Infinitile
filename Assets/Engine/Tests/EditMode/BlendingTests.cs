@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Classify;
@@ -652,6 +653,85 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(0.6, hits[1] / (double)samples, 0.01);
             Assert.AreEqual(0, hits[2]);
             Assert.AreEqual(0.3, hits[3] / (double)samples, 0.01);
+        }
+
+        [Test]
+        public void PickPatchy_OneBiomeNeedsNoNoise_AndWavelengthZeroIsTheWhiteNoisePick(){
+            for (int b = 0; b < BlendWeights.Capacity; b++)
+            for (int n = 0; n < 50; n++)
+                Assert.AreEqual(b, SurfacePick.PickPatchy(n * 7919, -n, 11u, 28f, BlendWeights.OneHot(b), BlendWeights.Capacity));
+            Assert.AreEqual(-1, SurfacePick.PickPatchy(0, 0, 11u, 28f, default, BlendWeights.Capacity));
+
+            BlendWeights w = default;
+            w[0] = 0.1f;
+            w[1] = 0.6f;
+            w[3] = 0.3f;
+            for (int n = 0; n < 5000; n++)
+                Assert.AreEqual(SurfacePick.Pick(n % 97, n / 97, 5u, HashSalts.SurfacePick, w, 4), SurfacePick.PickPatchy(n % 97, n / 97, 5u, 0f, w, 4));
+        }
+
+        [Test]
+        public void Threshold01_IsSmoothBoundedAndSymmetric(){
+            // The threshold stays within its bounds, covers them, has its mean at .5 and changes little from one
+            // column to the next (white noise changes by a third on average).
+            const int n = 512;
+            double sum = 0, step = 0;
+            float min = 1f, max = 0f;
+            int[] deciles = new int[10];
+            for (int x = 0; x < n; x++)
+            for (int z = 0; z < n; z++){
+                float u = SurfacePick.Threshold01(x - 1000, z + 300, 7u, 28f);
+                Assert.That(u, Is.InRange(SurfacePick.MinThreshold, SurfacePick.MaxThreshold));
+                sum += u;
+                min = math.min(min, u);
+                max = math.max(max, u);
+                deciles[math.min((int)(u * 10f), 9)]++;
+                step += math.abs(u - SurfacePick.Threshold01(x - 999, z + 300, 7u, 28f));
+            }
+
+            TestContext.WriteLine("threshold deciles: " + string.Join(" ", deciles.Select(c => (c * 100.0 / (n * n)).ToString("F1"))) +
+                                  $"; mean step {step / (n * n):F4}");
+            Assert.AreEqual(.5, sum / (n * n), .03);
+            Assert.AreEqual(SurfacePick.MinThreshold, min);
+            Assert.AreEqual(SurfacePick.MaxThreshold, max);
+            Assert.Less(step / (n * n), .08, "neighbouring columns share nearly the same threshold");
+            Assert.IsTrue(deciles.All(c => c > n * n / 40), "every tenth of the range occurs");
+        }
+
+        [Test]
+        public void PickPatchy_GivesPatchesNotSpeckles_AndKeepsTheShares(){
+            // A constant 50 : 50 mix: both biomes take half of the area, and a column agrees with its neighbour far
+            // more often than under white noise (where half of the pairs differ). Uneven weights shift the shares
+            // the same way for either biome.
+            const int n = 512;
+            BlendWeights even = default, uneven = default, mirrored = default;
+            even[0] = even[2] = .5f;
+            uneven[0] = mirrored[2] = .25f;
+            uneven[2] = mirrored[0] = .75f;
+            int first = 0, differ = 0, alone = 0, small = 0, large = 0;
+            for (int x = 0; x < n; x++)
+            for (int z = 0; z < n; z++){
+                int pick = SurfacePick.PickPatchy(x, z, 7u, 28f, even, 4);
+                Assert.IsTrue(pick is 0 or 2);
+                if (pick == 0) first++;
+                int east = SurfacePick.PickPatchy(x + 1, z, 7u, 28f, even, 4);
+                if (pick != east) differ++;
+                if (pick != east && pick != SurfacePick.PickPatchy(x - 1, z, 7u, 28f, even, 4) &&
+                    pick != SurfacePick.PickPatchy(x, z + 1, 7u, 28f, even, 4) &&
+                    pick != SurfacePick.PickPatchy(x, z - 1, 7u, 28f, even, 4)) alone++;
+                if (SurfacePick.PickPatchy(x, z, 7u, 28f, uneven, 4) == 0) small++;
+                if (SurfacePick.PickPatchy(x, z, 7u, 28f, mirrored, 4) == 0) large++;
+            }
+
+            double total = n * (double)n;
+            TestContext.WriteLine($"share {first / total:F3}, differing neighbours {differ / total:F3}, single columns {alone}, " +
+                                  $"share at weight .25 {small / total:F3}, at .75 {large / total:F3}");
+            Assert.AreEqual(.5, first / total, .04);
+            Assert.Less(differ / total, .1, "patches, not speckles");
+            Assert.Less(alone / total, .001, "next to no single columns");
+            Assert.Less(small / total, .35);
+            Assert.Greater(small / total, .05);
+            Assert.AreEqual(1.0, small / total + large / total, .06, "the shares mirror each other");
         }
 
         // --- Jobs -----------------------------------------------------------------------------------------------------

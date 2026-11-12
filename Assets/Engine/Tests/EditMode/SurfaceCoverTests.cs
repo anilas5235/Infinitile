@@ -25,6 +25,11 @@ namespace Engine.Tests.EditMode{
                 SnowLineHeight = 210f,
                 SnowLineNoiseAmplitude = 6f,
                 SnowLineNoiseWavelength = 48f,
+                TreeLineHeight = 195f,
+                TreeLineNoiseAmplitude = 8f,
+                TreeLineNoiseWavelength = 64f,
+                FloraDensityWavelength = new Unity.Mathematics.float4(96f, 48f, 24f, 64f),
+                FloraDensityContrast = new Unity.Mathematics.float4(2f),
                 FreezeNoiseAmplitude = noiseAmplitude,
                 FreezeNoiseWavelength = 24f,
                 StrataWarpAmplitude = 4f,
@@ -82,6 +87,90 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void IsForestFloor_FollowsTheTreeDensityNoise_OnDryColumnsOnly(){
+            // The floor lies exactly where the tree density factor reaches the biome's threshold; a higher threshold
+            // gives less of it, and columns under water or biomes without the block have none.
+            WorldGenConfig cfg = Config(0f);
+            Biome.BiomeDef forest = new(){ forestFloorBlock = FloraFixture.Granite, forestFloorDensity = 1.5f };
+            Biome.BiomeDef sparse = new(){ forestFloorBlock = FloraFixture.Granite, forestFloorDensity = 1.9f };
+            int floor = 0, open = 0, sparseFloor = 0;
+            for (int x = -600; x < 600; x += 7)
+            for (int z = -600; z < 600; z += 11){
+                float density = Engine.Scripts.WorldGen.Flora.FloraPlacement.DensityFactor(x, z, 0, cfg);
+                bool expected = density >= 1.5f;
+                Assert.AreEqual(expected, SurfaceCover.IsForestFloor(x, z, 150, forest, cfg), $"({x},{z}) density {density}");
+                Assert.AreEqual(expected, SurfaceCover.IsForestFloor(x, z, WaterLevel - 1, forest, cfg), "top face at the water surface");
+                Assert.IsFalse(SurfaceCover.IsForestFloor(x, z, WaterLevel - 2, forest, cfg), "under water");
+                Assert.IsFalse(SurfaceCover.IsForestFloor(x, z, 150, default, cfg), "no forest floor block");
+                if (expected) floor++;
+                else open++;
+                if (SurfaceCover.IsForestFloor(x, z, 150, sparse, cfg)) sparseFloor++;
+            }
+
+            Assert.Greater(floor, 1000, "dense forest");
+            Assert.Greater(open, floor, "most of the biome keeps its top block");
+            Assert.Less(sparseFloor, floor * 3 / 4, "a higher threshold shrinks the patches");
+            Assert.Greater(sparseFloor, 0);
+        }
+
+        [Test]
+        public void IsMeadow_LiesBelowTheTreeLine_OnDryColumnsOfABiomeWithAMeadow(){
+            // The meadow ends exactly where the column's top face reaches its tree line; columns under water and
+            // biomes without a meadow block have none. Without a tree line every dry column is meadow.
+            WorldGenConfig cfg = Config(0f);
+            Biome.BiomeDef alp = new(){ meadowBlock = TestFixtures.Grass, meadowGround = 1 };
+            int meadow = 0, rock = 0;
+            for (int x = -600; x < 600; x += 13)
+            for (int z = -600; z < 600; z += 17)
+            for (int h = 184; h <= 204; h++){
+                bool below = h + 1 < SurfaceCover.TreeLine(x, z, cfg);
+                Assert.AreEqual(below, SurfaceCover.IsMeadow(x, z, h, alp, cfg), $"({x},{z}) h {h}");
+                Assert.IsFalse(SurfaceCover.IsMeadow(x, z, h, default, cfg), "no meadow block");
+                if (below) meadow++;
+                else rock++;
+            }
+
+            Assert.Greater(meadow, 1000);
+            Assert.Greater(rock, 1000);
+            Assert.IsTrue(SurfaceCover.IsMeadow(5, 9, WaterLevel - 1, alp, cfg), "top face at the water surface");
+            Assert.IsFalse(SurfaceCover.IsMeadow(5, 9, WaterLevel - 2, alp, cfg), "under water");
+            Assert.IsFalse(SurfaceCover.IsMeadow(5, 9, 240, alp, cfg), "far above the line");
+            cfg.TreeLineHeight = 0f;
+            Assert.IsTrue(SurfaceCover.IsMeadow(5, 9, 240, alp, cfg), "no tree line: meadow everywhere");
+        }
+
+        [Test]
+        public void TreeLine_WobblesWithinTheAmplitude_AndZeroTurnsItOff(){
+            // Like the snow line: no straight contour, within ±amplitude, and a column is above the line exactly
+            // where its top face reaches it. It has its own noise, not the snow line's.
+            WorldGenConfig cfg = Config(0f);
+            float min = float.MaxValue, max = float.MinValue;
+            int apart = 0;
+            for (int x = -600; x < 600; x += 7)
+            for (int z = -600; z < 600; z += 11){
+                float line = SurfaceCover.TreeLine(x, z, cfg);
+                min = System.Math.Min(min, line);
+                max = System.Math.Max(max, line);
+                for (int h = 180; h <= 206; h++)
+                    Assert.AreEqual(h + 1 >= line, SurfaceCover.AboveTreeLine(x, z, h, cfg), $"({x},{z}) h {h} line {line}");
+                float snow = (SurfaceCover.SnowLine(x, z, cfg) - 210f) / 6f;
+                if (System.Math.Abs((line - 195f) / 8f - snow) > .25f) apart++;
+            }
+
+            Assert.GreaterOrEqual(min, 187f);
+            Assert.LessOrEqual(max, 203f);
+            Assert.Greater(max - min, 8f, "the line rises and falls");
+            Assert.Greater(apart, 1000, "the tree line does not follow the snow line noise");
+
+            cfg.TreeLineNoiseAmplitude = 0f;
+            Assert.AreEqual(195f, SurfaceCover.TreeLine(5, 9, cfg));
+            Assert.IsTrue(SurfaceCover.AboveTreeLine(5, 9, 194, cfg), "top face at 195");
+            Assert.IsFalse(SurfaceCover.AboveTreeLine(5, 9, 193, cfg), "top face at 194");
+            cfg.TreeLineHeight = 0f;
+            Assert.IsFalse(SurfaceCover.AboveTreeLine(5, 9, 250, cfg), "height 0: no tree line");
+        }
+
+        [Test]
         public void WaterFreezes_OnlyInBiomesWhoseWaterFreezes(){
             WorldGenConfig cfg = Config(0f);
             Assert.IsTrue(SurfaceCover.WaterFreezes(0, 0, .1f, Snowy, cfg), "cold biome");
@@ -116,6 +205,32 @@ namespace Engine.Tests.EditMode{
 
             Assert.IsFalse(SurfaceCover.InStrataBand(0, 0, 0, 2), "period 0");
             Assert.IsFalse(SurfaceCover.InStrataBand(0, 0, 7, 0), "thickness 0");
+        }
+
+        [Test]
+        public void StrataBand_CountsThePeriodsUpwards_AlsoBelowZero(){
+            // One number per period: constant across a band and the gap above it, one more per period upwards.
+            for (int shift = -9; shift <= 9; shift += 3)
+            for (int y = -30; y < 60; y++){
+                int band = SurfaceCover.StrataBand(y, shift, 7);
+                Assert.AreEqual((int)System.Math.Floor((y + shift) / 7.0), band, $"y {y} shift {shift}");
+                // The band starts where the phase is 0.
+                if (SurfaceCover.InStrataBand(y, shift, 7, 1))
+                    Assert.AreEqual(band - 1, SurfaceCover.StrataBand(y - 1, shift, 7), $"y {y} shift {shift}: a new band starts");
+            }
+
+            Assert.AreEqual(0, SurfaceCover.StrataBand(40, 2, 0), "period 0");
+        }
+
+        [Test]
+        public void StrataBlockOf_CyclesThroughThePalette(){
+            Biome.BiomeDef one = new(){ strataBlock = 5 };
+            Biome.BiomeDef three = new(){ strataBlock = 5, strataBlock1 = 6, strataBlock2 = 7, strataCount = 3 };
+            ushort[] cycle = { 5, 6, 7 };
+            for (int band = -7; band < 9; band++){
+                Assert.AreEqual(5, one.StrataBlockOf(band), $"band {band}: no palette");
+                Assert.AreEqual(cycle[((band % 3) + 3) % 3], three.StrataBlockOf(band), $"band {band}");
+            }
         }
 
         [Test]

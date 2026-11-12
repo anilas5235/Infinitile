@@ -205,8 +205,9 @@ namespace Engine.Tests.EditMode{
                 }
 
                 // DeadTree is out of every biome since 2026-11-10.
-                Assert.AreEqual(10, cfg.TreeSpecies.Length,
-                    "Oak, Birch, Bush, Spruce, Cactus, Boulder, FallenLog, JungleTree, Acacia, Willow");
+                Assert.AreEqual(14, cfg.TreeSpecies.Length,
+                    "Oak, Birch, Bush, Spruce, Cactus, Boulder, FallenLog, JungleTree, Acacia, Willow, BushSwamp, " +
+                    "BoulderGrey, BoulderMossy, BoulderRed");
                 for (int i = 0; i < cfg.TreeVariants.Length; i++){
                     TreeVariantDef v = cfg.TreeVariants[i];
                     if (v.TrunkHeight.y > 0) Assert.AreNotEqual(0, v.TrunkVoxel, $"variant {i}: trunk voxel");
@@ -235,8 +236,11 @@ namespace Engine.Tests.EditMode{
                 Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:Reeds")));
                 Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:Fern")));
                 Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:GrassFTallDry")));
+                // Round 2 (2026-11-10): the Swamp's own bush leaves and grass plant.
+                Assert.AreEqual(FloraVoxelClass.Leaves, cfg.VoxelClassOf(Id("std:LeavesBushSwamp")));
+                Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:GrassFSwamp")));
                 Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:StoneGrey")), "boulders never replace terrain");
-                Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:Water")), "water is never overwritten");
+                Assert.AreEqual(FloraVoxelClass.Solid, cfg.VoxelClassOf(Id("std:Water")), "leaves and plants never replace water (only solid flora voxels do)");
             }
             finally{
                 cfg.Dispose();
@@ -246,6 +250,131 @@ namespace Engine.Tests.EditMode{
         private ushort Id(string fullName){
             Assert.IsTrue(_importer.VoxelRegistry.TryGetId(fullName, out ushort id), fullName);
             return id;
+        }
+
+        [Test]
+        public void ShippedWorldGenSettings_TreesStopAtTheTreeLineAndNeedSoil(){
+            // Every tree, bush and fallen log rule of the shipped biomes ends at the tree line and needs soil;
+            // boulders, cacti and single-block plants carry neither flag. The highest tree line lies below the
+            // lowest snow line.
+            WorldGenSettings settings = AssetDatabase.LoadAssetAtPath<WorldGenSettings>(ShippedSettingsPath);
+            Assert.IsNotNull(settings, ShippedSettingsPath);
+            Assert.Greater(settings.TreeLineHeight, 0f);
+            Assert.Less(settings.TreeLineHeight + settings.TreeLineNoiseAmplitude,
+                settings.SnowLineHeight - settings.SnowLineNoiseAmplitude);
+            int trees = 0, others = 0;
+            foreach (Biome biome in settings.Biomes.Biomes)
+            foreach (FloraRule rule in biome.FloraRules){
+                string species = rule.SpeciesTree ? rule.SpeciesTree.name : "";
+                bool tree = species.Length > 0 && !species.StartsWith("Boulder") && species != "Cactus";
+                Assert.AreEqual(tree, rule.StopsAtTreeLine, $"{biome.name}: {species} StopsAtTreeLine");
+                Assert.AreEqual(tree, rule.RequiresSoil, $"{biome.name}: {species} RequiresSoil");
+                if (tree) trees++;
+                else others++;
+            }
+
+            Assert.AreEqual(19, trees, "tree rules of the shipped biomes");
+            Assert.Greater(others, 20);
+        }
+
+        [Test]
+        public void ShippedWorldGenSettings_TaigaTreesAreSpruces(){
+            // The only standing tree of the Taiga is the Spruce (no Birch, whose lime crowns stood out there); its
+            // other tree species are the fallen log and the mossy boulder.
+            WorldGenSettings settings = AssetDatabase.LoadAssetAtPath<WorldGenSettings>(ShippedSettingsPath);
+            Assert.IsNotNull(settings, ShippedSettingsPath);
+            Biome taiga = settings.Biomes.Biomes.Find(b => b.name == "Taiga");
+            Assert.IsNotNull(taiga, "Taiga");
+            List<string> species = taiga.FloraRules.Where(r => r.SpeciesTree).Select(r => r.SpeciesTree.name).ToList();
+            CollectionAssert.AreEquivalent(new[]{ "Spruce", "FallenLog", "BoulderMossy" }, species);
+        }
+
+        [Test]
+        public void ShippedWorldGenSettings_BouldersSitAThirdToAHalfInTheGround(){
+            // Every variant of the boulder species the shipped biomes plant has one radius and one sink depth, and the
+            // sink is a third to a half of the boulder's height (2 r + 1): no boulder rests on its lowest voxel.
+            WorldGenSettings settings = AssetDatabase.LoadAssetAtPath<WorldGenSettings>(ShippedSettingsPath);
+            Assert.IsNotNull(settings, ShippedSettingsPath);
+            HashSet<TreeSpecies> boulders = new();
+            foreach (Biome biome in settings.Biomes.Biomes)
+            foreach (FloraRule rule in biome.FloraRules)
+                if (rule.SpeciesTree && rule.SpeciesTree.name.StartsWith("Boulder")) boulders.Add(rule.SpeciesTree);
+            Assert.AreEqual(4, boulders.Count, "Boulder, BoulderGrey, BoulderMossy, BoulderRed");
+            foreach (TreeSpecies species in boulders){
+                bool small = false, large = false;
+                foreach (TreeVariant v in species.Variants){
+                    string id = $"{species.name} {v.Name}";
+                    Assert.AreEqual(0, v.TrunkHeight.Max, $"{id}: no trunk");
+                    Assert.AreEqual(CrownShape.Round, v.CrownShape, $"{id}: round");
+                    Assert.AreEqual(1, v.CrownBase, $"{id}: lowest layer on the ground before sinking");
+                    Assert.AreEqual(v.CrownRadius.Min, v.CrownRadius.Max, $"{id}: one radius");
+                    Assert.AreEqual(v.Sink.Min, v.Sink.Max, $"{id}: one sink depth");
+                    int height = 2 * v.CrownRadius.Max + 1, sink = v.Sink.Max;
+                    Assert.GreaterOrEqual(3 * sink, height, $"{id}: at least a third of {height} blocks in the ground");
+                    Assert.LessOrEqual(2 * sink, height, $"{id}: at most half of {height} blocks in the ground");
+                    small |= v.CrownRadius.Max == 1;
+                    large |= v.CrownRadius.Max == 2;
+                }
+
+                Assert.IsTrue(small && large, $"{species.name}: a small and a large variant");
+            }
+        }
+
+        [Test]
+        public void ShippedWorldGenSettings_MountainSprucesGrowOnItsMeadow(){
+            // The Mountain is bare stone with a meadow block: in a 4096² area at stride 8 its ground carries spruces,
+            // all of them below their tree line. Without the meadow its tree rule never grows on its own ground.
+            LoadPackages();
+            WorldGenConfig cfg = ShippedConfig(out WorldGenSettings settings);
+            const int n = 512;
+            RegionBuffers buffers = new(){
+                SurfaceSource = new NativeArray<int>(n * n, Allocator.TempJob),
+                ColumnHeight = new NativeArray<int>(n * n, Allocator.TempJob),
+                FloraSpecies = new NativeArray<ushort>(n * n, Allocator.TempJob)
+            };
+            try{
+                List<Biome> biomes = settings.ActiveBiomes().ToList();
+                int mountain = biomes.FindIndex(b => b.name == "Mountain");
+                Assert.GreaterOrEqual(mountain, 0);
+                Assert.AreEqual(biomes[mountain].StoneBlock, biomes[mountain].TopBlock, "the Mountain's own ground is stone");
+                Assert.IsNotNull(biomes[mountain].MeadowBlock, "meadow block");
+                Assert.AreNotEqual(biomes[mountain].StoneBlock, biomes[mountain].MeadowBlock);
+                // Tour 2 (2026-11-11): the steps of a meadow slope show stone and no dirt. The meadow block has the
+                // Mountain's stone tile below and a stone side with the grass rim, and the block under it is stone.
+                Voxel meadowVoxel = biomes[mountain].MeadowBlock;
+                Assert.AreEqual(biomes[mountain].StoneBlock, biomes[mountain].UnderBlock, "stone under the meadow");
+                Assert.AreEqual(biomes[mountain].StoneBlock.all, meadowVoxel.bottom, "meadow block: stone tile below");
+                Assert.AreEqual("stone_grass_taiga", meadowVoxel.side ? meadowVoxel.side.name : null, "meadow block: stone side");
+                Assert.AreEqual(0, cfg.Biomes[mountain].soilGround);
+                Assert.AreEqual(Id(biomes[mountain].MeadowBlock.GetFullName().ToString()), cfg.Biomes[mountain].meadowBlock);
+                int spruce = System.Array.IndexOf(settings.FloraSpeciesNames(), "Spruce");
+                Assert.Greater(spruce, 0, "Spruce species id");
+
+                WorldGenRequest request = new(){ Config = cfg, Origin = new int2(-2048, -2048), Size = new int2(n, n), Stride = 8 };
+                WorldGenApi.SampleRegion(request, ref buffers).Complete();
+                int ground = 0, meadow = 0, spruces = 0;
+                for (int i = 0; i < n * n; i++){
+                    if (buffers.SurfaceSource[i] != mountain) continue;
+                    int x = request.Origin.x + i % n * request.Stride, z = request.Origin.y + i / n * request.Stride;
+                    ground++;
+                    bool isMeadow = SurfaceCover.IsMeadow(x, z, buffers.ColumnHeight[i], cfg.Biomes[mountain], cfg);
+                    if (isMeadow) meadow++;
+                    if (buffers.FloraSpecies[i] != spruce) continue;
+                    Assert.IsTrue(isMeadow, $"({x},{z}) h {buffers.ColumnHeight[i]}: spruce off the meadow");
+                    spruces++;
+                }
+
+                TestContext.WriteLine($"Mountain ground {ground} sampled columns, meadow {meadow}, spruce anchors {spruces}");
+                Assert.Greater(meadow, ground / 10, "a good part of the Mountain lies below the tree line");
+                Assert.Less(meadow, ground, "rock above the tree line");
+                Assert.Greater(spruces, 0, "spruces on Mountain ground");
+            }
+            finally{
+                buffers.SurfaceSource.Dispose();
+                buffers.ColumnHeight.Dispose();
+                buffers.FloraSpecies.Dispose();
+                cfg.Dispose();
+            }
         }
 
         [Test]

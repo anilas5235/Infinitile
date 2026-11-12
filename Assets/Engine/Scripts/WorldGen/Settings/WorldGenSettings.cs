@@ -28,6 +28,11 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Tooltip("B_mat: material blend width in blocks (DistanceBlend only; material-stage DistortedBoundary is a one-hot warp).")]
         public float MaterialBlendWidth = 32f;
 
+        [Tooltip("Wavelength in blocks of the border noise: inside a blend zone the surface material follows this noise, " +
+                 "so two materials meet in tongues and patches of about half this size. 0: a per-block mix (white noise).")]
+        [Min(0f)]
+        public float MaterialBorderWavelength = 28f;
+
         [Tooltip("σ_mat: material blend width in normalised parameter units (ParameterSpaceWeighting).")]
         public float MaterialSigma = 0.04f;
 
@@ -178,6 +183,18 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Tooltip("Wavelength of the snow line noise in blocks.")]
         public float SnowLineNoiseWavelength = 48f;
 
+        [Tooltip("Tree line in blocks: flora rules with Stops At Tree Line grow only where the top face of their column " +
+                 "lies below this height, plus the tree line noise. Keep it below the snow line. 0: no tree line.")]
+        [Min(0f)]
+        public float TreeLineHeight = 195f;
+
+        [Tooltip("Amplitude in blocks of the noise on the tree line, so the forest edge is no straight contour.")]
+        [Min(0f)]
+        public float TreeLineNoiseAmplitude = 8f;
+
+        [Tooltip("Wavelength of the tree line noise in blocks.")]
+        public float TreeLineNoiseWavelength = 64f;
+
         [Tooltip("Amplitude of the noise on the effective temperature; it makes ice edges ragged.")]
         [Min(0f)]
         public float FreezeNoiseAmplitude = 0.04f;
@@ -307,6 +324,8 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (!IsPositiveFinite(FreezeNoiseWavelength)) yield return (nameof(FreezeNoiseWavelength), FreezeNoiseWavelength);
             if (!IsPositiveFinite(SnowLineNoiseWavelength))
                 yield return (nameof(SnowLineNoiseWavelength), SnowLineNoiseWavelength);
+            if (!IsPositiveFinite(TreeLineNoiseWavelength))
+                yield return (nameof(TreeLineNoiseWavelength), TreeLineNoiseWavelength);
             if (!IsPositiveFinite(StrataWarpWavelength)) yield return (nameof(StrataWarpWavelength), StrataWarpWavelength);
             if (!IsPositiveFinite(BeachWavelength)) yield return (nameof(BeachWavelength), BeachWavelength);
             if (!IsPositiveFinite(TreesDensityWavelength)) yield return (nameof(TreesDensityWavelength), TreesDensityWavelength);
@@ -349,6 +368,9 @@ namespace Engine.Scripts.WorldGen.Settings{
             bool heightUsed = biomeFirst && heightMethod != BlendMethod.None;
             if (MaterialMethod == BlendMethod.DistanceBlend && !IsPositiveFinite(MaterialBlendWidth))
                 yield return (nameof(MaterialBlendWidth), MaterialBlendWidth);
+            // 0 is allowed: the per-block mix.
+            if (MaterialMethod != BlendMethod.None && !(MaterialBorderWavelength >= 0f && !float.IsInfinity(MaterialBorderWavelength)))
+                yield return (nameof(MaterialBorderWavelength), MaterialBorderWavelength);
             if (heightUsed && heightMethod is BlendMethod.DistanceBlend or BlendMethod.DistortedBoundary && !IsPositiveFinite(HeightBlendWidth))
                 yield return (nameof(HeightBlendWidth), HeightBlendWidth);
             if (MaterialMethod == BlendMethod.ParameterSpaceWeighting && !IsPositiveFinite(MaterialSigma))
