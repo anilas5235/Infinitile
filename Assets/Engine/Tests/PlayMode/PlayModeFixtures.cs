@@ -122,7 +122,10 @@ namespace Engine.Tests.PlayMode{
                 ChunkPrefab = chunkPrefab,
                 DrawDistance = drawDistance
             };
-            settings.Scheduler = new SchedulerSettings();
+            // Fixed sizes for the rigs, whatever their draw distance is
+            settings.Scheduler = new SchedulerSettings{
+                meshingBatchSize = 4, partitionBuildBatchSize = 4, referenceDrawDistance = 0
+            };
             settings.Renderer = new RendererSettings();
             return settings;
         }

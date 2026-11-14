@@ -1,4 +1,5 @@
-﻿using Engine.Scripts.Jobs.ColliderBake;
+﻿using System;
+using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.World;
@@ -11,6 +12,7 @@ namespace Engine.Scripts.Jobs.Core{
     /// </summary>
     internal class ColliderJobStateHandler : JobStateHandler<int3>{
         private readonly ColliderBakeScheduler _colliderBakeScheduler;
+        private readonly Func<PriorityUtil.Focus, int3, bool> _outsideWindow; // created once: FocusUpdate must not allocate
 
         /// <summary>
         ///     Initializes a new instance of the ColliderJobStateHandler class.
@@ -23,16 +25,19 @@ namespace Engine.Scripts.Jobs.Core{
             ColliderBakeScheduler colliderBakeScheduler)
             : base(settings, chunkManager, chunkPool){
             _colliderBakeScheduler = colliderBakeScheduler;
+            _outsideWindow = (focus, pos) => !IsPartitionStillRelevant(pos, focus);
             int side = 2 * settings.Chunk.UpdateDistance + 1;
             Reserve(side * side * VoxelConstants.PartitionsPerChunk, settings.Scheduler.colliderBatchSize);
         }
 
         /// <summary>
-        ///     Updates focus and reprioritizes all queued partitions based on distance from focus.
+        ///     Updates focus: drops the queued partitions that left the update distance and reprioritizes the rest
+        ///     based on distance from focus.
         /// </summary>
         /// <param name="focus">The new focus position.</param>
         public override void FocusUpdate(PriorityUtil.Focus focus){
             WakeUp();
+            PruneQueue(focus, _outsideWindow);
             // Static lambda with explicit state instead of a closure capturing the focus
             Queue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.DistPriority(ref pos, ref f));
         }

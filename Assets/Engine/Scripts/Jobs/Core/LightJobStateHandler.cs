@@ -1,3 +1,4 @@
+using System;
 using Engine.Scripts.Jobs.Light;
 using Engine.Scripts.Settings;
 using Engine.Scripts.World;
@@ -11,12 +12,14 @@ namespace Engine.Scripts.Jobs.Core{
     internal class LightJobStateHandler : JobStateHandler<int2>{
         private readonly LightScheduler _lightScheduler;
         private readonly MeshJobStateHandler _meshJobHandler;
+        private readonly Func<PriorityUtil.Focus, int2, bool> _outsideWindow; // created once: FocusUpdate must not allocate
 
         public LightJobStateHandler(VoxelEngineSettings settings, ChunkManager chunkManager, ChunkPool chunkPool,
             LightScheduler lightScheduler, MeshJobStateHandler meshJobHandler) :
             base(settings, chunkManager, chunkPool){
             _lightScheduler = lightScheduler;
             _meshJobHandler = meshJobHandler;
+            _outsideWindow = (focus, pos) => !IsChunkStillRelevant(pos, focus);
             int side = 2 * LightDistance + 1;
             Reserve(side * side, settings.Scheduler.lightBatchSize);
         }
@@ -24,8 +27,12 @@ namespace Engine.Scripts.Jobs.Core{
         /// <summary>The ring the light job can serve: each lit chunk needs its neighbours' voxel data.</summary>
         private int LightDistance => math.max(0, Settings.Chunk.LoadDistance - 1);
 
+        /// <summary>
+        ///     Updates focus: drops the queued chunks that left the light distance and reprioritizes the rest.
+        /// </summary>
         public override void FocusUpdate(PriorityUtil.Focus focus){
             WakeUp();
+            PruneQueue(focus, _outsideWindow);
             // Static lambda with explicit state instead of a closure capturing the focus
             Queue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.DistPriority(ref pos, ref f));
         }

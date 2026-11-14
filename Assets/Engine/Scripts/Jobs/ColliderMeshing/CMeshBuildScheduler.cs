@@ -28,6 +28,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         private readonly ChunkPool _chunkPool;
         private readonly VoxelRegistry _voxelRegistry;
         private readonly VoxelWorld _world;
+        private readonly int _buildBacklogLimit; // waiting GPU builds up to which the next batch is dispatched
 
         /// <summary>
         ///     Indicates whether the scheduler is ready to accept a new list of mesh build jobs.
@@ -51,6 +52,18 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         // Targets for results that Complete drops (chunk unloaded or partition reclaimed during the job)
         private readonly List<Mesh> _discardMeshes = new();
 
+        // The partitions of a batch whose mesh was applied, for the pass over the applied meshes
+        private readonly List<(int3 pos, ChunkPartition partition)> _applied;
+
+        /// <summary>Partitions that got a mesh from a mesh job since the world was built.</summary>
+        internal int MeshedPartitions{ get; private set; }
+
+        /// <summary>Partitions without a voxel that became active without a mesh job and without a GPU build.</summary>
+        internal int PartitionsWithoutMesh{ get; private set; }
+
+        /// <summary>Meshed partitions whose collider mesh came out empty, so they needed no bake.</summary>
+        internal int PartitionsWithoutBake{ get; private set; }
+
         /// <summary>
         ///     Initializes a new instance of the <see cref="CMeshBuildScheduler" /> class.
         /// </summary>
@@ -70,15 +83,19 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             _chunkPool = chunkPool;
             _voxelRegistry = voxelRegistry;
             _world = world;
+            // Both follow the draw distance and are fixed here, when the world is built
+            int drawDistance = settings.Chunk.DrawDistance;
+            int meshBatch = settings.Scheduler.MeshBatchSizeAt(drawDistance);
+            _buildBacklogLimit = 2 * settings.Scheduler.BuildSlotsAt(drawDistance);
 
             _colliderVertexParams = CVertex.CreateLayout(Allocator.Domain);
 
             // One result per job of a batch; a parallel writer cannot grow the map, so it is sized from the
             // batch size (and grown in Start for a larger batch) instead of the draw distance.
-            _results = new NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult>(
-                math.max(1, settings.Scheduler.meshingBatchSize), Allocator.Domain);
+            _results = new NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult>(meshBatch, Allocator.Domain);
             _jobs = new NativeList<int3>(Allocator.Domain);
-            _colliderMeshes = new List<Mesh>(math.max(1, settings.Scheduler.meshingBatchSize));
+            _colliderMeshes = new List<Mesh>(meshBatch);
+            _applied = new List<(int3, ChunkPartition)>(meshBatch);
 
             // The job reads chunk data through the accessor; finish it before the manager edits or disposes a chunk.
             _chunkManager.AccessorChunkWriting += CompleteIfRunning;
@@ -88,6 +105,13 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         ///     Gets a value indicating whether the currently scheduled mesh build jobs have completed.
         /// </summary>
         internal bool IsComplete => _handle.IsCompleted;
+
+        /// <summary>
+        ///     True while more partitions of earlier batches wait in the renderer for a GPU build slot than two rounds
+        ///     of its slots take: the slots do not run empty between two mesh batches, and the waiting list stays
+        ///     short enough to follow the focus. Always false without a renderer.
+        /// </summary>
+        internal bool RendererBehind => _world.PendingPartitionBuilds > _buildBacklogLimit;
 
         /// <summary>
         ///     Starts a mesh build job for the given list of chunk positions.
@@ -165,6 +189,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
                 partition.MarkMeshChanged(); // a bake of the previous mesh is stale
                 _colliderMeshes[result.Index] = partition.ColliderMesh;
                 partition.ColliderMesh.bounds = result.ColliderBounds;
+                _applied.Add((pos, partition));
             }
 
             // Every entry of the mesh data array needs a target mesh
@@ -175,6 +200,18 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             );
             _colliderMeshes.Clear();
             for (int i = 0; i < discarded; i++) _discardMeshes[i].Clear();
+
+            // A mesh without a vertex (water, plants, or blocks with no open face) needs no bake: the partition
+            // has no collider, and one from before its last solid face went is removed here.
+            MeshedPartitions += _applied.Count;
+            for (int i = 0; i < _applied.Count; i++){
+                (int3 pos, ChunkPartition partition) = _applied[i];
+                if (partition.ColliderMesh.vertexCount > 0) continue;
+                MarkCollidableWithoutCollider(pos, partition);
+                PartitionsWithoutBake++;
+            }
+
+            _applied.Clear();
 
 #if VOXEL_TIMING_LOGS
             double totalTime = (Time.realtimeSinceStartupAsDouble - start) * 1000;
@@ -199,6 +236,31 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
 #else
             StopRecord();
 #endif
+        }
+
+        /// <summary>
+        ///     Makes a partition without a voxel active without a mesh job: it has no geometry (every face belongs
+        ///     to the voxel it is a face of) and no collider, so the pooled partition, cleared by the claim, is
+        ///     already its final state. No GPU build is requested and no bake is needed. The partition counts in
+        ///     the pool like a meshed one, so the pool evicts as before; an edit that places a block in it flags it
+        ///     for remeshing, and it is then meshed like any other.
+        /// </summary>
+        internal void ApplyEmpty(int3 pos){
+            _chunkManager.ReMeshStarted(pos);
+            // Already active: its mesh is empty, because a partition that ever held a voxel keeps its bit
+            if (_chunkPool.IsPartitionActive(pos) || !_chunkManager.IsChunkLoaded(pos.xz)) return;
+
+            ChunkPartition partition = _chunkPool.GetOrClaimPartition(pos);
+            // The claim reclaims the farthest partition of a full pool, which may be this one
+            if (!_chunkPool.IsPartitionActive(pos)) return;
+            MarkCollidableWithoutCollider(pos, partition);
+            PartitionsWithoutMesh++;
+        }
+
+        private void MarkCollidableWithoutCollider(int3 pos, ChunkPartition partition){
+            _chunkPool.ColliderBaked(pos);
+            _chunkManager.ReCollidedPartition(pos);
+            partition.ApplyColliderMesh(); // an empty mesh removes the collider
         }
 
         /// <summary>

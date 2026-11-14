@@ -181,6 +181,32 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void ChunkJob_MarksExactlyThePartitionsThatHoldAVoxel(){
+            // The mesh stage builds nothing for a partition whose bit is clear, so a bit must never be missing; the
+            // job adds whole runs, so no bit is set without a voxel either.
+            int withoutVoxels = 0;
+            foreach (KeyValuePair<int2, ChunkVoxelData> pair in _chunks){
+                ChunkVoxelData data = pair.Value;
+                for (int partition = 0; partition < PartitionsPerChunk; partition++){
+                    bool holdsVoxel = false;
+                    for (int x = 0; x < ChunkWidth && !holdsVoxel; x++)
+                    for (int z = 0; z < ChunkDepth && !holdsVoxel; z++)
+                    for (int y = partition * PartitionHeight; y < (partition + 1) * PartitionHeight; y++){
+                        if (data.GetVoxel(new int3(x, y, z)) == 0) continue;
+                        holdsVoxel = true;
+                        break;
+                    }
+
+                    Assert.AreEqual(holdsVoxel, data.PartitionHasVoxels(partition),
+                        $"chunk {pair.Key}, partition {partition}");
+                    if (!holdsVoxel) withoutVoxels++;
+                }
+            }
+
+            Assert.Greater(withoutVoxels, 0, "the sky above the terrain holds partitions without a voxel");
+        }
+
+        [Test]
         public void SampleSlice_RejectsBadRangeAndShortOutput(){
             WorldGenRequest request = new(){ Config = _config.WorldGen, Origin = int2.zero, Size = new int2(8, 1), Stride = 1 };
             NativeArray<ushort> voxels = new(8 * 10, Allocator.TempJob);

@@ -78,6 +78,13 @@ namespace Engine.Scripts.World{
         }
 
         /// <summary>
+        ///     Partitions that wait in the renderer for a free GPU build slot; the renderer keeps the number current
+        ///     (0 without a renderer). The mesh stage holds its next batch while the renderer is behind, see
+        ///     <see cref="CMeshBuildScheduler.RendererBehind" />.
+        /// </summary>
+        internal int PendingPartitionBuilds{ get; set; }
+
+        /// <summary>
         ///     Gets the voxel ID at the given world voxel position.
         /// </summary>
         /// <param name="position">World voxel position.</param>
@@ -103,7 +110,10 @@ namespace Engine.Scripts.World{
             return ChunkManager.IsChunkLoaded(VoxelConstants.WorldToChunkPos(position));
         }
 
-        /// <summary>True if the partition at <paramref name="pos" /> is active and has its collider baked.</summary>
+        /// <summary>
+        ///     True if the partition at <paramref name="pos" /> is active and its collider is ready: baked, or known
+        ///     to be empty (a partition without a solid open face has no collider and needs no bake).
+        /// </summary>
         /// <param name="pos">Partition position.</param>
         public bool IsCollidable(int3 pos){
             return _chunkPool.IsPartitionActive(pos) && _chunkPool.IsCollidable(pos);

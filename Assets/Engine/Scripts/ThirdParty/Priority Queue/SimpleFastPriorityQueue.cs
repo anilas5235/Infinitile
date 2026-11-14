@@ -31,6 +31,9 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         private readonly Stack<SimpleNode> _nodePool = new();
         private readonly Stack<List<SimpleNode>> _listPool = new();
 
+        // Items picked by RemoveAll, kept so the pass does not allocate
+        private readonly List<TItem> _removeScratch = new();
+
         /// <summary>
         ///     Returns the number of nodes in the queue.
         ///     O(1)
@@ -60,6 +63,27 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
             _itemToNodesCache.EnsureCapacity(capacity);
             for (int i = _nodePool.Count + _queue.Count; i < capacity; i++) _nodePool.Push(new SimpleNode(default));
             for (int i = _listPool.Count + _itemToNodesCache.Count; i < capacity; i++) _listPool.Push(new List<SimpleNode>(1));
+            if (_removeScratch.Capacity < capacity) _removeScratch.Capacity = capacity;
+        }
+
+        /// <summary>
+        ///     Removes every item <paramref name="match" /> returns true for and returns how many were removed.
+        ///     O(n + k log n) for k removed items; does not allocate within the reserved capacity. Null items are
+        ///     not visited.
+        /// </summary>
+        public int RemoveAll<TState>(TState state, Func<TState, TItem, bool> match){
+            _removeScratch.Clear();
+            foreach (KeyValuePair<TItem, IList<SimpleNode>> pair in _itemToNodesCache)
+                if (match(state, pair.Key)) _removeScratch.Add(pair.Key);
+
+            int removed = _removeScratch.Count;
+            for (int i = 0; i < removed; i++){
+                TItem item = _removeScratch[i];
+                while (_itemToNodesCache.ContainsKey(item)) Remove(item); // every copy of the item
+            }
+
+            _removeScratch.Clear();
+            return removed;
         }
 
         /// <summary>

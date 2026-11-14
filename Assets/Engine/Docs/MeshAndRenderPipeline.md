@@ -660,3 +660,182 @@ Trade-offs:
 
 - The registry, the voxel def buffer and the quad buffer grow by the variants; nothing per chunk grows.
 - Adding or removing a rotatable voxel shifts every later variant id, which is why ids are never stored.
+
+# Version 1.8 (Paced Partition Builds)
+
+## The Mesh Step Follows the GPU Build Slots
+
+```mermaid
+flowchart LR
+    Q[Mesh queue
+    nearest first,
+    inside the draw window] -->|batch, only while
+    pending <= 2 x slots| J[CMeshBuildJob
+    collider mesh]
+    J --> P[Renderer pending list
+    first in, first out]
+    P --> S[GPU build slots
+    partitionBuildBatchSize]
+    S -->|read-back, a few frames| R[Pages + draw]
+    P -. pending count .-> Q
+```
+
+### Description
+
+A meshed partition takes two things: the collider mesh job on the CPU and the point build on the GPU. The renderer
+builds one partition per slot (`SchedulerSettings.partitionBuildBatchSize` slots, each with its own counter
+buffers of about 8 MB) and a slot is busy until its read-back returns, a few frames later. The mesh step used to
+hand over its batches without looking at the renderer.
+
+- **Pacing.** The renderer reports the number of partitions that wait for a slot
+  (`VoxelWorld.PendingPartitionBuilds`). The mesh step dispatches its next batch only while at most two rounds of
+  slots wait (`CMeshBuildScheduler.RendererBehind`). Two rounds keep the slots busy between two mesh batches; the
+  rest of the backlog stays in the mesh queue, which is re-sorted around the focus and pruned to the draw window
+  on every focus update. The renderer's list is first in, first out and cannot follow the focus.
+- **Throughput.** With the scheduler of `ChunkPipeline.md` ("Scheduling") the mesh step is no longer bound to one
+  batch per twelve frames. The GPU build slots are the limit now: a slot finishes a partition about every second
+  frame. So the shipped settings went from a mesh batch of 8 with 4 slots to 16 with 8, a mesh batch being two
+  rounds of slots. Fresh world at draw distance 12 and 60 frames per second (2026-11-14):
+
+  | Scheduler | Mesh batch / slots | Frames | Seconds | Partitions per frame |
+  | --- | --- | --- | --- | --- |
+  | old (one sub-step every fourth frame) | 8 / 4 | 7553 | 125.9 | 0.66 |
+  | work-conserving | 8 / 4 | 2532 | 42.8 | 1.98 |
+  | work-conserving | 16 / 8 (shipped) | 1345 | 22.4 | 3.72 |
+  | work-conserving | 32 / 16 | 1037 | 17.3 | 4.82 |
+
+  With 32 / 16 the collider bake becomes the limit (its queue peaks at 2802 in a flight) and applying a mesh
+  batch of 32 takes up to 21 ms of main-thread time in one frame, against 12 ms with 16.
+- **Without a renderer** (EditMode tests, a disabled renderer) the count is 0 and the mesh step never waits.
+
+Trade-offs:
+
+- The collider mesh of a partition is produced by the same batch as its GPU build request, so the pacing also
+  delays collider meshes behind the GPU builds. Near partitions come first in both, so the focus column is still
+  collidable first.
+- More slots raise the throughput at about 8 MB of GPU memory per slot: 66 MB for the 8 shipped slots, 33 MB
+  before.
+
+# Version 1.9 (Sizes From the Draw Distance, Partitions Without Voxels)
+
+## Mesh Batch and Build Slots Follow the Draw Distance
+
+### Description
+
+The mesh batch and the GPU build slots only have to be as large as the draw distance needs. Flying across a chunk
+border exposes one row of the draw window, `2 x DrawDistance + 1` chunks, so that side length is the work the mesh
+step has to keep up with.
+
+- **Rule.** `SchedulerSettings.meshingBatchSize` and `partitionBuildBatchSize` are given for
+  `referenceDrawDistance` (shipped: 16 and 8 at 12). `MeshBatchSizeAt(drawDistance)` and `BuildSlotsAt(drawDistance)`
+  scale them with the side of the draw window, rounded to the nearest, at least 1:
+
+  | Draw distance | 2 | 4 | 6 | 8 | 12 | 16 | 24 | 40 |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | Mesh batch | 3 | 6 | 8 | 11 | 16 | 21 | 31 | 32 |
+  | GPU build slots | 2 | 3 | 4 | 5 | 8 | 11 | 16 | 16 |
+  | GPU memory of the slots (MB) | 17 | 25 | 33 | 41 | 66 | 91 | 132 | 132 |
+
+- **Caps.** Scaling up stops at a mesh batch of 32 and 16 slots (`MaxScaledMeshBatchSize`, `MaxScaledBuildSlots`):
+  beyond that the collider bake and the main-thread time of applying one batch are the limit (version 1.8). A value
+  the asset sets above a cap is used as it is.
+- **When.** Both are read once, when the world is built: `CMeshBuildScheduler` sizes its result map with the batch
+  and takes its pacing limit (two rounds of slots) from the slots, `VoxelWorldRenderer` creates one point builder
+  with its GPU buffers per slot (`VoxelWorldRenderer.BuildSlots`). A draw distance changed in a running world needs
+  a new world, as it did before.
+- **No scaling.** `referenceDrawDistance = 0` uses the two values as they are; the test rigs do that.
+- **Other batch sizes stay fixed.** Data, light and collider bake did not limit a fresh world or a flight at draw
+  distance 6 or 12, so they are not scaled.
+- **Why these sizes.** They are the smallest that keep up with a sprint flight (80 units per second) and have the
+  first build over well inside 20 s. Measured in the Editor without a frame cap (2026-11-14; a player build is
+  faster): the world is built while the player stands, then the flight runs for 30 s.
+
+  | Draw distance | Mesh batch / slots | World built after | Mesh queue in flight: peak / at the end | Meshed share of the draw window in flight | Flight frame ms p95 / p99 |
+  | --- | --- | --- | --- | --- | --- |
+  | 12 | 8 / 4 | 10.7 s | 3070 / 2643 | 0.58 | 13.9 / 16.3 |
+  | 12 | 12 / 6 | 7.3 s | 1644 / 1195 | 0.80 | 15.0 / 17.1 |
+  | 12 | 16 / 8 (derived) | 5.6 s | 336 / 156 | 0.97 | 14.1 / 16.4 |
+  | 6 | 4 / 2 | 3.6 s | 236 / 82 | 0.93 | 7.7 / 10.2 |
+  | 6 | 8 / 4 (derived) | 2.5 s | 131 / 0 | 0.98 | 7.4 / 10.1 |
+  | 6 | 16 / 8 | 1.4 s | 88 / 0 | 0.99 | 7.8 / 10.5 |
+
+  With smaller sizes the mesh queue grows during the flight and the edge of the draw window stays unbuilt. The
+  frame time of the flight does not depend on the sizes: a larger batch is not what makes a frame long.
+- **Frame time (goal: 8.33 ms at the 95th percentile, stable from 20 s after the world start).** Standing, 20 s to
+  40 s after the start: p95 5.1 ms, p99 6.7 ms, 13 of 5082 frames over 8.33 ms at draw distance 12; p95 4.6 ms and
+  no frame over 8.33 ms at 6. In the sprint flight the goal is met at 6 (p95 7.4 ms, 3 % of the frames over
+  8.33 ms) and missed at 12 (p95 14.1 ms, 42 % over 8.33 ms, 0.8 % over 16.67 ms). The long frames come from
+  main-thread work that is done in one piece: applying a data batch (2.4 ms on average, up to 8.7 ms) and applying
+  a mesh batch (2.4 ms, up to 5.9 ms). Bounding that work per frame by time is a later step.
+
+## Partitions Without Voxels Are Not Built
+
+```mermaid
+flowchart LR
+    Q[Mesh queue] --> V{Voxel in the
+    partition?}
+    V -->|no: bit clear| E[Active at once
+    empty mesh, collidable]
+    V -->|yes| J[CMeshBuildJob
+    + GPU build request]
+    J --> C{Collider mesh
+    has vertices?}
+    C -->|no| N[Collidable
+    without bake]
+    C -->|yes| B[Collider bake]
+    S[SetVoxel places a block] -->|sets the bit,
+    flags the partition| Q
+```
+
+### Description
+
+At draw distance 12 almost half of the partitions of the draw window hold only air (the sky above the terrain).
+They used to go through the whole mesh step: a mesh job, a GPU build slot with its read-back, and a place in the
+collider bake queue, all for nothing to draw and nothing to collide with.
+
+- **Occupancy bit.** `ChunkVoxelData.OccupiedPartitions` has one bit per partition of the chunk. `AddVoxels`
+  (generation) and `SetVoxel` (edits) are the only writers of voxel data; both set the bit of every partition a
+  voxel that is not air goes into. The bit is never cleared: a partition the player dug empty is still built, to an
+  empty mesh.
+- **Why air alone decides.** Every face belongs to the voxel it is a face of, in the point build and in the
+  collider mesh. A partition without a voxel therefore has no geometry and no collider, whatever its neighbours
+  hold.
+- **What is skipped, per stage:**
+
+  | Partition | Mesh job | GPU build | Collider bake |
+  | --- | --- | --- | --- |
+  | no voxel (bit clear) | skipped | skipped (not requested) | skipped |
+  | voxels, collider mesh without a vertex (water, plants, no open solid face) | runs | runs | skipped |
+  | voxels with an open solid face | runs | runs | runs |
+
+- **Mesh step.** `MeshJobStateHandler` sorts the partitions it takes from the queue: those with voxels fill the
+  batch, those without are claimed in the pool and are active at once (`CMeshBuildScheduler.ApplyEmpty`). They do
+  not count against the batch; one turn takes at most four batches of them, so a turn stays bounded.
+- **Collider state.** A partition without a collider is marked collidable right away
+  (`MarkCollidableWithoutCollider`), so `VoxelWorld.IsCollidable` means "the collider is ready: baked, or known to
+  be empty" and nothing waits for a bake that never comes. A meshed partition whose last solid face went loses its
+  old collider the same way, without a bake.
+- **Renderer.** No GPU build is requested for a partition without a voxel, so the renderer has no pending entry
+  and no slot for it; it never waits for one.
+- **Wake-up.** `SetVoxel` sets the bit and always flags the edited partition, so the first block placed in an air
+  partition meshes it. `ChunkManager.FlagReMesh` (light changes) and the flags for the neighbours of an edit skip a
+  partition without a voxel: it has no face that could change.
+- **Pool.** A skipped partition is claimed like a meshed one, so the pool's count, its priority threshold and the
+  eviction are unchanged, and "world built" (every partition of the draw window active) is reached as before.
+- **Measured** (Editor, draw distance 12, 60 frames per second, 2026-11-14): of the 5000 partitions of a fresh
+  world 2398 (48 %) hold no voxel and take no mesh job and no GPU build; 495 more need no bake.
+
+  | | Before the skip | With the skip |
+  | --- | --- | --- |
+  | Fresh world | 1346 frames / 22.5 s | 703 frames / 11.7 s |
+  | Fresh world: mesh queue peak / bake queue peak | 3128 / 1134 | 1661 / 483 |
+  | Sprint flight through a building world: mesh queue peak | 3503 | 2366 |
+  | Sprint flight: meshed share of the columns within 4 of the focus | 0.68 | 0.93 |
+  | World complete after the flight stops | 15.7 s | 3.6 s |
+
+Trade-offs:
+
+- The bit is conservative: it is set for a partition that holds only water or plants, and it stays set after the
+  last block is removed. Such partitions take the mesh job and the GPU build; only the bake is skipped.
+- A claim in a full pool can reclaim a pooled chunk and unload its data, so the mesh step drops the partitions of
+  the batch it is filling that lost a chunk of their neighbourhood; the next scan picks them up again.

@@ -30,6 +30,40 @@ in the 3 x 3 neighbourhood of a chunk, so each step reaches one ring less than t
 Strictly, `DrawDistance + 2` would be enough (light up to `DrawDistance + 1`, mesh up to `DrawDistance`); the extra
 ring is slack, so lit neighbours are usually ready by the time a chunk enters the draw distance.
 
+## Scheduling
+
+Each step has a `JobStateHandler` with a priority queue (nearest to the focus first) and one batch of jobs in
+flight. The scheduler gives one step per frame a turn on the main thread, so a frame never pays for two steps:
+
+- **A turn does everything the step can do now:** it collects the finished batch, refills the queue when it runs
+  low (a scan of the step's window, at the latest every fourth turn), and dispatches the next batch. A step whose
+  batch still runs has nothing to do and costs no frame.
+- **Work-conserving round robin.** The scheduler starts with the step after the one that worked last and takes the
+  first step that has work. With every step busy each gets every fourth frame; a step that is alone gets every
+  frame. (Until 2026-11 each step got every fourth frame for one of three sub-steps, twelve frames per batch,
+  whether the other steps had work or not: at draw distance 12 the mesh step took 7553 frames for a fresh world
+  while data and light were done after a fifth of them.)
+- **Queues stay inside their windows.** The focus update (every 0.5 s) removes the queued entries that left the
+  step's window before it re-sorts the rest, so no queue holds more than its window (mesh: the draw window, 5000
+  partitions at draw distance 12). Before, entries the focus had left behind stayed queued until they were
+  dequeued and thrown away; in a sprint flight the mesh queue reached 13 000.
+- **The mesh step waits for the renderer.** Every meshed partition also needs a GPU build
+  (`MeshAndRenderPipeline.md`, version 1.8). While more than two rounds of GPU build slots wait in the renderer,
+  the mesh step dispatches nothing: the partitions stay in the priority queue, which follows the focus, instead
+  of piling up in the renderer's first-in-first-out list.
+- **The mesh batch and the GPU build slots follow the draw distance.** `SchedulerSettings.MeshBatchSizeAt` and
+  `BuildSlotsAt` scale the two asset values with the side of the draw window; they are read once, when the world
+  is built (`MeshAndRenderPipeline.md`, version 1.9).
+- **A partition without a voxel is not meshed.** `ChunkVoxelData.OccupiedPartitions` has one bit per partition of
+  the chunk, set when generation or `SetVoxel` puts a voxel that is not air into it, and never cleared. The mesh
+  step takes a partition whose bit is clear from the queue and makes it active at once, with an empty mesh: no
+  mesh job, no GPU build, no collider bake. `SetVoxel` sets the bit and flags the partition, so the first block
+  placed in it meshes it like any other. Light changes and edits next to it do not flag it, because it has no
+  face (`MeshAndRenderPipeline.md`, version 1.9).
+
+`PipelineThroughputTests` (PlayMode) holds the limit on the number of frames a fresh world may take and the queue
+limits in a flight; `PipelineMeasurementTests` (explicit) prints the timings.
+
 ## Light
 
 - **Light job.** `LightJob` lights one chunk per index from the voxel data of its 3 x 3 neighbourhood

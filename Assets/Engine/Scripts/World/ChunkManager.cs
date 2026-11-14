@@ -80,7 +80,7 @@ namespace Engine.Scripts.World{
             for (int i = 0; i < _chunkStoreSize; i++) _chunkObjectPool.Push(new Chunk());
 
             _accessorMap = new NativeParallelHashMap<int2, ChunkVoxelData>(
-                settings.Scheduler.meshingBatchSize * 6,
+                settings.Scheduler.MeshBatchSizeAt(settings.Chunk.DrawDistance) * 6,
                 Allocator.Domain
             );
             _lightJobMap = new NativeParallelHashMap<int2, ChunkVoxelData>(
@@ -261,8 +261,18 @@ namespace Engine.Scripts.World{
         ///     Flags a partition of a loaded chunk for remeshing (light around it changed).
         /// </summary>
         internal void FlagReMesh(int3 partition){
-            if (!_chunks.ContainsKey(partition.xz) || !_reMeshPartitions.Add(partition)) return;
+            // A partition without a voxel has no face that could take the new light
+            if (!PartitionHasVoxels(partition) || !_reMeshPartitions.Add(partition)) return;
             OnRemeshRequested?.Invoke();
+        }
+
+        /// <summary>
+        ///     True when the partition's chunk is loaded and the partition may hold a voxel that is not air (see
+        ///     <see cref="ChunkVoxelData.OccupiedPartitions" />). A partition without one has no geometry and no
+        ///     collider whatever its neighbours hold, because every face belongs to the voxel it is a face of.
+        /// </summary>
+        internal bool PartitionHasVoxels(int3 partition){
+            return _chunks.TryGetValue(partition.xz, out Chunk chunk) && chunk.VoxelData.PartitionHasVoxels(partition.y);
         }
 
         /// <summary>
@@ -317,32 +327,40 @@ namespace Engine.Scripts.World{
             int3 localPos = GetPartitionLocalVoxelCoords(pCoords, blockPosition);
             switch (localPos.x % PartitionWidth){
                 case MinPartitionPosXYZ:
-                    _reMeshPartitions.Add(pCoords + Int3Left);
+                    ReMeshNeighbour(pCoords + Int3Left);
                     break;
                 case MaxXPartitionPos:
-                    _reMeshPartitions.Add(pCoords + Int3Right);
+                    ReMeshNeighbour(pCoords + Int3Right);
                     break;
             }
 
             switch (localPos.z % PartitionDepth){
                 case MinPartitionPosXYZ:
-                    _reMeshPartitions.Add(pCoords + Int3Backward);
+                    ReMeshNeighbour(pCoords + Int3Backward);
                     break;
                 case MaxZPartitionPos:
-                    _reMeshPartitions.Add(pCoords + Int3Forward);
+                    ReMeshNeighbour(pCoords + Int3Forward);
                     break;
             }
 
             switch (localPos.y % PartitionHeight){
                 case MinPartitionPosXYZ:
-                    _reMeshPartitions.Add(pCoords + Int3Down);
+                    ReMeshNeighbour(pCoords + Int3Down);
                     break;
                 case MaxYPartitionPos:
-                    _reMeshPartitions.Add(pCoords + Int3Up);
+                    ReMeshNeighbour(pCoords + Int3Up);
                     break;
             }
 
             OnRemeshRequested?.Invoke();
+        }
+
+        /// <summary>
+        ///     Flags a partition that borders an edited block. One without a voxel is left alone: the edit changes
+        ///     none of its faces, because it has none.
+        /// </summary>
+        private void ReMeshNeighbour(int3 partition){
+            if (PartitionHasVoxels(partition)) _reMeshPartitions.Add(partition);
         }
 
         #region API

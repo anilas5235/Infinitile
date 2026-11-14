@@ -8,9 +8,9 @@ using Unity.Mathematics;
 namespace Engine.Scripts.Jobs.Core{
     /// <summary>
     ///     Abstract base class for job state handlers that manage queues of work items with priority-based scheduling.
-    ///     Implements a three-step state machine: UpdateQueues -> JobUpdate -> CollectResults.
+    ///     One <see cref="Update" /> is one turn of the stage: collect the finished batch, look for new work, start
+    ///     the next batch. A stage whose batch still runs passes its turn on.
     /// </summary>
-    /// <typeparam name="T">The type of items in the queue (must be a struct that implements IEquatable).</typeparam>
     internal abstract class JobStateHandler<T> where T : struct, IEquatable<T>{
         /// <summary>
         ///     Reference to the chunk manager.
@@ -50,16 +50,25 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        ///     Gets the current step of the scheduler state machine.
+        ///     Turns between two scans for new work while the queue still holds a full batch. A scan visits every
+        ///     column of the stage's window, so it does not run on every turn; a queue shorter than one batch is
+        ///     scanned at once, and the handler only goes to sleep after a scan that found nothing.
         /// </summary>
-        public SchedulerStep CurrentStep{ get; private set; } = SchedulerStep.UpdateQueues;
+        private const int ScanInterval = 4;
+
+        private int _batchSize = 1;
+
+        /// <summary>Items per batch, as given to <see cref="Reserve" />.</summary>
+        protected int BatchSize => _batchSize;
+        private int _turnsSinceScan;
 
         /// <summary>
         ///     Pre-sizes the queue and the in-flight set so that filling them during flight does not allocate.
         /// </summary>
         protected void Reserve(int queueCapacity, int batchSize){
+            _batchSize = math.max(1, batchSize);
             Queue.Reserve(queueCapacity);
-            Set.EnsureCapacity(math.max(1, batchSize));
+            Set.EnsureCapacity(_batchSize);
         }
 
         /// <summary>
@@ -73,27 +82,53 @@ namespace Engine.Scripts.Jobs.Core{
         public bool Sleeping{ get; private set; }
 
         /// <summary>
-        ///     Updates the handler state machine with a new focus position.
-        ///     Processes one step of the three-step cycle based on current state.
+        ///     True while the stage may start a batch. A stage that has to wait for something outside the scheduler
+        ///     (the mesh stage waits for the renderer) keeps its queue and neither scans nor dispatches meanwhile.
+        /// </summary>
+        protected virtual bool CanDispatch => true;
+
+        /// <summary>
+        ///     One turn of the stage: applies the finished batch, scans for new work when the queue runs short (or
+        ///     every <see cref="ScanInterval" /> turns) and starts the next batch. The handler goes to sleep when a
+        ///     scan finds nothing and no batch runs.
         /// </summary>
         /// <param name="focus">The focus position (e.g., player chunk position).</param>
-        public void Update(PriorityUtil.Focus focus){
-            if (Sleeping) return;
-            switch (CurrentStep){
-                case SchedulerStep.UpdateQueues:
-                    if (EnqueueStep(focus)) CurrentStep = SchedulerStep.JobUpdate;
-                    else Sleeping = true;
-                    break;
-                case SchedulerStep.JobUpdate:
-                    if (JobUpdateStep(focus))
-                        CurrentStep = Set.Count > 0 ? SchedulerStep.CollectResults : SchedulerStep.UpdateQueues;
-                    break;
-                case SchedulerStep.CollectResults:
-                    if (CollectResultsStep()) CurrentStep = SchedulerStep.UpdateQueues;
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
+        /// <returns>
+        ///     True when the turn did main-thread work; false when the handler sleeps, its batch still runs or it
+        ///     may not dispatch, so the scheduler can give the frame to another stage.
+        /// </returns>
+        public bool Update(PriorityUtil.Focus focus){
+            if (Sleeping) return false;
+
+            bool worked = false;
+            if (Set.Count > 0){
+                if (!CollectResultsStep()) return false; // the batch still runs
+                worked = true;
             }
+
+            if (!CanDispatch) return worked;
+
+            if (Queue.Count < _batchSize || ++_turnsSinceScan >= ScanInterval){
+                _turnsSinceScan = 0;
+                worked = true;
+                if (!EnqueueStep(focus)){
+                    Sleeping = true; // nothing queued and nothing running
+                    return true;
+                }
+            }
+
+            return JobUpdateStep(focus) || worked;
+        }
+
+        /// <summary>
+        ///     Removes the queued items <paramref name="outsideWindow" /> returns true for and makes the next turn
+        ///     scan: the window moved with the focus. Without it the entries the focus left behind would stay
+        ///     queued until they reach the head of the queue, and the queue would grow past its reserved capacity
+        ///     during a flight.
+        /// </summary>
+        protected void PruneQueue(PriorityUtil.Focus focus, Func<PriorityUtil.Focus, T, bool> outsideWindow){
+            Queue.RemoveAll(focus, outsideWindow);
+            _turnsSinceScan = ScanInterval;
         }
 
         /// <summary>
@@ -112,7 +147,7 @@ namespace Engine.Scripts.Jobs.Core{
 
         /// <summary>
         ///     Enqueues new work items based on the focus position.
-        ///     Called during the UpdateQueues step.
+        ///     Called when a turn scans for work.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if items were enqueued, false if queue is empty.</returns>
@@ -121,8 +156,8 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        ///     Updates jobs and dispatches batch work to the appropriate scheduler.
-        ///     Called during the JobUpdate step.
+        ///     Dispatches the next batch to the stage's job scheduler; the batch's items are in the in-flight set.
+        ///     Called on every turn that may dispatch.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if processing completed, false if still working.</returns>
@@ -132,7 +167,7 @@ namespace Engine.Scripts.Jobs.Core{
 
         /// <summary>
         ///     Collects results from completed job batches.
-        ///     Called during the CollectResults step.
+        ///     Called at the start of a turn while a batch is in flight.
         /// </summary>
         /// <returns>True if result collection completed, false if still working.</returns>
         protected virtual bool CollectResultsStep(){

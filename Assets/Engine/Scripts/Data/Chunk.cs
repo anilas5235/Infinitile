@@ -121,7 +121,22 @@ namespace Engine.Scripts.Data{
 
     [BurstCompile]
     public struct ChunkVoxelData : IDisposable{
+        private const uint AllPartitions = (1u << PartitionsPerChunk) - 1;
+
         internal UnsafeIntervalList<ushort> Data;
+
+        /// <summary>
+        ///     Bit p is set when partition p of the chunk (its layers p x 32 to p x 32 + 31) may hold a voxel that
+        ///     is not air. A partition whose bit is clear holds only air: it has no geometry and no collider, so
+        ///     the mesh stage does not build it. The bit is set when a voxel is added or placed and never cleared;
+        ///     a partition that edits emptied again is still built (to an empty mesh).
+        /// </summary>
+        internal uint OccupiedPartitions;
+
+        /// <summary>True when partition <paramref name="partitionY" /> may hold a voxel that is not air.</summary>
+        public bool PartitionHasVoxels(int partitionY){
+            return (uint)partitionY < PartitionsPerChunk && (OccupiedPartitions & (1u << partitionY)) != 0;
+        }
 
         public UnsafeIntervalList<ushort> GetData(){
             return Data;
@@ -129,13 +144,35 @@ namespace Engine.Scripts.Data{
 
         public ChunkVoxelData(int initCapacity){
             Data = new UnsafeIntervalList<ushort>(initCapacity, Allocator.Domain);
+            OccupiedPartitions = 0;
         }
 
         /// <summary>
         ///     Adds a run of identical voxels (during initialization / generation).
         /// </summary>
         public void AddVoxels(ushort voxelId, int count){
+            if (voxelId != 0 && count > 0) MarkOccupied(Data.Length, count);
             Data.AddInterval(voxelId, count);
+        }
+
+        /// <summary>
+        ///     Sets the bits of the partitions a run of <paramref name="count" /> voxels from flat index
+        ///     <paramref name="start" /> touches. The height is the innermost axis of the flat order, so a run is a
+        ///     piece of one column, or it runs over the top of a column into the next ones.
+        /// </summary>
+        private void MarkOccupied(int start, int count){
+            if (count >= ChunkHeight){
+                OccupiedPartitions = AllPartitions;
+                return;
+            }
+
+            int end = start + count - 1;
+            int first = start % ChunkHeight / PartitionHeight;
+            int last = end % ChunkHeight / PartitionHeight;
+            uint fromFirst = AllPartitions & ~((1u << first) - 1);
+            uint upToLast = (1u << (last + 1)) - 1;
+            // In one column the run covers first..last; over a column border it covers first..top and bottom..last
+            OccupiedPartitions |= start / ChunkHeight == end / ChunkHeight ? fromFirst & upToLast : fromFirst | upToLast;
         }
 
         /// <summary>
@@ -143,6 +180,7 @@ namespace Engine.Scripts.Data{
         /// </summary>
         public bool SetVoxel(int3 pos, ushort voxelId){
             bool result = Data.Set(GetIndex(pos), voxelId);
+            if (voxelId != 0) OccupiedPartitions |= 1u << (pos.y / PartitionHeight);
             return result;
         }
 

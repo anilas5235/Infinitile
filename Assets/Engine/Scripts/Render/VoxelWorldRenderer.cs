@@ -91,6 +91,9 @@ namespace Engine.Scripts.Render{
         private bool _isDestroyed;
         private int _maxInFlight = 1;
 
+        /// <summary>Partitions this renderer builds on the GPU at the same time, each with its own point builder.</summary>
+        internal int BuildSlots => _maxInFlight;
+
         private PointBuilderHandler[] _pointBuilderHandlers;
 
         private VoxelEngineSettings _settings;
@@ -108,7 +111,9 @@ namespace Engine.Scripts.Render{
             VoxelLightingGlobals.SetDefaults(); // lit without a DayNightCycle, which overrides these per frame
             if (_settings.Renderer.skyMaterial) RenderSettings.skybox = _settings.Renderer.skyMaterial;
             UpdateSkyGlobals();
-            _maxInFlight = math.max(1, _settings.Scheduler.partitionBuildBatchSize);
+            // The build slots follow the draw distance; every slot owns a point builder with its GPU buffers, so a
+            // world with a short draw distance holds fewer of them. Fixed here, when the world is built.
+            _maxInFlight = _settings.Scheduler.BuildSlotsAt(_settings.Chunk.DrawDistance);
 
             // sized for the partition pool so the request bookkeeping does not grow during flight
             int partitionPoolSize = _settings.Chunk.DrawDistance.SquareSize() * PartitionsPerChunk;
@@ -165,6 +170,7 @@ namespace Engine.Scripts.Render{
 
             CompleteFinishedPartitionBuilds();
             StartPendingPartitionBuilds();
+            ReportPendingBuilds();
             UpdateSkyGlobals();
         }
 
@@ -230,6 +236,7 @@ namespace Engine.Scripts.Render{
             world.ChunkEvicted -= RemoveChunkData;
             world.PartitionEvicted -= RemovePartitionRenderData;
             world.PartitionBuildRequested -= UpdatePartitions;
+            world.PendingPartitionBuilds = 0; // nobody builds them while the renderer is off
         }
 
         /// <summary>
@@ -422,6 +429,13 @@ namespace Engine.Scripts.Render{
                 _requestedPartitions.Add(partition);
                 EnqueuePartitionBuild(partition);
             }
+
+            ReportPendingBuilds();
+        }
+
+        /// <summary>Tells the world how many builds wait for a slot; the mesh stage paces its batches with it.</summary>
+        private void ReportPendingBuilds(){
+            if (world != null) world.PendingPartitionBuilds = _pendingBuildSet.Count;
         }
 
         /// <summary>
