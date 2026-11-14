@@ -1,4 +1,5 @@
-﻿using Engine.Scripts.Jobs.ColliderMeshing;
+﻿using System;
+using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.World;
@@ -12,6 +13,7 @@ namespace Engine.Scripts.Jobs.Core{
     internal class MeshJobStateHandler : JobStateHandler<int3>{
         private readonly CMeshBuildScheduler _cMeshBuildScheduler;
         private readonly ColliderJobStateHandler _colliderJobHandler;
+        private readonly Func<PriorityUtil.Focus, int3, bool> _outsideWindow; // created once: FocusUpdate must not allocate
 
         /// <summary>
         ///     Initializes a new instance of the MeshJobStateHandler class.
@@ -26,20 +28,30 @@ namespace Engine.Scripts.Jobs.Core{
             base(settings, chunkManager, chunkPool){
             _cMeshBuildScheduler = cMeshBuildScheduler;
             _colliderJobHandler = colliderJobHandler;
+            _outsideWindow = (focus, pos) => !IsInDrawWindow(pos, focus);
             int side = 2 * settings.Chunk.DrawDistance + 1;
             int layers = math.min(VoxelConstants.PartitionsPerChunk, side);
             Reserve(side * side * layers, settings.Scheduler.meshingBatchSize);
         }
 
         /// <summary>
-        ///     Updates focus and reprioritizes all queued partitions based on distance from focus.
+        ///     Updates focus: drops the queued partitions that left the draw window and reprioritizes the rest based
+        ///     on distance from focus. So the queue never holds more than the window.
         /// </summary>
         /// <param name="focus">The new focus position.</param>
         public override void FocusUpdate(PriorityUtil.Focus focus){
             WakeUp();
+            PruneQueue(focus, _outsideWindow);
             // Static lambda with explicit state instead of a closure capturing the focus
             Queue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.DistPriority(ref pos, ref f));
         }
+
+        /// <summary>
+        ///     The renderer builds the geometry of every dispatched partition on the GPU, a few per frame. While it
+        ///     is behind, the next batch waits here: the partitions stay in the priority queue, which follows the
+        ///     focus, instead of piling up in the renderer's first-in-first-out list.
+        /// </summary>
+        protected override bool CanDispatch => !_cMeshBuildScheduler.RendererBehind;
 
         /// <summary>
         ///     Enqueues partitions within draw distance that need mesh generation.
@@ -152,11 +164,16 @@ namespace Engine.Scripts.Jobs.Core{
         /// <param name="prioThreshold">The priority threshold for relevance.</param>
         /// <returns>True if partition is still relevant.</returns>
         private bool IsPartitionStillRelevant(int3 position, PriorityUtil.Focus focus, float prioThreshold){
+            return IsInDrawWindow(position, focus) &&
+                   PriorityUtil.EvictionPriority(ref position, ref focus) > prioThreshold;
+        }
+
+        /// <summary>Whether a partition lies within the draw distance of the focus on every axis.</summary>
+        private bool IsInDrawWindow(int3 position, PriorityUtil.Focus focus){
             int drawDistance = Settings.Chunk.DrawDistance;
             return math.abs(position.x - focus.Pos.x) <= drawDistance &&
                    math.abs(position.z - focus.Pos.z) <= drawDistance &&
-                   math.abs(position.y - focus.Pos.y) <= drawDistance &&
-                   PriorityUtil.EvictionPriority(ref position, ref focus) > prioThreshold;
+                   math.abs(position.y - focus.Pos.y) <= drawDistance;
         }
     }
 }

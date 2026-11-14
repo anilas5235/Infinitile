@@ -165,6 +165,7 @@ namespace Engine.Scripts.Render{
 
             CompleteFinishedPartitionBuilds();
             StartPendingPartitionBuilds();
+            ReportPendingBuilds();
             UpdateSkyGlobals();
         }
 
@@ -230,6 +231,7 @@ namespace Engine.Scripts.Render{
             world.ChunkEvicted -= RemoveChunkData;
             world.PartitionEvicted -= RemovePartitionRenderData;
             world.PartitionBuildRequested -= UpdatePartitions;
+            world.PendingPartitionBuilds = 0; // nobody builds them while the renderer is off
         }
 
         /// <summary>
@@ -422,6 +424,13 @@ namespace Engine.Scripts.Render{
                 _requestedPartitions.Add(partition);
                 EnqueuePartitionBuild(partition);
             }
+
+            ReportPendingBuilds();
+        }
+
+        /// <summary>Tells the world how many builds wait for a slot; the mesh stage paces its batches with it.</summary>
+        private void ReportPendingBuilds(){
+            if (world != null) world.PendingPartitionBuilds = _pendingBuildSet.Count;
         }
 
         /// <summary>

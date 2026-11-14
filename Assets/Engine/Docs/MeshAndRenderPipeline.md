@@ -660,3 +660,58 @@ Trade-offs:
 
 - The registry, the voxel def buffer and the quad buffer grow by the variants; nothing per chunk grows.
 - Adding or removing a rotatable voxel shifts every later variant id, which is why ids are never stored.
+
+# Version 1.8 (Paced Partition Builds)
+
+## The Mesh Step Follows the GPU Build Slots
+
+```mermaid
+flowchart LR
+    Q[Mesh queue
+    nearest first,
+    inside the draw window] -->|batch, only while
+    pending <= 2 x slots| J[CMeshBuildJob
+    collider mesh]
+    J --> P[Renderer pending list
+    first in, first out]
+    P --> S[GPU build slots
+    partitionBuildBatchSize]
+    S -->|read-back, a few frames| R[Pages + draw]
+    P -. pending count .-> Q
+```
+
+### Description
+
+A meshed partition takes two things: the collider mesh job on the CPU and the point build on the GPU. The renderer
+builds one partition per slot (`SchedulerSettings.partitionBuildBatchSize` slots, each with its own counter
+buffers of about 8 MB) and a slot is busy until its read-back returns, a few frames later. The mesh step used to
+hand over its batches without looking at the renderer.
+
+- **Pacing.** The renderer reports the number of partitions that wait for a slot
+  (`VoxelWorld.PendingPartitionBuilds`). The mesh step dispatches its next batch only while at most two rounds of
+  slots wait (`CMeshBuildScheduler.RendererBehind`). Two rounds keep the slots busy between two mesh batches; the
+  rest of the backlog stays in the mesh queue, which is re-sorted around the focus and pruned to the draw window
+  on every focus update. The renderer's list is first in, first out and cannot follow the focus.
+- **Throughput.** With the scheduler of `ChunkPipeline.md` ("Scheduling") the mesh step is no longer bound to one
+  batch per twelve frames. The GPU build slots are the limit now: a slot finishes a partition about every second
+  frame. So the shipped settings went from a mesh batch of 8 with 4 slots to 16 with 8, a mesh batch being two
+  rounds of slots. Fresh world at draw distance 12 and 60 frames per second (2026-11-14):
+
+  | Scheduler | Mesh batch / slots | Frames | Seconds | Partitions per frame |
+  | --- | --- | --- | --- | --- |
+  | old (one sub-step every fourth frame) | 8 / 4 | 7553 | 125.9 | 0.66 |
+  | work-conserving | 8 / 4 | 2532 | 42.8 | 1.98 |
+  | work-conserving | 16 / 8 (shipped) | 1345 | 22.4 | 3.72 |
+  | work-conserving | 32 / 16 | 1037 | 17.3 | 4.82 |
+
+  With 32 / 16 the collider bake becomes the limit (its queue peaks at 2802 in a flight) and applying a mesh
+  batch of 32 takes up to 21 ms of main-thread time in one frame, against 12 ms with 16.
+- **Without a renderer** (EditMode tests, a disabled renderer) the count is 0 and the mesh step never waits.
+
+Trade-offs:
+
+- The collider mesh of a partition is produced by the same batch as its GPU build request, so the pacing also
+  delays collider meshes behind the GPU builds. Near partitions come first in both, so the focus column is still
+  collidable first.
+- More slots raise the throughput at about 8 MB of GPU memory per slot: 66 MB for the 8 shipped slots, 33 MB
+  before.

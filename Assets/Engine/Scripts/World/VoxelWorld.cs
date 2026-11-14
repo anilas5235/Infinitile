@@ -78,6 +78,13 @@ namespace Engine.Scripts.World{
         }
 
         /// <summary>
+        ///     Partitions that wait in the renderer for a free GPU build slot; the renderer keeps the number current
+        ///     (0 without a renderer). The mesh stage holds its next batch while the renderer is behind, see
+        ///     <see cref="CMeshBuildScheduler.RendererBehind" />.
+        /// </summary>
+        internal int PendingPartitionBuilds{ get; set; }
+
+        /// <summary>
         ///     Gets the voxel ID at the given world voxel position.
         /// </summary>
         /// <param name="position">World voxel position.</param>

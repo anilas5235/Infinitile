@@ -31,7 +31,7 @@ MonoBehaviour:
     shadows: 0
   Scheduler:
     chunkGenBatchSize: 8
-    meshingBatchSize: 8
-    partitionBuildBatchSize: 4
+    meshingBatchSize: 16
+    partitionBuildBatchSize: 8
     colliderBatchSize: 6
     lightBatchSize: 8

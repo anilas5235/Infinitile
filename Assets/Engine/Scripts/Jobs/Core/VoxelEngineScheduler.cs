@@ -9,7 +9,9 @@ using Unity.Mathematics;
 
 namespace Engine.Scripts.Jobs.Core{
     /// <summary>
-    ///     Central scheduler that orchestrates data, light, mesh, and collider jobs as a round-robin state machine.
+    ///     Central scheduler that orchestrates data, light, mesh, and collider jobs. Every frame one stage gets a
+    ///     turn (collect its finished batch, look for work, start the next batch); the stages take turns round
+    ///     robin, and a stage that sleeps or still waits for its batch passes the frame on to the next one.
     ///     Manages separate priority queues and selects batches according to scheduler settings.
     /// </summary>
     public class VoxelEngineScheduler{
@@ -67,28 +69,36 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        ///     Executes a scheduler tick. Processes queue updates, job dispatching, or result collection
-        ///     depending on the current step in the round-robin cycle.
+        ///     Executes a scheduler tick: the first stage in round-robin order that has main-thread work gets the
+        ///     frame, and the stage after it is first in line on the next tick. So at most one stage applies a batch
+        ///     per frame, no frame is left unused while any stage has work, and a busy stage cannot starve the others.
         /// </summary>
         /// <param name="focus">The focus position (e.g., player chunk root).</param>
         internal void ScheduleUpdate(PriorityUtil.Focus focus){
-            switch (_currentUpdate){
+            for (int i = 0; i < SchedulerUpdateCount; i++){
+                SchedulerUpdate stage = (SchedulerUpdate)(((byte)_currentUpdate + i) % SchedulerUpdateCount);
+                if (!UpdateStage(stage, focus)) continue;
+
+                _currentUpdate = (SchedulerUpdate)(((byte)stage + 1) % SchedulerUpdateCount);
+                return;
+            }
+        }
+
+        /// <summary>Gives <paramref name="stage" /> its turn; false when it had nothing to do on the main thread.</summary>
+        private bool UpdateStage(SchedulerUpdate stage, PriorityUtil.Focus focus){
+            switch (stage){
                 // One profiler marker per scheduler stage
                 case SchedulerUpdate.Data:
-                    using (VoxelProfilerMarkers.SchedulerData.Auto()) _dataJobHandler.Update(focus);
-                    break;
+                    using (VoxelProfilerMarkers.SchedulerData.Auto()) return _dataJobHandler.Update(focus);
                 case SchedulerUpdate.Light:
-                    using (VoxelProfilerMarkers.SchedulerLight.Auto()) _lightJobHandler.Update(focus);
-                    break;
+                    using (VoxelProfilerMarkers.SchedulerLight.Auto()) return _lightJobHandler.Update(focus);
                 case SchedulerUpdate.Mesh:
-                    using (VoxelProfilerMarkers.SchedulerMesh.Auto()) _meshJobHandler.Update(focus);
-                    break;
+                    using (VoxelProfilerMarkers.SchedulerMesh.Auto()) return _meshJobHandler.Update(focus);
                 case SchedulerUpdate.Collider:
-                    using (VoxelProfilerMarkers.SchedulerCollider.Auto()) _colliderJobHandler.Update(focus);
-                    break;
+                    using (VoxelProfilerMarkers.SchedulerCollider.Auto()) return _colliderJobHandler.Update(focus);
+                default:
+                    return false;
             }
-
-            _currentUpdate = (SchedulerUpdate)(((byte)_currentUpdate + 1) % SchedulerUpdateCount);
         }
 
         /// <summary>
@@ -217,19 +227,5 @@ namespace Engine.Scripts.Jobs.Core{
         public int BakeQueueCount => _colliderJobHandler.QueueCount;
 
         #endregion
-    }
-
-    /// <summary>
-    ///     Enum representing the three steps in the scheduler state machine.
-    /// </summary>
-    internal enum SchedulerStep{
-        /// <summary>Updating and enqueuing new work items.</summary>
-        UpdateQueues,
-
-        /// <summary>Dispatching jobs to sub-schedulers.</summary>
-        JobUpdate,
-
-        /// <summary>Collecting and processing results.</summary>
-        CollectResults
     }
 }

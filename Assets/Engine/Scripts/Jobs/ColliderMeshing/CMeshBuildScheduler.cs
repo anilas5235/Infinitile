@@ -28,6 +28,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         private readonly ChunkPool _chunkPool;
         private readonly VoxelRegistry _voxelRegistry;
         private readonly VoxelWorld _world;
+        private readonly int _buildBacklogLimit; // waiting GPU builds up to which the next batch is dispatched
 
         /// <summary>
         ///     Indicates whether the scheduler is ready to accept a new list of mesh build jobs.
@@ -70,6 +71,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             _chunkPool = chunkPool;
             _voxelRegistry = voxelRegistry;
             _world = world;
+            _buildBacklogLimit = 2 * math.max(1, settings.Scheduler.partitionBuildBatchSize);
 
             _colliderVertexParams = CVertex.CreateLayout(Allocator.Domain);
 
@@ -88,6 +90,13 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         ///     Gets a value indicating whether the currently scheduled mesh build jobs have completed.
         /// </summary>
         internal bool IsComplete => _handle.IsCompleted;
+
+        /// <summary>
+        ///     True while more partitions of earlier batches wait in the renderer for a GPU build slot than two rounds
+        ///     of its slots take: the slots do not run empty between two mesh batches, and the waiting list stays
+        ///     short enough to follow the focus. Always false without a renderer.
+        /// </summary>
+        internal bool RendererBehind => _world.PendingPartitionBuilds > _buildBacklogLimit;
 
         /// <summary>
         ///     Starts a mesh build job for the given list of chunk positions.

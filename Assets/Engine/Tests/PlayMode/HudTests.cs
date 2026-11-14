@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using Engine.Scripts.World;
 using Engine.Scripts.WorldGen.Core;
 using NUnit.Framework;
@@ -12,9 +13,26 @@ namespace Engine.Tests.PlayMode{
     ///     the column under the camera. The HUD lives in the game assembly, so the test reads it by element names.
     /// </summary>
     public class HudTests{
+        /// <summary>
+        ///     Warnings and errors logged while the test runs. Plain log lines do not count: the world may still
+        ///     build behind the HUD and reports the growth of its render buffers.
+        /// </summary>
+        private readonly List<string> _problems = new();
+
         [UnitySetUp]
         public IEnumerator SetUp(){
             yield return PlayModeFixtures.LoadGameScene();
+            _problems.Clear();
+            Application.logMessageReceived += CollectProblem;
+        }
+
+        [TearDown]
+        public void TearDown(){
+            Application.logMessageReceived -= CollectProblem;
+        }
+
+        private void CollectProblem(string condition, string stackTrace, LogType type){
+            if (type != LogType.Log) _problems.Add($"[{type}] {condition}");
         }
 
         [UnityTest]
@@ -35,7 +53,7 @@ namespace Engine.Tests.PlayMode{
             Assert.IsNotNull(biome);
             StringAssert.StartsWith($"Biome {biome}", hud.Q<Label>("biome").text);
 
-            LogAssert.NoUnexpectedReceived();
+            Assert.IsEmpty(_problems, "warnings or errors while the HUD ran");
         }
 
         private static VisualElement FindHud(){

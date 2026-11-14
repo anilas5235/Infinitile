@@ -1,4 +1,5 @@
-﻿using Engine.Scripts.Jobs.Chunk;
+﻿using System;
+using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Settings;
 using Engine.Scripts.World;
 using Unity.Mathematics;
@@ -11,6 +12,7 @@ namespace Engine.Scripts.Jobs.Core{
     internal class DataJobStateHandler : JobStateHandler<int2>{
         private readonly ChunkScheduler _chunkScheduler;
         private readonly LightJobStateHandler _lightJobHandler;
+        private readonly Func<PriorityUtil.Focus, int2, bool> _outsideWindow; // created once: FocusUpdate must not allocate
 
         /// <summary>
         ///     Initializes a new instance of the DataJobStateHandler class.
@@ -25,16 +27,19 @@ namespace Engine.Scripts.Jobs.Core{
             base(settings, chunkManager, chunkPool){
             _chunkScheduler = chunkScheduler;
             _lightJobHandler = lightJobHandler;
+            _outsideWindow = (focus, pos) => !IsChunkStillRelevant(pos, focus);
             int side = 2 * settings.Chunk.LoadDistance + 1;
             Reserve(side * side, settings.Scheduler.chunkGenBatchSize);
         }
 
         /// <summary>
-        ///     Updates focus and reprioritizes all queued chunks based on distance from focus.
+        ///     Updates focus: drops the queued chunks that left the load distance and reprioritizes the rest based
+        ///     on distance from focus.
         /// </summary>
         /// <param name="focus">The new focus position.</param>
         public override void FocusUpdate(PriorityUtil.Focus focus){
             WakeUp();
+            PruneQueue(focus, _outsideWindow);
             // Static lambda with explicit state instead of a closure capturing the focus
             Queue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.DistPriority(ref pos, ref f));
         }
