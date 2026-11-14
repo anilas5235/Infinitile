@@ -132,7 +132,7 @@ MonoBehaviour:
     MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 0}
     SpeciesStructure: {fileID: 0}
-    SpeciesTree: {fileID: 11400000, guid: b63902cc64d597f4ab8d6519895c2ea0, type: 2}
+    SpeciesTree: {fileID: 11400000, guid: 4b3d4dd7d0804deb9c28f705e80260d7, type: 2}
     Probability: 0.002
     RequiresSurfaceFromSameBiome: 0
     RequiresBeachGround: 0

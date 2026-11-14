@@ -205,9 +205,9 @@ namespace Engine.Tests.EditMode{
                 }
 
                 // DeadTree is out of every biome since 2026-11-10.
-                Assert.AreEqual(14, cfg.TreeSpecies.Length,
+                Assert.AreEqual(17, cfg.TreeSpecies.Length,
                     "Oak, Birch, Bush, Spruce, Cactus, Boulder, FallenLog, JungleTree, Acacia, Willow, BushSwamp, " +
-                    "BoulderGrey, BoulderMossy, BoulderRed");
+                    "BoulderGrey, BoulderMossy, BoulderRed, FallenLogOak, FallenLogSpruce, FallenLogJungle");
                 for (int i = 0; i < cfg.TreeVariants.Length; i++){
                     TreeVariantDef v = cfg.TreeVariants[i];
                     if (v.TrunkHeight.y > 0) Assert.AreNotEqual(0, v.TrunkVoxel, $"variant {i}: trunk voxel");
@@ -280,13 +280,52 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void ShippedWorldGenSettings_TaigaTreesAreSpruces(){
             // The only standing tree of the Taiga is the Spruce (no Birch, whose lime crowns stood out there); its
-            // other tree species are the fallen log and the mossy boulder.
+            // other tree species are the fallen spruce log and the mossy boulder.
             WorldGenSettings settings = AssetDatabase.LoadAssetAtPath<WorldGenSettings>(ShippedSettingsPath);
             Assert.IsNotNull(settings, ShippedSettingsPath);
             Biome taiga = settings.Biomes.Biomes.Find(b => b.name == "Taiga");
             Assert.IsNotNull(taiga, "Taiga");
             List<string> species = taiga.FloraRules.Where(r => r.SpeciesTree).Select(r => r.SpeciesTree.name).ToList();
-            CollectionAssert.AreEquivalent(new[]{ "Spruce", "FallenLog", "BoulderMossy" }, species);
+            CollectionAssert.AreEquivalent(new[]{ "Spruce", "FallenLogSpruce", "BoulderMossy" }, species);
+        }
+
+        [Test]
+        public void ShippedWorldGenSettings_FallenLogsAreOfTheBiomesTrees(){
+            // A biome's fallen logs are made of the trunk of a tree that stands in the same biome: Spruce logs in the
+            // Taiga, Jungle logs in the Jungle, Oak logs in the Swamp (Willow), Oak and Birch logs in Forest and
+            // Plains. A bush (trunk of one block) is no tree here.
+            WorldGenSettings settings = AssetDatabase.LoadAssetAtPath<WorldGenSettings>(ShippedSettingsPath);
+            Assert.IsNotNull(settings, ShippedSettingsPath);
+            Dictionary<string, string[]> expected = new(){
+                ["Forest"] = new[]{ "LogBirch", "LogOak" }, ["Plains"] = new[]{ "LogBirch", "LogOak" },
+                ["Taiga"] = new[]{ "LogSpruce" }, ["Jungle"] = new[]{ "LogJungle" }, ["Swamp"] = new[]{ "LogOak" }
+            };
+            int withLogs = 0;
+            foreach (Biome biome in settings.Biomes.Biomes){
+                HashSet<string> standing = new(), lying = new();
+                foreach (FloraRule rule in biome.FloraRules){
+                    if (!rule.SpeciesTree) continue;
+                    foreach (TreeVariant v in rule.SpeciesTree.Variants){
+                        if (!v.TrunkVoxel) continue;
+                        if (v.Lying) lying.Add(v.TrunkVoxel.name);
+                        else if (v.TrunkHeight.Min >= 2) standing.Add(v.TrunkVoxel.name);
+                    }
+                }
+
+                foreach (string log in lying)
+                    Assert.IsTrue(standing.Contains(log),
+                        $"{biome.name}: fallen {log}, but its trees have {string.Join(", ", standing.OrderBy(s => s))}");
+                if (lying.Count == 0){
+                    Assert.IsFalse(expected.ContainsKey(biome.name), $"{biome.name}: no fallen log");
+                    continue;
+                }
+
+                withLogs++;
+                Assert.IsTrue(expected.TryGetValue(biome.name, out string[] logs), $"{biome.name}: unexpected fallen logs");
+                CollectionAssert.AreEqual(logs, lying.OrderBy(s => s).ToArray(), biome.name);
+            }
+
+            Assert.AreEqual(expected.Count, withLogs, "biomes with fallen logs");
         }
 
         [Test]

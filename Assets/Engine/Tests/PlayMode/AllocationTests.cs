@@ -34,7 +34,7 @@ namespace Engine.Tests.PlayMode{
             return false;
         }
 
-        private static IEnumerator WaitForFocusColumn(VoxelWorld world, float timeoutSeconds, bool failOnTimeout){
+        internal static IEnumerator WaitForFocusColumn(VoxelWorld world, float timeoutSeconds, bool failOnTimeout){
             float deadline = Time.realtimeSinceStartup + timeoutSeconds;
             while (!FocusColumnCollidable(world)){
                 if (Time.realtimeSinceStartup > deadline){
@@ -56,7 +56,7 @@ namespace Engine.Tests.PlayMode{
             LogAssert.NoUnexpectedReceived();
         }
 
-        private static IEnumerator WaitForSteadyState(VoxelEngineScheduler scheduler, float timeoutSeconds){
+        internal static IEnumerator WaitForSteadyState(VoxelEngineScheduler scheduler, float timeoutSeconds){
             // Measure the steady state: the world around the focus is generated, meshed and collided, so every
             // handler sleeps once. One-time warm-up work (first job schedules, render buffer growth) is over.
             DataJobStateHandler data = PlayModeFixtures.GetPrivateField<DataJobStateHandler>(scheduler, "_dataJobHandler");
@@ -76,13 +76,22 @@ namespace Engine.Tests.PlayMode{
         public IEnumerator EngineStep_DoesNotAllocateDuringFlight(){
             // Scheduler update, renderer update and buffer rebuild must not allocate managed memory while the focus
             // flies through loaded and loading terrain.
+            yield return FlightDoesNotAllocate(120f);
+        }
+
+        /// <summary>
+        ///     The flight of <see cref="EngineStep_DoesNotAllocateDuringFlight" /> in the loaded world, whatever its
+        ///     draw distance: waits for the steady state, flies <see cref="FlightFrames" /> frames along +x and
+        ///     asserts that no engine step allocated.
+        /// </summary>
+        internal static IEnumerator FlightDoesNotAllocate(float steadyStateTimeoutSeconds){
             VoxelWorld world = VoxelWorld.Instance;
             VoxelWorldRenderer renderer = VoxelWorldRenderer.Instance;
             Assert.IsNotNull(renderer, "VoxelWorldRenderer missing in scene");
             yield return WaitForFocusColumn(world, 45f, false);
 
             VoxelEngineScheduler scheduler = PlayModeFixtures.GetPrivateField<VoxelEngineScheduler>(world, "_scheduler");
-            yield return WaitForSteadyState(scheduler, 120f);
+            yield return WaitForSteadyState(scheduler, steadyStateTimeoutSeconds);
             Transform focus = PlayModeFixtures.GetPrivateField<Transform>(world, "focus");
             Action rendererUpdate = (Action)Delegate.CreateDelegate(typeof(Action), renderer,
                 PlayModeFixtures.GetPrivateMethod(typeof(VoxelWorldRenderer), "Update"));

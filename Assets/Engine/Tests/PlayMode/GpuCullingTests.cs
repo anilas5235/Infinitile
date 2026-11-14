@@ -8,7 +8,6 @@ using NUnit.Framework;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.TestTools.Constraints;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
@@ -40,7 +39,7 @@ namespace Engine.Tests.PlayMode{
         private const int MinPagesForTiming = 512;
 
         /// <summary>
-        ///     Draw distance for the timing comparison: at the scene default (6 chunks) the Editor is not GPU-bound
+        ///     Draw distance for the timing comparison: at the suite's draw distance (6 chunks) the Editor is not GPU-bound
         ///     and culling on/off measure the same frame time, so the world is reloaded with this distance.
         /// </summary>
         private const int TimingDrawDistance = 10;
@@ -404,31 +403,6 @@ namespace Engine.Tests.PlayMode{
             yield return null;
         }
 
-        /// <summary>
-        ///     Reloads the game scene with another draw distance; the settings asset is shared in memory. Waits for
-        ///     an idle scheduler first: unloading the scene while a CMeshBuildJob runs frees the registry's
-        ///     VoxelRenderDefs under the job (shutdown order between DataImporter and VoxelWorld, not culling).
-        /// </summary>
-        private static IEnumerator ReloadWorldWithDrawDistance(int drawDistance){
-            float deadline = Time.realtimeSinceStartup + 300f;
-            while (!SchedulerSleeping() && Time.realtimeSinceStartup < deadline) yield return null;
-            VoxelWorld.Instance.Settings.Chunk.DrawDistance = drawDistance;
-            AsyncOperation load = SceneManager.LoadSceneAsync(PlayModeFixtures.SceneName, LoadSceneMode.Single);
-            while (!load.isDone) yield return null;
-            yield return PlayModeFixtures.LoadGameScene();
-        }
-
-        /// <summary>True when every scheduler handler sleeps, i.e. the world around the focus is fully built.</summary>
-        private static bool SchedulerSleeping(){
-            VoxelEngineScheduler scheduler =
-                PlayModeFixtures.GetPrivateField<VoxelEngineScheduler>(VoxelWorld.Instance, "_scheduler");
-            DataJobStateHandler data = PlayModeFixtures.GetPrivateField<DataJobStateHandler>(scheduler, "_dataJobHandler");
-            MeshJobStateHandler mesh = PlayModeFixtures.GetPrivateField<MeshJobStateHandler>(scheduler, "_meshJobHandler");
-            ColliderJobStateHandler collider =
-                PlayModeFixtures.GetPrivateField<ColliderJobStateHandler>(scheduler, "_colliderJobHandler");
-            return data.Sleeping && mesh.Sleeping && collider.Sleeping;
-        }
-
         [UnityTest]
         [Timeout(600000)]
         public IEnumerator CullingOnVsOff_AtFixedViewpoint_ReducesVisiblePagesAndGpuTime(){
@@ -437,13 +411,13 @@ namespace Engine.Tests.PlayMode{
             // provides GPU times, the GPU frame time must drop too; CPU frame time is logged. The world is always
             // reloaded with the default draw distance before anything is asserted (no yield in finally).
             int originalDrawDistance = VoxelWorld.Instance.Settings.Chunk.DrawDistance;
-            yield return ReloadWorldWithDrawDistance(TimingDrawDistance);
+            yield return PlayModeFixtures.ReloadWorldWithDrawDistance(TimingDrawDistance);
             VoxelWorldRenderer renderer = Renderer();
             GpuCuller culler = Culler(renderer);
 
             string failure = null;
             float deadline = Time.realtimeSinceStartup + 300f;
-            while (!(SchedulerSleeping() && SolidPages(renderer) >= MinPagesForTiming)){
+            while (!(PlayModeFixtures.SchedulerSleeping() && SolidPages(renderer) >= MinPagesForTiming)){
                 if (Time.realtimeSinceStartup > deadline){
                     failure = $"the world did not reach a steady state with {MinPagesForTiming} solid pages in 300 s";
                     break;
@@ -524,7 +498,7 @@ namespace Engine.Tests.PlayMode{
             Object.Destroy(cameraObject);
             target.Release();
             Object.Destroy(target);
-            yield return ReloadWorldWithDrawDistance(originalDrawDistance); // later tests expect the default world
+            yield return PlayModeFixtures.ReloadWorldWithDrawDistance(originalDrawDistance); // later tests expect the suite's world
             Assert.IsNull(failure, failure);
 
             LogTiming("culling on", on);
