@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
@@ -11,9 +12,17 @@ namespace Engine.Scripts.Jobs.Core{
     ///     Handles enqueuing, dispatching, and result collection for mesh generation.
     /// </summary>
     internal class MeshJobStateHandler : JobStateHandler<int3>{
+        /// <summary>
+        ///     Partitions without a voxel that one turn may take from the queue, in mesh batches. They cost a claim in
+        ///     the pool and nothing else, so a turn takes more of them than of the partitions that need a job.
+        /// </summary>
+        private const int EmptyPartitionsPerBatch = 4;
+
         private readonly CMeshBuildScheduler _cMeshBuildScheduler;
         private readonly ColliderJobStateHandler _colliderJobHandler;
         private readonly Func<PriorityUtil.Focus, int3, bool> _outsideWindow; // created once: FocusUpdate must not allocate
+        private readonly Predicate<int3> _lostItsChunks; // created once: JobUpdateStep must not allocate
+        private readonly List<int3> _emptyPartitions; // the partitions without a voxel of the current turn
 
         /// <summary>
         ///     Initializes a new instance of the MeshJobStateHandler class.
@@ -29,10 +38,16 @@ namespace Engine.Scripts.Jobs.Core{
             _cMeshBuildScheduler = cMeshBuildScheduler;
             _colliderJobHandler = colliderJobHandler;
             _outsideWindow = (focus, pos) => !IsInDrawWindow(pos, focus);
+            _lostItsChunks = pos => !CanGenerateMeshForChunk(pos.xz);
             int side = 2 * settings.Chunk.DrawDistance + 1;
             int layers = math.min(VoxelConstants.PartitionsPerChunk, side);
-            Reserve(side * side * layers, settings.Scheduler.meshingBatchSize);
+            // The batch size follows the draw distance; it is fixed here, when the world is built
+            Reserve(side * side * layers, settings.Scheduler.MeshBatchSizeAt(settings.Chunk.DrawDistance));
+            _emptyPartitions = new List<int3>(EmptyPartitionsPerBatch * BatchSize);
         }
+
+        /// <summary>Partitions handed to the mesh job per batch in this world.</summary>
+        internal int MeshBatchSize => BatchSize;
 
         /// <summary>
         ///     Updates focus: drops the queued partitions that left the draw window and reprioritizes the rest based
@@ -85,30 +100,38 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        ///     Dispatches a batch of partitions to the mesh build scheduler.
+        ///     Takes the next partitions from the queue. The ones that hold a voxel go to the mesh build scheduler
+        ///     as a batch. The ones that hold only air need no mesh job, no GPU build and no collider bake: they
+        ///     become active at once, with an empty mesh (see <see cref="CMeshBuildScheduler.ApplyEmpty" />). They
+        ///     do not count against the batch, but a turn takes a limited number of them.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <returns>True if jobs were dispatched or batch is full, false if scheduler is busy.</returns>
         protected override bool JobUpdateStep(PriorityUtil.Focus focus){
             if (!_cMeshBuildScheduler.IsReady) return false;
 
-            int count = math.min(Settings.Scheduler.meshingBatchSize, Queue.Count);
             float prioThreshold = ChunkPool.GetPartitionPrioThreshold();
-            int accepted = 0;
+            int emptyLimit = EmptyPartitionsPerBatch * BatchSize;
 
-            while (accepted < count && Queue.Count > 0){
+            while (Set.Count < BatchSize && _emptyPartitions.Count < emptyLimit && Queue.Count > 0){
                 int3 partition = Queue.Dequeue();
                 if (!IsPartitionStillRelevant(partition, focus, prioThreshold)) continue;
                 if (!CanGenerateMeshForChunk(partition.xz)) continue;
                 if (!ShouldScheduleForMeshing(partition)) continue;
 
-                Set.Add(partition);
-                accepted++;
+                if (ChunkManager.PartitionHasVoxels(partition)) Set.Add(partition);
+                else _emptyPartitions.Add(partition);
             }
 
-            if (accepted == 0) return true;
+            if (_emptyPartitions.Count > 0){
+                for (int i = 0; i < _emptyPartitions.Count; i++) _cMeshBuildScheduler.ApplyEmpty(_emptyPartitions[i]);
+                _emptyPartitions.Clear();
+                // A claim in a full pool can reclaim a pooled chunk, and the world then unloads its data: a
+                // partition of this batch that lost a chunk of its neighbourhood is left to the next scan.
+                if (Set.Count > 0) Set.RemoveWhere(_lostItsChunks);
+            }
 
-            _cMeshBuildScheduler.Start(Set);
+            if (Set.Count > 0) _cMeshBuildScheduler.Start(Set);
 
             return true;
         }

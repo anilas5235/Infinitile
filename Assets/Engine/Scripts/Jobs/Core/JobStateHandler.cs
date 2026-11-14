@@ -57,6 +57,9 @@ namespace Engine.Scripts.Jobs.Core{
         private const int ScanInterval = 4;
 
         private int _batchSize = 1;
+
+        /// <summary>Items per batch, as given to <see cref="Reserve" />.</summary>
+        protected int BatchSize => _batchSize;
         private int _turnsSinceScan;
 
         /// <summary>

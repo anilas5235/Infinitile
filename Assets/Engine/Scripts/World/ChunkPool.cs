@@ -81,7 +81,7 @@ namespace Engine.Scripts.World{
         }
 
         /// <summary>
-        ///     Returns whether a chunk already has a baked collider.
+        ///     Returns whether the collider of a partition is ready: baked, or known to be empty.
         /// </summary>
         internal bool IsCollidable(int3 pos){
             return _colliderSet.Contains(pos);

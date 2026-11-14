@@ -51,9 +51,18 @@ flight. The scheduler gives one step per frame a turn on the main thread, so a f
   (`MeshAndRenderPipeline.md`, version 1.8). While more than two rounds of GPU build slots wait in the renderer,
   the mesh step dispatches nothing: the partitions stay in the priority queue, which follows the focus, instead
   of piling up in the renderer's first-in-first-out list.
+- **The mesh batch and the GPU build slots follow the draw distance.** `SchedulerSettings.MeshBatchSizeAt` and
+  `BuildSlotsAt` scale the two asset values with the side of the draw window; they are read once, when the world
+  is built (`MeshAndRenderPipeline.md`, version 1.9).
+- **A partition without a voxel is not meshed.** `ChunkVoxelData.OccupiedPartitions` has one bit per partition of
+  the chunk, set when generation or `SetVoxel` puts a voxel that is not air into it, and never cleared. The mesh
+  step takes a partition whose bit is clear from the queue and makes it active at once, with an empty mesh: no
+  mesh job, no GPU build, no collider bake. `SetVoxel` sets the bit and flags the partition, so the first block
+  placed in it meshes it like any other. Light changes and edits next to it do not flag it, because it has no
+  face (`MeshAndRenderPipeline.md`, version 1.9).
 
-`PipelineThroughputTests` (PlayMode) holds the frame budget for a fresh world and the queue limits in a flight;
-`PipelineMeasurementTests` (explicit) prints the timings.
+`PipelineThroughputTests` (PlayMode) holds the limit on the number of frames a fresh world may take and the queue
+limits in a flight; `PipelineMeasurementTests` (explicit) prints the timings.
 
 ## Light
 

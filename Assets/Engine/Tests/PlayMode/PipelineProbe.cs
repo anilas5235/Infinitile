@@ -61,6 +61,8 @@ namespace Engine.Tests.PlayMode{
         private readonly float[] _doneSeconds = { -1f, -1f, -1f, -1f };
         private readonly int[] _doneFrames = new int[StageCount];
         private readonly Func<bool> _rendererBehind;
+        private readonly CMeshBuildScheduler _meshJobs;
+        private readonly int _meshBatchSize;
         private int _framesRendererBehind;
         private float _gpuDoneSeconds = -1f;
         private int _gpuDoneFrame;
@@ -94,6 +96,8 @@ namespace Engine.Tests.PlayMode{
             _jobComplete[Mesh] = () => meshJobs.IsComplete;
             _jobComplete[Bake] = () => bakeJobs.IsComplete;
             _rendererBehind = () => meshJobs.RendererBehind;
+            _meshJobs = meshJobs;
+            _meshBatchSize = mesh.MeshBatchSize;
 
             ChunkPool pool = PlayModeFixtures.GetPrivateField<ChunkPool>(world, "_chunkPool");
             _meshMap = PlayModeFixtures.GetPrivateField<Dictionary<int3, ChunkPartition>>(pool, "_meshMap");
@@ -124,6 +128,12 @@ namespace Engine.Tests.PlayMode{
             _startTime = Time.realtimeSinceStartup;
         }
 
+        /// <summary>A frame of 120 frames per second, the goal of the performance work (2026-11-14).</summary>
+        internal const float GoalFrameMs = 1000f / 120f;
+
+        /// <summary>A frame of 60 frames per second; a longer one is a stutter the player sees.</summary>
+        internal const float StutterFrameMs = 1000f / 60f;
+
         /// <summary>Frames sampled so far.</summary>
         internal int Frames{ get; private set; }
 
@@ -140,6 +150,18 @@ namespace Engine.Tests.PlayMode{
         internal int MeshBatches{ get; private set; }
 
         internal int MeshPartitions{ get; private set; }
+
+        /// <summary>Partitions that got a mesh from a mesh job since the world was created.</summary>
+        internal int MeshedPartitions => _meshJobs.MeshedPartitions;
+
+        /// <summary>Partitions without a voxel that became active without a mesh job and without a GPU build.</summary>
+        internal int PartitionsWithoutMesh => _meshJobs.PartitionsWithoutMesh;
+
+        /// <summary>Meshed partitions whose collider mesh came out empty, so they needed no bake.</summary>
+        internal int PartitionsWithoutBake => _meshJobs.PartitionsWithoutBake;
+
+        /// <summary>Partitions without a voxel that were handed to a mesh job all the same; must stay 0.</summary>
+        internal int DispatchedWithoutVoxels{ get; private set; }
 
         /// <summary>Seconds until every stage slept with its upstream stages done; -1 while that did not happen.</summary>
         internal float BuiltSeconds => _doneSeconds[Bake];
@@ -161,7 +183,26 @@ namespace Engine.Tests.PlayMode{
             foreach (int3 partition in partitions){
                 _dispatchCounts.TryGetValue(partition, out int count);
                 _dispatchCounts[partition] = count + 1;
+                if (!_world.ChunkManager.PartitionHasVoxels(partition)) DispatchedWithoutVoxels++;
             }
+        }
+
+        /// <summary>Forgets the queue peaks, so a second phase reports its own.</summary>
+        internal void ResetPeaks(){
+            Array.Clear(PeakQueue, 0, PeakQueue.Length);
+            PeakPendingBuilds = 0;
+        }
+
+        /// <summary>
+        ///     Frame times and scheduler main-thread times of the samples <paramref name="from" /> (included) to
+        ///     <paramref name="to" /> (excluded), as one log line. <see cref="Frames" /> is the index of the next
+        ///     sample.
+        /// </summary>
+        internal string FrameTimes(string label, int from, int to){
+            return string.Format(CultureInfo.InvariantCulture,
+                "[PipelineProbe] {0}: frame ms {1}; {2}; scheduler main-thread ms {3}; {4}\n", label,
+                Distribution(_frameMs, from, to), OverGoal(_frameMs, from, to), Distribution(_schedulerMs, from, to),
+                OverGoal(_schedulerMs, from, to));
         }
 
         /// <summary>
@@ -247,9 +288,9 @@ namespace Engine.Tests.PlayMode{
             string head = $"[PipelineProbe] {label}";
             float seconds = Seconds;
             text.AppendLine(string.Format(inv, "{0}: {1} frames in {2:0.0} s ({3:0} fps), {4} chunks loaded, " +
-                                               "{5} partitions meshed, {6} collidable",
+                                               "{5} partitions active, {6} collidable; mesh batch {7}, GPU build slots {8}",
                 head, Frames, seconds, Frames / math.max(seconds, 1e-3f), _world.Stats.LoadedChunks, _meshMap.Count,
-                _colliderSet.Count));
+                _colliderSet.Count, _meshBatchSize, VoxelWorldRenderer.Instance.BuildSlots));
             text.AppendLine(string.Format(inv, "{0}: queue peaks data {1}, light {2}, mesh {3}, bake {4}, " +
                                                "renderer pending builds {5}",
                 head, PeakQueue[Data], PeakQueue[Light], PeakQueue[Mesh], PeakQueue[Bake], PeakPendingBuilds));
@@ -268,6 +309,15 @@ namespace Engine.Tests.PlayMode{
                 Frames / (float)math.max(MeshBatches, 1), MeshPartitions / (float)math.max(Frames, 1),
                 MeshPartitions / math.max(seconds, 1e-3f), repeated, empty, _meshMap.Count));
 
+            int withoutMesh = PartitionsWithoutMesh;
+            int meshed = MeshedPartitions;
+            text.AppendLine(string.Format(inv, "{0}: {1} partitions hold no voxel and became active without a mesh " +
+                                               "job or a GPU build ({2:0.0} % of {3}); {4} got a mesh job, {5} of " +
+                                               "them needed no bake (empty collider mesh); {6} partitions without a " +
+                                               "voxel were dispatched",
+                head, withoutMesh, 100f * withoutMesh / math.max(withoutMesh + meshed, 1), withoutMesh + meshed, meshed,
+                PartitionsWithoutBake, DispatchedWithoutVoxels));
+
             for (int i = 0; i < StageCount; i++){
                 text.AppendLine(string.Format(inv, "{0}: {1} job frames: running {2}, finished but not collected {3}, " +
                                                    "idle with work {4}, sleeping {5}; done after {6:0.0} s (frame {7})",
@@ -278,8 +328,7 @@ namespace Engine.Tests.PlayMode{
             text.AppendLine(string.Format(inv, "{0}: renderer builds done after {1:0.0} s (frame {2}); the mesh stage " +
                                                "waited for the renderer in {3} frames",
                 head, _gpuDoneSeconds, _gpuDoneFrame, _framesRendererBehind));
-            text.AppendLine(string.Format(inv, "{0}: frame ms {1}; scheduler main-thread ms {2}",
-                head, Distribution(_frameMs), Distribution(_schedulerMs)));
+            text.Append(FrameTimes(label, 0, Frames));
             text.Append(head).Append(": main-thread ms per frame it ran in (avg / max / frames):");
             for (int i = 0; i < CostNames.Length; i++){
                 text.Append(string.Format(inv, " {0} {1:0.000} / {2:0.000} / {3};", CostNames[i],
@@ -290,15 +339,35 @@ namespace Engine.Tests.PlayMode{
             return text.ToString();
         }
 
-        private static string Distribution(List<float> values){
-            if (values.Count == 0) return "no samples";
-            List<float> sorted = new(values);
+        private static string Distribution(List<float> values, int from, int to){
+            from = math.clamp(from, 0, values.Count);
+            to = math.clamp(to, from, values.Count);
+            if (to == from) return "no samples";
+            List<float> sorted = values.GetRange(from, to - from);
             sorted.Sort();
             double sum = 0;
             foreach (float value in sorted) sum += value;
-            return string.Format(CultureInfo.InvariantCulture, "avg {0:0.000}, p50 {1:0.000}, p99 {2:0.000}, max {3:0.000}",
-                sum / sorted.Count, sorted[sorted.Count / 2], sorted[(int)((sorted.Count - 1) * 0.99f)],
-                sorted[^1]);
+            int last = sorted.Count - 1;
+            return string.Format(CultureInfo.InvariantCulture,
+                "avg {0:0.000}, p50 {1:0.000}, p95 {2:0.000}, p99 {3:0.000}, max {4:0.000}",
+                sum / sorted.Count, sorted[sorted.Count / 2], sorted[(int)(last * 0.95f)], sorted[(int)(last * 0.99f)],
+                sorted[last]);
+        }
+
+        /// <summary>How many of the samples are longer than a frame of 120 and of 60 frames per second.</summary>
+        private static string OverGoal(List<float> values, int from, int to){
+            from = math.clamp(from, 0, values.Count);
+            to = math.clamp(to, from, values.Count);
+            int overGoal = 0, overStutter = 0;
+            for (int i = from; i < to; i++){
+                if (values[i] > GoalFrameMs) overGoal++;
+                if (values[i] > StutterFrameMs) overStutter++;
+            }
+
+            int count = math.max(to - from, 1);
+            return string.Format(CultureInfo.InvariantCulture,
+                "{0} of {1} over 8.33 ms ({2:0.00} %), {3} over 16.67 ms ({4:0.00} %)",
+                overGoal, to - from, 100f * overGoal / count, overStutter, 100f * overStutter / count);
         }
     }
 }

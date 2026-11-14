@@ -35,3 +35,4 @@ MonoBehaviour:
     partitionBuildBatchSize: 8
     colliderBatchSize: 6
     lightBatchSize: 8
+    referenceDrawDistance: 12

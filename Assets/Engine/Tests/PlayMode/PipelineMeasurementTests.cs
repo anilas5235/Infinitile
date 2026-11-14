@@ -20,11 +20,27 @@ namespace Engine.Tests.PlayMode{
         /// </summary>
         private static readonly (int meshBatch, int buildSlots)[] Variants ={ (8, 4), (32, 16) };
 
+        /// <summary>
+        ///     The small draw distance of <see cref="DrawDistances_AreCompared" />: the one the mesh batch of 8 and
+        ///     the 4 GPU build slots were written for. The shipped one has 16 and 8.
+        /// </summary>
+        private const int SmallDrawDistance = 6;
+
+        /// <summary>
+        ///     Draw distance, mesh batch and GPU build slots of <see cref="FrameTimeGoal_OtherSizes_AreMeasured" />:
+        ///     smaller sizes than the derived ones at the shipped draw distance (16 and 8) and at the small one
+        ///     (8 and 4), and the small draw distance with the sizes of the shipped one.
+        /// </summary>
+        private static readonly (int draw, int meshBatch, int buildSlots)[] GoalVariants ={
+            (12, 8, 4), (12, 12, 6), (6, 4, 2), (6, 16, 8)
+        };
+
         private int _savedTargetFrameRate;
         private int _savedVSync;
         private SchedulerSettings _scheduler;
         private int _savedMeshBatch;
         private int _savedBuildSlots;
+        private int _savedReference;
 
         [SetUp]
         public void SaveFrameSettings(){
@@ -43,6 +59,7 @@ namespace Engine.Tests.PlayMode{
             // The settings asset is shared in memory: put the shipped values back and rebuild the world with them.
             _scheduler.meshingBatchSize = _savedMeshBatch;
             _scheduler.partitionBuildBatchSize = _savedBuildSlots;
+            _scheduler.referenceDrawDistance = _savedReference;
             yield return PlayModeFixtures.ReloadWorldWithDrawDistance(PlayModeFixtures.ShippedDrawDistance);
             yield return PipelineThroughputTests.WaitForBuiltWorld();
         }
@@ -71,6 +88,8 @@ namespace Engine.Tests.PlayMode{
             _scheduler = VoxelWorld.Instance.Settings.Scheduler;
             _savedMeshBatch = _scheduler.meshingBatchSize;
             _savedBuildSlots = _scheduler.partitionBuildBatchSize;
+            _savedReference = _scheduler.referenceDrawDistance;
+            _scheduler.referenceDrawDistance = 0; // the variants are used as given, not scaled with the draw distance
 
             foreach ((int meshBatch, int buildSlots) in Variants){
                 _scheduler.meshingBatchSize = meshBatch;
@@ -83,6 +102,46 @@ namespace Engine.Tests.PlayMode{
                 yield return PipelineThroughputTests.BuildFreshWorld(0, new PipelineThroughputTests.PipelineRun(), variant);
                 yield return PipelineThroughputTests.FlyThroughBuildingWorld(0, new PipelineThroughputTests.PipelineRun(),
                     variant);
+            }
+        }
+
+        [UnityTest]
+        [Order(4)]
+        [Timeout(1200000)]
+        public IEnumerator FrameTimeGoal_ShippedSizes_IsMeasured(){
+            // The goal run (stand, then a sprint flight through the built world) without a frame cap at the small
+            // and at the shipped draw distance, with the sizes the settings derive for each. Then the runs the
+            // earlier numbers were taken with: fresh world and a flight through the building world.
+            yield return PipelineThroughputTests.StandThenFly(0, "", SmallDrawDistance);
+            yield return PipelineThroughputTests.StandThenFly(0);
+
+            yield return PipelineThroughputTests.BuildFreshWorld(0, new PipelineThroughputTests.PipelineRun());
+            yield return PipelineThroughputTests.FlyThroughBuildingWorld(0, new PipelineThroughputTests.PipelineRun());
+            int capped = PipelineThroughputTests.CappedFrameRate;
+            yield return PipelineThroughputTests.BuildFreshWorld(capped, new PipelineThroughputTests.PipelineRun(), "",
+                SmallDrawDistance);
+            yield return PipelineThroughputTests.FlyThroughBuildingWorld(capped, new PipelineThroughputTests.PipelineRun(),
+                "", SmallDrawDistance);
+        }
+
+        [UnityTest]
+        [Order(5)]
+        [Timeout(1200000)]
+        public IEnumerator FrameTimeGoal_OtherSizes_AreMeasured(){
+            // The goal run with other mesh batches and GPU build slots than the derived ones: which are the
+            // smallest that keep up with a sprint flight and have the first build done 20 s after the start?
+            yield return PlayModeFixtures.LoadGameScene(drawDistance: PlayModeFixtures.ShippedDrawDistance);
+            _scheduler = VoxelWorld.Instance.Settings.Scheduler;
+            _savedMeshBatch = _scheduler.meshingBatchSize;
+            _savedBuildSlots = _scheduler.partitionBuildBatchSize;
+            _savedReference = _scheduler.referenceDrawDistance;
+            _scheduler.referenceDrawDistance = 0; // the variants are used as given, not scaled with the draw distance
+
+            foreach ((int draw, int meshBatch, int buildSlots) in GoalVariants){
+                _scheduler.meshingBatchSize = meshBatch;
+                _scheduler.partitionBuildBatchSize = buildSlots;
+                yield return PipelineThroughputTests.StandThenFly(0, $"mesh batch {meshBatch}, build slots {buildSlots}: ",
+                    draw);
             }
         }
     }

@@ -110,7 +110,10 @@ namespace Engine.Scripts.World{
             return ChunkManager.IsChunkLoaded(VoxelConstants.WorldToChunkPos(position));
         }
 
-        /// <summary>True if the partition at <paramref name="pos" /> is active and has its collider baked.</summary>
+        /// <summary>
+        ///     True if the partition at <paramref name="pos" /> is active and its collider is ready: baked, or known
+        ///     to be empty (a partition without a solid open face has no collider and needs no bake).
+        /// </summary>
         /// <param name="pos">Partition position.</param>
         public bool IsCollidable(int3 pos){
             return _chunkPool.IsPartitionActive(pos) && _chunkPool.IsCollidable(pos);
