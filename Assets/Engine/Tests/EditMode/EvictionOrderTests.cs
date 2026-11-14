@@ -1,12 +1,15 @@
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
+using Engine.Scripts.Utils;
 using Engine.Scripts.World;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
@@ -62,6 +65,31 @@ namespace Engine.Tests.EditMode{
 
             Assert.IsTrue(_manager.IsChunkLoaded(behind), "the closer chunk behind the player must stay loaded");
             Assert.IsFalse(_manager.IsChunkLoaded(front), "the farthest chunk must be the one evicted");
+        }
+
+        [Test]
+        public void AddChunks_PositionAlreadyLoaded_KeepsTheLoadedChunk_AndTakesTheRestOfTheBatch(){
+            // The manager owns every list of a batch. A position that is already loaded is not an exception in the
+            // middle of the batch (the lists added before it would then belong to their chunk and to the caller's
+            // map, and both dispose them): its new list is released, an error is logged, the batch goes on.
+            int2 loaded = new(0, 0);
+            int2 fresh = new(1, 0);
+            NativeParallelHashMap<int2, ChunkVoxelData> first = new(4, Allocator.Temp);
+            first.Add(loaded, TestFixtures.CreateUniformChunk(TestFixtures.Stone));
+            _manager.AddChunks(first);
+            first.Dispose();
+
+            NativeParallelHashMap<int2, ChunkVoxelData> second = new(4, Allocator.Temp);
+            second.Add(loaded, TestFixtures.CreateUniformChunk(TestFixtures.Air));
+            second.Add(fresh, TestFixtures.CreateUniformChunk(TestFixtures.Dirt));
+            LogAssert.Expect(LogType.Error, new Regex("already exists"));
+            _manager.AddChunks(second);
+            second.Dispose();
+
+            Assert.AreEqual(2, _manager.ChunkCount());
+            Assert.AreEqual(TestFixtures.Stone, _manager.GetVoxel(new int3(0, 10, 0)), "the loaded chunk keeps its data");
+            Assert.AreEqual(TestFixtures.Dirt, _manager.GetVoxel(new int3(VoxelConstants.ChunkWidth, 10, 0)),
+                "the other chunk of the batch is added");
         }
     }
 }

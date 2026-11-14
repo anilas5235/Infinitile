@@ -122,14 +122,21 @@ namespace Engine.Scripts.World{
         }
 
         /// <summary>
-        ///     Adds newly generated chunks, evicts oldest if capacity exceeded.
+        ///     Adds newly generated chunks, evicts oldest if capacity exceeded. The manager owns every voxel list of
+        ///     the batch afterwards: a list goes to its chunk, and the list of a position that is already loaded is
+        ///     released here (with an error log; the loaded chunk keeps its data). The caller only clears its map.
         /// </summary>
         internal void AddChunks(NativeParallelHashMap<int2, ChunkVoxelData> chunks){
             foreach (KeyValue<int2, ChunkVoxelData> pair in chunks){
                 int2 position = pair.Key;
 
-                if (_chunks.ContainsKey(position))
-                    throw new InvalidOperationException($"Chunk {position} already exists");
+                if (_chunks.ContainsKey(position)){
+                    // Not an exception: thrown in the middle of the batch it would leave the lists added so far
+                    // with two owners (their chunk and the caller's map), and both dispose them.
+                    pair.Value.Dispose();
+                    VoxelEngineLogger.Error<ChunkManager>($"Chunk {position} already exists; the new data was dropped");
+                    continue;
+                }
 
                 if (_unloadingQueue.Count >= _chunkStoreSize) RemoveChunkData(_unloadingQueue.Dequeue());
 
