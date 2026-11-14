@@ -103,7 +103,8 @@ namespace Engine.Tests.EditMode{
             // the Jungle keeps to the lower ground of the steep west (68 % of the window, up to 191 at p95), Badlands and
             // Jungle hardly meet (2.2 % of the border edges), the Badlands domes carry no Mountain cap (10 %) and Mountain
             // holds only the summit of the dome that had a meadow (29 %, from 175), and less of Plains and Savanna lies
-            // under water (35 % and 48 %).
+            // under water (35 % and 48 %). Since the massif tuning of 2026-11-12 the dome that had a meadow lies in a
+            // range: the meadow is gone and Mountain holds 15 % of the window, still only the high ground.
             WorldGenSettings settings = LoadShipped();
             string[] names = settings.Biomes.Names();
             int jungle = System.Array.IndexOf(names, "Jungle"), badlands = System.Array.IndexOf(names, "Badlands");
@@ -156,7 +157,7 @@ namespace Engine.Tests.EditMode{
                 float[] meadow = In(new int4(896, 640, 1088, 1024), mountain, out int dome);
                 TestContext.WriteLine($"Badlands dome with the meadow: Mountain {100.0 * meadow.Length / dome:F1} %" +
                                       (meadow.Length > 0 ? $", from {meadow[0]:F0}" : ""));
-                Assert.Less(meadow.Length, 0.08 * dome, "Badlands dome with the meadow: Mountain share");
+                Assert.Less(meadow.Length, 0.2 * dome, "Badlands dome with the meadow: Mountain share");
                 if (meadow.Length > 0) Assert.Greater(meadow[0], 185f, "Badlands dome with the meadow: lowest Mountain column");
 
                 int4 tour = new(-1280, -1280, 1280, 1280);

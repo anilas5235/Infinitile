@@ -52,7 +52,7 @@ namespace Engine.Tests.PlayMode{
                 // A clean world first: earlier tests may have edited voxels.
                 world.Regenerate();
                 yield return WaitForChunk(world, buffers, centre);
-                int[] original = SurfaceHeights(world, centre);
+                int[] original = ColumnHashes(world, centre, out int[] originalHeights);
 
                 WorldGenSettings variant = Object.Instantiate(world.Settings.WorldGen);
                 variant.Architecture = variant.Architecture == GenArchitecture.BiomeFirst
@@ -76,17 +76,17 @@ namespace Engine.Tests.PlayMode{
                     Assert.IsFalse(pool.IsPartitionActive(new int3(centre.x, p, centre.y)), "pool partitions must be reclaimed");
 
                 yield return WaitForChunk(world, buffers, centre);
-                int[] regenerated = SurfaceHeights(world, centre);
+                int[] regenerated = ColumnHashes(world, centre, out _);
                 Assert.AreNotEqual(original, regenerated, "the other architecture must change the terrain");
 
                 world.Regenerate();
                 yield return WaitForChunk(world, buffers, centre);
-                Assert.AreEqual(original, SurfaceHeights(world, centre), "regenerating with the asset must reproduce it");
+                Assert.AreEqual(original, ColumnHashes(world, centre, out _), "regenerating with the asset must reproduce it");
 
                 // Courtesy for later tests: release the player once the ground under it is collidable again (or
                 // after the timeout; a water surface has no collider of its own).
                 int3 under = focus.position.Int3();
-                under.y = original[(under.z - centre.y * ChunkDepth) * ChunkWidth + under.x - centre.x * ChunkWidth];
+                under.y = originalHeights[(under.z - centre.y * ChunkDepth) * ChunkWidth + under.x - centre.x * ChunkWidth];
                 float deadline = Time.realtimeSinceStartup + LoadTimeout;
                 while (WorldToChunkPos(under).Equals(centre) && !world.IsCollidable(WorldToPartitionPos(under))){
                     if (Time.realtimeSinceStartup > deadline) break;
@@ -106,18 +106,30 @@ namespace Engine.Tests.PlayMode{
             }
         }
 
-        /// <summary>Top non-air voxel per column of <paramref name="chunk" />, row-major over (z, x).</summary>
-        private static int[] SurfaceHeights(VoxelWorld world, int2 chunk){
-            int[] heights = new int[ChunkWidth * ChunkDepth];
+        /// <summary>
+        ///     Hash over every voxel per column of <paramref name="chunk" />, row-major over (z, x), and the top
+        ///     non-air voxel per column in <paramref name="heights" />. The hash sees the ground under water too: the
+        ///     chunk under the spawn is open water, whose surface is the same in every architecture.
+        /// </summary>
+        private static int[] ColumnHashes(VoxelWorld world, int2 chunk, out int[] heights){
+            int[] hashes = new int[ChunkWidth * ChunkDepth];
+            heights = new int[ChunkWidth * ChunkDepth];
             for (int z = 0; z < ChunkDepth; z++)
             for (int x = 0; x < ChunkWidth; x++){
                 int3 column = new(chunk.x * ChunkWidth + x, 0, chunk.y * ChunkDepth + z);
-                int y = ChunkHeight - 1;
-                while (y > 0 && world.GetVoxel(new int3(column.x, y, column.z)) == PlayModeFixtures.Air) y--;
-                heights[z * ChunkWidth + x] = y;
+                int hash = 17;
+                int top = 0;
+                for (int y = 0; y < ChunkHeight; y++){
+                    ushort voxel = world.GetVoxel(new int3(column.x, y, column.z));
+                    hash = unchecked(hash * 31 + voxel);
+                    if (voxel != PlayModeFixtures.Air) top = y;
+                }
+
+                hashes[z * ChunkWidth + x] = hash;
+                heights[z * ChunkWidth + x] = top;
             }
 
-            return heights;
+            return hashes;
         }
     }
 }

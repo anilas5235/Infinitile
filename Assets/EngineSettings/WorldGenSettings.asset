@@ -47,7 +47,7 @@ MonoBehaviour:
   - 0.17
   - 0.1
   - 0.05
-  PeakWavelength: 288
+  PeakWavelength: 192
   WGain: 1.6
   ClimateFrequencyScale: 0.85
   temperatureProfile:
