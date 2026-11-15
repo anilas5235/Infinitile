@@ -4,7 +4,7 @@ using System.Diagnostics;
 namespace Engine.Scripts.Jobs.Core{
     /// <summary>
     ///     The main-thread time the pipeline may spend in one frame. The scheduler starts it once per frame and the
-    ///     stages ask it before every item of work (a pool claim, the upload of one chunk, one column of a queue
+    ///     stages ask it before every item of work (a pool claim, the upload of one chunk, one row of a queue
     ///     scan, the start of a batch). The first item of a frame always runs, so every frame makes progress; an
     ///     item after it runs only while time is left. Work that was refused continues in the next frame where it
     ///     stopped. An item that has started is finished, so a frame can exceed the budget by one item.

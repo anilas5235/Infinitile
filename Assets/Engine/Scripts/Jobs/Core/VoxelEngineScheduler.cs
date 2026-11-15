@@ -84,7 +84,8 @@ namespace Engine.Scripts.Jobs.Core{
         ///     <see cref="SchedulerSettings.mainThreadBudgetMs" /> and
         ///     <see cref="SchedulerSettings.cappedFrameSpareShare" /> when the world is built; under a frame cap it
         ///     grows with the cap that is in force in the frame (<see cref="FrameCap" />). The focus update is not
-        ///     part of it: it runs outside the tick, when the focus enters another chunk.
+        ///     part of it: it runs outside the tick, from a check every 0.5 s, when the focus moved to another
+        ///     partition or its forward vector (quantised to 45°) changed.
         /// </summary>
         internal FrameBudget Budget{ get; set; }
 

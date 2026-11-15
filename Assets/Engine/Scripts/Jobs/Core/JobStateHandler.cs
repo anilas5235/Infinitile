@@ -74,6 +74,7 @@ namespace Engine.Scripts.Jobs.Core{
 
         private Step _step;
         private int _scanRow; // the next row of the running scan
+        private bool _changedDuringScan; // a wake-up or prune arrived while a cut scan waited for its next frame
         private bool _worked; // the turn did main-thread work
 
         /// <summary>
@@ -150,8 +151,15 @@ namespace Engine.Scripts.Jobs.Core{
                     }
                 }
 
+                // A wake-up or prune while the scan was cut may concern a row the scan had already visited (or the
+                // window it was scanning): the next turn scans again, and the stage only sleeps after a scan that
+                // nothing interrupted.
+                bool rescan = _changedDuringScan;
+                _changedDuringScan = false;
+                if (rescan) _turnsSinceScan = ScanInterval;
+
                 if (Queue.Count == 0){
-                    Sleeping = true; // nothing queued and nothing running
+                    if (!rescan) Sleeping = true; // nothing queued and nothing running
                     return EndTurn();
                 }
 
@@ -176,13 +184,14 @@ namespace Engine.Scripts.Jobs.Core{
 
         /// <summary>
         ///     Removes the queued items <paramref name="outsideWindow" /> returns true for and makes the next turn
-        ///     scan: the window moved with the focus. Without it the entries the focus left behind would stay
-        ///     queued until they reach the head of the queue, and the queue would grow past its reserved capacity
-        ///     during a flight.
+        ///     scan (or, during a cut scan, the turn after it): the window moved with the focus. Without it the
+        ///     entries the focus left behind would stay queued until they reach the head of the queue, and the queue
+        ///     would grow past its reserved capacity during a flight.
         /// </summary>
         protected void PruneQueue(PriorityUtil.Focus focus, Func<PriorityUtil.Focus, T, bool> outsideWindow){
             Queue.RemoveAll(focus, outsideWindow);
             _turnsSinceScan = ScanInterval;
+            if (_step == Step.Scan) _changedDuringScan = true;
         }
 
         /// <summary>
@@ -193,10 +202,13 @@ namespace Engine.Scripts.Jobs.Core{
         public abstract void FocusUpdate(PriorityUtil.Focus focus);
 
         /// <summary>
-        ///     Wakes up the handler from sleeping state so it resumes processing.
+        ///     Wakes up the handler from sleeping state so it resumes processing. A wake-up while a scan is cut
+        ///     makes the handler scan again once that scan is finished: the new work may lie in a row it has
+        ///     already visited.
         /// </summary>
         public void WakeUp(){
             Sleeping = false;
+            if (_step == Step.Scan) _changedDuringScan = true;
         }
 
         /// <summary>

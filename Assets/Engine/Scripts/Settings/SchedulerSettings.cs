@@ -19,9 +19,11 @@ namespace Engine.Scripts.Settings{
         public const int MaxScaledBuildSlots = 16;
 
         /// <summary>
-        ///     Number of chunks processed per update for data streaming/generation.
+        ///     Number of chunks processed per update for data streaming/generation. Read once when the world is
+        ///     built; at least 1 (a smaller value is taken as 1).
         /// </summary>
         [Tooltip("Number of chunks to process per update for generation")]
+        [Min(1)]
         public int chunkGenBatchSize = 8;
 
         /// <summary>
@@ -39,15 +41,19 @@ namespace Engine.Scripts.Settings{
         public int partitionBuildBatchSize = 8;
 
         /// <summary>
-        ///     Number of chunks processed per update for collider generation.
+        ///     Number of partitions baked per update for collider generation. Read once when the world is built; at
+        ///     least 1 (a smaller value is taken as 1).
         /// </summary>
-        [Tooltip("Number of chunks to process per update for collider generation")]
+        [Tooltip("Number of partitions to bake per update for collider generation")]
+        [Min(1)]
         public int colliderBatchSize = 4;
 
         /// <summary>
-        ///     Number of chunks lit per light job batch.
+        ///     Number of chunks lit per light job batch. Read once when the world is built; at least 1 (a smaller
+        ///     value is taken as 1).
         /// </summary>
         [Tooltip("Number of chunks to light per update")]
+        [Min(1)]
         public int lightBatchSize = 8;
 
         /// <summary>

@@ -111,7 +111,8 @@ namespace Engine.Scripts.Jobs.Core{
         ///     do not count against the batch, but a turn takes a limited number of them.
         ///     Items of work for the frame's budget: taking the partitions from the queue, every partition without
         ///     a voxel (its claim in the pool) and the start of the mesh job. A dispatch the budget cut keeps its
-        ///     partitions and continues where it stopped.
+        ///     partitions and continues where it stopped; a partition without a voxel that left the draw window or
+        ///     got a voxel in the meantime is skipped.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <param name="budget">The frame's budget.</param>
@@ -141,8 +142,12 @@ namespace Engine.Scripts.Jobs.Core{
 
             for (; _nextEmpty < _emptyPartitions.Count; _nextEmpty++){
                 int3 partition = _emptyPartitions[_nextEmpty];
-                // Frames passed since a cut dispatch took its partitions from the queue: the focus may have moved on
-                if (_dispatchCut && !IsInDrawWindow(partition, focus)) continue;
+                // Frames passed since a cut dispatch took its partitions from the queue: the focus may have moved
+                // on, and an edit may have placed a block in the partition. Such a partition is left to the next
+                // scan, which finds it flagged (or inactive) and meshes it like any other; made active here, with
+                // an empty mesh and its remesh flag consumed, the block would stay invisible and without collider.
+                if (_dispatchCut &&
+                    (!IsInDrawWindow(partition, focus) || ChunkManager.PartitionHasVoxels(partition))) continue;
                 if (!budget.Next()) return CutDispatch();
 
                 _cMeshBuildScheduler.ApplyEmpty(partition);

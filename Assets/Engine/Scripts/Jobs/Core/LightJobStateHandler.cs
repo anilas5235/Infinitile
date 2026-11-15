@@ -55,7 +55,7 @@ namespace Engine.Scripts.Jobs.Core{
             if (!_lightScheduler.IsReady) return StageTurn.None;
             if (!budget.Next()) return StageTurn.Cut;
 
-            int count = math.min(Settings.Scheduler.lightBatchSize, Queue.Count);
+            int count = math.min(BatchSize, Queue.Count); // the size from the settings, read once and at least 1
             int accepted = 0;
 
             while (accepted < count && Queue.Count > 0){
