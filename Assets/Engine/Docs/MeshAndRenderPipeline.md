@@ -766,7 +766,9 @@ step has to keep up with.
   no frame over 8.33 ms at 6. In the sprint flight the goal is met at 6 (p95 7.4 ms, 3 % of the frames over
   8.33 ms) and missed at 12 (p95 14.1 ms, 42 % over 8.33 ms, 0.8 % over 16.67 ms). The long frames come from
   main-thread work that is done in one piece: applying a data batch (2.4 ms on average, up to 8.7 ms) and applying
-  a mesh batch (2.4 ms, up to 5.9 ms). Bounding that work per frame by time is a later step.
+  a mesh batch (2.4 ms, up to 5.9 ms). These numbers are from before 2026-11-15: since then a main-thread budget
+  per frame bounds that work (`ChunkPipeline.md`, "Main-thread budget per frame", with the numbers measured
+  with it).
 
 ## Partitions Without Voxels Are Not Built
 

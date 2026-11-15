@@ -328,7 +328,8 @@ namespace Engine.Scripts.World{
         }
 
         /// <summary>
-        ///     Flags all neighbor partitions (including own) for remeshing.
+        ///     Flags the partition of the block for remeshing, and each face neighbour across a partition border the
+        ///     block touches, if that neighbour holds voxels (<see cref="ReMeshNeighbour" />).
         /// </summary>
         /// <param name="blockPosition">World block position that changed.</param>
         private void ReMeshPartitions(int3 blockPosition){
@@ -409,7 +410,6 @@ namespace Engine.Scripts.World{
             CompleteReadersOf(chunkPos);
             ushort oldVoxel = chunk.VoxelData.GetVoxel(blockPos);
             bool result = chunk.VoxelData.SetVoxel(blockPos, voxelId);
-            _chunks[chunkPos] = chunk;
             if (result) VoxelEdited?.Invoke(position, oldVoxel); // light follows every edit
             if (remesh && result){
                 ReMeshPartitions(position);

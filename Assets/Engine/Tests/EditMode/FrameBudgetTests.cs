@@ -272,7 +272,15 @@ namespace Engine.Tests.EditMode{
                 _clock.Spend(_itemMilliseconds);
             }
 
-            public override void FocusUpdate(PriorityUtil.Focus focus){ }
+            /// <summary>The window moved: like the mesh stage, the queue is pruned (here nothing leaves it).</summary>
+            public override void FocusUpdate(PriorityUtil.Focus focus){
+                PruneQueue(focus, static (_, _) => false);
+            }
+
+            /// <summary>New work in <paramref name="row" />, as an edit would bring it.</summary>
+            public void AddPending(int row, int item){
+                _pending[row + Rows].Add(item);
+            }
 
             protected override int ScanDistance => Rows;
 
@@ -390,6 +398,50 @@ namespace Engine.Tests.EditMode{
             CollectionAssert.AreEqual(whole.Log, cut.Log);
             Assert.AreEqual(cut.Log.Count, cut.Frame, "one item of work in every frame");
             for (int i = 0; i < cut.LogFrames.Count; i++) Assert.AreEqual(i, cut.LogFrames[i]);
+        }
+
+        /// <summary>
+        ///     Starts a scan the budget cuts after its first row (the row -2), so the rest of it waits for the next
+        ///     frame. Returns the budget of one item per frame.
+        /// </summary>
+        private static FrameBudget ScanCutAfterTheFirstRow(FakeClock clock, FakeStage stage){
+            stage.RunUntilAsleep(null);
+            stage.WakeUp();
+            FrameBudget budget = clock.Budget(1f);
+            budget.BeginFrame();
+            Assert.AreEqual(StageTurn.Cut, stage.Update(Origin, budget), "the scan waits for the next frame");
+            Assert.AreEqual("scan row -2", stage.Log[stage.Log.Count - 1]);
+            return budget;
+        }
+
+        [Test]
+        public void AWakeUpWhileAScanIsCut_LeadsToAnotherScan(){
+            // An edit flags work in a row the cut scan has already visited and wakes the stage. The rest of the
+            // scan finds nothing; the stage must scan again instead of going to sleep with the work flagged.
+            FakeClock clock = new();
+            FakeStage stage = new(clock, 1f, Items);
+            FrameBudget budget = ScanCutAfterTheFirstRow(clock, stage);
+
+            stage.AddPending(-2, 100);
+            stage.WakeUp();
+            stage.RunUntilAsleep(budget);
+
+            CollectionAssert.Contains(stage.Applied, 100, "the work the wake-up brought");
+        }
+
+        [Test]
+        public void APruneWhileAScanIsCut_LeadsToAnotherScan(){
+            // The focus moved while the scan waited: the rows already visited belong to the old window, so the
+            // stage scans again, as after any prune.
+            FakeClock clock = new();
+            FakeStage stage = new(clock, 1f, Items);
+            FrameBudget budget = ScanCutAfterTheFirstRow(clock, stage);
+
+            stage.AddPending(-2, 100);
+            stage.FocusUpdate(Origin);
+            stage.RunUntilAsleep(budget);
+
+            CollectionAssert.Contains(stage.Applied, 100, "the work in a row the cut scan had visited");
         }
 
         [Test]

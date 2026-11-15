@@ -157,8 +157,8 @@ namespace Engine.Tests.PlayMode{
             // the budget takes half the frame's spare time (2 ms + 4.17 ms with the shipped share 0.5): the draw
             // window is meshed 0.587 to 0.594 on average in the flight (0.60 without a budget, 0.40 with the budget
             // alone), the scheduler's 95th percentile is 6.2 ms against the limit of 8.17 ms, and 115 to 130
-            // frames are cut (Editor, 2026-11-15). Uncapped the effective budget is the budget, so the limit is
-            // twice the budget there.
+            // frames are cut (Editor, 2026-11-15). This limit holds without a budget too (6.6 to 6.9 ms): that
+            // the budget works is held by Flight_Uncapped_SchedulerStaysWithinTwiceTheBudget.
             float budget = VoxelWorld.Instance.Settings.Scheduler.mainThreadBudgetMs;
             Assert.Greater(budget, 0f, "the shipped settings bound the main-thread work per frame");
             Assert.Greater(run.FramesCut, 0, "frames in which the budget stopped a turn");
@@ -171,6 +171,25 @@ namespace Engine.Tests.PlayMode{
 
         [UnityTest]
         [Order(3)]
+        [Timeout(900000)]
+        public IEnumerator Flight_Uncapped_SchedulerStaysWithinTwiceTheBudget(){
+            // Uncapped the effective budget is the budget itself, so a frame of the scheduler stays near it: a
+            // turn stops once the budget is used, and a frame exceeds it by the one item that ran last. In a sprint
+            // flight at draw distance 12 the scheduler's 95th percentile is 2.3 to 2.6 ms with the 2 ms budget and
+            // 6.5 to 7.0 ms without one (Editor, 2026-11-15), so twice the budget (4 ms) fails when the budget is
+            // lost.
+            PipelineRun run = new();
+            yield return FlyThroughBuildingWorld(0, run);
+            float budget = VoxelWorld.Instance.Settings.Scheduler.mainThreadBudgetMs;
+            Assert.Greater(budget, 0f, "the shipped settings bound the main-thread work per frame");
+            Assert.AreEqual(budget, run.EffectiveBudgetMs, 1e-4f, "uncapped the effective budget is the budget");
+            Assert.Greater(run.FramesCut, 0, "frames in which the budget stopped a turn");
+            Assert.LessOrEqual(run.SchedulerP95Ms, 2f * budget,
+                $"scheduler main-thread ms per frame at the 95th percentile, against twice the budget ({budget:0.##} ms)");
+        }
+
+        [UnityTest]
+        [Order(4)]
         [Timeout(900000)]
         public IEnumerator FreshWorld_UnderATightBudget_IsBuiltTheSame(){
             // The main-thread budget only spreads a stage's turn over more frames: a world built with four items

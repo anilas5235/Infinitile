@@ -245,6 +245,39 @@ namespace Engine.Tests.PlayMode{
 
         [UnityTest]
         [Timeout(120000)]
+        public IEnumerator SetVoxel_IntoAPartitionThatACutDispatchHolds_MeshesIt(){
+            // One item of work per frame: the dispatch takes its partitions from the queue in one frame and makes
+            // one partition without a voxel active in each of the next. A block placed in one that is still waiting
+            // gives it something to show: it must not be made active with an empty mesh, but meshed like any
+            // partition the edit flagged, with its collider.
+            using MeshRig rig = new(PartitionHeight);
+            PriorityUtil.Focus focus = rig.FocusAt(1);
+            FrameBudget budget = ItemsPerFrame(1);
+            for (int i = 0; i < MaxUpdates && rig.MeshJobs.PartitionsWithoutMesh == 0; i++){
+                budget.BeginFrame();
+                rig.MeshHandler.Update(focus, budget);
+                yield return null;
+            }
+
+            List<int3> waiting = PlayModeFixtures.GetPrivateField<List<int3>>(rig.MeshHandler, "_emptyPartitions");
+            Assert.Greater(waiting.Count, 1, "the cut dispatch holds more partitions without a voxel");
+            int3 partition = waiting[waiting.Count - 1];
+            Assert.IsFalse(rig.Pool.IsPartitionActive(partition), "the partition still waits");
+            // Inside the partition, at none of its borders
+            int3 block = new(partition.x * ChunkWidth + 5, partition.y * PartitionHeight + 6, partition.z * ChunkDepth + 5);
+            Assert.IsTrue(rig.Manager.SetVoxel(PlayModeFixtures.Grass, block));
+
+            yield return rig.MeshUntilAsleep(focus, budget);
+            Assert.IsTrue(rig.Requested.Contains(partition), "GPU build of the partition that holds a block now");
+            Assert.Greater(rig.Pool.GetPartition(partition).ColliderMesh.vertexCount, 0, "collider mesh of the block");
+
+            yield return rig.BakeUntilAsleep(focus);
+            Assert.IsTrue(rig.Pool.IsCollidable(partition));
+            Assert.IsNotNull(rig.Pool.GetPartition(partition).Collider.sharedMesh, "collider of the block");
+        }
+
+        [UnityTest]
+        [Timeout(120000)]
         public IEnumerator SetVoxel_IntoAPartitionWithoutVoxels_MeshesIt(){
             using MeshRig rig = new(PartitionHeight);
             PriorityUtil.Focus focus = rig.FocusAt(1);

@@ -84,10 +84,14 @@ is the behaviour before 2026-11-15; read once when the world is built), plus the
 - **The world can change between the frames of a cut turn** (focus update, an edit, an unload). A cut mesh
   dispatch checks the draw window again for its partitions without a voxel and drops the partitions that lost a
   chunk of their neighbourhood; a cut data collect skips a chunk that was unloaded again; a cut mesh collect
-  claims no partition whose chunk is gone. `CompleteRunning` (shutdown, tests) finishes a cut turn's batch
-  without the budget.
-- **Not part of the budget:** the focus update (it runs when the focus enters another chunk, outside the turn)
-  and the renderer's GPU builds, which have their own slot count.
+  claims no partition whose chunk is gone. A partition without a voxel that a cut mesh dispatch still holds and
+  that got a block in the meantime is not made active empty: it is left to the next scan and meshed like any
+  other flagged partition. A wake-up or a queue prune that arrives while a scan is cut makes the stage scan again
+  instead of going to sleep after it. `CompleteRunning` (shutdown, tests) finishes a cut turn's batch without
+  the budget.
+- **Not part of the budget:** the focus update (outside the turn: a check every 0.5 s that reaches the stages
+  when the focus moved to another partition or its forward vector, quantised to 45°, changed) and the
+  renderer's GPU builds, which have their own slot count.
 - **A capped frame gives part of its spare time to the budget.** The budget is per frame, and a frame of the
   120 frames goal is 8.33 ms; a frame cap with a longer period leaves that much more time in every frame. The
   budget of a capped frame is `mainThreadBudgetMs + cappedFrameSpareShare × (period − 8.33 ms)` (shipped share
@@ -114,12 +118,16 @@ is the behaviour before 2026-11-15; read once when the world is built), plus the
   peak about 200 / 950 partitions (nearest first); settled after the flight stops within 8 to 22 / 105 to 206
   frames. A larger value fills the far edge and the collider queue sooner and has longer frames.
 
-`FrameBudgetTests` (EditMode) holds the budget and the round robin with a counting clock.
+`FrameBudgetTests` (EditMode) holds the budget and the round robin with a counting clock, that a wake-up or
+prune during a cut scan leads to another scan, the cap's period and the budget after the cap.
 `PipelineThroughputTests` (PlayMode) holds the limit on the number of frames a fresh world may take, the queue
-limits in a flight, the scheduler's share of a frame in a flight (p95 at most the budget after the frame cap plus
-the budget, twice the budget uncapped), the meshed share of the draw window in a capped flight and that a world
-built under a tight budget is the same world; `EmptyPartitionTests` covers a cut mesh dispatch.
-`FrameBudgetTests` also holds the cap's period and the budget after the cap.
+limits in a flight, the meshed share of the draw window in a capped flight, the scheduler's share of a frame and
+that a world built under a tight budget is the same world. The scheduler's share is held twice: in an uncapped
+sprint flight p95 at most twice the budget (4 ms; 2.3 to 2.6 ms with the budget, 6.5 to 7.0 ms without), which fails
+when the budget is lost; in the capped flight p95 at most the budget after the frame cap plus the budget
+(8.17 ms; 6.2 ms with the budget), a limit a run without the budget meets too (6.6 to 6.9 ms).
+`EmptyPartitionTests` covers a cut mesh dispatch, including a block placed in a partition it still holds;
+`SchedulerBatchSizeTests` that a batch size of 0 in the settings does not stall the data, light or bake stage.
 `PipelineMeasurementTests` (explicit) prints the timings.
 
 ## Light

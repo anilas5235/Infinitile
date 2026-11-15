@@ -239,6 +239,9 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             }
 #endif
 
+#if VOXEL_TIMING_LOGS
+            int builtJobs = _jobs.Length; // the log below runs after the clear
+#endif
             _results.Clear();
             _jobs.Clear();
             _claimed = 0;
@@ -248,7 +251,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             double totalJobTime = StopRecord();
             if (totalJobTime > 100){
                 VoxelEngineLogger.Warn<CMeshBuildScheduler>(
-                    $"Total Mesh Build Time for {_jobs.Length} jobs: <color=red>{totalJobTime:0.000}</color>ms"
+                    $"Total Mesh Build Time for {builtJobs} jobs: <color=red>{totalJobTime:0.000}</color>ms"
                 );
             }
 #else

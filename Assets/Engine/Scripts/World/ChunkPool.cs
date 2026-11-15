@@ -227,7 +227,7 @@ namespace Engine.Scripts.World{
         }
 
         /// <summary>
-        ///     Callback after collider bake: mark chunk collidable.
+        ///     Callback after collider bake: mark the partition collidable.
         /// </summary>
         internal void ColliderBaked(int3 position){
             _colliderSet.Add(position);
