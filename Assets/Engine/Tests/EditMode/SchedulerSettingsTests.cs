@@ -42,6 +42,15 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(Shipped().mainThreadBudgetMs, new SchedulerSettings().mainThreadBudgetMs, "class default");
         }
 
+        [Test]
+        public void ShippedSettings_GiveHalfTheSpareTimeOfACappedFrame(){
+            // The owner's pick of 2026-11-15 from shares 0, 0.5 and 1: half the spare time keeps about 4 ms of a
+            // 60 frames frame free; the class default is the same value
+            Assert.AreEqual(0.5f, Shipped().cappedFrameSpareShare, "spare share of the shipped settings");
+            Assert.AreEqual(Shipped().cappedFrameSpareShare, new SchedulerSettings().cappedFrameSpareShare,
+                "class default");
+        }
+
         [TestCase(2, 3, 2)]
         [TestCase(4, 6, 3)]
         [TestCase(8, 11, 5)]

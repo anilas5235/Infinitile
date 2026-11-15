@@ -67,7 +67,7 @@ namespace Engine.Tests.PlayMode{
         ///     the GPU build slots limit the mesh stage now. Without the partitions that hold no voxel (48 % of the
         ///     draw window, no mesh job and no GPU build) it needs 701 to 703. Under the main-thread budget of 2 ms
         ///     per frame it needed 799 to 820 while the budget left the spare time of a frame of the 60 frames cap
-        ///     unused; with the spare time (shipped share 1) it needs 703 again (Editor, 2026-11-15). The limit
+        ///     unused; with half of it (shipped share 0.5) or all of it it needs 703 again (Editor, 2026-11-15). The limit
         ///     leaves 8 % of slack and fails when the spare time is lost.
         /// </summary>
         private const int FreshBuildFrameBudget = 760;
@@ -154,10 +154,11 @@ namespace Engine.Tests.PlayMode{
             Assert.AreEqual(0, run.DispatchedWithoutVoxels, "partitions without a voxel that got a mesh job");
             // The main-thread budget bounds the scheduler's share of a frame: the flight has more work than fits,
             // so turns are cut, and a frame exceeds the budget by one item of work at most. Under the 60 frames cap
-            // the budget takes the frame's spare time (2 ms + 8.33 ms): the draw window is meshed as fast as without
-            // a budget (0.60 on average in the flight, 0.40 with the budget alone), and the scheduler's 95th
-            // percentile is 6.6 ms against 6.9 ms without a budget (Editor, 2026-11-15). Uncapped the effective
-            // budget is the budget, so the limit is twice the budget there.
+            // the budget takes half the frame's spare time (2 ms + 4.17 ms with the shipped share 0.5): the draw
+            // window is meshed 0.587 to 0.594 on average in the flight (0.60 without a budget, 0.40 with the budget
+            // alone), the scheduler's 95th percentile is 6.2 ms against the limit of 8.17 ms, and 115 to 130
+            // frames are cut (Editor, 2026-11-15). Uncapped the effective budget is the budget, so the limit is
+            // twice the budget there.
             float budget = VoxelWorld.Instance.Settings.Scheduler.mainThreadBudgetMs;
             Assert.Greater(budget, 0f, "the shipped settings bound the main-thread work per frame");
             Assert.Greater(run.FramesCut, 0, "frames in which the budget stopped a turn");

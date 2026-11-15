@@ -73,7 +73,10 @@ namespace Engine.Scripts.Jobs.Core{
         ///     <see cref="GoalFrameMs" />. No cap (period 0), a cap of 120 frames per second or more, or a share of
         ///     0 leave the budget as it is; a budget of 0 (no limit) stays 0.
         /// </summary>
-        /// <example>2 ms, share 1: 60 frames cap 10.33 ms, 30 frames cap 27 ms, 120 or 144 frames cap 2 ms.</example>
+        /// <example>
+        ///     2 ms, shipped share 0.5: 60 frames cap 6.17 ms, 30 frames cap 14.5 ms, 120 or 144 frames cap 2 ms
+        ///     (share 1: 10.33 and 27 ms).
+        /// </example>
         internal static float Effective(float milliseconds, float capPeriodMs, float capShare){
             if (milliseconds <= 0f) return 0f;
 
