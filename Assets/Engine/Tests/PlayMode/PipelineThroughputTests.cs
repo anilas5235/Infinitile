@@ -397,7 +397,9 @@ namespace Engine.Tests.PlayMode{
                 label, run.BuildSeconds, run.BuildFrames, run.PeakQueue[PipelineProbe.Mesh]));
             if (attribute)
                 Debug.Log(probe.OverBudget(label, flightBegin, flightEnd) +
-                          probe.OverBudget($"{label}, settling after it", flightEnd, probe.Frames));
+                          probe.OverBudget($"{label}, settling after it", flightEnd, probe.Frames) +
+                          probe.DequeueReport(label, flightBegin, flightEnd) +
+                          probe.DequeueReport($"{label}, settling after it", flightEnd, probe.Frames));
         }
 
         /// <summary>

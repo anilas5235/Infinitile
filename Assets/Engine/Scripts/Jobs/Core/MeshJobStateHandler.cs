@@ -30,6 +30,55 @@ namespace Engine.Scripts.Jobs.Core{
         private int _nextEmpty;
 
         /// <summary>
+        ///     What the dequeue loop of the dispatch did since the world was built, for the measurement rig. Plain
+        ///     counters: a few additions per entry and nothing else.
+        /// </summary>
+        internal struct DequeueCounts{
+            /// <summary>Dispatches that ran the dequeue loop, and the entries the queue held at their start.</summary>
+            internal long Calls, QueueAtStart;
+
+            /// <summary>Entries taken from the queue.</summary>
+            internal long Taken;
+
+            /// <summary>Entries kept for the batch: with a voxel (mesh job), and without one (empty partition).</summary>
+            internal long KeptWithVoxels, KeptEmpty;
+
+            /// <summary>
+            ///     Entries dropped: outside the draw window or under the pool's threshold (IsPartitionStillRelevant),
+            ///     3x3 neighbourhood not loaded and lit (CanGenerateMeshForChunk), no mesh needed
+            ///     (ShouldScheduleForMeshing).
+            /// </summary>
+            internal long DroppedNotRelevant, DroppedNotLit, DroppedNotNeeded;
+
+            /// <summary>Loops that ended because the queue was empty.</summary>
+            internal long QueueEmptied;
+
+            /// <summary>
+            ///     Dropped entries a later scan queued again, by the check that dropped them; only counted while
+            ///     <see cref="TrackRequeues" /> is on.
+            /// </summary>
+            internal long RequeuedNotRelevant, RequeuedNotLit, RequeuedNotNeeded;
+        }
+
+        private const byte DropNotRelevant = 0;
+        private const byte DropNotLit = 1;
+        private const byte DropNotNeeded = 2;
+
+        /// <summary>The counters of the dequeue loop (see <see cref="DequeueCounts" />).</summary>
+        internal DequeueCounts Dequeued;
+
+        private Dictionary<int3, byte> _droppedEntries; // null unless the measurement rig tracks requeues
+
+        /// <summary>
+        ///     Remembers every dropped entry, so that <see cref="DequeueCounts" /> also counts the ones a scan queues
+        ///     again. For the measurement rig only: it allocates.
+        /// </summary>
+        internal bool TrackRequeues{
+            get => _droppedEntries != null;
+            set => _droppedEntries = value ? _droppedEntries ?? new Dictionary<int3, byte>(4096) : null;
+        }
+
+        /// <summary>
         ///     Initializes a new instance of the MeshJobStateHandler class.
         /// </summary>
         /// <param name="settings">The voxel engine settings.</param>
@@ -99,6 +148,7 @@ namespace Engine.Scripts.Jobs.Core{
                     // The threshold is the pool's eviction priority, compare in the same measure
                     if (PriorityUtil.EvictionPriority(ref pos, ref focus) <= prioThreshold) continue;
 
+                    if (_droppedEntries != null && _droppedEntries.Remove(pos, out byte dropped)) CountRequeue(dropped);
                     Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
                 }
             }
@@ -126,15 +176,40 @@ namespace Engine.Scripts.Jobs.Core{
                 int emptyLimit = EmptyPartitionsPerBatch * BatchSize;
 
                 using (VoxelProfilerMarkers.MeshBuildDequeue.Auto()){
+                    Dequeued.Calls++;
+                    Dequeued.QueueAtStart += Queue.Count;
                     while (Set.Count < BatchSize && _emptyPartitions.Count < emptyLimit && Queue.Count > 0){
                         int3 partition = Queue.Dequeue();
-                        if (!IsPartitionStillRelevant(partition, focus, prioThreshold)) continue;
-                        if (!CanGenerateMeshForChunk(partition.xz)) continue;
-                        if (!ShouldScheduleForMeshing(partition)) continue;
+                        Dequeued.Taken++;
+                        if (!IsPartitionStillRelevant(partition, focus, prioThreshold)){
+                            Dequeued.DroppedNotRelevant++;
+                            _droppedEntries?.TryAdd(partition, DropNotRelevant);
+                            continue;
+                        }
 
-                        if (ChunkManager.PartitionHasVoxels(partition)) Set.Add(partition);
-                        else _emptyPartitions.Add(partition);
+                        if (!CanGenerateMeshForChunk(partition.xz)){
+                            Dequeued.DroppedNotLit++;
+                            _droppedEntries?.TryAdd(partition, DropNotLit);
+                            continue;
+                        }
+
+                        if (!ShouldScheduleForMeshing(partition)){
+                            Dequeued.DroppedNotNeeded++;
+                            _droppedEntries?.TryAdd(partition, DropNotNeeded);
+                            continue;
+                        }
+
+                        if (ChunkManager.PartitionHasVoxels(partition)){
+                            Set.Add(partition);
+                            Dequeued.KeptWithVoxels++;
+                        }
+                        else{
+                            _emptyPartitions.Add(partition);
+                            Dequeued.KeptEmpty++;
+                        }
                     }
+
+                    if (Queue.Count == 0) Dequeued.QueueEmptied++;
                 }
 
                 _dispatching = true;
@@ -169,6 +244,14 @@ namespace Engine.Scripts.Jobs.Core{
             _emptyPartitions.Clear();
             _dispatching = false;
             return StageTurn.Done;
+        }
+
+        private void CountRequeue(byte dropped){
+            switch (dropped){
+                case DropNotRelevant: Dequeued.RequeuedNotRelevant++; break;
+                case DropNotLit: Dequeued.RequeuedNotLit++; break;
+                default: Dequeued.RequeuedNotNeeded++; break;
+            }
         }
 
         private StageTurn CutDispatch(){
