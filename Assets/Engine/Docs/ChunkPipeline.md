@@ -69,7 +69,7 @@ is the behaviour before 2026-11-15; read once when the world is built), plus the
 
 - **A turn is made of items of work.** An item is: adding a data batch to the chunk store, the upload of one
   chunk to the renderer, the pool claim of one meshed partition, handing the meshes of a batch to Unity, one
-  partition without a voxel, one row of a queue scan, four entries the mesh dispatch takes from its queue, the
+  partition without a voxel, one row of a queue scan, 32 entries the mesh dispatch takes from its queue, the
   apply of a light batch or of a bake batch, the start of a batch.
 - **`FrameBudget` is asked before every item.** The scheduler starts it once per frame. The first item of a
   frame always runs, so every frame makes progress; a later item runs only while time is left. It reads

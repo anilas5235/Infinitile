@@ -813,10 +813,17 @@ collider bake queue, all for nothing to draw and nothing to collide with.
 - **Mesh step.** `MeshJobStateHandler` sorts the partitions it takes from the queue: those with voxels fill the
   batch, those without are claimed in the pool and are active at once (`CMeshBuildScheduler.ApplyEmpty`). They do
   not count against the batch; one turn takes at most four batches of them, so a turn stays bounded. The
-  dequeue loop asks the frame's budget for every four entries (`MeshJobStateHandler.DefaultDequeueSlice`): in the
-  Editor an entry cost 37 to 57 µs in a capped flight at draw distance 12 (2026-11-15; the priority queue checks
-  its whole heap on every `Dequeue` in builds with `DEBUG`), and a loop of up to 77 entries took up to 3.7 ms in
-  one piece. A loop the budget cut continues in the next frame and completes its batch before it is dispatched.
+  dequeue loop asks the frame's budget for every 32 entries (`MeshJobStateHandler.DefaultDequeueSlice`): in the
+  Editor an entry costs 5.2 to 5.4 µs in a capped flight at draw distance 12 (2026-11-15, an upper bound), so a
+  slice stays below 0.2 ms and a loop of up to 79 entries below 0.45 ms. A loop the budget cut continues in the
+  next frame and completes its batch before it is dispatched.
+- **Priority queue check.** `GenericPriorityQueue.Dequeue` (and `FastPriorityQueue`, `StablePriorityQueue`)
+  checks the whole heap (`IsValidQueue`, O(capacity)) only with the scripting define `PRIORITY_QUEUE_VALIDATE`
+  (Project Settings > Player > Other Settings > Scripting Define Symbols); add it to hunt a corrupted queue.
+  Until 2026-11-15 the check ran in every build with `DEBUG`, so in the Editor: an entry of the mesh dispatch
+  cost 37 to 57 µs, a dequeue loop took up to 3.7 ms in one piece and was sliced every four entries, and the
+  pool claims cost several times what they do now. Editor timings from before that change are not comparable
+  with timings after it. The cheap checks (empty queue, null node) still run under `DEBUG`.
 - **Collider state.** A partition without a collider is marked collidable right away
   (`MarkCollidableWithoutCollider`), so `VoxelWorld.IsCollidable` means "the collider is ready: baked, or known to
   be empty" and nothing waits for a bake that never comes. A meshed partition whose last solid face went loses its

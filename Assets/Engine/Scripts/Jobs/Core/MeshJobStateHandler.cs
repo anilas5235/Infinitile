@@ -26,10 +26,12 @@ namespace Engine.Scripts.Jobs.Core{
 
         /// <summary>
         ///     Entries the dequeue loop takes from the queue per item of the frame's budget. Measured on 2026-11-15
-        ///     in the Editor: 37 to 57 us per entry in a capped flight at draw distance 12 (the queue checks its heap
-        ///     on every Dequeue in builds with DEBUG), so a slice of 4 stays near 0.2 ms.
+        ///     in the Editor in a capped flight at draw distance 12: 5.2 to 5.4 us per entry (an upper bound, the
+        ///     Editor was not focused), so a slice of 32 stays below 0.2 ms; a loop takes 79 entries at most. (With
+        ///     the priority queue's heap check in every Dequeue, which ran under DEBUG until then and now needs the
+        ///     define PRIORITY_QUEUE_VALIDATE, an entry cost 37 to 57 us and the slice was 4.)
         /// </summary>
-        internal const int DefaultDequeueSlice = 4;
+        internal const int DefaultDequeueSlice = 32;
 
         // A dispatch the budget cut: the rest continues in the next frame, first the rest of the dequeue loop
         private bool _dispatching;

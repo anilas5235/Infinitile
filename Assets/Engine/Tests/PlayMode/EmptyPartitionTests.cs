@@ -222,8 +222,8 @@ namespace Engine.Tests.PlayMode{
         [UnityTest]
         [Timeout(120000)]
         public IEnumerator PartitionsOfACutDispatch_ThatLeftTheDrawWindow_AreNotMadeActive(){
-            // One item of work per frame: the dispatch takes its partitions from the queue (four entries per
-            // frame) and makes one partition without a voxel active in each of the next. When the focus moves on in between, the
+            // One item of work per frame: the dispatch takes its partitions from the queue (up to
+            // MeshJobStateHandler.DefaultDequeueSlice entries per frame) and makes one partition without a voxel active in each of the next. When the focus moves on in between, the
             // ones that are waiting are outside the draw window and must not claim a place in the pool.
             using MeshRig rig = new(PartitionHeight);
             PriorityUtil.Focus focus = rig.FocusAt(1); // the vertical draw window holds the partitions 0 to 3
@@ -251,8 +251,8 @@ namespace Engine.Tests.PlayMode{
         [UnityTest]
         [Timeout(120000)]
         public IEnumerator SetVoxel_IntoAPartitionThatACutDispatchHolds_MeshesIt(){
-            // One item of work per frame: the dispatch takes its partitions from the queue (four entries per
-            // frame) and makes one partition without a voxel active in each of the next. A block placed in one that is still waiting
+            // One item of work per frame: the dispatch takes its partitions from the queue (up to
+            // MeshJobStateHandler.DefaultDequeueSlice entries per frame) and makes one partition without a voxel active in each of the next. A block placed in one that is still waiting
             // gives it something to show: it must not be made active with an empty mesh, but meshed like any
             // partition the edit flagged, with its collider.
             using MeshRig rig = new(PartitionHeight);
