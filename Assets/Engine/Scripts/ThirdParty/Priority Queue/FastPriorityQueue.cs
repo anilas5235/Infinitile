@@ -299,7 +299,11 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
         public T Dequeue(){
 #if DEBUG
             if (Count <= 0) throw new InvalidOperationException("Cannot call Dequeue() on an empty queue");
-
+#endif
+#if PRIORITY_QUEUE_VALIDATE
+            // The check of the whole heap is O(capacity) per Dequeue; under DEBUG it made every Dequeue in the Editor
+            // cost 37 to 57 us at the mesh queue's size (2026-11-15). Switch it on with the scripting define
+            // PRIORITY_QUEUE_VALIDATE (Project Settings > Player > Scripting Define Symbols) to hunt a corrupted queue.
             if (!IsValidQueue()){
                 throw new InvalidOperationException(
                     "Queue has been corrupted (Did you update a node priority manually instead of calling UpdatePriority()?" +
