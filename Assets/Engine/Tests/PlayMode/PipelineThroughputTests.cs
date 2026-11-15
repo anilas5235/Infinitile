@@ -329,19 +329,23 @@ namespace Engine.Tests.PlayMode{
 
         /// <summary>
         ///     Loads a fresh world, flies along +x as soon as the focus column is collidable, then stops and samples
-        ///     until the world around the focus is complete.
+        ///     until the world around the focus is complete. With <paramref name="attribute" /> the probe records
+        ///     every row of <see cref="FrameAttribution" />, and the log gets the table keyed on the scheduler's time
+        ///     per frame for the flight and for the settling after it (which frames went over the budget, and in
+        ///     what).
         /// </summary>
         internal static IEnumerator FlyThroughBuildingWorld(int frameRate, PipelineRun run, string variant = "",
-            int drawDistance = 0){
+            int drawDistance = 0, bool attribute = false){
             yield return LoadFreshWorld(frameRate, drawDistance);
             VoxelWorld world = VoxelWorld.Instance;
             int draw = world.Settings.Chunk.DrawDistance;
             string label = $"{variant}flight {FlightSpeed:0} u/s for {FlightSeconds:0} s, draw {draw}, {CapName(frameRate)}";
             Transform focus = PlayModeFixtures.GetPrivateField<Transform>(world, "focus");
-            using PipelineProbe probe = new(world);
+            using PipelineProbe probe = new(world, attribute);
 
             // The player starts to fly as soon as there is ground under the focus.
             yield return AllocationTests.WaitForFocusColumn(world, 60f, true);
+            int flightBegin = probe.Frames;
             Transform body = FlightBody(focus);
             Vector3 start = body.position;
             float flightStart = Time.realtimeSinceStartup;
@@ -361,6 +365,7 @@ namespace Engine.Tests.PlayMode{
                 ground.Sample(world, focus);
             }
 
+            int flightEnd = probe.Frames;
             CultureInfo inv = CultureInfo.InvariantCulture;
             float distance = (focus.position - start).magnitude;
             Debug.Log(ground.Report(label));
@@ -390,6 +395,9 @@ namespace Engine.Tests.PlayMode{
             Debug.Log(string.Format(inv, "[PipelineProbe] {0}: world complete {1:0.0} s ({2} frames) after the flight; " +
                                          "mesh queue peak {3}",
                 label, run.BuildSeconds, run.BuildFrames, run.PeakQueue[PipelineProbe.Mesh]));
+            if (attribute)
+                Debug.Log(probe.OverBudget(label, flightBegin, flightEnd) +
+                          probe.OverBudget($"{label}, settling after it", flightEnd, probe.Frames));
         }
 
         /// <summary>

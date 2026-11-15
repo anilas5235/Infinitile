@@ -207,6 +207,23 @@ namespace Engine.Tests.PlayMode{
             return _attribution != null ? _attribution.Table(label, _frameMs, from, to) : "";
         }
 
+        /// <summary>
+        ///     The attribution keyed on the scheduler's time per frame (see <see cref="FrameAttribution.TableByRow" />)
+        ///     for the frames <paramref name="from" /> to <paramref name="to" />: a frame is over when the scheduler
+        ///     took longer than its effective budget (the largest one of the window, after the frame cap). Empty
+        ///     without attribution.
+        /// </summary>
+        internal string OverBudget(string label, int from, int to){
+            if (_attribution == null) return "";
+            from = math.clamp(from, 0, _effectiveBudgetMs.Count);
+            to = math.clamp(to, from, _effectiveBudgetMs.Count);
+            float limit = 0f;
+            for (int i = from; i < to; i++) limit = math.max(limit, _effectiveBudgetMs[i]);
+            return limit > 0f
+                ? _attribution.TableByRow(label, FrameAttribution.SchedulerRow, limit, from, to)
+                : $"[FrameAttribution] {label}: the budget has no limit\n";
+        }
+
         private void OnMeshBatch(HashSet<int3> partitions){
             MeshBatches++;
             MeshPartitions += partitions.Count;

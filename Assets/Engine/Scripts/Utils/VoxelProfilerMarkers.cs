@@ -69,6 +69,14 @@ namespace Engine.Scripts.Utils{
         // Parts of the mesh batch apply, and the collider assignment of a partition
         internal static readonly ProfilerMarker MeshBuildClaim = new("Voxel.MeshBuild.Claim");
         internal static readonly ProfilerMarker MeshBuildApply = new("Voxel.MeshBuild.Apply");
+
+        // The start of every mesh collect (also of a resumed one): Complete of the mesh job and the wait for a
+        // running collider bake, before the first claim. The same bake wait inside a pool claim is not in here
+        internal static readonly ProfilerMarker MeshBuildWaitBake = new("Voxel.MeshBuild.WaitBake");
+
+        // The dispatch of the mesh stage taking its partitions from the queue, before the claims of the empty
+        // partitions and the start of the mesh job
+        internal static readonly ProfilerMarker MeshBuildDequeue = new("Voxel.MeshBuild.Dequeue");
         internal static readonly ProfilerMarker ColliderAssign = new("Voxel.Collider.Assign");
     }
 }

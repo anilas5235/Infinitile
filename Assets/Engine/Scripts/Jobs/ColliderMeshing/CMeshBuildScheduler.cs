@@ -165,8 +165,10 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
 #if VOXEL_TIMING_LOGS
             double start = Time.realtimeSinceStartupAsDouble;
 #endif
-            _handle.Complete();
-            _chunkPool.NotifyPartitionMeshWriting(); // a running bake may still read the meshes written below
+            using (VoxelProfilerMarkers.MeshBuildWaitBake.Auto()){
+                _handle.Complete();
+                _chunkPool.NotifyPartitionMeshWriting(); // a running bake may still read the meshes written below
+            }
 
             // Claim every partition before any mesh is assigned: a claim can reclaim a pooled chunk of this batch
             // (the world then unloads its data), which would clear a mesh already handed out. A partition claimed

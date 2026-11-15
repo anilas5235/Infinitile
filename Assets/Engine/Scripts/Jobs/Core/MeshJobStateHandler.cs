@@ -125,14 +125,16 @@ namespace Engine.Scripts.Jobs.Core{
                 float prioThreshold = ChunkPool.GetPartitionPrioThreshold();
                 int emptyLimit = EmptyPartitionsPerBatch * BatchSize;
 
-                while (Set.Count < BatchSize && _emptyPartitions.Count < emptyLimit && Queue.Count > 0){
-                    int3 partition = Queue.Dequeue();
-                    if (!IsPartitionStillRelevant(partition, focus, prioThreshold)) continue;
-                    if (!CanGenerateMeshForChunk(partition.xz)) continue;
-                    if (!ShouldScheduleForMeshing(partition)) continue;
+                using (VoxelProfilerMarkers.MeshBuildDequeue.Auto()){
+                    while (Set.Count < BatchSize && _emptyPartitions.Count < emptyLimit && Queue.Count > 0){
+                        int3 partition = Queue.Dequeue();
+                        if (!IsPartitionStillRelevant(partition, focus, prioThreshold)) continue;
+                        if (!CanGenerateMeshForChunk(partition.xz)) continue;
+                        if (!ShouldScheduleForMeshing(partition)) continue;
 
-                    if (ChunkManager.PartitionHasVoxels(partition)) Set.Add(partition);
-                    else _emptyPartitions.Add(partition);
+                        if (ChunkManager.PartitionHasVoxels(partition)) Set.Add(partition);
+                        else _emptyPartitions.Add(partition);
+                    }
                 }
 
                 _dispatching = true;

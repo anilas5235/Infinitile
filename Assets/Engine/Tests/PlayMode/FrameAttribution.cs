@@ -28,6 +28,37 @@ namespace Engine.Tests.PlayMode{
         /// <summary>Longest frames of a window that are printed with everything that ran in them.</summary>
         private const int WorstFrames = 8;
 
+        /// <summary>The row <see cref="TableByRow" /> is keyed on for the main-thread budget of the scheduler.</summary>
+        internal const string SchedulerRow = "scheduler stages (sum)";
+
+        /// <summary>Frames with the largest key row that <see cref="TableByRow" /> prints one by one.</summary>
+        private const int LargestKeyFrames = 20;
+
+        /// <summary>Upper edges of the classes of the overshoot histogram in ms; the last class is open.</summary>
+        private static readonly float[] OvershootEdges ={ 0.5f, 1f, 2f, 3f, 4f, 6f, 8f };
+
+        /// <summary>
+        ///     The scheduler's time of a frame in parts that do not overlap and add up to <see cref="SchedulerRow" />
+        ///     (every part is a marker row or what is left of one without the rows inside it). A chunk unload is
+        ///     not a part of its own: it runs inside "data complete" (eviction in AddChunks) and inside a mesh
+        ///     claim (a claim in a full pool reclaims a chunk, and the world unloads its data).
+        /// </summary>
+        private static readonly string[] SchedulerParts ={
+            "data complete", "light complete", "mesh collect start (job + bake wait)", "mesh claim partitions",
+            "mesh apply mesh data", "mesh complete rest (assign, empty colliders)", "bake complete",
+            "collect outside the four completes", "step scan (any stage)", "data schedule", "light schedule",
+            "mesh schedule", "bake schedule", "mesh dequeue", "dispatch rest (other dequeues, empty partitions)",
+            "stages outside collect, scan, dispatch"
+        };
+
+        private static readonly string[] StageRows ={ "stage data", "stage light", "stage mesh", "stage bake" };
+
+        /// <summary>Unity markers that can run inside the scheduler; the other Unity rows are the frame around it.</summary>
+        private static readonly string[] UnityInsideScheduler ={
+            "JobHandle.Complete", "GameObject.Activate", "GameObject.Deactivate", "Physics.SyncTransforms",
+            "Physics.HandleColliderHierarchyChanges", "GC.Collect", "Semaphore.WaitForSignal"
+        };
+
         private sealed class Row{
             internal int Depth;
             internal string Label;
@@ -35,6 +66,7 @@ namespace Engine.Tests.PlayMode{
             internal ProfilerMarker Marker; // one of the engine's markers
             internal bool HasMarker;
             internal string[] Sum; // labels of the rows a computed row adds up
+            internal string[] Minus; // labels of the rows a computed row takes off its sum (not below 0)
             internal bool Delayed; // a counter that arrives some frames late: no per-frame comparison
         }
 
@@ -54,13 +86,19 @@ namespace Engine.Tests.PlayMode{
             return new Row{ Depth = depth, Label = label, Sum = sum };
         }
 
+        /// <summary>What is left of row <paramref name="from" /> without the rows <paramref name="minus" />.</summary>
+        private static Row Rest(int depth, string label, string from, params string[] minus){
+            return new Row{ Depth = depth, Label = label, Sum = new[]{ from }, Minus = minus };
+        }
+
+        /// <summary>A computed row reads marker rows anywhere in the list and computed rows above itself.</summary>
         private static Row[] BuildRows(){
             return new[]{
                 Total(0, "pipeline on the main thread (sum)", "stage data", "stage light", "stage mesh",
                     "stage bake", "focus update", "gpu build complete", "gpu build dispatch", "render buffer rebuild"),
                 Unity(0, "PlayerLoop"),
                 Unity(1, "Update.ScriptRunBehaviourUpdate", "Update of all scripts"),
-                Total(2, "scheduler stages (sum)", "stage data", "stage light", "stage mesh", "stage bake"),
+                Total(2, SchedulerRow, "stage data", "stage light", "stage mesh", "stage bake"),
                 Voxel(3, "stage data", VoxelProfilerMarkers.SchedulerData),
                 Voxel(3, "stage light", VoxelProfilerMarkers.SchedulerLight),
                 Voxel(3, "stage mesh", VoxelProfilerMarkers.SchedulerMesh),
@@ -77,19 +115,33 @@ namespace Engine.Tests.PlayMode{
                 Voxel(5, "gpu upload voxels / light", VoxelProfilerMarkers.GpuUploadChunk),
                 Voxel(4, "light complete", VoxelProfilerMarkers.LightComplete),
                 Voxel(4, "mesh complete", VoxelProfilerMarkers.MeshBuildComplete),
+                // Before the first claim, on every collect and on every resume of a cut one; the bake wait in here
+                // is also in "wait for bake job", which counts the waits inside the pool's claims as well
+                Voxel(5, "mesh collect start (job + bake wait)", VoxelProfilerMarkers.MeshBuildWaitBake),
                 Voxel(5, "mesh claim partitions", VoxelProfilerMarkers.MeshBuildClaim),
                 Voxel(6, "pool claim partition", VoxelProfilerMarkers.PoolClaimPartition),
                 Voxel(7, "pool activate chunk object", VoxelProfilerMarkers.PoolActivateChunk),
                 Voxel(7, "partition clear (any caller)", VoxelProfilerMarkers.PartitionClear),
                 Voxel(5, "mesh apply mesh data", VoxelProfilerMarkers.MeshBuildApply),
+                Rest(5, "mesh complete rest (assign, empty colliders)", "mesh complete",
+                    "mesh collect start (job + bake wait)", "mesh claim partitions", "mesh apply mesh data"),
                 Voxel(4, "bake complete", VoxelProfilerMarkers.ColliderBakeComplete),
                 Voxel(5, "collider assign", VoxelProfilerMarkers.ColliderAssign),
+                Rest(4, "collect outside the four completes", "step collect (any stage)", "data complete",
+                    "light complete", "mesh complete", "bake complete"),
                 Voxel(3, "step scan (any stage)", VoxelProfilerMarkers.SchedulerScan),
                 Voxel(3, "step dispatch (any stage)", VoxelProfilerMarkers.SchedulerDispatch),
                 Voxel(4, "data schedule", VoxelProfilerMarkers.DataGenSchedule),
                 Voxel(4, "light schedule", VoxelProfilerMarkers.LightSchedule),
                 Voxel(4, "mesh schedule", VoxelProfilerMarkers.MeshBuildSchedule),
                 Voxel(4, "bake schedule", VoxelProfilerMarkers.ColliderBakeSchedule),
+                Voxel(4, "mesh dequeue", VoxelProfilerMarkers.MeshBuildDequeue),
+                // The dequeue loops of the other stages have no marker; the claims of the mesh stage's partitions
+                // without a voxel ("pool claim partition" there) are in here too
+                Rest(4, "dispatch rest (other dequeues, empty partitions)", "step dispatch (any stage)",
+                    "data schedule", "light schedule", "mesh schedule", "bake schedule", "mesh dequeue"),
+                Rest(3, "stages outside collect, scan, dispatch", SchedulerRow, "step collect (any stage)",
+                    "step scan (any stage)", "step dispatch (any stage)"),
                 Voxel(2, "gpu build complete", VoxelProfilerMarkers.PointBuildComplete),
                 Voxel(3, "gpu build copy", VoxelProfilerMarkers.PointBuildCopy),
                 Voxel(2, "gpu build dispatch", VoxelProfilerMarkers.PointBuildDispatch),
@@ -156,7 +208,9 @@ namespace Engine.Tests.PlayMode{
         private readonly Row[] _rows = BuildRows();
         private readonly ProfilerRecorder[] _recorders;
         private readonly List<float>[] _ms;
+        private readonly List<ushort>[] _calls; // times an engine marker ran in the frame; null for other rows
         private readonly int[][] _sumOf;
+        private readonly int[][] _minusOf;
         private readonly int _reference;
         private int _samples;
 
@@ -164,13 +218,17 @@ namespace Engine.Tests.PlayMode{
             Dictionary<string, ProfilerRecorderHandle> handles = AvailableHandles();
             _recorders = new ProfilerRecorder[_rows.Length];
             _ms = new List<float>[_rows.Length];
+            _calls = new List<ushort>[_rows.Length];
             _sumOf = new int[_rows.Length][];
+            _minusOf = new int[_rows.Length][];
             _reference = -1;
             for (int i = 0; i < _rows.Length; i++){
                 Row row = _rows[i];
                 if (row.Sum != null){
                     _sumOf[i] = new int[row.Sum.Length];
                     for (int k = 0; k < row.Sum.Length; k++) _sumOf[i][k] = IndexOf(row.Sum[k]);
+                    _minusOf[i] = new int[row.Minus?.Length ?? 0];
+                    for (int k = 0; k < _minusOf[i].Length; k++) _minusOf[i][k] = IndexOf(row.Minus[k]);
                     _ms[i] = new List<float>(capacity);
                     continue;
                 }
@@ -186,6 +244,7 @@ namespace Engine.Tests.PlayMode{
                               ProfilerRecorderOptions.CollectOnlyOnCurrentThread);
                 if (!_recorders[i].Valid) continue;
                 _ms[i] = new List<float>(capacity);
+                if (row.HasMarker) _calls[i] = new List<ushort>(capacity);
                 // The row that spans a whole frame: the Editor's tick, or the player loop in a build
                 if (row.Name == ReferenceEditor || (row.Name == ReferencePlayer && _reference < 0)) _reference = i;
             }
@@ -241,6 +300,10 @@ namespace Engine.Tests.PlayMode{
             for (int i = 0; i < _rows.Length; i++){
                 if (_ms[i] == null || _sumOf[i] != null) continue;
                 _ms[i].Add(_recorders[i].LastValue * 1e-6f);
+                if (_calls[i] == null) continue;
+                // The last frame's sample also holds how often the marker was entered in it
+                long calls = _recorders[i].Count > 0 ? _recorders[i].GetSample(0).Count : 0;
+                _calls[i].Add((ushort)Math.Clamp(calls, 0, ushort.MaxValue));
             }
 
             for (int i = 0; i < _rows.Length; i++){
@@ -248,7 +311,9 @@ namespace Engine.Tests.PlayMode{
                 float sum = 0f;
                 foreach (int k in _sumOf[i])
                     if (_ms[k] != null) sum += _ms[k][_samples];
-                _ms[i].Add(sum);
+                foreach (int k in _minusOf[i])
+                    if (_ms[k] != null) sum -= _ms[k][_samples];
+                _ms[i].Add(_minusOf[i].Length > 0 ? Math.Max(0f, sum) : sum);
             }
 
             _samples++;
@@ -367,6 +432,203 @@ namespace Engine.Tests.PlayMode{
             }
 
             return text.ToString();
+        }
+
+        /// <summary>
+        ///     The table for the samples <paramref name="from" /> (included) to <paramref name="to" /> (excluded),
+        ///     keyed on the row <paramref name="keyLabel" /> instead of on the frame time: a frame counts as over
+        ///     when that row is above <paramref name="limitMs" />, and the frames printed one by one are the ones in
+        ///     which the row is largest. The frame time cannot pick these frames under a frame cap: there every
+        ///     frame is about as long as the cap's period (16.67 ms at 60 fps) whatever the scheduler did in it, and
+        ///     the question is which work made the scheduler exceed its budget, not which frames were long. All
+        ///     rows here are recorder samples taken in the same <see cref="Sample" /> call, so they have the same
+        ///     lag and the key row and every other row of a sample belong to the same frame: no shift is needed.
+        ///     Columns: milliseconds per frame over all frames (average, 95th percentile, maximum), the share of
+        ///     frames the row ran in, the row's average and maximum in the frames over the limit, its average in
+        ///     the others, the share of the frames over the limit in which the row alone is as long as the overshoot
+        ///     (key row minus limit) or longer, and the share of the summed overshoot it covers (per frame the
+        ///     smaller of row and overshoot). Rows nest, so their shares must not be added up; the list after the
+        ///     table splits every frame over the limit into <see cref="SchedulerParts" />, which do not overlap.
+        /// </summary>
+        internal string TableByRow(string label, string keyLabel, float limitMs, int from, int to){
+            CultureInfo inv = CultureInfo.InvariantCulture;
+            int key = IndexOf(keyLabel);
+            from = Math.Max(from, 0);
+            to = Math.Min(to, _samples);
+            if (to <= from || _ms[key] == null) return $"{Head}{label}: no samples\n";
+
+            int frames = to - from;
+            List<float> keys = new(frames), overshoots = new();
+            List<int> overFrames = new();
+            double overshootSum = 0;
+            for (int i = from; i < to; i++){
+                float ms = _ms[key][i];
+                keys.Add(ms);
+                if (ms <= limitMs) continue;
+                overFrames.Add(i);
+                overshoots.Add(ms - limitMs);
+                overshootSum += ms - limitMs;
+            }
+
+            keys.Sort();
+            overshoots.Sort();
+            int over = overFrames.Count;
+            StringBuilder text = new();
+            text.AppendLine(string.Format(inv,
+                "{0}{1}: {2} frames keyed on '{3}' (avg {4:0.000}, p50 {5:0.000}, p95 {6:0.000}, p99 {7:0.000}, " +
+                "max {8:0.000} ms): {9} over the limit of {10:0.00} ms ({11:0.00} %)", Head, label, frames, keyLabel,
+                Average(keys), At(keys, 0.5f), At(keys, 0.95f), At(keys, 0.99f), keys[frames - 1], over, limitMs,
+                100.0 * over / frames));
+            if (over == 0) return text.ToString();
+
+            text.Append(string.Format(inv,
+                "{0}{1}: overshoot of these {2} frames in ms: avg {3:0.000}, p50 {4:0.000}, p95 {5:0.000}, " +
+                "max {6:0.000}, summed {7:0.0}; frames per class:", Head, label, over, overshootSum / over,
+                At(overshoots, 0.5f), At(overshoots, 0.95f), overshoots[over - 1], overshootSum));
+            int[] classes = new int[OvershootEdges.Length + 1];
+            foreach (float overshoot in overshoots){
+                int c = 0;
+                while (c < OvershootEdges.Length && overshoot > OvershootEdges[c]) c++;
+                classes[c]++;
+            }
+
+            for (int c = 0; c < classes.Length; c++){
+                float low = c == 0 ? 0f : OvershootEdges[c - 1];
+                text.Append(c < OvershootEdges.Length
+                    ? string.Format(inv, " {0:0.#} to {1:0.#}: {2};", low, OvershootEdges[c], classes[c])
+                    : string.Format(inv, " over {0:0.#}: {1};", low, classes[c]));
+            }
+
+            text.AppendLine();
+
+            // The stage that had the frame: the one with the largest stage row
+            int[] stages = new int[StageRows.Length], perStage = new int[StageRows.Length];
+            for (int s = 0; s < stages.Length; s++) stages[s] = IndexOf(StageRows[s]);
+            foreach (int i in overFrames) perStage[Largest(stages, i)]++;
+            text.Append($"{Head}{label}: frames over the limit by their largest stage:");
+            for (int s = 0; s < stages.Length; s++) text.Append($" {StageRows[s]} {perStage[s]};");
+            text.AppendLine();
+
+            text.AppendLine(string.Format(inv, "{0}{1,-52}{2,8}{3,8}{4,8}{5,9}{6,10}{7,10}{8,10}{9,11}{10,11}", Head,
+                "ms per frame", "avg", "p95", "max", "ran in %", "avg over", "max over", "avg rest", "explains %",
+                "of over %"));
+            List<float> sorted = new(frames);
+            for (int r = 0; r < _rows.Length; r++){
+                Row row = _rows[r];
+                if (row.Delayed) continue; // arrives some frames late: no per-frame comparison
+                string name = new string(' ', 2 * row.Depth) + row.Label;
+                if (_ms[r] == null){
+                    text.AppendLine($"{Head}{name,-52} not available");
+                    continue;
+                }
+
+                sorted.Clear();
+                double sum = 0, sumOver = 0, covered = 0;
+                float maxOver = 0f;
+                int active = 0, explained = 0;
+                for (int i = from; i < to; i++){
+                    float ms = _ms[r][i];
+                    sorted.Add(ms);
+                    sum += ms;
+                    if (ms > ActiveMs) active++;
+                    float overshoot = _ms[key][i] - limitMs;
+                    if (overshoot <= 0f) continue;
+                    sumOver += ms;
+                    maxOver = Math.Max(maxOver, ms);
+                    covered += Math.Min(ms, overshoot);
+                    if (ms >= overshoot) explained++;
+                }
+
+                sorted.Sort();
+                text.AppendLine(string.Format(inv,
+                    "{0}{1,-52}{2,8:0.000}{3,8:0.000}{4,8:0.000}{5,9:0.0}{6,10:0.000}{7,10:0.000}{8,10:0.000}" +
+                    "{9,11:0.0}{10,11:0.0}", Head, name, sum / frames, At(sorted, 0.95f), sorted[frames - 1],
+                    100.0 * active / frames, sumOver / over, maxOver, (sum - sumOver) / Math.Max(frames - over, 1),
+                    100.0 * explained / over, 100.0 * covered / overshootSum));
+            }
+
+            // Every frame over the limit by the largest of the parts that do not overlap
+            int[] parts = new int[SchedulerParts.Length];
+            for (int p = 0; p < parts.Length; p++) parts[p] = IndexOf(SchedulerParts[p]);
+            int bakeWait = IndexOf("wait for bake job");
+            int[] leads = new int[parts.Length], alone = new int[parts.Length];
+            double[] partSum = new double[parts.Length], partOvershoot = new double[parts.Length];
+            double[] leadOvershoot = new double[parts.Length], leadBakeWait = new double[parts.Length];
+            float[] partMax = new float[parts.Length];
+            foreach (int i in overFrames){
+                float overshoot = _ms[key][i] - limitMs;
+                for (int p = 0; p < parts.Length; p++)
+                    if (_ms[parts[p]] != null) partOvershoot[p] += Math.Min(_ms[parts[p]][i], overshoot);
+
+                int lead = Largest(parts, i);
+                float ms = _ms[parts[lead]] != null ? _ms[parts[lead]][i] : 0f;
+                leads[lead]++;
+                partSum[lead] += ms;
+                partMax[lead] = Math.Max(partMax[lead], ms);
+                leadOvershoot[lead] += overshoot;
+                if (ms >= overshoot) alone[lead]++;
+                if (_ms[bakeWait] != null) leadBakeWait[lead] += _ms[bakeWait][i];
+            }
+
+            text.AppendLine($"{Head}{label}: the frames over the limit by the largest part of '{keyLabel}' in " +
+                            "them. The parts do not overlap and add up to the key row; 'alone' counts the frames in " +
+                            "which that part is as long as the overshoot or longer, 'bake wait' is the average of " +
+                            "row 'wait for bake job' in those frames (wherever it was waited)");
+            text.AppendLine(string.Format(inv, "{0}{1,-50}{2,7}{3,9}{4,9}{5,9}{6,10}{7,11}{8,7}{9,10}{10,12}", Head,
+                "largest part", "frames", "frames %", "part avg", "part max", "over avg", "of over %", "alone",
+                "bake wait", "covers %"));
+            for (int p = 0; p < parts.Length; p++){
+                if (leads[p] == 0 && partOvershoot[p] <= 0) continue;
+                text.AppendLine(string.Format(inv,
+                    "{0}{1,-50}{2,7}{3,9:0.0}{4,9:0.000}{5,9:0.000}{6,10:0.000}{7,11:0.0}{8,7}{9,10:0.000}{10,12:0.0}",
+                    Head, SchedulerParts[p], leads[p], 100.0 * leads[p] / over, partSum[p] / Math.Max(leads[p], 1),
+                    partMax[p], leadOvershoot[p] / Math.Max(leads[p], 1), 100.0 * leadOvershoot[p] / overshootSum,
+                    alone[p], leadBakeWait[p] / Math.Max(leads[p], 1), 100.0 * partOvershoot[p] / overshootSum));
+            }
+
+            // The frames with the largest key row, each with every pipeline row of 0.3 ms or more in it
+            overFrames.Sort((a, b) => _ms[key][b].CompareTo(_ms[key][a]));
+            for (int k = 0; k < Math.Min(LargestKeyFrames, over); k++){
+                int i = overFrames[k];
+                text.Append(string.Format(inv, "{0}{1}: {2:0.00} ms, {3:0.00} over (sample {4}):", Head, label,
+                    _ms[key][i], _ms[key][i] - limitMs, i));
+                for (int r = 0; r < _rows.Length; r++){
+                    Row row = _rows[r];
+                    if (r == key || _ms[r] == null || row.Delayed || _ms[r][i] < 0.3f) continue;
+                    if (row.Name != null && Array.IndexOf(UnityInsideScheduler, row.Name) < 0) continue;
+                    text.Append(string.Format(inv, " {0} {1:0.00}", row.Label, _ms[r][i]));
+                    if (_calls[r] != null && _calls[r][i] > 1) text.Append(" x").Append(_calls[r][i]);
+                    text.Append(';');
+                }
+
+                text.AppendLine();
+            }
+
+            return text.ToString();
+        }
+
+        /// <summary>The position in <paramref name="rows" /> of the row that is largest in sample <paramref name="sample" />.</summary>
+        private int Largest(int[] rows, int sample){
+            int best = 0;
+            float bestMs = -1f;
+            for (int k = 0; k < rows.Length; k++){
+                float ms = _ms[rows[k]] != null ? _ms[rows[k]][sample] : 0f;
+                if (ms <= bestMs) continue;
+                bestMs = ms;
+                best = k;
+            }
+
+            return best;
+        }
+
+        private static double Average(List<float> values){
+            double sum = 0;
+            foreach (float value in values) sum += value;
+            return sum / Math.Max(values.Count, 1);
+        }
+
+        private static float At(List<float> sorted, float share){
+            return sorted[(int)((sorted.Count - 1) * share)];
         }
     }
 }
