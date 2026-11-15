@@ -36,6 +36,31 @@ namespace Engine.Tests.EditMode{
             return (ChunkVoxelData)args[1];
         }
 
+        [Test]
+        public void ChunkLists_ArePersistent_NotDomain(){
+            // The chunk and light jobs create these lists on worker threads. Unity's tracking of Allocator.Domain
+            // is not safe against that (see ChunkLists.Allocator): the Editor crashed in DomainUnloadAutoFree on the
+            // script reload after Play mode. Every way to create a list must stay off Allocator.Domain.
+            NativeArray<ushort> vox = new(TerrainLikeBuffer(1), Allocator.Temp);
+            _voxelData = WriteToChunkData(vox); // the path of the chunk job
+            _hasVoxelData = true;
+            vox.Dispose();
+            _lightData = ChunkLightData.CreateEmpty(64); // the path of the light jobs
+            _hasLightData = true;
+            ChunkLightData dark = new(16); // the path of a new chunk
+            ChunkVoxelData direct = new(16);
+            try{
+                Assert.AreEqual(Allocator.Persistent, _voxelData.Data.Allocator, "chunk job result");
+                Assert.AreEqual(Allocator.Persistent, _lightData.Data.Allocator, "light job result");
+                Assert.AreEqual(Allocator.Persistent, dark.Data.Allocator, "dark light of a new chunk");
+                Assert.AreEqual(Allocator.Persistent, direct.Data.Allocator, "voxel list");
+            }
+            finally{
+                dark.Dispose();
+                direct.Dispose();
+            }
+        }
+
         private static ushort[] TerrainLikeBuffer(int seed){
             System.Random rng = new(seed);
             ushort[] vox = new ushort[VoxelsPerChunk];

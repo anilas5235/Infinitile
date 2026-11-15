@@ -220,6 +220,29 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void ChunkJob_Result_IsNotDomainAllocated(){
+            // The scheduled Burst job, as the chunk scheduler runs it: the list it creates on a worker thread must
+            // not be Allocator.Domain (see ChunkLists.Allocator; the Editor crashed in DomainUnloadAutoFree).
+            UseTerrainFirst();
+            NativeList<int2> jobs = new(1, Allocator.TempJob);
+            jobs.Add(new int2(0, 0));
+            NativeParallelHashMap<int2, ChunkVoxelData> results = new(1, Allocator.TempJob);
+            try{
+                new ChunkJob{
+                    Jobs = jobs, Results = results.AsParallelWriter(), Config = _config
+                }.Schedule(jobs.Length, 1).Complete();
+
+                Assert.IsTrue(results.TryGetValue(new int2(0, 0), out ChunkVoxelData data));
+                Assert.AreEqual(Allocator.Persistent, data.Data.Allocator);
+            }
+            finally{
+                foreach (KeyValue<int2, ChunkVoxelData> r in results) r.Value.Dispose();
+                results.Dispose();
+                jobs.Dispose();
+            }
+        }
+
+        [Test]
         public void ChunkJob_TerrainFirst_VoxelsAtTheBorderMatchTheSampler(){
             UseTerrainFirst();
             NativeList<int2> jobs = new(2, Allocator.TempJob);

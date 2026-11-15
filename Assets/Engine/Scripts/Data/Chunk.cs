@@ -64,6 +64,22 @@ namespace Engine.Scripts.Data{
     }
 
     /// <summary>
+    ///     Allocator of the voxel and light lists of a chunk.
+    /// </summary>
+    internal static class ChunkLists{
+        /// <summary>
+        ///     <c>Persistent</c>, not <c>Domain</c>: the chunk and light jobs create and grow these lists on worker
+        ///     threads, and Unity's bookkeeping for <c>Allocator.Domain</c> (<c>DomainUnloadAutoFree</c>) is not safe
+        ///     against that. Its maintenance pass on the main thread edits the tracking lists without a lock while
+        ///     workers push to them, so a pointer the engine has freed can stay tracked, and the next domain reload
+        ///     frees it a second time: the Editor crashed there on a script reload after Play mode. Persistent
+        ///     memory is not tracked. It is also not freed at a domain reload, so every list needs an owner that
+        ///     disposes it: its <see cref="Chunk" />, or the scheduler whose result map still holds it.
+        /// </summary>
+        internal const Allocator Allocator = Unity.Collections.Allocator.Persistent;
+    }
+
+    /// <summary>
     ///     Light of a whole chunk, one 16-bit value per voxel (sky(4) | R(4) | G(4) | B(4), see
     ///     <see cref="VoxelLight" />), stored as an interval list in the same Flatten order as
     ///     <see cref="ChunkVoxelData" /> so the GPU upload reuses the voxel-data path. A new chunk is dark until
@@ -77,13 +93,13 @@ namespace Engine.Scripts.Data{
 
         /// <summary>Creates a dark chunk (all light 0).</summary>
         public ChunkLightData(int initCapacity){
-            Data = new UnsafeIntervalList<ushort>(initCapacity, Allocator.Domain);
+            Data = new UnsafeIntervalList<ushort>(initCapacity, ChunkLists.Allocator);
             Data.AddInterval(0, VoxelsPerChunk);
         }
 
         /// <summary>Creates an empty list that the caller fills with <see cref="AddLights" /> (light job output).</summary>
         internal static ChunkLightData CreateEmpty(int initCapacity){
-            return new ChunkLightData{ Data = new UnsafeIntervalList<ushort>(initCapacity, Allocator.Domain) };
+            return new ChunkLightData{ Data = new UnsafeIntervalList<ushort>(initCapacity, ChunkLists.Allocator) };
         }
 
         public UnsafeIntervalList<ushort> GetData(){
@@ -143,7 +159,7 @@ namespace Engine.Scripts.Data{
         }
 
         public ChunkVoxelData(int initCapacity){
-            Data = new UnsafeIntervalList<ushort>(initCapacity, Allocator.Domain);
+            Data = new UnsafeIntervalList<ushort>(initCapacity, ChunkLists.Allocator);
             OccupiedPartitions = 0;
         }
 

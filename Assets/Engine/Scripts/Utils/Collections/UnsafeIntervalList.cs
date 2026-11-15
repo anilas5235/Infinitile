@@ -42,6 +42,9 @@ namespace Engine.Scripts.Utils.Collections{
         /// </summary>
         internal int Capacity => _internal.Capacity;
 
+        /// <summary>The allocator the node list was created with.</summary>
+        internal Allocator Allocator => _internal.Allocator.ToAllocator;
+
         /// <summary>
         ///     Creates a new compressed list with the specified initial capacity.
         /// </summary>

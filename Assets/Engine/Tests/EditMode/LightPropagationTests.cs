@@ -34,6 +34,20 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void LightJob_Result_IsNotDomainAllocated(){
+            // The scheduled Burst job: the list it creates (and grows) on a worker thread must not be
+            // Allocator.Domain (see ChunkLists.Allocator; the Editor crashed in DomainUnloadAutoFree).
+            using LightTestWorld world = new(1, RandomTerrain(3));
+            ChunkLightData light = world.LightChunk(int2.zero);
+            try{
+                Assert.AreEqual(Allocator.Persistent, light.Data.Allocator);
+            }
+            finally{
+                light.Dispose();
+            }
+        }
+
+        [Test]
         public void Emitter_NearChunkBorder_LightsNeighbourChunkEdge(){
             // The lamp is in chunk (1, 0); the centre chunk only sees its light through the job's margin.
             int3 lamp = new(34, 100, 5);
