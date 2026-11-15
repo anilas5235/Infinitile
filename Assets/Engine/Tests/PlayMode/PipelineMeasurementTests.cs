@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
+using Engine.Scripts.ThirdParty.Priority_Queue;
 using Engine.Scripts.World;
 using NUnit.Framework;
 using UnityEngine;
@@ -316,6 +317,61 @@ namespace Engine.Tests.PlayMode{
                     new PipelineThroughputTests.PipelineRun(), $"dequeue slice {slice}, uncapped part {i + 1}: ",
                     PlayModeFixtures.ShippedDrawDistance, false, world => SetDequeueSlice(world, slice));
             }
+        }
+
+        /// <summary>
+        ///     The capped flights of <see cref="MeshDequeueQueueCheck_IsCompared" /> in the order A B B A A B: A = the
+        ///     priority queue checks its whole heap on every Dequeue (as under DEBUG until 2026-11-15) and the slice of
+        ///     four entries chosen for it, B = no check and the shipped slice.
+        /// </summary>
+        private static readonly bool[] CappedQueueChecks ={ true, false, false, true, true, false };
+
+        /// <summary>The uncapped flights of <see cref="MeshDequeueQueueCheck_IsCompared" />, A B B A.</summary>
+        private static readonly bool[] UncappedQueueChecks ={ true, false, false, true };
+
+        /// <summary>The dequeue slice of the variant with the queue check, chosen for it in step 2 (2026-11-15).</summary>
+        private const int SliceWithQueueCheck = 4;
+
+        [UnityTest]
+        [Order(11)]
+        [Timeout(3600000)]
+        public IEnumerator MeshDequeueQueueCheck_IsCompared(){
+            // As MeshDequeueSlice_IsCompared, with the check of the whole heap in every Dequeue of the priority
+            // queues (all of them: the mesh queue and the pool queues) and the slice of four against no check and
+            // the shipped slice. Both are set on the fresh world before the probe starts.
+            try{
+                yield return PlayModeFixtures.LoadGameScene(drawDistance: PlayModeFixtures.ShippedDrawDistance);
+                int capped = PipelineThroughputTests.CappedFrameRate;
+                for (int i = 0; i < CappedQueueChecks.Length; i++){
+                    bool check = CappedQueueChecks[i];
+                    yield return PipelineThroughputTests.FreshSceneAfterFlight();
+                    yield return PipelineThroughputTests.FlyThroughBuildingWorld(capped,
+                        new PipelineThroughputTests.PipelineRun(), $"{QueueCheckLabel(check)}, capped part {i + 1}: ",
+                        PlayModeFixtures.ShippedDrawDistance, true, world => SetQueueCheck(world, check));
+                }
+
+                for (int i = 0; i < UncappedQueueChecks.Length; i++){
+                    bool check = UncappedQueueChecks[i];
+                    yield return PipelineThroughputTests.FreshSceneAfterFlight();
+                    yield return PipelineThroughputTests.FlyThroughBuildingWorld(0,
+                        new PipelineThroughputTests.PipelineRun(), $"{QueueCheckLabel(check)}, uncapped part {i + 1}: ",
+                        PlayModeFixtures.ShippedDrawDistance, false, world => SetQueueCheck(world, check));
+                }
+            }
+            finally{
+                PriorityQueueMeasurement.ValidateOnDequeue = false;
+            }
+        }
+
+        private static string QueueCheckLabel(bool check){
+            return check
+                ? $"queue check on, slice {SliceWithQueueCheck}"
+                : $"queue check off, slice {MeshJobStateHandler.DefaultDequeueSlice}";
+        }
+
+        private static void SetQueueCheck(VoxelWorld world, bool check){
+            PriorityQueueMeasurement.ValidateOnDequeue = check;
+            SetDequeueSlice(world, check ? SliceWithQueueCheck : MeshJobStateHandler.DefaultDequeueSlice);
         }
 
         private static void SetDequeueSlice(VoxelWorld world, int slice){
