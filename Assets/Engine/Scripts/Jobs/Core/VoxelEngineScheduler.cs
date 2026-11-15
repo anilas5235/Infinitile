@@ -71,7 +71,8 @@ namespace Engine.Scripts.Jobs.Core{
                     VoxelProfilerMarkers.SchedulerData, VoxelProfilerMarkers.SchedulerLight,
                     VoxelProfilerMarkers.SchedulerMesh, VoxelProfilerMarkers.SchedulerCollider
                 });
-            Budget = new FrameBudget(settings.Scheduler.mainThreadBudgetMs);
+            Budget = new FrameBudget(settings.Scheduler.mainThreadBudgetMs,
+                capShare: settings.Scheduler.cappedFrameSpareShare);
 
             _chunkManager.OnRemeshRequested += OnRemesh;
             _chunkManager.OnLightInvalidated += OnLightInvalidated;
@@ -80,7 +81,9 @@ namespace Engine.Scripts.Jobs.Core{
 
         /// <summary>
         ///     The main-thread time the stages may spend per frame, from
-        ///     <see cref="SchedulerSettings.mainThreadBudgetMs" /> when the world is built. The focus update is not
+        ///     <see cref="SchedulerSettings.mainThreadBudgetMs" /> and
+        ///     <see cref="SchedulerSettings.cappedFrameSpareShare" /> when the world is built; under a frame cap it
+        ///     grows with the cap that is in force in the frame (<see cref="FrameCap" />). The focus update is not
         ///     part of it: it runs outside the tick, when the focus enters another chunk.
         /// </summary>
         internal FrameBudget Budget{ get; set; }
@@ -94,7 +97,8 @@ namespace Engine.Scripts.Jobs.Core{
         /// </summary>
         /// <param name="focus">The focus position (e.g., player chunk root).</param>
         internal void ScheduleUpdate(PriorityUtil.Focus focus){
-            Budget.BeginFrame();
+            // The frame cap is read every frame: a settings menu can change it while the world runs
+            Budget.BeginFrame(Budget.FollowsCap ? FrameCap.PeriodMs() : 0f);
             _ring.Turn(focus, Budget);
         }
 

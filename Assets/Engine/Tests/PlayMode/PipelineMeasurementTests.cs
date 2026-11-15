@@ -47,6 +47,7 @@ namespace Engine.Tests.PlayMode{
         private int _savedBuildSlots;
         private int _savedReference;
         private float _savedBudget;
+        private float _savedCapShare;
 
         /// <summary>Takes the shared scheduler settings and remembers the shipped values for the tear-down.</summary>
         private void TakeSchedulerSettings(){
@@ -55,6 +56,7 @@ namespace Engine.Tests.PlayMode{
             _savedBuildSlots = _scheduler.partitionBuildBatchSize;
             _savedReference = _scheduler.referenceDrawDistance;
             _savedBudget = _scheduler.mainThreadBudgetMs;
+            _savedCapShare = _scheduler.cappedFrameSpareShare;
         }
 
         [SetUp]
@@ -89,6 +91,7 @@ namespace Engine.Tests.PlayMode{
             _scheduler.partitionBuildBatchSize = _savedBuildSlots;
             _scheduler.referenceDrawDistance = _savedReference;
             _scheduler.mainThreadBudgetMs = _savedBudget;
+            _scheduler.cappedFrameSpareShare = _savedCapShare;
             yield return PlayModeFixtures.ReloadWorldWithDrawDistance(PlayModeFixtures.ShippedDrawDistance);
             yield return PipelineThroughputTests.WaitForBuiltWorld();
         }
@@ -213,6 +216,40 @@ namespace Engine.Tests.PlayMode{
             // one session, and a drift of the session does not favour either
             float shipped = new SchedulerSettings().mainThreadBudgetMs;
             yield return CompareBudgets(PlayModeFixtures.ShippedDrawDistance, new[]{ 0f, shipped, shipped, 0f }, true);
+        }
+
+        /// <summary>
+        ///     Main-thread budget and share of a capped frame's spare time (see
+        ///     <see cref="SchedulerSettings.cappedFrameSpareShare" />) of <see cref="FrameBudget_CappedSpare_IsCompared" />, in
+        ///     the order of the runs: without a limit, the shipped budget without and with the spare time (all of it
+        ///     and half of it), then the same in reverse, so that every variant is measured twice in one session and
+        ///     a drift of the session favours none.
+        /// </summary>
+        private static readonly (float budget, float share)[] CappedVariants ={
+            (0f, 0f), (2f, 0f), (2f, 1f), (2f, 0.5f), (2f, 0.5f), (2f, 1f), (2f, 0f), (0f, 0f)
+        };
+
+        [UnityTest]
+        [Order(6)]
+        [Timeout(1800000)]
+        public IEnumerator FrameBudget_CappedSpare_IsCompared(){
+            // Under the 60 frames cap: a fresh world at the shipped draw distance until it is built, and a sprint
+            // flight through a world that is still being built, once per variant, each in a world built again
+            yield return PlayModeFixtures.LoadGameScene(drawDistance: PlayModeFixtures.ShippedDrawDistance);
+            TakeSchedulerSettings();
+            int capped = PipelineThroughputTests.CappedFrameRate;
+            for (int i = 0; i < CappedVariants.Length; i++){
+                (float budget, float share) = CappedVariants[i];
+                _scheduler.mainThreadBudgetMs = budget;
+                _scheduler.cappedFrameSpareShare = share;
+                string variant = string.Format(CultureInfo.InvariantCulture, "budget {0:0.##} ms, spare share {1:0.##}, " +
+                                                                             "part {2}: ", budget, share, i + 1);
+                yield return PipelineThroughputTests.FreshSceneAfterFlight();
+                yield return PipelineThroughputTests.BuildFreshWorld(capped, new PipelineThroughputTests.PipelineRun(),
+                    variant);
+                yield return PipelineThroughputTests.FlyThroughBuildingWorld(capped,
+                    new PipelineThroughputTests.PipelineRun(), variant);
+            }
         }
 
         /// <summary>

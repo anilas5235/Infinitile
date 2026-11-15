@@ -64,7 +64,8 @@ flight. The scheduler gives one step per frame a turn on the main thread, so a f
 ### Main-thread budget per frame
 
 The turn of a frame is bounded by time: `SchedulerSettings.mainThreadBudgetMs` (shipped 2 ms; 0 = no limit, which
-is the behaviour before 2026-11-15; read once when the world is built).
+is the behaviour before 2026-11-15; read once when the world is built), plus the spare time of a capped frame
+(`SchedulerSettings.cappedFrameSpareShare`, see below).
 
 - **A turn is made of items of work.** An item is: adding a data batch to the chunk store, the upload of one
   chunk to the renderer, the pool claim of one meshed partition, handing the meshes of a batch to Unity, one
@@ -87,10 +88,22 @@ is the behaviour before 2026-11-15; read once when the world is built).
   without the budget.
 - **Not part of the budget:** the focus update (it runs when the focus enters another chunk, outside the turn)
   and the renderer's GPU builds, which have their own slot count.
-- **The budget is per frame, not per second.** With a frame cap the pipeline gets less main-thread time per
-  second than without one: under the 60 frames cap a fresh world at draw distance 12 takes 810 to 820 frames
-  instead of 701 to 703, and a flight through a world that is still being built fills the draw window later.
-  Uncapped, the world is built as fast as without the limit (5.1 to 5.4 s against 4.9 to 5.2 s).
+- **A capped frame gives its spare time to the budget.** The budget is per frame, and a frame of the 120 frames
+  goal is 8.33 ms; a frame cap with a longer period leaves that much more time in every frame. The budget of a
+  capped frame is `mainThreadBudgetMs + cappedFrameSpareShare × (period − 8.33 ms)` (shipped share 1): 10.33 ms
+  under the 60 frames cap, 27 ms under 30, 2 ms under 120 or more and uncapped. `FrameCap` reads the cap in
+  force every frame (vertical sync with the display's refresh rate wins over `Application.targetFrameRate`), so
+  a cap changed at run time is followed from the next frame; vertical sync forced by the driver or by the
+  Editor's game view is not seen and keeps the plain budget. The shipped game runs uncapped (vertical sync 0 on
+  both quality levels, no target frame rate); only the PlayMode tests cap at 60.
+  Measured under the 60 frames cap at draw distance 12 (Editor, 2026-11-15, two runs each, no budget / 2 ms
+  alone / 2 ms with share 1): fresh world 703 / 799 to 804 / 703 frames; draw window meshed in a sprint flight
+  through a building world 0.60 / 0.40 / 0.60 on average, complete 4.5 / 10.2 to 10.3 / 4.6 to 4.7 s after
+  the flight; scheduler time per frame in the flight p95 6.6 to 6.9 / 2.7 / 6.6 to 6.7 ms, max 17 to 19 / 5 to
+  9 / 10.5 to 10.6 ms, so no frame of the pipeline's work outgrew the 16.67 ms period. Share 0.5 met the
+  window 0.59 with a max of 9 ms. In the Editor the frame time under the cap jitters around the period (p95
+  about 22 ms in every variant), so frames over 16.67 ms say nothing there. Uncapped nothing changed.
+  `cappedFrameSpareShare` 0 is the budget as introduced on 2026-11-15.
 - **What the 2 ms cost and buy** (owner's pick of 2026-11-15 from 2, 3 and 4 ms; Editor, uncapped, sprint flight
   of 80 units per second at draw distance 12, two runs each, without / with the limit): frames over 16.67 ms 93
   to 103 / 2 to 7 of about 4800; frame p95 13.0 to 13.3 / 9.6 to 9.7 ms; frames over 8.33 ms 21 % / 10 to 12 %;
@@ -100,8 +113,10 @@ is the behaviour before 2026-11-15; read once when the world is built).
 
 `FrameBudgetTests` (EditMode) holds the budget and the round robin with a counting clock.
 `PipelineThroughputTests` (PlayMode) holds the limit on the number of frames a fresh world may take, the queue
-limits in a flight, the scheduler's share of a frame in a flight (p95 at most twice the budget) and that a world
+limits in a flight, the scheduler's share of a frame in a flight (p95 at most the budget after the frame cap plus
+the budget, twice the budget uncapped), the meshed share of the draw window in a capped flight and that a world
 built under a tight budget is the same world; `EmptyPartitionTests` covers a cut mesh dispatch.
+`FrameBudgetTests` also holds the cap's period and the budget after the cap.
 `PipelineMeasurementTests` (explicit) prints the timings.
 
 ## Light

@@ -69,12 +69,33 @@ namespace Engine.Scripts.Settings{
         ///     runs, an item after it only while time is left, and what did not fit continues in the next frame.
         ///     An item that has started is finished, so a frame can exceed the value by one item. 0 switches the
         ///     limit off. Read once when the world is built.
+        ///     The value is the budget of an uncapped frame. A frame under a frame cap whose period is longer than
+        ///     8.33 ms adds <see cref="cappedFrameSpareShare" /> of the rest of its period (60 frames cap: 10.33 ms),
+        ///     so a capped game builds the world as fast as without the limit.
         ///     2 ms is the owner's pick of 2026-11-15 from a comparison of 2, 3 and 4 ms in a sprint flight at draw
         ///     distance 12 (Editor): the shortest frames of the three, with the columns around the focus fully
         ///     meshed; the far edge of the draw window and the collider queue fill later than with a larger value.
         /// </summary>
         [Tooltip("Main-thread milliseconds per frame for the pipeline's stages (collect, scan, dispatch); 0 = no limit")]
         public float mainThreadBudgetMs = 2f;
+
+        /// <summary>
+        ///     Share (0 to 1) of a capped frame's spare time that is added to <see cref="mainThreadBudgetMs" />. The
+        ///     spare time is the part of the frame cap's period above 8.33 ms, the frame of the 120 frames per second
+        ///     goal: under the 60 frames cap 8.33 ms, under the 30 frames cap 25 ms, under a cap of 120 frames or more
+        ///     none. The cap is the one in force in each frame (vertical sync with the display's refresh rate, else
+        ///     <see cref="Application.targetFrameRate" />), so a cap changed at run time is followed. Without a cap
+        ///     the budget is <see cref="mainThreadBudgetMs" />. 0 keeps the budget at <see cref="mainThreadBudgetMs" />
+        ///     under every cap (the behaviour of the budget as it was introduced on 2026-11-15). Read once when the
+        ///     world is built.
+        ///     1 is measured under the 60 frames cap at draw distance 12 (Editor, 2026-11-15): a fresh world in 703
+        ///     frames as without a budget (799 to 804 with 0), the draw window in a sprint flight meshed 0.60 on
+        ///     average as without a budget (0.40 with 0), the scheduler's time per frame at most 10.6 ms (17 to
+        ///     19 ms without a budget), inside the 16.67 ms frame. 0.5 met the window 0.59 with a max of 9 ms.
+        /// </summary>
+        [Range(0f, 1f)]
+        [Tooltip("Share of a capped frame's time above 8.33 ms added to the main-thread budget; 0 = budget only")]
+        public float cappedFrameSpareShare = 1f;
 
         /// <summary>
         ///     Mesh batch size at <paramref name="drawDistance" />. Read once when the world is built: the mesh
