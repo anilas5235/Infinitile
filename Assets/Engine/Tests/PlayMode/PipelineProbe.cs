@@ -54,6 +54,7 @@ namespace Engine.Tests.PlayMode{
         private readonly List<float> _frameMs = new(1 << 16);
         private readonly List<float> _schedulerMs = new(1 << 16);
         private readonly List<int> _framesCut = new(1 << 16); // the budget's count of cut frames after every sample
+        private readonly List<float> _effectiveBudgetMs = new(1 << 16); // the budget of every frame, after the cap
         private readonly VoxelEngineScheduler _scheduler;
         private readonly int _framesCutAtStart;
 
@@ -225,6 +226,9 @@ namespace Engine.Tests.PlayMode{
         /// <summary>Frames since the probe started in which the budget stopped a stage's turn.</summary>
         internal int FramesCut => _scheduler.Budget.FramesCut - _framesCutAtStart;
 
+        /// <summary>The main-thread budget of the last frame, after the frame cap (0: no limit).</summary>
+        internal float EffectiveBudgetMs => _scheduler.Budget.EffectiveMilliseconds;
+
         /// <summary>The scheduler's main-thread milliseconds of a frame that 95 % of all samples stay under.</summary>
         internal float SchedulerP95Ms{
             get{
@@ -243,9 +247,25 @@ namespace Engine.Tests.PlayMode{
         internal string FrameTimes(string label, int from, int to){
             return string.Format(CultureInfo.InvariantCulture,
                 "[PipelineProbe] {0}: frame ms {1}; {2}; scheduler main-thread ms {3}; {4}; " +
-                "main-thread budget {5:0.##} ms, cut a turn in {6} frames\n", label,
+                "main-thread budget {5:0.##} ms ({6} after the frame cap), cut a turn in {7} frames\n", label,
                 Distribution(_frameMs, from, to), OverGoal(_frameMs, from, to), Distribution(_schedulerMs, from, to),
-                OverGoal(_schedulerMs, from, to), _scheduler.Budget.Milliseconds, FramesCutBefore(to) - FramesCutBefore(from));
+                OverGoal(_schedulerMs, from, to), _scheduler.Budget.Milliseconds, EffectiveBudgets(from, to),
+                FramesCutBefore(to) - FramesCutBefore(from));
+        }
+
+        /// <summary>The budgets of the frames <paramref name="from" /> to <paramref name="to" /> after the frame cap.</summary>
+        private string EffectiveBudgets(int from, int to){
+            from = math.clamp(from, 0, _effectiveBudgetMs.Count);
+            to = math.clamp(to, from, _effectiveBudgetMs.Count);
+            if (to == from) return "no samples";
+            float low = float.MaxValue, high = 0f;
+            for (int i = from; i < to; i++){
+                low = math.min(low, _effectiveBudgetMs[i]);
+                high = math.max(high, _effectiveBudgetMs[i]);
+            }
+
+            return string.Format(CultureInfo.InvariantCulture, low == high ? "{0:0.##} ms" : "{0:0.##} to {1:0.##} ms",
+                low, high);
         }
 
         /// <summary>Frames in which the budget had stopped a stage's turn before sample <paramref name="sample" />.</summary>
@@ -329,6 +349,7 @@ namespace Engine.Tests.PlayMode{
             _frameMs.Add(Time.unscaledDeltaTime * 1000f);
             _schedulerMs.Add(schedulerNs * 1e-6f);
             _framesCut.Add(_scheduler.Budget.FramesCut);
+            _effectiveBudgetMs.Add(_scheduler.Budget.EffectiveMilliseconds);
             _attribution?.Sample();
         }
 

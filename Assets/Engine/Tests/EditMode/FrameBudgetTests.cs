@@ -141,6 +141,99 @@ namespace Engine.Tests.EditMode{
 
         #endregion
 
+        #region Frame cap
+
+        // The period of a capped frame: vertical sync with the refresh rate wins over the target frame rate
+        [TestCase(0, -1, 60d, 0f, TestName = "FrameCap_Off")]
+        [TestCase(0, 0, 60d, 0f, TestName = "FrameCap_TargetZero_IsOff")]
+        [TestCase(0, 60, 144d, 1000f / 60f, TestName = "FrameCap_Target60")]
+        [TestCase(0, 120, 60d, 1000f / 120f, TestName = "FrameCap_Target120")]
+        [TestCase(0, 144, 60d, 1000f / 144f, TestName = "FrameCap_Target144")]
+        [TestCase(0, 30, 60d, 1000f / 30f, TestName = "FrameCap_Target30")]
+        [TestCase(1, -1, 60d, 1000f / 60f, TestName = "FrameCap_VSync60Hz")]
+        [TestCase(2, -1, 60d, 1000f / 30f, TestName = "FrameCap_VSyncEverySecondBlank60Hz")]
+        [TestCase(1, -1, 144d, 1000f / 144f, TestName = "FrameCap_VSync144Hz")]
+        [TestCase(1, 30, 144d, 1000f / 144f, TestName = "FrameCap_VSync_WinsOverTarget")]
+        [TestCase(1, -1, 0d, 0f, TestName = "FrameCap_VSyncWithoutRefreshRate_IsOff")]
+        public void FrameCap_Period(int vSyncCount, int targetFrameRate, double refreshHz, float expectedMs){
+            Assert.AreEqual(expectedMs, FrameCap.PeriodMs(vSyncCount, targetFrameRate, refreshHz), 1e-4f);
+        }
+
+        // The budget of a capped frame: 2 ms plus the share of the period above 8.33 ms
+        [TestCase(2f, 0f, 1f, 2f, TestName = "Effective_Uncapped_IsTheBudget")]
+        [TestCase(2f, 1000f / 60f, 1f, 2f + 1000f / 120f, TestName = "Effective_Cap60")]
+        [TestCase(2f, 1000f / 120f, 1f, 2f, TestName = "Effective_Cap120_HasNoSpareTime")]
+        [TestCase(2f, 1000f / 144f, 1f, 2f, TestName = "Effective_Cap144_HasNoSpareTime")]
+        [TestCase(2f, 1000f / 30f, 1f, 27f, TestName = "Effective_Cap30")]
+        [TestCase(2f, 1000f / 60f, 0.5f, 2f + 1000f / 240f, TestName = "Effective_Cap60_HalfShare")]
+        [TestCase(2f, 1000f / 60f, 0f, 2f, TestName = "Effective_Cap60_ShareZero_IsTheBudget")]
+        [TestCase(2f, 1000f / 60f, 3f, 2f + 1000f / 120f, TestName = "Effective_ShareAboveOne_IsOne")]
+        [TestCase(0f, 1000f / 60f, 1f, 0f, TestName = "Effective_NoLimit_StaysNoLimit")]
+        [TestCase(0f, 0f, 1f, 0f, TestName = "Effective_NoLimitUncapped_StaysNoLimit")]
+        public void EffectiveBudget(float milliseconds, float capPeriodMs, float share, float expectedMs){
+            Assert.AreEqual(expectedMs, FrameBudget.Effective(milliseconds, capPeriodMs, share), 1e-4f);
+        }
+
+        /// <summary>Items of 1 ms that one frame lets run, after <see cref="FrameBudget.BeginFrame" /> with the cap.</summary>
+        private static int ItemsOfOneMillisecond(FakeClock clock, FrameBudget budget, float capPeriodMs){
+            budget.BeginFrame(capPeriodMs);
+            int items = 0;
+            while (budget.Next()){
+                items++;
+                clock.Spend(1f);
+                Assert.Less(items, 1000, "the budget never refused");
+            }
+
+            return items;
+        }
+
+        [Test]
+        public void UnderACap_TheFrameGetsTheSpareTime_AndFollowsACapChangedAtRunTime(){
+            FakeClock clock = new();
+            FrameBudget budget = new(2f, clock.Now, TicksPerMillisecond, 1f);
+            Assert.IsTrue(budget.FollowsCap);
+
+            // Items start at 0, 1, 2 ... ms; the last one that starts is the one before the budget is used up
+            Assert.AreEqual(2, ItemsOfOneMillisecond(clock, budget, 0f), "uncapped: 2 ms");
+            Assert.AreEqual(2f, budget.EffectiveMilliseconds);
+            Assert.AreEqual(11, ItemsOfOneMillisecond(clock, budget, 1000f / 60f), "60 frames cap: 10.33 ms");
+            Assert.AreEqual(2f + 1000f / 120f, budget.EffectiveMilliseconds, 1e-4f);
+            Assert.AreEqual(11, ItemsOfOneMillisecond(clock, budget, 1000f / 60f), "the same cap in the next frame");
+            Assert.AreEqual(27, ItemsOfOneMillisecond(clock, budget, 1000f / 30f), "30 frames cap: 27 ms");
+            Assert.AreEqual(2, ItemsOfOneMillisecond(clock, budget, 1000f / 144f), "144 frames cap: 2 ms");
+            Assert.AreEqual(2, ItemsOfOneMillisecond(clock, budget, 0f), "the cap switched off again");
+            Assert.AreEqual(2f, budget.EffectiveMilliseconds);
+            Assert.AreEqual(2f, budget.Milliseconds, "the setting itself does not change");
+        }
+
+        [Test]
+        public void WithShareZero_ACapChangesNothing(){
+            FakeClock clock = new();
+            FrameBudget budget = clock.Budget(2f);
+            Assert.IsFalse(budget.FollowsCap);
+            Assert.AreEqual(2, ItemsOfOneMillisecond(clock, budget, 1000f / 60f));
+            Assert.AreEqual(2, ItemsOfOneMillisecond(clock, budget, 1000f / 30f));
+            Assert.AreEqual(2f, budget.EffectiveMilliseconds);
+        }
+
+        [Test]
+        public void WithoutALimit_ACapChangesNothing(){
+            FakeClock clock = new();
+            FrameBudget budget = new(0f, clock.Now, TicksPerMillisecond, 1f);
+            Assert.IsFalse(budget.Limited);
+            Assert.IsFalse(budget.FollowsCap);
+            budget.BeginFrame(1000f / 60f);
+            for (int item = 0; item < 100; item++){
+                Assert.IsTrue(budget.Next());
+                clock.Spend(1f);
+            }
+
+            Assert.AreEqual(0f, budget.EffectiveMilliseconds);
+            Assert.AreEqual(0, budget.FramesCut);
+        }
+
+        #endregion
+
         #region A stage's turn
 
         /// <summary>

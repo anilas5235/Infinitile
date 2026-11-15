@@ -65,11 +65,12 @@ namespace Engine.Tests.PlayMode{
         ///     frames (125.9 s at 60 frames per second, measured 2026-11-14). The work-conserving one needs 2532
         ///     with the mesh batch of 8 and the 4 GPU build slots of that time, and 1345 with the shipped 16 and 8;
         ///     the GPU build slots limit the mesh stage now. Without the partitions that hold no voxel (48 % of the
-        ///     draw window, no mesh job and no GPU build) it needs 701, and 820 under the main-thread budget of 2 ms
-        ///     per frame (2026-11-15; a frame of the 60 frames cap has time to spare, the budget does not use it).
-        ///     The limit leaves a fifth of slack.
+        ///     draw window, no mesh job and no GPU build) it needs 701 to 703. Under the main-thread budget of 2 ms
+        ///     per frame it needed 799 to 820 while the budget left the spare time of a frame of the 60 frames cap
+        ///     unused; with half of it (shipped share 0.5) or all of it it needs 703 again (Editor, 2026-11-15). The limit
+        ///     leaves 8 % of slack and fails when the spare time is lost.
         /// </summary>
-        private const int FreshBuildFrameBudget = 1000;
+        private const int FreshBuildFrameBudget = 760;
 
         private int _savedTargetFrameRate;
         private int _savedVSync;
@@ -152,13 +153,20 @@ namespace Engine.Tests.PlayMode{
                 $"meshed share of the columns within {NearRadius} of the focus against the whole draw window");
             Assert.AreEqual(0, run.DispatchedWithoutVoxels, "partitions without a voxel that got a mesh job");
             // The main-thread budget bounds the scheduler's share of a frame: the flight has more work than fits,
-            // so turns are cut, and a frame exceeds the budget by one item of work at most (5.5 and 6.4 ms at the
-            // 95th percentile without the budget, 2.8 ms with the shipped 2 ms, 2026-11-15).
+            // so turns are cut, and a frame exceeds the budget by one item of work at most. Under the 60 frames cap
+            // the budget takes half the frame's spare time (2 ms + 4.17 ms with the shipped share 0.5): the draw
+            // window is meshed 0.587 to 0.594 on average in the flight (0.60 without a budget, 0.40 with the budget
+            // alone), the scheduler's 95th percentile is 6.2 ms against the limit of 8.17 ms, and 115 to 130
+            // frames are cut (Editor, 2026-11-15). Uncapped the effective budget is the budget, so the limit is
+            // twice the budget there.
             float budget = VoxelWorld.Instance.Settings.Scheduler.mainThreadBudgetMs;
             Assert.Greater(budget, 0f, "the shipped settings bound the main-thread work per frame");
             Assert.Greater(run.FramesCut, 0, "frames in which the budget stopped a turn");
-            Assert.LessOrEqual(run.SchedulerP95Ms, 2f * budget,
-                "scheduler main-thread ms per frame at the 95th percentile, against twice the budget");
+            Assert.LessOrEqual(run.SchedulerP95Ms, run.EffectiveBudgetMs + budget,
+                $"scheduler main-thread ms per frame at the 95th percentile, against the budget after the frame cap " +
+                $"({run.EffectiveBudgetMs:0.##} ms) plus the budget");
+            Assert.GreaterOrEqual(run.WindowCoverage, 0.5f,
+                "meshed share of the draw window during the flight (the spare time of a capped frame is used)");
         }
 
         [UnityTest]
@@ -236,8 +244,12 @@ namespace Engine.Tests.PlayMode{
             /// <summary>The scheduler's main-thread milliseconds of a frame that 95 % of the frames stay under.</summary>
             internal float SchedulerP95Ms;
 
+            /// <summary>The main-thread budget of the last frame, after the frame cap (0: no limit).</summary>
+            internal float EffectiveBudgetMs;
+
             internal void CopyCounts(PipelineProbe probe){
                 FramesCut = probe.FramesCut;
+                EffectiveBudgetMs = probe.EffectiveBudgetMs;
                 SchedulerP95Ms = probe.SchedulerP95Ms;
                 probe.PeakQueue.CopyTo(PeakQueue, 0);
                 LoadedChunks = probe.LoadedChunks;
