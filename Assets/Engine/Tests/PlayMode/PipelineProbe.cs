@@ -420,7 +420,7 @@ namespace Engine.Tests.PlayMode{
         private static MeshJobStateHandler.DequeueCounts Minus(MeshJobStateHandler.DequeueCounts a,
             MeshJobStateHandler.DequeueCounts b){
             return new MeshJobStateHandler.DequeueCounts{
-                Calls = a.Calls - b.Calls, QueueAtStart = a.QueueAtStart - b.QueueAtStart, Taken = a.Taken - b.Taken,
+                Calls = a.Calls - b.Calls, Cuts = a.Cuts - b.Cuts, QueueAtStart = a.QueueAtStart - b.QueueAtStart, Taken = a.Taken - b.Taken,
                 KeptWithVoxels = a.KeptWithVoxels - b.KeptWithVoxels, KeptEmpty = a.KeptEmpty - b.KeptEmpty,
                 DroppedNotRelevant = a.DroppedNotRelevant - b.DroppedNotRelevant,
                 DroppedNotLit = a.DroppedNotLit - b.DroppedNotLit,
@@ -451,7 +451,8 @@ namespace Engine.Tests.PlayMode{
             long kept = t.KeptWithVoxels + t.KeptEmpty;
             double taken = math.max(t.Taken, 1);
             text.AppendLine(string.Format(inv,
-                "{0}: dequeue loop: {1} calls, queue {2:0} entries at the start on average, emptied it in {3}; took " +
+                "{0}: dequeue loop: {1} calls ({19} cut by the budget), queue {2:0} entries at the start on average, " +
+                "emptied it in {3}; took " +
                 "{4} entries ({5:0.0} per call), kept {6} ({7:0.0} %: {8} with voxels, {9} empty), dropped {10} " +
                 "({11:0.0} %): not relevant {12} ({13:0.0} %), neighbourhood not lit {14} ({15:0.0} %), no mesh " +
                 "needed {16} ({17:0.0} %); {18:0.00} entries taken per kept one",
@@ -459,7 +460,7 @@ namespace Engine.Tests.PlayMode{
                 t.Taken / (double)math.max(t.Calls, 1), kept, 100 * kept / taken, t.KeptWithVoxels, t.KeptEmpty,
                 dropped, 100 * dropped / taken, t.DroppedNotRelevant, 100 * t.DroppedNotRelevant / taken,
                 t.DroppedNotLit, 100 * t.DroppedNotLit / taken, t.DroppedNotNeeded, 100 * t.DroppedNotNeeded / taken,
-                t.Taken / (double)math.max(kept, 1)));
+                t.Taken / (double)math.max(kept, 1), t.Cuts));
             text.AppendLine(string.Format(inv,
                 "{0}: dropped entries a scan queued again{1}: not relevant {2}, neighbourhood not lit {3}, no mesh " +
                 "needed {4} ({5} of {6} dropped)",

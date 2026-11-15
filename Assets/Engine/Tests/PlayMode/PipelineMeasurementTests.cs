@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
 using Engine.Scripts.World;
 using NUnit.Framework;
@@ -272,6 +273,54 @@ namespace Engine.Tests.PlayMode{
                     new PipelineThroughputTests.PipelineRun(), $"overshoot part {i + 1}: ",
                     PlayModeFixtures.ShippedDrawDistance, true);
             }
+        }
+
+        /// <summary>
+        ///     Entries per budget item of the mesh dispatch's dequeue loop (see
+        ///     <see cref="MeshJobStateHandler.DequeueSlice" />) in the order of the capped flights of
+        ///     <see cref="MeshDequeueSlice_IsCompared" />: 0 (the loop in one piece, before 2026-11-15) and the shipped
+        ///     slice, in the order A B B A A B.
+        /// </summary>
+        private static readonly int[] CappedDequeueSlices ={
+            0, MeshJobStateHandler.DefaultDequeueSlice, MeshJobStateHandler.DefaultDequeueSlice, 0, 0,
+            MeshJobStateHandler.DefaultDequeueSlice
+        };
+
+        /// <summary>The slices of the uncapped flights of <see cref="MeshDequeueSlice_IsCompared" />, A B B A.</summary>
+        private static readonly int[] UncappedDequeueSlices ={
+            0, MeshJobStateHandler.DefaultDequeueSlice, MeshJobStateHandler.DefaultDequeueSlice, 0
+        };
+
+        [UnityTest]
+        [Order(10)]
+        [Timeout(3600000)]
+        public IEnumerator MeshDequeueSlice_IsCompared(){
+            // The capped flight through a world that is still being built (with the attribution: frames over the
+            // effective budget and the dequeue counts), then the uncapped flight, at the shipped draw distance,
+            // with the dequeue loop in one piece and with the shipped slice. The slice is set on the fresh world's
+            // mesh stage before the probe starts; the frames of the load before it use the shipped slice.
+            yield return PlayModeFixtures.LoadGameScene(drawDistance: PlayModeFixtures.ShippedDrawDistance);
+            int capped = PipelineThroughputTests.CappedFrameRate;
+            for (int i = 0; i < CappedDequeueSlices.Length; i++){
+                int slice = CappedDequeueSlices[i];
+                yield return PipelineThroughputTests.FreshSceneAfterFlight();
+                yield return PipelineThroughputTests.FlyThroughBuildingWorld(capped,
+                    new PipelineThroughputTests.PipelineRun(), $"dequeue slice {slice}, capped part {i + 1}: ",
+                    PlayModeFixtures.ShippedDrawDistance, true, world => SetDequeueSlice(world, slice));
+            }
+
+            for (int i = 0; i < UncappedDequeueSlices.Length; i++){
+                int slice = UncappedDequeueSlices[i];
+                yield return PipelineThroughputTests.FreshSceneAfterFlight();
+                yield return PipelineThroughputTests.FlyThroughBuildingWorld(0,
+                    new PipelineThroughputTests.PipelineRun(), $"dequeue slice {slice}, uncapped part {i + 1}: ",
+                    PlayModeFixtures.ShippedDrawDistance, false, world => SetDequeueSlice(world, slice));
+            }
+        }
+
+        private static void SetDequeueSlice(VoxelWorld world, int slice){
+            VoxelEngineScheduler scheduler = PlayModeFixtures.GetPrivateField<VoxelEngineScheduler>(world, "_scheduler");
+            PlayModeFixtures.GetPrivateField<MeshJobStateHandler>(scheduler, "_meshJobHandler").DequeueSlice = slice;
         }
 
         /// <summary>

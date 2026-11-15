@@ -812,7 +812,11 @@ collider bake queue, all for nothing to draw and nothing to collide with.
 
 - **Mesh step.** `MeshJobStateHandler` sorts the partitions it takes from the queue: those with voxels fill the
   batch, those without are claimed in the pool and are active at once (`CMeshBuildScheduler.ApplyEmpty`). They do
-  not count against the batch; one turn takes at most four batches of them, so a turn stays bounded.
+  not count against the batch; one turn takes at most four batches of them, so a turn stays bounded. The
+  dequeue loop asks the frame's budget for every four entries (`MeshJobStateHandler.DefaultDequeueSlice`): in the
+  Editor an entry cost 37 to 57 µs in a capped flight at draw distance 12 (2026-11-15; the priority queue checks
+  its whole heap on every `Dequeue` in builds with `DEBUG`), and a loop of up to 77 entries took up to 3.7 ms in
+  one piece. A loop the budget cut continues in the next frame and completes its batch before it is dispatched.
 - **Collider state.** A partition without a collider is marked collidable right away
   (`MarkCollidableWithoutCollider`), so `VoxelWorld.IsCollidable` means "the collider is ready: baked, or known to
   be empty" and nothing waits for a bake that never comes. A meshed partition whose last solid face went loses its
