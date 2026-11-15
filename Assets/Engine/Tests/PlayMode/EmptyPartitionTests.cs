@@ -109,9 +109,12 @@ namespace Engine.Tests.PlayMode{
                 return focus;
             }
 
-            public IEnumerator MeshUntilAsleep(PriorityUtil.Focus focus){
+            /// <param name="focus">The focus of the turns.</param>
+            /// <param name="budget">The main-thread budget of every frame; null: no limit.</param>
+            public IEnumerator MeshUntilAsleep(PriorityUtil.Focus focus, FrameBudget budget = null){
                 for (int i = 0; i < MaxUpdates && !MeshHandler.Sleeping; i++){
-                    MeshHandler.Update(focus);
+                    budget?.BeginFrame();
+                    MeshHandler.Update(focus, budget);
                     yield return null;
                 }
 
@@ -171,6 +174,73 @@ namespace Engine.Tests.PlayMode{
             yield return rig.BakeUntilAsleep(focus);
             Assert.IsTrue(rig.Pool.IsCollidable(int3.zero));
             Assert.IsNotNull(rig.Pool.GetPartition(int3.zero).Collider.sharedMesh, "collider of the ground");
+        }
+
+        /// <summary>
+        ///     A budget of <paramref name="items" /> items of work per frame: its clock counts the items it is asked
+        ///     for instead of the time, so a test with it does not depend on the machine.
+        /// </summary>
+        private static FrameBudget ItemsPerFrame(int items){
+            long asked = 0;
+            return new FrameBudget(items, () => asked++, 1d);
+        }
+
+        [UnityTest]
+        [Timeout(120000)]
+        public IEnumerator AMeshStageTheBudgetCuts_ReachesTheSameState(){
+            // Two items of work per frame: a row of the scan, a partition without a voxel, a claim in the pool
+            // and the start of a batch each wait for their frame. The world ends as without a limit (see
+            // PartitionsWithoutVoxels_BecomeActive_WithoutMeshJobOrGpuBuild).
+            using MeshRig rig = new(PartitionHeight);
+            PriorityUtil.Focus focus = rig.FocusAt(1);
+            FrameBudget budget = ItemsPerFrame(2);
+            yield return rig.MeshUntilAsleep(focus, budget);
+            Assert.Greater(budget.FramesCut, 0, "frames in which the budget stopped the turn");
+
+            int columns = (2 * Draw + 1) * (2 * Draw + 1);
+            for (int x = -Draw; x <= Draw; x++)
+            for (int z = -Draw; z <= Draw; z++)
+            for (int y = 0; y <= 3; y++){
+                int3 pos = new(x, y, z);
+                Assert.IsTrue(rig.Pool.IsPartitionActive(pos), $"{pos} is active");
+                Assert.AreEqual(y == 0, rig.Requested.Contains(pos), $"{pos}: GPU build requested");
+                if (y == 0) Assert.Greater(rig.Pool.GetPartition(pos).ColliderMesh.vertexCount, 0, $"{pos}: collider mesh");
+            }
+
+            Assert.AreEqual(columns, rig.MeshJobs.MeshedPartitions, "partitions that went through the mesh job");
+            Assert.AreEqual(3 * columns, rig.MeshJobs.PartitionsWithoutMesh, "partitions that became active without one");
+
+            yield return rig.BakeUntilAsleep(focus);
+            Assert.IsTrue(rig.Pool.IsCollidable(int3.zero));
+        }
+
+        [UnityTest]
+        [Timeout(120000)]
+        public IEnumerator PartitionsOfACutDispatch_ThatLeftTheDrawWindow_AreNotMadeActive(){
+            // One item of work per frame: the dispatch takes its partitions from the queue in one frame and makes
+            // one partition without a voxel active in each of the next. When the focus moves on in between, the
+            // ones that are waiting are outside the draw window and must not claim a place in the pool.
+            using MeshRig rig = new(PartitionHeight);
+            PriorityUtil.Focus focus = rig.FocusAt(1); // the vertical draw window holds the partitions 0 to 3
+            FrameBudget budget = ItemsPerFrame(1);
+            for (int i = 0; i < MaxUpdates && rig.MeshJobs.PartitionsWithoutMesh == 0; i++){
+                budget.BeginFrame();
+                rig.MeshHandler.Update(focus, budget);
+                yield return null;
+            }
+
+            Assert.AreEqual(1, rig.MeshJobs.PartitionsWithoutMesh, "the first partition without a voxel");
+            List<int3> waiting = PlayModeFixtures.GetPrivateField<List<int3>>(rig.MeshHandler, "_emptyPartitions");
+            Assert.Greater(waiting.Count, 1, "the cut dispatch holds more partitions without a voxel");
+            int3[] left = waiting.GetRange(1, waiting.Count - 1).ToArray();
+
+            focus = rig.FocusAt(6); // the window holds the partitions 4 to 7 now, all of them air
+            yield return rig.MeshUntilAsleep(focus, budget);
+
+            foreach (int3 pos in left) Assert.IsFalse(rig.Pool.IsPartitionActive(pos), $"{pos} left the draw window");
+            int columns = (2 * Draw + 1) * (2 * Draw + 1);
+            Assert.AreEqual(1 + 4 * columns, rig.MeshJobs.PartitionsWithoutMesh,
+                "the one before the focus moved, and the four layers of the new window");
         }
 
         [UnityTest]

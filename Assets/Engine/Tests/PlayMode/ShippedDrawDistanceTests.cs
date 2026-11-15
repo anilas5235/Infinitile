@@ -56,6 +56,7 @@ namespace Engine.Tests.PlayMode{
         public IEnumerator TearDown(){
             // The flight ends with chunks still loading; let them finish (no assert: the test has its verdict).
             if (VoxelWorld.Instance == null) yield break;
+            yield return PipelineThroughputTests.FreshSceneAfterFlight();
             float deadline = Time.realtimeSinceStartup + FullBuildSeconds;
             while (!PlayModeFixtures.SchedulerSleeping() && Time.realtimeSinceStartup < deadline) yield return null;
         }

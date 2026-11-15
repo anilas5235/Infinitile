@@ -1,5 +1,7 @@
 ﻿using Engine.Scripts.Jobs.ColliderBake;
+using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.Rendering;
 using static Engine.Scripts.Utils.VoxelConstants;
@@ -61,11 +63,13 @@ namespace Engine.Scripts.Behaviour{
         }
 
         public void ApplyColliderMesh(){
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.ColliderAssign.Auto();
             // An empty mesh has no collider; the partition may still hold the one from before its last block went
             Collider.sharedMesh = ColliderMesh.vertexCount > 0 ? ColliderMesh : null;
         }
 
         public void Clear(){
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.PartitionClear.Auto();
             MeshVersion++;
             ColliderMesh.Clear();
             Collider.sharedMesh = null;

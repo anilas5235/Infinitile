@@ -63,6 +63,20 @@ namespace Engine.Scripts.Settings{
         public int referenceDrawDistance = 12;
 
         /// <summary>
+        ///     Main-thread time in milliseconds the pipeline's stages may spend per frame on collecting batches,
+        ///     scanning for work and dispatching. A stage's turn is made of items of work (a pool claim, the upload
+        ///     of one chunk, one row of a queue scan, the start of a batch): the first item of a frame always
+        ///     runs, an item after it only while time is left, and what did not fit continues in the next frame.
+        ///     An item that has started is finished, so a frame can exceed the value by one item. 0 switches the
+        ///     limit off. Read once when the world is built.
+        ///     2 ms is the owner's pick of 2026-11-15 from a comparison of 2, 3 and 4 ms in a sprint flight at draw
+        ///     distance 12 (Editor): the shortest frames of the three, with the columns around the focus fully
+        ///     meshed; the far edge of the draw window and the collider queue fill later than with a larger value.
+        /// </summary>
+        [Tooltip("Main-thread milliseconds per frame for the pipeline's stages (collect, scan, dispatch); 0 = no limit")]
+        public float mainThreadBudgetMs = 2f;
+
+        /// <summary>
         ///     Mesh batch size at <paramref name="drawDistance" />. Read once when the world is built: the mesh
         ///     scheduler sizes its containers with it.
         /// </summary>

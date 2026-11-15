@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Engine.Scripts.Settings;
 using Engine.Scripts.ThirdParty.Priority_Queue;
+using Engine.Scripts.Utils;
 using Engine.Scripts.World;
 using Unity.Mathematics;
 
@@ -9,9 +10,11 @@ namespace Engine.Scripts.Jobs.Core{
     /// <summary>
     ///     Abstract base class for job state handlers that manage queues of work items with priority-based scheduling.
     ///     One <see cref="Update" /> is one turn of the stage: collect the finished batch, look for new work, start
-    ///     the next batch. A stage whose batch still runs passes its turn on.
+    ///     the next batch. A stage whose batch still runs passes its turn on. A turn is made of items of work (see
+    ///     <see cref="FrameBudget" />): when the frame's budget runs out between two items the turn stops there,
+    ///     and the next <see cref="Update" /> continues it.
     /// </summary>
-    internal abstract class JobStateHandler<T> where T : struct, IEquatable<T>{
+    internal abstract class JobStateHandler<T> : IPipelineStage where T : struct, IEquatable<T>{
         /// <summary>
         ///     Reference to the chunk manager.
         /// </summary>
@@ -62,6 +65,17 @@ namespace Engine.Scripts.Jobs.Core{
         protected int BatchSize => _batchSize;
         private int _turnsSinceScan;
 
+        /// <summary>Where a turn stands. A turn the budget cut continues at its step.</summary>
+        private enum Step : byte{
+            Collect,
+            Scan,
+            Dispatch
+        }
+
+        private Step _step;
+        private int _scanRow; // the next row of the running scan
+        private bool _worked; // the turn did main-thread work
+
         /// <summary>
         ///     Pre-sizes the queue and the in-flight set so that filling them during flight does not allocate.
         /// </summary>
@@ -88,36 +102,76 @@ namespace Engine.Scripts.Jobs.Core{
         protected virtual bool CanDispatch => true;
 
         /// <summary>
-        ///     One turn of the stage: applies the finished batch, scans for new work when the queue runs short (or
-        ///     every <see cref="ScanInterval" /> turns) and starts the next batch. The handler goes to sleep when a
-        ///     scan finds nothing and no batch runs.
+        ///     One turn of the stage, or the rest of a turn the budget cut: applies the finished batch, scans for
+        ///     new work when the queue runs short (or every <see cref="ScanInterval" /> turns) and starts the next
+        ///     batch. The handler goes to sleep when a scan finds nothing and no batch runs.
         /// </summary>
         /// <param name="focus">The focus position (e.g., player chunk position).</param>
+        /// <param name="budget">The frame's budget, asked before every item of work; null means no limit.</param>
         /// <returns>
-        ///     True when the turn did main-thread work; false when the handler sleeps, its batch still runs or it
-        ///     may not dispatch, so the scheduler can give the frame to another stage.
+        ///     <see cref="StageTurn.Done" /> when the turn did main-thread work and is finished,
+        ///     <see cref="StageTurn.Cut" /> when the budget ran out inside it, and <see cref="StageTurn.None" /> when
+        ///     the handler sleeps, its batch still runs or it may not dispatch, so the scheduler can give the frame
+        ///     to another stage.
         /// </returns>
-        public bool Update(PriorityUtil.Focus focus){
-            if (Sleeping) return false;
+        public StageTurn Update(PriorityUtil.Focus focus, FrameBudget budget = null){
+            budget ??= FrameBudget.Unlimited;
 
-            bool worked = false;
-            if (Set.Count > 0){
-                if (!CollectResultsStep()) return false; // the batch still runs
-                worked = true;
-            }
+            if (_step == Step.Collect){
+                if (Sleeping) return StageTurn.None;
 
-            if (!CanDispatch) return worked;
+                if (Set.Count > 0){
+                    StageTurn collected;
+                    using (VoxelProfilerMarkers.SchedulerCollect.Auto()) collected = CollectResultsStep(budget);
+                    if (collected != StageTurn.Done) return collected; // the batch still runs, or the budget cut
 
-            if (Queue.Count < _batchSize || ++_turnsSinceScan >= ScanInterval){
-                _turnsSinceScan = 0;
-                worked = true;
-                if (!EnqueueStep(focus)){
-                    Sleeping = true; // nothing queued and nothing running
-                    return true;
+                    _worked = true;
+                }
+
+                if (!CanDispatch) return EndTurn();
+
+                if (Queue.Count < _batchSize || ++_turnsSinceScan >= ScanInterval){
+                    _turnsSinceScan = 0;
+                    _worked = true;
+                    _scanRow = -ScanDistance;
+                    _step = Step.Scan;
+                }
+                else{
+                    _step = Step.Dispatch;
                 }
             }
 
-            return JobUpdateStep(focus) || worked;
+            if (_step == Step.Scan){
+                using (VoxelProfilerMarkers.SchedulerScan.Auto()){
+                    for (; _scanRow <= ScanDistance; _scanRow++){
+                        if (!budget.Next()) return StageTurn.Cut;
+
+                        EnqueueRow(focus, _scanRow);
+                    }
+                }
+
+                if (Queue.Count == 0){
+                    Sleeping = true; // nothing queued and nothing running
+                    return EndTurn();
+                }
+
+                _step = Step.Dispatch;
+            }
+
+            StageTurn dispatched;
+            using (VoxelProfilerMarkers.SchedulerDispatch.Auto()) dispatched = JobUpdateStep(focus, budget);
+            if (dispatched == StageTurn.Cut) return StageTurn.Cut;
+
+            if (dispatched == StageTurn.Done) _worked = true;
+            return EndTurn();
+        }
+
+        /// <summary>Ends the turn: the next <see cref="Update" /> starts a new one.</summary>
+        private StageTurn EndTurn(){
+            StageTurn turn = _worked ? StageTurn.Done : StageTurn.None;
+            _worked = false;
+            _step = Step.Collect;
+            return turn;
         }
 
         /// <summary>
@@ -146,32 +200,46 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        ///     Enqueues new work items based on the focus position.
-        ///     Called when a turn scans for work.
+        ///     Rows on either side of the focus that a scan for new work visits: it calls
+        ///     <see cref="EnqueueRow" /> for every x from -ScanDistance to ScanDistance.
+        /// </summary>
+        protected virtual int ScanDistance => 0;
+
+        /// <summary>
+        ///     Enqueues the new work items of one row of the stage's window: the columns <paramref name="x" />
+        ///     chunks from the focus. A row is one item of work for the frame's budget, so a scan the budget cut
+        ///     continues with the next row (and the focus of that frame).
         /// </summary>
         /// <param name="focus">The current focus position.</param>
-        /// <returns>True if items were enqueued, false if queue is empty.</returns>
-        protected virtual bool EnqueueStep(PriorityUtil.Focus focus){
-            return true;
-        }
+        /// <param name="x">The row, in chunks from the focus.</param>
+        protected virtual void EnqueueRow(PriorityUtil.Focus focus, int x){ }
 
         /// <summary>
         ///     Dispatches the next batch to the stage's job scheduler; the batch's items are in the in-flight set.
-        ///     Called on every turn that may dispatch.
+        ///     Called on every turn that may dispatch, and again for the rest of a dispatch the budget cut.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
-        /// <returns>True if processing completed, false if still working.</returns>
-        protected virtual bool JobUpdateStep(PriorityUtil.Focus focus){
-            return true;
+        /// <param name="budget">The frame's budget.</param>
+        /// <returns>
+        ///     <see cref="StageTurn.Done" /> when the step is finished, <see cref="StageTurn.Cut" /> when the budget
+        ///     ran out inside it, <see cref="StageTurn.None" /> when the job scheduler is busy.
+        /// </returns>
+        protected virtual StageTurn JobUpdateStep(PriorityUtil.Focus focus, FrameBudget budget){
+            return StageTurn.Done;
         }
 
         /// <summary>
         ///     Collects results from completed job batches.
-        ///     Called at the start of a turn while a batch is in flight.
+        ///     Called at the start of a turn while a batch is in flight, and again for the rest of a collect the
+        ///     budget cut.
         /// </summary>
-        /// <returns>True if result collection completed, false if still working.</returns>
-        protected virtual bool CollectResultsStep(){
-            return true;
+        /// <param name="budget">The frame's budget.</param>
+        /// <returns>
+        ///     <see cref="StageTurn.Done" /> when the batch is applied, <see cref="StageTurn.Cut" /> when the budget
+        ///     ran out inside it, <see cref="StageTurn.None" /> when the batch still runs.
+        /// </returns>
+        protected virtual StageTurn CollectResultsStep(FrameBudget budget){
+            return StageTurn.Done;
         }
     }
 }

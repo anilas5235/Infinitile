@@ -367,7 +367,7 @@ namespace Engine.Tests.PlayMode{
         [UnityTest]
         [Timeout(120000)]
         public IEnumerator MeshHandler_IdlesOnceVerticalDrawWindowIsMeshed(){
-            // EnqueueStep queues every partition y of a chunk but JobUpdateStep drops the ones outside the vertical
+            // EnqueueRow queues every partition y of a chunk but JobUpdateStep drops the ones outside the vertical
             // draw window; with a focus near the top the handler must not re-queue y 0..4 forever and never sleep.
             VoxelEngineSettings settings = PlayModeFixtures.CreateSettings(2, VoxelWorld.Instance.Settings.Chunk.ChunkPrefab);
             settings.Chunk.LoadDistanceOverride = 6; // chunk store must hold the 7x7 air grid below

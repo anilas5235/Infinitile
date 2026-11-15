@@ -61,8 +61,48 @@ flight. The scheduler gives one step per frame a turn on the main thread, so a f
   placed in it meshes it like any other. Light changes and edits next to it do not flag it, because it has no
   face (`MeshAndRenderPipeline.md`, version 1.9).
 
-`PipelineThroughputTests` (PlayMode) holds the limit on the number of frames a fresh world may take and the queue
-limits in a flight; `PipelineMeasurementTests` (explicit) prints the timings.
+### Main-thread budget per frame
+
+The turn of a frame is bounded by time: `SchedulerSettings.mainThreadBudgetMs` (shipped 2 ms; 0 = no limit, which
+is the behaviour before 2026-11-15; read once when the world is built).
+
+- **A turn is made of items of work.** An item is: adding a data batch to the chunk store, the upload of one
+  chunk to the renderer, the pool claim of one meshed partition, handing the meshes of a batch to Unity, one
+  partition without a voxel, one row of a queue scan, the apply of a light batch or of a bake batch, the start
+  of a batch.
+- **`FrameBudget` is asked before every item.** The scheduler starts it once per frame. The first item of a
+  frame always runs, so every frame makes progress; a later item runs only while time is left. It reads
+  `Stopwatch.GetTimestamp` and allocates nothing.
+- **A cut turn keeps its place.** The step whose turn ran out of time is first in line in the next frame and
+  continues where it stopped; the other steps wait until that turn is finished (`StageRing`). So a batch is
+  applied completely and in order, and no step sees a batch another step has applied in part.
+- **A started item is finished.** A frame can exceed the budget by one item; the largest items are the apply of
+  a light batch and handing a mesh batch to Unity. Measured with 2 ms in a sprint flight at draw distance 12
+  (Editor): scheduler time per frame p95 2.3 ms, p99 2.6 ms, max 4.8 to 6.9 ms; without the limit p95 6.5 to
+  6.7 ms, p99 11.9 ms, max 21 to 22 ms.
+- **The world can change between the frames of a cut turn** (focus update, an edit, an unload). A cut mesh
+  dispatch checks the draw window again for its partitions without a voxel and drops the partitions that lost a
+  chunk of their neighbourhood; a cut data collect skips a chunk that was unloaded again; a cut mesh collect
+  claims no partition whose chunk is gone. `CompleteRunning` (shutdown, tests) finishes a cut turn's batch
+  without the budget.
+- **Not part of the budget:** the focus update (it runs when the focus enters another chunk, outside the turn)
+  and the renderer's GPU builds, which have their own slot count.
+- **The budget is per frame, not per second.** With a frame cap the pipeline gets less main-thread time per
+  second than without one: under the 60 frames cap a fresh world at draw distance 12 takes 810 to 820 frames
+  instead of 701 to 703, and a flight through a world that is still being built fills the draw window later.
+  Uncapped, the world is built as fast as without the limit (5.1 to 5.4 s against 4.9 to 5.2 s).
+- **What the 2 ms cost and buy** (owner's pick of 2026-11-15 from 2, 3 and 4 ms; Editor, uncapped, sprint flight
+  of 80 units per second at draw distance 12, two runs each, without / with the limit): frames over 16.67 ms 93
+  to 103 / 2 to 7 of about 4800; frame p95 13.0 to 13.3 / 9.6 to 9.7 ms; frames over 8.33 ms 21 % / 10 to 12 %;
+  columns within 4 of the focus meshed 100 % / 100 %; draw window meshed 98.4 % / 96 %; collider queue at its
+  peak about 200 / 950 partitions (nearest first); settled after the flight stops within 8 to 22 / 105 to 206
+  frames. A larger value fills the far edge and the collider queue sooner and has longer frames.
+
+`FrameBudgetTests` (EditMode) holds the budget and the round robin with a counting clock.
+`PipelineThroughputTests` (PlayMode) holds the limit on the number of frames a fresh world may take, the queue
+limits in a flight, the scheduler's share of a frame in a flight (p95 at most twice the budget) and that a world
+built under a tight budget is the same world; `EmptyPartitionTests` covers a cut mesh dispatch.
+`PipelineMeasurementTests` (explicit) prints the timings.
 
 ## Light
 

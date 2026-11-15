@@ -120,6 +120,12 @@ namespace Engine.Scripts.Jobs.ColliderBake{
         ///     Waits for the running bake job; its results are still applied by <see cref="Complete" />.
         /// </summary>
         internal void CompleteJobIfRunning(){
+            if (_handle.IsCompleted){
+                _handle.Complete();
+                return;
+            }
+
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.WaitColliderBake.Auto();
             _handle.Complete();
         }
 

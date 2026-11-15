@@ -4,11 +4,13 @@ using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
 using Engine.Scripts.ThirdParty.Priority_Queue;
+using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.Utils.Logger;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
+using Unity.Profiling;
 using static Engine.Scripts.Utils.Extensions.VectorConstants;
 using static Engine.Scripts.Utils.VoxelConstants;
 using static Engine.Scripts.Utils.VoxelUtils;
@@ -168,6 +170,7 @@ namespace Engine.Scripts.World{
             if (_unloadingQueue.Contains(position)) _unloadingQueue.Remove(position);
             if (!_chunks.TryGetValue(position, out Chunk chunk)) return false;
 
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.ChunkUnload.Auto();
             CompleteReadersOf(position);
             chunk.Dispose();
             _chunks.Remove(position);

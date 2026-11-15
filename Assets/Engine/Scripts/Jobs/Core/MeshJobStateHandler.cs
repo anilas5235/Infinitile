@@ -24,6 +24,11 @@ namespace Engine.Scripts.Jobs.Core{
         private readonly Predicate<int3> _lostItsChunks; // created once: JobUpdateStep must not allocate
         private readonly List<int3> _emptyPartitions; // the partitions without a voxel of the current turn
 
+        // A dispatch the budget cut: its partitions are taken from the queue, the rest continues in the next frame
+        private bool _dispatching;
+        private bool _dispatchCut;
+        private int _nextEmpty;
+
         /// <summary>
         ///     Initializes a new instance of the MeshJobStateHandler class.
         /// </summary>
@@ -68,17 +73,19 @@ namespace Engine.Scripts.Jobs.Core{
         /// </summary>
         protected override bool CanDispatch => !_cMeshBuildScheduler.RendererBehind;
 
+        /// <summary>The scan visits the draw distance.</summary>
+        protected override int ScanDistance => Settings.Chunk.DrawDistance;
+
         /// <summary>
-        ///     Enqueues partitions within draw distance that need mesh generation.
+        ///     Enqueues the partitions of one row within draw distance that need mesh generation.
         ///     Only enqueues if the parent chunk has all neighboring chunks loaded.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
-        /// <returns>True if any partitions were enqueued, false if queue is empty.</returns>
-        protected override bool EnqueueStep(PriorityUtil.Focus focus){
+        /// <param name="x">The row, in chunks from the focus.</param>
+        protected override void EnqueueRow(PriorityUtil.Focus focus, int x){
             int draw = Settings.Chunk.DrawDistance;
             float prioThreshold = ChunkPool.GetPartitionPrioThreshold();
 
-            for (int x = -draw; x <= draw; x++)
             for (int z = -draw; z <= draw; z++){
                 if (!CanGenerateMeshForChunk(focus.Pos.xz + new int2(x, z))) continue;
                 // Only the vertical draw window is queued, the same filter IsPartitionStillRelevant applies;
@@ -95,8 +102,6 @@ namespace Engine.Scripts.Jobs.Core{
                     Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
                 }
             }
-
-            return Queue.Count > 0;
         }
 
         /// <summary>
@@ -104,52 +109,82 @@ namespace Engine.Scripts.Jobs.Core{
         ///     as a batch. The ones that hold only air need no mesh job, no GPU build and no collider bake: they
         ///     become active at once, with an empty mesh (see <see cref="CMeshBuildScheduler.ApplyEmpty" />). They
         ///     do not count against the batch, but a turn takes a limited number of them.
+        ///     Items of work for the frame's budget: taking the partitions from the queue, every partition without
+        ///     a voxel (its claim in the pool) and the start of the mesh job. A dispatch the budget cut keeps its
+        ///     partitions and continues where it stopped.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
-        /// <returns>True if jobs were dispatched or batch is full, false if scheduler is busy.</returns>
-        protected override bool JobUpdateStep(PriorityUtil.Focus focus){
-            if (!_cMeshBuildScheduler.IsReady) return false;
+        /// <param name="budget">The frame's budget.</param>
+        /// <returns>None while the scheduler is busy, Cut when the budget ran out inside, otherwise Done.</returns>
+        protected override StageTurn JobUpdateStep(PriorityUtil.Focus focus, FrameBudget budget){
+            if (!_dispatching){
+                if (!_cMeshBuildScheduler.IsReady) return StageTurn.None;
+                if (!budget.Next()) return StageTurn.Cut;
 
-            float prioThreshold = ChunkPool.GetPartitionPrioThreshold();
-            int emptyLimit = EmptyPartitionsPerBatch * BatchSize;
+                float prioThreshold = ChunkPool.GetPartitionPrioThreshold();
+                int emptyLimit = EmptyPartitionsPerBatch * BatchSize;
 
-            while (Set.Count < BatchSize && _emptyPartitions.Count < emptyLimit && Queue.Count > 0){
-                int3 partition = Queue.Dequeue();
-                if (!IsPartitionStillRelevant(partition, focus, prioThreshold)) continue;
-                if (!CanGenerateMeshForChunk(partition.xz)) continue;
-                if (!ShouldScheduleForMeshing(partition)) continue;
+                while (Set.Count < BatchSize && _emptyPartitions.Count < emptyLimit && Queue.Count > 0){
+                    int3 partition = Queue.Dequeue();
+                    if (!IsPartitionStillRelevant(partition, focus, prioThreshold)) continue;
+                    if (!CanGenerateMeshForChunk(partition.xz)) continue;
+                    if (!ShouldScheduleForMeshing(partition)) continue;
 
-                if (ChunkManager.PartitionHasVoxels(partition)) Set.Add(partition);
-                else _emptyPartitions.Add(partition);
+                    if (ChunkManager.PartitionHasVoxels(partition)) Set.Add(partition);
+                    else _emptyPartitions.Add(partition);
+                }
+
+                _dispatching = true;
+                _dispatchCut = false;
+                _nextEmpty = 0;
             }
 
-            if (_emptyPartitions.Count > 0){
-                for (int i = 0; i < _emptyPartitions.Count; i++) _cMeshBuildScheduler.ApplyEmpty(_emptyPartitions[i]);
-                _emptyPartitions.Clear();
-                // A claim in a full pool can reclaim a pooled chunk, and the world then unloads its data: a
-                // partition of this batch that lost a chunk of its neighbourhood is left to the next scan.
-                if (Set.Count > 0) Set.RemoveWhere(_lostItsChunks);
+            for (; _nextEmpty < _emptyPartitions.Count; _nextEmpty++){
+                int3 partition = _emptyPartitions[_nextEmpty];
+                // Frames passed since a cut dispatch took its partitions from the queue: the focus may have moved on
+                if (_dispatchCut && !IsInDrawWindow(partition, focus)) continue;
+                if (!budget.Next()) return CutDispatch();
+
+                _cMeshBuildScheduler.ApplyEmpty(partition);
             }
 
-            if (Set.Count > 0) _cMeshBuildScheduler.Start(Set);
+            // A claim in a full pool can reclaim a pooled chunk, and the world then unloads its data: a partition
+            // of this batch that lost a chunk of its neighbourhood is left to the next scan. The same holds for a
+            // chunk that was unloaded in the frames a cut dispatch waited.
+            if (Set.Count > 0 && (_emptyPartitions.Count > 0 || _dispatchCut)) Set.RemoveWhere(_lostItsChunks);
 
-            return true;
+            if (Set.Count > 0){
+                if (!budget.Next()) return CutDispatch();
+
+                _cMeshBuildScheduler.Start(Set);
+            }
+
+            _emptyPartitions.Clear();
+            _dispatching = false;
+            return StageTurn.Done;
+        }
+
+        private StageTurn CutDispatch(){
+            _dispatchCut = true;
+            return StageTurn.Cut;
         }
 
         /// <summary>
-        ///     Collects results from completed mesh building and wakes up the collider handler.
+        ///     Collects results from completed mesh building and wakes up the collider handler. Every claim in the
+        ///     pool is an item of work (see <see cref="CMeshBuildScheduler.Complete" />).
         /// </summary>
-        /// <returns>True if collection completed, false if scheduler is still working.</returns>
-        protected override bool CollectResultsStep(){
+        /// <param name="budget">The frame's budget.</param>
+        /// <returns>None while the batch runs, Cut when the budget ran out inside the collect, otherwise Done.</returns>
+        protected override StageTurn CollectResultsStep(FrameBudget budget){
             // A batch that was already applied elsewhere only clears the set; waiting for it would stall the handler.
             if (!_cMeshBuildScheduler.IsReady){
-                if (!_cMeshBuildScheduler.IsComplete) return false;
-                _cMeshBuildScheduler.Complete();
+                if (!_cMeshBuildScheduler.IsComplete) return StageTurn.None;
+                if (!_cMeshBuildScheduler.Complete(budget)) return StageTurn.Cut;
             }
 
             Set.Clear();
             _colliderJobHandler.WakeUp();
-            return true;
+            return StageTurn.Done;
         }
 
         /// <summary>

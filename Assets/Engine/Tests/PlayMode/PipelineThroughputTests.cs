@@ -3,6 +3,7 @@ using System.Collections;
 using System.Globalization;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Render;
+using Engine.Scripts.Render.Post;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.World;
@@ -29,7 +30,22 @@ namespace Engine.Tests.PlayMode{
         /// <summary>Spectator flight with sprint: 40 units per second times two.</summary>
         private const float FlightSpeed = 80f;
 
+        /// <summary>
+        ///     The flights of the goal run, in units per second: the spectator sprint, and the fastest movement
+        ///     outside spectator mode (flying at 20 with sprint, or the spectator without).
+        /// </summary>
+        private static readonly float[] GoalFlightSpeeds ={ FlightSpeed, 40f };
+
         private const float FlightSeconds = 30f;
+
+        /// <summary>
+        ///     Height of every flight: above the terrain along the path (highest block y 123 to 139 near the spawn)
+        ///     and under the world's top at 256 (owner, 2026-11-15).
+        /// </summary>
+        internal const float FlightHeight = 200f;
+
+        /// <summary>Degrees the camera of a flight looks down, so the picture holds terrain and not only sky.</summary>
+        internal const float FlightPitch = 20f;
 
         /// <summary>
         ///     The first world build at the start is exempt from the frame-time goal; from this many seconds after
@@ -49,9 +65,11 @@ namespace Engine.Tests.PlayMode{
         ///     frames (125.9 s at 60 frames per second, measured 2026-11-14). The work-conserving one needs 2532
         ///     with the mesh batch of 8 and the 4 GPU build slots of that time, and 1345 with the shipped 16 and 8;
         ///     the GPU build slots limit the mesh stage now. Without the partitions that hold no voxel (48 % of the
-        ///     draw window, no mesh job and no GPU build) it needs 701. The limit leaves a quarter of slack.
+        ///     draw window, no mesh job and no GPU build) it needs 701, and 820 under the main-thread budget of 2 ms
+        ///     per frame (2026-11-15; a frame of the 60 frames cap has time to spare, the budget does not use it).
+        ///     The limit leaves a fifth of slack.
         /// </summary>
-        private const int FreshBuildFrameBudget = 900;
+        private const int FreshBuildFrameBudget = 1000;
 
         private int _savedTargetFrameRate;
         private int _savedVSync;
@@ -66,6 +84,7 @@ namespace Engine.Tests.PlayMode{
         public IEnumerator TearDown(){
             Application.targetFrameRate = _savedTargetFrameRate;
             QualitySettings.vSyncCount = _savedVSync;
+            yield return FreshSceneAfterFlight();
             yield return WaitForBuiltWorld();
         }
 
@@ -132,6 +151,40 @@ namespace Engine.Tests.PlayMode{
             Assert.Greater(run.NearCoverage, run.WindowCoverage,
                 $"meshed share of the columns within {NearRadius} of the focus against the whole draw window");
             Assert.AreEqual(0, run.DispatchedWithoutVoxels, "partitions without a voxel that got a mesh job");
+            // The main-thread budget bounds the scheduler's share of a frame: the flight has more work than fits,
+            // so turns are cut, and a frame exceeds the budget by one item of work at most (5.5 and 6.4 ms at the
+            // 95th percentile without the budget, 2.8 ms with the shipped 2 ms, 2026-11-15).
+            float budget = VoxelWorld.Instance.Settings.Scheduler.mainThreadBudgetMs;
+            Assert.Greater(budget, 0f, "the shipped settings bound the main-thread work per frame");
+            Assert.Greater(run.FramesCut, 0, "frames in which the budget stopped a turn");
+            Assert.LessOrEqual(run.SchedulerP95Ms, 2f * budget,
+                "scheduler main-thread ms per frame at the 95th percentile, against twice the budget");
+        }
+
+        [UnityTest]
+        [Order(3)]
+        [Timeout(900000)]
+        public IEnumerator FreshWorld_UnderATightBudget_IsBuiltTheSame(){
+            // The main-thread budget only spreads a stage's turn over more frames: a world built with four items
+            // of work per frame (a claim in the pool, the upload of a chunk, a row of a queue scan, the start of
+            // a batch) ends in the same state as one built without a limit. The budget's clock counts the items
+            // it is asked for instead of the time, so the test does not depend on the machine.
+            const int draw = 4;
+            PipelineRun whole = new();
+            yield return BuildFreshWorld(0, whole, "no budget: ", draw, FrameBudget.Unlimited);
+
+            long asked = 0;
+            FrameBudget budget = new(4f, () => asked++, 1d);
+            PipelineRun cut = new();
+            yield return BuildFreshWorld(0, cut, "four items per frame: ", draw, budget);
+
+            Assert.Greater(budget.FramesCut, 0, "frames in which the budget stopped a turn");
+            Assert.Greater(cut.BuildFrames, whole.BuildFrames, "the cut turns took more frames");
+            Assert.AreEqual(whole.LoadedChunks, cut.LoadedChunks, "chunks loaded");
+            Assert.AreEqual(whole.ActivePartitions, cut.ActivePartitions, "active partitions");
+            Assert.AreEqual(whole.CollidablePartitions, cut.CollidablePartitions, "collidable partitions");
+            AssertQueuesInsideWindows(cut);
+            Assert.AreEqual(0, cut.DispatchedWithoutVoxels, "partitions without a voxel that got a mesh job");
         }
 
         private static void AssertQueuesInsideWindows(PipelineRun run){
@@ -170,8 +223,26 @@ namespace Engine.Tests.PlayMode{
             /// <summary>Partitions without a voxel that were handed to a mesh job all the same.</summary>
             internal int DispatchedWithoutVoxels;
 
+            /// <summary>The world at the end of the run: chunks in the store, active and collidable partitions.</summary>
+            internal int LoadedChunks;
+
+            internal int ActivePartitions;
+
+            internal int CollidablePartitions;
+
+            /// <summary>Frames in which the main-thread budget stopped a stage's turn.</summary>
+            internal int FramesCut;
+
+            /// <summary>The scheduler's main-thread milliseconds of a frame that 95 % of the frames stay under.</summary>
+            internal float SchedulerP95Ms;
+
             internal void CopyCounts(PipelineProbe probe){
+                FramesCut = probe.FramesCut;
+                SchedulerP95Ms = probe.SchedulerP95Ms;
                 probe.PeakQueue.CopyTo(PeakQueue, 0);
+                LoadedChunks = probe.LoadedChunks;
+                ActivePartitions = probe.ActivePartitions;
+                CollidablePartitions = probe.CollidablePartitions;
                 MeshedPartitions = probe.MeshedPartitions;
                 PartitionsWithoutMesh = probe.PartitionsWithoutMesh;
                 DispatchedWithoutVoxels = probe.DispatchedWithoutVoxels;
@@ -202,12 +273,15 @@ namespace Engine.Tests.PlayMode{
 
         /// <summary>
         ///     Loads a fresh world and samples it until it is built. <paramref name="variant" /> names the settings
-        ///     in the log lines when they are not the shipped ones.
+        ///     in the log lines when they are not the shipped ones. <paramref name="budget" /> replaces the
+        ///     main-thread budget of the world's scheduler.
         /// </summary>
         internal static IEnumerator BuildFreshWorld(int frameRate, PipelineRun run, string variant = "",
-            int drawDistance = 0){
+            int drawDistance = 0, FrameBudget budget = null){
             yield return LoadFreshWorld(frameRate, drawDistance);
             VoxelWorld world = VoxelWorld.Instance;
+            if (budget != null)
+                PlayModeFixtures.GetPrivateField<VoxelEngineScheduler>(world, "_scheduler").Budget = budget;
             int draw = world.Settings.Chunk.DrawDistance;
             using PipelineProbe probe = new(world);
             while (!probe.Built){
@@ -237,24 +311,29 @@ namespace Engine.Tests.PlayMode{
 
             // The player starts to fly as soon as there is ground under the focus.
             yield return AllocationTests.WaitForFocusColumn(world, 60f, true);
-            Vector3 start = focus.position;
+            Transform body = FlightBody(focus);
+            Vector3 start = body.position;
             float flightStart = Time.realtimeSinceStartup;
             double nearSum = 0, windowSum = 0;
             int coverageSamples = 0;
+            PathGround ground = new();
             while (true){
                 float elapsed = Time.realtimeSinceStartup - flightStart;
                 if (elapsed >= FlightSeconds) break;
-                focus.position = start + new Vector3(FlightSpeed * elapsed, 0f, 0f);
+                body.position = start + new Vector3(FlightSpeed * elapsed, 0f, 0f);
                 yield return null;
                 probe.Sample();
                 if (probe.Frames % 15 != 0) continue;
                 nearSum += probe.Coverage(NearRadius);
                 windowSum += probe.Coverage(draw);
                 coverageSamples++;
+                ground.Sample(world, focus);
             }
 
             CultureInfo inv = CultureInfo.InvariantCulture;
             float distance = (focus.position - start).magnitude;
+            Debug.Log(ground.Report(label));
+            ground.AssertBelow(focus);
             run.NearCoverage = (float)(nearSum / math.max(coverageSamples, 1));
             run.WindowCoverage = (float)(windowSum / math.max(coverageSamples, 1));
             Debug.Log(probe.Report(label) + string.Format(inv,
@@ -284,70 +363,214 @@ namespace Engine.Tests.PlayMode{
 
         /// <summary>
         ///     The run for the frame-time goal (120 frames per second at the 95th percentile, no stutter the player
-        ///     notices): a fresh world with the player standing still for <see cref="StandSeconds" />, then a sprint
-        ///     flight through the built world, then the stop. It prints when the world was built, the frame times
-        ///     from <see cref="StableAfterSeconds" /> after the start to the end of the standing phase, the frame
-        ///     times of the flight with its queue peaks and the meshed share near the focus, and how long the world
-        ///     takes to settle after the flight. Asserts nothing but the time limit.
+        ///     notices): a fresh world with the focus standing still for <see cref="StandSeconds" /> where the
+        ///     flights start (above the spawn at <see cref="FlightHeight" />, see <see cref="FlightBody" />), then
+        ///     one flight through the built world per entry of <see cref="GoalFlightSpeeds" />, each followed by
+        ///     the stop. It prints when the world was built, the frame times from <see cref="StableAfterSeconds" />
+        ///     after the start to the end of the standing phase, the frame times of every flight with its queue
+        ///     peaks and the meshed share near the focus, and how long the world takes to settle after it; with
+        ///     <paramref name="attribute" /> also where the main thread spent the frames of each phase. Asserts
+        ///     nothing but the time limit.
         /// </summary>
-        internal static IEnumerator StandThenFly(int frameRate, string variant = "", int drawDistance = 0){
+        internal static IEnumerator StandThenFly(int frameRate, string variant = "", int drawDistance = 0,
+            bool attribute = false){
             yield return LoadFreshWorld(frameRate, drawDistance);
             VoxelWorld world = VoxelWorld.Instance;
             int draw = world.Settings.Chunk.DrawDistance;
             CultureInfo inv = CultureInfo.InvariantCulture;
             string label = $"{variant}goal run, draw {draw}, {CapName(frameRate)}";
             Transform focus = PlayModeFixtures.GetPrivateField<Transform>(world, "focus");
-            using PipelineProbe probe = new(world);
+            FlightBody(focus);
+            using PipelineProbe probe = new(world, attribute);
 
-            // Standing: the first build, and the frames after it
+            // Standing where the flights start: the first build, and the frames after it
             int stableFrom = -1;
+            string places = Place(world, focus, label, "start of the standing phase");
             while (probe.Seconds < StandSeconds){
                 yield return null;
-                if (stableFrom < 0 && probe.Seconds >= StableAfterSeconds) stableFrom = probe.Frames;
+                if (stableFrom < 0 && probe.Seconds >= StableAfterSeconds){
+                    stableFrom = probe.Frames;
+                    places += Place(world, focus, label, $"{StableAfterSeconds:0} s after the start");
+                }
+
                 probe.Sample();
             }
 
             int standEnd = probe.Frames;
-            Debug.Log(probe.Report($"{label}, standing {StandSeconds:0} s") +
+            places += Place(world, focus, label, "end of the standing phase");
+            Debug.Log(places + probe.Report($"{label}, standing {StandSeconds:0} s") +
                       string.Format(inv, "[PipelineProbe] {0}: world built after {1:0.0} s (frame {2}; -1: not built)\n",
                           label, probe.Built ? probe.BuiltSeconds : -1f, probe.Built ? probe.BuiltFrames : -1) +
                       probe.FrameTimes($"{label}, standing, first {StableAfterSeconds:0} s (not judged)", 0, stableFrom) +
                       probe.FrameTimes($"{label}, standing, {StableAfterSeconds:0} s to {StandSeconds:0} s after the start",
-                          stableFrom, standEnd));
+                          stableFrom, standEnd) +
+                      probe.Attribution($"{label}, standing, first {StableAfterSeconds:0} s (not judged)", 0, stableFrom) +
+                      probe.Attribution(
+                          $"{label}, standing, {StableAfterSeconds:0} s to {StandSeconds:0} s after the start", stableFrom,
+                          standEnd));
 
-            // The sprint flight
+            foreach (float speed in GoalFlightSpeeds) yield return FlyAndSettle(probe, world, focus, label, speed);
+        }
+
+        /// <summary>
+        ///     What a flight moves: the focus alone, with nothing in the scene that can fall. In the game scene the
+        ///     focus is the camera of a player with physics. Moving the camera alone leaves the player behind, the
+        ///     ground under it unloads, it falls, and the camera, its child, sinks with it whenever the test does
+        ///     not hold it (between two phases). A measurement of the pipeline needs the focus and the rendering
+        ///     camera, not the player: the focus is taken out of the player and the player object is switched off.
+        ///     The HUD and the rest of the scene stay as they are.
+        ///     The flight goes above the terrain (the spawn is on the sea floor, 46 blocks under water): the focus
+        ///     is lifted to <see cref="FlightHeight" /> and looks along the flight, <see cref="FlightPitch" /> degrees
+        ///     down. The effect of the water around the spawn would stay on the picture, because the handler that
+        ///     follows the camera sits on the player: it is cleared here. <see cref="FreshSceneAfterFlight" /> in the
+        ///     fixture's tear-down gives the tests that follow a scene with a player again.
+        /// </summary>
+        internal static Transform FlightBody(Transform focus){
+            if (focus.parent != null){
+                GameObject player = focus.root.gameObject;
+                focus.SetParent(null, true);
+                player.SetActive(false);
+                PostProcessManager post = PostProcessManager.Instance;
+                if (post){
+                    post.ResetLiftGammaGain();
+                    post.ResetColorAdjustments();
+                }
+
+                UnderwaterFogFeature.Enabled = false;
+            }
+
+            Vector3 eye = focus.position;
+            focus.SetPositionAndRotation(new Vector3(eye.x, FlightHeight, eye.z), Quaternion.Euler(FlightPitch, 90f, 0f));
+            return focus;
+        }
+
+        /// <summary>
+        ///     After a flight the player is switched off and the focus is far from the spawn. Reloads the scene when
+        ///     that is the case (the focus of the game scene hangs on the player unless <see cref="FlightBody" />
+        ///     took it out), so the next test finds the scene as it ships.
+        /// </summary>
+        internal static IEnumerator FreshSceneAfterFlight(){
+            VoxelWorld world = VoxelWorld.Instance;
+            if (world == null) yield break;
+
+            Transform focus = PlayModeFixtures.GetPrivateField<Transform>(world, "focus");
+            if (focus == null || focus.parent != null) yield break;
+
+            yield return PlayModeFixtures.ReloadWorldWithDrawDistance(world.Settings.Chunk.DrawDistance);
+        }
+
+        /// <summary>
+        ///     Where the focus (the transform the tests move, the camera in the game scene) and the object it
+        ///     hangs on (the player with its physics) are, and the highest block under the focus. A camera under
+        ///     the ground, or one that sinks with a falling player between two phases, draws another picture than
+        ///     a flight does, so every phase says where it was.
+        /// </summary>
+        internal static string Place(VoxelWorld world, Transform focus, string label, string moment){
+            Vector3 eye = focus.position;
+            Transform root = focus.root;
+            int3 column = eye.Int3();
+            int top = HighestBlock(world, column);
+            ushort inside = top >= 0 && eye.y >= 0f && eye.y < ChunkHeight ? world.GetVoxel(column) : (ushort)0;
+            Vector3 body = root.position;
+            bool rootLoaded = world.IsChunkLoaded(new int3((int)math.floor(body.x), 0, (int)math.floor(body.z)));
+            return string.Format(CultureInfo.InvariantCulture,
+                "[PipelineProbe] {0}: place at the {1}: focus '{2}' at ({3:0.0}, {4:0.0}, {5:0.0}) in voxel id {12} " +
+                "(0: air), highest block of its column y {6} (-1: column not loaded); its root '{7}' at ({8:0.0}, " +
+                "{9:0.0}, {10:0.0}), the column under the root is {11}\n", label, moment, focus.name, eye.x, eye.y,
+                eye.z, top, root.name, body.x, body.y, body.z, rootLoaded ? "loaded" : "not loaded", inside);
+        }
+
+        /// <summary>The highest block of the column of <paramref name="column" />; -1 when it is not loaded or empty.</summary>
+        private static int HighestBlock(VoxelWorld world, int3 column){
+            if (!world.IsChunkLoaded(column)) return -1;
+
+            for (int y = ChunkHeight - 1; y >= 0; y--)
+                if (world.GetVoxel(new int3(column.x, y, column.z)) != 0)
+                    return y;
+            return -1;
+        }
+
+        /// <summary>
+        ///     The ground under a flight: the highest block of the focus column, read at every sample. A flight
+        ///     that is meant to go above the terrain says with it how much room it had, and fails when the ground
+        ///     reached the focus.
+        /// </summary>
+        internal struct PathGround{
+            private int _samples, _notLoaded, _highest;
+            private float _highestAtX;
+
+            internal void Sample(VoxelWorld world, Transform focus){
+                Vector3 eye = focus.position;
+                int top = HighestBlock(world, eye.Int3());
+                _samples++;
+                if (top < 0) _notLoaded++;
+                if (top <= _highest) return;
+
+                _highest = top;
+                _highestAtX = eye.x;
+            }
+
+            internal string Report(string label){
+                return string.Format(CultureInfo.InvariantCulture,
+                    "[PipelineProbe] {0}: ground under the flight: highest block y {1} (at x {2:0}) in {3} samples of " +
+                    "the focus column, {4} of them without loaded voxels\n", label, _highest, _highestAtX, _samples,
+                    _notLoaded);
+            }
+
+            internal void AssertBelow(Transform focus){
+                Assert.Less(_highest, focus.position.y - 1f, "the ground reached the height of the flight");
+            }
+        }
+
+        /// <summary>One flight of <see cref="StandThenFly" /> along +x at <paramref name="speed" />, and the stop.</summary>
+        private static IEnumerator FlyAndSettle(PipelineProbe probe, VoxelWorld world, Transform focus, string label,
+            float speed){
+            CultureInfo inv = CultureInfo.InvariantCulture;
+            int draw = world.Settings.Chunk.DrawDistance;
+
+            // The frame that wrote the report of the phase before is the test's own cost, not the flight's
+            yield return null;
+            probe.Sample();
+            int flightBegin = probe.Frames;
             probe.ResetPeaks();
-            Vector3 start = focus.position;
+            Transform body = FlightBody(focus);
+            Vector3 start = body.position;
+            string flight = $"{label}, flight {speed:0} u/s for {FlightSeconds:0} s";
+            string places = Place(world, focus, flight, "start of the flight");
+            float sankAt = -1f;
             float flightStart = Time.realtimeSinceStartup;
             double nearSum = 0, windowSum = 0;
             float nearMin = 1f;
             int coverageSamples = 0;
+            PathGround ground = new();
             while (true){
                 float elapsed = Time.realtimeSinceStartup - flightStart;
                 if (elapsed >= FlightSeconds) break;
-                focus.position = start + new Vector3(FlightSpeed * elapsed, 0f, 0f);
+                body.position = start + new Vector3(speed * elapsed, 0f, 0f);
                 yield return null;
                 probe.Sample();
+                if (sankAt < 0f && math.abs(focus.position.y - start.y) > 0.5f){
+                    sankAt = elapsed;
+                    places += Place(world, focus, flight, string.Format(inv,
+                        "{0:0.0} s into the flight, the focus has left the height of its start", elapsed));
+                }
+
                 if (probe.Frames % 15 != 0) continue;
                 float near = probe.Coverage(NearRadius);
                 nearSum += near;
                 nearMin = math.min(nearMin, near);
                 windowSum += probe.Coverage(draw);
                 coverageSamples++;
+                ground.Sample(world, focus);
             }
 
+            // What the flight left behind is read now and written after the stop: a report costs frame time
             int flightEnd = probe.Frames;
-            string flight = $"{label}, flight {FlightSpeed:0} u/s for {FlightSeconds:0} s";
-            Debug.Log(probe.FrameTimes(flight, standEnd, flightEnd) + string.Format(inv,
-                "[PipelineProbe] {0}: {1} frames ({2:0} fps); queue peaks data {3}, light {4}, mesh {5}, bake {6}, " +
-                "renderer pending builds {7}; at the end of the flight mesh queue {8}, bake queue {9}; meshed share of " +
-                "the columns within {10} of the focus: average {11:0.000}, lowest {12:0.000}, at the end {13:0.000}; " +
-                "of the draw window: average {14:0.000}, at the end {15:0.000}",
-                flight, flightEnd - standEnd, (flightEnd - standEnd) / FlightSeconds, probe.PeakQueue[PipelineProbe.Data],
-                probe.PeakQueue[PipelineProbe.Light], probe.PeakQueue[PipelineProbe.Mesh],
-                probe.PeakQueue[PipelineProbe.Bake], probe.PeakPendingBuilds, world.Stats.MeshQueue,
-                world.Stats.BakeQueue, NearRadius, nearSum / math.max(coverageSamples, 1), nearMin,
-                probe.Coverage(NearRadius), windowSum / math.max(coverageSamples, 1), probe.Coverage(draw)));
+            places += Place(world, focus, flight, "end of the flight");
+            int peakData = probe.PeakQueue[PipelineProbe.Data], peakLight = probe.PeakQueue[PipelineProbe.Light];
+            int peakMesh = probe.PeakQueue[PipelineProbe.Mesh], peakBake = probe.PeakQueue[PipelineProbe.Bake];
+            int peakBuilds = probe.PeakPendingBuilds, meshQueue = world.Stats.MeshQueue, bakeQueue = world.Stats.BakeQueue;
+            float nearEnd = probe.Coverage(NearRadius), windowEnd = probe.Coverage(draw);
 
             // The player stops; how long until the world around them is complete?
             probe.RestartCompletion();
@@ -359,9 +582,27 @@ namespace Engine.Tests.PlayMode{
                 probe.Sample();
             }
 
-            Debug.Log(string.Format(inv, "[PipelineProbe] {0}: world complete {1:0.0} s ({2} frames) after the flight\n",
-                          label, probe.Seconds - settleStart, probe.Frames - flightEnd) +
-                      probe.FrameTimes($"{label}, settling after the flight", flightEnd, probe.Frames));
+            int settleEnd = probe.Frames;
+            float settleSeconds = probe.Seconds - settleStart;
+            places += Place(world, focus, flight, "world complete after the flight");
+            string report = places + ground.Report(flight) + probe.FrameTimes(flight, flightBegin, flightEnd) +
+                            string.Format(inv,
+                "[PipelineProbe] {0}: {1} frames ({2:0} fps); queue peaks data {3}, light {4}, mesh {5}, bake {6}, " +
+                "renderer pending builds {7}; at the end of the flight mesh queue {8}, bake queue {9}; meshed share of " +
+                "the columns within {10} of the focus: average {11:0.000}, lowest {12:0.000}, at the end {13:0.000}; " +
+                "of the draw window: average {14:0.000}, at the end {15:0.000}\n",
+                flight, flightEnd - flightBegin, (flightEnd - flightBegin) / FlightSeconds, peakData, peakLight, peakMesh,
+                peakBake, peakBuilds, meshQueue, bakeQueue, NearRadius, nearSum / math.max(coverageSamples, 1), nearMin,
+                nearEnd, windowSum / math.max(coverageSamples, 1), windowEnd) +
+                            probe.Attribution(flight, flightBegin, flightEnd) + string.Format(inv,
+                                "[PipelineProbe] {0}: world complete {1:0.0} s ({2} frames) after the flight\n",
+                                flight, settleSeconds, settleEnd - flightEnd);
+            if (settleEnd > flightEnd)
+                report += probe.FrameTimes($"{flight}, settling after it", flightEnd, settleEnd) +
+                          probe.Attribution($"{flight}, settling after it", flightEnd, settleEnd);
+            Debug.Log(report);
+            Assert.AreEqual(start.y, focus.position.y, 0.01f, "the focus left its height during the flight or the stop");
+            ground.AssertBelow(focus);
         }
     }
 }

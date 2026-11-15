@@ -6,12 +6,15 @@ using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.World;
 using Unity.Mathematics;
+using Unity.Profiling;
 
 namespace Engine.Scripts.Jobs.Core{
     /// <summary>
     ///     Central scheduler that orchestrates data, light, mesh, and collider jobs. Every frame one stage gets a
     ///     turn (collect its finished batch, look for work, start the next batch); the stages take turns round
     ///     robin, and a stage that sleeps or still waits for its batch passes the frame on to the next one.
+    ///     The main-thread time of a turn is bounded by <see cref="SchedulerSettings.mainThreadBudgetMs" />: a turn
+    ///     that runs out of it continues in the next frame (see <see cref="FrameBudget" />, <see cref="StageRing" />).
     ///     Manages separate priority queues and selects batches according to scheduler settings.
     /// </summary>
     public class VoxelEngineScheduler{
@@ -27,7 +30,7 @@ namespace Engine.Scripts.Jobs.Core{
         private readonly LightScheduler _lightScheduler;
         private readonly MeshJobStateHandler _meshJobHandler;
 
-        private SchedulerUpdate _currentUpdate;
+        private readonly StageRing _ring;
 
         /// <summary>
         ///     Creates a new scheduler and initializes all job queues and state handlers.
@@ -61,7 +64,14 @@ namespace Engine.Scripts.Jobs.Core{
             _dataJobHandler =
                 new DataJobStateHandler(settings, chunkManager, chunkPool, chunkScheduler, _lightJobHandler);
 
-            _currentUpdate = SchedulerUpdate.Data;
+            // One profiler marker per scheduler stage
+            _ring = new StageRing(
+                new IPipelineStage[]{ _dataJobHandler, _lightJobHandler, _meshJobHandler, _colliderJobHandler },
+                new[]{
+                    VoxelProfilerMarkers.SchedulerData, VoxelProfilerMarkers.SchedulerLight,
+                    VoxelProfilerMarkers.SchedulerMesh, VoxelProfilerMarkers.SchedulerCollider
+                });
+            Budget = new FrameBudget(settings.Scheduler.mainThreadBudgetMs);
 
             _chunkManager.OnRemeshRequested += OnRemesh;
             _chunkManager.OnLightInvalidated += OnLightInvalidated;
@@ -69,36 +79,23 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
+        ///     The main-thread time the stages may spend per frame, from
+        ///     <see cref="SchedulerSettings.mainThreadBudgetMs" /> when the world is built. The focus update is not
+        ///     part of it: it runs outside the tick, when the focus enters another chunk.
+        /// </summary>
+        internal FrameBudget Budget{ get; set; }
+
+        /// <summary>
         ///     Executes a scheduler tick: the first stage in round-robin order that has main-thread work gets the
         ///     frame, and the stage after it is first in line on the next tick. So at most one stage applies a batch
         ///     per frame, no frame is left unused while any stage has work, and a busy stage cannot starve the others.
+        ///     A turn that uses up the frame's budget stops between two items of work and continues on the next
+        ///     tick, before any other stage.
         /// </summary>
         /// <param name="focus">The focus position (e.g., player chunk root).</param>
         internal void ScheduleUpdate(PriorityUtil.Focus focus){
-            for (int i = 0; i < SchedulerUpdateCount; i++){
-                SchedulerUpdate stage = (SchedulerUpdate)(((byte)_currentUpdate + i) % SchedulerUpdateCount);
-                if (!UpdateStage(stage, focus)) continue;
-
-                _currentUpdate = (SchedulerUpdate)(((byte)stage + 1) % SchedulerUpdateCount);
-                return;
-            }
-        }
-
-        /// <summary>Gives <paramref name="stage" /> its turn; false when it had nothing to do on the main thread.</summary>
-        private bool UpdateStage(SchedulerUpdate stage, PriorityUtil.Focus focus){
-            switch (stage){
-                // One profiler marker per scheduler stage
-                case SchedulerUpdate.Data:
-                    using (VoxelProfilerMarkers.SchedulerData.Auto()) return _dataJobHandler.Update(focus);
-                case SchedulerUpdate.Light:
-                    using (VoxelProfilerMarkers.SchedulerLight.Auto()) return _lightJobHandler.Update(focus);
-                case SchedulerUpdate.Mesh:
-                    using (VoxelProfilerMarkers.SchedulerMesh.Auto()) return _meshJobHandler.Update(focus);
-                case SchedulerUpdate.Collider:
-                    using (VoxelProfilerMarkers.SchedulerCollider.Auto()) return _colliderJobHandler.Update(focus);
-                default:
-                    return false;
-            }
+            Budget.BeginFrame();
+            _ring.Turn(focus, Budget);
         }
 
         /// <summary>
@@ -106,12 +103,13 @@ namespace Engine.Scripts.Jobs.Core{
         /// </summary>
         /// <param name="focus">The new focus position.</param>
         internal void FocusUpdate(PriorityUtil.Focus focus){
-            _dataJobHandler.FocusUpdate(focus);
-            _lightJobHandler.FocusUpdate(focus);
-            _meshJobHandler.FocusUpdate(focus);
-            _colliderJobHandler.FocusUpdate(focus);
-            _chunkManager.FocusUpdate(focus);
-            _chunkPool.FocusUpdate(focus);
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.FocusUpdate.Auto();
+            using (VoxelProfilerMarkers.FocusData.Auto()) _dataJobHandler.FocusUpdate(focus);
+            using (VoxelProfilerMarkers.FocusLight.Auto()) _lightJobHandler.FocusUpdate(focus);
+            using (VoxelProfilerMarkers.FocusMesh.Auto()) _meshJobHandler.FocusUpdate(focus);
+            using (VoxelProfilerMarkers.FocusCollider.Auto()) _colliderJobHandler.FocusUpdate(focus);
+            using (VoxelProfilerMarkers.FocusChunkStore.Auto()) _chunkManager.FocusUpdate(focus);
+            using (VoxelProfilerMarkers.FocusPool.Auto()) _chunkPool.FocusUpdate(focus);
         }
 
         /// <summary>
@@ -168,25 +166,6 @@ namespace Engine.Scripts.Jobs.Core{
             _chunkManager.OnRemeshRequested -= OnRemesh;
             _chunkManager.OnLightInvalidated -= OnLightInvalidated;
             _chunkManager.OnChunkUnloaded -= OnChunkUnloaded;
-        }
-
-        private const int SchedulerUpdateCount = 4;
-
-        /// <summary>
-        ///     Enum representing the four job types in the round-robin scheduling cycle.
-        /// </summary>
-        private enum SchedulerUpdate : byte{
-            /// <summary>Data generation job update.</summary>
-            Data,
-
-            /// <summary>Light job update.</summary>
-            Light,
-
-            /// <summary>Mesh building job update.</summary>
-            Mesh,
-
-            /// <summary>Collider baking job update.</summary>
-            Collider
         }
 
         #region RuntimeStatsAPI

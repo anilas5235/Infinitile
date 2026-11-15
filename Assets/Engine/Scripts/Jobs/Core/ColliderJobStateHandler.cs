@@ -42,15 +42,17 @@ namespace Engine.Scripts.Jobs.Core{
             Queue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.DistPriority(ref pos, ref f));
         }
 
+        /// <summary>The scan visits the update distance.</summary>
+        protected override int ScanDistance => Settings.Chunk.UpdateDistance;
+
         /// <summary>
-        ///     Enqueues partitions within update distance that need collider baking.
+        ///     Enqueues the partitions of one row within update distance that need collider baking.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
-        /// <returns>True if any partitions were enqueued, false if queue is empty.</returns>
-        protected override bool EnqueueStep(PriorityUtil.Focus focus){
+        /// <param name="x">The row, in chunks from the focus.</param>
+        protected override void EnqueueRow(PriorityUtil.Focus focus, int x){
             int update = Settings.Chunk.UpdateDistance;
 
-            for (int x = -update; x <= update; x++)
             for (int z = -update; z <= update; z++)
             for (int y = 0; y < VoxelConstants.PartitionsPerChunk; y++){
                 int3 pos = new(x + focus.Pos.x, y, z + focus.Pos.z);
@@ -59,17 +61,17 @@ namespace Engine.Scripts.Jobs.Core{
                 if (!Queue.Contains(pos) && CanBakeColliderForChunk(pos) && ShouldScheduleForBaking(pos))
                     Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
             }
-
-            return Queue.Count > 0;
         }
 
         /// <summary>
-        ///     Dispatches a batch of partitions to the collider bake scheduler.
+        ///     Dispatches a batch of partitions to the collider bake scheduler. One item of work.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
-        /// <returns>True if jobs were dispatched or batch is full, false if scheduler is busy.</returns>
-        protected override bool JobUpdateStep(PriorityUtil.Focus focus){
-            if (!_colliderBakeScheduler.IsReady) return false;
+        /// <param name="budget">The frame's budget.</param>
+        /// <returns>None while the scheduler is busy, Cut when the budget is used up, otherwise Done.</returns>
+        protected override StageTurn JobUpdateStep(PriorityUtil.Focus focus, FrameBudget budget){
+            if (!_colliderBakeScheduler.IsReady) return StageTurn.None;
+            if (!budget.Next()) return StageTurn.Cut;
 
             int count = math.min(Settings.Scheduler.colliderBatchSize, Queue.Count);
             int accepted = 0;
@@ -82,26 +84,30 @@ namespace Engine.Scripts.Jobs.Core{
                 accepted++;
             }
 
-            if (accepted == 0) return true;
+            if (accepted == 0) return StageTurn.Done;
 
             _colliderBakeScheduler.Start(Set);
 
-            return true;
+            return StageTurn.Done;
         }
 
         /// <summary>
-        ///     Collects results from completed collider baking.
+        ///     Collects results from completed collider baking. The batch is applied as one item of work, at the
+        ///     start of the turn.
         /// </summary>
-        /// <returns>True if collection completed, false if scheduler is still working.</returns>
-        protected override bool CollectResultsStep(){
+        /// <param name="budget">The frame's budget.</param>
+        /// <returns>None while the batch runs, Cut when the budget is used up, otherwise Done.</returns>
+        protected override StageTurn CollectResultsStep(FrameBudget budget){
             // A batch that was already applied elsewhere only clears the set; waiting for it would stall the handler.
             if (!_colliderBakeScheduler.IsReady){
-                if (!_colliderBakeScheduler.IsComplete) return false;
+                if (!_colliderBakeScheduler.IsComplete) return StageTurn.None;
+                if (!budget.Next()) return StageTurn.Cut;
+
                 _colliderBakeScheduler.Complete();
             }
 
             Set.Clear();
-            return true;
+            return StageTurn.Done;
         }
 
         /// <summary>

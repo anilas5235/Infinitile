@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using Engine.Scripts.Behaviour;
 using Engine.Scripts.Settings;
 using Engine.Scripts.ThirdParty.Priority_Queue;
+using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
 using Unity.Mathematics;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.Pool;
 using static Engine.Scripts.Jobs.Core.PriorityUtil;
@@ -131,8 +133,12 @@ namespace Engine.Scripts.World{
                 ReclaimChunk(reclaim);
             }
 
-            ChunkBehaviour behaviour = _pool.Get();
-            behaviour.Transform.position = new float3(position.x * ChunkWidth, 0, position.y * ChunkDepth);
+            ChunkBehaviour behaviour;
+            using (VoxelProfilerMarkers.PoolActivateChunk.Auto()){
+                behaviour = _pool.Get();
+                behaviour.Transform.position = new float3(position.x * ChunkWidth, 0, position.y * ChunkDepth);
+            }
+
             _chunkMap.Add(position, behaviour);
             _chunkQueue.Enqueue(position, PriorityCalc(position));
             return behaviour;
@@ -156,6 +162,7 @@ namespace Engine.Scripts.World{
             if (_meshMap.ContainsKey(position))
                 throw new InvalidOperationException($"Partition ({position}) already active");
 
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.PoolClaimPartition.Auto();
             ChunkBehaviour behaviour = GetOrClaimChunk(position.xz);
             ChunkPartition partition = behaviour.GetPartition(position.y);
 
@@ -184,10 +191,11 @@ namespace Engine.Scripts.World{
         }
 
         private void ReclaimChunk(int2 reclaim){
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.PoolReclaimChunk.Auto();
             ChunkBehaviour reclaimBehaviour = _chunkMap[reclaim];
             PartitionMeshWriting?.Invoke(); // ClearData clears collider meshes a running bake may read
             reclaimBehaviour.ClearData();
-            _pool.Release(reclaimBehaviour);
+            using (VoxelProfilerMarkers.PoolDeactivateChunk.Auto()) _pool.Release(reclaimBehaviour);
             _chunkMap.Remove(reclaim);
 
             for (int pId = 0; pId < PartitionsPerChunk; pId++){

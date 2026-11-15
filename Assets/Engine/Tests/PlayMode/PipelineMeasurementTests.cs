@@ -1,4 +1,6 @@
 using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
 using Engine.Scripts.Settings;
 using Engine.Scripts.World;
 using NUnit.Framework;
@@ -37,22 +39,48 @@ namespace Engine.Tests.PlayMode{
 
         private int _savedTargetFrameRate;
         private int _savedVSync;
+#if UNITY_EDITOR
+        private GameViewGizmos _gizmos;
+#endif
         private SchedulerSettings _scheduler;
         private int _savedMeshBatch;
         private int _savedBuildSlots;
         private int _savedReference;
+        private float _savedBudget;
+
+        /// <summary>Takes the shared scheduler settings and remembers the shipped values for the tear-down.</summary>
+        private void TakeSchedulerSettings(){
+            _scheduler = VoxelWorld.Instance.Settings.Scheduler;
+            _savedMeshBatch = _scheduler.meshingBatchSize;
+            _savedBuildSlots = _scheduler.partitionBuildBatchSize;
+            _savedReference = _scheduler.referenceDrawDistance;
+            _savedBudget = _scheduler.mainThreadBudgetMs;
+        }
 
         [SetUp]
         public void SaveFrameSettings(){
             _savedTargetFrameRate = Application.targetFrameRate;
             _savedVSync = QualitySettings.vSyncCount;
             _scheduler = null;
+#if UNITY_EDITOR
+            // With the Gizmos button of the game view on, every chunk object the pool switches on or off makes the
+            // Editor rebuild its gizmo list in the next frame (6 to 10 ms): not part of the engine, so it is off
+            // for the runs that measure and back on in the tear-down
+            _gizmos = new GameViewGizmos();
+            Debug.Log($"[PipelineProbe] Gizmos of the game view: {_gizmos.SwitchedOff} switch(es) were on and are " +
+                      "off for this run");
+#endif
         }
 
         [UnityTearDown]
         public IEnumerator TearDown(){
             Application.targetFrameRate = _savedTargetFrameRate;
             QualitySettings.vSyncCount = _savedVSync;
+#if UNITY_EDITOR
+            _gizmos?.Dispose();
+            _gizmos = null;
+#endif
+            if (_scheduler == null) yield return PipelineThroughputTests.FreshSceneAfterFlight();
             yield return PipelineThroughputTests.WaitForBuiltWorld();
             if (_scheduler == null) yield break;
 
@@ -60,6 +88,7 @@ namespace Engine.Tests.PlayMode{
             _scheduler.meshingBatchSize = _savedMeshBatch;
             _scheduler.partitionBuildBatchSize = _savedBuildSlots;
             _scheduler.referenceDrawDistance = _savedReference;
+            _scheduler.mainThreadBudgetMs = _savedBudget;
             yield return PlayModeFixtures.ReloadWorldWithDrawDistance(PlayModeFixtures.ShippedDrawDistance);
             yield return PipelineThroughputTests.WaitForBuiltWorld();
         }
@@ -85,10 +114,7 @@ namespace Engine.Tests.PlayMode{
             // The same four runs with other mesh batches and GPU build slots; the world is rebuilt per run,
             // so the mesh scheduler and the renderer are created with the changed settings.
             yield return PlayModeFixtures.LoadGameScene(drawDistance: PlayModeFixtures.ShippedDrawDistance);
-            _scheduler = VoxelWorld.Instance.Settings.Scheduler;
-            _savedMeshBatch = _scheduler.meshingBatchSize;
-            _savedBuildSlots = _scheduler.partitionBuildBatchSize;
-            _savedReference = _scheduler.referenceDrawDistance;
+            TakeSchedulerSettings();
             _scheduler.referenceDrawDistance = 0; // the variants are used as given, not scaled with the draw distance
 
             foreach ((int meshBatch, int buildSlots) in Variants){
@@ -125,16 +151,181 @@ namespace Engine.Tests.PlayMode{
         }
 
         [UnityTest]
+        [Order(6)]
+        [Timeout(600000)]
+        public IEnumerator FrameTimeGoal_MainThread_IsAttributed(){
+            // The goal run at the shipped draw distance with the table that says where the main thread spends
+            // the frames of each phase (standing, the two flights, settling): what has to be bounded per frame.
+            yield return PipelineThroughputTests.StandThenFly(0, "", 0, true);
+        }
+
+        [UnityTest]
+        [Order(6)]
+        [Timeout(600000)]
+        public IEnumerator FrameTimeGoal_SmallDraw_IsAttributed(){
+            // The same run and table at the small draw distance
+            yield return PipelineThroughputTests.StandThenFly(0, "", SmallDrawDistance, true);
+        }
+
+        /// <summary>
+        ///     Main-thread budgets of the comparison in milliseconds per frame (see
+        ///     <see cref="SchedulerSettings.mainThreadBudgetMs" />); 0 is the scheduler without a limit.
+        /// </summary>
+        private static readonly float[] Budgets ={ 0f, 2f, 3f, 4f };
+
+        /// <summary>The same budgets in the other order, so that no budget is always the last run of a session.</summary>
+        private static readonly float[] BudgetsBackwards ={ 4f, 3f, 2f };
+
+        [UnityTest]
+        [Order(6)]
+        [Timeout(900000)]
+        public IEnumerator FrameBudget_ShippedDraw_IsCompared(){
+            // The goal run (standing, then the two flights) once per main-thread budget at the shipped draw distance
+            yield return CompareBudgets(PlayModeFixtures.ShippedDrawDistance, Budgets);
+        }
+
+        [UnityTest]
+        [Order(6)]
+        [Timeout(900000)]
+        public IEnumerator FrameBudget_ShippedDrawBackwards_IsCompared(){
+            yield return CompareBudgets(PlayModeFixtures.ShippedDrawDistance, BudgetsBackwards);
+        }
+
+        [UnityTest]
+        [Order(6)]
+        [Timeout(900000)]
+        public IEnumerator FrameBudget_SmallDraw_IsCompared(){
+            yield return CompareBudgets(SmallDrawDistance, Budgets);
+        }
+
+        [UnityTest]
+        [Order(6)]
+        [Timeout(900000)]
+        public IEnumerator FrameBudget_SmallDrawBackwards_IsCompared(){
+            yield return CompareBudgets(SmallDrawDistance, BudgetsBackwards);
+        }
+
+        [UnityTest]
+        [Order(6)]
+        [Timeout(900000)]
+        public IEnumerator FrameBudget_OnAndOff_IsCompared(){
+            // Without a limit, twice with the shipped budget, without a limit again: both are measured twice in
+            // one session, and a drift of the session does not favour either
+            float shipped = new SchedulerSettings().mainThreadBudgetMs;
+            yield return CompareBudgets(PlayModeFixtures.ShippedDrawDistance, new[]{ 0f, shipped, shipped, 0f }, true);
+        }
+
+        /// <summary>
+        ///     One goal run per budget, each in a world that is built again with the budget (the scheduler reads
+        ///     the setting when the world is built). <paramref name="numbered" /> adds the position in the order to
+        ///     the log labels, for an order that holds a budget twice.
+        /// </summary>
+        private IEnumerator CompareBudgets(int drawDistance, float[] budgets, bool numbered = false){
+            yield return PlayModeFixtures.LoadGameScene(drawDistance: drawDistance);
+            TakeSchedulerSettings();
+            for (int i = 0; i < budgets.Length; i++){
+                _scheduler.mainThreadBudgetMs = budgets[i];
+                string variant = string.Format(CultureInfo.InvariantCulture, "budget {0:0.##} ms{1}: ", budgets[i],
+                    numbered ? $", part {i + 1}" : "");
+                // The flights of the run before took the focus out of the player: start from the scene as it ships
+                yield return PipelineThroughputTests.FreshSceneAfterFlight();
+                yield return PipelineThroughputTests.StandThenFly(0, variant, drawDistance);
+            }
+        }
+
+        [UnityTest]
+        [Order(7)]
+        [Timeout(120000)]
+        public IEnumerator ProfilerMarkers_AreListed(){
+            // Not a measurement: writes the markers and counters this Unity version offers to a file and logs the
+            // rows of the attribution table that have none (Unity renames markers between versions). It also
+            // prints the table of a few seconds of the starting world, to see that every row reads a value.
+            yield return PlayModeFixtures.LoadGameScene();
+            using FrameAttribution attribution = new(1024);
+            List<float> frameMs = new(1024);
+            for (int frame = 0; frame < 600; frame++){
+                yield return null;
+                frameMs.Add(Time.unscaledDeltaTime * 1000f);
+                attribution.Sample();
+            }
+
+            Debug.Log(FrameAttribution.ListAvailable("Temp/profiler-marker-names.txt") + "\n" +
+                      attribution.Table("check of the table, not a measurement", frameMs, 0, frameMs.Count));
+#if UNITY_EDITOR
+            using FrameHierarchy hierarchy = new(300);
+            for (int frame = 0; frame < 150; frame++) yield return null;
+            hierarchy.Stop();
+            Debug.Log(hierarchy.Report("check of the sample tree, not a measurement", PipelineProbe.GoalFrameMs, 0.1f));
+#endif
+        }
+
+#if UNITY_EDITOR
+        /// <summary>Flight speeds and seconds of <see cref="FrameTimeGoal_FlightFrames_AreTakenApart" />.</summary>
+        private static readonly float[] HierarchySpeeds ={ 80f, 40f };
+
+        private const float HierarchySeconds = 12f;
+
+        [UnityTest]
+        [Order(8)]
+        [Timeout(600000)]
+        public IEnumerator FrameTimeGoal_FlightFrames_AreTakenApart(){
+            // Not a timing: the Editor's profiler records a flight through the built world at the shipped draw
+            // distance, and the report says what the frames over the goal are made of on the main thread, down
+            // to the samples Unity itself emits (render, present, waits), next to the frames under the goal.
+            yield return PlayModeFixtures.LoadGameScene(drawDistance: PlayModeFixtures.ShippedDrawDistance);
+            QualitySettings.vSyncCount = 0;
+            Application.targetFrameRate = -1;
+            yield return PipelineThroughputTests.WaitForBuiltWorld();
+            VoxelWorld world = VoxelWorld.Instance;
+            Transform focus = PlayModeFixtures.GetPrivateField<Transform>(world, "focus");
+            int draw = world.Settings.Chunk.DrawDistance;
+
+            string label = $"recording, draw {draw}, uncapped";
+            // Standing where the flights start, on the rig of the flights
+            PipelineThroughputTests.FlightBody(focus);
+            string places = PipelineThroughputTests.Place(world, focus, label, "start of the standing phase");
+            using (FrameHierarchy standing = new(600)){
+                for (int frame = 0; frame < 500; frame++) yield return null;
+                standing.Stop();
+                places += PipelineThroughputTests.Place(world, focus, label, "end of the standing phase");
+                Debug.Log(places + standing.Report($"draw {draw}, uncapped, standing in the built world",
+                    PipelineProbe.GoalFrameMs, 0.1f));
+            }
+
+            foreach (float speed in HierarchySpeeds){
+                yield return null;
+                using FrameHierarchy hierarchy = new(2000);
+                Transform body = PipelineThroughputTests.FlightBody(focus);
+                Vector3 start = body.position;
+                string flight = $"{label}, flight {speed:0} u/s for {HierarchySeconds:0} s";
+                places = PipelineThroughputTests.Place(world, focus, flight, "start of the flight");
+                float flightStart = Time.realtimeSinceStartup;
+                while (true){
+                    float elapsed = Time.realtimeSinceStartup - flightStart;
+                    if (elapsed >= HierarchySeconds) break;
+                    body.position = start + new Vector3(speed * elapsed, 0f, 0f);
+                    yield return null;
+                }
+
+                hierarchy.Stop();
+                places += PipelineThroughputTests.Place(world, focus, flight, "end of the flight");
+                Debug.Log(places + hierarchy.Report(
+                    $"draw {draw}, uncapped, flight {speed:0} u/s for {HierarchySeconds:0} s", PipelineProbe.GoalFrameMs,
+                    0.1f));
+                yield return PipelineThroughputTests.WaitForBuiltWorld();
+                Debug.Log(PipelineThroughputTests.Place(world, focus, flight, "world complete after the flight"));
+            }
+        }
+#endif
+
+        [UnityTest]
         [Order(5)]
         [Timeout(1200000)]
         public IEnumerator FrameTimeGoal_OtherSizes_AreMeasured(){
             // The goal run with other mesh batches and GPU build slots than the derived ones: which are the
             // smallest that keep up with a sprint flight and have the first build done 20 s after the start?
             yield return PlayModeFixtures.LoadGameScene(drawDistance: PlayModeFixtures.ShippedDrawDistance);
-            _scheduler = VoxelWorld.Instance.Settings.Scheduler;
-            _savedMeshBatch = _scheduler.meshingBatchSize;
-            _savedBuildSlots = _scheduler.partitionBuildBatchSize;
-            _savedReference = _scheduler.referenceDrawDistance;
+            TakeSchedulerSettings();
             _scheduler.referenceDrawDistance = 0; // the variants are used as given, not scaled with the draw distance
 
             foreach ((int draw, int meshBatch, int buildSlots) in GoalVariants){
