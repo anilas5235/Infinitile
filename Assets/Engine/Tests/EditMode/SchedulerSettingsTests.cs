@@ -34,6 +34,14 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(buildSlots, defaults.BuildSlotsAt(drawDistance), "GPU build slots");
         }
 
+        [Test]
+        public void ShippedSettings_BoundTheMainThreadWorkPerFrame(){
+            // The owner's pick from the comparison of 2, 3 and 4 ms (2026-11-15); the class default is the same
+            // value, so a world built from fresh settings behaves like the shipped one
+            Assert.AreEqual(2f, Shipped().mainThreadBudgetMs, "main-thread budget of the shipped settings in ms");
+            Assert.AreEqual(Shipped().mainThreadBudgetMs, new SchedulerSettings().mainThreadBudgetMs, "class default");
+        }
+
         [TestCase(2, 3, 2)]
         [TestCase(4, 6, 3)]
         [TestCase(8, 11, 5)]

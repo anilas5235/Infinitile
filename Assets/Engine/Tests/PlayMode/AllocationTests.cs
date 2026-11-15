@@ -27,6 +27,12 @@ namespace Engine.Tests.PlayMode{
             yield return PlayModeFixtures.LoadGameScene();
         }
 
+        [UnityTearDown]
+        public IEnumerator TearDown(){
+            // The flight switches the player off: the next test gets the scene as it ships
+            yield return PipelineThroughputTests.FreshSceneAfterFlight();
+        }
+
         private static bool FocusColumnCollidable(VoxelWorld world){
             int3 focus = world.Focus.Pos;
             for (int y = 0; y < PartitionsPerChunk; y++)
@@ -106,9 +112,10 @@ namespace Engine.Tests.PlayMode{
 
             int allocatingFrames = 0;
             int firstAllocatingFrame = -1;
-            Vector3 start = focus.position;
+            Transform body = PipelineThroughputTests.FlightBody(focus);
+            Vector3 start = body.position;
             for (int frame = 0; frame < FlightFrames; frame++){
-                focus.position += new Vector3(FlightStepPerFrame, 0f, 0f);
+                body.position += new Vector3(FlightStepPerFrame, 0f, 0f);
                 try{
                     Assert.That(engineStep, Is.Not.AllocatingGCMemory());
                 }
@@ -134,6 +141,8 @@ namespace Engine.Tests.PlayMode{
             // Allocation rule for the state handlers: re-prioritising the queues on a focus change must not allocate.
             VoxelWorld world = VoxelWorld.Instance;
             VoxelEngineScheduler scheduler = PlayModeFixtures.GetPrivateField<VoxelEngineScheduler>(world, "_scheduler");
+            // The rule holds for the built world: while a fresh one builds, the queues still grow to their size
+            yield return WaitForSteadyState(scheduler, 120f);
             PriorityUtil.Focus original = world.Focus;
             PriorityUtil.Focus shifted = new(original.Pos + new int3(1, 0, 0), original.Forward);
             try{

@@ -102,6 +102,8 @@ namespace Engine.Scripts.Jobs.Light{
         ///     the light of the pre-edit data and updates it incrementally.
         /// </summary>
         internal void CompleteIfRunning(){
+            if (IsReady) return;
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.WaitLight.Auto();
             Complete();
         }
 

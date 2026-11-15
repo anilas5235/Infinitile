@@ -44,31 +44,33 @@ namespace Engine.Scripts.Jobs.Core{
             Queue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.DistPriority(ref pos, ref f));
         }
 
+        /// <summary>The scan visits the load distance.</summary>
+        protected override int ScanDistance => Settings.Chunk.LoadDistance;
+
         /// <summary>
-        ///     Enqueues chunks within load distance that need data generation.
+        ///     Enqueues the chunks of one row within load distance that need data generation.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
-        /// <returns>True if any chunks were enqueued, false if queue is empty.</returns>
-        protected override bool EnqueueStep(PriorityUtil.Focus focus){
+        /// <param name="x">The row, in chunks from the focus.</param>
+        protected override void EnqueueRow(PriorityUtil.Focus focus, int x){
             int load = Settings.Chunk.LoadDistance;
-            for (int x = -load; x <= load; x++)
             for (int z = -load; z <= load; z++){
                 int2 pos = focus.Pos.xz + new int2(x, z);
                 if (Queue.Contains(pos) || !ShouldScheduleForGenerating(pos)) continue;
 
                 Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
             }
-
-            return Queue.Count > 0;
         }
 
         /// <summary>
-        ///     Dispatches a batch of chunks to the chunk scheduler for data generation.
+        ///     Dispatches a batch of chunks to the chunk scheduler for data generation. One item of work.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
-        /// <returns>True if jobs were dispatched or batch is full, false if scheduler is busy.</returns>
-        protected override bool JobUpdateStep(PriorityUtil.Focus focus){
-            if (!_chunkScheduler.IsReady) return false;
+        /// <param name="budget">The frame's budget.</param>
+        /// <returns>None while the scheduler is busy, Cut when the budget is used up, otherwise Done.</returns>
+        protected override StageTurn JobUpdateStep(PriorityUtil.Focus focus, FrameBudget budget){
+            if (!_chunkScheduler.IsReady) return StageTurn.None;
+            if (!budget.Next()) return StageTurn.Cut;
 
             int count = math.min(Settings.Scheduler.chunkGenBatchSize, Queue.Count);
             int accepted = 0;
@@ -81,27 +83,29 @@ namespace Engine.Scripts.Jobs.Core{
                 accepted++;
             }
 
-            if (accepted == 0) return true;
+            if (accepted == 0) return StageTurn.Done;
 
             _chunkScheduler.Start(Set);
 
-            return true;
+            return StageTurn.Done;
         }
 
         /// <summary>
-        ///     Collects results from completed chunk data generation and wakes up the light handler.
+        ///     Collects results from completed chunk data generation and wakes up the light handler. The upload of
+        ///     every chunk is an item of work (see <see cref="ChunkScheduler.Complete" />).
         /// </summary>
-        /// <returns>True if collection completed, false if scheduler is still working.</returns>
-        protected override bool CollectResultsStep(){
+        /// <param name="budget">The frame's budget.</param>
+        /// <returns>None while the batch runs, Cut when the budget ran out inside the collect, otherwise Done.</returns>
+        protected override StageTurn CollectResultsStep(FrameBudget budget){
             // A batch that was already applied elsewhere only clears the set; waiting for it would stall the handler.
             if (!_chunkScheduler.IsReady){
-                if (!_chunkScheduler.IsComplete) return false;
-                _chunkScheduler.Complete();
+                if (!_chunkScheduler.IsComplete) return StageTurn.None;
+                if (!_chunkScheduler.Complete(budget)) return StageTurn.Cut;
             }
 
             Set.Clear();
             _lightJobHandler.WakeUp();
-            return true;
+            return StageTurn.Done;
         }
 
         /// <summary>

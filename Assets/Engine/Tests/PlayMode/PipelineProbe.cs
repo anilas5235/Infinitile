@@ -53,6 +53,9 @@ namespace Engine.Tests.PlayMode{
         private readonly Dictionary<int3, int> _dispatchCounts = new();
         private readonly List<float> _frameMs = new(1 << 16);
         private readonly List<float> _schedulerMs = new(1 << 16);
+        private readonly List<int> _framesCut = new(1 << 16); // the budget's count of cut frames after every sample
+        private readonly VoxelEngineScheduler _scheduler;
+        private readonly int _framesCutAtStart;
 
         private readonly int[] _framesIdle = new int[StageCount];
         private readonly int[] _framesRunning = new int[StageCount];
@@ -67,10 +70,18 @@ namespace Engine.Tests.PlayMode{
         private float _gpuDoneSeconds = -1f;
         private int _gpuDoneFrame;
         private float _startTime;
+        private readonly FrameAttribution _attribution;
 
-        internal PipelineProbe(VoxelWorld world){
+        /// <param name="world">The world to sample.</param>
+        /// <param name="attribute">
+        ///     Also records where the main thread spends every frame, for <see cref="Attribution" />.
+        /// </param>
+        internal PipelineProbe(VoxelWorld world, bool attribute = false){
             _world = world;
+            if (attribute) _attribution = new FrameAttribution();
             VoxelEngineScheduler scheduler = PlayModeFixtures.GetPrivateField<VoxelEngineScheduler>(world, "_scheduler");
+            _scheduler = scheduler;
+            _framesCutAtStart = scheduler.Budget.FramesCut;
             DataJobStateHandler data = PlayModeFixtures.GetPrivateField<DataJobStateHandler>(scheduler, "_dataJobHandler");
             LightJobStateHandler light = PlayModeFixtures.GetPrivateField<LightJobStateHandler>(scheduler, "_lightJobHandler");
             MeshJobStateHandler mesh = PlayModeFixtures.GetPrivateField<MeshJobStateHandler>(scheduler, "_meshJobHandler");
@@ -140,6 +151,15 @@ namespace Engine.Tests.PlayMode{
         /// <summary>Seconds since the probe was created.</summary>
         internal float Seconds => Time.realtimeSinceStartup - _startTime;
 
+        /// <summary>Chunks in the chunk store.</summary>
+        internal int LoadedChunks => _world.Stats.LoadedChunks;
+
+        /// <summary>Partitions the pool holds active (with a mesh, or without a voxel).</summary>
+        internal int ActivePartitions => _meshMap.Count;
+
+        /// <summary>Active partitions that are collidable.</summary>
+        internal int CollidablePartitions => _colliderSet.Count;
+
         /// <summary>Longest queue seen per stage.</summary>
         internal int[] PeakQueue{ get; } = new int[StageCount];
 
@@ -175,6 +195,15 @@ namespace Engine.Tests.PlayMode{
             if (_world != null) _world.PartitionBuildRequested -= OnMeshBatch;
             for (int i = 0; i < StageCount; i++) _recorders[i].Dispose();
             for (int i = 0; i < _costRecorders.Length; i++) _costRecorders[i].Dispose();
+            _attribution?.Dispose();
+        }
+
+        /// <summary>
+        ///     Where the main thread spent the frames <paramref name="from" /> (included) to <paramref name="to" />
+        ///     (excluded), as the table of <see cref="FrameAttribution.Table" />; empty without attribution.
+        /// </summary>
+        internal string Attribution(string label, int from, int to){
+            return _attribution != null ? _attribution.Table(label, _frameMs, from, to) : "";
         }
 
         private void OnMeshBatch(HashSet<int3> partitions){
@@ -193,6 +222,19 @@ namespace Engine.Tests.PlayMode{
             PeakPendingBuilds = 0;
         }
 
+        /// <summary>Frames since the probe started in which the budget stopped a stage's turn.</summary>
+        internal int FramesCut => _scheduler.Budget.FramesCut - _framesCutAtStart;
+
+        /// <summary>The scheduler's main-thread milliseconds of a frame that 95 % of all samples stay under.</summary>
+        internal float SchedulerP95Ms{
+            get{
+                if (_schedulerMs.Count == 0) return 0f;
+                List<float> sorted = new(_schedulerMs);
+                sorted.Sort();
+                return sorted[(int)((sorted.Count - 1) * 0.95f)];
+            }
+        }
+
         /// <summary>
         ///     Frame times and scheduler main-thread times of the samples <paramref name="from" /> (included) to
         ///     <paramref name="to" /> (excluded), as one log line. <see cref="Frames" /> is the index of the next
@@ -200,9 +242,16 @@ namespace Engine.Tests.PlayMode{
         /// </summary>
         internal string FrameTimes(string label, int from, int to){
             return string.Format(CultureInfo.InvariantCulture,
-                "[PipelineProbe] {0}: frame ms {1}; {2}; scheduler main-thread ms {3}; {4}\n", label,
+                "[PipelineProbe] {0}: frame ms {1}; {2}; scheduler main-thread ms {3}; {4}; " +
+                "main-thread budget {5:0.##} ms, cut a turn in {6} frames\n", label,
                 Distribution(_frameMs, from, to), OverGoal(_frameMs, from, to), Distribution(_schedulerMs, from, to),
-                OverGoal(_schedulerMs, from, to));
+                OverGoal(_schedulerMs, from, to), _scheduler.Budget.Milliseconds, FramesCutBefore(to) - FramesCutBefore(from));
+        }
+
+        /// <summary>Frames in which the budget had stopped a stage's turn before sample <paramref name="sample" />.</summary>
+        private int FramesCutBefore(int sample){
+            sample = math.clamp(sample, 0, _framesCut.Count);
+            return sample == 0 ? _framesCutAtStart : _framesCut[sample - 1];
         }
 
         /// <summary>
@@ -279,6 +328,8 @@ namespace Engine.Tests.PlayMode{
 
             _frameMs.Add(Time.unscaledDeltaTime * 1000f);
             _schedulerMs.Add(schedulerNs * 1e-6f);
+            _framesCut.Add(_scheduler.Budget.FramesCut);
+            _attribution?.Sample();
         }
 
         /// <summary>The samples as log lines, each starting with "[PipelineProbe] <paramref name="label" />".</summary>

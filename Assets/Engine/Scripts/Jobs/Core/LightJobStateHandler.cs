@@ -37,21 +37,23 @@ namespace Engine.Scripts.Jobs.Core{
             Queue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.DistPriority(ref pos, ref f));
         }
 
-        protected override bool EnqueueStep(PriorityUtil.Focus focus){
+        /// <summary>The scan visits the light distance.</summary>
+        protected override int ScanDistance => LightDistance;
+
+        protected override void EnqueueRow(PriorityUtil.Focus focus, int x){
             int distance = LightDistance;
-            for (int x = -distance; x <= distance; x++)
             for (int z = -distance; z <= distance; z++){
                 int2 pos = focus.Pos.xz + new int2(x, z);
                 if (Queue.Contains(pos) || !ShouldScheduleForLighting(pos)) continue;
 
                 Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
             }
-
-            return Queue.Count > 0;
         }
 
-        protected override bool JobUpdateStep(PriorityUtil.Focus focus){
-            if (!_lightScheduler.IsReady) return false;
+        /// <summary>Dispatches a batch of chunks to the light scheduler. One item of work.</summary>
+        protected override StageTurn JobUpdateStep(PriorityUtil.Focus focus, FrameBudget budget){
+            if (!_lightScheduler.IsReady) return StageTurn.None;
+            if (!budget.Next()) return StageTurn.Cut;
 
             int count = math.min(Settings.Scheduler.lightBatchSize, Queue.Count);
             int accepted = 0;
@@ -64,25 +66,28 @@ namespace Engine.Scripts.Jobs.Core{
                 accepted++;
             }
 
-            if (accepted == 0) return true;
+            if (accepted == 0) return StageTurn.Done;
 
             _lightScheduler.Start(Set);
-            return true;
+            return StageTurn.Done;
         }
 
         /// <summary>
         ///     Applies the finished batch and wakes the mesh handler. A batch that was already completed and applied
-        ///     early (an edit or unload of a chunk it read) only clears the set.
+        ///     early (an edit or unload of a chunk it read) only clears the set. The batch is applied as one item
+        ///     of work, at the start of the turn.
         /// </summary>
-        protected override bool CollectResultsStep(){
+        protected override StageTurn CollectResultsStep(FrameBudget budget){
             if (!_lightScheduler.IsReady){
-                if (!_lightScheduler.IsComplete) return false;
+                if (!_lightScheduler.IsComplete) return StageTurn.None;
+                if (!budget.Next()) return StageTurn.Cut;
+
                 _lightScheduler.Complete();
             }
 
             Set.Clear();
             _meshJobHandler.WakeUp();
-            return true;
+            return StageTurn.Done;
         }
 
         private bool ShouldScheduleForLighting(int2 position){

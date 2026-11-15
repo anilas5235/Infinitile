@@ -44,6 +44,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         private JobHandle _handle;
 
         private NativeList<int3> _jobs;
+        private int _claimed; // jobs of the batch whose partition Complete has claimed; it continues there after a cut
         private NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult> _results;
 
         // Reused per batch instead of a new Mesh[] per Complete
@@ -151,9 +152,15 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         /// <summary>
         ///     Completes the scheduled mesh build jobs, applies the generated mesh data to chunk meshes
         ///     and colliders, recalculates bounds and logs timing information.
+        ///     Items of work for <paramref name="budget" />: every claim of a partition in the pool, and the rest
+        ///     (all meshes of the batch are assigned and applied in one call). When the budget runs out in between,
+        ///     the batch stays unapplied and the next call continues with the next claim.
         /// </summary>
-        internal void Complete(){
-            if (IsReady) return;
+        /// <param name="budget">The frame's budget; null means no limit.</param>
+        /// <returns>True when the batch is applied; false when the budget cut the call.</returns>
+        internal bool Complete(FrameBudget budget = null){
+            if (IsReady) return true;
+            budget ??= FrameBudget.Unlimited;
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.MeshBuildComplete.Auto();
 #if VOXEL_TIMING_LOGS
             double start = Time.realtimeSinceStartupAsDouble;
@@ -162,11 +169,18 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             _chunkPool.NotifyPartitionMeshWriting(); // a running bake may still read the meshes written below
 
             // Claim every partition before any mesh is assigned: a claim can reclaim a pooled chunk of this batch
-            // (the world then unloads its data), which would clear a mesh already handed out.
-            for (int index = 0; index < _jobs.Length; index++){
-                int3 pos = _jobs[index];
-                if (_chunkManager.IsChunkLoaded(pos.xz)) _chunkPool.GetOrClaimPartition(pos);
+            // (the world then unloads its data), which would clear a mesh already handed out. A partition claimed
+            // in an earlier frame of a cut call that was reclaimed since is dropped below like any other.
+            using (VoxelProfilerMarkers.MeshBuildClaim.Auto()){
+                for (; _claimed < _jobs.Length; _claimed++){
+                    if (!budget.Next()) return false;
+
+                    int3 pos = _jobs[_claimed];
+                    if (_chunkManager.IsChunkLoaded(pos.xz)) _chunkPool.GetOrClaimPartition(pos);
+                }
             }
+
+            if (!budget.Next()) return false;
 
             _colliderMeshes.Clear();
             for (int index = 0; index < _jobs.Length; index++) _colliderMeshes.Add(null);
@@ -193,11 +207,14 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             }
 
             // Every entry of the mesh data array needs a target mesh
-            Mesh.ApplyAndDisposeWritableMeshData(
-                _colliderMeshDataArray,
-                _colliderMeshes,
-                MeshFlags
-            );
+            using (VoxelProfilerMarkers.MeshBuildApply.Auto()){
+                Mesh.ApplyAndDisposeWritableMeshData(
+                    _colliderMeshDataArray,
+                    _colliderMeshes,
+                    MeshFlags
+                );
+            }
+
             _colliderMeshes.Clear();
             for (int i = 0; i < discarded; i++) _discardMeshes[i].Clear();
 
@@ -224,6 +241,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
 
             _results.Clear();
             _jobs.Clear();
+            _claimed = 0;
 
             IsReady = true;
 #if VOXEL_TIMING_LOGS
@@ -236,6 +254,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
 #else
             StopRecord();
 #endif
+            return true;
         }
 
         /// <summary>
@@ -269,6 +288,12 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         ///     would re-enter <see cref="Complete" /> when claiming a partition evicts a chunk of the running batch.
         /// </summary>
         internal void CompleteIfRunning(){
+            if (_handle.IsCompleted){
+                _handle.Complete();
+                return;
+            }
+
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.WaitMeshBuild.Auto();
             _handle.Complete();
         }
 

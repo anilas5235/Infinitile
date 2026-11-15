@@ -36,5 +36,39 @@ namespace Engine.Scripts.Utils{
         internal static readonly ProfilerMarker RenderRebuildBuffers = new("Voxel.Render.RebuildBuffers");
         internal static readonly ProfilerMarker RenderCulling = new("Voxel.Render.Culling");
         internal static readonly ProfilerMarker RenderDraw = new("Voxel.Render.Draw");
+        internal static readonly ProfilerMarker PointBuildComplete = new("Voxel.PointBuild.Complete");
+        internal static readonly ProfilerMarker RenderRelease = new("Voxel.Render.Release");
+
+        // The three steps of a stage's turn (JobStateHandler.Update), whatever the stage
+        internal static readonly ProfilerMarker SchedulerCollect = new("Voxel.Scheduler.Collect");
+        internal static readonly ProfilerMarker SchedulerScan = new("Voxel.Scheduler.Scan");
+        internal static readonly ProfilerMarker SchedulerDispatch = new("Voxel.Scheduler.Dispatch");
+
+        // Focus update (VoxelEngineScheduler.FocusUpdate, every 0.5 s while the focus moves)
+        internal static readonly ProfilerMarker FocusUpdate = new("Voxel.Focus.Update");
+        internal static readonly ProfilerMarker FocusData = new("Voxel.Focus.Data");
+        internal static readonly ProfilerMarker FocusLight = new("Voxel.Focus.Light");
+        internal static readonly ProfilerMarker FocusMesh = new("Voxel.Focus.Mesh");
+        internal static readonly ProfilerMarker FocusCollider = new("Voxel.Focus.Collider");
+        internal static readonly ProfilerMarker FocusChunkStore = new("Voxel.Focus.ChunkStore");
+        internal static readonly ProfilerMarker FocusPool = new("Voxel.Focus.Pool");
+
+        // The main thread waits for a job that still runs, because data the job reads is about to change
+        internal static readonly ProfilerMarker WaitColliderBake = new("Voxel.Wait.ColliderBake");
+        internal static readonly ProfilerMarker WaitMeshBuild = new("Voxel.Wait.MeshBuild");
+        internal static readonly ProfilerMarker WaitLight = new("Voxel.Wait.Light");
+
+        // Eviction and reuse (ChunkManager, ChunkPool)
+        internal static readonly ProfilerMarker ChunkUnload = new("Voxel.Chunk.Unload");
+        internal static readonly ProfilerMarker PoolClaimPartition = new("Voxel.Pool.ClaimPartition");
+        internal static readonly ProfilerMarker PoolReclaimChunk = new("Voxel.Pool.ReclaimChunk");
+        internal static readonly ProfilerMarker PoolActivateChunk = new("Voxel.Pool.ActivateChunk");
+        internal static readonly ProfilerMarker PoolDeactivateChunk = new("Voxel.Pool.DeactivateChunk");
+        internal static readonly ProfilerMarker PartitionClear = new("Voxel.Partition.Clear");
+
+        // Parts of the mesh batch apply, and the collider assignment of a partition
+        internal static readonly ProfilerMarker MeshBuildClaim = new("Voxel.MeshBuild.Claim");
+        internal static readonly ProfilerMarker MeshBuildApply = new("Voxel.MeshBuild.Apply");
+        internal static readonly ProfilerMarker ColliderAssign = new("Voxel.Collider.Assign");
     }
 }

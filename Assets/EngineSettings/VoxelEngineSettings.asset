@@ -36,3 +36,4 @@ MonoBehaviour:
     colliderBatchSize: 6
     lightBatchSize: 8
     referenceDrawDistance: 12
+    mainThreadBudgetMs: 2

@@ -508,6 +508,7 @@ namespace Engine.Scripts.Render{
         ///     Completes finished partition builds and applies their results.
         /// </summary>
         private void CompleteFinishedPartitionBuilds(){
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.PointBuildComplete.Auto();
             bool updatedPartitions = false;
 
             for (int i = 0; i < _maxInFlight; i++){
@@ -583,6 +584,7 @@ namespace Engine.Scripts.Render{
         /// </summary>
         /// <param name="chunk">The chunk position.</param>
         private void RemoveChunkData(int2 chunk){
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderRelease.Auto();
             if (_voxelLists.Remove(chunk, out IntervalRange voxelList)) _intervalStore.Release(ref voxelList);
             if (_lightLists.Remove(chunk, out IntervalRange lightList)) _intervalStore.Release(ref lightList);
         }
@@ -593,6 +595,7 @@ namespace Engine.Scripts.Render{
         /// <param name="partition">The partition position.</param>
         private void RemovePartitionRenderData(int3 partition){
             if (_isDestroyed) return;
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderRelease.Auto();
 
             _requestedPartitions.Remove(partition);
             _pendingBuildSet.Remove(partition);

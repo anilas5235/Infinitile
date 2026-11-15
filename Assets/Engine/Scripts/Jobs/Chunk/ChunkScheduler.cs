@@ -33,6 +33,10 @@ namespace Engine.Scripts.Jobs.Chunk{
         private NativeList<int2> _jobs;
         private NativeParallelHashMap<int2, ChunkVoxelData> _results;
 
+        // Complete after a cut: the batch's chunks are in the store, the upload continues at this job
+        private bool _added;
+        private int _uploaded;
+
         /// <summary>
         ///     Initializes a new instance of the <see cref="ChunkScheduler" /> class with its own result collection.
         /// </summary>
@@ -87,14 +91,27 @@ namespace Engine.Scripts.Jobs.Chunk{
         /// <summary>
         ///     Waits for the job to finish, transfers the results into the chunk store
         ///     and clears temporary containers.
+        ///     Items of work for <paramref name="budget" />: adding the batch to the chunk store, and the upload of
+        ///     every chunk (the world hands its voxel data to the renderer). When the budget runs out in between,
+        ///     the next call continues with the next chunk.
         /// </summary>
-        internal void Complete(){
+        /// <param name="budget">The frame's budget; null means no limit.</param>
+        /// <returns>True when the batch is applied; false when the budget cut the call.</returns>
+        internal bool Complete(FrameBudget budget = null){
+            budget ??= FrameBudget.Unlimited;
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.DataGenComplete.Auto();
 #if VOXEL_TIMING_LOGS
             double start = Time.realtimeSinceStartupAsDouble;
 #endif
             _handle.Complete();
-            _chunkManager.AddChunks(_results);
+            if (!_added){
+                if (!budget.Next()) return false;
+
+                _chunkManager.AddChunks(_results);
+                _results.Clear(); // the store owns the chunk data from here on
+                _added = true;
+                _uploaded = 0;
+            }
 
 #if VOXEL_TIMING_LOGS
             double totalTime = (Time.realtimeSinceStartupAsDouble - start) * 1000;
@@ -105,19 +122,19 @@ namespace Engine.Scripts.Jobs.Chunk{
             }
 #endif
 
-            UploadChunks();
+            // A chunk that was unloaded again in the frames a cut call waited is skipped
+            for (; _uploaded < _jobs.Length; _uploaded++){
+                if (!budget.Next()) return false;
 
-            _jobs.Clear();
-            _results.Clear();
-            IsReady = true;
-            StopRecord();
-        }
-
-        private void UploadChunks(){
-            foreach (KeyValue<int2, ChunkVoxelData> r in _results){
-                if (_chunkManager.TryGetChunk(r.Key, out Data.Chunk chunk))
+                if (_chunkManager.TryGetChunk(_jobs[_uploaded], out Data.Chunk chunk))
                     _world.RaiseChunkDataReady(chunk);
             }
+
+            _jobs.Clear();
+            _added = false;
+            IsReady = true;
+            StopRecord();
+            return true;
         }
 
         /// <summary>
