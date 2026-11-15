@@ -252,6 +252,28 @@ namespace Engine.Tests.PlayMode{
             }
         }
 
+        /// <summary>Runs of <see cref="FrameBudget_CappedFlightOvershoot_IsAttributed" /> in one session.</summary>
+        private const int OvershootRuns = 3;
+
+        [UnityTest]
+        [Order(9)]
+        [Timeout(1800000)]
+        public IEnumerator FrameBudget_CappedFlightOvershoot_IsAttributed(){
+            // The capped flight through a world that is still being built, at the shipped draw distance and with
+            // the shipped scheduler settings (the run of Flight_AtSixtyFrames_KeepsMeshQueueInsideDrawWindow), with
+            // every row of the attribution recorded: the log says how many frames the scheduler took longer than
+            // its effective budget, by how much, and which item or wait took the time in them. Several runs in one
+            // session, each in a world built again, so the runs can be compared with each other.
+            yield return PlayModeFixtures.LoadGameScene(drawDistance: PlayModeFixtures.ShippedDrawDistance);
+            int capped = PipelineThroughputTests.CappedFrameRate;
+            for (int i = 0; i < OvershootRuns; i++){
+                yield return PipelineThroughputTests.FreshSceneAfterFlight();
+                yield return PipelineThroughputTests.FlyThroughBuildingWorld(capped,
+                    new PipelineThroughputTests.PipelineRun(), $"overshoot part {i + 1}: ",
+                    PlayModeFixtures.ShippedDrawDistance, true);
+            }
+        }
+
         /// <summary>
         ///     One goal run per budget, each in a world that is built again with the budget (the scheduler reads
         ///     the setting when the world is built). <paramref name="numbered" /> adds the position in the order to
