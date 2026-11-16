@@ -97,6 +97,23 @@ namespace Engine.Scripts.Render{
         /// <summary>Partitions queued for a GPU build that has not finished yet.</summary>
         internal int PendingBuildCount => _pendingBuildSet.Count;
 
+        /// <summary>Diagnostics: times the shared interval store was replaced by a larger buffer.</summary>
+        internal int IntervalStoreGrowCount => _intervalStore?.GrowCount ?? 0;
+
+        /// <summary>Diagnostics: pages of the interval store (capacity).</summary>
+        internal int IntervalStorePages => _intervalStore?.Pages.PageCount ?? 0;
+
+        /// <summary>Diagnostics: pages of the interval store in use now.</summary>
+        internal int IntervalStoreUsedPages => _intervalStore?.Pages.UsedPageCount ?? 0;
+
+        /// <summary>Diagnostics: the most pages of the interval store in use at once.</summary>
+        internal int IntervalStorePeakPages => _intervalStore?.Pages.PeakUsedPageCount ?? 0;
+
+        /// <summary>Diagnostics: render buffers of the layers solid (0), transparent (1) and foliage (2).</summary>
+        internal int RenderBufferCount(int layer){
+            return _layers != null && layer >= 0 && layer < _layers.Length ? _layers[layer].Buffers.Count : 0;
+        }
+
         private PointBuilderHandler[] _pointBuilderHandlers;
 
         private VoxelEngineSettings _settings;
