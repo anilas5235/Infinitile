@@ -249,7 +249,7 @@ namespace UI{
             float now = Mb(renderer.GpuMemory.IntervalStoreBytes);
             _menuStoreEstimate.text = _pickedDraw == world.DrawDistance
                 ? Invariant($"GPU interval store {now:F0} MB")
-                : Invariant($"GPU interval store {now:F0} → {Mb(VoxelWorldRenderer.IntervalStoreBytesAt(_pickedDraw)):F0} MB");
+                : Invariant($"GPU interval store {now:F0} to {Mb(VoxelWorldRenderer.IntervalStoreBytesAt(_pickedDraw)):F0} MB");
         }
 
         /// <summary>

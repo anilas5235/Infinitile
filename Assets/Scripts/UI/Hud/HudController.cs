@@ -213,7 +213,10 @@ namespace UI{
             else if (_playerInput.isActiveAndEnabled) _playerInput.ActivateInput();
         }
 
-        /// <summary>The display font on the menu and the hotbar; their children inherit it.</summary>
+        /// <summary>
+        ///     The display font on the menu and the hotbar; their children inherit it. Its glyphs cover Latin text,
+        ///     digits and common punctuation, but no arrows.
+        /// </summary>
         private void ApplyDisplayFont(){
             if (!displayFont) return;
             StyleFontDefinition font = new(FontDefinition.FromFont(displayFont));

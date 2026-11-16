@@ -518,6 +518,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   moveSpeed: 20
+  spectatorSpeed: 40
   targetCamera: {fileID: 330585545}
 --- !u!143 &455605772
 CharacterController:
@@ -710,9 +711,8 @@ MonoBehaviour:
   - std:Leaves
   - std:Glass
   - std:Water
-  debugPanelsKey: 100
-  cursorKey: 53
   showDebugPanels: 1
+  displayFont: {fileID: 12800000, guid: 3f719857cdd396540bd023a3b40d0ac5, type: 3}
   refreshInterval: 0.1
   voxelEditor: {fileID: 455605775}
 --- !u!114 &812062173
@@ -1003,8 +1003,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cdb6e2abf61c2be46af19860b4ede215, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UI.CullingDebugKeys
-  cullingKey: 101
-  freezeKey: 102
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
