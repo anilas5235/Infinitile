@@ -77,6 +77,12 @@ namespace Engine.Scripts.Diagnostics{
         private int Frames => _frameMs.Count;
         private float Seconds => Time.realtimeSinceStartup - _drawStart;
 
+        /// <summary>Before the first scene builds its world: a goal run ignores the player's saved choices.</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void MarkAutomatedIfRequested(){
+            if (IndexOf(Environment.GetCommandLineArgs(), Flag) >= 0) AutomatedRun.Active = true;
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void StartIfRequested(){
             string[] args = Environment.GetCommandLineArgs();

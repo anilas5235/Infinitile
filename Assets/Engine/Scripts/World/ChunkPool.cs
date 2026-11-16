@@ -43,10 +43,10 @@ namespace Engine.Scripts.World{
         ///     Constructs a pool based on draw/update distances.
         /// </summary>
         internal ChunkPool(Transform transform, VoxelEngineSettings settings){
-            _chunkPoolSize = (settings.Chunk.DrawDistance + 2).SquareSize();
+            _chunkPoolSize = (settings.Chunk.ActiveDrawDistance + 2).SquareSize();
             _chunkMap = new Dictionary<int2, ChunkBehaviour>(_chunkPoolSize);
 
-            _partitionPoolSize = settings.Chunk.DrawDistance.SquareSize() * PartitionsPerChunk;
+            _partitionPoolSize = settings.Chunk.ActiveDrawDistance.SquareSize() * PartitionsPerChunk;
             _meshMap = new Dictionary<int3, ChunkPartition>(_partitionPoolSize);
 
             // An entry per active partition (cleared on reclaim), so the set never rehashes during flight
@@ -69,7 +69,10 @@ namespace Engine.Scripts.World{
                 },
                 chunkBehaviour => chunkBehaviour.gameObject.SetActive(true),
                 chunkBehaviour => chunkBehaviour.gameObject.SetActive(false),
-                null, false, _chunkPoolSize, _chunkPoolSize
+                chunkBehaviour => {
+                    if (chunkBehaviour) UnityEngine.Rendering.CoreUtils.Destroy(chunkBehaviour.gameObject); // DestroyImmediate in edit mode
+                },
+                false, _chunkPoolSize, _chunkPoolSize
             );
 
             // Instantiate the whole pool now; claiming a chunk during flight must not Instantiate.
@@ -241,6 +244,15 @@ namespace Engine.Scripts.World{
             int2[] active = new int2[_chunkMap.Count];
             _chunkMap.Keys.CopyTo(active, 0);
             foreach (int2 position in active) TryReclaimChunk(position);
+        }
+
+        /// <summary>
+        ///     Destroys the pool's chunk objects (with their partitions and collider meshes), e.g. before the world
+        ///     is built again with another draw distance. Call it after <see cref="ReclaimAll" />: only chunks back in
+        ///     the pool are destroyed. Not needed when the world itself is destroyed, which destroys its children.
+        /// </summary>
+        internal void DestroyChunkObjects(){
+            _pool.Clear();
         }
 
         internal void Dispose(){

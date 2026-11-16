@@ -82,7 +82,7 @@ namespace Engine.Scripts.World{
             for (int i = 0; i < _chunkStoreSize; i++) _chunkObjectPool.Push(new Chunk());
 
             _accessorMap = new NativeParallelHashMap<int2, ChunkVoxelData>(
-                settings.Scheduler.MeshBatchSizeAt(settings.Chunk.DrawDistance) * 6,
+                settings.Scheduler.MeshBatchSizeAt(settings.Chunk.ActiveDrawDistance) * 6,
                 Allocator.Domain
             );
             _lightJobMap = new NativeParallelHashMap<int2, ChunkVoxelData>(

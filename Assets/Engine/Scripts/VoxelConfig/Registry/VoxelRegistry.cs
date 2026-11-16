@@ -44,6 +44,10 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         ///     slot (slot 0 unused); the transparent shader reads it as <c>_VoxelVolumeFog</c>.
         /// </summary>
         public GraphicsBuffer VolumeFogBuffer{ get; private set; }
+
+        /// <summary>Bytes of the voxel definition, quad, texture pair and volume fog buffers.</summary>
+        internal long GpuBytes => Render.GpuBytes.Of(VoxelRenderDefBuffer) + Render.GpuBytes.Of(QuadBuffer) +
+                                  Render.GpuBytes.Of(QuadTexPairBuffer) + Render.GpuBytes.Of(VolumeFogBuffer);
         public NativeHashMap<FixedString32Bytes, Voxel.VoxelDef> VoxelMap{ get; private set; }
 
         /// <summary>Number of base voxel ids (air included); the turned variants follow after them.</summary>

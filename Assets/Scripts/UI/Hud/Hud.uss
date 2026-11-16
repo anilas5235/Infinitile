@@ -193,3 +193,93 @@
     margin-top: 4px;
     min-height: 18px;
 }
+
+/* Settings menu (Esc): centred, above everything else. Hidden until the HudController opens it. */
+.menu {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.35);
+    display: none;
+}
+
+.menu__panel {
+    width: 440px;
+    padding: 10px 14px 10px 14px;
+    background-color: rgba(0, 0, 0, 0.8);
+}
+
+.menu__panel .panel__title {
+    font-size: 16px;
+    margin-bottom: 8px;
+}
+
+.menu__line {
+    flex-direction: row;
+    align-items: center;
+}
+
+.menu__field {
+    margin: 4px 0;
+}
+
+.menu__field--grow {
+    flex-grow: 1;
+}
+
+.menu__field .unity-base-field__label {
+    min-width: 150px;
+    color: rgb(235, 235, 235);
+}
+
+.menu__field .unity-base-popup-field__input {
+    color: rgb(235, 235, 235);
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.menu__field .unity-base-popup-field__input:hover {
+    border-color: rgb(255, 214, 120);
+}
+
+.menu__field:disabled {
+    opacity: 0.45;
+}
+
+.menu__note {
+    margin-top: 0;
+    margin-bottom: 6px;
+}
+
+.menu__button {
+    min-width: 96px;
+    height: 28px;
+    margin: 0 8px 0 0;
+    color: rgb(235, 235, 235);
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.menu__button:hover {
+    border-color: rgb(255, 214, 120);
+    background-color: rgba(255, 255, 255, 0.22);
+}
+
+.menu__button:disabled {
+    opacity: 0.4;
+}
+
+.menu__button--apply {
+    min-width: 72px;
+    margin: 0 0 0 8px;
+}
+
+.menu__actions {
+    margin-top: 10px;
+}

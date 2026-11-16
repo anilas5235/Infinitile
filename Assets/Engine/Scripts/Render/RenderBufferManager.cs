@@ -62,6 +62,15 @@ namespace Engine.Scripts.Render{
         /// <summary>The render buffers of this manager, in buffer-index order.</summary>
         internal IReadOnlyList<RenderBuffer> Buffers => _renderBuffers;
 
+        /// <summary>Bytes of all render buffers of this layer.</summary>
+        internal long GpuBytes{
+            get{
+                long bytes = 0;
+                foreach (RenderBuffer buffer in _renderBuffers) bytes += buffer.GpuBytes;
+                return bytes;
+            }
+        }
+
         /// <summary>
         ///     Releases all GPU resources held by this manager.
         /// </summary>

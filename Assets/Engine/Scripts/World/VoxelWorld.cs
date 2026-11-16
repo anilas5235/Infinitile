@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using Engine.Scripts.Data;
+using Engine.Scripts.Diagnostics;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.ColliderMeshing;
@@ -52,6 +53,15 @@ namespace Engine.Scripts.World{
         internal event Action<int2> ChunkEvicted;
         internal event Action<int3> PartitionEvicted;
         internal event Action<HashSet<int3>> PartitionBuildRequested;
+
+        /// <summary>
+        ///     The world was torn down for another draw distance and is about to be built again: the old chunks are
+        ///     evicted (with their events), the new ones are not loaded yet. The renderer sizes its stores again here.
+        /// </summary>
+        internal event Action DrawDistanceRebuilding;
+
+        /// <summary>The world was built again with the draw distance passed; loading restarts around the focus.</summary>
+        public event Action<int> DrawDistanceChanged;
 
         internal void RaiseChunkChanged(Chunk chunk){
             ChunkChanged?.Invoke(chunk);
@@ -257,6 +267,61 @@ namespace Engine.Scripts.World{
             TryFocusUpdate();
         }
 
+        /// <summary>Smallest draw distance <see cref="ChangeDrawDistance" /> accepts.</summary>
+        public const int MinDrawDistance = 1;
+
+        /// <summary>Largest draw distance <see cref="ChangeDrawDistance" /> accepts.</summary>
+        public const int MaxDrawDistance = 32;
+
+        /// <summary>
+        ///     Draw distance a world is built with instead of the settings asset's, e.g. the player's saved choice;
+        ///     0 for the asset's. Read when a world is built, so set it before the game scene loads. Ignored while
+        ///     <see cref="AutomatedRun.Active" />. <see cref="ChangeDrawDistance" /> sets it as well, so a world
+        ///     built later (a reloaded scene) keeps the distance.
+        /// </summary>
+        public static int RequestedDrawDistance{ get; set; }
+
+        /// <summary>The draw distance the running world is built with (chunks in each direction).</summary>
+        public int DrawDistance => settings.Chunk.ActiveDrawDistance;
+
+        /// <summary>
+        ///     Builds the world again with another draw distance, in the running scene. Running jobs are completed,
+        ///     every chunk is evicted through the normal events, and everything sized from the draw distance is made
+        ///     anew: the chunk store, the chunk and partition pool with its objects, the schedulers and the
+        ///     renderer's stores (<see cref="DrawDistanceRebuilding" />). Loading restarts around the focus, so the
+        ///     ground under the player is missing for a moment; edits made to the world are lost, and the world is
+        ///     generated with the settings asset's configuration again (not one passed to <see cref="Regenerate" />).
+        ///     The settings asset is not written: the distance is held as an override until the world is destroyed.
+        /// </summary>
+        /// <param name="drawDistance">
+        ///     Chunks in each direction, <see cref="MinDrawDistance" /> to <see cref="MaxDrawDistance" />.
+        /// </param>
+        /// <returns>False when nothing was rebuilt: the distance is the current one, or the world is shutting down.</returns>
+        public bool ChangeDrawDistance(int drawDistance){
+            if (drawDistance < MinDrawDistance || drawDistance > MaxDrawDistance)
+                throw new ArgumentOutOfRangeException(nameof(drawDistance), drawDistance,
+                    $"the draw distance must be {MinDrawDistance} to {MaxDrawDistance}");
+            RequestedDrawDistance = drawDistance;
+            if (_isShuttingDown || _scheduler == null || drawDistance == DrawDistance) return false;
+
+            _scheduler.CompleteRunning();
+            _scheduler.Dispose();
+            _chunkPool.ReclaimAll(); // eviction events: the renderer releases its lists and pages
+            ChunkManager.UnloadAll();
+            DisposePool();
+            _chunkPool.DestroyChunkObjects();
+            DisposeChunkManager();
+
+            settings.Chunk.DrawDistanceOverride = drawDistance == settings.Chunk.DrawDistance ? 0 : drawDistance;
+            DrawDistanceRebuilding?.Invoke();
+
+            ConstructEngineComponents();
+            Focus = UnsetFocus;
+            TryFocusUpdate();
+            DrawDistanceChanged?.Invoke(drawDistance);
+            return true;
+        }
+
         /// <summary>
         ///     Samples column (<paramref name="x" />, <paramref name="z" />) with the generation config the chunks are
         ///     built from (after <see cref="Regenerate" /> the new one): climate fields, height, biomes and flora as
@@ -339,6 +404,11 @@ namespace Engine.Scripts.World{
 
             VoxelEngineProvider.Initialize(new VoxelEngineProvider(), provider => provider.Settings = settings);
 
+            int requested = AutomatedRun.Active ? 0 : RequestedDrawDistance;
+            settings.Chunk.DrawDistanceOverride =
+                requested >= MinDrawDistance && requested <= MaxDrawDistance && requested != settings.Chunk.DrawDistance
+                    ? requested
+                    : 0;
             ConstructEngineComponents();
 
             Focus = UnsetFocus;
@@ -371,20 +441,26 @@ namespace Engine.Scripts.World{
         /// </summary>
         protected override void OnDestroy(){
             _isShuttingDown = true;
-            if (ChunkManager != null){
-                ChunkManager.OnChunkChange -= RaiseChunkChanged;
-                ChunkManager.OnChunkUnloaded -= HandleChunkUnloaded;
-            }
-
-            if (_chunkPool != null){
-                _chunkPool.OnChunkEvicted -= HandleChunkEvicted;
-                _chunkPool.OnPartitionEvicted -= HandlePartitionEvicted;
-                _chunkPool.Dispose();
-            }
-
+            if (Instance == this && settings) settings.Chunk.DrawDistanceOverride = 0; // the asset object outlives the world
+            DisposePool();
             base.OnDestroy();
             _scheduler?.Dispose();
-            ChunkManager?.Dispose();
+            DisposeChunkManager();
+        }
+
+        /// <summary>Unsubscribes from and disposes the pool (not its chunk objects).</summary>
+        private void DisposePool(){
+            if (_chunkPool == null) return;
+            _chunkPool.OnChunkEvicted -= HandleChunkEvicted;
+            _chunkPool.OnPartitionEvicted -= HandlePartitionEvicted;
+            _chunkPool.Dispose();
+        }
+
+        private void DisposeChunkManager(){
+            if (ChunkManager == null) return;
+            ChunkManager.OnChunkChange -= RaiseChunkChanged;
+            ChunkManager.OnChunkUnloaded -= HandleChunkUnloaded;
+            ChunkManager.Dispose();
         }
 
         private IEnumerator FocusUpdateRoutine(){

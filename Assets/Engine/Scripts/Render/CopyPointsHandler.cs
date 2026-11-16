@@ -133,6 +133,10 @@ namespace Engine.Scripts.Render{
             _foliagePagesBuffer.SetData(_pageData, 0, 0, count);
         }
 
+        /// <summary>Bytes of the page and count buffers of the copy pass.</summary>
+        internal long GpuBytes => Render.GpuBytes.Of(_pageCountsBuffer) + Render.GpuBytes.Of(_solidPagesBuffer) +
+                                  Render.GpuBytes.Of(_transparentPagesBuffer) + Render.GpuBytes.Of(_foliagePagesBuffer);
+
         private GraphicsBuffer GetTargetBuffer(RenderBufferManager bufferManager, AllocInfo allocInfo){
             int bufferIndex = allocInfo.Count > 0 ? allocInfo.BufferIndex : 0;
             return bufferManager.GetBuffer(bufferIndex);

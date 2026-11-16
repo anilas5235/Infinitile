@@ -121,6 +121,30 @@ namespace Engine.Scripts.Render{
             return _layers != null && layer >= 0 && layer < _layers.Length ? _layers[layer].Buffers.Count : 0;
         }
 
+        /// <summary>
+        ///     The GPU memory of the engine's own buffers right now: the interval store, the render buffers, the build
+        ///     slots and the rest (culling, copy pass, voxel definitions). Read-only; sums a few dozen buffers, so read
+        ///     it a few times per second at most.
+        /// </summary>
+        public GpuMemory GpuMemory{
+            get{
+                if (_isDestroyed || _intervalStore == null) return default;
+                long buildSlotBytes = 0;
+                if (_pointBuilderHandlers != null)
+                    foreach (PointBuilderHandler handler in _pointBuilderHandlers)
+                        buildSlotBytes += handler?.GpuBytes ?? 0L;
+                long otherBytes = (_culler?.GpuBytes ?? 0L) + (_copyPointsHandler?.GpuBytes ?? 0L);
+                DataImporter importer = DataImporter.Instance;
+                if (importer && importer.VoxelRegistry != null) otherBytes += importer.VoxelRegistry.GpuBytes;
+                return new GpuMemory(
+                    _intervalStore.GpuBytes, IntervalStorePages, IntervalStoreUsedPages, IntervalStorePeakPages,
+                    IntervalStoreGrowCount, RenderBufferCount(0), RenderBufferCount(1), RenderBufferCount(2),
+                    (_solidBufferManager?.GpuBytes ?? 0L) + (_transparentBufferManager?.GpuBytes ?? 0L) +
+                    (_foliageBufferManager?.GpuBytes ?? 0L),
+                    _maxInFlight, buildSlotBytes, otherBytes);
+            }
+        }
+
         private PointBuilderHandler[] _pointBuilderHandlers;
 
         private VoxelEngineSettings _settings;
@@ -138,12 +162,20 @@ namespace Engine.Scripts.Render{
             VoxelLightingGlobals.SetDefaults(); // lit without a DayNightCycle, which overrides these per frame
             if (_settings.Renderer.skyMaterial) RenderSettings.skybox = _settings.Renderer.skyMaterial;
             UpdateSkyGlobals();
+            CreateResources();
+        }
+
+        /// <summary>
+        ///     Creates everything sized from the draw distance (build slots with their point builders, the interval
+        ///     store, the request bookkeeping) and the render buffers, the culler and the copy pass that use them.
+        /// </summary>
+        private void CreateResources(){
             // The build slots follow the draw distance; every slot owns a point builder with its GPU buffers, so a
             // world with a short draw distance holds fewer of them. Fixed here, when the world is built.
-            _maxInFlight = _settings.Scheduler.BuildSlotsAt(_settings.Chunk.DrawDistance);
+            _maxInFlight = _settings.Scheduler.BuildSlotsAt(_settings.Chunk.ActiveDrawDistance);
 
             // sized for the partition pool so the request bookkeeping does not grow during flight
-            int partitionPoolSize = _settings.Chunk.DrawDistance.SquareSize() * PartitionsPerChunk;
+            int partitionPoolSize = _settings.Chunk.ActiveDrawDistance.SquareSize() * PartitionsPerChunk;
             _requestedPartitions.EnsureCapacity(partitionPoolSize);
             _pendingBuilds = new Queue<int3>(partitionPoolSize);
             _pendingBuildSet.EnsureCapacity(partitionPoolSize);
@@ -213,7 +245,7 @@ namespace Engine.Scripts.Render{
             Color horizon = fog ? sky.GetColor(VoxelRenderConstants.SkyHorizonColorNameID) : Color.white;
             Color zenith = fog ? sky.GetColor(VoxelRenderConstants.SkyZenithColorNameID) : Color.white;
             float power = fog ? sky.GetFloat(VoxelRenderConstants.SkyGradientPowerNameID) : 1f;
-            float end = _settings.Chunk.DrawDistance * ChunkWidth;
+            float end = _settings.Chunk.ActiveDrawDistance * ChunkWidth;
             VoxelLightingGlobals.SetHorizonFog(fog, horizon, zenith, power, end - ChunkWidth, end,
                 rSettings.fogSteepness);
 
@@ -248,6 +280,7 @@ namespace Engine.Scripts.Render{
             world.ChunkEvicted += RemoveChunkData;
             world.PartitionEvicted += RemovePartitionRenderData;
             world.PartitionBuildRequested += UpdatePartitions;
+            world.DrawDistanceRebuilding += HandleDrawDistanceRebuilding;
         }
 
         /// <summary>
@@ -263,6 +296,7 @@ namespace Engine.Scripts.Render{
             world.ChunkEvicted -= RemoveChunkData;
             world.PartitionEvicted -= RemovePartitionRenderData;
             world.PartitionBuildRequested -= UpdatePartitions;
+            world.DrawDistanceRebuilding -= HandleDrawDistanceRebuilding;
             world.PendingPartitionBuilds = 0; // nobody builds them while the renderer is off
         }
 
@@ -272,6 +306,23 @@ namespace Engine.Scripts.Render{
         protected override void OnDestroy(){
             base.OnDestroy();
             _isDestroyed = true;
+            ReleaseResources();
+        }
+
+        /// <summary>
+        ///     The world is built again with another draw distance; its chunks are evicted already. Everything sized
+        ///     from the old distance is released and created anew, the render buffers too, so a shorter distance
+        ///     gives their GPU memory back.
+        /// </summary>
+        private void HandleDrawDistanceRebuilding(){
+            if (_isDestroyed) return;
+            ReleaseResources();
+            _buffersRebuildPending = false;
+            world.PendingPartitionBuilds = 0;
+            CreateResources();
+        }
+
+        private void ReleaseResources(){
             // every resource is released on its own, so one failing Dispose does not leak the rest
             SafeDispose(_copyPointsHandler);
 

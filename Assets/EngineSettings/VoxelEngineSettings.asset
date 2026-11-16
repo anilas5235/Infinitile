@@ -38,3 +38,4 @@ MonoBehaviour:
     referenceDrawDistance: 12
     mainThreadBudgetMs: 2
     cappedFrameSpareShare: 0.5
+    fastCapBudgetShare: 0.3

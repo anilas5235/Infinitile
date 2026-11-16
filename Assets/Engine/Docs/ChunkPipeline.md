@@ -39,6 +39,23 @@ before it in the 3 x 3 neighbourhood of a chunk, so each stage reaches one ring 
 Strictly, `DrawDistance + 2` would be enough (light up to `DrawDistance + 1`, mesh up to `DrawDistance`); the extra
 ring is slack, so lit neighbours are usually ready by the time a chunk enters the draw distance.
 
+### Changing the draw distance at run time
+
+Every distance above follows `ChunkSettings.ActiveDrawDistance`: the draw distance of the settings asset, unless an
+override replaces it. The override is not serialized, so the asset keeps its value; the world clears it when it is
+destroyed.
+
+- **Before the world is built:** `VoxelWorld.RequestedDrawDistance` (static, 0 = the asset's) is the distance the
+  next world is built with. The game sets it from the player's saved choice before the scene loads. Tests and the
+  goal run set `AutomatedRun.Active`, and the world then ignores the request.
+- **While the world runs:** `VoxelWorld.ChangeDrawDistance(n)` (1 to 32) builds the world again in the running
+  scene. It completes the running batches, evicts every chunk through the normal events, makes the chunk store,
+  the chunk and partition pool (with its game objects) and the schedulers anew, raises `DrawDistanceRebuilding`
+  (the renderer makes its draw-distance-sized buffers anew, `MeshAndRenderPipeline.md`, version 1.10) and starts
+  loading around the focus again; then `DrawDistanceChanged`. Edits to the world are lost, and the ground under
+  the player is missing until the first chunks are built: the game holds the player meanwhile
+  (`PlayerManager.HoldUntilGrounded`). The same distance returns false and rebuilds nothing.
+
 ## Scheduling
 
 Each stage has a `JobStateHandler` with a priority queue (nearest to the focus first) and one batch of jobs in
@@ -63,7 +80,7 @@ flight. The scheduler gives one stage per frame a turn on the main thread, so a 
   list.
 - **The mesh batch and the GPU build slots follow the draw distance.** `SchedulerSettings.MeshBatchSizeAt` and
   `BuildSlotsAt` scale the two asset values with the side of the draw window, up to 32 and 16; they are read once,
-  when the world is built (`MeshAndRenderPipeline.md`, version 1.9). The data, light and collider batch sizes are
+  when the world is built or its draw distance changes (`MeshAndRenderPipeline.md`, version 1.9). The data, light and collider batch sizes are
   read once as well, with at least 1. The class default of `colliderBatchSize` is 4; the shipped
   `VoxelEngineSettings.asset` sets 6.
 - **A partition without a voxel is not meshed.** `ChunkVoxelData.OccupiedPartitions` has one bit per partition of
@@ -77,8 +94,8 @@ flight. The scheduler gives one stage per frame a turn on the main thread, so a 
 ### Main-thread budget per frame
 
 The turn of a frame is bounded by time: `SchedulerSettings.mainThreadBudgetMs` (shipped 2 ms; 0 = no limit; read
-once when the world is built), plus the spare time of a capped frame (`SchedulerSettings.cappedFrameSpareShare`,
-see below).
+once when the world is built), plus the spare time of a slow capped frame (`SchedulerSettings.cappedFrameSpareShare`)
+and at most a share of a fast capped frame (`SchedulerSettings.fastCapBudgetShare`, see below).
 
 - **A turn is made of items of work.** An item is: adding a data batch to the chunk store, the upload of one
   chunk to the renderer, the pool claim of one meshed partition, handing the meshes of a batch to Unity, one
@@ -114,8 +131,14 @@ see below).
   `FrameCap` reads the cap in force every frame (vertical sync with the display's refresh rate wins over
   `Application.targetFrameRate`), so a cap changed at run time is followed from the next frame; vertical sync
   forced by the driver or by the Editor's game view is not seen and keeps the plain budget. The shipped game
-  runs uncapped (vertical sync 0 on both quality levels, no target frame rate); only the PlayMode tests cap at 60.
-  The share is read once when the world is built; 0 gives the plain budget in every frame.
+  runs uncapped (vertical sync 0 on both quality levels, no target frame rate) unless the player picks a frame
+  rate in the menu; only the PlayMode tests cap at 60. The share is read once when the world is built; 0 gives the
+  plain budget in every frame.
+- **A fast cap limits the budget.** A frame cap shorter than 8.33 ms leaves less time than the budget assumes, so
+  there the budget is at most `fastCapBudgetShare × period` (shipped 0.3): 2 ms under 120 and 144 frames, 1.25 ms
+  under 240, 1 ms under 300. The ceiling never raises the budget, and it does not apply uncapped (2 ms) or under a
+  slower cap. With the two shares, the menu's frame rates give 6.17 ms (60), 3.39 ms (90), 2 ms (120), 1 ms (300)
+  and 2 ms uncapped. 0 turns the ceiling off; it is read once when the world is built, like the other share.
 
 The measured effect of the budget and of the share, and the frame-time goal, are recorded in the spec
 (`Docs/WorldGenSpec.html`, §E1.1).
@@ -123,7 +146,10 @@ The measured effect of the budget and of the share, and the frame-time goal, are
 ### Tests
 
 `FrameBudgetTests` (EditMode) holds the budget and the round robin with a counting clock, that a wake-up or
-prune during a cut scan leads to another scan, the cap's period and the budget after the cap.
+prune during a cut scan leads to another scan, the cap's period and the budget after the cap, including the
+fast-cap ceiling and the shipped shares at the menu's frame rates. `DrawDistanceChangeTests` (PlayMode) holds that
+`ChangeDrawDistance` builds the world again at the new size (load distance, interval store, build slots), keeps
+the settings asset, rebuilds nothing for the same distance and gives the original sizes back.
 `SchedulerBatchSizeTests` holds that a batch size of 0 in the settings does not stall the data, light or bake
 stage.
 

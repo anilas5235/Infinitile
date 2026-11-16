@@ -24,11 +24,12 @@ namespace UI{
     /// <summary>
     ///     The in-game HUD (UI Toolkit, Hud.uxml): crosshair, a hotbar of voxels to place, and two debug panels
     ///     toggled with F7: the world under the player (position, chunk, biome, climate, generation methods) and the
-    ///     engine's performance (frame time, graphics memory, chunk queues, culling pages per layer). Holding Left Alt frees the cursor. E opens a list of every voxel,
-    ///     searchable by name or id, that puts the clicked voxel into the hotbar.
+    ///     engine's performance (frame time, the engine's GPU buffers, chunk queues, culling pages per layer). Holding
+    ///     Left Alt frees the cursor. E opens a list of every voxel, searchable by name or id, that puts the clicked
+    ///     voxel into the hotbar. Esc closes that list, or opens and closes the settings menu.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
-    public class HudController : MonoBehaviour{
+    public partial class HudController : MonoBehaviour{
         [SerializeField] private Texture2D crosshair;
 
         [Tooltip("Voxels of hotbar slots 1–9 by full name (package:name). Middle click replaces the selected slot.")]
@@ -53,6 +54,7 @@ namespace UI{
         private readonly List<VisualElement> _slots = new();
         private Label _biome, _chunk, _chunks, _climate, _fps, _generation, _height, _hint;
         private Label _position, _queues, _vram, _voxelName;
+        private Label _gpuTotal, _gpuStore, _gpuRender, _gpuSlots;
         private VisualElement _crosshair, _culling, _debugLeft, _debugRight, _search;
         private TextField _searchField;
         private Label _searchName;
@@ -95,16 +97,22 @@ namespace UI{
             _generation = Root.Q<Label>("generation");
             _fps = Root.Q<Label>("fps");
             _vram = Root.Q<Label>("vram");
+            _gpuTotal = Root.Q<Label>("gpu-total");
+            _gpuStore = Root.Q<Label>("gpu-store");
+            _gpuRender = Root.Q<Label>("gpu-render");
+            _gpuSlots = Root.Q<Label>("gpu-slots");
             _chunks = Root.Q<Label>("chunks");
             _queues = Root.Q<Label>("queues");
             _culling = Root.Q("culling");
             _voxelName = Root.Q<Label>("voxel-name");
 
             // Unity's own graphics allocations (textures, meshes, buffers, render targets); in the Editor this
-            // includes the Editor's windows.
+            // includes the Editor's windows. Only the Editor and development players have this counter.
             _gfxMemory = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "Gfx Used Memory");
             BuildHotbar();
             BindVoxelSearch();
+            BindMenu();
+            GameSettings.ApplyFrameCapAtStart();
             if (voxelEditor) voxelEditor.OnVoxelIdChanged += OnVoxelIdChanged;
             SetDebugPanels(showDebugPanels);
         }
@@ -112,6 +120,7 @@ namespace UI{
         private void OnDisable(){
             if (voxelEditor) voxelEditor.OnVoxelIdChanged -= OnVoxelIdChanged;
             if (_searchOpen) SetVoxelSearch(false);
+            UnbindMenu();
             _searchField?.UnregisterValueChangedCallback(OnSearchChanged);
             _searchField?.UnregisterCallback<FocusOutEvent>(OnSearchFocusOut);
             if (_cursorFree) SetCursorFree(false);
@@ -155,11 +164,14 @@ namespace UI{
                 else if (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame)
                     PickFirstMatch();
             }
-            else if (keyboard[voxelSearchKey].wasPressedThisFrame){
+            else if (keyboard.escapeKey.wasPressedThisFrame){
+                SetMenu(!_menuOpen);
+            }
+            else if (!_menuOpen && keyboard[voxelSearchKey].wasPressedThisFrame){
                 SetVoxelSearch(true);
             }
 
-            bool cursorFree = _searchOpen || keyboard[cursorKey].isPressed;
+            bool cursorFree = _searchOpen || _menuOpen || keyboard[cursorKey].isPressed;
             if (cursorFree != _cursorFree) SetCursorFree(cursorFree);
 
             if (_slotIds.Length == 0 || _cursorFree) return;
@@ -178,15 +190,19 @@ namespace UI{
             _debugLeft.style.display = display;
             _debugRight.style.display = display;
             if (VoxelWorldRenderer.Instance) VoxelWorldRenderer.Instance.CollectCullingStats = show;
+            _menuDebugToggle?.SetValueWithoutNotify(show);
             string modes = _movement ? $"    {_movement.ModeKey}: walk / fly / spectator" : "";
             _hint.text = show
                 ? $"{debugPanelsKey}: hide panels    hold {cursorKey}: cursor    1–9 / wheel: voxel    middle click: pick" +
-                  $"    {voxelSearchKey}: all voxels{modes}"
-                : $"{debugPanelsKey}: debug panels    {voxelSearchKey}: all voxels{modes}";
+                  $"    {voxelSearchKey}: all voxels{modes}    Esc: menu"
+                : $"{debugPanelsKey}: debug panels    {voxelSearchKey}: all voxels{modes}    Esc: menu";
             _nextRefresh = 0f;
         }
 
-        /// <summary>Unlocks the cursor and stops looking and editing while the cursor key is held or the voxel list is open.</summary>
+        /// <summary>
+        ///     Unlocks the cursor and stops looking and editing while the cursor key is held, the voxel list or the
+        ///     menu is open.
+        /// </summary>
         private void SetCursorFree(bool free){
             _cursorFree = free;
             Cursor.lockState = free ? CursorLockMode.None : CursorLockMode.Locked;
@@ -243,14 +259,15 @@ namespace UI{
 
         private void RefreshPerformance(){
             float ms = _frames > 0 ? _frameTimeSum / _frames * 1000f : 0f;
-            _fps.text = ms > 0f ? Invariant($"{1000f / ms:F0} FPS   {ms:F1} ms") : "- FPS";
-            string usedMb = _gfxMemory.Valid ? $"{_gfxMemory.LastValue / (1024 * 1024)}" : "-";
-            _vram.text = $"VRAM {usedMb} / {SystemInfo.graphicsMemorySize} MB";
+            _fps.text = ms > 0f
+                ? Invariant($"{1000f / ms:F0} FPS   {ms:F1} ms (avg {refreshInterval:0.##} s)")
+                : "- FPS";
+            RefreshGpuMemory();
 
             VoxelWorld world = VoxelWorld.Instance;
             if (world){
                 WorldStats stats = world.Stats;
-                _chunks.text = $"Chunks loaded {stats.LoadedChunks}";
+                _chunks.text = $"Chunks loaded {stats.LoadedChunks}   draw distance {world.DrawDistance}";
                 _queues.text = $"Queues   data {stats.DataQueue}   light {stats.LightQueue}   " +
                                $"mesh {stats.MeshQueue}   bake {stats.BakeQueue}";
             }
@@ -279,6 +296,32 @@ namespace UI{
                 _cullingRows[i].text = $"{s.Layer}   {s.VisiblePages} / {s.ShadowPages} / {s.AllocatedPages}" +
                                        $"   ({s.Buffers} buffer{(s.Buffers == 1 ? "" : "s")})";
             }
+        }
+
+        /// <summary>
+        ///     The engine's own GPU buffers (every build) and, where Unity counts it (Editor, development players),
+        ///     Unity's graphics memory.
+        /// </summary>
+        private void RefreshGpuMemory(){
+            VoxelWorldRenderer renderer = VoxelWorldRenderer.Instance;
+            GpuMemory gpu = renderer ? renderer.GpuMemory : default;
+            _gpuTotal.text = Invariant($"GPU buffers {Mb(gpu.TotalBytes):F0} MB");
+            _gpuStore.text = Invariant($"Interval store {Mb(gpu.IntervalStoreBytes):F0} MB   ") +
+                             Invariant($"{gpu.IntervalStoreUsed * 100f:F0} % used, peak {gpu.IntervalStorePeak * 100f:F0} %") +
+                             $", {gpu.IntervalStoreGrowCount} grow{(gpu.IntervalStoreGrowCount == 1 ? "" : "s")}";
+            _gpuRender.text = $"Render buffers {gpu.SolidBuffers} / {gpu.TransparentBuffers} / {gpu.FoliageBuffers}   " +
+                              Invariant($"{Mb(gpu.RenderBufferBytes):F0} MB");
+            _gpuSlots.text = gpu.BuildSlots > 0
+                ? Invariant($"Build slots {gpu.BuildSlots} × {Mb(gpu.BuildSlotBytes) / gpu.BuildSlots:F1} MB")
+                : "Build slots -";
+
+            _vram.style.display = _gfxMemory.Valid ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_gfxMemory.Valid)
+                _vram.text = $"VRAM (Unity) {_gfxMemory.LastValue / (1024 * 1024)} / {SystemInfo.graphicsMemorySize} MB";
+        }
+
+        private static float Mb(long bytes){
+            return bytes / (1024f * 1024f);
         }
 
         // ── Hotbar ───────────────────────────────────────────────────────────
@@ -410,13 +453,7 @@ namespace UI{
             _searchOpen = open;
             _search.style.display = open ? DisplayStyle.Flex : DisplayStyle.None;
             _crosshair.style.display = open ? DisplayStyle.None : DisplayStyle.Flex;
-            // Looked up on every open: the player may spawn after the HUD, or be replaced.
-            if (open) _playerInput = FindFirstObjectByType<PlayerInput>();
-            if (_playerInput){
-                if (open) _playerInput.DeactivateInput();
-                // In teardown the PlayerInput may already be disabled; it activates itself when enabled again.
-                else if (_playerInput.isActiveAndEnabled) _playerInput.ActivateInput();
-            }
+            SetPlayerInput(!open);
 
             if (!open){
                 _focusSearchFrame = -1;
@@ -430,6 +467,16 @@ namespace UI{
             _searchResults.scrollOffset = Vector2.zero;
             // Focus a frame later, so the key that opened the list is not typed into the field.
             _focusSearchFrame = Time.frameCount + 1;
+        }
+
+        /// <summary>Turns the player's input off while the voxel list or the menu is open, and on again.</summary>
+        private void SetPlayerInput(bool active){
+            // Looked up on every switch-off: the player may spawn after the HUD, or be replaced.
+            if (!active) _playerInput = FindFirstObjectByType<PlayerInput>();
+            if (!_playerInput) return;
+            if (!active) _playerInput.DeactivateInput();
+            // In teardown the PlayerInput may already be disabled; it activates itself when enabled again.
+            else if (_playerInput.isActiveAndEnabled) _playerInput.ActivateInput();
         }
 
         /// <summary>

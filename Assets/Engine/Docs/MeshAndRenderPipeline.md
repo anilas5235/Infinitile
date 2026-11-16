@@ -748,8 +748,8 @@ step has to keep up with.
   the asset sets above a cap is used as it is.
 - **When.** Both are read once, when the world is built: `CMeshBuildScheduler` sizes its result map with the batch
   and takes its pacing limit (two rounds of slots) from the slots, `VoxelWorldRenderer` creates one point builder
-  with its GPU buffers per slot (`VoxelWorldRenderer.BuildSlots`). A draw distance changed in a running world needs
-  a new world, as it did before.
+  with its GPU buffers per slot (`VoxelWorldRenderer.BuildSlots`). A draw distance changed in a running world
+  builds the world and these sizes again (version 1.10).
 - **No scaling.** `referenceDrawDistance = 0` uses the two values as they are; the test rigs do that.
 - **Other batch sizes stay fixed.** Data, light and collider bake did not limit a fresh world or a flight at draw
   distance 6 or 12, so they are not scaled.
@@ -859,3 +859,49 @@ Trade-offs:
   last block is removed. Such partitions take the mesh job and the GPU build; only the bake is skipped.
 - A claim in a full pool can reclaim a pooled chunk and unload its data, so the mesh step drops the partitions of
   the batch it is filling that lost a chunk of their neighbourhood; the next scan picks them up again.
+
+# Version 1.10 (Draw Distance at Run Time, GPU Memory Readout)
+
+## The Renderer Rebuilds Its Draw-Distance-Sized Buffers
+
+### Description
+
+The player can change the draw distance in the game's menu (`VoxelWorld.ChangeDrawDistance`,
+`ChunkPipeline.md`). The world builds itself again in the running scene, and the renderer follows.
+
+- **What is sized from the draw distance.** The GPU build slots and their point builders, the partition pool, the
+  interval store (version 1.5), the request arrays, the three render buffer managers (solid, transparent,
+  foliage), the culler and the copy pass. `VoxelWorldRenderer.CreateResources` makes all of them;
+  `ReleaseResources` disposes them. `Awake` and `OnDestroy` call the two.
+- **On a change.** The world first evicts every chunk, so the renderer releases its lists and pages through the
+  normal events. Then it raises `DrawDistanceRebuilding`; the renderer drops its pending partition builds and runs
+  `ReleaseResources` and `CreateResources` with the new distance. The world then loads again around the focus,
+  and the uploads and builds fill the new buffers as for a fresh world.
+- **Sizes.** The interval store starts with 41 pages per list (version 1.5) for every chunk the store can hold:
+
+  | Draw distance | 4 | 6 | 8 | 10 | 12 | 16 |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | Interval store (MB) | 121 | 178 | 245 | 323 | 411 | 621 |
+  | GPU build slots | 3 | 4 | 5 | 7 | 8 | 11 |
+
+  Going back to a distance gives the same sizes again. The render buffers start small and grow with the world as
+  before.
+
+## GPU Memory Readout
+
+`VoxelWorldRenderer.GpuMemory` (public, read-only) returns a `GpuMemory` value with the bytes of the engine's own
+GPU buffers, counted as `count × stride` of each `GraphicsBuffer`:
+
+- the interval store: bytes, pages, pages in use, the peak in use and how often it grew (`IntervalStoreUsed` and
+  `IntervalStorePeak` as 0 to 1);
+- the render buffers: count per layer and bytes;
+- the build slots: count and bytes;
+- the rest: culler, copy pass and the voxel registry's buffers;
+- `TotalBytes`, the sum.
+
+It works in every build, unlike Unity's "Gfx Used Memory" counter, which a release player does not have. The
+HUD shows both: the engine's buffers always, Unity's counter only where it is valid. Reading it allocates nothing;
+it returns an empty value while the renderer is not running.
+
+`DrawDistanceChangeTests` (PlayMode) holds that the store and the build slots follow a change and come back to
+their sizes, and that the world is uploaded again after it.

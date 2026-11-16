@@ -19,6 +19,10 @@
             <ui:VisualElement name="performance-panel" class="panel" picking-mode="Ignore">
                 <ui:Label text="Performance" class="panel__title" />
                 <ui:Label name="fps" class="row row--strong" />
+                <ui:Label name="gpu-total" class="row" />
+                <ui:Label name="gpu-store" class="row" />
+                <ui:Label name="gpu-render" class="row" />
+                <ui:Label name="gpu-slots" class="row" />
                 <ui:Label name="vram" class="row" />
                 <ui:Label name="chunks" class="row" />
                 <ui:Label name="queues" class="row" />
@@ -41,6 +45,25 @@
                 <ui:ScrollView name="voxel-search-results" class="voxel-search__results" />
                 <ui:Label name="voxel-search-name" class="row row--strong voxel-search__name" />
                 <ui:Label text="Click or Enter (first match): put into the hotbar    Esc: close" class="row row--dim" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="menu" class="menu" picking-mode="Ignore">
+            <ui:VisualElement class="panel menu__panel">
+                <ui:Label text="Menu" class="panel__title" />
+                <ui:VisualElement class="menu__line">
+                    <ui:DropdownField name="menu-draw-distance" label="Draw distance" class="menu__field menu__field--grow" />
+                    <ui:Button name="menu-apply" text="Apply" class="menu__button menu__button--apply" />
+                </ui:VisualElement>
+                <ui:Label text="Apply builds the world again around you; your changes to it are lost." class="row row--dim menu__note" />
+                <ui:DropdownField name="menu-frame-rate" label="Frame rate" class="menu__field" />
+                <ui:Toggle name="menu-vsync" label="VSync" class="menu__field" />
+                <ui:Toggle name="menu-debug-panels" label="Debug panels" class="menu__field" />
+                <ui:VisualElement class="menu__line menu__actions">
+                    <ui:Button name="menu-resume" text="Resume" class="menu__button" />
+                    <ui:Button name="menu-quit" text="Quit" class="menu__button" />
+                </ui:VisualElement>
+                <ui:Label text="Esc: resume" class="row row--dim" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>
