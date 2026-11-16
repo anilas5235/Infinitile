@@ -532,8 +532,11 @@ needed.
   `store[_CompPages[_CompPagesOffset + (k >> 9)] * 512 + (k & 511)]` (Version 1.6: `BuildPrepBox`, through a
   header of table offsets).
 - **Growth.** If the free pages do not suffice, the store allocates a larger buffer, copies the old one on the GPU
-  (`CopyIntervals`) and logs it. It starts with 17 pages per list, two lists per chunk the `ChunkManager` can hold, the
-  same memory as the former pool.
+  (`CopyIntervals`) and logs it. It started with 17 pages per list (8 intervals per column), two lists per chunk the
+  `ChunkManager` can hold, the same memory as the former pool. Caves and the denser terrain later outgrew that: the goal
+  run's sprint flight grew the store twice at draw distance 12, and each grow was a 17–23 ms frame. It now starts with
+  41 pages per list (20 intervals per column, `InitialIntervalsPerColumn`): 100,450 pages (411 MB) at draw distance 12
+  and 43,378 pages (178 MB) at 6, against flight peaks of 75,620 and 33,926 pages.
 - **Measured** (PlayMode allocation flight test in the game scene): 6935 of 17986 pages used at the peak (39 %). No growth, 0/300
   allocating frames. Upload about 71 µs per chunk list as before. The prep dispatch takes about 22 µs per build
   instead of 20 µs (page-table upload).

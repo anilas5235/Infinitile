@@ -62,6 +62,14 @@ namespace Engine.Scripts.Diagnostics{
         private readonly List<int> _framesCut = new(SampleCapacity);
         private readonly List<int> _gcCount = new(SampleCapacity);
         private readonly List<int> _unfocused = new(SampleCapacity);
+
+        // The per-frame trace: what else happened in each sample (counters cumulative; see AppendTrace)
+        private readonly List<float> _sampleSeconds = new(SampleCapacity);
+        private readonly List<float> _focusX = new(SampleCapacity);
+        private readonly List<int> _storeGrows = new(SampleCapacity);
+        private readonly List<int> _storePages = new(SampleCapacity);
+        private readonly List<int> _storeUsed = new(SampleCapacity);
+        private readonly List<int> _buffers = new(SampleCapacity); // solid | transparent << 10 | foliage << 20
         private int _unfocusedCount;
         private int _framesCutAtStart, _gcAtStart;
         private float _drawStart;
@@ -138,6 +146,9 @@ namespace Engine.Scripts.Diagnostics{
 
             internal FrameTimeStats.Summary Times;
             internal int FramesCut, GcCollections, Unfocused;
+
+            /// <summary>Interval store: grows, pages at the end, most pages in use during the phase.</summary>
+            internal int StoreGrows, StorePagesEnd, StoreUsedMax;
         }
 
         /// <summary>Everything measured at one draw distance.</summary>
@@ -149,6 +160,12 @@ namespace Engine.Scripts.Diagnostics{
             internal int BuiltFrame = -1;
             internal string Problem;
             internal readonly List<Phase> Phases = new();
+
+            /// <summary>The trace rows (frames over the goal, or with a store grow, a render buffer added or a GC).</summary>
+            internal readonly StringBuilder Trace = new();
+
+            /// <summary>The interval store's most pages in use at once, over the whole world.</summary>
+            internal int StorePeak = -1;
         }
 
         private void Awake(){
@@ -238,6 +255,12 @@ namespace Engine.Scripts.Diagnostics{
             _framesCut.Clear();
             _gcCount.Clear();
             _unfocused.Clear();
+            _sampleSeconds.Clear();
+            _focusX.Clear();
+            _storeGrows.Clear();
+            _storePages.Clear();
+            _storeUsed.Clear();
+            _buffers.Clear();
             _unfocusedCount = 0;
             _framesCutAtStart = world.Scheduler.Budget.FramesCut;
             _gcAtStart = GC.CollectionCount(0);
@@ -269,6 +292,8 @@ namespace Engine.Scripts.Diagnostics{
             foreach (float speed in GoalRunRig.GoalFlightSpeeds) yield return FlyAndStop(run, world, stages, focus, draw, speed);
 
             foreach (Phase phase in run.Phases) Summarize(phase);
+            AppendTrace(run);
+            if (renderer) run.StorePeak = renderer.IntervalStorePeakPages;
         }
 
         /// <summary>One flight along +x at <paramref name="speed" />, and the stop until the world is built again.</summary>
@@ -332,6 +357,15 @@ namespace Engine.Scripts.Diagnostics{
             _gcCount.Add(GC.CollectionCount(0));
             if (!Application.isFocused) _unfocusedCount++;
             _unfocused.Add(_unfocusedCount);
+            _sampleSeconds.Add(Seconds);
+            _focusX.Add(world.FocusTransform ? world.FocusTransform.position.x : 0f);
+            VoxelWorldRenderer renderer = VoxelWorldRenderer.Instance;
+            _storeGrows.Add(renderer ? renderer.IntervalStoreGrowCount : 0);
+            _storePages.Add(renderer ? renderer.IntervalStorePages : 0);
+            _storeUsed.Add(renderer ? renderer.IntervalStoreUsedPages : 0);
+            _buffers.Add(renderer
+                ? renderer.RenderBufferCount(0) | renderer.RenderBufferCount(1) << 10 | renderer.RenderBufferCount(2) << 20
+                : 0);
             stages.SampleCompletion(Seconds, Frames);
         }
 
@@ -340,6 +374,60 @@ namespace Engine.Scripts.Diagnostics{
             phase.FramesCut = Delta(_framesCut, _framesCutAtStart, phase.From, phase.To);
             phase.GcCollections = Delta(_gcCount, _gcAtStart, phase.From, phase.To);
             phase.Unfocused = Delta(_unfocused, 0, phase.From, phase.To);
+            phase.StoreGrows = Delta(_storeGrows, 0, phase.From, phase.To);
+            int from = math.clamp(phase.From, 0, _storeUsed.Count), to = math.clamp(phase.To, from, _storeUsed.Count);
+            phase.StorePagesEnd = to > 0 ? _storePages[to - 1] : 0;
+            for (int i = from; i < to; i++) phase.StoreUsedMax = math.max(phase.StoreUsedMax, _storeUsed[i]);
+        }
+
+        /// <summary>Most rows the trace of one draw distance writes; the rest are counted.</summary>
+        private const int MaxTraceRows = 300;
+
+        /// <summary>
+        ///     The per-frame trace of a draw distance: one row per sample whose frame time is over
+        ///     <see cref="FrameTimeStats.GoalFrameMs" />, or in which the interval store grew, a render buffer was added
+        ///     or a gen-0 GC happened. A sample is taken after Update; work done in that frame's Update shows in the
+        ///     frame time of the next sample, so each row shows both ("ms" and "next ms").
+        /// </summary>
+        private void AppendTrace(DrawRun run){
+            StringBuilder text = run.Trace;
+            int rows = 0, skipped = 0;
+            for (int i = 0; i < Frames; i++){
+                int grows = _storeGrows[i] - (i > 0 ? _storeGrows[i - 1] : 0);
+                int gc = _gcCount[i] - (i > 0 ? _gcCount[i - 1] : _gcAtStart);
+                int cut = _framesCut[i] - (i > 0 ? _framesCut[i - 1] : _framesCutAtStart);
+                int b = _buffers[i], bPrev = i > 0 ? _buffers[i - 1] : 0;
+                int addSolid = (b & 1023) - (bPrev & 1023);
+                int addTransparent = (b >> 10 & 1023) - (bPrev >> 10 & 1023);
+                int addFoliage = (b >> 20 & 1023) - (bPrev >> 20 & 1023);
+                bool slow = _frameMs[i] > FrameTimeStats.GoalFrameMs;
+                if (!slow && grows == 0 && gc == 0 && addSolid == 0 && addTransparent == 0 && addFoliage == 0) continue;
+                if (rows >= MaxTraceRows){
+                    skipped++;
+                    continue;
+                }
+
+                Phase phase = PhaseOf(run, i);
+                int from = phase?.From ?? 0;
+                float next = i + 1 < Frames ? _frameMs[i + 1] : -1f;
+                string mark = !slow ? "" : _frameMs[i] > FrameTimeStats.StutterFrameMs ? "  STUTTER" : "  slow";
+                text.AppendLine(string.Format(Inv,
+                    "  {0,-20} {1,6} {2,7:0.000} {3,9:0.0} | {4,7:0.00} {5,7:0.00} | {6,3} {7,5} {8,7} {9,7} | " +
+                    "{10,3} {11,3} {12,3} | {13,3}{14}",
+                    phase != null ? phase.Name : "?", i - from, _sampleSeconds[i] - _sampleSeconds[from], _focusX[i],
+                    _frameMs[i], next, gc, grows, _storePages[i], _storeUsed[i], addSolid, addTransparent, addFoliage,
+                    cut, mark));
+                rows++;
+            }
+
+            if (skipped > 0) text.AppendLine(string.Format(Inv, "  ... {0} more row(s) not written", skipped));
+        }
+
+        private static Phase PhaseOf(DrawRun run, int sample){
+            foreach (Phase p in run.Phases)
+                if (sample >= p.From && sample < p.To)
+                    return p;
+            return null;
         }
 
         /// <summary>
@@ -486,6 +574,18 @@ namespace Engine.Scripts.Diagnostics{
             }
 
             text.AppendLine("* not judged (the first world build)");
+            text.AppendLine("interval store per phase (grows, pages at the end, most pages in use):");
+            foreach (Phase p in run.Phases)
+                text.AppendLine(string.Format(Inv, "  {0,-22} grows {1}, pages {2}, used max {3}", p.Name, p.StoreGrows,
+                    p.StorePagesEnd, p.StoreUsedMax));
+            text.AppendLine(string.Format(Inv, "  peak pages in use over the world: {0}", run.StorePeak));
+            text.AppendLine("trace: frames over 8.33 ms, and frames with a store grow, a render buffer added or a gen-0 GC");
+            text.AppendLine("  (frame = index in the phase, s = seconds into the phase, x = focus x; the work of a frame's " +
+                            "Update shows in the next frame's time, 'next ms'; +s/+t/+f = render buffers added to solid/" +
+                            "transparent/foliage; cut = the budget stopped a stage's turn)");
+            text.AppendLine("  phase                 frame       s         x |      ms next ms |  GC grows   pages    used |" +
+                            "  +s  +t  +f | cut");
+            text.Append(run.Trace);
             foreach (Phase p in run.Phases){
                 if (!p.Judged || p.Times.Count == 0) continue;
                 float margin = p.Times.P95 - FrameTimeStats.GoalFrameMs;

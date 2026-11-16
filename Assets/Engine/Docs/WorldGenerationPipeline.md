@@ -593,7 +593,8 @@ in-chunk voxels only]
     collision) < solid. Ids not in the table (terrain, water) count as solid. Logs therefore beat leaves, and leaves
     beat grass tufts. Because the order is the world order, every voxel ends up as in a whole-world stamp, whichever
     chunk holds it.
-- **Renderer**: flora adds voxel runs per column (measured in flight: median 4.6, maximum 6 intervals per column).
+- **Renderer**: flora adds voxel runs per column. With caves the goal-run flight averages about 15 intervals per
+  column over the whole interval store.
   All chunk lists share one paged interval store, so a longer list just takes more pages
   (`MeshAndRenderPipeline.md`, Version 1.5).
 - **Burst**: `WorldSampler.SampleCore` is a Burst direct-call entry like `SampleColumn`. Run managed (Mono), the
