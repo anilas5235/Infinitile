@@ -69,8 +69,8 @@ is the behaviour before 2026-11-15; read once when the world is built), plus the
 
 - **A turn is made of items of work.** An item is: adding a data batch to the chunk store, the upload of one
   chunk to the renderer, the pool claim of one meshed partition, handing the meshes of a batch to Unity, one
-  partition without a voxel, one row of a queue scan, the apply of a light batch or of a bake batch, the start
-  of a batch.
+  partition without a voxel, one row of a queue scan, 32 entries the mesh dispatch takes from its queue, the
+  apply of a light batch or of a bake batch, the start of a batch.
 - **`FrameBudget` is asked before every item.** The scheduler starts it once per frame. The first item of a
   frame always runs, so every frame makes progress; a later item runs only while time is left. It reads
   `Stopwatch.GetTimestamp` and allocates nothing.
@@ -84,7 +84,9 @@ is the behaviour before 2026-11-15; read once when the world is built), plus the
 - **The world can change between the frames of a cut turn** (focus update, an edit, an unload). A cut mesh
   dispatch checks the draw window again for its partitions without a voxel and drops the partitions that lost a
   chunk of their neighbourhood; a cut data collect skips a chunk that was unloaded again; a cut mesh collect
-  claims no partition whose chunk is gone. A partition without a voxel that a cut mesh dispatch still holds and
+  claims no partition whose chunk is gone. A mesh dispatch cut while it takes its partitions from the queue goes
+  on filling the same batch in the next frame, with that frame's focus. A partition without a voxel that a cut
+  mesh dispatch still holds and
   that got a block in the meantime is not made active empty: it is left to the next scan and meshed like any
   other flagged partition. A wake-up or a queue prune that arrives while a scan is cut makes the stage scan again
   instead of going to sleep after it. `CompleteRunning` (shutdown, tests) finishes a cut turn's batch without

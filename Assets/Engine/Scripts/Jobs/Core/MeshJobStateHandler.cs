@@ -24,10 +24,83 @@ namespace Engine.Scripts.Jobs.Core{
         private readonly Predicate<int3> _lostItsChunks; // created once: JobUpdateStep must not allocate
         private readonly List<int3> _emptyPartitions; // the partitions without a voxel of the current turn
 
-        // A dispatch the budget cut: its partitions are taken from the queue, the rest continues in the next frame
+        /// <summary>
+        ///     Entries the dequeue loop takes from the queue per item of the frame's budget. Measured on 2026-11-15
+        ///     in the Editor in a capped flight at draw distance 12: 5.2 to 5.4 us per entry (an upper bound, the
+        ///     Editor was not focused), so a slice of 32 stays below 0.2 ms; a loop takes 79 entries at most. (With
+        ///     the priority queue's heap check in every Dequeue, which ran under DEBUG until then and now needs the
+        ///     define PRIORITY_QUEUE_VALIDATE, an entry cost 37 to 57 us and the slice was 4.)
+        /// </summary>
+        internal const int DefaultDequeueSlice = 32;
+
+        // A dispatch the budget cut: the rest continues in the next frame, first the rest of the dequeue loop
         private bool _dispatching;
+        private bool _dequeuing; // the dispatch is still taking its partitions from the queue
         private bool _dispatchCut;
         private int _nextEmpty;
+        private int _sliceLeft; // entries the current item of the budget may still take from the queue
+
+        /// <summary>
+        ///     What the dequeue loop of the dispatch did since the world was built, for the measurement rig. Plain
+        ///     counters: a few additions per entry and nothing else.
+        /// </summary>
+        internal struct DequeueCounts{
+            /// <summary>
+            ///     Runs of the dequeue loop (a loop the budget cut runs again in the next frame, and counts again),
+            ///     and the entries the queue held at their start.
+            /// </summary>
+            internal long Calls, QueueAtStart;
+
+            /// <summary>Runs of the dequeue loop the budget cut before the batch was complete.</summary>
+            internal long Cuts;
+
+            /// <summary>Entries taken from the queue.</summary>
+            internal long Taken;
+
+            /// <summary>Entries kept for the batch: with a voxel (mesh job), and without one (empty partition).</summary>
+            internal long KeptWithVoxels, KeptEmpty;
+
+            /// <summary>
+            ///     Entries dropped: outside the draw window or under the pool's threshold (IsPartitionStillRelevant),
+            ///     3x3 neighbourhood not loaded and lit (CanGenerateMeshForChunk), no mesh needed
+            ///     (ShouldScheduleForMeshing).
+            /// </summary>
+            internal long DroppedNotRelevant, DroppedNotLit, DroppedNotNeeded;
+
+            /// <summary>Loops that ended because the queue was empty.</summary>
+            internal long QueueEmptied;
+
+            /// <summary>
+            ///     Dropped entries a later scan queued again, by the check that dropped them; only counted while
+            ///     <see cref="TrackRequeues" /> is on.
+            /// </summary>
+            internal long RequeuedNotRelevant, RequeuedNotLit, RequeuedNotNeeded;
+        }
+
+        private const byte DropNotRelevant = 0;
+        private const byte DropNotLit = 1;
+        private const byte DropNotNeeded = 2;
+
+        /// <summary>The counters of the dequeue loop (see <see cref="DequeueCounts" />).</summary>
+        internal DequeueCounts Dequeued;
+
+        /// <summary>
+        ///     Entries the dequeue loop takes per item of the frame's budget (<see cref="DefaultDequeueSlice" />);
+        ///     0 takes the whole batch as one item, as before 2026-11-15. Not a setting: tests and the measurement
+        ///     rig change it.
+        /// </summary>
+        internal int DequeueSlice{ get; set; } = DefaultDequeueSlice;
+
+        private Dictionary<int3, byte> _droppedEntries; // null unless the measurement rig tracks requeues
+
+        /// <summary>
+        ///     Remembers every dropped entry, so that <see cref="DequeueCounts" /> also counts the ones a scan queues
+        ///     again. For the measurement rig only: it allocates.
+        /// </summary>
+        internal bool TrackRequeues{
+            get => _droppedEntries != null;
+            set => _droppedEntries = value ? _droppedEntries ?? new Dictionary<int3, byte>(4096) : null;
+        }
 
         /// <summary>
         ///     Initializes a new instance of the MeshJobStateHandler class.
@@ -99,6 +172,7 @@ namespace Engine.Scripts.Jobs.Core{
                     // The threshold is the pool's eviction priority, compare in the same measure
                     if (PriorityUtil.EvictionPriority(ref pos, ref focus) <= prioThreshold) continue;
 
+                    if (_droppedEntries != null && _droppedEntries.Remove(pos, out byte dropped)) CountRequeue(dropped);
                     Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
                 }
             }
@@ -109,10 +183,12 @@ namespace Engine.Scripts.Jobs.Core{
         ///     as a batch. The ones that hold only air need no mesh job, no GPU build and no collider bake: they
         ///     become active at once, with an empty mesh (see <see cref="CMeshBuildScheduler.ApplyEmpty" />). They
         ///     do not count against the batch, but a turn takes a limited number of them.
-        ///     Items of work for the frame's budget: taking the partitions from the queue, every partition without
-        ///     a voxel (its claim in the pool) and the start of the mesh job. A dispatch the budget cut keeps its
-        ///     partitions and continues where it stopped; a partition without a voxel that left the draw window or
-        ///     got a voxel in the meantime is skipped.
+        ///     Items of work for the frame's budget: every <see cref="DequeueSlice" /> entries taken from the queue,
+        ///     every partition without a voxel (its claim in the pool) and the start of the mesh job. A dispatch the
+        ///     budget cut keeps its partitions and continues where it stopped: a cut dequeue loop goes on filling
+        ///     the same batch in the next frame, with that frame's focus. After a cut a partition without a voxel
+        ///     that left the draw window or got a voxel in the meantime is skipped, and a partition with voxels
+        ///     whose neighbourhood lost a chunk is left to the next scan.
         /// </summary>
         /// <param name="focus">The current focus position.</param>
         /// <param name="budget">The frame's budget.</param>
@@ -122,24 +198,17 @@ namespace Engine.Scripts.Jobs.Core{
                 if (!_cMeshBuildScheduler.IsReady) return StageTurn.None;
                 if (!budget.Next()) return StageTurn.Cut;
 
-                float prioThreshold = ChunkPool.GetPartitionPrioThreshold();
-                int emptyLimit = EmptyPartitionsPerBatch * BatchSize;
-
-                using (VoxelProfilerMarkers.MeshBuildDequeue.Auto()){
-                    while (Set.Count < BatchSize && _emptyPartitions.Count < emptyLimit && Queue.Count > 0){
-                        int3 partition = Queue.Dequeue();
-                        if (!IsPartitionStillRelevant(partition, focus, prioThreshold)) continue;
-                        if (!CanGenerateMeshForChunk(partition.xz)) continue;
-                        if (!ShouldScheduleForMeshing(partition)) continue;
-
-                        if (ChunkManager.PartitionHasVoxels(partition)) Set.Add(partition);
-                        else _emptyPartitions.Add(partition);
-                    }
-                }
-
                 _dispatching = true;
+                _dequeuing = true;
                 _dispatchCut = false;
                 _nextEmpty = 0;
+                _sliceLeft = DequeueSlice; // the item just granted is the first slice
+            }
+
+            if (_dequeuing){
+                if (!TakeFromQueue(focus, budget)) return CutDispatch();
+
+                _dequeuing = false;
             }
 
             for (; _nextEmpty < _emptyPartitions.Count; _nextEmpty++){
@@ -169,6 +238,79 @@ namespace Engine.Scripts.Jobs.Core{
             _emptyPartitions.Clear();
             _dispatching = false;
             return StageTurn.Done;
+        }
+
+        /// <summary>
+        ///     The dequeue loop: takes entries from the queue until the batch or the partitions without a voxel are
+        ///     complete or the queue is empty, and asks the budget for every <see cref="DequeueSlice" /> entries.
+        ///     The first slice of a dispatch is the item <see cref="JobUpdateStep" /> was granted; a loop the budget
+        ///     cut starts its next frame with a new slice, the frame's first item, so it takes an entry in every
+        ///     frame.
+        /// </summary>
+        /// <returns>False when the budget ran out before the loop was done.</returns>
+        private bool TakeFromQueue(PriorityUtil.Focus focus, FrameBudget budget){
+            float prioThreshold = ChunkPool.GetPartitionPrioThreshold();
+            int emptyLimit = EmptyPartitionsPerBatch * BatchSize;
+
+            using (VoxelProfilerMarkers.MeshBuildDequeue.Auto()){
+                Dequeued.Calls++;
+                Dequeued.QueueAtStart += Queue.Count;
+                while (Set.Count < BatchSize && _emptyPartitions.Count < emptyLimit && Queue.Count > 0){
+                    if (DequeueSlice > 0){
+                        if (_sliceLeft <= 0){
+                            if (!budget.Next()){
+                                Dequeued.Cuts++;
+                                return false;
+                            }
+
+                            _sliceLeft = DequeueSlice;
+                        }
+
+                        _sliceLeft--;
+                    }
+
+                    int3 partition = Queue.Dequeue();
+                    Dequeued.Taken++;
+                    if (!IsPartitionStillRelevant(partition, focus, prioThreshold)){
+                        Dequeued.DroppedNotRelevant++;
+                        _droppedEntries?.TryAdd(partition, DropNotRelevant);
+                        continue;
+                    }
+
+                    if (!CanGenerateMeshForChunk(partition.xz)){
+                        Dequeued.DroppedNotLit++;
+                        _droppedEntries?.TryAdd(partition, DropNotLit);
+                        continue;
+                    }
+
+                    if (!ShouldScheduleForMeshing(partition)){
+                        Dequeued.DroppedNotNeeded++;
+                        _droppedEntries?.TryAdd(partition, DropNotNeeded);
+                        continue;
+                    }
+
+                    if (ChunkManager.PartitionHasVoxels(partition)){
+                        Set.Add(partition);
+                        Dequeued.KeptWithVoxels++;
+                    }
+                    else{
+                        _emptyPartitions.Add(partition);
+                        Dequeued.KeptEmpty++;
+                    }
+                }
+
+                if (Queue.Count == 0) Dequeued.QueueEmptied++;
+            }
+
+            return true;
+        }
+
+        private void CountRequeue(byte dropped){
+            switch (dropped){
+                case DropNotRelevant: Dequeued.RequeuedNotRelevant++; break;
+                case DropNotLit: Dequeued.RequeuedNotLit++; break;
+                default: Dequeued.RequeuedNotNeeded++; break;
+            }
         }
 
         private StageTurn CutDispatch(){

@@ -7,6 +7,7 @@ using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
+using Engine.Scripts.ThirdParty.Priority_Queue;
 using Engine.Scripts.Utils;
 using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.World;
@@ -60,6 +61,9 @@ namespace Engine.Tests.PlayMode{
             /// <summary>Every partition a GPU build was requested for.</summary>
             public readonly HashSet<int3> Requested = new();
 
+            /// <summary>The size of every batch the mesh stage started, in order (one GPU build request each).</summary>
+            public readonly List<int> Batches = new();
+
             private readonly ColliderBakeScheduler _bakeJobs;
             private readonly GameObject _root;
             private readonly GameObject _worldObject;
@@ -98,6 +102,7 @@ namespace Engine.Tests.PlayMode{
 
             private void OnBuildRequested(HashSet<int3> partitions){
                 Requested.UnionWith(partitions);
+                Batches.Add(partitions.Count);
             }
 
             /// <summary>A focus in the centre column at partition <paramref name="y" />.</summary>
@@ -217,8 +222,8 @@ namespace Engine.Tests.PlayMode{
         [UnityTest]
         [Timeout(120000)]
         public IEnumerator PartitionsOfACutDispatch_ThatLeftTheDrawWindow_AreNotMadeActive(){
-            // One item of work per frame: the dispatch takes its partitions from the queue in one frame and makes
-            // one partition without a voxel active in each of the next. When the focus moves on in between, the
+            // One item of work per frame: the dispatch takes its partitions from the queue (up to
+            // MeshJobStateHandler.DefaultDequeueSlice entries per frame) and makes one partition without a voxel active in each of the next. When the focus moves on in between, the
             // ones that are waiting are outside the draw window and must not claim a place in the pool.
             using MeshRig rig = new(PartitionHeight);
             PriorityUtil.Focus focus = rig.FocusAt(1); // the vertical draw window holds the partitions 0 to 3
@@ -246,8 +251,8 @@ namespace Engine.Tests.PlayMode{
         [UnityTest]
         [Timeout(120000)]
         public IEnumerator SetVoxel_IntoAPartitionThatACutDispatchHolds_MeshesIt(){
-            // One item of work per frame: the dispatch takes its partitions from the queue in one frame and makes
-            // one partition without a voxel active in each of the next. A block placed in one that is still waiting
+            // One item of work per frame: the dispatch takes its partitions from the queue (up to
+            // MeshJobStateHandler.DefaultDequeueSlice entries per frame) and makes one partition without a voxel active in each of the next. A block placed in one that is still waiting
             // gives it something to show: it must not be made active with an empty mesh, but meshed like any
             // partition the edit flagged, with its collider.
             using MeshRig rig = new(PartitionHeight);
@@ -261,6 +266,129 @@ namespace Engine.Tests.PlayMode{
 
             List<int3> waiting = PlayModeFixtures.GetPrivateField<List<int3>>(rig.MeshHandler, "_emptyPartitions");
             Assert.Greater(waiting.Count, 1, "the cut dispatch holds more partitions without a voxel");
+            int3 partition = waiting[waiting.Count - 1];
+            Assert.IsFalse(rig.Pool.IsPartitionActive(partition), "the partition still waits");
+            // Inside the partition, at none of its borders
+            int3 block = new(partition.x * ChunkWidth + 5, partition.y * PartitionHeight + 6, partition.z * ChunkDepth + 5);
+            Assert.IsTrue(rig.Manager.SetVoxel(PlayModeFixtures.Grass, block));
+
+            yield return rig.MeshUntilAsleep(focus, budget);
+            Assert.IsTrue(rig.Requested.Contains(partition), "GPU build of the partition that holds a block now");
+            Assert.Greater(rig.Pool.GetPartition(partition).ColliderMesh.vertexCount, 0, "collider mesh of the block");
+
+            yield return rig.BakeUntilAsleep(focus);
+            Assert.IsTrue(rig.Pool.IsCollidable(partition));
+            Assert.IsNotNull(rig.Pool.GetPartition(partition).Collider.sharedMesh, "collider of the block");
+        }
+
+        [UnityTest]
+        [Timeout(120000)]
+        public IEnumerator ADequeueLoopTheBudgetCuts_LosesNoPartition_AndMeshesNoneTwice(){
+            // The loop asks the budget for every entry and gets one item per frame: every batch is taken from the
+            // queue over many frames. A cut batch is continued, not dispatched with what it has: the first batch
+            // has the size it has without a limit, and every partition is meshed exactly once.
+            List<int> unlimitedBatches;
+            MeshJobStateHandler.DequeueCounts unlimited;
+            using (MeshRig reference = new(PartitionHeight)){
+                reference.MeshHandler.DequeueSlice = 0;
+                yield return reference.MeshUntilAsleep(reference.FocusAt(1));
+                unlimitedBatches = new List<int>(reference.Batches);
+                unlimited = reference.MeshHandler.Dequeued;
+            }
+
+            using MeshRig rig = new(PartitionHeight);
+            PriorityUtil.Focus focus = rig.FocusAt(1);
+            rig.MeshHandler.DequeueSlice = 1;
+            yield return rig.MeshUntilAsleep(focus, ItemsPerFrame(1));
+            MeshJobStateHandler.DequeueCounts cut = rig.MeshHandler.Dequeued;
+            Assert.Greater(cut.Cuts, 0, "dequeue loops the budget cut");
+            Assert.AreEqual(0, unlimited.Cuts, "no cut without a slice");
+
+            int columns = (2 * Draw + 1) * (2 * Draw + 1);
+            for (int x = -Draw; x <= Draw; x++)
+            for (int z = -Draw; z <= Draw; z++)
+            for (int y = 0; y <= 3; y++){
+                int3 pos = new(x, y, z);
+                Assert.IsTrue(rig.Pool.IsPartitionActive(pos), $"{pos} is active");
+                Assert.AreEqual(y == 0, rig.Requested.Contains(pos), $"{pos}: GPU build requested");
+            }
+
+            Assert.AreEqual(columns, rig.MeshJobs.MeshedPartitions, "partitions that went through the mesh job");
+            Assert.AreEqual(3 * columns, rig.MeshJobs.PartitionsWithoutMesh, "partitions that became active without one");
+            int requested = 0;
+            foreach (int batch in rig.Batches) requested += batch;
+            Assert.AreEqual(columns, requested, "GPU build requests: none lost, none twice");
+            Assert.AreEqual(4 * columns, cut.KeptWithVoxels + cut.KeptEmpty, "partitions the loop kept");
+            Assert.AreEqual(unlimited.KeptWithVoxels, cut.KeptWithVoxels);
+            Assert.AreEqual(unlimited.KeptEmpty, cut.KeptEmpty);
+            Assert.AreEqual(unlimitedBatches[0], rig.Batches[0], "the first batch, cut in the loop, is completed");
+
+            yield return rig.BakeUntilAsleep(focus);
+            Assert.IsTrue(rig.Pool.IsCollidable(int3.zero));
+        }
+
+        [UnityTest]
+        [Timeout(120000)]
+        public IEnumerator ADequeueLoopThatKeepsNothing_TakesAnEntryInEveryFrame(){
+            // Entries the loop drops: partitions that are active and need no mesh. With one item per frame and one
+            // entry per item the loop keeps nothing, is cut in every frame, and must still take one entry in each
+            // of them until the queue is empty; then the stage sleeps.
+            using MeshRig rig = new(PartitionHeight);
+            PriorityUtil.Focus focus = rig.FocusAt(1);
+            yield return rig.MeshUntilAsleep(focus);
+
+            var queue = PlayModeFixtures.GetPrivateField<SimpleFastPriorityQueue<int3, float>>(rig.MeshHandler, "Queue");
+            Assert.AreEqual(0, queue.Count);
+            int entries = 0;
+            for (int x = -Draw; x <= Draw; x++)
+            for (int z = -Draw; z <= Draw; z++){
+                queue.Enqueue(new int3(x, 0, z), entries);
+                entries++;
+            }
+
+            rig.MeshHandler.DequeueSlice = 1;
+            rig.MeshHandler.WakeUp();
+            FrameBudget budget = ItemsPerFrame(1);
+            MeshJobStateHandler.DequeueCounts before = rig.MeshHandler.Dequeued;
+            List<long> takenPerFrame = new();
+            for (int i = 0; i < MaxUpdates && !rig.MeshHandler.Sleeping; i++){
+                long calls = rig.MeshHandler.Dequeued.Calls;
+                long taken = rig.MeshHandler.Dequeued.Taken;
+                budget.BeginFrame();
+                rig.MeshHandler.Update(focus, budget);
+                if (rig.MeshHandler.Dequeued.Calls > calls) takenPerFrame.Add(rig.MeshHandler.Dequeued.Taken - taken);
+                yield return null;
+            }
+
+            Assert.IsTrue(rig.MeshHandler.Sleeping, "the stage sleeps once the queue is empty");
+            MeshJobStateHandler.DequeueCounts after = rig.MeshHandler.Dequeued;
+            Assert.AreEqual(entries, after.Taken - before.Taken, "every entry was taken");
+            Assert.AreEqual(0, after.KeptWithVoxels + after.KeptEmpty - before.KeptWithVoxels - before.KeptEmpty,
+                "nothing kept");
+            Assert.AreEqual(entries - 1, after.Cuts - before.Cuts, "a cut after every entry but the last");
+            Assert.AreEqual(entries, takenPerFrame.Count, "frames that ran the loop");
+            foreach (long taken in takenPerFrame) Assert.AreEqual(1, taken, "entries taken in a frame of the loop");
+        }
+
+        [UnityTest]
+        [Timeout(120000)]
+        public IEnumerator SetVoxel_IntoAPartitionACutDequeueLoopHolds_MeshesIt(){
+            // The loop asks the budget for every entry and gets one item per frame. A block placed in a partition
+            // without a voxel that the loop has already kept, while the loop still fills the batch, gives it
+            // something to show: it must be meshed like any partition the edit flagged, with its collider.
+            using MeshRig rig = new(PartitionHeight);
+            PriorityUtil.Focus focus = rig.FocusAt(1);
+            rig.MeshHandler.DequeueSlice = 1;
+            FrameBudget budget = ItemsPerFrame(1);
+            List<int3> waiting = PlayModeFixtures.GetPrivateField<List<int3>>(rig.MeshHandler, "_emptyPartitions");
+            for (int i = 0; i < MaxUpdates && (waiting.Count == 0 || rig.MeshHandler.Dequeued.Cuts == 0); i++){
+                budget.BeginFrame();
+                rig.MeshHandler.Update(focus, budget);
+                yield return null;
+            }
+
+            Assert.IsTrue(PlayModeFixtures.GetPrivateField<bool>(rig.MeshHandler, "_dequeuing"), "the loop still runs");
+            Assert.Greater(waiting.Count, 0, "the loop holds a partition without a voxel");
             int3 partition = waiting[waiting.Count - 1];
             Assert.IsFalse(rig.Pool.IsPartitionActive(partition), "the partition still waits");
             // Inside the partition, at none of its borders

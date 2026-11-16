@@ -73,6 +73,23 @@ namespace Engine.Tests.PlayMode{
         private float _startTime;
         private readonly FrameAttribution _attribution;
 
+        // The dequeue loop of the mesh dispatch: the handler's counters after every sample, and one entry per call
+        private readonly MeshJobStateHandler _meshHandler;
+        private readonly ProfilerRecorder _dequeueRecorder;
+        private readonly MeshJobStateHandler.DequeueCounts _dequeueAtStart;
+        private readonly List<MeshJobStateHandler.DequeueCounts> _dequeueTotals = new(1 << 16);
+        private readonly List<DequeueCall> _dequeueCalls = new(1 << 14);
+        private DequeueCall _pendingCall; // counted in the sample before; its marker time is read in this one
+        private bool _hasPendingCall;
+        private int _markerWithoutCall; // samples whose marker read time while no call was counted for that frame
+
+        /// <summary>One run of the dequeue loop: what it took and dropped, and the marker's time for it.</summary>
+        private struct DequeueCall{
+            internal int Sample;
+            internal MeshJobStateHandler.DequeueCounts Counts;
+            internal float Ms;
+        }
+
         /// <param name="world">The world to sample.</param>
         /// <param name="attribute">
         ///     Also records where the main thread spends every frame, for <see cref="Attribution" />.
@@ -110,6 +127,11 @@ namespace Engine.Tests.PlayMode{
             _rendererBehind = () => meshJobs.RendererBehind;
             _meshJobs = meshJobs;
             _meshBatchSize = mesh.MeshBatchSize;
+            _meshHandler = mesh;
+            _dequeueAtStart = mesh.Dequeued;
+            // Requeues are only counted for an attributed run: the tracking allocates
+            if (attribute) mesh.TrackRequeues = true;
+            _dequeueRecorder = ProfilerRecorder.StartNew(VoxelProfilerMarkers.MeshBuildDequeue);
 
             ChunkPool pool = PlayModeFixtures.GetPrivateField<ChunkPool>(world, "_chunkPool");
             _meshMap = PlayModeFixtures.GetPrivateField<Dictionary<int3, ChunkPartition>>(pool, "_meshMap");
@@ -196,6 +218,8 @@ namespace Engine.Tests.PlayMode{
             if (_world != null) _world.PartitionBuildRequested -= OnMeshBatch;
             for (int i = 0; i < StageCount; i++) _recorders[i].Dispose();
             for (int i = 0; i < _costRecorders.Length; i++) _costRecorders[i].Dispose();
+            _dequeueRecorder.Dispose();
+            if (_meshHandler != null) _meshHandler.TrackRequeues = false;
             _attribution?.Dispose();
         }
 
@@ -367,7 +391,129 @@ namespace Engine.Tests.PlayMode{
             _schedulerMs.Add(schedulerNs * 1e-6f);
             _framesCut.Add(_scheduler.Budget.FramesCut);
             _effectiveBudgetMs.Add(_scheduler.Budget.EffectiveMilliseconds);
+            SampleDequeue();
             _attribution?.Sample();
+        }
+
+        /// <summary>
+        ///     The counters of the dequeue loop. The scheduler runs in Update, before this sample, so the counters
+        ///     already hold this frame's loop; a recorder's last value is the frame before this one. The loop counted
+        ///     in the sample before is therefore paired with the marker time read now.
+        /// </summary>
+        private void SampleDequeue(){
+            float markerMs = _dequeueRecorder.LastValue * 1e-6f;
+            if (_hasPendingCall){
+                _pendingCall.Ms = markerMs;
+                _dequeueCalls.Add(_pendingCall);
+            }
+            else if (markerMs > 0f){
+                _markerWithoutCall++;
+            }
+
+            MeshJobStateHandler.DequeueCounts now = _meshHandler.Dequeued;
+            MeshJobStateHandler.DequeueCounts before = _dequeueTotals.Count > 0 ? _dequeueTotals[^1] : _dequeueAtStart;
+            _hasPendingCall = now.Calls > before.Calls;
+            if (_hasPendingCall) _pendingCall = new DequeueCall{ Sample = _dequeueTotals.Count, Counts = Minus(now, before) };
+            _dequeueTotals.Add(now);
+        }
+
+        private static MeshJobStateHandler.DequeueCounts Minus(MeshJobStateHandler.DequeueCounts a,
+            MeshJobStateHandler.DequeueCounts b){
+            return new MeshJobStateHandler.DequeueCounts{
+                Calls = a.Calls - b.Calls, Cuts = a.Cuts - b.Cuts, QueueAtStart = a.QueueAtStart - b.QueueAtStart, Taken = a.Taken - b.Taken,
+                KeptWithVoxels = a.KeptWithVoxels - b.KeptWithVoxels, KeptEmpty = a.KeptEmpty - b.KeptEmpty,
+                DroppedNotRelevant = a.DroppedNotRelevant - b.DroppedNotRelevant,
+                DroppedNotLit = a.DroppedNotLit - b.DroppedNotLit,
+                DroppedNotNeeded = a.DroppedNotNeeded - b.DroppedNotNeeded,
+                QueueEmptied = a.QueueEmptied - b.QueueEmptied,
+                RequeuedNotRelevant = a.RequeuedNotRelevant - b.RequeuedNotRelevant,
+                RequeuedNotLit = a.RequeuedNotLit - b.RequeuedNotLit,
+                RequeuedNotNeeded = a.RequeuedNotNeeded - b.RequeuedNotNeeded
+            };
+        }
+
+        /// <summary>
+        ///     What the dequeue loop of the mesh dispatch did in the samples <paramref name="from" /> (included) to
+        ///     <paramref name="to" /> (excluded): the entries it took, kept and dropped (by check), the dropped ones
+        ///     a scan queued again (attributed runs only), the entries and the marker time per call and the time per
+        ///     entry, and the slowest calls.
+        /// </summary>
+        internal string DequeueReport(string label, int from, int to){
+            CultureInfo inv = CultureInfo.InvariantCulture;
+            from = math.clamp(from, 0, _dequeueTotals.Count);
+            to = math.clamp(to, from, _dequeueTotals.Count);
+            MeshJobStateHandler.DequeueCounts start = from == 0 ? _dequeueAtStart : _dequeueTotals[from - 1];
+            MeshJobStateHandler.DequeueCounts end = to == 0 ? _dequeueAtStart : _dequeueTotals[to - 1];
+            MeshJobStateHandler.DequeueCounts t = Minus(end, start);
+            string head = $"[PipelineProbe] {label}";
+            StringBuilder text = new();
+            long dropped = t.DroppedNotRelevant + t.DroppedNotLit + t.DroppedNotNeeded;
+            long kept = t.KeptWithVoxels + t.KeptEmpty;
+            double taken = math.max(t.Taken, 1);
+            text.AppendLine(string.Format(inv,
+                "{0}: dequeue loop: {1} calls ({19} cut by the budget), queue {2:0} entries at the start on average, " +
+                "emptied it in {3}; took " +
+                "{4} entries ({5:0.0} per call), kept {6} ({7:0.0} %: {8} with voxels, {9} empty), dropped {10} " +
+                "({11:0.0} %): not relevant {12} ({13:0.0} %), neighbourhood not lit {14} ({15:0.0} %), no mesh " +
+                "needed {16} ({17:0.0} %); {18:0.00} entries taken per kept one",
+                head, t.Calls, t.QueueAtStart / (double)math.max(t.Calls, 1), t.QueueEmptied, t.Taken,
+                t.Taken / (double)math.max(t.Calls, 1), kept, 100 * kept / taken, t.KeptWithVoxels, t.KeptEmpty,
+                dropped, 100 * dropped / taken, t.DroppedNotRelevant, 100 * t.DroppedNotRelevant / taken,
+                t.DroppedNotLit, 100 * t.DroppedNotLit / taken, t.DroppedNotNeeded, 100 * t.DroppedNotNeeded / taken,
+                t.Taken / (double)math.max(kept, 1), t.Cuts));
+            text.AppendLine(string.Format(inv,
+                "{0}: dropped entries a scan queued again{1}: not relevant {2}, neighbourhood not lit {3}, no mesh " +
+                "needed {4} ({5} of {6} dropped)",
+                head, _meshHandler.TrackRequeues ? "" : " (not tracked in this run)", t.RequeuedNotRelevant,
+                t.RequeuedNotLit, t.RequeuedNotNeeded, t.RequeuedNotRelevant + t.RequeuedNotLit + t.RequeuedNotNeeded,
+                dropped));
+
+            List<DequeueCall> calls = new();
+            foreach (DequeueCall call in _dequeueCalls)
+                if (call.Sample >= from && call.Sample < to) calls.Add(call);
+            if (calls.Count == 0) return text.ToString();
+
+            List<float> takenPerCall = new(calls.Count), keptPerCall = new(calls.Count), ms = new(calls.Count);
+            double sumMs = 0, sumTaken = 0, slowMs = 0, slowTaken = 0, slowKept = 0, slowDropped = 0;
+            int slowCalls = 0, zeroMs = 0;
+            foreach (DequeueCall call in calls){
+                MeshJobStateHandler.DequeueCounts c = call.Counts;
+                takenPerCall.Add(c.Taken);
+                keptPerCall.Add(c.KeptWithVoxels + c.KeptEmpty);
+                ms.Add(call.Ms);
+                sumMs += call.Ms;
+                sumTaken += c.Taken;
+                if (call.Ms <= 0f) zeroMs++;
+                if (call.Ms < 1f) continue;
+                slowCalls++;
+                slowMs += call.Ms;
+                slowTaken += c.Taken;
+                slowKept += c.KeptWithVoxels + c.KeptEmpty;
+                slowDropped += c.DroppedNotRelevant + c.DroppedNotLit + c.DroppedNotNeeded;
+            }
+
+            text.AppendLine(string.Format(inv,
+                "{0}: dequeue per call: entries taken {1}; kept {2}; marker ms {3}; {4:0.00} us per entry taken " +
+                "({5:0} entries in {6:0.0} ms); calls of 1 ms or more: {7}, {8:0.00} us per entry, {9:0.0} taken, " +
+                "{10:0.0} kept and {11:0.0} dropped per call; check of the pairing: {12} calls read 0 ms, {13} " +
+                "samples read marker time without a call",
+                head, Distribution(takenPerCall, 0, takenPerCall.Count), Distribution(keptPerCall, 0, keptPerCall.Count),
+                Distribution(ms, 0, ms.Count), 1000 * sumMs / math.max(sumTaken, 1), sumTaken, sumMs, slowCalls,
+                1000 * slowMs / math.max(slowTaken, 1), slowTaken / math.max(slowCalls, 1),
+                slowKept / math.max(slowCalls, 1), slowDropped / math.max(slowCalls, 1), zeroMs, _markerWithoutCall));
+
+            calls.Sort((a, b) => b.Ms.CompareTo(a.Ms));
+            text.Append(head).Append(": slowest dequeue calls (ms, queue at start, taken, kept with voxels / empty, " +
+                                     "dropped not relevant / not lit / not needed):");
+            for (int i = 0; i < math.min(10, calls.Count); i++){
+                MeshJobStateHandler.DequeueCounts c = calls[i].Counts;
+                text.Append(string.Format(inv, " {0:0.00} q{1} t{2} k{3}/{4} d{5}/{6}/{7};", calls[i].Ms,
+                    c.QueueAtStart, c.Taken, c.KeptWithVoxels, c.KeptEmpty, c.DroppedNotRelevant, c.DroppedNotLit,
+                    c.DroppedNotNeeded));
+            }
+
+            text.AppendLine();
+            return text.ToString();
         }
 
         /// <summary>The samples as log lines, each starting with "[PipelineProbe] <paramref name="label" />".</summary>

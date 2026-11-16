@@ -332,12 +332,14 @@ namespace Engine.Tests.PlayMode{
         ///     until the world around the focus is complete. With <paramref name="attribute" /> the probe records
         ///     every row of <see cref="FrameAttribution" />, and the log gets the table keyed on the scheduler's time
         ///     per frame for the flight and for the settling after it (which frames went over the budget, and in
-        ///     what).
+        ///     what). <paramref name="prepare" /> runs on the fresh world before the probe starts (a variant of the
+        ///     engine that is not a setting).
         /// </summary>
         internal static IEnumerator FlyThroughBuildingWorld(int frameRate, PipelineRun run, string variant = "",
-            int drawDistance = 0, bool attribute = false){
+            int drawDistance = 0, bool attribute = false, Action<VoxelWorld> prepare = null){
             yield return LoadFreshWorld(frameRate, drawDistance);
             VoxelWorld world = VoxelWorld.Instance;
+            prepare?.Invoke(world);
             int draw = world.Settings.Chunk.DrawDistance;
             string label = $"{variant}flight {FlightSpeed:0} u/s for {FlightSeconds:0} s, draw {draw}, {CapName(frameRate)}";
             Transform focus = PlayModeFixtures.GetPrivateField<Transform>(world, "focus");
@@ -397,7 +399,9 @@ namespace Engine.Tests.PlayMode{
                 label, run.BuildSeconds, run.BuildFrames, run.PeakQueue[PipelineProbe.Mesh]));
             if (attribute)
                 Debug.Log(probe.OverBudget(label, flightBegin, flightEnd) +
-                          probe.OverBudget($"{label}, settling after it", flightEnd, probe.Frames));
+                          probe.OverBudget($"{label}, settling after it", flightEnd, probe.Frames) +
+                          probe.DequeueReport(label, flightBegin, flightEnd) +
+                          probe.DequeueReport($"{label}, settling after it", flightEnd, probe.Frames));
         }
 
         /// <summary>
