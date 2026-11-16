@@ -4,22 +4,27 @@ using UnityEngine.InputSystem;
 
 namespace UI{
     /// <summary>
-    ///     Debug keys for the GPU page culling: F8 toggles culling itself (off = every page with points is drawn,
-    ///     for before/after comparison), F9 freezes the frustum so you can fly out and look at what was culled. The
-    ///     page counts show in the HUD's performance panel. Game-side only; the engine exposes the switches as
-    ///     properties on <see cref="VoxelWorldRenderer" />.
+    ///     Debug keys for the GPU page culling, from the "Hud" map of the project's input actions: ToggleCulling (F8)
+    ///     switches culling itself (off = every page with points is drawn, for before/after comparison),
+    ///     FreezeCulling (F9) freezes the frustum so you can fly out and look at what was culled. The page counts show
+    ///     in the HUD's Culling panel. Game-side only; the engine exposes the switches as properties on
+    ///     <see cref="VoxelWorldRenderer" />.
     /// </summary>
     public class CullingDebugKeys : MonoBehaviour{
-        [SerializeField] private Key cullingKey = Key.F8;
-        [SerializeField] private Key freezeKey = Key.F9;
+        private InputAction _toggle, _freeze;
+
+        private void OnEnable(){
+            InputActionMap map = HudInput.Map();
+            _toggle = map?.FindAction("ToggleCulling");
+            _freeze = map?.FindAction("FreezeCulling");
+        }
 
         private void Update(){
-            Keyboard keyboard = Keyboard.current;
             VoxelWorldRenderer renderer = VoxelWorldRenderer.Instance;
-            if (keyboard == null || renderer == null) return;
+            if (renderer == null) return;
 
-            if (keyboard[cullingKey].wasPressedThisFrame) renderer.GpuCulling = !renderer.GpuCulling;
-            if (keyboard[freezeKey].wasPressedThisFrame) renderer.FreezeCulling = !renderer.FreezeCulling;
+            if (_toggle != null && _toggle.WasPressedThisFrame()) renderer.GpuCulling = !renderer.GpuCulling;
+            if (_freeze != null && _freeze.WasPressedThisFrame()) renderer.FreezeCulling = !renderer.FreezeCulling;
         }
     }
 }

@@ -32,7 +32,12 @@ namespace Engine.Scripts.Settings{
         ///     so the draw distance plus one ring per stage and one for the light stage. Derived, never stored, so
         ///     the settings asset is not changed at runtime.
         /// </summary>
-        public int LoadDistance => LoadDistanceOverride ?? ActiveDrawDistance + 3;
+        public int LoadDistance => LoadDistanceOverride ?? LoadDistanceAt(ActiveDrawDistance);
+
+        /// <summary>The load distance that goes with a draw distance (three chunks of margin).</summary>
+        public static int LoadDistanceAt(int drawDistance){
+            return drawDistance + 3;
+        }
 
         /// <summary>Distance for collider baking around the focus; at most the draw distance, at least 2.</summary>
         public int UpdateDistance => math.max(ActiveDrawDistance - 2, 2);

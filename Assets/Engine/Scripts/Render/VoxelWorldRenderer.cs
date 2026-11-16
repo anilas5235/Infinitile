@@ -54,6 +54,15 @@ namespace Engine.Scripts.Render{
         /// </summary>
         private const int InitialIntervalsPerColumn = 20;
 
+        /// <summary>
+        ///     Bytes of the interval store a world built with <paramref name="drawDistance" /> starts with: two lists
+        ///     (voxel data and light) per chunk of the chunk store, <see cref="InitialPagesPerList" /> pages each.
+        /// </summary>
+        public static long IntervalStoreBytesAt(int drawDistance){
+            int chunkStoreSize = (ChunkSettings.LoadDistanceAt(drawDistance) + 2).SquareSize();
+            return 2L * chunkStoreSize * InitialPagesPerList * IntervalPages.PageSize * sizeof(uint) * 2;
+        }
+
         private ChunkIntervalStore _intervalStore;
         private bool _buffersRebuildPending;
 

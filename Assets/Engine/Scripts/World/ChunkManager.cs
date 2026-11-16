@@ -420,6 +420,19 @@ namespace Engine.Scripts.World{
         }
 
         /// <summary>
+        ///     Reads the light (sky and block channels, see <see cref="VoxelLight" />) at a world position. False when
+        ///     the chunk is not loaded or not lit yet, or Y is outside the chunk.
+        /// </summary>
+        internal bool TryGetLight(int3 position, out ushort light){
+            light = 0;
+            int3 blockPos = GetLocalVoxelCoords(position);
+            if (blockPos.y < 0 || blockPos.y >= ChunkHeight) return false;
+            if (!_chunks.TryGetValue(GetChunkCoords(position), out Chunk chunk) || !chunk.LightReady) return false;
+            light = chunk.LightData.GetLight(blockPos);
+            return true;
+        }
+
+        /// <summary>
         ///     Number of currently loaded chunks.
         /// </summary>
         public int ChunkCount(){

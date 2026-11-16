@@ -1,80 +1,199 @@
 using System;
 using System.Collections.Generic;
+using Engine.Scripts.Render;
 using Engine.Scripts.World;
 using Player;
 using UnityEngine;
 using UnityEngine.UIElements;
+using static System.FormattableString;
+using Object = UnityEngine.Object;
 
 namespace UI{
     /// <summary>
-    ///     The settings menu (Esc): draw distance with Apply, frame rate, VSync, the debug panels, Resume and Quit.
-    ///     The game keeps running while it is open; the player's input is off and the cursor is free.
+    ///     The Esc menu: a main page (Continue, Settings, Quit) and a settings page (draw distance with Apply and the
+    ///     GPU store it needs, VSync, frame rate). The game keeps running while it is open; the player's input is off,
+    ///     the cursor is free and the panels and hotbar are hidden. The menu key goes back from the settings page,
+    ///     and closes the menu from the main page.
     /// </summary>
     public partial class HudController{
-        private readonly List<int> _drawChoices = new();
-        private Button _menuApply;
-        private DropdownField _menuDrawDistance;
-        private Toggle _menuDebugToggle;
-        private DropdownField _menuFrameRate;
-        private VisualElement _menu;
-        private bool _menuOpen;
-        private Toggle _menuVSync;
+        private static readonly Color Ink = new Color32(42, 26, 0, 255);
+        private static readonly Color Paper = new Color32(244, 241, 234, 255);
+        private static readonly Color ExitRed = new Color32(255, 138, 122, 255);
+        private static readonly Color ApplyInk = new Color32(23, 58, 16, 255);
+        private static readonly Color Accent = new Color32(242, 179, 61, 255);
 
-        /// <summary>The settings menu is open.</summary>
+        /// <summary>The name on tilted tiles in the world's colours: letter, face, bottom edge, text, tilt, lift.</summary>
+        private static readonly (char Letter, Color32 Face, Color32 Edge, Color32 Text, float Tilt, float Lift)[] Logo = {
+            ('I', new Color32(108, 195, 90, 255), new Color32(62, 127, 51, 255), new Color32(23, 58, 16, 255), -4f, 0f),
+            ('N', new Color32(226, 210, 156, 255), new Color32(168, 149, 94, 255), new Color32(74, 61, 23, 255), 3f, -6f),
+            ('F', new Color32(158, 162, 168, 255), new Color32(95, 98, 104, 255), new Color32(36, 39, 44, 255), -2f, 0f),
+            ('I', new Color32(93, 147, 208, 255), new Color32(35, 74, 120, 255), new Color32(14, 36, 64, 255), 5f, -10f),
+            ('N', new Color32(238, 242, 245, 255), new Color32(174, 184, 194, 255), new Color32(58, 69, 82, 255), -3f, 0f),
+            ('I', new Color32(160, 124, 78, 255), new Color32(94, 68, 41, 255), new Color32(42, 28, 12, 255), 2f, -4f),
+            ('T', new Color32(242, 179, 61, 255), new Color32(185, 127, 22, 255), new Color32(42, 26, 0, 255), -5f, -12f),
+            ('I', new Color32(108, 195, 90, 255), new Color32(62, 127, 51, 255), new Color32(23, 58, 16, 255), 4f, 0f),
+            ('L', new Color32(158, 162, 168, 255), new Color32(95, 98, 104, 255), new Color32(36, 39, 44, 255), -2f, -6f),
+            ('E', new Color32(226, 210, 156, 255), new Color32(168, 149, 94, 255), new Color32(74, 61, 23, 255), 3f, 0f)
+        };
+
+        private readonly List<int> _drawChoices = new();
+        private readonly List<Button> _drawTiles = new();
+        private readonly List<Button> _rateTiles = new();
+        private Texture2D _dimTexture;
+        private VisualElement _menu, _menuMain, _menuSettings, _drawTileRow, _rateTileRow;
+        private Button _menuApply, _menuContinue, _menuSettingsButton, _menuQuit, _menuVSync, _settingsBack;
+        private Label _menuStoreEstimate;
+        private bool _menuOpen, _settingsPageOpen;
+        private int _pickedDraw;
+
+        /// <summary>The Esc menu is open (either page).</summary>
         public bool MenuOpen => _menuOpen;
 
         private void BindMenu(){
             _menu = Root.Q("menu");
-            _menuDrawDistance = Root.Q<DropdownField>("menu-draw-distance");
+            _menuMain = Root.Q("menu-main");
+            _menuSettings = Root.Q("menu-settings-page");
+            _menuContinue = Root.Q<Button>("menu-continue");
+            _menuSettingsButton = Root.Q<Button>("menu-settings");
+            _menuQuit = Root.Q<Button>("menu-quit");
+            _settingsBack = Root.Q<Button>("settings-back");
             _menuApply = Root.Q<Button>("menu-apply");
-            _menuFrameRate = Root.Q<DropdownField>("menu-frame-rate");
-            _menuVSync = Root.Q<Toggle>("menu-vsync");
-            _menuDebugToggle = Root.Q<Toggle>("menu-debug-panels");
+            _menuVSync = Root.Q<Button>("menu-vsync");
+            _menuStoreEstimate = Root.Q<Label>("menu-store-estimate");
+            _drawTileRow = Root.Q("menu-draw-distance");
+            _rateTileRow = Root.Q("menu-frame-rate");
 
-            List<string> rates = new();
-            foreach (int rate in GameSettings.FrameRates) rates.Add(rate > 0 ? $"{rate} fps" : "Uncapped");
-            _menuFrameRate.choices = rates;
-            _menuDebugToggle.label = $"Debug panels ({debugPanelsKey})";
+            BuildLogo(Root.Q("menu-logo"));
+            _dimTexture = DimGradient();
+            Root.Q("menu-dim").style.backgroundImage = _dimTexture;
+            AddGlyph("menu-continue-icon", GlyphKind.Play, Ink);
+            AddGlyph("menu-settings-icon", GlyphKind.Gear, Paper);
+            AddGlyph("menu-quit-icon", GlyphKind.Exit, ExitRed);
+            AddGlyph("settings-back-icon", GlyphKind.Back, Paper);
+            AddGlyph("menu-apply-icon", GlyphKind.Check, ApplyInk);
+            AddGlyph("menu-warn-icon", GlyphKind.Warning, Accent);
 
-            _menuDrawDistance.RegisterValueChangedCallback(OnMenuDrawDistanceChanged);
-            _menuFrameRate.RegisterValueChangedCallback(OnMenuFrameRateChanged);
-            _menuVSync.RegisterValueChangedCallback(OnMenuVSyncChanged);
-            _menuDebugToggle.RegisterValueChangedCallback(OnMenuDebugPanelsChanged);
+            _rateTileRow.Clear();
+            _rateTiles.Clear();
+            foreach (int rate in GameSettings.FrameRates){
+                int value = rate;
+                Button tile = Tile(rate > 0 ? $"{rate}" : "Uncapped", () => PickFrameRate(value));
+                _rateTileRow.Add(tile);
+                _rateTiles.Add(tile);
+            }
+
+            // Without Unity's button look: the blocks style themselves, hover and press included.
+            _menu.Query<Button>().ForEach(button => button.RemoveFromClassList(Button.ussClassName));
+
+            _menuContinue.clicked += CloseMenu;
+            _menuSettingsButton.clicked += OpenSettingsPage;
+            _menuQuit.clicked += Quit;
+            _settingsBack.clicked += OpenMainPage;
             _menuApply.clicked += ApplyMenuDrawDistance;
-            Root.Q<Button>("menu-resume").clicked += CloseMenu;
-            Root.Q<Button>("menu-quit").clicked += Quit;
+            _menuVSync.clicked += ToggleVSync;
             _menu.style.display = DisplayStyle.None;
         }
 
         private void UnbindMenu(){
             if (_menu == null) return;
             if (_menuOpen) SetMenu(false);
-            _menuDrawDistance.UnregisterValueChangedCallback(OnMenuDrawDistanceChanged);
-            _menuFrameRate.UnregisterValueChangedCallback(OnMenuFrameRateChanged);
-            _menuVSync.UnregisterValueChangedCallback(OnMenuVSyncChanged);
-            _menuDebugToggle.UnregisterValueChangedCallback(OnMenuDebugPanelsChanged);
+            _menuContinue.clicked -= CloseMenu;
+            _menuSettingsButton.clicked -= OpenSettingsPage;
+            _menuQuit.clicked -= Quit;
+            _settingsBack.clicked -= OpenMainPage;
             _menuApply.clicked -= ApplyMenuDrawDistance;
-            Root.Q<Button>("menu-resume").clicked -= CloseMenu;
-            Root.Q<Button>("menu-quit").clicked -= Quit;
+            _menuVSync.clicked -= ToggleVSync;
+            if (_dimTexture) Object.Destroy(_dimTexture);
         }
 
-        /// <summary>Opens or closes the menu; while it is open the cursor is free and the player's input is off.</summary>
+        private void BuildLogo(VisualElement logo){
+            logo.Clear();
+            foreach (var tile in Logo){
+                VisualElement face = new(){ pickingMode = PickingMode.Ignore };
+                face.AddToClassList("logo__tile");
+                face.style.backgroundColor = (Color)tile.Face;
+                face.style.borderBottomColor = (Color)tile.Edge;
+                face.style.rotate = new Rotate(new Angle(tile.Tilt, AngleUnit.Degree));
+                face.style.translate = new Translate(0, tile.Lift);
+                Label letter = new(tile.Letter.ToString()){ pickingMode = PickingMode.Ignore };
+                letter.AddToClassList("logo__letter");
+                letter.style.color = (Color)tile.Text;
+                face.Add(letter);
+                logo.Add(face);
+            }
+        }
+
+        /// <summary>Dark on the left, where the menu sits, fading towards the right of the screen.</summary>
+        private static Texture2D DimGradient(){
+            const int width = 64;
+            Texture2D texture = new(width, 1, TextureFormat.RGBA32, false){
+                wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, hideFlags = HideFlags.DontSave
+            };
+            Color32[] pixels = new Color32[width];
+            for (int x = 0; x < width; x++){
+                float t = x / (width - 1f);
+                pixels[x] = new Color32(8, 10, 14, (byte)(255 * Mathf.Lerp(0.78f, 0.22f, t)));
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+            return texture;
+        }
+
+        private void AddGlyph(string well, GlyphKind kind, Color color){
+            VisualElement element = Root.Q(well);
+            element.Clear();
+            element.Add(new HudGlyph(kind, color));
+        }
+
+        private static Button Tile(string text, Action clicked){
+            Button tile = new(clicked){ text = text };
+            tile.RemoveFromClassList(Button.ussClassName);
+            tile.AddToClassList("t");
+            return tile;
+        }
+
+        // ── Open, close, pages ───────────────────────────────────────────────
+
+        /// <summary>Opens the menu on its main page, or closes it.</summary>
         public void SetMenu(bool open){
             if (_menu == null) return;
+            if (open && _searchOpen) SetVoxelSearch(false);
             _menuOpen = open;
             _menu.style.display = open ? DisplayStyle.Flex : DisplayStyle.None;
-            _crosshair.style.display = open ? DisplayStyle.None : DisplayStyle.Flex;
             SetPlayerInput(!open);
-            if (open) RefreshMenu();
+            UpdateLayers();
+            if (open) OpenMainPage();
             else _menu.Blur();
+        }
+
+        /// <summary>The menu key: back from the settings page, else open or close the menu.</summary>
+        private void MenuBack(){
+            if (_menuOpen && _settingsPageOpen) OpenMainPage();
+            else SetMenu(!_menuOpen);
         }
 
         private void CloseMenu(){
             SetMenu(false);
         }
 
-        /// <summary>Shows the current choices: the world's draw distance, the saved frame cap and VSync.</summary>
-        private void RefreshMenu(){
+        private void OpenMainPage(){
+            _settingsPageOpen = false;
+            Show(_menuMain, true);
+            Show(_menuSettings, false);
+        }
+
+        private void OpenSettingsPage(){
+            _settingsPageOpen = true;
+            Show(_menuMain, false);
+            Show(_menuSettings, true);
+            RefreshSettings();
+        }
+
+        // ── Settings page ────────────────────────────────────────────────────
+
+        /// <summary>Shows the current choices: the world's draw distance, VSync and the saved frame cap.</summary>
+        private void RefreshSettings(){
             VoxelWorld world = VoxelWorld.Instance;
             int current = world ? world.DrawDistance : 0;
             _drawChoices.Clear();
@@ -84,34 +203,53 @@ namespace UI{
                 _drawChoices.Sort();
             }
 
-            List<string> labels = new(_drawChoices.Count);
-            foreach (int distance in _drawChoices) labels.Add($"{distance} chunks");
-            _menuDrawDistance.choices = labels;
-            _menuDrawDistance.SetValueWithoutNotify(current > 0 ? $"{current} chunks" : "");
-            _menuDrawDistance.SetEnabled(world);
-            UpdateApplyButton();
+            _drawTileRow.Clear();
+            _drawTiles.Clear();
+            foreach (int distance in _drawChoices){
+                int value = distance;
+                Button tile = Tile($"{distance}", () => PickDrawDistance(value));
+                if (distance == current){
+                    Label badge = new("NOW"){ pickingMode = PickingMode.Ignore };
+                    badge.AddToClassList("badge");
+                    tile.Add(badge);
+                }
 
-            int rateIndex = Array.IndexOf(GameSettings.FrameRates, GameSettings.FrameRate);
-            _menuFrameRate.SetValueWithoutNotify(_menuFrameRate.choices[rateIndex >= 0 ? rateIndex : GameSettings.FrameRates.Length - 1]);
-            _menuVSync.SetValueWithoutNotify(GameSettings.VSync);
-            _menuFrameRate.SetEnabled(!GameSettings.VSync);
-            _menuDebugToggle.SetValueWithoutNotify(showDebugPanels);
+                _drawTileRow.Add(tile);
+                _drawTiles.Add(tile);
+            }
+
+            _drawTileRow.SetEnabled(world);
+            _pickedDraw = current;
+            RefreshDrawTiles();
+            RefreshDisplaySettings();
         }
 
-        /// <summary>The draw distance picked in the menu, 0 when none is.</summary>
-        private int PickedDrawDistance(){
-            int index = _menuDrawDistance.index;
-            return index >= 0 && index < _drawChoices.Count ? _drawChoices[index] : 0;
+        private void PickDrawDistance(int distance){
+            _pickedDraw = distance;
+            RefreshDrawTiles();
         }
 
-        private void UpdateApplyButton(){
+        private void RefreshDrawTiles(){
+            for (int i = 0; i < _drawTiles.Count; i++) _drawTiles[i].EnableInClassList("t--on", _drawChoices[i] == _pickedDraw);
             VoxelWorld world = VoxelWorld.Instance;
-            int picked = PickedDrawDistance();
-            _menuApply.SetEnabled(world && picked > 0 && picked != world.DrawDistance);
+            _menuApply.SetEnabled(world && _pickedDraw > 0 && _pickedDraw != world.DrawDistance);
+            RefreshStoreEstimate();
         }
 
-        private void OnMenuDrawDistanceChanged(ChangeEvent<string> _){
-            UpdateApplyButton();
+        /// <summary>The GPU interval store now and at the picked draw distance, from the store's own sizing.</summary>
+        private void RefreshStoreEstimate(){
+            if (_menuStoreEstimate == null) return;
+            VoxelWorld world = VoxelWorld.Instance;
+            VoxelWorldRenderer renderer = VoxelWorldRenderer.Instance;
+            if (!world || !renderer || _pickedDraw <= 0){
+                _menuStoreEstimate.text = "";
+                return;
+            }
+
+            float now = Mb(renderer.GpuMemory.IntervalStoreBytes);
+            _menuStoreEstimate.text = _pickedDraw == world.DrawDistance
+                ? Invariant($"GPU interval store {now:F0} MB")
+                : Invariant($"GPU interval store {now:F0} → {Mb(VoxelWorldRenderer.IntervalStoreBytesAt(_pickedDraw)):F0} MB");
         }
 
         /// <summary>
@@ -120,33 +258,39 @@ namespace UI{
         /// </summary>
         private void ApplyMenuDrawDistance(){
             VoxelWorld world = VoxelWorld.Instance;
-            int picked = PickedDrawDistance();
-            if (!world || picked <= 0) return;
+            int picked = _pickedDraw;
+            if (!world || picked <= 0 || picked == world.DrawDistance) return;
             GameSettings.DrawDistance = picked;
             if (world.ChangeDrawDistance(picked)){
                 PlayerManager player = FindFirstObjectByType<PlayerManager>();
                 if (player) player.HoldUntilGrounded();
             }
 
-            UpdateApplyButton();
+            RefreshSettings();
             _nextRefresh = 0f;
         }
 
-        private void OnMenuFrameRateChanged(ChangeEvent<string> _){
-            int index = _menuFrameRate.index;
-            if (index < 0 || index >= GameSettings.FrameRates.Length) return;
-            GameSettings.FrameRate = GameSettings.FrameRates[index];
+        private void ToggleVSync(){
+            GameSettings.VSync = !GameSettings.VSync;
             GameSettings.ApplyFrameCap();
+            RefreshDisplaySettings();
         }
 
-        private void OnMenuVSyncChanged(ChangeEvent<bool> change){
-            GameSettings.VSync = change.newValue;
+        private void PickFrameRate(int rate){
+            if (GameSettings.VSync) return;
+            GameSettings.FrameRate = rate;
             GameSettings.ApplyFrameCap();
-            _menuFrameRate.SetEnabled(!change.newValue);
+            RefreshDisplaySettings();
         }
 
-        private void OnMenuDebugPanelsChanged(ChangeEvent<bool> change){
-            SetDebugPanels(change.newValue);
+        /// <summary>VSync switch first; the frame rate tiles are off while VSync caps the frames.</summary>
+        private void RefreshDisplaySettings(){
+            bool vSync = GameSettings.VSync;
+            _menuVSync.EnableInClassList("switch--on", vSync);
+            int rateIndex = Array.IndexOf(GameSettings.FrameRates, GameSettings.FrameRate);
+            if (rateIndex < 0) rateIndex = GameSettings.FrameRates.Length - 1;
+            for (int i = 0; i < _rateTiles.Count; i++) _rateTiles[i].EnableInClassList("t--on", i == rateIndex);
+            _rateTileRow.SetEnabled(!vSync);
         }
 
         /// <summary>Leaves Play mode in the Editor; quits the player otherwise.</summary>

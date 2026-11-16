@@ -343,7 +343,8 @@ every page change) with per-page frustum culling that runs once per camera and f
   *every* camera with it, so the Scene view (or a detached game camera) shows exactly the pages the game camera
   kept; the frozen frustum is drawn as a yellow gizmo. `ShowCullingOverlay` shows visible / allocated pages per
   layer and buffer (read back asynchronously with one frame of latency). All three are Inspector check-boxes on
-  `VoxelWorldRenderer`; in the game `CullingDebugKeys` maps them to F7 (overlay), F8 (culling), F9 (freeze).
+  `VoxelWorldRenderer`; in the game `CullingDebugKeys` maps culling and freeze to F8 and F9 through the "Hud" map
+  of the input actions, and the HUD's Culling panel (F3) shows the page counts.
   The Input System only sees the keyboard while the Game view has focus, so the Editor-only
   `CullingSceneViewKeys` handles F7/F8/F9 with the Scene view focused too and shows the switches there. Without
   freeze the Scene view camera culls with its own frustum, so nothing ever looks missing from it. To watch

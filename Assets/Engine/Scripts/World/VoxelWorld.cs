@@ -285,6 +285,21 @@ namespace Engine.Scripts.World{
         public int DrawDistance => settings.Chunk.ActiveDrawDistance;
 
         /// <summary>
+        ///     The main-thread time the engine's scheduler may use in the current frame, in milliseconds, after the
+        ///     frame cap; 0 when the limit is switched off or the world is not running.
+        /// </summary>
+        public float MainThreadBudgetMs => _scheduler?.Budget?.EffectiveMilliseconds ?? 0f;
+
+        /// <summary>
+        ///     Reads the light at a world voxel position: sky and block channels packed as in <see cref="VoxelLight" />.
+        ///     False when the chunk is not loaded or not lit yet.
+        /// </summary>
+        public bool TryGetLight(int3 position, out ushort light){
+            light = 0;
+            return ChunkManager != null && ChunkManager.TryGetLight(position, out light);
+        }
+
+        /// <summary>
         ///     Builds the world again with another draw distance, in the running scene. Running jobs are completed,
         ///     every chunk is evicted through the normal events, and everything sized from the draw distance is made
         ///     anew: the chunk store, the chunk and partition pool with its objects, the schedulers and the

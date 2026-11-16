@@ -16,6 +16,9 @@ namespace Player{
         /// </summary>
         public bool destruct;
 
+        /// <summary>How far the player reaches to break, place and pick voxels, in metres.</summary>
+        public const float Reach = 5f;
+
         /// <summary>
         ///     If true, placement mode is active and voxels will be placed instead of removed.
         /// </summary>
@@ -105,6 +108,19 @@ namespace Player{
         }
 
         /// <summary>
+        ///     The voxel the player would break: the same ray and <see cref="Reach" /> as breaking.
+        /// </summary>
+        /// <param name="voxelWorldPos">World position of the voxel that was hit.</param>
+        /// <param name="hitInfo">The raycast hit on the voxel's face.</param>
+        /// <returns><c>true</c> when a voxel is within reach.</returns>
+        public bool TryGetLookedAt(out Vector3Int voxelWorldPos, out RaycastHit hitInfo){
+            if (_camera) return GetLookAtVoxelPos(out voxelWorldPos, out hitInfo);
+            voxelWorldPos = Vector3Int.zero;
+            hitInfo = default;
+            return false;
+        }
+
+        /// <summary>
         ///     Calculates the world voxel position the camera is currently looking at within a short range.
         /// </summary>
         /// <param name="voxelWorldPos">Resulting voxel world position when the raycast hits.</param>
@@ -114,7 +130,7 @@ namespace Player{
         private bool GetLookAtVoxelPos(out Vector3Int voxelWorldPos, out RaycastHit hitInfo, bool placeMode = false){
             voxelWorldPos = Vector3Int.zero;
             bool res = Physics.Raycast(_camera.transform.position, _camera.transform.forward, out hitInfo,
-                5f, voxelLayerMask);
+                Reach, voxelLayerMask);
             if (!res) return false;
 
             Vector3 worldPos = hitInfo.point + _camera.transform.forward * (.001f * (placeMode ? -1 : 1));
