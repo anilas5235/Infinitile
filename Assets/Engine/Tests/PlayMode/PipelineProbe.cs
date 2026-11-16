@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using Engine.Scripts.Behaviour;
+using Engine.Scripts.Diagnostics;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.ColliderMeshing;
@@ -24,20 +25,17 @@ namespace Engine.Tests.PlayMode{
     ///     samples into the lines the pipeline tests log and assert on.
     /// </summary>
     internal sealed class PipelineProbe : IDisposable{
-        internal const int Data = 0;
-        internal const int Light = 1;
-        internal const int Mesh = 2;
-        internal const int Bake = 3;
-        private const int StageCount = 4;
-        private static readonly string[] StageNames = { "data", "light", "mesh", "bake" };
+        internal const int Data = PipelineStages.Data;
+        internal const int Light = PipelineStages.Light;
+        internal const int Mesh = PipelineStages.Mesh;
+        internal const int Bake = PipelineStages.Bake;
+        private const int StageCount = PipelineStages.Count;
+        private static readonly string[] StageNames = PipelineStages.Names;
 
         private readonly VoxelWorld _world;
-        private readonly Func<bool>[] _sleeping = new Func<bool>[StageCount];
-        private readonly Func<bool>[] _jobReady = new Func<bool>[StageCount];
-        private readonly Func<bool>[] _jobComplete = new Func<bool>[StageCount];
+        private readonly PipelineStages _stages;
         private readonly Dictionary<int3, ChunkPartition> _meshMap;
         private readonly HashSet<int3> _colliderSet;
-        private readonly HashSet<int3> _pendingBuilds;
         private readonly ProfilerRecorder[] _recorders = new ProfilerRecorder[StageCount];
 
         // Main-thread work of the pipeline, per frame it ran in
@@ -62,14 +60,9 @@ namespace Engine.Tests.PlayMode{
         private readonly int[] _framesRunning = new int[StageCount];
         private readonly int[] _framesFinished = new int[StageCount];
         private readonly int[] _framesSleeping = new int[StageCount];
-        private readonly float[] _doneSeconds = { -1f, -1f, -1f, -1f };
-        private readonly int[] _doneFrames = new int[StageCount];
-        private readonly Func<bool> _rendererBehind;
         private readonly CMeshBuildScheduler _meshJobs;
         private readonly int _meshBatchSize;
         private int _framesRendererBehind;
-        private float _gpuDoneSeconds = -1f;
-        private int _gpuDoneFrame;
         private float _startTime;
         private readonly FrameAttribution _attribution;
 
@@ -97,35 +90,12 @@ namespace Engine.Tests.PlayMode{
         internal PipelineProbe(VoxelWorld world, bool attribute = false){
             _world = world;
             if (attribute) _attribution = new FrameAttribution();
-            VoxelEngineScheduler scheduler = PlayModeFixtures.GetPrivateField<VoxelEngineScheduler>(world, "_scheduler");
+            VoxelEngineScheduler scheduler = world.Scheduler;
             _scheduler = scheduler;
             _framesCutAtStart = scheduler.Budget.FramesCut;
-            DataJobStateHandler data = PlayModeFixtures.GetPrivateField<DataJobStateHandler>(scheduler, "_dataJobHandler");
-            LightJobStateHandler light = PlayModeFixtures.GetPrivateField<LightJobStateHandler>(scheduler, "_lightJobHandler");
-            MeshJobStateHandler mesh = PlayModeFixtures.GetPrivateField<MeshJobStateHandler>(scheduler, "_meshJobHandler");
-            ColliderJobStateHandler bake =
-                PlayModeFixtures.GetPrivateField<ColliderJobStateHandler>(scheduler, "_colliderJobHandler");
-            ChunkScheduler chunkJobs = PlayModeFixtures.GetPrivateField<ChunkScheduler>(scheduler, "_chunkScheduler");
-            LightScheduler lightJobs = PlayModeFixtures.GetPrivateField<LightScheduler>(scheduler, "_lightScheduler");
-            CMeshBuildScheduler meshJobs =
-                PlayModeFixtures.GetPrivateField<CMeshBuildScheduler>(scheduler, "_cMeshBuildScheduler");
-            ColliderBakeScheduler bakeJobs =
-                PlayModeFixtures.GetPrivateField<ColliderBakeScheduler>(scheduler, "_colliderBakeScheduler");
-
-            _sleeping[Data] = () => data.Sleeping;
-            _sleeping[Light] = () => light.Sleeping;
-            _sleeping[Mesh] = () => mesh.Sleeping;
-            _sleeping[Bake] = () => bake.Sleeping;
-            _jobReady[Data] = () => chunkJobs.IsReady;
-            _jobReady[Light] = () => lightJobs.IsReady;
-            _jobReady[Mesh] = () => meshJobs.IsReady;
-            _jobReady[Bake] = () => bakeJobs.IsReady;
-            _jobComplete[Data] = () => chunkJobs.IsComplete;
-            _jobComplete[Light] = () => lightJobs.IsComplete;
-            _jobComplete[Mesh] = () => meshJobs.IsComplete;
-            _jobComplete[Bake] = () => bakeJobs.IsComplete;
-            _rendererBehind = () => meshJobs.RendererBehind;
-            _meshJobs = meshJobs;
+            _stages = new PipelineStages(world);
+            MeshJobStateHandler mesh = scheduler.MeshHandler;
+            _meshJobs = scheduler.MeshJobs;
             _meshBatchSize = mesh.MeshBatchSize;
             _meshHandler = mesh;
             _dequeueAtStart = mesh.Dequeued;
@@ -136,8 +106,6 @@ namespace Engine.Tests.PlayMode{
             ChunkPool pool = PlayModeFixtures.GetPrivateField<ChunkPool>(world, "_chunkPool");
             _meshMap = PlayModeFixtures.GetPrivateField<Dictionary<int3, ChunkPartition>>(pool, "_meshMap");
             _colliderSet = PlayModeFixtures.GetPrivateField<HashSet<int3>>(pool, "_colliderSet");
-            _pendingBuilds =
-                PlayModeFixtures.GetPrivateField<HashSet<int3>>(VoxelWorldRenderer.Instance, "_pendingBuildSet");
 
             _recorders[Data] = ProfilerRecorder.StartNew(VoxelProfilerMarkers.SchedulerData);
             _recorders[Light] = ProfilerRecorder.StartNew(VoxelProfilerMarkers.SchedulerLight);
@@ -162,11 +130,11 @@ namespace Engine.Tests.PlayMode{
             _startTime = Time.realtimeSinceStartup;
         }
 
-        /// <summary>A frame of 120 frames per second, the goal of the performance work (2026-11-14).</summary>
-        internal const float GoalFrameMs = 1000f / 120f;
+        /// <summary>A frame of 120 frames per second, the goal of the performance work.</summary>
+        internal const float GoalFrameMs = FrameTimeStats.GoalFrameMs;
 
         /// <summary>A frame of 60 frames per second; a longer one is a stutter the player sees.</summary>
-        internal const float StutterFrameMs = 1000f / 60f;
+        internal const float StutterFrameMs = FrameTimeStats.StutterFrameMs;
 
         /// <summary>Frames sampled so far.</summary>
         internal int Frames{ get; private set; }
@@ -207,12 +175,12 @@ namespace Engine.Tests.PlayMode{
         internal int DispatchedWithoutVoxels{ get; private set; }
 
         /// <summary>Seconds until every stage slept with its upstream stages done; -1 while that did not happen.</summary>
-        internal float BuiltSeconds => _doneSeconds[Bake];
+        internal float BuiltSeconds => _stages.BuiltSeconds;
 
-        internal int BuiltFrames => _doneFrames[Bake];
+        internal int BuiltFrames => _stages.BuiltFrame;
 
         /// <summary>True once every stage slept after its upstream stages and no GPU build is pending.</summary>
-        internal bool Built => _doneSeconds[Bake] >= 0f && _gpuDoneSeconds >= 0f;
+        internal bool Built => _stages.Built;
 
         public void Dispose(){
             if (_world != null) _world.PartitionBuildRequested -= OnMeshBatch;
@@ -319,8 +287,7 @@ namespace Engine.Tests.PlayMode{
         ///     Forgets the completion times, so a second phase (the world settling after a flight) is timed from now.
         /// </summary>
         internal void RestartCompletion(){
-            for (int i = 0; i < StageCount; i++) _doneSeconds[i] = -1f;
-            _gpuDoneSeconds = -1f;
+            _stages.RestartCompletion();
         }
 
         /// <summary>
@@ -328,16 +295,7 @@ namespace Engine.Tests.PlayMode{
         ///     have a mesh.
         /// </summary>
         internal float Coverage(int radius){
-            int3 focus = _world.Focus.Pos;
-            int meshed = 0, total = 0;
-            for (int x = -radius; x <= radius; x++)
-            for (int z = -radius; z <= radius; z++)
-            for (int y = 0; y < VoxelConstants.PartitionsPerChunk; y++){
-                total++;
-                if (_meshMap.ContainsKey(new int3(focus.x + x, y, focus.z + z))) meshed++;
-            }
-
-            return meshed / (float)total;
+            return _stages.Coverage(radius);
         }
 
         /// <summary>Takes one sample; call once per frame.</summary>
@@ -348,36 +306,25 @@ namespace Engine.Tests.PlayMode{
             PeakQueue[Light] = math.max(PeakQueue[Light], stats.LightQueue);
             PeakQueue[Mesh] = math.max(PeakQueue[Mesh], stats.MeshQueue);
             PeakQueue[Bake] = math.max(PeakQueue[Bake], stats.BakeQueue);
-            PeakPendingBuilds = math.max(PeakPendingBuilds, _pendingBuilds.Count);
-            if (_rendererBehind()) _framesRendererBehind++;
+            PeakPendingBuilds = math.max(PeakPendingBuilds, PipelineStages.PendingBuilds);
+            if (_meshJobs.RendererBehind) _framesRendererBehind++;
 
             long schedulerNs = 0;
-            bool upstreamDone = stats.LoadedChunks >= _world.Settings.Chunk.LoadDistance.SquareSize();
             for (int i = 0; i < StageCount; i++){
                 schedulerNs += _recorders[i].LastValue;
-                bool sleeping = _sleeping[i]();
-                if (!_jobReady[i]()){
-                    if (_jobComplete[i]()) _framesFinished[i]++;
+                if (!_stages.JobReady[i]()){
+                    if (_stages.JobComplete[i]()) _framesFinished[i]++;
                     else _framesRunning[i]++;
                 }
-                else if (sleeping){
+                else if (_stages.Sleeping[i]()){
                     _framesSleeping[i]++;
                 }
                 else{
                     _framesIdle[i]++;
                 }
-
-                upstreamDone &= sleeping && _jobReady[i]();
-                if (upstreamDone && _doneSeconds[i] < 0f){
-                    _doneSeconds[i] = Seconds;
-                    _doneFrames[i] = Frames;
-                }
             }
 
-            if (_doneSeconds[Mesh] >= 0f && _gpuDoneSeconds < 0f && _pendingBuilds.Count == 0){
-                _gpuDoneSeconds = Seconds;
-                _gpuDoneFrame = Frames;
-            }
+            _stages.SampleCompletion(Seconds, Frames);
 
             for (int i = 0; i < _costRecorders.Length; i++){
                 float ms = _costRecorders[i].LastValue * 1e-6f;
@@ -557,12 +504,12 @@ namespace Engine.Tests.PlayMode{
                 text.AppendLine(string.Format(inv, "{0}: {1} job frames: running {2}, finished but not collected {3}, " +
                                                    "idle with work {4}, sleeping {5}; done after {6:0.0} s (frame {7})",
                     head, StageNames[i], _framesRunning[i], _framesFinished[i], _framesIdle[i], _framesSleeping[i],
-                    _doneSeconds[i], _doneFrames[i]));
+                    _stages.DoneSeconds(i), _stages.DoneFrame(i)));
             }
 
             text.AppendLine(string.Format(inv, "{0}: renderer builds done after {1:0.0} s (frame {2}); the mesh stage " +
                                                "waited for the renderer in {3} frames",
-                head, _gpuDoneSeconds, _gpuDoneFrame, _framesRendererBehind));
+                head, _stages.GpuDoneSeconds, _stages.GpuDoneFrame, _framesRendererBehind));
             text.Append(FrameTimes(label, 0, Frames));
             text.Append(head).Append(": main-thread ms per frame it ran in (avg / max / frames):");
             for (int i = 0; i < CostNames.Length; i++){
@@ -575,34 +522,12 @@ namespace Engine.Tests.PlayMode{
         }
 
         private static string Distribution(List<float> values, int from, int to){
-            from = math.clamp(from, 0, values.Count);
-            to = math.clamp(to, from, values.Count);
-            if (to == from) return "no samples";
-            List<float> sorted = values.GetRange(from, to - from);
-            sorted.Sort();
-            double sum = 0;
-            foreach (float value in sorted) sum += value;
-            int last = sorted.Count - 1;
-            return string.Format(CultureInfo.InvariantCulture,
-                "avg {0:0.000}, p50 {1:0.000}, p95 {2:0.000}, p99 {3:0.000}, max {4:0.000}",
-                sum / sorted.Count, sorted[sorted.Count / 2], sorted[(int)(last * 0.95f)], sorted[(int)(last * 0.99f)],
-                sorted[last]);
+            return FrameTimeStats.Distribution(values, from, to);
         }
 
         /// <summary>How many of the samples are longer than a frame of 120 and of 60 frames per second.</summary>
         private static string OverGoal(List<float> values, int from, int to){
-            from = math.clamp(from, 0, values.Count);
-            to = math.clamp(to, from, values.Count);
-            int overGoal = 0, overStutter = 0;
-            for (int i = from; i < to; i++){
-                if (values[i] > GoalFrameMs) overGoal++;
-                if (values[i] > StutterFrameMs) overStutter++;
-            }
-
-            int count = math.max(to - from, 1);
-            return string.Format(CultureInfo.InvariantCulture,
-                "{0} of {1} over 8.33 ms ({2:0.00} %), {3} over 16.67 ms ({4:0.00} %)",
-                overGoal, to - from, 100f * overGoal / count, overStutter, 100f * overStutter / count);
+            return FrameTimeStats.OverGoal(values, from, to);
         }
     }
 }
