@@ -875,6 +875,7 @@ Docs/                                 WorldGenSpec.html (this file; outside Asse
 <h2 id="s16">16 · Improvement ideas</h2>
 <p>Improvements found during the phases and the engine review. An idea is not a requirement and belongs to no phase until the user schedules it. Once done, its entry keeps the original idea and gains a <b>Done</b> list with what was built and measured; the acceptance criteria then stay in force as regression targets (PERF-03).</p>
 <p>§16.1–16.7 were scheduled by the user on 2026-10-21 (DEC-26) and merged the same day: §16.2 then §16.1 in PR #38 (<code>phase/20</code>), §16.5–16.7 in PR #40 (<code>phase/20.5-20.7</code>), §16.3–16.4 in PR #41 (<code>phase/20.3-20.4</code>). The branch and baseline names keep the old section number 20.</p>
+<p>§16.15–16.23 are the open follow-ups of the scheduler work (§E1.1, PRs #59–#65), recorded on 2026-11-16. None is scheduled.</p>
 
 <h3>16.1 Shared GPU buffer for chunk voxel data</h3>
 <p class="small">Recorded 2026-10-20 (Phase 4, from the TST-E21 investigation).</p>
@@ -1100,6 +1101,79 @@ Docs/                                 WorldGenSpec.html (this file; outside Asse
 <li><b>Idea:</b> canyons as ridged 2D noise lines (the absolute value of a low-frequency noise below a small threshold gives thin, winding lines, as in ridge-noise rivers), each with a hashed depth and width profile along the line. Two kinds on the same mask: <em>surface canyons</em> cut the terrain from the surface down (the column keeps its height for Part III, the cut is a carving pass like the caves, so the floor shows strata and the walls are steep with a smoothstep profile across the line); <em>underground canyons</em> are tall, narrow fissures in the hall band, carved by the same line mask with a vertical extent of 20&ndash;40 blocks and a width of 2&ndash;6, so worms and halls that cross them connect. Both keep the water rule (CAV-05): no cut into water, and surface canyons end before the beach. A floor of gravel or sand and pools of water in surface canyons are later options.</li>
 <li><b>Costs and risks:</b> a per-column 2D noise plus a per-voxel profile only inside the line band, so the cost is small outside canyons (PERF-12); surface canyons change the surface look and the flora on the rim (anchors on the cut columns must be skipped as in CAV-04), and open cuts need the light and collider rows of CAV-50…52 checked again. The line mask must be a pure function of world position (CAV-01).</li>
 <li><b>Acceptance if scheduled:</b> canyons show in the cross-section and in play in both architectures, no canyon drains or floods water, flora never stands on a cut column, the seam tests pass, and the chunk rows stay within the PERF-12 budget.</li>
+</ul>
+<!-- ============================================================ -->
+<h3>16.15 Split the data collect</h3>
+<p class="small">Recorded 2026-11-16 (open after PRs #61–#65, §E1.1). Not scheduled.</p>
+<ul class="tight">
+<li><b>Observation:</b> after PR #65 the few frames still over the capped budget all lie in the data stage: adding a data batch to the chunk store is one item of 6.3–7.3 ms (up to 8 chunks, with up to 8 evictions and their nested waits). The first item of a frame always runs, so this item alone can take a 120 fps frame.</li>
+<li><b>Idea:</b> make the add per chunk (and the evictions per chunk) separate items of the frame's budget, as the light and mesh collects already are.</li>
+<li><b>Acceptance if scheduled:</b> no scheduler item over 2 ms in the capped and the uncapped flight at draw 12; world built and flight coverage as before.</li>
+</ul>
+<!-- ============================================================ -->
+<h3>16.16 Focus update inside the budget</h3>
+<p class="small">Recorded 2026-11-16 (§E1.1, PERF-17). Not scheduled.</p>
+<ul class="tight">
+<li><b>Observation:</b> the focus update (re-prioritising and pruning every stage queue) runs outside the frame's budget, from a check every 0.5 s, when the focus moved to another partition or turned by 45°. Its cost in a sprint flight is not measured on its own.</li>
+<li><b>Idea:</b> measure it with its own marker first; if it is large, spread the re-prioritisation over frames as items of the budget.</li>
+<li><b>Acceptance if scheduled:</b> the focus update shows in the attribution; no frame of the flight is long because of it.</li>
+</ul>
+<!-- ============================================================ -->
+<h3>16.17 Re-check the budget values without the heap check</h3>
+<p class="small">Recorded 2026-11-16 (DEC-105…107). Not scheduled.</p>
+<ul class="tight">
+<li><b>Observation:</b> <code>mainThreadBudgetMs</code> 2 and <code>cappedFrameSpareShare</code> 0.5 were chosen on Editor timings with the priority queue's heap check on every dequeue (about 10 times the cost per entry). Without it the pool claims are about 6 times cheaper, and the sprint flight at draw 12 already meets the goal.</li>
+<li><b>Idea:</b> repeat the comparison of 2, 3 and 4 ms and of share 0, 0.5 and 1 on the current code, two runs each in ABBA order, focused Editor, the user's go first.</li>
+<li><b>Acceptance if scheduled:</b> a table with the same columns as DEC-105 and DEC-106; the user keeps or changes the values.</li>
+</ul>
+<!-- ============================================================ -->
+<h3>16.18 Machine-dependent limits in the regular PlayMode tier</h3>
+<p class="small">Recorded 2026-11-16 (scheduler review 2026-11-15, finding 5). Not scheduled.</p>
+<ul class="tight">
+<li><b>Observation:</b> <code>PipelineThroughputTests</code> in the regular tier pins timing-dependent values: the draw window meshed in the capped flight ≥ 0.5 (measured 0.575–0.594), a fresh world in ≤ 760 frames (701–703), and a cut run that takes more frames than a whole run (two uncapped runs, whose order is open when the jobs are the limit). A slower machine, an unfocused Editor or a busy disk can fail them without a defect.</li>
+<li><b>Idea:</b> either widen the limits to what a slow run still meets, or move the timing pins to the explicit tier and keep only count-based checks in the regular one. The user decides which.</li>
+<li><b>Acceptance if scheduled:</b> the regular tier passes three times in a row with the Editor unfocused.</li>
+</ul>
+<!-- ============================================================ -->
+<h3>16.19 Collider batch size: class default and shipped value</h3>
+<p class="small">Recorded 2026-11-16. Not scheduled.</p>
+<ul class="tight">
+<li><b>Observation:</b> <code>SchedulerSettings.colliderBatchSize</code> is 4 in the class and 6 in the shipped <code>VoxelEngineSettings.asset</code>. Tests that build settings from the class run with 4, the game with 6; <code>SchedulerSettingsTests</code> covers two values only. The collider queue peaks at about 1000 partitions in a sprint flight under 2 ms (DEC-105).</li>
+<li><b>Idea:</b> pick one value (measured against the collider queue and the collidable share near the player) and use it in both places.</li>
+<li><b>Acceptance if scheduled:</b> class default and asset agree; the choice is recorded with its numbers.</li>
+</ul>
+<!-- ============================================================ -->
+<h3>16.20 Two renderer risks: partitions without geometry, geometry without a partition</h3>
+<p class="small">Recorded 2026-11-16 (scheduler review 2026-11-15, risks 7 and 8; both older than PRs #59–#65, plausible, not reproduced). Not scheduled.</p>
+<ul class="tight">
+<li><b>Observation:</b> (7) a remeshed partition can be evicted by a pool claim of its own batch and end up active without GPU geometry (<code>CMeshBuildScheduler</code>; a cut collect widens the window for it). (8) GPU geometry can stay for a partition whose chunk is unloaded between the start of its job and its claim (<code>VoxelWorld</code>, <code>VoxelWorldRenderer</code>).</li>
+<li><b>Idea:</b> a reproduction first: a PlayMode test that forces the order of events (evict during a batch, unload between job start and claim) and checks the renderer's pages against the pool. Fix only what the test shows.</li>
+<li><b>Acceptance if scheduled:</b> both tests exist; each either passes on the current code (risk closed) or fails before and passes after a fix.</li>
+</ul>
+<!-- ============================================================ -->
+<h3>16.21 Frame-time goal in a release player build</h3>
+<p class="small">Recorded 2026-11-16 (PERF-13). Not scheduled.</p>
+<ul class="tight">
+<li><b>Observation:</b> every number of §E1.1 is from the Editor. About 3 ms of a recorded Editor frame is Editor-only work, and development builds carry the DEBUG define. PERF-13 is judged in a player build, for which no measurement recipe exists.</li>
+<li><b>Idea:</b> a release player build with a goal-run scene (the y 200 flight rig of PERF-20, standing, 40 and 80 u/s, draw 6 and 12) that writes p95, p99, max and the frames over 8.33 ms and 16.67 ms to a file; the user names the hardware.</li>
+<li><b>Acceptance if scheduled:</b> one table per draw distance from two runs of the build, next to the Editor numbers of the same commit.</li>
+</ul>
+<!-- ============================================================ -->
+<h3>16.22 A player without ground falls forever</h3>
+<p class="small">Recorded 2026-11-16 (seen in the frame-budget measurements, 2026-11-15). Not scheduled.</p>
+<ul class="tight">
+<li><b>Observation:</b> the walking controller has no limit on the fall speed, and nothing puts a player back that is under the world or above a partition that is not collidable yet. In the old measurement rig the player fell to y −7275 in a 30 s flight once the ground under it went back to the pool. In normal play the focus moves with the player, so this was not seen in the game; a player could still reach it through a teleport or a slow collider bake.</li>
+<li><b>Idea:</b> a terminal fall speed, and holding the player in place (as at the spawn) while the partition under it is not collidable; a player below y 0 is put back on the ground.</li>
+<li><b>Acceptance if scheduled:</b> a PlayMode test drops a player over an unbaked partition and below the world, and the player ends up standing on ground.</li>
+</ul>
+<!-- ============================================================ -->
+<h3>16.23 Chunk pool without <code>SetActive</code></h3>
+<p class="small">Recorded 2026-11-16 (frame-budget attribution, 2026-11-15). Not scheduled.</p>
+<ul class="tight">
+<li><b>Observation:</b> the chunk pool switches chunk objects on and off with <code>SetActive</code>. In the Editor that marks the gizmo list dirty, and with the Game view's Gizmos on the next frame rebuilds it over all objects (6–10 ms per rebuild in flights). The measurement rig therefore turns Gizmos off (PERF-20). Editor-only; the gain in a player build is not known.</li>
+<li><b>Idea:</b> keep pooled chunk objects active and switch only their renderers and colliders, or move them out of view.</li>
+<li><b>Costs and risks:</b> touches the pool and the collider life cycle; an inactive collider must still not be hit.</li>
+<li><b>Acceptance if scheduled:</b> a flight with Gizmos on is as smooth as with Gizmos off; pool and collider tests pass.</li>
 </ul>
 <h2 id="s17">17 · Generation improvements (Phase G)</h2>
 <p>Planned on 2026-10-24, started the same day. Goal: a world that looks less uniform. There will be more tree kinds, several variants of each kind, crowns that differ voxel by voxel, groves and clearings, ground details and patchy beaches. Generation defects such as grass under water are fixed as well. The decisions behind this section are DEC-30…36 (§17.8). All rules of Part I keep applying, in particular R3 (pure functions of world position), R5 (the user sets the design values), VEG-01…06 (flora pick and anchor spacing), PERF-03 / PERF-04 and the seam test TST-03.</p>
