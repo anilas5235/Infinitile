@@ -39,13 +39,20 @@ namespace Engine.Scripts.Render{
         private readonly Dictionary<int2, IntervalRange> _lightLists = new();
 
         /// <summary>
-        ///     Pages the interval store starts with per list. Eight intervals per voxel column cover the default
-        ///     terrain with flora (measured in flight: median 4.6, maximum 6 per column). The store is shared, so a
-        ///     longer list just takes more pages while the total fits; the store only grows (rarely, it allocates)
-        ///     when it does not.
+        ///     Pages the interval store starts with per list: <see cref="InitialIntervalsPerColumn" /> intervals per
+        ///     voxel column. The store is shared, so a longer list just takes more pages while the total fits.
         /// </summary>
         private const int InitialPagesPerList =
-            (ChunkWidth * ChunkDepth * 8 + 1 + IntervalPages.PageSize - 1) / IntervalPages.PageSize;
+            (ChunkWidth * ChunkDepth * InitialIntervalsPerColumn + 1 + IntervalPages.PageSize - 1) / IntervalPages.PageSize;
+
+        /// <summary>
+        ///     Intervals per voxel column the interval store is sized for at start-up. The sprint flight of the goal
+        ///     run over the terrain with caves and flora peaks at about 15 per column over the whole store (75,620 of
+        ///     100,450 pages at draw distance 12, 33,926 of 43,378 at 6); the rest is headroom. A store that does not
+        ///     fit grows: it allocates a buffer 1.5 times the size and copies the whole store on the GPU in one frame,
+        ///     which costs 17 to 23 ms at draw distance 12. Normal play must not need it.
+        /// </summary>
+        private const int InitialIntervalsPerColumn = 20;
 
         private ChunkIntervalStore _intervalStore;
         private bool _buffersRebuildPending;
