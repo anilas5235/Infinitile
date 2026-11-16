@@ -154,10 +154,44 @@ cut dequeue loop: it loses no partition, meshes none twice and takes an entry in
   counts (`MeshJobStateHandler.Dequeued`, with `TrackRequeues` for the entries a scan queues again);
   `FrameAttribution` splits each frame's time by marker; `FrameHierarchy` records the profiler hierarchy of the
   longest frames. A flight takes the focus out of the player and switches the player off, then flies the focus at
-  y 200 with a pitch of 20° (`PipelineThroughputTests.FlightBody`).
+  y 200 with a pitch of 20° (`GoalRunRig.FlightBody`).
 - **`PipelineMeasurementTests`** (PlayMode, explicit) prints the timings. It switches the game view's Gizmos off
   for the run (the pool's `SetActive` calls make the Editor rebuild the gizmo list) and needs a focused Editor;
   an unfocused Editor reads slow.
+- **The goal run in a player build** (`GoalRunner`, in `Scripts/Diagnostics`) runs the rig of the frame-time
+  goal in a release player, outside the Editor. It starts only with the command-line flag `-goalrun`; without it
+  nothing of it runs. The rig (`GoalRunRig`: flight height, pitch, speeds, phases) and the frame statistics
+  (`FrameTimeStats`) are the ones the PlayMode tests use. Per draw distance (6, then 12) it loads a fresh world,
+  stands 40 s, flies at 80 u/s for 30 s and stops until the world is built, then the same at 40 u/s; uncapped
+  (vSync off, no target frame rate). It writes one text file per run: the machine, the window, the build
+  (`build-info.txt`), one table per draw distance in the column order of the probe's goal rows (p95, p99, max,
+  frames over 8.33 ms and over 16.67 ms, world built after, meshed share near the focus and of the draw window),
+  a verdict per phase (frames from 20 s after the world start are judged: p95 at most 8.33 ms) and the same rows
+  as CSV. Frame times are the wall-clock time between frames. The scheduler's milliseconds per frame are not in
+  it: the engine reports them only through profiler markers, which a release player does not record.
+
+#### Goal run on another machine
+
+1. Build the player on the development machine: menu **Infinitile → Goal Run → Build Release Player (Mono)**
+   (or IL2CPP; IL2CPP needs the Visual Studio C++ tools and a Windows SDK). The build lands in
+   `Builds/Mono/` (or `Builds/IL2CPP/`) at the repository root, with `build-info.txt` naming the commit. The
+   build is always x64, whatever architecture the Editor's build settings hold. A build leaves Unity's own
+   changes in `ProjectSettings/` and `Assets/Settings/` (shader prefilter flags, preloaded assets); they are
+   not part of a change.
+2. Copy the whole folder `Builds/Mono/` to the other machine (any path; it needs write access next to the
+   executable, otherwise the result goes to `%USERPROFILE%\AppData\LocalLow\DefaultCompany\voxel-game\`).
+3. Close other programs, plug a laptop in, then start from a terminal in that folder:
+
+   ```
+   .\voxel-game.exe -goalrun -goalrun-label <machine-name>
+   ```
+
+   Do not touch mouse or keyboard and leave the window in front for the whole run (about 6 to 10 minutes; the
+   file counts frames without focus). The player quits by itself when it is done. Optional: `-goalrun-draw 12`
+   for one draw distance only, `-screen-width 1920 -screen-height 1080 -screen-fullscreen 1` for a fixed
+   window, `-goalrun-timeout <minutes>` (default 30).
+4. The result is `GoalRunResults/goal-run-<label>-<date>-<time>.txt` next to the executable. Send back that file
+   and `Player.log` (`%USERPROFILE%\AppData\LocalLow\DefaultCompany\voxel-game\Player.log`).
 
 ## Light
 

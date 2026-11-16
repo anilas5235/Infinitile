@@ -94,6 +94,9 @@ namespace Engine.Scripts.Render{
         /// <summary>Partitions this renderer builds on the GPU at the same time, each with its own point builder.</summary>
         internal int BuildSlots => _maxInFlight;
 
+        /// <summary>Partitions queued for a GPU build that has not finished yet.</summary>
+        internal int PendingBuildCount => _pendingBuildSet.Count;
+
         private PointBuilderHandler[] _pointBuilderHandlers;
 
         private VoxelEngineSettings _settings;

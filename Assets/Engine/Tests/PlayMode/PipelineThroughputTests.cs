@@ -1,9 +1,9 @@
 using System;
 using System.Collections;
 using System.Globalization;
+using Engine.Scripts.Diagnostics;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Render;
-using Engine.Scripts.Render.Post;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.World;
@@ -22,42 +22,18 @@ namespace Engine.Tests.PlayMode{
     ///     reason. <see cref="PipelineMeasurementTests" /> holds the runs that only measure.
     /// </summary>
     public class PipelineThroughputTests{
-        internal const float BuildTimeoutSeconds = 600f;
+        internal const float BuildTimeoutSeconds = GoalRunRig.BuildTimeoutSeconds;
 
         /// <summary>The frame rate of a player with vertical sync on a 60 Hz display.</summary>
         internal const int CappedFrameRate = 60;
 
-        /// <summary>Spectator flight with sprint: 40 units per second times two.</summary>
-        private const float FlightSpeed = 80f;
-
-        /// <summary>
-        ///     The flights of the goal run, in units per second: the spectator sprint, and the fastest movement
-        ///     outside spectator mode (flying at 20 with sprint, or the spectator without).
-        /// </summary>
-        private static readonly float[] GoalFlightSpeeds ={ FlightSpeed, 40f };
-
-        private const float FlightSeconds = 30f;
-
-        /// <summary>
-        ///     Height of every flight: above the terrain along the path (highest block y 123 to 139 near the spawn)
-        ///     and under the world's top at 256 (owner, 2026-11-15).
-        /// </summary>
-        internal const float FlightHeight = 200f;
-
-        /// <summary>Degrees the camera of a flight looks down, so the picture holds terrain and not only sky.</summary>
-        internal const float FlightPitch = 20f;
-
-        /// <summary>
-        ///     The first world build at the start is exempt from the frame-time goal; from this many seconds after
-        ///     the start the frame times must be stable (owner, 2026-11-14).
-        /// </summary>
-        private const float StableAfterSeconds = 20f;
-
-        /// <summary>How long <see cref="StandThenFly" /> stands still before the flight, from the world start.</summary>
-        private const float StandSeconds = 40f;
-
-        /// <summary>Columns around the focus that count as "near" for the near-first check.</summary>
-        private const int NearRadius = 4;
+        // The rig of the goal run, shared with the goal run of a player build (see GoalRunRig)
+        private const float FlightSpeed = GoalRunRig.SprintFlightSpeed;
+        private static readonly float[] GoalFlightSpeeds = GoalRunRig.GoalFlightSpeeds;
+        private const float FlightSeconds = GoalRunRig.FlightSeconds;
+        private const float StableAfterSeconds = GoalRunRig.StableAfterSeconds;
+        private const float StandSeconds = GoalRunRig.StandSeconds;
+        private const int NearRadius = GoalRunRig.NearRadius;
 
         /// <summary>
         ///     Frames a fresh world at the shipped draw distance may take until every stage sleeps and no GPU build
@@ -357,10 +333,10 @@ namespace Engine.Tests.PlayMode{
             while (true){
                 float elapsed = Time.realtimeSinceStartup - flightStart;
                 if (elapsed >= FlightSeconds) break;
-                body.position = start + new Vector3(FlightSpeed * elapsed, 0f, 0f);
+                body.position = GoalRunRig.FlightPosition(start, FlightSpeed, elapsed);
                 yield return null;
                 probe.Sample();
-                if (probe.Frames % 15 != 0) continue;
+                if (probe.Frames % GoalRunRig.CoverageEveryFrames != 0) continue;
                 nearSum += probe.Coverage(NearRadius);
                 windowSum += probe.Coverage(draw);
                 coverageSamples++;
@@ -407,7 +383,7 @@ namespace Engine.Tests.PlayMode{
         /// <summary>
         ///     The run for the frame-time goal (120 frames per second at the 95th percentile, no stutter the player
         ///     notices): a fresh world with the focus standing still for <see cref="StandSeconds" /> where the
-        ///     flights start (above the spawn at <see cref="FlightHeight" />, see <see cref="FlightBody" />), then
+        ///     flights start (above the spawn at <see cref="GoalRunRig.FlightHeight" />, see <see cref="FlightBody" />), then
         ///     one flight through the built world per entry of <see cref="GoalFlightSpeeds" />, each followed by
         ///     the stop. It prints when the world was built, the frame times from <see cref="StableAfterSeconds" />
         ///     after the start to the end of the standing phase, the frame times of every flight with its queue
@@ -456,35 +432,12 @@ namespace Engine.Tests.PlayMode{
         }
 
         /// <summary>
-        ///     What a flight moves: the focus alone, with nothing in the scene that can fall. In the game scene the
-        ///     focus is the camera of a player with physics. Moving the camera alone leaves the player behind, the
-        ///     ground under it unloads, it falls, and the camera, its child, sinks with it whenever the test does
-        ///     not hold it (between two phases). A measurement of the pipeline needs the focus and the rendering
-        ///     camera, not the player: the focus is taken out of the player and the player object is switched off.
-        ///     The HUD and the rest of the scene stay as they are.
-        ///     The flight goes above the terrain (the spawn is on the sea floor, 46 blocks under water): the focus
-        ///     is lifted to <see cref="FlightHeight" /> and looks along the flight, <see cref="FlightPitch" /> degrees
-        ///     down. The effect of the water around the spawn would stay on the picture, because the handler that
-        ///     follows the camera sits on the player: it is cleared here. <see cref="FreshSceneAfterFlight" /> in the
-        ///     fixture's tear-down gives the tests that follow a scene with a player again.
+        ///     What a flight moves: the focus alone, out of the player, at the height and pitch of the rig (see
+        ///     <see cref="GoalRunRig.FlightBody" />). <see cref="FreshSceneAfterFlight" /> in the fixture's tear-down
+        ///     gives the tests that follow a scene with a player again.
         /// </summary>
         internal static Transform FlightBody(Transform focus){
-            if (focus.parent != null){
-                GameObject player = focus.root.gameObject;
-                focus.SetParent(null, true);
-                player.SetActive(false);
-                PostProcessManager post = PostProcessManager.Instance;
-                if (post){
-                    post.ResetLiftGammaGain();
-                    post.ResetColorAdjustments();
-                }
-
-                UnderwaterFogFeature.Enabled = false;
-            }
-
-            Vector3 eye = focus.position;
-            focus.SetPositionAndRotation(new Vector3(eye.x, FlightHeight, eye.z), Quaternion.Euler(FlightPitch, 90f, 0f));
-            return focus;
+            return GoalRunRig.FlightBody(focus);
         }
 
         /// <summary>
@@ -589,7 +542,7 @@ namespace Engine.Tests.PlayMode{
             while (true){
                 float elapsed = Time.realtimeSinceStartup - flightStart;
                 if (elapsed >= FlightSeconds) break;
-                body.position = start + new Vector3(speed * elapsed, 0f, 0f);
+                body.position = GoalRunRig.FlightPosition(start, speed, elapsed);
                 yield return null;
                 probe.Sample();
                 if (sankAt < 0f && math.abs(focus.position.y - start.y) > 0.5f){
@@ -598,7 +551,7 @@ namespace Engine.Tests.PlayMode{
                         "{0:0.0} s into the flight, the focus has left the height of its start", elapsed));
                 }
 
-                if (probe.Frames % 15 != 0) continue;
+                if (probe.Frames % GoalRunRig.CoverageEveryFrames != 0) continue;
                 float near = probe.Coverage(NearRadius);
                 nearSum += near;
                 nearMin = math.min(nearMin, near);

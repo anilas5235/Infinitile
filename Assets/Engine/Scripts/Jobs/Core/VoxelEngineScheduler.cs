@@ -89,6 +89,17 @@ namespace Engine.Scripts.Jobs.Core{
         /// </summary>
         internal FrameBudget Budget{ get; set; }
 
+        /// <summary>The state handlers and job schedulers of the four stages, for measurements of the pipeline.</summary>
+        internal DataJobStateHandler DataHandler => _dataJobHandler;
+
+        internal LightJobStateHandler LightHandler => _lightJobHandler;
+        internal MeshJobStateHandler MeshHandler => _meshJobHandler;
+        internal ColliderJobStateHandler ColliderHandler => _colliderJobHandler;
+        internal ChunkScheduler DataJobs => _chunkScheduler;
+        internal LightScheduler LightJobs => _lightScheduler;
+        internal CMeshBuildScheduler MeshJobs => _cMeshBuildScheduler;
+        internal ColliderBakeScheduler BakeJobs => _colliderBakeScheduler;
+
         /// <summary>
         ///     Executes a scheduler tick: the first stage in round-robin order that has main-thread work gets the
         ///     frame, and the stage after it is first in line on the next tick. So at most one stage applies a batch

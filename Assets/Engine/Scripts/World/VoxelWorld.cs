@@ -317,6 +317,12 @@ namespace Engine.Scripts.World{
         /// </summary>
         internal ChunkManager ChunkManager{ get; private set; }
 
+        /// <summary>The scheduler of the pipeline, the pool and the focus transform, for measurements of the pipeline.</summary>
+        internal VoxelEngineScheduler Scheduler => _scheduler;
+
+        internal ChunkPool Pool => _chunkPool;
+        internal Transform FocusTransform => focus;
+
         public VoxelEngineSettings Settings => settings;
 
         #endregion
