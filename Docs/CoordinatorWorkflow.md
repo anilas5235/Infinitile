@@ -4,7 +4,8 @@ How the owner and a coordinating agent drive a spec phase to completion with one
 per task. Adapted on 2026-11-08 from a multi-repo outline (PageMark) to the constraints of a
 single Unity project: one checkout, one Editor, Burst, and tests that only run inside that
 Editor. The spec ([WorldGenSpec.html](WorldGenSpec.html)) stays the single source of truth;
-this file only says how work on it is organised.
+this file only says how work on it is organised. Updated on 2026-11-16 with the owner's rules
+of 2026-11-08…16 (Opus for every session, Editor restarts, archiving, timing runs, test tiers).
 
 ## 1. Roles
 
