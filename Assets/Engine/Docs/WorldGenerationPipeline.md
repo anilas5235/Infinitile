@@ -936,8 +936,8 @@ The scheduler collects generation requests, batches chunk jobs, and builds voxel
 Inside the generate step, each chunk job runs a fixed sequence: prepare inputs, sample noise fields, classify base
 materials, run feature passes (ores/caves/structures/vegetation), apply border fixups, then pack the final voxel map and
 metadata.
-When chunk data is finished, it is registered in the chunk manager and forwarded to the mesh pipeline for visual and
-collider updates.
+When chunk data is finished, it is registered in the chunk manager and wakes the light stage; the mesh stage meshes
+a chunk once its 3 x 3 neighbourhood is lit (`ChunkPipeline.md`).
 
 Advantages:
 

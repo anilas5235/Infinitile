@@ -110,13 +110,16 @@ It exposes events such as chunk changes, chunk data readiness, partition evictio
 Most systems listen to these events instead of polling the world directly.
 
 ### `VoxelEngineScheduler`
-Coordinates the major job pipelines in a round-robin cycle:
+Coordinates the major job pipelines as four stages:
 - data generation
 - light
 - mesh building
 - collider baking
 
-It also tracks queue counts and average timings for diagnostics.
+Each frame gives one stage a turn (collect, scan, dispatch) through `StageRing`, bounded by a main-thread time
+budget per frame (`FrameBudget`); see `ChunkPipeline.md`, "Scheduling". It also exposes queue counts and average
+timings for diagnostics. Profiler markers and the PlayMode measurement rig are described in `ChunkPipeline.md`,
+"Measuring".
 
 ### `ChunkScheduler`
 Dispatches chunk data generation jobs.
@@ -128,7 +131,9 @@ runs the incremental light update after each voxel edit (see `ChunkPipeline.md`)
 It is used by the light job state handler.
 
 ### `CMeshBuildScheduler`
-Dispatches partition collider mesh generation jobs.
+Dispatches partition collider mesh generation jobs and, in the same dispatch, requests the GPU builds of those
+partitions from the renderer. It makes partitions without a voxel active without a job (`ApplyEmpty`) and reports
+when the renderer is behind (`RendererBehind`), so the mesh stage waits.
 It is used by the mesh job state handler.
 
 ### `ColliderBakeScheduler`
@@ -180,8 +185,10 @@ Copies built point data into the target render buffers and prepares page metadat
   test assemblies. Runtime internals they use are exposed with `InternalsVisibleTo` in `Scripts/AssemblyInfo.cs`.
 - EditMode test tiers (`TestTiers`): methods of 5 s or more carry `[Category("Slow")]`, the print-only cave report
   `[Category("Report")]`, and both are `[Explicit]`, because the Editor's runner cannot leave out a category. A plain
-  run holds only the fast tests (570 tests, about 70 s); with the explicit tests it holds all 678 (about 290 s), which
-  runs before each pull request. With the project open in the Editor, start long runs detached, since a run ends with
+  run holds only the fast tests (761 tests in November 2026); with the explicit tests it holds all of them (879 on 2026-11-16, 2 of them
+  skipped; 330 to 410 s on 2026-11-14), which runs before each pull request, as the last Editor step: the test pipeline can cancel it at its
+  timeout and then answer no command until the Editor is restarted, while the run itself finishes into
+  `TestResults.xml`. With the project open in the Editor, start long runs detached, since a run ends with
   the shell that waits for it:
 
   ```
@@ -249,6 +256,8 @@ When adding new behavior, hook into the existing events instead of polling where
 ### Preserve GPU and job lifetimes
 Many systems own native arrays, graphics buffers, or compute-shader resources.
 When editing these systems, check disposal paths carefully.
+Never allocate, grow or free `Allocator.Domain` memory inside a job: chunk lists that jobs create use
+`ChunkLists.Allocator` (`Allocator.Persistent`), see `ChunkPipeline.md`, "Lifetime rules".
 
 ### Prefer minimal changes
 The project already has a layered architecture.
