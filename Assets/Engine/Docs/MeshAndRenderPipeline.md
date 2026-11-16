@@ -672,10 +672,10 @@ flowchart LR
     inside the draw window] -->|batch, only while
     pending <= 2 x slots| J[CMeshBuildJob
     collider mesh]
-    J --> P[Renderer pending list
+    Q -->|same dispatch| P[Renderer pending list
     first in, first out]
     P --> S[GPU build slots
-    partitionBuildBatchSize]
+    BuildSlotsAt of the draw distance]
     S -->|read-back, a few frames| R[Pages + draw]
     P -. pending count .-> Q
 ```
@@ -683,13 +683,15 @@ flowchart LR
 ### Description
 
 A meshed partition takes two things: the collider mesh job on the CPU and the point build on the GPU. The renderer
-builds one partition per slot (`SchedulerSettings.partitionBuildBatchSize` slots, each with its own counter
-buffers of about 8 MB) and a slot is busy until its read-back returns, a few frames later. The mesh step used to
-hand over its batches without looking at the renderer.
+builds one partition per slot (`SchedulerSettings.BuildSlotsAt(DrawDistance)` slots since version 1.9, each with
+its own counter buffers of about 8 MB) and a slot is busy until its read-back returns, a few frames later. The mesh step used to
+hand over its batches without looking at the renderer. One dispatch schedules the collider mesh job and requests the
+GPU builds of the same partitions (`CMeshBuildScheduler.Start`), so both run side by side.
 
 - **Pacing.** The renderer reports the number of partitions that wait for a slot
   (`VoxelWorld.PendingPartitionBuilds`). The mesh step dispatches its next batch only while at most two rounds of
-  slots wait (`CMeshBuildScheduler.RendererBehind`). Two rounds keep the slots busy between two mesh batches; the
+  slots wait (`CMeshBuildScheduler.RendererBehind`); meanwhile it neither scans nor dispatches, but still collects a
+  finished batch. Two rounds keep the slots busy between two mesh batches; the
   rest of the backlog stays in the mesh queue, which is re-sorted around the focus and pruned to the draw window
   on every focus update. The renderer's list is first in, first out and cannot follow the focus.
 - **Throughput.** With the scheduler of `ChunkPipeline.md` ("Scheduling") the mesh step is no longer bound to one
@@ -705,7 +707,9 @@ hand over its batches without looking at the renderer.
   | work-conserving | 32 / 16 | 1037 | 17.3 | 4.82 |
 
   With 32 / 16 the collider bake becomes the limit (its queue peaks at 2802 in a flight) and applying a mesh
-  batch of 32 takes up to 21 ms of main-thread time in one frame, against 12 ms with 16.
+  batch of 32 takes up to 21 ms of main-thread time in one frame, against 12 ms with 16. (Measured before the
+  main-thread budget of `ChunkPipeline.md`; a batch is now applied over several frames, one pool claim per item of
+  the budget.)
 - **Without a renderer** (EditMode tests, a disabled renderer) the count is 0 and the mesh step never waits.
 
 Trade-offs:
