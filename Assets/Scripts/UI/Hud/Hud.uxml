@@ -2,7 +2,6 @@
     <Style src="Hud.uss" />
     <ui:VisualElement name="hud" class="hud" picking-mode="Ignore">
         <ui:VisualElement name="crosshair" class="crosshair" picking-mode="Ignore" />
-        <ui:Label name="message" class="message" picking-mode="Ignore" />
 
         <ui:VisualElement name="debug-left" class="column column--left" picking-mode="Ignore">
             <ui:VisualElement name="world-panel" class="panel" picking-mode="Ignore">
@@ -13,18 +12,6 @@
                 <ui:Label name="height" class="row" />
                 <ui:Label name="climate" class="row" />
                 <ui:Label name="generation" class="row" />
-            </ui:VisualElement>
-
-            <ui:VisualElement name="gen-panel" class="panel">
-                <ui:Label text="World generation" class="panel__title" />
-                <ui:Label name="configuration" class="row" />
-                <ui:VisualElement class="button-row">
-                    <ui:Button name="previous-config" text="◀ Prev" tooltip="Shift+F10" class="hud-button" />
-                    <ui:Button name="next-config" text="Next ▶" tooltip="F10" class="hud-button" />
-                    <ui:Button name="architecture" text="Architecture" tooltip="F11" class="hud-button" />
-                </ui:VisualElement>
-                <ui:Label text="Bookmarks: F1–F4 go, Shift stores" class="row row--dim" />
-                <ui:VisualElement name="bookmarks" class="bookmarks" />
             </ui:VisualElement>
         </ui:VisualElement>
 

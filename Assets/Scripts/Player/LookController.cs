@@ -44,7 +44,7 @@ namespace Player{
         public float Pitch => _pitch;
 
         /// <summary>
-        ///     Sets the camera pitch in degrees (clamped), e.g. when a camera bookmark is restored.
+        ///     Sets the camera pitch in degrees (clamped).
         /// </summary>
         public void SetPitch(float pitch){
             _pitch = Mathf.Clamp(pitch, -maxLookAngle, maxLookAngle);

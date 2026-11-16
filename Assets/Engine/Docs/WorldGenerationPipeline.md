@@ -386,8 +386,8 @@ in-chunk voxels only]
 
 The preview window is the comparison tool for world generation. It switches architecture, blend method and strength,
 compares two configurations side by side with a difference view, lists the boundary lengths of every biome pair with
-implausible pairs flagged, and draws every spline level as a 1D plot. In game, a debug key regenerates the loaded
-world with another configuration, and camera bookmarks return to the same spots. Every tool reads
+implausible pairs flagged, and draws every spline level as a 1D plot. (Version 1.6 also had in-game debug keys that regenerated the loaded world
+with another configuration and camera bookmarks; they were removed on 2026-11-16.) Every tool reads
 `WorldGenApi.SampleRegion` or the Burst spline evaluator, so the preview shows what the chunk job builds.
 
 ## Preview and comparison data flow
@@ -414,8 +414,6 @@ Signed / Mismatch / Pixels]
     PB --> D
     S --> SP[SplinePlots
 Flatten + PlotJob per node]
-    S --> G[WorldGenDebugKeys
-transient variant] --> R[VoxelWorld.Regenerate]
 ```
 
 ### Description
@@ -471,15 +469,11 @@ transient variant] --> R[VoxelWorld.Regenerate]
     - it waits for a pause in the change requests (`RebuildDebounceSeconds`);
     - it owns passes A and B, the distribution plane job and the spline plots;
     - it raises `Finished` when a build has been applied.
-- **In game** (`Scripts/UI/WorldGenDebugKeys.cs`):
-  - F10 regenerates the loaded world with the next configuration and Shift+F10 with the previous one. The list holds
-    the asset as assigned, Biome-first × 4 methods, and Terrain-first with None and with DistanceBlend. Strengths are
-    the asset's.
-  - Each variant is a transient copy of the asset, destroyed right after `VoxelWorld.Regenerate`.
-  - F1–F4 restore a camera bookmark (position, yaw, pitch) and Shift+F1–F4 store one. Bookmarks persist in
-    PlayerPrefs.
-  - `PlayerManager.HoldUntilGrounded` keeps the player in place until the ground has colliders again, and lifts the
-    player when the new terrain would bury them.
+- **In game**: removed on 2026-11-16 together with the HUD's world-generation panel. The debug keys
+  (`Scripts/UI/WorldGenDebugKeys.cs`: F10 / Shift+F10 next or previous configuration, F11 architecture switch, F1–F4
+  camera bookmarks) are gone. `VoxelWorld.Regenerate` stays and is called only by `WorldRegenerationTests`;
+  `PlayerManager.HoldUntilGrounded` (keeps the player in place until the ground has colliders again) stays without a
+  caller.
 - **World reset** (`World/VoxelWorld.cs`): `Regenerate(WorldGenSettings = null)` runs in this order:
   1. Builds the new `ChunkScheduler` (the provider takes the override), so invalid settings throw while the world is
      still intact.

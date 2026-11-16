@@ -22,11 +22,10 @@ using Cursor = UnityEngine.Cursor;
 
 namespace UI{
     /// <summary>
-    ///     The in-game HUD (UI Toolkit, Hud.uxml): crosshair, a hotbar of voxels to place, and three debug panels
-    ///     toggled with F7: the world under the player (position, chunk, biome, climate, generation methods), the
-    ///     engine's performance (frame time, graphics memory, chunk queues, culling pages per layer) and the world generation controls
-    ///     of <see cref="WorldGenDebugKeys" />. Holding Left Alt frees the cursor to click the panel buttons. E opens
-    ///     a list of every voxel, searchable by name or id, that puts the clicked voxel into the hotbar.
+    ///     The in-game HUD (UI Toolkit, Hud.uxml): crosshair, a hotbar of voxels to place, and two debug panels
+    ///     toggled with F7: the world under the player (position, chunk, biome, climate, generation methods) and the
+    ///     engine's performance (frame time, graphics memory, chunk queues, culling pages per layer). Holding Left Alt frees the cursor. E opens a list of every voxel,
+    ///     searchable by name or id, that puts the clicked voxel into the hotbar.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class HudController : MonoBehaviour{
@@ -47,15 +46,13 @@ namespace UI{
         [SerializeField] private float refreshInterval = 0.1f;
 
         [SerializeField] private VoxelEditor voxelEditor;
-        [SerializeField] private WorldGenDebugKeys worldGenKeys;
 
         private readonly List<CullingLayerStats> _cullingStats = new();
         private readonly List<Label> _cullingRows = new();
         private readonly List<SearchEntry> _searchEntries = new();
         private readonly List<VisualElement> _slots = new();
-        private Button[] _bookmarkGo;
-        private Label _biome, _chunk, _chunks, _climate, _configuration, _fps, _generation, _height, _hint;
-        private Label _message, _position, _queues, _vram, _voxelName;
+        private Label _biome, _chunk, _chunks, _climate, _fps, _generation, _height, _hint;
+        private Label _position, _queues, _vram, _voxelName;
         private VisualElement _crosshair, _culling, _debugLeft, _debugRight, _search;
         private TextField _searchField;
         private Label _searchName;
@@ -82,13 +79,11 @@ namespace UI{
             Root = GetComponent<UIDocument>().rootVisualElement.Q("hud");
             if (Root == null) return;
             if (!voxelEditor) voxelEditor = FindFirstObjectByType<VoxelEditor>();
-            if (!worldGenKeys) worldGenKeys = FindFirstObjectByType<WorldGenDebugKeys>();
             _look = FindFirstObjectByType<LookController>();
             _movement = FindFirstObjectByType<PlayerControllerManager>();
 
             _crosshair = Root.Q("crosshair");
             _crosshair.style.backgroundImage = crosshair;
-            _message = Root.Q<Label>("message");
             _hint = Root.Q<Label>("hint");
             _debugLeft = Root.Q("debug-left");
             _debugRight = Root.Q("debug-right");
@@ -103,13 +98,11 @@ namespace UI{
             _chunks = Root.Q<Label>("chunks");
             _queues = Root.Q<Label>("queues");
             _culling = Root.Q("culling");
-            _configuration = Root.Q<Label>("configuration");
             _voxelName = Root.Q<Label>("voxel-name");
 
             // Unity's own graphics allocations (textures, meshes, buffers, render targets); in the Editor this
             // includes the Editor's windows.
             _gfxMemory = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "Gfx Used Memory");
-            BindGenControls();
             BuildHotbar();
             BindVoxelSearch();
             if (voxelEditor) voxelEditor.OnVoxelIdChanged += OnVoxelIdChanged;
@@ -139,16 +132,11 @@ namespace UI{
 
             if (!HotbarResolved()) ResolveHotbar(); // the registry fills in the DataImporter's Awake
 
-            string message = worldGenKeys ? worldGenKeys.Message : null;
-            _message.text = message;
-            _message.style.display = string.IsNullOrEmpty(message) ? DisplayStyle.None : DisplayStyle.Flex;
-
             if (Time.unscaledTime < _nextRefresh) return;
             _nextRefresh = Time.unscaledTime + refreshInterval;
             if (showDebugPanels){
                 RefreshWorld();
                 RefreshPerformance();
-                RefreshGenControls();
             }
 
             _frameTimeSum = 0f;
@@ -291,42 +279,6 @@ namespace UI{
                 _cullingRows[i].text = $"{s.Layer}   {s.VisiblePages} / {s.ShadowPages} / {s.AllocatedPages}" +
                                        $"   ({s.Buffers} buffer{(s.Buffers == 1 ? "" : "s")})";
             }
-        }
-
-        // ── World generation panel ───────────────────────────────────────────
-
-        private void BindGenControls(){
-            Root.Q("gen-panel").style.display = worldGenKeys ? DisplayStyle.Flex : DisplayStyle.None;
-            _bookmarkGo = Array.Empty<Button>();
-            if (!worldGenKeys) return;
-
-            Root.Q<Button>("previous-config").clicked += () => worldGenKeys.StepConfiguration(-1);
-            Root.Q<Button>("next-config").clicked += () => worldGenKeys.StepConfiguration(1);
-            Root.Q<Button>("architecture").clicked += worldGenKeys.SwitchArchitecture;
-
-            VisualElement bookmarks = Root.Q("bookmarks");
-            bookmarks.Clear();
-            _bookmarkGo = new Button[worldGenKeys.BookmarkCount];
-            for (int i = 0; i < _bookmarkGo.Length; i++){
-                int index = i;
-                VisualElement entry = new();
-                entry.AddToClassList("bookmark");
-                Button go = new(() => worldGenKeys.RestoreBookmark(index)){ text = $"{index + 1}", tooltip = "Go" };
-                Button store = new(() => worldGenKeys.StoreBookmark(index)){ text = "Store" };
-                go.AddToClassList("hud-button");
-                store.AddToClassList("hud-button");
-                entry.Add(go);
-                entry.Add(store);
-                bookmarks.Add(entry);
-                _bookmarkGo[i] = go;
-            }
-        }
-
-        private void RefreshGenControls(){
-            if (!worldGenKeys) return;
-            _configuration.text = $"Config {worldGenKeys.CurrentConfiguration}";
-            for (int i = 0; i < _bookmarkGo.Length; i++)
-                _bookmarkGo[i].EnableInClassList("hud-button--empty", !worldGenKeys.HasBookmark(i));
         }
 
         // ── Hotbar ───────────────────────────────────────────────────────────
