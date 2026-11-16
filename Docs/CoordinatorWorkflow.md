@@ -117,7 +117,7 @@ Prompt:
     changed; explicit tier last, before the PR; timing runs (benchmark rows against <baseline>)
     only after the owner's go for each run (section 6); UI and in-game behaviour are listed for
     the owner to check, never claimed
-  - forbidden: committing to master, `unity cmd eval_file` and `eval`, plain `unity recompile`,
+  - forbidden: committing to master, `unity cmd eval_file` (and avoid `eval`), plain `unity recompile`,
     `unity pipeline upgrade`, rebasing or force-pushing, merging, stash or reset, printing the
     Editor.log header, editing WorldGenSpec.html directly unless asked, changing shipped tuning
     values without a DEC, fixing review findings before the owner picked them
@@ -151,8 +151,8 @@ The Editor
   plain `unity recompile` (unknown command, 30 s timeout) and never `unity pipeline upgrade`.
   `unity cmd recompile` answers "up to date" when Unity already refreshed on its own; then check
   the assembly's time stamp and `error CS` in `Editor.log`.
-- Never `unity cmd eval_file` or `eval`: after one, the next refresh or domain reload has hung
-  the Editor for good. Ad-hoc checks go into an EditMode test with `TestContext.WriteLine`.
+- Never `unity cmd eval_file`, and avoid `eval`: after an `eval_file`, the next refresh or
+  domain reload has hung the Editor for good. Ad-hoc checks go into an EditMode test with `TestContext.WriteLine`.
 - Never send unknown or guessed commands while a test runs: every Editor error log fails the
   running test. Do not poll `unity status` during PlayMode runs.
 - Never print the header of `Editor.log`: it contains an access token. When quoting the log,
@@ -194,7 +194,7 @@ Tests and benchmarks
   run blocks the main thread) or a log line alone.
 - Tiers: the plain EditMode run while iterating (761 tests on 2026-11-16) and the regular
   PlayMode tier when the renderer, scheduler or HUD changed (57 tests). The explicit EditMode
-  tier (`--include_explicit true`, 830–846 tests, 327–406 s on 2026-11-14) runs last: the
+  tier (`--include_explicit true`, 877 passed and 2 skipped on 2026-11-16; 327–406 s on 2026-11-14) runs last: the
   pipeline cancels it at its timeout even with `--timeout 900` and then answers no command,
   while the run itself finishes into `TestResults.xml`. Plan an Editor restart after it.
   Flora tests run with caves off (DEC-72).
@@ -261,7 +261,8 @@ memory, the spec and the repository alone.
 ## 10. Tooling notes (Windows / Git Bash)
 
 - Native tools want `N:\…` paths; Git Bash wants `/n/…`. Use absolute paths: a `cd` in one
-  call can leave the shell elsewhere for the next.
+  call can leave the shell elsewhere for the next. Run `unity cmd eval -- '…'` from Bash,
+  PowerShell loses the inner quotes (and see section 6 on avoiding `eval`).
 - Python scripts: write them to the scratchpad and run `python -I <path>`; `-I` ignores
   `PYTHONIOENCODING`, so call `sys.stdout.reconfigure(encoding='utf-8')` in the script; write
   files with `newline='\n'`.

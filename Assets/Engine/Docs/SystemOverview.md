@@ -185,8 +185,8 @@ Copies built point data into the target render buffers and prepares page metadat
   test assemblies. Runtime internals they use are exposed with `InternalsVisibleTo` in `Scripts/AssemblyInfo.cs`.
 - EditMode test tiers (`TestTiers`): methods of 5 s or more carry `[Category("Slow")]`, the print-only cave report
   `[Category("Report")]`, and both are `[Explicit]`, because the Editor's runner cannot leave out a category. A plain
-  run holds only the fast tests (761 tests in November 2026); with the explicit tests it holds all of them (830 to 846,
-  330 to 410 s), which runs before each pull request, as the last Editor step: the test pipeline can cancel it at its
+  run holds only the fast tests (761 tests in November 2026); with the explicit tests it holds all of them (879 on 2026-11-16, 2 of them
+  skipped; 330 to 410 s on 2026-11-14), which runs before each pull request, as the last Editor step: the test pipeline can cancel it at its
   timeout and then answer no command until the Editor is restarted, while the run itself finishes into
   `TestResults.xml`. With the project open in the Editor, start long runs detached, since a run ends with
   the shell that waits for it:
