@@ -316,11 +316,6 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
                     "Queue has been corrupted (Did you update a node priority manually instead of calling UpdatePriority()?" +
                     "Or add the same node to two different queues?)");
             }
-#elif DEBUG
-            // Measurement only: the check as every Dequeue ran it under DEBUG until 2026-11-15, so a timing run can
-            // compare both in one Editor session (PipelineMeasurementTests). Off unless a test switches it on.
-            if (PriorityQueueMeasurement.ValidateOnDequeue && !IsValidQueue())
-                throw new InvalidOperationException("Queue has been corrupted");
 #endif
 
             TItem returnMe = _nodes[1];
@@ -526,16 +521,5 @@ namespace Engine.Scripts.ThirdParty.Priority_Queue{
 
             return true;
         }
-    }
-}
-
-namespace Engine.Scripts.ThirdParty.Priority_Queue{
-    /// <summary>
-    ///     Measurement only, in builds with DEBUG: <see cref="ValidateOnDequeue" /> makes every Dequeue of a
-    ///     <see cref="GenericPriorityQueue{TItem,TPriority}" /> check the whole heap again, as it did under DEBUG
-    ///     until 2026-11-15 (PRIORITY_QUEUE_VALIDATE switches the check on for good). Not a setting.
-    /// </summary>
-    internal static class PriorityQueueMeasurement{
-        internal static bool ValidateOnDequeue;
     }
 }
