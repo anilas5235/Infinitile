@@ -10,6 +10,13 @@ using UnityEngine;
 
 namespace Player{
     public class PlayerManager : MonoBehaviour{
+        /// <summary>Gap between the feet and the ground when a held player that reaches into the ground is set down.</summary>
+        private const float SetDownClearance = 0.25f;
+
+        /// <summary>Free voxels above the ground a body needs to stand (the capsule is 1.8 high).</summary>
+        private const int StandingRoom = 2;
+
+        private CharacterController _body;
         private PlayerControllerManager _controllerManager;
 
         private bool _holding;
@@ -22,6 +29,11 @@ namespace Player{
 
         private void Start(){
             DisablePlayer();
+            if (_world) _world.DrawDistanceChanged += OnDrawDistanceChanged;
+        }
+
+        private void OnDestroy(){
+            if (_world) _world.DrawDistanceChanged -= OnDrawDistanceChanged;
         }
 
         private void FixedUpdate(){
@@ -38,6 +50,7 @@ namespace Player{
         }
 
         private void OnEnable(){
+            _body = GetComponent<CharacterController>();
             _controllerManager = GetComponent<PlayerControllerManager>();
             _voxelEditor = GetComponent<VoxelEditor>();
             _postProcessHandler = GetComponent<VoxelPostProcessHandler>();
@@ -46,29 +59,80 @@ namespace Player{
         }
 
         /// <summary>
-        ///     Disables the player until the ground under it is loaded and collidable again, e.g. after
-        ///     <see cref="VoxelWorld.Regenerate" /> or a teleport. The player keeps its pose unless the new terrain
-        ///     buries it; then it is put on top of the column.
+        ///     Freezes the player where it is (no input, no gravity, no move) until the ground under it is loaded and
+        ///     its collider is ready again, e.g. while the world is built anew at another draw distance, after
+        ///     <see cref="VoxelWorld.Regenerate" /> or after a teleport. Then the player goes on from where it was; only
+        ///     a body that reaches into the ground is set down just above it.
         /// </summary>
         public void HoldUntilGrounded(){
             DisablePlayer();
             _holding = true;
         }
 
-        private void TryReleaseHold(){
-            if (!ReadyForPlayer(out int3 below)) return;
+        private void OnDrawDistanceChanged(int drawDistance){
+            HoldUntilGrounded();
+        }
 
-            // The first collidable voxel under the head lies inside the body: lift the player above the column and
-            // release it once the top is collidable.
-            int3 playerPos = transform.position.Int3();
-            if (below.y >= playerPos.y - 1){
+        private void TryReleaseHold(){
+            if (!TryFindGround(out float groundTop)) return;
+
+            float feet = FeetY;
+            if (feet < groundTop){
                 Vector3 position = transform.position;
-                transform.position = new Vector3(position.x, VoxelConstants.ChunkHeight, position.z);
-                return;
+                transform.position = new Vector3(position.x, position.y + groundTop + SetDownClearance - feet, position.z);
             }
 
             _holding = false;
             EnablePlayer();
+        }
+
+        /// <summary>World height of the bottom of the player's capsule.</summary>
+        private float FeetY => transform.position.y + (_body.center.y - _body.height * 0.5f) * transform.lossyScale.y;
+
+        /// <summary>
+        ///     The top of the ground the player stands on or over, once the voxel data is loaded and the partition of
+        ///     that ground has its collider. The ground is the first collidable voxel down from the head; if that
+        ///     voxel reaches above the feet, the body is in the ground and the ground is the floor of the first free
+        ///     space above it that the body fits in.
+        /// </summary>
+        private bool TryFindGround(out float groundTop){
+            groundTop = 0f;
+            Vector3 position = transform.position;
+            if (!_world.IsChunkLoaded(position.Int3())) return false;
+
+            float feet = FeetY;
+            int top = VoxelConstants.ChunkHeight - 1;
+            int3 ground = new((int)math.floor(position.x), 0, (int)math.floor(position.z));
+            ground.y = math.min((int)math.floor(feet + _body.height * transform.lossyScale.y), top);
+            while (ground.y >= 0 && !IsSolid(ground)) ground.y--;
+            if (ground.y < 0) return false;
+
+            if (ground.y + 1 > feet){
+                // in the ground: climb to the first gap the body fits in
+                int free = 0;
+                int3 probe = ground;
+                while (probe.y < top && free < StandingRoom){
+                    probe.y++;
+                    if (IsSolid(probe)){
+                        free = 0;
+                        ground.y = probe.y;
+                    }
+                    else{
+                        free++;
+                    }
+                }
+            }
+
+            if (!_world.IsCollidable(VoxelConstants.WorldToPartitionPos(ground))) return false;
+            groundTop = ground.y + 1;
+            return true;
+        }
+
+        /// <summary>Whether the voxel there stops the player; an id the registry does not know counts as solid.</summary>
+        private bool IsSolid(int3 position){
+            ushort voxelId = _world.GetVoxel(position);
+            if (voxelId == 0) return false;
+            return !_voxelRegistry.TryGet(voxelId, out Voxel voxelDef) || voxelDef.collision;
         }
 
         public void DisablePlayer(){

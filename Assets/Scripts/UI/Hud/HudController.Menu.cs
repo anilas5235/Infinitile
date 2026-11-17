@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Engine.Scripts.Render;
 using Engine.Scripts.World;
-using Player;
 using UnityEngine;
 using UnityEngine.UIElements;
 using static System.FormattableString;
@@ -253,19 +252,16 @@ namespace UI{
         }
 
         /// <summary>
-        ///     Builds the world again at the picked draw distance around the player, who keeps the pose and is held
-        ///     until the ground under them is solid again. The choice is saved for the next start.
+        ///     Builds the world again at the picked draw distance around the player, who is frozen in place until the
+        ///     ground under them has its collider again (the player listens to the world for that). The choice is
+        ///     saved for the next start.
         /// </summary>
         private void ApplyMenuDrawDistance(){
             VoxelWorld world = VoxelWorld.Instance;
             int picked = _pickedDraw;
             if (!world || picked <= 0 || picked == world.DrawDistance) return;
             GameSettings.DrawDistance = picked;
-            if (world.ChangeDrawDistance(picked)){
-                PlayerManager player = FindFirstObjectByType<PlayerManager>();
-                if (player) player.HoldUntilGrounded();
-            }
-
+            world.ChangeDrawDistance(picked);
             RefreshSettings();
             _nextRefresh = 0f;
         }

@@ -91,6 +91,80 @@ namespace Engine.Tests.PlayMode{
             }
         }
 
+        /// <summary>
+        ///     The real player during a draw-distance change, shrinking and growing: frozen exactly where it stood (no
+        ///     gravity, no physics move) while the world is rebuilt, released once the ground has its collider, and
+        ///     then standing on the ground where it was, not sinking or falling through.
+        /// </summary>
+        [UnityTest]
+        [Timeout(300000)]
+        public IEnumerator ChangeDrawDistance_FreezesThePlayer_UntilTheGroundHasItsCollider(){
+            VoxelWorld world = VoxelWorld.Instance;
+            VoxelWorldRenderer renderer = VoxelWorldRenderer.Instance;
+            int original = world.DrawDistance;
+            Transform player = PlayModeFixtures.GetPrivateField<Transform>(world, "focus").root;
+            CharacterController body = player.GetComponent<CharacterController>();
+            Component manager = player.GetComponent("PlayerManager"); // game assembly: found by name
+            Assert.IsNotNull(body, "player CharacterController");
+            Assert.IsNotNull(manager, "PlayerManager on the player");
+
+            yield return WaitUntilBuilt(world, renderer);
+            yield return WaitUntilStanding(player, body);
+            try{
+                foreach (int distance in new[]{ Smaller, original }){
+                    Vector3 stood = player.position;
+                    Assert.IsTrue(world.ChangeDrawDistance(distance));
+                    Assert.IsTrue(Holding(manager), $"the player is held at once ({distance})");
+
+                    int heldFrames = 0;
+                    float deadline = Time.realtimeSinceStartup + LoadTimeout;
+                    while (Holding(manager)){
+                        Assert.Less(Vector3.Distance(stood, player.position), 1e-4f, $"frozen in place ({distance})");
+                        Assert.IsFalse(body.enabled, "no physics move while frozen");
+                        if (Time.realtimeSinceStartup > deadline) Assert.Fail($"the player was not released ({distance})");
+                        heldFrames++;
+                        yield return null;
+                    }
+
+                    Assert.Greater(heldFrames, 0, "held until the colliders are back");
+                    Assert.AreEqual(stood.y, player.position.y, 0.05f, $"released where it stood ({distance})");
+
+                    float until = Time.realtimeSinceStartup + 1.5f;
+                    while (Time.realtimeSinceStartup < until){
+                        Assert.GreaterOrEqual(player.position.y, stood.y - 0.05f, $"does not sink or fall ({distance})");
+                        yield return null;
+                    }
+
+                    Assert.IsTrue(body.enabled && body.isGrounded, $"stands on the ground afterwards ({distance})");
+                    Assert.AreEqual(stood.y, player.position.y, 0.05f, $"on the ground where it stood ({distance})");
+                    yield return WaitUntilBuilt(world, renderer);
+                }
+            }
+            finally{
+                if (world && world.DrawDistance != original) world.ChangeDrawDistance(original);
+                VoxelWorld.RequestedDrawDistance = 0;
+            }
+        }
+
+        private static bool Holding(Component manager){
+            return PlayModeFixtures.GetPrivateField<bool>(manager, "_holding");
+        }
+
+        /// <summary>Waits until the player has landed: walking with its collider on, grounded and still for 0.5 s.</summary>
+        private static IEnumerator WaitUntilStanding(Transform player, CharacterController body){
+            float deadline = Time.realtimeSinceStartup + LoadTimeout;
+            float stillSince = Time.realtimeSinceStartup;
+            Vector3 last = player.position;
+            while (true){
+                if (Time.realtimeSinceStartup > deadline) Assert.Fail("the player did not land");
+                bool still = body.enabled && body.isGrounded && Vector3.Distance(last, player.position) < 1e-3f;
+                if (!still) stillSince = Time.realtimeSinceStartup;
+                else if (Time.realtimeSinceStartup - stillSince > 0.5f) yield break;
+                last = player.position;
+                yield return null;
+            }
+        }
+
         /// <summary>Waits until the chunk under the focus is loaded and uploaded and the scheduler sleeps.</summary>
         private static IEnumerator WaitUntilBuilt(VoxelWorld world, VoxelWorldRenderer renderer){
             Dictionary<int2, IntervalRange> lists =
