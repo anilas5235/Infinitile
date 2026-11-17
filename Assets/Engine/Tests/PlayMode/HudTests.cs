@@ -38,6 +38,9 @@ namespace Engine.Tests.PlayMode{
         [TearDown]
         public void TearDown(){
             Application.logMessageReceived -= CollectProblem;
+            // the game scene stays loaded between tests: hide the panels again, as they start
+            FindHud(out UIDocument document);
+            if (document) document.gameObject.SendMessage("SetDebugPanels", false);
         }
 
         private void CollectProblem(string condition, string stackTrace, LogType type){
