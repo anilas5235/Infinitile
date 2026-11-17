@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Spec</title>
+<meta name="description" content="Spec for later game work on Infinitile: game mechanics, worlds and persistence, content, feedback and feel, UI and menus, audio and input. Everything here waits until the owner schedules it; the focus stays on terrain-first world generation and the engine core (WorldGenSpec.html).">
+<style>
+:root{
+  --bg:#fbfaf7; --surface:#ffffff; --surface-2:#f2f0ea; --text:#1d1f22; --muted:#5d636b;
+  --border:#dedad0; --accent:#2f6f5e; --accent-soft:#e3efe9; --warn:#9a5b00; --warn-soft:#fbf0dc;
+  --bad:#a33a2b; --bad-soft:#f8e4e0; --code-bg:#f4f2ec; --must:#2f6f5e; --should:#3d5a8a; --may:#6b6b6b;
+  --tf:#2f6f5e; --bf:#8a4f2f;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15171a; --surface:#1c1f23; --surface-2:#23272c; --text:#e6e4df; --muted:#a0a6ad;
+    --border:#33383f; --accent:#7cc4ad; --accent-soft:#1f3530; --warn:#e3b05c; --warn-soft:#3a2f1c;
+    --bad:#ec8a7a; --bad-soft:#3b2220; --code-bg:#22262b; --must:#7cc4ad; --should:#9db7e8; --may:#a0a6ad;
+    --tf:#7cc4ad; --bf:#e2a27e;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15171a; --surface:#1c1f23; --surface-2:#23272c; --text:#e6e4df; --muted:#a0a6ad;
+  --border:#33383f; --accent:#7cc4ad; --accent-soft:#1f3530; --warn:#e3b05c; --warn-soft:#3a2f1c;
+  --bad:#ec8a7a; --bad-soft:#3b2220; --code-bg:#22262b; --must:#7cc4ad; --should:#9db7e8; --may:#a0a6ad;
+  --tf:#7cc4ad; --bf:#e2a27e;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 "Inter","Segoe UI",system-ui,-apple-system,sans-serif}
+.layout{display:grid;grid-template-columns:270px minmax(0,1fr);max-width:1320px;margin:0 auto}
+nav.toc{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:28px 18px 40px 22px;border-right:1px solid var(--border);font-size:14px}
+nav.toc .brand{font-weight:700;font-size:15px;margin-bottom:4px}
+nav.toc .ver{color:var(--muted);font-size:12.5px;margin-bottom:18px}
+nav.toc ol{list-style:none;padding:0;margin:0}
+nav.toc li{margin:2px 0}
+nav.toc a{color:var(--muted);text-decoration:none;display:block;padding:3px 8px;border-radius:6px}
+nav.toc a:hover{background:var(--surface-2);color:var(--text)}
+main{padding:36px 48px 120px;min-width:0}
+h1{font-size:30px;line-height:1.25;margin:0 0 6px;letter-spacing:-.01em}
+h2{font-size:23px;margin:56px 0 12px;padding-top:12px;border-top:1px solid var(--border);letter-spacing:-.005em}
+h3{font-size:18px;margin:32px 0 8px}
+h4{font-size:15.5px;margin:22px 0 6px}
+p,li{max-width:78ch}
+a{color:var(--accent)}
+.sub{color:var(--muted);margin:0 0 18px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 26px}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+code,pre,kbd{font-family:"JetBrains Mono","Cascadia Code",Consolas,ui-monospace,monospace;font-size:13.5px}
+code{background:var(--code-bg);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;overflow-x:auto;line-height:1.5}
+pre code{background:none;padding:0}
+pre.math{border-left:3px solid var(--accent)}
+table{border-collapse:collapse;width:100%;margin:12px 0 18px;font-size:14.5px;display:block;overflow-x:auto}
+th,td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top}
+th{background:var(--surface-2);font-weight:600}
+td code{white-space:nowrap}
+.box{border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin:16px 0;background:var(--surface)}
+.box.note{border-left:4px solid var(--accent);background:var(--accent-soft)}
+.box.warn{border-left:4px solid var(--warn);background:var(--warn-soft)}
+.box.bad{border-left:4px solid var(--bad);background:var(--bad-soft)}
+.box > :first-child{margin-top:0}.box > :last-child{margin-bottom:0}
+.req{border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin:10px 0;background:var(--surface)}
+.req .id{font-family:"JetBrains Mono",Consolas,monospace;font-weight:700;font-size:13px;margin-right:8px}
+.kw{font-size:11.5px;font-weight:700;letter-spacing:.04em;padding:1px 7px;border-radius:4px;border:1px solid currentColor;margin-right:8px}
+.kw.must{color:var(--must)}.kw.should{color:var(--should)}.kw.may{color:var(--may)}
+.req p{margin:4px 0}
+.tf{color:var(--tf);font-weight:600}.bf{color:var(--bf);font-weight:600}
+.diagram{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin:16px 0;overflow-x:auto}
+.diagram svg{display:block;min-width:820px;width:100%;height:auto}
+.diagram .bx{fill:var(--surface-2);stroke:var(--border)}
+.diagram .bx.tfb{stroke:var(--tf)}.diagram .bx.bfb{stroke:var(--bf)}
+.diagram text{fill:var(--text);font:13px "Inter","Segoe UI",system-ui,sans-serif}
+.diagram text.lane{font-weight:700;font-size:14px}
+.diagram text.lane.t{fill:var(--tf)}.diagram text.lane.b{fill:var(--bf)}
+.diagram text.small{fill:var(--muted);font-size:11.5px}
+.diagram .ar{stroke:var(--muted);stroke-width:1.5;fill:none;marker-end:url(#arrow)}
+.diagram marker path{fill:var(--muted)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cols > .box{margin:0}
+ul.tight li{margin:2px 0}
+.phase{border:1px solid var(--border);border-radius:10px;padding:12px 18px;margin:14px 0;background:var(--surface)}
+.phase h4{margin-top:4px}
+.small{font-size:13.5px;color:var(--muted)}
+.part{margin:64px 0 0;padding:14px 18px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);font-size:20px;font-weight:700}
+.part span{display:inline-block;margin-right:10px;padding:2px 10px;border-radius:999px;background:var(--accent);color:var(--bg);font-size:13px;vertical-align:middle}
+.part + h2{border-top:none;margin-top:24px}
+nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text)}
+@media (max-width: 960px){
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:none;border-bottom:1px solid var(--border);padding:18px 16px}
+  main{padding:24px 16px 80px}
+  .cols{grid-template-columns:1fr}
+}
+.item{border:1px solid var(--border);border-radius:10px;padding:12px 18px 14px;margin:18px 0;background:var(--surface)}
+.item h3{margin:4px 0 10px;font-size:17px}
+.item h3 .id{font-family:"JetBrains Mono",Consolas,monospace;font-weight:700;font-size:14px;margin-right:8px;color:var(--accent)}
+dl.f{display:grid;grid-template-columns:132px minmax(0,1fr);gap:6px 14px;margin:0}
+dl.f dt{color:var(--muted);font-size:13.5px;font-weight:600;padding-top:2px}
+dl.f dd{margin:0;max-width:78ch}
+dl.f dd ul{margin:0;padding-left:20px}
+.st{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.04em;padding:1px 8px;border-radius:999px;border:1px solid var(--should);color:var(--should)}
+q{font-style:italic}
+td > a:only-child{white-space:nowrap}
+@media (max-width: 960px){
+  dl.f{grid-template-columns:1fr;gap:2px}
+  dl.f dd{margin-bottom:6px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <div class="brand">Game Spec</div>
+  <div class="ver">v1.0 · 2026-11-17 · later work, outside the focus</div>
+  <ol>
+    <li><a href="#s0">0 · Why this spec exists</a></li>
+    <li><a href="#s1">1 · Overview</a></li>
+    <li class="toc-part">Groups</li>
+    <li><a href="#s2">2 · Game mechanics</a></li>
+    <li><a href="#s3">3 · Worlds &amp; persistence</a></li>
+    <li><a href="#s4">4 · Content</a></li>
+    <li><a href="#s5">5 · Feedback &amp; feel</a></li>
+    <li><a href="#s6">6 · UI &amp; menus</a></li>
+    <li><a href="#s7">7 · Audio</a></li>
+    <li><a href="#s8">8 · Input</a></li>
+    <li class="toc-part">Boundary</li>
+    <li><a href="#s9">9 · Stays in focus</a></li>
+  </ol>
+</nav>
+
+<main>
+<h1>Game Spec — later work</h1>
+<p class="sub">Game features for Infinitile that wait until the owner schedules them: game mechanics, worlds and persistence, content, feedback and feel, UI and menus, audio and input. The current work is terrain-first world generation and the engine core; that lives in <a href="WorldGenSpec.html">WorldGenSpec.html</a>.</p>
+<div class="meta">
+  <span class="chip">Unity 6000.3.11f1 · C# · UI Toolkit · Input System</span>
+  <span class="chip">30 items, all status later</span>
+  <span class="chip">Focus decision 2026-11-17</span>
+  <span class="chip">Persistence decisions 2026-11-17 (§3.1)</span>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s0">0 · Why this spec exists</h2>
+<p>On 2026-11-17, the day v1.0.0 was released, the owner moved the project back to its focus:</p>
+<div class="box note">
+<p><q>ok we need to get back into focus, all todos/ideas that do not have to do with terrain-first worldgen (and realted) or engine core. push into a new spec for later: divide between game ready mechanics, polisch,...</q> — owner, 2026-11-17</p>
+</div>
+<p>This spec holds those items. The owner's picks for the move, the same day:</p>
+<ul class="tight">
+  <li><strong>Persistence moves completely</strong> (<q>Move all</q>): the whole save concept (D2, P1–P4) is here, §3.</li>
+  <li><strong>Leaf rendering is split:</strong> the flat look, the clipping and the transparency check stay in the focus; only the wind sway moves here (GAME-34).</li>
+  <li><strong>Form:</strong> HTML in the style of WorldGenSpec, with its own ID prefix.</li>
+</ul>
+<p>What stays in focus and is <strong>not</strong> in this spec is listed in §9.</p>
+
+<h3>How to use this spec</h3>
+<ul>
+  <li><strong>Status.</strong> Every item has status <span class="st">LATER</span>: not scheduled, no phase, no branch. An item moves out of this state only when the owner schedules it. It then gets a phase section here (or in WorldGenSpec, for engine-side parts), and its entry keeps the original text and gains a <b>Done</b> list, as WorldGenSpec §16 does.</li>
+  <li><strong>IDs.</strong> Items carry <code>GAME-nn</code>, grouped by tens per section (GAME-01… mechanics, GAME-10… persistence, GAME-20… content, GAME-30… feel, GAME-40… UI, GAME-50… audio, GAME-60… input). IDs are stable; a new item takes the next free number of its group. Reference them in commit messages and PR descriptions only. WorldGenSpec rule R8 holds here too: no spec IDs, dates or history in code or anything the Editor shows.</li>
+  <li><strong>Fields of an item.</strong> What: a short description. Origin: the owner's words and the date. Depends on: other items or WorldGenSpec IDs. Open picks: design questions that go to the owner as options, recommendation first, before any code. Cost: a note against the frame-time goal where it matters.</li>
+  <li><strong>Frame-time goal.</strong> WorldGenSpec PERF-13 (DEC-104): 120 fps or more at p95, frame time ≤ 8.33 ms, no stutters the player notices. The scheduler's main-thread budget is 2 ms per frame (PERF-17); no managed allocations per frame in steady state (PERF-04). A feature that adds main-thread work per frame brings its own measurement and keeps the goal run at its numbers.</li>
+  <li><strong>UI rule.</strong> No permanent how-to text in menus or panels (like <q>Esc: resume</q> or <q>Drag blocks here</q>). The key hint row is the exception. This holds for every UI item here.</li>
+  <li><strong>Assets.</strong> Every outside asset (sound, music, font, texture) needs a source and a licence check before it ships, recorded like the Kenney set and the Lilita One font (OFL).</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="s1">1 · Overview</h2>
+<table>
+<tr><th>ID</th><th>Item</th><th>Group</th><th>Depends on</th><th>Status</th></tr>
+<tr><td><a href="#GAME-01">GAME-01</a></td><td>Survival mode</td><td>Mechanics</td><td>GAME-02, GAME-08, GAME-10</td><td>later</td></tr>
+<tr><td><a href="#GAME-02">GAME-02</a></td><td>Mining time, item drops and pickup</td><td>Mechanics</td><td>GAME-01</td><td>later</td></tr>
+<tr><td><a href="#GAME-03">GAME-03</a></td><td>Crafting</td><td>Mechanics</td><td>GAME-01, GAME-02</td><td>later</td></tr>
+<tr><td><a href="#GAME-04">GAME-04</a></td><td>Block tick system</td><td>Mechanics</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-05">GAME-05</a></td><td>Growing plants (wheat)</td><td>Mechanics</td><td>GAME-04, GAME-11</td><td>later</td></tr>
+<tr><td><a href="#GAME-06">GAME-06</a></td><td>Mobs and day/night spawning</td><td>Mechanics</td><td>GAME-01, GAME-11</td><td>later</td></tr>
+<tr><td><a href="#GAME-07">GAME-07</a></td><td>Support rule: torch drops when its block breaks</td><td>Mechanics</td><td>GAME-02</td><td>later</td></tr>
+<tr><td><a href="#GAME-08">GAME-08</a></td><td>Saved count 0 must load as empty, not Unlimited</td><td>Mechanics</td><td>before GAME-01</td><td>later</td></tr>
+<tr><td><a href="#GAME-10">GAME-10</a></td><td>P1 World folder and player</td><td>Persistence</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-11">GAME-11</a></td><td>P2 Block edits (D2)</td><td>Persistence</td><td>GAME-10</td><td>later</td></tr>
+<tr><td><a href="#GAME-12">GAME-12</a></td><td>P3 Main menu, world list, per-world settings</td><td>Persistence</td><td>GAME-10, GAME-11</td><td>later</td></tr>
+<tr><td><a href="#GAME-13">GAME-13</a></td><td>P4 Inventory into the world</td><td>Persistence</td><td>GAME-10</td><td>later</td></tr>
+<tr><td><a href="#GAME-14">GAME-14</a></td><td>P5 Later save work</td><td>Persistence</td><td>GAME-11, GAME-12</td><td>later</td></tr>
+<tr><td><a href="#GAME-15">GAME-15</a></td><td>Own intro instead of the Unity splash</td><td>Persistence</td><td>GAME-12 (optional)</td><td>later</td></tr>
+<tr><td><a href="#GAME-20">GAME-20</a></td><td>Wall torch</td><td>Content</td><td>ROT-02, GAME-07</td><td>later</td></tr>
+<tr><td><a href="#GAME-21">GAME-21</a></td><td>More light blocks (lamps, lanterns)</td><td>Content</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-30">GAME-30</a></td><td>Block break particles</td><td>Feel</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-31">GAME-31</a></td><td>Breaking animation with crack stages</td><td>Feel</td><td>GAME-01, GAME-02</td><td>later</td></tr>
+<tr><td><a href="#GAME-32">GAME-32</a></td><td>Block placement preview</td><td>Feel</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-33">GAME-33</a></td><td>Torch placement sound and particles</td><td>Feel</td><td>GAME-50</td><td>later</td></tr>
+<tr><td><a href="#GAME-34">GAME-34</a></td><td>Wind sway for grass and leaves</td><td>Feel</td><td>leaf rendering fix (in focus)</td><td>later</td></tr>
+<tr><td><a href="#GAME-35">GAME-35</a></td><td>Inventory slot hover animation (optional)</td><td>Feel</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-40">GAME-40</a></td><td>UI dark/light mode</td><td>UI</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-41">GAME-41</a></td><td>Version number in the menus</td><td>UI</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-42">GAME-42</a></td><td>Controls page in settings</td><td>UI</td><td>GAME-60</td><td>later</td></tr>
+<tr><td><a href="#GAME-43">GAME-43</a></td><td>Obsolete <code>MeshWriteData.uvRegion</code> (CS0618)</td><td>UI</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-50">GAME-50</a></td><td>Audio system and sound effects</td><td>Audio</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-51">GAME-51</a></td><td>Main menu music</td><td>Audio</td><td>GAME-12, GAME-50</td><td>later</td></tr>
+<tr><td><a href="#GAME-52">GAME-52</a></td><td>Sound settings page</td><td>Audio</td><td>GAME-50</td><td>later</td></tr>
+<tr><td><a href="#GAME-60">GAME-60</a></td><td>Full controller support</td><td>Input</td><td>—</td><td>later</td></tr>
+</table>
+<p class="small">Two clusters: <strong>survival</strong> (GAME-01, 02, 03, 07, 08, 31, partly 06) and <strong>saving</strong> (GAME-10…14, which GAME-05 and GAME-06 need to keep their state). Both need a concept session with design picks before any code, as persistence had.</p>
+
+<!-- ============================================================ -->
+<h2 id="s2">2 · Game mechanics (game-ready)</h2>
+<p>The game is creative-only today: every slot holds a <code>BlockStack</code> with an unlimited count, breaking is instant, and nothing drops (DEC-113). These items turn it into a game with goals.</p>
+
+<div class="item" id="GAME-01">
+<h3><span class="id">GAME-01</span>Survival mode <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>A survival game mode beside today's creative mode, chosen per world. Inventory counts become real (the inventory is already count-ready), mining takes time and drops items, maybe health and hunger. It ties together GAME-02, GAME-03, GAME-05, GAME-07 and GAME-31. A big feature: a concept session first, as for persistence, then design picks.</dd>
+<dt>Origin</dt><dd><q>add to TODO list: survival mode</q> — owner, 2026-11-17. Inventory: <q>They will have counts, but for now only "creative" mode</q> (DEC-113, 2026-11-17).</dd>
+<dt>Depends on</dt><dd>GAME-02 (mining and drops), GAME-08 (count fix first), GAME-10 (the mode is stored in <code>world.json</code>); the Create World screen of GAME-12 shows the mode greyed until this exists.</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Health, hunger, fall damage, death and respawn: which, and how hard.</li><li>Switching mode in a running world: allowed or not.</li><li>Stack size per item.</li><li>What the HUD shows in survival (hearts, hunger bar) in the PR #70 style.</li></ul></dd>
+<dt>Cost</dt><dd>The mode itself is cheap (a few HUD values). The cost sits in its parts: item entities (GAME-02) and mobs (GAME-06).</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-02">
+<h3><span class="id">GAME-02</span>Mining time, item drops and pickup <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>In survival, breaking a block takes time, set per block type (hardness), and the broken block drops as an item that the player picks up by walking near it. Creative keeps instant breaking without drops. The item drop and pickup system does not exist yet; GAME-07 and GAME-03 need it too.</dd>
+<dt>Origin</dt><dd>Split out of GAME-01 for this spec. The owner's items that need it: <q>add to TODO list: survival mode</q>, <q>add to TODO list: block breaking animation (survival only)</q>, <q>add to TODO list: torch item drop when block below breaks</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>GAME-01 (mode and counts).</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Mining time per block type, and whether tools exist (tools need GAME-03).</li><li>What drops: the block itself, or something else (stone → cobble, leaves → sapling, grass → dirt).</li><li>Drop look: a small spinning block, or the flat icon.</li><li>Pickup radius, merge of nearby drops, despawn time.</li></ul></dd>
+<dt>Cost</dt><dd>Item entities are the risk: a Rigidbody per drop is too expensive in large numbers. Use a pooled, simple mover (gravity plus a voxel lookup for the floor, no PhysX), cap the live count, merge drops close to each other. No allocation per drop (PERF-04). A tree felled at once must not create a stutter.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-03">
+<h3><span class="id">GAME-03</span>Crafting <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>Recipes turn items into blocks or other items. The Workbench and Oven voxels already exist and could be the stations: using one opens its crafting view.</dd>
+<dt>Origin</dt><dd><q>add to TODO list: crafting</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>GAME-01 (counts), GAME-02 (items to craft with).</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Grid (shaped recipes) or a recipe list (pick a result, see the inputs).</li><li>Stations: Workbench and Oven as stations, or crafting from the inventory too.</li><li>Recipe data format: ScriptableObjects next to the voxel package, or JSON.</li><li>Recipe discovery: all shown, or unlocked by found items.</li></ul></dd>
+<dt>Cost</dt><dd>UI only; no frame cost while the view is closed.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-04">
+<h3><span class="id">GAME-04</span>Block tick system <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>An update system for placed blocks, which does not exist yet: blocks that change over time (a plant grows a stage, later maybe fire, water flow or leaf decay). GAME-05 is the first user. It is an engine-side piece; when scheduled, its engine rules go into WorldGenSpec Part E.</dd>
+<dt>Origin</dt><dd>From the growing-plants item (GAME-05): <q>Needs a tick/update system for placed blocks, which doesn't exist yet</q> — coordinator's note on the owner's item, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>—. Its changes go through the normal edit path, so the chunk is saved by GAME-11.</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Random ticks (a few random voxels per loaded chunk per tick) or scheduled ticks (a queue of voxels with a due time), or both.</li><li>Tick rate, and which chunks tick (all loaded, or only near the player).</li><li>Whether ticks continue while a chunk is unloaded (catch up on load by elapsed time).</li></ul></dd>
+<dt>Cost</dt><dd>At draw distance 12 there are 625 loaded chunks. The search for tickable voxels runs in a Burst job on workers; applying the changes is main-thread edit work and goes under the frame budget (PERF-17), sliced across frames. Each changed voxel rebuilds its partition's mesh and light, so many changes in one frame cost mesh-stage time; changes are batched per partition. Needs its own benchmark row (PERF-03).</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-05">
+<h3><span class="id">GAME-05</span>Growing plants (wheat) <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>Plants grow over time through stages, e.g. wheat from seedling to ripe. The existing wheat-like voxels (growth-stage icons in the All blocks list) can become the stages. Each stage is its own voxel id, like the rotated variants (ROT-02), so no extra per-voxel state is needed.</dd>
+<dt>Origin</dt><dd><q>add TODO: growing plants (wheat)</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>GAME-04 (ticks); GAME-11 (growth state saved: a planted chunk is an edited chunk, so D2 keeps it). Harvest drops need GAME-02.</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Growth speed, and whether growth needs light or water nearby.</li><li>Planting: seeds as an item, or the first stage as a block.</li><li>Harvest: what drops, and whether the plant resets to the first stage.</li><li>Farmland block (tilled soil) or plain dirt and grass.</li></ul></dd>
+<dt>Cost</dt><dd>The tick cost of GAME-04, plus one partition remesh per stage change. A large field ripening at once must stay sliced.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-06">
+<h3><span class="id">GAME-06</span>Mobs and day/night spawning <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>Mobs (animals, creatures) in general, and spawning that depends on day and night (<code>DayNightCycle</code> exists) and probably on the light level (the light system gives sky and block light per voxel). Needs pathfinding on voxels, AI, models and animation, a spawn and despawn budget per frame, and saving. A concept session first.</dd>
+<dt>Origin</dt><dd><q>add to TODO list: mobs in general, day/night mob spawning</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>GAME-01 (hostile mobs make sense in survival); GAME-11 for saving (D2 saves voxels only; mobs need their own records in the world folder, a new design pick).</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Which mobs first: passive animals per biome, or hostile night mobs.</li><li>Light level and time of day that allow spawning.</li><li>Model style that fits the voxel look; animation (rigid parts or skinned).</li><li>Simulation range: only near the player (colliders exist only near it), frozen elsewhere.</li><li>Saved or not: passive mobs saved, hostile ones despawned.</li></ul></dd>
+<dt>Cost</dt><dd>The largest of all items. Pathfinding in Burst jobs on workers, an AI update with a per-frame cap, a spawn and despawn budget under PERF-17, pooled mob objects (PERF-04), instanced drawing. A spawn check reads light and voxels near the player only. The goal run must hold with a typical mob count; the count is capped.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-07">
+<h3><span class="id">GAME-07</span>Support rule: torch drops when its block breaks <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>When the block under a torch is removed, the torch pops off and drops as an item. Today it probably floats; check first. The same support rule fits flora (grass, flowers on a removed block) and wall torches (GAME-20, held by the block behind).</dd>
+<dt>Origin</dt><dd><q>add to TODO list: torch item drop when block below breaks</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>GAME-02 for the drop. Without survival the rule can still remove the torch (no drop).</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Which voxels need support: torch only, or all flora too.</li><li>Creative: remove the unsupported block, or let it float.</li><li>Placement: refuse a torch with nothing under it.</li></ul></dd>
+<dt>Cost</dt><dd>One neighbour check per edit (constant time). A chain (a tower of supported blocks) is resolved in the same edit, bounded by the world height.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-08">
+<h3><span class="id">GAME-08</span>Saved count 0 must load as empty, not Unlimited <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd><code>BlockInventory</code> loads a saved count of 0 as Unlimited. Before survival counts become real, save Unlimited explicitly (e.g. −1) and load 0 as an empty slot. Small, but it must land before GAME-01.</dd>
+<dt>Origin</dt><dd>Review finding L4 on PR #72, owner pick, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>Before GAME-01. If GAME-13 (inventory in <code>player.json</code>) comes first, the new format writes −1 from the start and the PlayerPrefs reader keeps the old meaning for the one-time import.</dd>
+<dt>Open picks</dt><dd>None; the owner picked the fix.</dd>
+<dt>Cost</dt><dd>None.</dd>
+</dl>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s3">3 · Worlds and persistence</h2>
+<p>Today nothing is saved: block edits are lost when the world is built again (PR #70), and the inventory sits in <code>PlayerPrefs</code> (<code>InventoryStore</code>, DEC-113). The persistence concept of 2026-11-17 (by the persistence-concept session; concept only, nothing built) was moved here completely (<q>Move all</q>, owner, 2026-11-17). Its phases are P1 → P2 → P3 → P4, then P5.</p>
+<div class="box note">
+<p><strong>Origin.</strong> <q>replaced standard "made with unity" intro, make game menu with + multiple worlds, persistance of worlds, worlds settings like seed and so on.</q> Then: <q>add to TODO list: main menu with world selection</q> and <q>add to TODO list: save game and load game</q> (world edits, player position, inventory and hotbar). On the first draft, which saved only the changed voxels: <q>huge problem if we only save deltas a generator change will destroy the world.</q> — owner, 2026-11-17.</p>
+</div>
+
+<h3 id="s3-1">3.1 Persistence decisions (owner, 2026-11-17)</h3>
+<p>Asked as options; binding. The question numbers are those of the concept.</p>
+<table>
+<tr><th>#</th><th>Pick</th></tr>
+<tr><td>Q1′</td><td><strong>D2:</strong> every edited chunk and a ring of 2 chunks around it (5 × 5 = 25 chunks) are saved whole as "kept chunks" and loaded from disk from then on; all other land is generated. Deltas were dropped after the owner's objection above. Option C (save every visited chunk) was rejected: about 1 GB per 10 min of flying.</td></tr>
+<tr><td>Q2</td><td>Region files of 16 × 16 chunks (512 × 512 blocks), rewritten whole and safely (temp file, replace, <code>.bak</code>).</td></tr>
+<tr><td>Q3</td><td>Deflate (<code>System.IO.Compression</code>).</td></tr>
+<tr><td>Q4′</td><td>Unedited land follows the current generator. <code>world.json</code> stamps the generator version and the settings hash; the world list marks "terrain updated" (a status, not a hint).</td></tr>
+<tr><td>Q5</td><td>Backpack and hotbar per world, in <code>player.json</code>.</td></tr>
+<tr><td>Q6</td><td>Autosave every 5 min (changed regions only), plus when a changed region leaves memory, plus on quit.</td></tr>
+<tr><td>Q7</td><td>PR order P1 → P2 → P3 → P4.</td></tr>
+<tr><td>Q8</td><td>Create World asks name and seed (empty = random, text allowed).</td></tr>
+<tr><td>Q9</td><td>Delete: confirm dialog, then the folder is removed.</td></tr>
+<tr><td>Q10</td><td>Editor Play without the menu saves nothing: a throwaway world, like tests and the goal run (differs from the concept's first recommendation).</td></tr>
+</table>
+<p class="small">Saved: kept chunks (interval runs, palette by block name and orientation), seed and generator stamp, player pose and movement mode, inventory, time of day, world meta (name, created, last played, play time, mode). Not saved: light (recomputed). Game settings (draw distance, frame rate, vSync, later key bindings and volumes) stay global in <code>PlayerPrefs</code>. Layout: <code>&lt;persistentDataPath&gt;/saves/&lt;name-slug&gt;-&lt;4 hex&gt;/</code> with <code>world.json</code> (written last, the commit point), <code>world.json.bak</code>, <code>player.json</code>, <code>worldgen.json</code> (reference only), <code>session.lock</code>, <code>region/r.X.Z.ivr</code>.</p>
+
+<div class="item" id="GAME-10">
+<h3><span class="id">GAME-10</span>P1 World folder and player <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>The <code>saves/</code> layout, <code>world.json</code> and <code>player.json</code> (JsonUtility DTOs), a <code>WorldSession</code>, the seed taken from the session (a runtime override, the asset is not written), a default "World 1" until the menu exists, an atomic write helper (temp + replace + <code>.bak</code>), save on quit and autosave of player and manifest, spawn at the saved pose (reusing <code>HoldUntilGrounded</code>), time of day. No session (Editor Play, tests, goal run) = nothing read or written (Q10). Size M.</dd>
+<dt>Origin</dt><dd>Persistence concept P1; owner quotes above (2026-11-17).</dd>
+<dt>Depends on</dt><dd>—.</dd>
+<dt>Open picks</dt><dd>None left from the concept. Risks: spawning into unloaded ground; the seed override must reach every config build (<code>Regenerate</code>, <code>ChangeDrawDistance</code>).</dd>
+<dt>Cost</dt><dd>Writes happen on quit and every 5 min, small files; no per-frame work.</dd>
+<dt>Tests</dt><dd>Manifest and player round trip (EditMode); an interrupted write leaves the old file intact; a newer format is refused; PlayMode: save → reload scene → same pose and mode; same seed → same world, other seed → other world.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-11">
+<h3><span class="id">GAME-11</span>P2 Block edits (D2) <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>A KeepSet (edited chunks + ring 2), the region file format with snapshot records stamped with generator version and settings hash, an IO thread, a RegionCache with a gate and prefetch, a Burst decode job for kept chunks (it replaces <code>ChunkJob</code> for them, so <code>ChunkJob</code> stays untouched), snapshots on unload, autosave, region eviction and quit, a palette by name and orientation, a placeholder for unknown names, CRC and corrupt-file handling, a format version with one migration fixture, a <code>generatorVersion</code> constant, and a <strong>golden-hash test</strong> (the voxels of a fixed set of chunks per seed, in EditMode and in a development player on Windows and Linux). Size L.</dd>
+<dt>Origin</dt><dd>Persistence concept P2; <q>save game and load game</q> and the delta objection above (owner, 2026-11-17).</dd>
+<dt>Depends on</dt><dd>GAME-10.</dd>
+<dt>Open picks</dt><dd>None left from the concept. Risks: snapshot copy cost on the main thread in save bursts; lifetime of the inflated buffers in the decode job; region size with many builds (about 0.5 MB per lone edit); <code>DeflateStream</code> on the Linux player; a missed <code>generatorVersion</code> bump (the golden hash catches it).</dd>
+<dt>Cost</dt><dd>Main thread: a region check per chunk at dispatch (&lt; 1 µs), marking chunk + ring on an edit (&lt; 1 µs), copying one kept chunk's interval list for a save (20–60 µs), sliced by the frame budget (PERF-17). IO thread: read a region 1–5 ms, compress a chunk 1–2 ms, write a region 10–30 ms. Worker: decode a kept chunk 0.2–0.5 ms (generation is 5–7 ms). Quit waits under 1 s for typical worlds. Pins: <code>ChunkJob</code> bench unchanged; goal run p95 and frames over 8.33 ms unchanged on a world with a build area; a PlayMode test that an autosave of 110 changed kept chunks never puts a frame's scheduler time over the budget plus one item. Disk: about 2.2 MB per hour of building; flying writes nothing.</dd>
+<dt>Tests</dt><dd>Edit → save → reload → same voxels in the edited chunk and the ring (with turned variants and a new voxel that shifts ids); a ring chunk is loaded from disk, not generated; edits survive unload and <code>ChangeDrawDistance</code> without a save; a changed settings hash keeps kept chunks and regenerates the rest; truncated or bad-CRC region; an unknown name round-trips; migration fixture; golden hash.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-12">
+<h3><span class="id">GAME-12</span>P3 Main menu, world list and per-world settings <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>A MainMenu scene (build index 0, UI Toolkit, the block-menu look of PR #70). Title: Play, Settings (the existing page), Quit. World list: one card per world folder, sorted by last played (name, last played, play time, mode; thumbnail later), with Play, Rename, Delete and Create. Create asks name (default "World N") and seed (text; empty = random; numbers as is, text hashed with a stable FNV-1a); preset and game mode are shown greyed until they exist. Rename changes <code>world.json</code> only. Delete asks to confirm, then removes the folder; refused while the world's <code>session.lock</code> is held. The Esc menu gets "Save and quit to title" and shows "Saved" briefly after a save. Size M–L.</dd>
+<dt>Origin</dt><dd><q>make game menu with + multiple worlds</q>, <q>worlds settings like seed and so on</q>, <q>add to TODO list: main menu with world selection</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>GAME-10, GAME-11. GAME-41 and GAME-51 hook into this menu.</dd>
+<dt>Open picks</dt><dd>Which further per-world settings beyond the seed (preset, game mode once GAME-01 exists). Risk: the scene switch must tear the world down cleanly (dispose order, domain-reload rules).</dd>
+<dt>Cost</dt><dd>Menu only; the world is not running behind it.</dd>
+<dt>Tests</dt><dd>Create → folder and manifest; rename keeps the folder; delete removes it; Play loads the right seed; <code>HudTests</code> extended.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-13">
+<h3><span class="id">GAME-13</span>P4 Inventory into the world <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>Backpack and hotbar move from <code>PlayerPrefs</code> into each world's <code>player.json</code>, by block name (+ orientation), with a count field for survival. The current <code>PlayerPrefs</code> set becomes the start set of the first world, then is cleared. Size S.</dd>
+<dt>Origin</dt><dd>Persistence concept P4, owner pick Q5 (2026-11-17).</dd>
+<dt>Depends on</dt><dd>GAME-10 (the inventory PR #72 is merged). See GAME-08 for the count encoding.</dd>
+<dt>Open picks</dt><dd>None.</dd>
+<dt>Cost</dt><dd>None per frame.</dd>
+<dt>Tests</dt><dd>Round trip, including names unknown to the registry.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-14">
+<h3><span class="id">GAME-14</span>P5 Later save work <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>World thumbnails; backups of the last N autosaves; world export and import (zip); seam smoothing toward kept borders after a terrain update; an "Update terrain" action that drops ring chunks without edits.</dd>
+<dt>Origin</dt><dd>Persistence concept P5 (2026-11-17).</dd>
+<dt>Depends on</dt><dd>GAME-11, GAME-12.</dd>
+<dt>Open picks</dt><dd>Which of these, and when. Seam smoothing touches generation and would get its own WorldGenSpec section.</dd>
+<dt>Cost</dt><dd>Thumbnails: one render-to-texture on save. Seam smoothing: generation cost, to be measured.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-15">
+<h3><span class="id">GAME-15</span>Own intro instead of the Unity splash <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>Replace Unity's standard "Made with Unity" splash with an own intro (logo, the A tile cube of the app icon). First the licence check: the coordinator's notes say the splash can only be turned off on a paid plan; Unity's announcement of September 2024 says the splash is optional for Unity Personal from Unity 6 on. Check <em>Player Settings → Splash Image → Show Splash Screen</em> on 6000.3.11f1 with the owner's Personal licence before deciding.</dd>
+<dt>Origin</dt><dd><q>replaced standard "made with unity" intro</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>— (GAME-12 if the intro leads into the main menu).</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>If the splash can be turned off: own intro, or no intro at all.</li><li>If not: keep Unity's splash with an own logo after it, or a paid plan (owner).</li><li>Intro length and whether a key skips it.</li></ul></dd>
+<dt>Cost</dt><dd>None during play.</dd>
+</dl>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s4">4 · Content</h2>
+<p>The torch (<code>std:Torch</code>, DEC-114) is the one voxel of the Light category today: a data-only shape <code>Shapes/Torch</code>, Foliage layer, no collider, light emission (14, 10, 5).</p>
+
+<div class="item" id="GAME-20">
+<h3><span class="id">GAME-20</span>Wall torch <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>A torch mounted on a block side, tilted against the wall, one orientation per side. Probably the rotated-voxel orientations (WorldGenSpec §18, ROT-02: each orientation its own variant id) plus a tilted torch shape. Clicking a side face places the wall torch, the top face the standing torch.</dd>
+<dt>Origin</dt><dd><q>add to TODO torch on wall</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>ROT-02 (variant ids); GAME-07 (held by the block behind it).</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Tilted stick (needs slanted quads, a shape the data-only shapes may not cover yet) or a straight stick on the wall (no new shape code).</li><li>Placement rules: which face was clicked; what the bottom face does (refuse).</li><li>One inventory item for both kinds (recommended) or two.</li></ul></dd>
+<dt>Cost</dt><dd>Four more registry ids (PERF-11: report registry and quad buffer growth). No per-frame cost.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-21">
+<h3><span class="id">GAME-21</span>More light blocks (lamps, lanterns) <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>More voxels in the Light category beside the torch: e.g. a lamp (full cube, glowing tile) and a lantern (small shape, standing or hanging). Tiles in the existing texture style, drawn by <code>Docs/Tools/make_tiles.py</code>; reuse existing shapes where possible.</dd>
+<dt>Origin</dt><dd><q>add to TODO list: more light blocks like lamps and lanterns</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>— (a hanging lantern needs GAME-07 for support).</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Which blocks, and their light colours (the light is coloured per channel; e.g. a cold white lamp beside the warm torch).</li><li>Shapes: reuse, or a new data-only shape for the lantern.</li><li>Collider: a lamp is solid, a lantern not.</li></ul></dd>
+<dt>Cost</dt><dd>Placing an emitter runs the light job for the edit; many emitters close together raise the light job time on workers (the emitter-dense case of WorldGenSpec §16.2, 9 ms per chunk). Worth a benchmark row if lamps are meant to be placed in grids.</dd>
+</dl>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5">5 · Feedback and feel (polish)</h2>
+
+<div class="item" id="GAME-30">
+<h3><span class="id">GAME-30</span>Block break particles <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>When a block breaks, small cube particles in the block's own colours fly out and fall, in creative and survival. One pooled particle system; the colours come from the voxel's atlas tile, taken once when the registry is built (not a texture read per break).</dd>
+<dt>Origin</dt><dd><q>add to TODO list: block break particles</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>—. Goes with GAME-31, GAME-33 and the break sound of GAME-50.</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Particles per break.</li><li>Collide with the world (lie on the ground) or just fall and fade.</li><li>Textured bits (a corner of the tile) or flat colours.</li></ul></dd>
+<dt>Cost</dt><dd>Particle count capped per break and in total. Particle collision with the world colliders costs physics time; fall-and-fade is free of it. No allocation per break (PERF-04).</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-31">
+<h3><span class="id">GAME-31</span>Breaking animation with crack stages <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>In survival, breaking takes time and shows crack stages on the block: an overlay on the targeted voxel, e.g. 5–10 crack textures drawn in our style. Creative keeps instant breaking.</dd>
+<dt>Origin</dt><dd><q>add to TODO list: block breaking animation (survival only)</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>GAME-01, GAME-02 (mining time per block type is shared with it).</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Number of stages and their look.</li><li>Overlay on non-cube shapes (torch, slab, flora): follow the shape, or a cube.</li></ul></dd>
+<dt>Cost</dt><dd>One small mesh and one draw while mining; no rebuild of the chunk mesh.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-32">
+<h3><span class="id">GAME-32</span>Block placement preview <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>Show where, and in which orientation for rotated voxels (§18 of WorldGenSpec), the selected hotbar block would be placed: a translucent ghost block or an outline at the target cell. The looked-at ray already exists (collider-based, same reach as block interaction, PR #70).</dd>
+<dt>Origin</dt><dd><q>add to TODO list: block placement preview</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>—. GAME-20 adds the wall/standing choice to the preview.</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Ghost or outline.</li><li>Colour when placement is blocked (player inside the cell, no support).</li><li>On by default, or a setting.</li></ul></dd>
+<dt>Cost</dt><dd>One draw per frame; the ray exists. A ghost needs the voxel's shape as a mesh (the HUD's iso icons may already build one); built when the hotbar selection changes, not per frame.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-33">
+<h3><span class="id">GAME-33</span>Torch placement sound and particles <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>A sound when a torch is placed, and particles: sparks or smoke above the glowing tip.</dd>
+<dt>Origin</dt><dd><q>add to TODO list: torch placement sound and particles</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>GAME-50 (no audio system yet; sound assets need a source and licence check).</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Particles once on placing, or always (ambient sparks or smoke).</li><li>Ambient: only for torches within some distance.</li></ul></dd>
+<dt>Cost</dt><dd>Ambient particles need a pooled emitter per visible torch, which grows with the torch count: cap the emitters and drop the farthest. A one-shot on placing is cheap.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-34">
+<h3><span class="id">GAME-34</span>Wind sway for grass and leaves <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>Grass, flowers, leaves and similar blocks move in the wind through the shader (vertex animation). Only the wind part moved here; the leaf flat look, the clipping and the transparency check stay in the focus (§9).</dd>
+<dt>Origin</dt><dd><q>add to TODO: fix leave rendering (flat, clipping) + transparency handle?, moving grass, leaves,.. with shaders.</q> — owner, 2026-11-17. Split by the owner the same day: the third part (moving grass and leaves) is this item.</dd>
+<dt>Depends on</dt><dd>The leaf rendering fix in focus (same material and shader path; do it after).</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Which blocks sway (grass and flowers only, or leaves too).</li><li>Strength; one global wind or per biome; a setting to turn it off.</li></ul></dd>
+<dt>Cost</dt><dd>GPU only: a few instructions per vertex on the Foliage layer, no CPU work. The sway must stay inside the culling bounds and must not bring back the leaf/water flicker fixed earlier (WorldGenSpec §17). Check the GPU time in the goal run at draw 12 over a forest.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-35">
+<h3><span class="id">GAME-35</span>Inventory slot hover animation (optional) <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>Optional polish: a small hover animation on inventory (and maybe hotbar) slots, e.g. a lift or scale, a highlight fade, or the block icon turning. UI Toolkit transitions, in the slot style shipped with PR #72.</dd>
+<dt>Origin</dt><dd><q>add to TODO list: inventory slot hover animation (optional)</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>— (gamepad focus should animate the same as mouse hover, GAME-60).</dd>
+<dt>Open picks</dt><dd>Which animation; hotbar too or not.</dd>
+<dt>Cost</dt><dd>Animate transforms (scale, translate), not layout properties, so no relayout per frame.</dd>
+</dl>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s6">6 · UI and menus</h2>
+
+<div class="item" id="GAME-40">
+<h3><span class="id">GAME-40</span>UI dark/light mode <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>A light theme beside today's dark HUD and menu look (PR #70 style), switchable in the settings. Done with USS colour variables, so menus, panels, inventory and scrollbars switch together.</dd>
+<dt>Origin</dt><dd><q>add to TODO list: UI dark/light mode</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>—.</dd>
+<dt>Open picks</dt><dd>A mockup of the light look first; whether to follow the system theme.</dd>
+<dt>Cost</dt><dd>None per frame.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-41">
+<h3><span class="id">GAME-41</span>Version number in the menus <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>Show the game version (<code>major.minor.patch</code>, from 1.0.0) in the Esc menu and later in the main menu. The release build writes it into <code>PlayerSettings.bundleVersion</code>, so the player reads it as <code>Application.version</code> (<code>ReleaseBuild.cs</code>, <code>Docs/Releases.md</code>). A version label is not a hint, so the UI rule allows it.</dd>
+<dt>Origin</dt><dd><q>add to TODO list: in-game version number in the menu</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>— (GAME-12 for the main menu).</dd>
+<dt>Open picks</dt><dd>Where (a corner of the Esc menu, the settings page); what the Editor shows (the project's own <code>bundleVersion</code>, or "dev").</dd>
+<dt>Cost</dt><dd>None.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-42">
+<h3><span class="id">GAME-42</span>Controls page in settings <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>A Controls page in the settings menu: the key and button overview, maybe rebinding. F3 stays fixed (owner). The bindings come from <code>InputSystem_Actions.inputactions</code>; the Input System has interactive rebinding, and the overrides would be kept as JSON in <code>PlayerPrefs</code> (game settings stay global, §3.1).</dd>
+<dt>Origin</dt><dd><q>add to TODO list: in-game controls page in settings + controller support for the howl game</q> — owner, 2026-11-17 (first part; the second is GAME-60).</dd>
+<dt>Depends on</dt><dd>GAME-60 (the page shows gamepad bindings too).</dd>
+<dt>Open picks</dt><dd>Rebinding yes or no; mouse sensitivity and invert-Y on this page.</dd>
+<dt>Cost</dt><dd>None per frame.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-43">
+<h3><span class="id">GAME-43</span>Obsolete <code>MeshWriteData.uvRegion</code> (CS0618) <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>The compiler warns CS0618: <code>MeshWriteData.uvRegion</code> is obsolete, used in <code>Assets/Scripts/UI/Hud/HudWidgets.cs:67</code> to place a texture that may sit in an atlas. Move to the replacement the 6000.3 docs name; the HUD icons must look the same.</dd>
+<dt>Origin</dt><dd>Compiler warning, recorded on the coordinator's list on 2026-11-17 and moved here with the UI items.</dd>
+<dt>Depends on</dt><dd>— (check again after the Editor upgrade to 28f1, which stays in focus; the API may change again).</dd>
+<dt>Open picks</dt><dd>None.</dd>
+<dt>Cost</dt><dd>None.</dd>
+</dl>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s7">7 · Audio</h2>
+<p>The game has no audio today: no mixer, no sources, no assets. The owner's item, 2026-11-17: <q>add to TODO list: main menu music and sound settings + music and sounds effects in general</q>. It is split into three items.</p>
+
+<div class="item" id="GAME-50">
+<h3><span class="id">GAME-50</span>Audio system and sound effects <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>An audio system (an AudioMixer with Master, Music and Effects groups; pooled AudioSources for one-shots) and sound effects in the game: block break and place by material (stone, wood, dirt, grass, sand, glass…), footsteps by the block under the player, ambience (biome, underwater, caves). Music in the game too, if picked. Every asset needs a source and a licence check before it ships (CC0 packs such as Kenney's audio sets are a likely source), recorded with the other credits.</dd>
+<dt>Origin</dt><dd>Owner's item above, part 3 (<q>music and sounds effects in general</q>), 2026-11-17.</dd>
+<dt>Depends on</dt><dd>—. GAME-33, GAME-51 and GAME-52 build on it.</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Asset source and style.</li><li>Material classes for blocks: a new field on <code>Voxel</code> (like <code>category</code>) or derived from the category.</li><li>Music in the game: none, rare tracks, or constant.</li></ul></dd>
+<dt>Cost</dt><dd>Audio mixing runs on the audio thread. One-shots come from a pool with a voice cap, no allocation per play (PERF-04). The footstep lookup is one voxel read per step.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-51">
+<h3><span class="id">GAME-51</span>Main menu music <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>Music in the main menu.</dd>
+<dt>Origin</dt><dd>Owner's item above, part 1 (<q>main menu music</q>), 2026-11-17.</dd>
+<dt>Depends on</dt><dd>GAME-12 (main menu), GAME-50.</dd>
+<dt>Open picks</dt><dd>Track source; fade out into the world or stop.</dd>
+<dt>Cost</dt><dd>None during play (a streamed clip in the menu).</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-52">
+<h3><span class="id">GAME-52</span>Sound settings page <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>A sound page in the settings with volume sliders for Master, Music and Effects, driving exposed AudioMixer parameters. Kept globally in <code>PlayerPrefs</code> with the other game settings (§3.1).</dd>
+<dt>Origin</dt><dd>Owner's item above, part 2 (<q>sound settings</q>), 2026-11-17.</dd>
+<dt>Depends on</dt><dd>GAME-50.</dd>
+<dt>Open picks</dt><dd>A mute toggle; more groups (ambience, UI).</dd>
+<dt>Cost</dt><dd>None per frame.</dd>
+</dl>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s8">8 · Input</h2>
+
+<div class="item" id="GAME-60">
+<h3><span class="id">GAME-60</span>Full controller support <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>Gamepad support for the whole game: movement, look (stick sensitivity, dead zone), jump, fly and spectator, block break and place, hotbar, menus and HUD (UI Toolkit focus navigation). All input goes through <code>InputSystem_Actions.inputactions</code> since PR #70, and the inventory already has gamepad (PR #72), so most of the work is bindings and menu navigation. F3 stays on the keyboard.</dd>
+<dt>Origin</dt><dd><q>add to TODO list: in-game controls page in settings + controller support for the howl game</q> — owner, 2026-11-17 (second part; the first is GAME-42).</dd>
+<dt>Depends on</dt><dd>—. GAME-42 shows its bindings.</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Which controllers (Xbox, PlayStation, Switch Pro, Steam Deck).</li><li>Button glyphs per device in the key hint row (the one place hints are allowed).</li><li>Typing in the voxel search list with a gamepad: on-screen keyboard, or browse by category only.</li></ul></dd>
+<dt>Cost</dt><dd>None beyond input reading.</dd>
+</dl>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s9">9 · Stays in focus (not in this spec)</h2>
+<p>These open items are terrain-first world generation (and related) or engine core, so they stay on the current list and in WorldGenSpec (owner, 2026-11-17):</p>
+<ul class="tight">
+  <li>Scheduler follow-ups, WorldGenSpec §16.15–16.23.</li>
+  <li>The leak-report task (the "Found N leak(s)" reports after PlayMode runs).</li>
+  <li>The Editor upgrade to 6000.3.28f1.</li>
+  <li>The full EditMode + PlayMode coverage run.</li>
+  <li>The figure for the mountain massifs in the docs.</li>
+  <li>Flora gallery tuning.</li>
+  <li>The semester documentation.</li>
+  <li>Leaf rendering: the flat look and the clipping, and how transparency is handled (sorting, cut-out vs blend, water next to leaves). Only the wind sway is here (GAME-34).</li>
+</ul>
+<p>WorldGenSpec §16 was checked for items that are neither world generation nor engine core: §16.1–16.23 are engine or generation work, and §16.24 (the Esc menu with settings) is done (DEC-111). None was moved.</p>
+
+</main>
+</div>
+</body>
+</html>

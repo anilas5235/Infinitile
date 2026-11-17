@@ -124,6 +124,10 @@ The world generation specification is [Docs/WorldGenSpec.html](Docs/WorldGenSpec
 engine rules (Part E), the engine cleanup, implemented ideas and planned generation improvements (Part II, §15–17) and the research tooling (Part III). It
 lives outside `Assets` so Unity does not import it.
 
+Game features for later (game mechanics, worlds and saving, content, polish, UI, audio and input) are collected in
+[Docs/GameSpec.html](Docs/GameSpec.html). They wait until the owner schedules them; the focus is terrain-first world
+generation and the engine core (decision of 2026-11-17).
+
 How the owner and the coordinating agent organise a spec phase (roles, branches, briefs, Editor rules, proofs) is
 in [Docs/CoordinatorWorkflow.md](Docs/CoordinatorWorkflow.md).
 
