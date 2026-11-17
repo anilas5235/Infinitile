@@ -385,10 +385,13 @@
 }
 
 /* ── Scrollbars: any ScrollView with .hud-scroll ───────────────────────
-   A slim amber block on a dark track, no arrow buttons. */
+   Variant A, Recessed track (DEC-113, owner's pick 2026-11-17): the track is a pocket like the slots (darker than
+   the panel, even frame, inner shadow ScrollShadow.png drawn by Docs/Tools/make_slot_shadow.py), the thumb a small
+   grey block like the buttons, amber only while it is dragged. No arrow buttons. The slider is 4 px shorter at each
+   end and the tracker reaches back over that, so the thumb stops inside the pocket. */
 
 .hud-scroll .unity-scroller--vertical {
-    width: 14px;
+    width: 20px;
     margin-left: 6px;
     border-width: 0;
     background-color: rgba(0, 0, 0, 0);
@@ -400,32 +403,57 @@
 }
 
 .hud-scroll .unity-scroller--vertical > .unity-scroller__slider {
-    margin: 0;
+    width: 20px;
+    min-width: 0;
+    margin: 4px 0;
+}
+
+/* the tracker reaches 4 px past the slider at each end; nothing on the way may clip it */
+.hud-scroll .unity-scroller__slider,
+.hud-scroll .unity-scroller__slider .unity-base-slider__input,
+.hud-scroll .unity-scroller__slider .unity-base-slider__drag-container {
+    overflow: visible;
 }
 
 .hud-scroll .unity-scroller .unity-base-slider__tracker {
     left: 0;
     right: 0;
+    top: -4px;
+    bottom: -4px;
     width: auto;
+    height: auto;
     margin: 0;
-    border-width: 0;
-    border-radius: 7px;
-    background-color: rgba(255, 255, 255, 0.08);
+    border-width: 2px;
+    border-color: rgba(0, 0, 0, 0.28);
+    border-radius: 10px;
+    background-color: rgb(24, 28, 38);
+    background-image: url("ScrollShadow.png");
+    -unity-slice-left: 15;
+    -unity-slice-right: 15;
+    -unity-slice-top: 32;
+    -unity-slice-bottom: 32;
+    -unity-slice-scale: 0.5px;
 }
 
 .hud-scroll .unity-scroller .unity-base-slider__dragger {
-    left: 0;
-    width: 14px;
+    left: 4px;
+    width: 12px;
     margin: 0;
     border-width: 0;
-    border-radius: 7px;
+    border-radius: 6px;
     border-bottom-width: 4px;
-    border-bottom-color: rgb(185, 127, 22);
-    background-color: rgb(242, 179, 61);
+    border-bottom-color: rgb(38, 44, 59);
+    background-color: rgb(70, 80, 106);
 }
 
 .hud-scroll .unity-scroller .unity-base-slider__dragger:hover {
-    background-color: rgb(250, 196, 92);
+    background-color: rgb(86, 97, 127);
+}
+
+/* the slider's drag container is :active while the thumb (or the track) is held */
+.hud-scroll .unity-scroller .unity-base-slider__drag-container:active > .unity-base-slider__dragger {
+    border-bottom-color: rgb(185, 127, 22);
+    background-color: rgb(242, 179, 61);
 }
 
 .hud-scroll .unity-scroller .unity-base-slider__dragger-border {
