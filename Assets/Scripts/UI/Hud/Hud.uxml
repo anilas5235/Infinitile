@@ -130,7 +130,6 @@
                 <ui:TextField name="voxel-search-field" class="voxel-search__field" />
                 <ui:ScrollView name="voxel-search-results" class="voxel-search__results hud-scroll" mode="Vertical" horizontal-scroller-visibility="Hidden" />
                 <ui:Label name="voxel-search-name" class="voxel-search__name" />
-                <ui:Label text="Click or Enter (first match): put into the hotbar" class="voxel-search__note" />
             </ui:VisualElement>
         </ui:VisualElement>
 
