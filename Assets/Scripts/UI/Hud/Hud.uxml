@@ -50,7 +50,6 @@
                     <ui:VisualElement class="kv"><ui:Label text="Light" class="kv__k" /><ui:Label name="look-light" class="kv__v" /></ui:VisualElement>
                     <ui:VisualElement name="look-attenuation-row" class="kv"><ui:Label text="Attenuation" class="kv__k" /><ui:Label name="look-attenuation" class="kv__v" /></ui:VisualElement>
                     <ui:VisualElement name="look-emits-row" class="kv"><ui:Label text="Emits" class="kv__k" /><ui:Label name="look-emits" class="kv__v" /></ui:VisualElement>
-                    <ui:VisualElement class="kv"><ui:Label text="Biome" class="kv__k" /><ui:Label name="look-biome" class="kv__v" /></ui:VisualElement>
                 </ui:VisualElement>
                 <ui:Label name="look-empty" text="No block in reach" class="look__empty" />
             </ui:VisualElement>
@@ -129,7 +128,7 @@
                     <ui:Label text="VOXELS" class="p__title" />
                 </ui:VisualElement>
                 <ui:TextField name="voxel-search-field" class="voxel-search__field" />
-                <ui:ScrollView name="voxel-search-results" class="voxel-search__results" />
+                <ui:ScrollView name="voxel-search-results" class="voxel-search__results hud-scroll" mode="Vertical" horizontal-scroller-visibility="Hidden" />
                 <ui:Label name="voxel-search-name" class="voxel-search__name" />
                 <ui:Label text="Click or Enter (first match): put into the hotbar" class="voxel-search__note" />
             </ui:VisualElement>

@@ -371,6 +371,54 @@
     color: rgba(244, 241, 234, 0.55);
 }
 
+/* ── Scrollbars: any ScrollView with .hud-scroll ───────────────────────
+   A slim amber block on a dark track, no arrow buttons. */
+
+.hud-scroll .unity-scroller--vertical {
+    width: 14px;
+    margin-left: 6px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.hud-scroll .unity-scroller__low-button,
+.hud-scroll .unity-scroller__high-button {
+    display: none;
+}
+
+.hud-scroll .unity-scroller--vertical > .unity-scroller__slider {
+    margin: 0;
+}
+
+.hud-scroll .unity-scroller .unity-base-slider__tracker {
+    left: 0;
+    right: 0;
+    width: auto;
+    margin: 0;
+    border-width: 0;
+    border-radius: 7px;
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.hud-scroll .unity-scroller .unity-base-slider__dragger {
+    left: 0;
+    width: 14px;
+    margin: 0;
+    border-width: 0;
+    border-radius: 7px;
+    border-bottom-width: 4px;
+    border-bottom-color: rgb(185, 127, 22);
+    background-color: rgb(242, 179, 61);
+}
+
+.hud-scroll .unity-scroller .unity-base-slider__dragger:hover {
+    background-color: rgb(250, 196, 92);
+}
+
+.hud-scroll .unity-scroller .unity-base-slider__dragger-border {
+    border-width: 0;
+}
+
 /* ── Voxel list (E) ──────────────────────────────────────────────────── */
 
 .voxel-search {

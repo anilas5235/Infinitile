@@ -36,7 +36,7 @@ namespace UI{
         private VisualElement _gpuBarFill, _gpuBarPeak, _vramRow, _culling;
 
         private Label _lookDistance, _lookName, _lookId, _lookBlock, _lookFace, _lookChunk, _lookLayer, _lookFacing;
-        private Label _lookLight, _lookAttenuation, _lookEmits, _lookBiome, _lookEmpty;
+        private Label _lookLight, _lookAttenuation, _lookEmits, _lookEmpty;
         private VisualElement _lookBody, _lookFacingRow, _lookAttenuationRow, _lookEmitsRow, _lookFlags;
         private BlockIcon _lookSwatch;
         private ushort _lookShownId = ushort.MaxValue;
@@ -79,7 +79,6 @@ namespace UI{
             _lookAttenuation = Root.Q<Label>("look-attenuation");
             _lookEmitsRow = Root.Q("look-emits-row");
             _lookEmits = Root.Q<Label>("look-emits");
-            _lookBiome = Root.Q<Label>("look-biome");
 
             _fps = Root.Q<Label>("fps");
             _frameMs = Root.Q<Label>("frame-ms");
@@ -210,9 +209,6 @@ namespace UI{
             Vector3 front = ray.point + ray.normal * 0.5f;
             int3 lit = (int3)math.floor((float3)front);
             _lookLight.text = world.TryGetLight(lit, out ushort light) ? LightText(light) : "-";
-            _lookBiome.text = world.TrySampleColumn(p.x, p.z, out ColumnSample sample)
-                ? world.BiomeName(sample.SurfaceSource) ?? "?"
-                : "-";
             return true;
         }
 
