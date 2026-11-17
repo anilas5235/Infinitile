@@ -1,5 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
+using Engine.Scripts.VoxelConfig;
+using Engine.Scripts.VoxelConfig.Data.Voxel;
+using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using Engine.Scripts.WorldGen.Core;
 using NUnit.Framework;
@@ -171,7 +174,7 @@ namespace Engine.Tests.PlayMode{
 
                 // the Liquids chip narrows the list; Enter (PutFirstMatch) puts its first block on the hotbar
                 document.gameObject.SendMessage("SetTab", 1);
-                document.gameObject.SendMessage("SetCategory", 5); // VoxelCategory.Liquids
+                document.gameObject.SendMessage("SetCategory", (int)VoxelCategory.Liquids);
                 yield return null;
                 int shown = 0;
                 foreach (VisualElement slot in all.contentContainer.Children())
@@ -180,6 +183,20 @@ namespace Engine.Tests.PlayMode{
                 Assert.Greater(shown, 0, "liquids shown");
                 Assert.Less(shown, total, "the chip filters");
                 Assert.AreEqual($"{shown} blocks", hud.Q<Label>("inv-search-count").text);
+
+                // the Light chip shows the voxels of category Light only; lava glows but stays a liquid
+                document.gameObject.SendMessage("SetCategory", (int)VoxelCategory.Light);
+                yield return null;
+                int lightVoxels = 0;
+                VoxelRegistry registry = DataImporter.Instance.VoxelRegistry;
+                for (ushort id = 1; id < registry.BaseCount; id++)
+                    if (registry.TryGet(id, out Voxel voxel) && voxel.category == VoxelCategory.Light)
+                        lightVoxels++;
+                Assert.AreEqual(lightVoxels == 1 ? "1 block" : $"{lightVoxels} blocks",
+                    hud.Q<Label>("inv-search-count").text, "Light chip");
+
+                document.gameObject.SendMessage("SetCategory", (int)VoxelCategory.Liquids);
+                yield return null;
                 document.gameObject.SendMessage("PutFirstMatch");
                 yield return null;
                 string placed = hud.Q<Label>("voxel-name").text;

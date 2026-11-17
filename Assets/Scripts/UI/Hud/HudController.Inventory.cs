@@ -211,8 +211,7 @@ namespace UI{
                 RegisterSlot(slot, new SlotTag(SlotArea.All, id));
                 _allGrid.Add(slot);
                 _allEntries.Add(new AllEntry{
-                    Id = id, IdText = $"{id}", Name = fullName.ToLowerInvariant(), Category = voxel.category,
-                    EmitsLight = voxel.lightEmission != Vector3Int.zero, Slot = slot
+                    Id = id, IdText = $"{id}", Name = fullName.ToLowerInvariant(), Category = voxel.category, Slot = slot
                 });
             }
 
@@ -335,8 +334,7 @@ namespace UI{
             string query = _searchField.value.Trim().ToLowerInvariant();
             int shown = 0;
             foreach (AllEntry entry in _allEntries){
-                bool category = _category == AllCategories || (int)entry.Category == _category ||
-                                (_category == (int)VoxelCategory.Light && entry.EmitsLight);
+                bool category = _category == AllCategories || (int)entry.Category == _category;
                 entry.Visible = category && (query.Length == 0 || entry.Name.Contains(query) ||
                                              entry.IdText.StartsWith(query, StringComparison.Ordinal));
                 entry.Slot.style.display = entry.Visible ? DisplayStyle.Flex : DisplayStyle.None;
@@ -621,7 +619,6 @@ namespace UI{
 
         private sealed class AllEntry{
             public VoxelCategory Category;
-            public bool EmitsLight;
             public ushort Id;
             public string IdText, Name;
             public VisualElement Slot;
