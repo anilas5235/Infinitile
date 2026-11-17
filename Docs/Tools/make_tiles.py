@@ -112,6 +112,36 @@ tiles['grass_tall_jungle'] = recolour(load('grass3'), GREEN, 126, 1.05, .80)
 tiles['leaves_bush_swamp_transparent'] = recolour(load('leaves_transparent'), GREEN, 72, .92, .90)
 tiles['grass_swamp'] = recolour(load('grass1'), GREEN, 100, 1.0, .62)
 
+
+
+def torch():
+    """Torch (2026-11-17, cutout sprite of the Cross shape): a plank-coloured stick with a charred tip and a flame in
+    the lava palette, flat colours with soft edges like the Kenney plants. Drawn at 4x and scaled down."""
+    n = 128; ss = 4; S = lambda v: v * ss
+    im = Image.new('RGBA', (n * ss, n * ss), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    # stick: Kenney wood, a darker left side and a light plank stripe
+    d.rectangle([S(56), S(54), S(72) - 1, S(128) - 1], fill=(196, 134, 71, 255))
+    d.rectangle([S(56), S(54), S(60) - 1, S(128) - 1], fill=(170, 116, 61, 255))
+    d.rectangle([S(64), S(66), S(67) - 1, S(98) - 1], fill=(208, 142, 74, 255))
+    d.rectangle([S(62), S(106), S(65) - 1, S(120) - 1], fill=(180, 123, 65, 255))
+    # charred tip
+    d.rectangle([S(56), S(48), S(72) - 1, S(58) - 1], fill=(92, 62, 40, 255))
+
+    def drop(cx, top, bottom, half, col):
+        """A flame drop: round bottom of radius `half`, pointed top."""
+        cy = bottom - half
+        d.ellipse([S(cx - half), S(cy - half), S(cx + half), S(cy + half)], fill=col)
+        d.polygon([(S(cx - half), S(cy)), (S(cx + half), S(cy)), (S(cx + half * .25), S(top)),
+                   (S(cx - half * .1), S(top + 2))], fill=col)
+
+    drop(64, 10, 56, 17, (232, 106, 23, 255))   # lava orange
+    drop(64, 22, 54, 12, (255, 149, 19, 255))   # lava yellow-orange
+    drop(64, 34, 52, 7, (255, 222, 120, 255))   # pale core
+    return im.resize((n, n), Image.LANCZOS)
+
+
+tiles['torch'] = torch()
+
 for name, im in tiles.items():
     im.save(os.path.join(OUT, name + '.png'))
 

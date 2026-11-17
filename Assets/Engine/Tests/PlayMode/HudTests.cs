@@ -184,7 +184,7 @@ namespace Engine.Tests.PlayMode{
                 Assert.Less(shown, total, "the chip filters");
                 Assert.AreEqual($"{shown} blocks", hud.Q<Label>("inv-search-count").text);
 
-                // the Light chip shows the voxels of category Light only; lava glows but stays a liquid
+                // the Light chip shows the voxels of category Light only (the torch); lava glows but stays a liquid
                 document.gameObject.SendMessage("SetCategory", (int)VoxelCategory.Light);
                 yield return null;
                 int lightVoxels = 0;
@@ -192,8 +192,8 @@ namespace Engine.Tests.PlayMode{
                 for (ushort id = 1; id < registry.BaseCount; id++)
                     if (registry.TryGet(id, out Voxel voxel) && voxel.category == VoxelCategory.Light)
                         lightVoxels++;
-                Assert.AreEqual(lightVoxels == 1 ? "1 block" : $"{lightVoxels} blocks",
-                    hud.Q<Label>("inv-search-count").text, "Light chip");
+                Assert.AreEqual(1, lightVoxels, "the torch is the one Light block");
+                Assert.AreEqual("1 block", hud.Q<Label>("inv-search-count").text, "Light chip");
 
                 document.gameObject.SendMessage("SetCategory", (int)VoxelCategory.Liquids);
                 yield return null;

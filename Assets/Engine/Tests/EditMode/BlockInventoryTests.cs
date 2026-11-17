@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Engine.Scripts.Inventory;
 using Engine.Scripts.VoxelConfig;
+using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using NUnit.Framework;
 using UnityEngine;
@@ -10,7 +11,8 @@ using Area = Engine.Scripts.Inventory.BlockInventory.Area;
 namespace Engine.Tests.EditMode{
     /// <summary>
     ///     The player's block inventory (hotbar and backpack): slot edits, drag and drop, shift-click, "Sort by kind",
-    ///     "Fill hotbar", the save by block name; and every shipped voxel has an inventory category.
+    ///     "Fill hotbar", the save by block name; every shipped voxel has an inventory category, and the torch is the
+    ///     Light block.
     /// </summary>
     public class BlockInventoryTests{
         private static readonly Dictionary<string, ushort> Ids = new(){ { "std:Grass", 2 }, { "std:Stone", 5 }, { "std:Glass", 9 } };
@@ -177,6 +179,19 @@ namespace Engine.Tests.EditMode{
                 if (voxel.category == VoxelCategory.None)
                     missing.Add(voxel.name);
             Assert.IsEmpty(missing, "voxels without an inventory category: " + string.Join(", ", missing));
+        }
+
+        [Test]
+        public void ShippedTorch_IsALightBlockThatGlows(){
+            Voxel torch = Resources.LoadAll<VoxelDataPackage>("VoxelDataPackages")
+                .SelectMany(package => package.voxel).FirstOrDefault(v => v && v.name == "Torch");
+            Assert.IsNotNull(torch, "a Torch voxel in the shipped packages");
+            Assert.AreEqual(VoxelCategory.Light, torch.category);
+            Assert.AreEqual(new Vector3Int(14, 10, 5), torch.lightEmission, "warm light, a bit below lava (15, 9, 3)");
+            Assert.AreEqual(0, torch.lightAttenuation, "see-through like the plants");
+            Assert.IsFalse(torch.collision, "no collider, like the plants");
+            Assert.AreEqual(MeshLayer.Foliage, torch.meshLayer, "a cutout sprite of the Cross shape");
+            Assert.IsNotNull(torch.all, "the torch tile");
         }
     }
 }
