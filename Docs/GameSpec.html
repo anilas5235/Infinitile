@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Game Spec</title>
-<meta name="description" content="Spec for later game work on Infinitile: game mechanics, worlds and persistence, content, feedback and feel, UI and menus, audio and input. Everything here waits until the owner schedules it; the focus stays on terrain-first world generation and the engine core (WorldGenSpec.html).">
+<meta name="description" content="Spec for later game work on Infinitile, with modding as its top goal: game mechanics, worlds and persistence, content, feedback and feel, UI and menus, audio and input. Everything here waits until the owner schedules it; the focus stays on terrain-first world generation and the engine core (WorldGenSpec.html).">
 <style>
 :root{
   --bg:#fbfaf7; --surface:#ffffff; --surface-2:#f2f0ea; --text:#1d1f22; --muted:#5d636b;
@@ -101,6 +101,11 @@ dl.f dt{color:var(--muted);font-size:13.5px;font-weight:600;padding-top:2px}
 dl.f dd{margin:0;max-width:78ch}
 dl.f dd ul{margin:0;padding-left:20px}
 .st{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.04em;padding:1px 8px;border-radius:999px;border:1px solid var(--should);color:var(--should)}
+table.m1 td:nth-child(1){width:15%}
+table.m1 td:nth-child(3){width:36%}
+table.m1 code{white-space:normal;overflow-wrap:anywhere}
+.nw{white-space:nowrap}
+.st.hi{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
 q{font-style:italic}
 td > a:only-child{white-space:nowrap}
 .cols{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
@@ -120,6 +125,11 @@ td > a:only-child{white-space:nowrap}
   <ol>
     <li><a href="#s0">0 · Why this spec exists</a></li>
     <li><a href="#s1">1 · Overview</a></li>
+    <li class="toc-part">Top goal</li>
+    <li><a href="#sM">M · Modding (high priority)</a></li>
+    <li><a href="#sM-1">M.1 · What exists today</a></li>
+    <li><a href="#sM-3">M.3 · Cross-links</a></li>
+    <li><a href="#sM-4">M.4 · Open design picks</a></li>
     <li class="toc-part">Groups</li>
     <li><a href="#s2">2 · Game mechanics</a></li>
     <li><a href="#s3">3 · Worlds &amp; persistence</a></li>
@@ -138,10 +148,11 @@ td > a:only-child{white-space:nowrap}
 
 <main>
 <h1>Game Spec — later work</h1>
-<p class="sub">Game features for Infinitile that wait until the owner schedules them: game mechanics, worlds and persistence, content, feedback and feel, UI and menus, audio and input. The current work is terrain-first world generation and the engine core; that lives in <a href="WorldGenSpec.html">WorldGenSpec.html</a>.</p>
+<p class="sub">Game features for Infinitile that wait until the owner schedules them. Modding is the top goal (section M). The rest: game mechanics, worlds and persistence, content, feedback and feel, UI and menus, audio and input. The current work is terrain-first world generation and the engine core; that lives in <a href="WorldGenSpec.html">WorldGenSpec.html</a>.</p>
 <div class="meta">
   <span class="chip">Unity 6000.3.11f1 · C# · UI Toolkit · Input System</span>
-  <span class="chip">30 items, all status later</span>
+  <span class="chip">35 items, all status later</span>
+  <span class="chip">Top goal: modding (5 items, high priority)</span>
   <span class="chip">Focus decision 2026-11-17</span>
   <span class="chip">Persistence concept and decisions 2026-11-17 (§3)</span>
 </div>
@@ -158,12 +169,13 @@ td > a:only-child{white-space:nowrap}
   <li><strong>Leaf rendering is split:</strong> the flat look, the clipping and the transparency check stay in the focus; only the wind sway moves here (GAME-34).</li>
   <li><strong>Form:</strong> HTML in the style of WorldGenSpec, with its own ID prefix.</li>
 </ul>
+<div class="box warn"><p><strong>Top goal: modding.</strong> The owner made modding the high-priority goal of this spec (<q>I want add modding capability to the new spec as a high prio goal</q>, 2026-11-17). It is section M, right after the overview, and is scheduled first when later work starts.</p></div>
 <p>What stays in focus and is <strong>not</strong> in this spec is listed in §9.</p>
 
 <h3>How to use this spec</h3>
 <ul>
-  <li><strong>Status.</strong> Every item has status <span class="st">LATER</span>: not scheduled, no phase, no branch. An item moves out of this state only when the owner schedules it. It then gets a phase section here (or in WorldGenSpec, for engine-side parts), and its entry keeps the original text and gains a <b>Done</b> list, as WorldGenSpec §16 does.</li>
-  <li><strong>IDs.</strong> Items carry <code>GAME-nn</code>, grouped by tens per section (GAME-01… mechanics, GAME-10… persistence, GAME-20… content, GAME-30… feel, GAME-40… UI, GAME-50… audio, GAME-60… input). IDs are stable; a new item takes the next free number of its group. Reference them in commit messages and PR descriptions only. WorldGenSpec rule R8 holds here too: no spec IDs, dates or history in code or anything the Editor shows.</li>
+  <li><strong>Status.</strong> Every item has status <span class="st">LATER</span>: not scheduled, no phase, no branch. Modding items are marked <span class="st hi">LATER · HIGH PRIORITY</span>: still not scheduled, but first in line. An item moves out of this state only when the owner schedules it. It then gets a phase section here (or in WorldGenSpec, for engine-side parts), and its entry keeps the original text and gains a <b>Done</b> list, as WorldGenSpec §16 does.</li>
+  <li><strong>IDs.</strong> Items carry <code>GAME-nn</code>, grouped by tens per section; modding items carry <code>GAME-MOD-nn</code> (section M, which has a letter so the other section numbers stay stable). Groups: GAME-MOD-01… modding, GAME-01… mechanics, GAME-10… persistence, GAME-20… content, GAME-30… feel, GAME-40… UI, GAME-50… audio, GAME-60… input). IDs are stable; a new item takes the next free number of its group. Reference them in commit messages and PR descriptions only. WorldGenSpec rule R8 holds here too: no spec IDs, dates or history in code or anything the Editor shows.</li>
   <li><strong>Fields of an item.</strong> What: a short description. Origin: the owner's words and the date. Depends on: other items or WorldGenSpec IDs. Open picks: design questions that go to the owner as options, recommendation first, before any code. Cost: a note against the frame-time goal where it matters.</li>
   <li><strong>Frame-time goal.</strong> WorldGenSpec PERF-13 (DEC-104): 120 fps or more at p95, frame time ≤ 8.33 ms, no stutters the player notices. The scheduler's main-thread budget is 2 ms per frame (PERF-17); no managed allocations per frame in steady state (PERF-04). A feature that adds main-thread work per frame brings its own measurement and keeps the goal run at its numbers.</li>
   <li><strong>UI rule.</strong> No permanent how-to text in menus or panels (like <q>Esc: resume</q> or <q>Drag blocks here</q>). The key hint row is the exception. This holds for every UI item here.</li>
@@ -173,39 +185,191 @@ td > a:only-child{white-space:nowrap}
 <!-- ============================================================ -->
 <h2 id="s1">1 · Overview</h2>
 <table>
-<tr><th>ID</th><th>Item</th><th>Group</th><th>Depends on</th><th>Status</th></tr>
-<tr><td><a href="#GAME-01">GAME-01</a></td><td>Survival mode</td><td>Mechanics</td><td>GAME-02, GAME-08, GAME-10</td><td>later</td></tr>
-<tr><td><a href="#GAME-02">GAME-02</a></td><td>Mining time, item drops and pickup</td><td>Mechanics</td><td>GAME-01</td><td>later</td></tr>
-<tr><td><a href="#GAME-03">GAME-03</a></td><td>Crafting</td><td>Mechanics</td><td>GAME-01, GAME-02</td><td>later</td></tr>
-<tr><td><a href="#GAME-04">GAME-04</a></td><td>Block tick system</td><td>Mechanics</td><td>—</td><td>later</td></tr>
-<tr><td><a href="#GAME-05">GAME-05</a></td><td>Growing plants (wheat)</td><td>Mechanics</td><td>GAME-04, GAME-11</td><td>later</td></tr>
-<tr><td><a href="#GAME-06">GAME-06</a></td><td>Mobs and day/night spawning</td><td>Mechanics</td><td>GAME-01, GAME-11</td><td>later</td></tr>
-<tr><td><a href="#GAME-07">GAME-07</a></td><td>Support rule: torch drops when its block breaks</td><td>Mechanics</td><td>GAME-02</td><td>later</td></tr>
-<tr><td><a href="#GAME-08">GAME-08</a></td><td>Saved count 0 must load as empty, not Unlimited</td><td>Mechanics</td><td>before GAME-01</td><td>later</td></tr>
-<tr><td><a href="#GAME-10">GAME-10</a></td><td>P1 World folder and player</td><td>Persistence</td><td>—</td><td>later</td></tr>
-<tr><td><a href="#GAME-11">GAME-11</a></td><td>P2 Block edits (D2)</td><td>Persistence</td><td>GAME-10</td><td>later</td></tr>
-<tr><td><a href="#GAME-12">GAME-12</a></td><td>P3 Main menu, world list, per-world settings</td><td>Persistence</td><td>GAME-10, GAME-11</td><td>later</td></tr>
-<tr><td><a href="#GAME-13">GAME-13</a></td><td>P4 Inventory into the world</td><td>Persistence</td><td>GAME-10</td><td>later</td></tr>
-<tr><td><a href="#GAME-14">GAME-14</a></td><td>P5 Later save work</td><td>Persistence</td><td>GAME-11, GAME-12</td><td>later</td></tr>
-<tr><td><a href="#GAME-15">GAME-15</a></td><td>Own intro instead of the Unity splash</td><td>Persistence</td><td>GAME-12 (optional)</td><td>later</td></tr>
-<tr><td><a href="#GAME-20">GAME-20</a></td><td>Wall torch</td><td>Content</td><td>ROT-02, GAME-07</td><td>later</td></tr>
-<tr><td><a href="#GAME-21">GAME-21</a></td><td>More light blocks (lamps, lanterns)</td><td>Content</td><td>—</td><td>later</td></tr>
-<tr><td><a href="#GAME-30">GAME-30</a></td><td>Block break particles</td><td>Feel</td><td>—</td><td>later</td></tr>
-<tr><td><a href="#GAME-31">GAME-31</a></td><td>Breaking animation with crack stages</td><td>Feel</td><td>GAME-01, GAME-02</td><td>later</td></tr>
-<tr><td><a href="#GAME-32">GAME-32</a></td><td>Block placement preview</td><td>Feel</td><td>—</td><td>later</td></tr>
-<tr><td><a href="#GAME-33">GAME-33</a></td><td>Torch placement sound and particles</td><td>Feel</td><td>GAME-50</td><td>later</td></tr>
-<tr><td><a href="#GAME-34">GAME-34</a></td><td>Wind sway for grass and leaves</td><td>Feel</td><td>leaf rendering fix (in focus)</td><td>later</td></tr>
-<tr><td><a href="#GAME-35">GAME-35</a></td><td>Inventory slot hover animation (optional)</td><td>Feel</td><td>—</td><td>later</td></tr>
-<tr><td><a href="#GAME-40">GAME-40</a></td><td>UI dark/light mode</td><td>UI</td><td>—</td><td>later</td></tr>
-<tr><td><a href="#GAME-41">GAME-41</a></td><td>Version number in the menus</td><td>UI</td><td>—</td><td>later</td></tr>
-<tr><td><a href="#GAME-42">GAME-42</a></td><td>Controls page in settings</td><td>UI</td><td>GAME-60</td><td>later</td></tr>
-<tr><td><a href="#GAME-43">GAME-43</a></td><td>Obsolete <code>MeshWriteData.uvRegion</code> (CS0618)</td><td>UI</td><td>—</td><td>later</td></tr>
-<tr><td><a href="#GAME-50">GAME-50</a></td><td>Audio system and sound effects</td><td>Audio</td><td>—</td><td>later</td></tr>
-<tr><td><a href="#GAME-51">GAME-51</a></td><td>Main menu music</td><td>Audio</td><td>GAME-12, GAME-50</td><td>later</td></tr>
-<tr><td><a href="#GAME-52">GAME-52</a></td><td>Sound settings page</td><td>Audio</td><td>GAME-50</td><td>later</td></tr>
-<tr><td><a href="#GAME-60">GAME-60</a></td><td>Full controller support</td><td>Input</td><td>—</td><td>later</td></tr>
+<tr><th>ID</th><th>Item</th><th>Group</th><th>Priority</th><th>Depends on</th><th>Status</th></tr>
+<tr><td><a href="#GAME-MOD-01">GAME-MOD-01</a></td><td>Data mods (content packs)</td><td>Modding</td><td><strong>high</strong></td><td><span class="nw">GAME-MOD-02</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-MOD-02">GAME-MOD-02</a></td><td>Mod loader and mod list</td><td>Modding</td><td><strong>high</strong></td><td><span class="nw">GAME-12</span> (Mods page)</td><td>later</td></tr>
+<tr><td><a href="#GAME-MOD-03">GAME-MOD-03</a></td><td>Script mods and event API</td><td>Modding</td><td><strong>high</strong></td><td><span class="nw">GAME-MOD-02</span>, <span class="nw">GAME-04</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-MOD-04">GAME-MOD-04</a></td><td>World generation through data</td><td>Modding</td><td><strong>high</strong></td><td><span class="nw">GAME-MOD-01</span>, <span class="nw">GAME-MOD-02</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-MOD-05">GAME-MOD-05</a></td><td>Tooling, guide and compatibility rules</td><td>Modding</td><td><strong>high</strong></td><td><span class="nw">GAME-MOD-01</span>, <span class="nw">GAME-MOD-02</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-01">GAME-01</a></td><td>Survival mode</td><td>Mechanics</td><td>normal</td><td><span class="nw">GAME-02</span>, <span class="nw">GAME-08</span>, <span class="nw">GAME-10</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-02">GAME-02</a></td><td>Mining time, item drops and pickup</td><td>Mechanics</td><td>normal</td><td><span class="nw">GAME-01</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-03">GAME-03</a></td><td>Crafting</td><td>Mechanics</td><td>normal</td><td><span class="nw">GAME-01</span>, <span class="nw">GAME-02</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-04">GAME-04</a></td><td>Block tick system</td><td>Mechanics</td><td>normal</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-05">GAME-05</a></td><td>Growing plants (wheat)</td><td>Mechanics</td><td>normal</td><td><span class="nw">GAME-04</span>, <span class="nw">GAME-11</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-06">GAME-06</a></td><td>Mobs and day/night spawning</td><td>Mechanics</td><td>normal</td><td><span class="nw">GAME-01</span>, <span class="nw">GAME-11</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-07">GAME-07</a></td><td>Support rule: torch drops when its block breaks</td><td>Mechanics</td><td>normal</td><td><span class="nw">GAME-02</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-08">GAME-08</a></td><td>Saved count 0 must load as empty, not Unlimited</td><td>Mechanics</td><td>normal</td><td>before <span class="nw">GAME-01</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-10">GAME-10</a></td><td>P1 World folder and player</td><td>Persistence</td><td>normal</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-11">GAME-11</a></td><td>P2 Block edits (D2)</td><td>Persistence</td><td>normal</td><td><span class="nw">GAME-10</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-12">GAME-12</a></td><td>P3 Main menu, world list, per-world settings</td><td>Persistence</td><td>normal</td><td><span class="nw">GAME-10</span>, <span class="nw">GAME-11</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-13">GAME-13</a></td><td>P4 Inventory into the world</td><td>Persistence</td><td>normal</td><td><span class="nw">GAME-10</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-14">GAME-14</a></td><td>P5 Later save work</td><td>Persistence</td><td>normal</td><td><span class="nw">GAME-11</span>, <span class="nw">GAME-12</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-15">GAME-15</a></td><td>Own intro instead of the Unity splash</td><td>Persistence</td><td>normal</td><td><span class="nw">GAME-12</span> (optional)</td><td>later</td></tr>
+<tr><td><a href="#GAME-20">GAME-20</a></td><td>Wall torch</td><td>Content</td><td>normal</td><td><span class="nw">ROT-02</span>, <span class="nw">GAME-07</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-21">GAME-21</a></td><td>More light blocks (lamps, lanterns)</td><td>Content</td><td>normal</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-30">GAME-30</a></td><td>Block break particles</td><td>Feel</td><td>normal</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-31">GAME-31</a></td><td>Breaking animation with crack stages</td><td>Feel</td><td>normal</td><td><span class="nw">GAME-01</span>, <span class="nw">GAME-02</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-32">GAME-32</a></td><td>Block placement preview</td><td>Feel</td><td>normal</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-33">GAME-33</a></td><td>Torch placement sound and particles</td><td>Feel</td><td>normal</td><td><span class="nw">GAME-50</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-34">GAME-34</a></td><td>Wind sway for grass and leaves</td><td>Feel</td><td>normal</td><td>leaf rendering fix (in focus)</td><td>later</td></tr>
+<tr><td><a href="#GAME-35">GAME-35</a></td><td>Inventory slot hover animation (optional)</td><td>Feel</td><td>normal</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-40">GAME-40</a></td><td>UI dark/light mode</td><td>UI</td><td>normal</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-41">GAME-41</a></td><td>Version number in the menus</td><td>UI</td><td>normal</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-42">GAME-42</a></td><td>Controls page in settings</td><td>UI</td><td>normal</td><td><span class="nw">GAME-60</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-43">GAME-43</a></td><td>Obsolete <code>MeshWriteData.uvRegion</code> (CS0618)</td><td>UI</td><td>normal</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-50">GAME-50</a></td><td>Audio system and sound effects</td><td>Audio</td><td>normal</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-51">GAME-51</a></td><td>Main menu music</td><td>Audio</td><td>normal</td><td><span class="nw">GAME-12</span>, <span class="nw">GAME-50</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-52">GAME-52</a></td><td>Sound settings page</td><td>Audio</td><td>normal</td><td><span class="nw">GAME-50</span></td><td>later</td></tr>
+<tr><td><a href="#GAME-60">GAME-60</a></td><td>Full controller support</td><td>Input</td><td>normal</td><td>—</td><td>later</td></tr>
 </table>
-<p class="small">Two clusters: <strong>survival</strong> (GAME-01, 02, 03, 07, 08, 31, partly 06) and <strong>saving</strong> (GAME-10…14, which GAME-05 and GAME-06 need to keep their state). Both need a concept session with design picks before any code, as persistence had.</p>
+<p class="small">Modding comes first (section M). Two more clusters: <strong>survival</strong> (GAME-01, 02, 03, 07, 08, 31, partly 06) and <strong>saving</strong> (GAME-10…14, which GAME-05 and GAME-06 need to keep their state). Both need a concept session with design picks before any code, as persistence had.</p>
+
+<!-- ============================================================ -->
+<h2 id="sM">M · Modding (high priority)</h2>
+<div class="box warn">
+<p><strong>Top goal of this spec.</strong> <q>I want add modding capability to the new spec as a high prio goal</q> — owner, 2026-11-17. When later work starts, modding is scheduled first. Like everything here it is status later until the owner schedules it.</p>
+</div>
+<p>Goal: players add blocks, biomes, trees and later behaviour to the game without a new build. The work comes in five levels (GAME-MOD-01…05). Each level is useful on its own; later levels build on earlier ones. The section is labelled M, not numbered, so the other section numbers stay as they are.</p>
+
+<h3 id="sM-1">M.1 What exists today</h3>
+<p class="small">Read on master <code>aefe678</code>, 2026-11-17. Nothing here is a mod API yet; it is what a mod API would build on.</p>
+<table class="m1">
+<tr><th>Part</th><th>Today</th><th>What it means for mods</th></tr>
+<tr><td>Voxel packages</td><td><code>VoxelDataPackage</code> (ScriptableObject): a <code>packagePrefix</code> (<code>std</code> for <code>Standard.asset</code>) and lists of voxels, biomes and structures. <code>DataImporter</code> loads every package from <code>Resources/VoxelDataPackages</code> at start and registers its content.</td><td>A mod is one more package with its own prefix. The importer must also take packages built at run time from a folder.</td></tr>
+<tr><td>Registries</td><td><code>TopLevelRegistry&lt;T&gt;</code>: full name <code>prefix:Name</code> as <code>FixedString32Bytes</code> (at most 29 UTF-8 bytes); <code>ushort</code> ids handed out in registration order; <code>TryGetId</code>, <code>TryGetName</code>.</td><td>The name is the stable key. Ids change with the mod set and load order (M.3).</td></tr>
+<tr><td>Voxels</td><td><code>Voxel</code> (ScriptableObject): textures per face, texture mode, mesh layer, shape (data assets Cross, Cube, Slab, Torch), <code>category</code> (inventory tabs), collision, unbreakable, light emission, facing.</td><td>All plain data, so a JSON file can fill it. New shapes as data are possible; new mesh code is not.</td></tr>
+<tr><td>Texture array</td><td><code>TexRegistry</code> builds one <code>Texture2DArray</code> from all voxel textures. Every tile is 128 × 128 and one format (DXT1 / DXT5); a wrong size gets the error texture.</td><td>Mod PNGs are checked, compressed at load and added as layers. The array is built once at start; the GPU caps its depth (often 2048 layers).</td></tr>
+<tr><td>Biomes</td><td><code>Biome</code> (ScriptableObject: heights, top block, flora rules). <code>BiomeSet</code> picks the active biomes, at most 16 (<code>BiomeSet.MaxBiomes</code>), and lists implausible pairs.</td><td>A mod biome needs a slot in the set. 16 is a hard cap today.</td></tr>
+<tr><td>World generation settings</td><td>The <code>WorldGenSettings</code> asset owns the climate, the height splines and the BiomeSet. <code>WorldGenSettingsJson.Serialize</code> writes JSON (write only). <code>JsonReader.Parse</code> is a public JSON parser.</td><td>A parser exists. A reader from JSON into settings and biomes is new work.</td></tr>
+<tr><td>Trees and flora</td><td><code>TreeSpecies</code> (ScriptableObject) with variants (parametric trees); structures in packages; <code>FloraConfigBuilder</code> turns flora rules into native config for the jobs.</td><td>Parameters are data. The tree shape code and the placement run in Burst jobs.</td></tr>
+<tr><td>Input</td><td><code>InputSystem_Actions.inputactions</code>, maps Player (13 actions), Hud (19) and UI (10).</td><td>A mod could bring its own action map. Key clashes need a rule; rebinding comes with GAME-42.</td></tr>
+<tr><td>Scripting backend</td><td><code>ReleaseBuild.cs</code> builds the players with Mono (Windows x64, Linux x64).</td><td>Mono can load a C# assembly at run time; IL2CPP cannot. C# mods would tie the game to Mono.</td></tr>
+<tr><td>Data folder</td><td><code>%USERPROFILE%\AppData\LocalLow\anilas5235\Infinitile\</code> (Linux: <code>~/.config/unity3d/anilas5235/Infinitile/</code>); saves go to <code>saves/</code> (§3.4).</td><td>A <code>Mods/</code> folder fits beside <code>saves/</code>.</td></tr>
+</table>
+<div class="box note"><p><strong>Burst rule.</strong> Generation runs in Burst jobs. Managed mod code cannot run inside them. Data (numbers, blocks, rules) that is copied into the native config can. So worldgen mods are data mods (GAME-MOD-04).</p></div>
+
+<h3 id="sM-2">M.2 Levels</h3>
+<p>Suggested order: GAME-MOD-02 and 01 together (a loader with data mods is the first release of modding), then 05 (example and guide), then 04 (worldgen data), then 03 (scripts).</p>
+
+<div class="item" id="GAME-MOD-01">
+<h3><span class="id">GAME-MOD-01</span>Data mods (content packs) <span class="st hi">LATER · HIGH PRIORITY</span></h3>
+<dl class="f">
+<dt>What</dt><dd>A mod is a folder of JSON and PNG files. It adds voxels (textures, shape, category, light, collision); biomes, tree species and structures follow in GAME-MOD-04. At start the game reads every enabled mod, creates the objects at run time, registers them under the mod's prefix, and adds the PNGs as layers of the texture array. No mod code runs.
+<pre><code>Mods/
+  lanterns/
+    mod.json
+    voxels/lantern.json
+    textures/lantern_side.png
+    textures/lantern_top.png</code></pre></dd>
+<dt>Origin</dt><dd>Modding goal: <q>I want add modding capability to the new spec as a high prio goal</q> — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>GAME-MOD-02 (manifest, load order, errors).</dd>
+<dt>Open picks</dt><dd><ul class="tight">
+<li>What comes first: voxels only (recommended), or voxels, biomes and trees at once.</li>
+<li>JSON fields: the same names as the <code>Voxel</code> fields, one schema per kind (recommended), or a separate mod format.</li>
+<li>Textures: 128 × 128 PNG only, compressed to DXT at load (recommended), or any size scaled at load.</li>
+</ul></dd>
+<dt>Cost</dt><dd>Load time only: PNG decode and DXT compress per tile, registry built once. No per-frame cost. Each voxel adds one registry entry and one texture layer (PERF-11). Hard limits: <code>ushort</code> ids, the 29-byte name, the texture array depth.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-MOD-02">
+<h3><span class="id">GAME-MOD-02</span>Mod loader and mod list <span class="st hi">LATER · HIGH PRIORITY</span></h3>
+<dl class="f">
+<dt>What</dt><dd>Every mod has a <code>mod.json</code> manifest. The loader finds the mods, checks each manifest, sorts them by dependencies (then by id, so the order is stable) and loads them. The main menu gets a Mods page: list, enable / disable, version, errors. A broken mod (bad JSON, missing texture, missing dependency, name clash) is skipped and shown with its error; the game starts without it and never crashes. A change takes effect at the next start, because the registries are built once.
+<pre><code>{
+  "id": "lanterns",
+  "name": "Lanterns",
+  "version": "1.2.0",
+  "game": "&gt;=1.1.0 &lt;2.0.0",
+  "apiVersion": 1,
+  "dependencies": { "std-extras": "&gt;=0.3.0" },
+  "loadAfter": []
+}</code></pre>
+The <code>id</code> is the package prefix: lower case, short, unique.</dd>
+<dt>Origin</dt><dd>Modding goal — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>GAME-12 (main menu) for the Mods page. Before that, the enabled list can be a file.</dd>
+<dt>Open picks</dt><dd><ul class="tight">
+<li>Where mods live: <code>LocalLow\anilas5235\Infinitile\Mods\&lt;id&gt;\</code> (recommended: per user, writable, beside the saves), the install folder, or both.</li>
+<li>Enable per game (recommended; each world records which mods it was saved with, M.3) or per world.</li>
+<li>Name clash with <code>std</code> or another mod: refuse the second mod and show the error (recommended), or let the later one win.</li>
+</ul></dd>
+<dt>Cost</dt><dd>Start-up only.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-MOD-03">
+<h3><span class="id">GAME-MOD-03</span>Script mods and event API <span class="st hi">LATER · HIGH PRIORITY</span></h3>
+<dl class="f">
+<dt>What</dt><dd>Mods with behaviour. The game raises events at fixed places on the main thread: block placed, block broken, chunk generated, block tick (GAME-04), world loaded, a tick per second. Mods react through a small game API: read and set a voxel, give an item, show a message. The event API is the same whatever the script language is.</dd>
+<dt>Origin</dt><dd>Modding goal — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>GAME-MOD-02; GAME-04 for block ticks; GAME-02 for item drops.</dd>
+<dt>Open picks</dt><dd><ul class="tight">
+<li>Script language: <strong>none at first</strong>, data mods only (recommended for the first modding release); <strong>Lua through MoonSharp</strong> (an interpreter in pure C#, runs on Mono and IL2CPP, can be sandboxed; recommended when scripts come); <strong>C# assemblies</strong> (fastest, full .NET, Mono only, no sandbox).</li>
+<li>Sandbox: yes for any script language that ships (recommended): Lua sees only the game API, no file or OS access. C# assemblies cannot be sandboxed on Mono; they have the player's full rights, like any program the player installs.</li>
+<li>How much engine to open: data + events + a small API (recommended), no access to the chunk jobs, the mesher or the scheduler. This keeps engine refactors free.</li>
+</ul></dd>
+<dt>Cost</dt><dd>Mod handlers run on the main thread inside the frame and count against PERF-13 and PERF-17. An interpreter allocates per call, which goes against PERF-04. So: frequent events (chunk generated, block tick) are batched per frame; mod time per frame is measured and shown in F3; a mod over its share gets a warning.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-MOD-04">
+<h3><span class="id">GAME-MOD-04</span>World generation through data <span class="st hi">LATER · HIGH PRIORITY</span></h3>
+<dl class="f">
+<dt>What</dt><dd>Mods change generation through data only: new biomes (heights, top block, flora rules), tree species parameters, flora rules, structures, and overrides of <code>WorldGenSettings</code> values (climate, splines). The data goes into the native config the Burst jobs read, so generation stays as fast as today. A mod cannot run its own code inside the generation jobs (Burst rule, M.1).</dd>
+<dt>Origin</dt><dd>Modding goal — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>GAME-MOD-01, GAME-MOD-02; a JSON reader for settings and biomes (only a writer exists today); the biome and flora data in WorldGenSpec (<code>BiomeSet</code>, <code>TreeSpecies</code>, <code>FloraConfigBuilder</code>).</dd>
+<dt>Open picks</dt><dd><ul class="tight">
+<li>Biome cap: keep 16 for now, mod biomes take free slots or replace one (recommended); raising the cap is engine work in the focus.</li>
+<li>A managed pass per generated chunk on the main thread, after the job: no (recommended). It costs main-thread time per chunk and breaks determinism if it reads anything but seed and position.</li>
+</ul></dd>
+<dt>Cost</dt><dd>Per biome and flora rule as today (benchmark rows, PERF-03); more biomes mean more blending work. A changed mod set changes the generator (§3.7, M.3).</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-MOD-05">
+<h3><span class="id">GAME-MOD-05</span>Tooling, guide and compatibility rules <span class="st hi">LATER · HIGH PRIORITY</span></h3>
+<dl class="f">
+<dt>What</dt><dd><ul class="tight">
+<li>An example mod in the repo (a lantern block, later a biome), shipped with the build or as a download.</li>
+<li>A modding guide: folder layout, manifest, JSON schema per kind, texture rules, events. JSON schema files so editors can check mod files.</li>
+<li>An Editor export that writes a <code>VoxelDataPackage</code> as a mod folder, so the Standard package is the reference.</li>
+<li>Compatibility rules: <code>apiVersion</code> in <code>mod.json</code> (an integer, separate from the game's semver); a mod API break is a major game version (as <code>Docs/Releases.md</code> treats save breaks); a field is marked deprecated for one minor version before it goes.</li>
+</ul></dd>
+<dt>Origin</dt><dd>Modding goal — owner, 2026-11-17.</dd>
+<dt>Depends on</dt><dd>GAME-MOD-01, GAME-MOD-02; GAME-MOD-03 for the events part.</dd>
+<dt>Open picks</dt><dd><ul class="tight">
+<li>Steam Workshop: not now (recommended; no Steam release is planned and a plain folder works everywhere), or plan for it.</li>
+<li>Guide format: Markdown in <code>Docs/</code> next to the example mod (recommended), or HTML like the specs.</li>
+</ul></dd>
+<dt>Cost</dt><dd>None at run time.</dd>
+</dl>
+</div>
+
+<h3 id="sM-3">M.3 Cross-links</h3>
+<ul>
+  <li><strong>Persistence (§3).</strong> <code>world.json</code> gets a <code>mods</code> list (id and version) of the mods the world was last saved with. Region records already store voxels by name and orientation, not by id (§3.4), so a different mod set or load order gives other ids and the world still loads: the name palette is the id remap table. Unknown names load as placeholder blocks and keep their name (§3.4), so removing a mod does not wipe its blocks from the save. <code>player.json</code> stores hotbar and backpack by name too.</li>
+  <li><strong>Missing mod on world load</strong> (a pick): warn, list the missing mods and let the player open anyway (placeholders) or cancel (recommended); refuse to open; or open without a word.</li>
+  <li><strong>Mods change the generator.</strong> With D2, edited chunks are saved as snapshots and stay as they are; unedited chunks regenerate with the current mod set, as after a generator tuning release (§3.7). The <code>settingsHash</code> in <code>world.json</code> should cover the mod set and versions that touch generation, so a change is seen on load. A change shows as seams at the edge of kept chunks.</li>
+  <li><strong>Voxel ids</strong> are never saved and never promised to mods; mods use names. A full name is at most 29 bytes (<code>FixedString32Bytes</code>), so mod ids stay short.</li>
+  <li><strong>Security.</strong> Data mods: the readers treat every file as hostile (size limits, no paths outside the mod folder, no crash on bad input). Script mods: sandboxed Lua, or C# with the player's full rights and a clear warning when it is enabled.</li>
+  <li><strong>120 fps.</strong> Load-time work is free against the goal; mod code per frame counts against PERF-13, PERF-17 and PERF-04 (GAME-MOD-03).</li>
+  <li><strong>Determinism.</strong> Data mods keep generation inside the Burst jobs under the same rules (GEN-16, <code>FloatMode.Strict</code>). A managed pass would not.</li>
+  <li><strong>Multiplayer</strong> is not planned, so mod sets never need to be synced between players.</li>
+</ul>
+
+<h3 id="sM-4">M.4 Open design picks</h3>
+<p>For the owner, as options, before any modding code. The first option is the recommendation.</p>
+<table>
+<tr><th>Pick</th><th>Options (recommended first)</th><th>Item</th></tr>
+<tr><td>Script language</td><td>none at first · Lua (MoonSharp) when scripts come · C# assemblies (Mono only)</td><td><span class="nw">GAME-MOD-03</span></td></tr>
+<tr><td>Sandbox</td><td>yes for scripts (Lua sees only the game API) · no</td><td><span class="nw">GAME-MOD-03</span></td></tr>
+<tr><td>File format</td><td>JSON + PNG with <code>mod.json</code> · Unity AssetBundles (need the Unity Editor to make, break between Unity versions)</td><td><span class="nw">GAME-MOD-01, 02</span></td></tr>
+<tr><td>Where mods live</td><td><code>LocalLow\anilas5235\Infinitile\Mods\&lt;id&gt;\</code> · install folder · both</td><td><span class="nw">GAME-MOD-02</span></td></tr>
+<tr><td>Steam Workshop</td><td>not now · plan for it</td><td><span class="nw">GAME-MOD-05</span></td></tr>
+<tr><td>How much engine to open</td><td>data + events + small API · data only · full access</td><td><span class="nw">GAME-MOD-03, 04</span></td></tr>
+<tr><td>Missing mod on load</td><td>warn and let the player choose · refuse · open silently</td><td>M.3</td></tr>
+<tr><td>Enable scope</td><td>per game, the world records its set · per world</td><td><span class="nw">GAME-MOD-02</span></td></tr>
+</table>
 
 <!-- ============================================================ -->
 <h2 id="s2">2 · Game mechanics (game-ready)</h2>
@@ -840,6 +1004,7 @@ Autosave / quit / region leaves cache ──► snapshot dirty loaded kept chunk
   <li>The semester documentation.</li>
   <li>Leaf rendering: the flat look and the clipping, and how transparency is handled (sorting, cut-out vs blend, water next to leaves). Only the wind sway is here (GAME-34).</li>
 </ul>
+<div class="box note"><p><strong>Keep the mod path open.</strong> Registry, texture-array and world-generation work in the focus stays data-driven, so modding (section M) stays cheap: content comes from packages and is looked up by name (<code>prefix:Name</code>); no voxel ids or texture layers hard-coded in code; new generation features read their parameters from data assets that a JSON reader could fill. This costs nothing now.</p></div>
 <p>WorldGenSpec §16 was checked for items that are neither world generation nor engine core: §16.1–16.23 are engine or generation work, and §16.24 (the Esc menu with settings) is done (DEC-111). None was moved.</p>
 
 </main>
