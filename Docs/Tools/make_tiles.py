@@ -115,23 +115,24 @@ tiles['grass_swamp'] = recolour(load('grass1'), GREEN, 100, 1.0, .62)
 
 
 def torch():
-    """Torch (2026-11-17, voxel style after the owner's "no flame"): the front view of the Torch shape, a 2/16 stick
-    (y 0..6/16) under a 4/16 ember cube (y 6..10/16). The shape's quads sample exactly these rectangles, so the tile is
-    also the flat inventory icon. Flat colours on the 16-texel grid (8 px per texel): Kenney plank wood with a dark and
-    a light edge and a charred top, the ember cube in rings of the lava palette."""
+    """Torch (2026-11-17, third look after the owner's notes): the front view of the Torch shape, one 2/16 stick standing
+    in the block centre, 10/16 high; its top texels glow. The shape's quads sample exactly this rectangle (the top face
+    the two glowing rows), so the tile is also the flat inventory icon. Flat colours on the 16-texel grid (8 px per
+    texel): our plank wood in two tones, a charred band, a tip from the lava palette, pale yellow on top."""
     n = 128; t = 8
     im = Image.new('RGBA', (n, n), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
-    box = lambda x0, y0, x1, y1, col: d.rectangle([x0, y0, x1 - 1, y1 - 1], fill=col + (255,))
-    # stick: texels x 7..9, rows 10..16 from the top
-    box(7 * t, 10 * t, 9 * t, 16 * t, (196, 134, 71))
-    box(7 * t, 10 * t, 7 * t + 4, 16 * t, (170, 116, 61))
-    box(9 * t - 4, 10 * t, 9 * t, 16 * t, (208, 142, 74))
-    box(7 * t, 10 * t, 9 * t, 11 * t, (92, 62, 40))   # charred under the ember
-    # ember cube: texels x 6..10, rows 6..10, rings from dark to the pale core
-    for inset, col in ((0, (196, 70, 18)), (4, (232, 106, 23)), (8, (255, 149, 19)), (12, (255, 222, 120))):
-        box(6 * t + inset, 6 * t + inset, 10 * t - inset, 10 * t - inset, col)
-    box(6 * t + 4, 6 * t + 4, 6 * t + 8, 6 * t + 8, (255, 149, 19))     # a hot speck on the orange ring
-    box(10 * t - 8, 10 * t - 8, 10 * t - 4, 10 * t - 4, (196, 70, 18))  # a dark speck
+    texel = lambda col, row, rgb: d.rectangle([col * t, row * t, col * t + t - 1, row * t + t - 1], fill=rgb + (255,))
+    rows = {  # texel row from the top: (left texel, right texel) of the stick, columns 7 and 8
+        6: ((255, 222, 120), (255, 240, 176)),  # pale yellow top
+        7: ((255, 149, 19), (255, 222, 120)),   # yellow-orange
+        8: ((232, 106, 23), (255, 149, 19)),    # lava orange
+        9: ((92, 62, 40), (110, 74, 46)),       # charred band
+    }
+    for row in range(10, 16): rows[row] = ((170, 116, 61), (196, 134, 71))  # plank wood: dark and light side
+    rows[12] = ((170, 116, 61), (208, 142, 74))  # one lighter grain texel
+    for row, (left, right) in rows.items():
+        texel(7, row, left)
+        texel(8, row, right)
     return im
 
 

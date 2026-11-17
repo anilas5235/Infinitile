@@ -21,15 +21,5 @@ MonoBehaviour:
     drawCondition: 0
   - quadDef: {fileID: 11400000, guid: 9ffe489719524df7807b3c9b89fcd5ad, type: 2}
     drawCondition: 0
-  - quadDef: {fileID: 11400000, guid: f23f864afaae460889755b3a856ee79a, type: 2}
-    drawCondition: 0
-  - quadDef: {fileID: 11400000, guid: b32c5e8f5ee34a84a3c65a327ef1aecf, type: 2}
-    drawCondition: 0
-  - quadDef: {fileID: 11400000, guid: 685f3bc9eec644cf9abfe91f85f5dec9, type: 2}
-    drawCondition: 0
-  - quadDef: {fileID: 11400000, guid: 373b801a511d47769a88365384a9ead1, type: 2}
-    drawCondition: 0
   - quadDef: {fileID: 11400000, guid: 5030801ad8d4437e81c445de6aa3cca1, type: 2}
-    drawCondition: 0
-  - quadDef: {fileID: 11400000, guid: 48a645d4e13947a4bcbd224a1d9f9b96, type: 2}
     drawCondition: 0

@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 445781633436408eb1618f0f35f27b48, type: 3}
-  m_Name: TorchTipBack
+  m_Name: TorchStickUp
   m_EditorClassIdentifier: Assembly-CSharp::Runtime.Engine.VoxelConfig.Data.QuadDefinition
-  position00: {x: 0.375, y: 0.375, z: 0.375}
-  position01: {x: 0.375, y: 0.625, z: 0.375}
-  position02: {x: 0.625, y: 0.375, z: 0.375}
-  position03: {x: 0.625, y: 0.625, z: 0.375}
-  uv00: {x: 0.375, y: 0.375}
-  uv01: {x: 0.375, y: 0.625}
-  uv02: {x: 0.625, y: 0.375}
-  uv03: {x: 0.625, y: 0.625}
+  position00: {x: 0.4375, y: 0.625, z: 0.4375}
+  position01: {x: 0.4375, y: 0.625, z: 0.5625}
+  position02: {x: 0.5625, y: 0.625, z: 0.4375}
+  position03: {x: 0.5625, y: 0.625, z: 0.5625}
+  uv00: {x: 0.4375, y: 0.5}
+  uv01: {x: 0.4375, y: 0.625}
+  uv02: {x: 0.5625, y: 0.5}
+  uv03: {x: 0.5625, y: 0.625}

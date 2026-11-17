@@ -193,13 +193,14 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(MeshLayer.Foliage, torch.meshLayer, "drawn with the cutout plants");
             Assert.IsNotNull(torch.all, "the torch tile");
 
-            // voxel style: a stick and an ember cube, every quad axis-aligned, always drawn, inside x/z 6..10/16, y ≤ 10/16
+            // one thin stick in the block centre: four sides and a top, always drawn, x/z 7..9/16, y 0..10/16
             Assert.AreEqual("Torch", torch.shape.name);
+            Assert.AreEqual(5, torch.shape.quads.Length, "four sides and the glowing top");
             foreach (VoxelQuad quad in torch.shape.quads){
                 Assert.AreEqual(QuadDrawCondition.Always, quad.drawCondition, quad.quadDef.name);
                 foreach (Vector3 p in new[]{ quad.quadDef.position00, quad.quadDef.position01, quad.quadDef.position02, quad.quadDef.position03 }){
-                    Assert.That(p.x, Is.InRange(6f / 16f, 10f / 16f), quad.quadDef.name);
-                    Assert.That(p.z, Is.InRange(6f / 16f, 10f / 16f), quad.quadDef.name);
+                    Assert.That(p.x, Is.InRange(7f / 16f, 9f / 16f), quad.quadDef.name);
+                    Assert.That(p.z, Is.InRange(7f / 16f, 9f / 16f), quad.quadDef.name);
                     Assert.That(p.y, Is.InRange(0f, 10f / 16f), quad.quadDef.name);
                 }
             }

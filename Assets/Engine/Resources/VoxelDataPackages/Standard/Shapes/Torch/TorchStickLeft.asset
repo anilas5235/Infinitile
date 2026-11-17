@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Runtime.Engine.VoxelConfig.Data.QuadDefinition
   position00: {x: 0.4375, y: 0, z: 0.4375}
   position01: {x: 0.4375, y: 0, z: 0.5625}
-  position02: {x: 0.4375, y: 0.375, z: 0.4375}
-  position03: {x: 0.4375, y: 0.375, z: 0.5625}
+  position02: {x: 0.4375, y: 0.625, z: 0.4375}
+  position03: {x: 0.4375, y: 0.625, z: 0.5625}
   uv00: {x: 0.5625, y: 0}
   uv01: {x: 0.4375, y: 0}
-  uv02: {x: 0.5625, y: 0.375}
-  uv03: {x: 0.4375, y: 0.375}
+  uv02: {x: 0.5625, y: 0.625}
+  uv03: {x: 0.4375, y: 0.625}
