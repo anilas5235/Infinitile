@@ -4,6 +4,7 @@ using System.IO;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Engine.Scripts.Data;
+using Engine.Scripts.Diagnostics;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
 using Engine.Scripts.VoxelConfig;
@@ -56,6 +57,7 @@ namespace Engine.Tests.PlayMode{
         ///     <paramref name="drawDistance" />: then the world is reloaded with it.
         /// </summary>
         public static IEnumerator LoadGameScene(float timeoutSeconds = 60f, int drawDistance = BaselineDrawDistance){
+            AutomatedRun.Active = true; // the player's saved draw distance and frame cap stay out of the tests
             if (VoxelWorld.Instance == null){
                 SetAssetDrawDistance(drawDistance);
                 AsyncOperation load = SceneManager.LoadSceneAsync(SceneName, LoadSceneMode.Single);
@@ -75,6 +77,7 @@ namespace Engine.Tests.PlayMode{
         ///     VoxelRenderDefs under the job (shutdown order between DataImporter and VoxelWorld).
         /// </summary>
         public static IEnumerator ReloadWorldWithDrawDistance(int drawDistance, float timeoutSeconds = 60f){
+            AutomatedRun.Active = true;
             float deadline = Time.realtimeSinceStartup + 300f;
             while (!SchedulerSleeping() && Time.realtimeSinceStartup < deadline) yield return null;
             VoxelWorld.Instance.Settings.Chunk.DrawDistance = drawDistance;

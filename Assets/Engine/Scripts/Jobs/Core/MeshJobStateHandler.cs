@@ -117,10 +117,10 @@ namespace Engine.Scripts.Jobs.Core{
             _colliderJobHandler = colliderJobHandler;
             _outsideWindow = (focus, pos) => !IsInDrawWindow(pos, focus);
             _lostItsChunks = pos => !CanGenerateMeshForChunk(pos.xz);
-            int side = 2 * settings.Chunk.DrawDistance + 1;
+            int side = 2 * settings.Chunk.ActiveDrawDistance + 1;
             int layers = math.min(VoxelConstants.PartitionsPerChunk, side);
             // The batch size follows the draw distance; it is fixed here, when the world is built
-            Reserve(side * side * layers, settings.Scheduler.MeshBatchSizeAt(settings.Chunk.DrawDistance));
+            Reserve(side * side * layers, settings.Scheduler.MeshBatchSizeAt(settings.Chunk.ActiveDrawDistance));
             _emptyPartitions = new List<int3>(EmptyPartitionsPerBatch * BatchSize);
         }
 
@@ -147,7 +147,7 @@ namespace Engine.Scripts.Jobs.Core{
         protected override bool CanDispatch => !_cMeshBuildScheduler.RendererBehind;
 
         /// <summary>The scan visits the draw distance.</summary>
-        protected override int ScanDistance => Settings.Chunk.DrawDistance;
+        protected override int ScanDistance => Settings.Chunk.ActiveDrawDistance;
 
         /// <summary>
         ///     Enqueues the partitions of one row within draw distance that need mesh generation.
@@ -156,7 +156,7 @@ namespace Engine.Scripts.Jobs.Core{
         /// <param name="focus">The current focus position.</param>
         /// <param name="x">The row, in chunks from the focus.</param>
         protected override void EnqueueRow(PriorityUtil.Focus focus, int x){
-            int draw = Settings.Chunk.DrawDistance;
+            int draw = Settings.Chunk.ActiveDrawDistance;
             float prioThreshold = ChunkPool.GetPartitionPrioThreshold();
 
             for (int z = -draw; z <= draw; z++){
@@ -377,7 +377,7 @@ namespace Engine.Scripts.Jobs.Core{
 
         /// <summary>Whether a partition lies within the draw distance of the focus on every axis.</summary>
         private bool IsInDrawWindow(int3 position, PriorityUtil.Focus focus){
-            int drawDistance = Settings.Chunk.DrawDistance;
+            int drawDistance = Settings.Chunk.ActiveDrawDistance;
             return math.abs(position.x - focus.Pos.x) <= drawDistance &&
                    math.abs(position.z - focus.Pos.z) <= drawDistance &&
                    math.abs(position.y - focus.Pos.y) <= drawDistance;

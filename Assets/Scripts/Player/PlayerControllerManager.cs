@@ -4,8 +4,8 @@ using UnityEngine.InputSystem;
 namespace Player{
     /// <summary>
     ///     Manages switching between walking, flying and spectator controllers based on input
-    ///     and current grounded state. The mode key cycles walking, flying and spectator; spectator flies through
-    ///     blocks with the CharacterController off. The mode survives the player being disabled, e.g. while
+    ///     and current grounded state. The cycle-mode action (G) steps through walking, flying and spectator;
+    ///     spectator flies through blocks with the CharacterController off. The mode survives the player being disabled, e.g. while
     ///     <see cref="PlayerManager.HoldUntilGrounded" /> waits for the ground.
     /// </summary>
     public class PlayerControllerManager : MonoBehaviour{
@@ -15,9 +15,6 @@ namespace Player{
             Flying,
             Spectator
         }
-
-        [Tooltip("Cycles walking, flying and spectator (free flight through blocks).")]
-        [SerializeField] private Key modeKey = Key.G;
 
         /// <summary>
         ///     Fly controller used when the player is in flying mode.
@@ -41,15 +38,7 @@ namespace Player{
 
         public MovementMode Mode{ get; private set; } = MovementMode.Walking;
 
-        /// <summary>The key that cycles the movement modes.</summary>
-        public Key ModeKey => modeKey;
-
         private void Update(){
-            // The look controller is off while the HUD frees the cursor, e.g. while typing in the voxel search.
-            Keyboard keyboard = Keyboard.current;
-            if (keyboard != null && keyboard[modeKey].wasPressedThisFrame && lookController && lookController.enabled)
-                SwitchMovementMode(Next(Mode));
-
             if (Mode == MovementMode.Flying && _crouchPressed && _characterController.isGrounded)
                 SwitchMovementMode(MovementMode.Walking);
         }
@@ -79,6 +68,15 @@ namespace Player{
         /// <param name="value">Button state for the double jump action.</param>
         public void OnDoubleJump(InputValue value){
             if (Mode == MovementMode.Walking && !value.isPressed) SwitchMovementMode(MovementMode.Flying);
+        }
+
+        /// <summary>
+        ///     Input System callback for the "cycle mode" action: walking, flying, spectator, walking again. Ignored
+        ///     while the look controller is off, i.e. while the HUD frees the cursor.
+        /// </summary>
+        /// <param name="value">Button state of the action.</param>
+        public void OnCycleMode(InputValue value){
+            if (value.isPressed && lookController && lookController.enabled) SwitchMovementMode(Next(Mode));
         }
 
         /// <summary>

@@ -107,6 +107,19 @@ namespace Engine.Scripts.Settings{
         public float cappedFrameSpareShare = 0.5f;
 
         /// <summary>
+        ///     Under a frame cap faster than 120 frames per second, the most of the cap's period (0 to 1) the
+        ///     pipeline's main-thread budget may take; the budget is never raised above
+        ///     <see cref="mainThreadBudgetMs" /> by it. Such a frame is shorter than 8.33 ms, and 2 ms would be 60 % of
+        ///     a 300 frames frame (3.33 ms). With 0.3: 300 frames 1 ms, 240 frames 1.25 ms, 144 and 120 frames 2 ms.
+        ///     0 keeps the budget at <see cref="mainThreadBudgetMs" /> under every fast cap. Read once when the world
+        ///     is built; the cap itself is read every frame. 0.3 is the owner's pick for the frame-rate options of
+        ///     the settings menu (60, 90, 120, 300 frames per second).
+        /// </summary>
+        [Range(0f, 1f)]
+        [Tooltip("Under a cap faster than 120 fps: most of the frame period the main-thread budget may take; 0 = budget only")]
+        public float fastCapBudgetShare = 0.3f;
+
+        /// <summary>
         ///     Mesh batch size at <paramref name="drawDistance" />. Read once when the world is built: the mesh
         ///     scheduler sizes its containers with it.
         /// </summary>

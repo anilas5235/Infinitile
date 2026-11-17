@@ -90,6 +90,14 @@ namespace Engine.Scripts.Render{
         /// </summary>
         public GraphicsBuffer FoliagePointsOut{ get; }
 
+        /// <summary>Bytes of the buffers this handler owns (not the shared voxel definitions it reads).</summary>
+        internal long GpuBytes => _disposed
+            ? 0L
+            : Render.GpuBytes.Of(SolidPointsOut) + Render.GpuBytes.Of(TransparentPointsOut) +
+              Render.GpuBytes.Of(FoliagePointsOut) + Render.GpuBytes.Of(_preparedBox) +
+              Render.GpuBytes.Of(_pageTable) + Render.GpuBytes.Of(_metadata) +
+              Render.GpuBytes.Of(_readBackCountBuffer);
+
         /// <summary>
         ///     Releases all GPU resources held by this handler.
         /// </summary>

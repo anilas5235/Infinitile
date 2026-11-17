@@ -41,6 +41,9 @@ namespace Engine.Scripts.Render{
         /// <summary>Times the store buffer was replaced by a larger one.</summary>
         internal int GrowCount{ get; private set; }
 
+        /// <summary>Bytes of the store buffer.</summary>
+        internal long GpuBytes => Render.GpuBytes.Of(Buffer);
+
         public void Dispose(){
             Buffer?.Dispose();
             Buffer = null;

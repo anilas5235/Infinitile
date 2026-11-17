@@ -11,8 +11,9 @@ namespace Engine.Scripts.Jobs.Core{
     ///     Under a frame cap whose period is longer than <see cref="GoalFrameMs" />, the frame has time to spare
     ///     that an uncapped frame does not have: the budget of such a frame grows by
     ///     <see cref="CapShare" /> of the part of the period above <see cref="GoalFrameMs" /> (see
-    ///     <see cref="Effective" />). Uncapped, and under a cap of 120 frames per second or more, the budget is
-    ///     <see cref="Milliseconds" />.
+    ///     <see cref="Effective" />). Under a cap faster than 120 frames per second the frame is shorter than
+    ///     <see cref="GoalFrameMs" />, and the budget is at most <see cref="FastCapShare" /> of the cap's period
+    ///     (300 frames: 1 ms). Uncapped the budget is <see cref="Milliseconds" />.
     /// </summary>
     internal sealed class FrameBudget{
         /// <summary>
@@ -37,15 +38,20 @@ namespace Engine.Scripts.Jobs.Core{
         /// <param name="ticksPerMillisecond">Ticks of <paramref name="clock" /> per millisecond.</param>
         /// <param name="capShare">
         ///     Share (0 to 1) of a capped frame's spare time added to the budget; 0 keeps the budget at
-        ///     <paramref name="milliseconds" /> under every cap.
+        ///     <paramref name="milliseconds" /> under every cap of 120 frames per second or slower.
+        /// </param>
+        /// <param name="fastCapShare">
+        ///     Under a cap faster than 120 frames per second, the most of the cap's period (0 to 1) the budget may
+        ///     take; 0 keeps the budget at <paramref name="milliseconds" /> under such a cap.
         /// </param>
         internal FrameBudget(float milliseconds, Func<long> clock = null, double ticksPerMillisecond = 0d,
-            float capShare = 0f){
+            float capShare = 0f, float fastCapShare = 0f){
             _clock = clock ?? Stopwatch.GetTimestamp;
             if (clock == null) ticksPerMillisecond = Stopwatch.Frequency / 1000d;
             _ticksPerMillisecond = ticksPerMillisecond;
             Milliseconds = Math.Max(0f, milliseconds);
             CapShare = Math.Clamp(capShare, 0f, 1f);
+            FastCapShare = Math.Clamp(fastCapShare, 0f, 1f);
             SetEffective(Milliseconds);
         }
 
@@ -55,6 +61,9 @@ namespace Engine.Scripts.Jobs.Core{
         /// <summary>Share of a capped frame's spare time that is added to the budget.</summary>
         internal float CapShare{ get; }
 
+        /// <summary>The most of a fast cap's period (faster than 120 frames per second) the budget may take.</summary>
+        internal float FastCapShare{ get; }
+
         /// <summary>The budget of the current frame in milliseconds, after the frame cap; 0 without a limit.</summary>
         internal float EffectiveMilliseconds{ get; private set; }
 
@@ -62,27 +71,30 @@ namespace Engine.Scripts.Jobs.Core{
         internal bool Limited => Milliseconds > 0f;
 
         /// <summary>True when the budget grows under a frame cap: the caller then passes the cap's period.</summary>
-        internal bool FollowsCap => Limited && CapShare > 0f;
+        internal bool FollowsCap => Limited && (CapShare > 0f || FastCapShare > 0f);
 
         /// <summary>Frames in which an item was refused since the world was built.</summary>
         internal int FramesCut{ get; private set; }
 
         /// <summary>
-        ///     The budget of a frame under a frame cap: <paramref name="milliseconds" /> plus
-        ///     <paramref name="capShare" /> of the part of <paramref name="capPeriodMs" /> above
-        ///     <see cref="GoalFrameMs" />. No cap (period 0), a cap of 120 frames per second or more, or a share of
-        ///     0 leave the budget as it is; a budget of 0 (no limit) stays 0.
+        ///     The budget of a frame under a frame cap. A cap whose period is longer than <see cref="GoalFrameMs" />
+        ///     adds <paramref name="capShare" /> of the part of <paramref name="capPeriodMs" /> above it to
+        ///     <paramref name="milliseconds" />. A cap of 120 frames per second or faster limits the budget to
+        ///     <paramref name="fastCapShare" /> of the period, but never raises it above
+        ///     <paramref name="milliseconds" />. No cap (period 0) or a share of 0 leave the budget as it is; a
+        ///     budget of 0 (no limit) stays 0.
         /// </summary>
         /// <example>
-        ///     2 ms, shipped share 0.5: 60 frames cap 6.17 ms, 30 frames cap 14.5 ms, 120 or 144 frames cap 2 ms
-        ///     (share 1: 10.33 and 27 ms).
+        ///     2 ms, shipped shares 0.5 and 0.3: 30 frames cap 14.5 ms, 60 frames 6.17 ms, 90 frames 3.39 ms,
+        ///     120 and 144 frames 2 ms, 240 frames 1.25 ms, 300 frames 1 ms.
         /// </example>
-        internal static float Effective(float milliseconds, float capPeriodMs, float capShare){
+        internal static float Effective(float milliseconds, float capPeriodMs, float capShare, float fastCapShare = 0f){
             if (milliseconds <= 0f) return 0f;
+            if (capPeriodMs <= 0f) return milliseconds;
 
             float spare = capPeriodMs - GoalFrameMs;
-            if (spare <= 0f || capShare <= 0f) return milliseconds;
-            return milliseconds + Math.Min(capShare, 1f) * spare;
+            if (spare > 0f) return capShare > 0f ? milliseconds + Math.Min(capShare, 1f) * spare : milliseconds;
+            return fastCapShare > 0f ? Math.Min(milliseconds, Math.Min(fastCapShare, 1f) * capPeriodMs) : milliseconds;
         }
 
         /// <summary>Starts the budget of a frame.</summary>
@@ -95,7 +107,7 @@ namespace Engine.Scripts.Jobs.Core{
 
             if (FollowsCap && capPeriodMs != _capPeriodMs){
                 _capPeriodMs = capPeriodMs;
-                SetEffective(Effective(Milliseconds, capPeriodMs, CapShare));
+                SetEffective(Effective(Milliseconds, capPeriodMs, CapShare, FastCapShare));
             }
 
             _first = true;

@@ -53,6 +53,10 @@ namespace Engine.Scripts.Render{
         /// <summary>World-space AABB per page on the GPU; read by the culling kernel.</summary>
         internal GraphicsBuffer PageBoundsBuffer{ get; }
 
+        /// <summary>Bytes of the point, count and bounds buffers.</summary>
+        internal long GpuBytes => Render.GpuBytes.Of(PointBuffer) + Render.GpuBytes.Of(CountsPerPageBuffer) +
+                                  Render.GpuBytes.Of(PageBoundsBuffer);
+
         /// <summary>CPU-side page state (counts and bounds), the reference for the GPU copies.</summary>
         internal PageAllocator Pages => _pages;
 

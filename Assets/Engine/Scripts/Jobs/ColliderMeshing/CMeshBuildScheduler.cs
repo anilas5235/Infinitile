@@ -85,7 +85,7 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
             _voxelRegistry = voxelRegistry;
             _world = world;
             // Both follow the draw distance and are fixed here, when the world is built
-            int drawDistance = settings.Chunk.DrawDistance;
+            int drawDistance = settings.Chunk.ActiveDrawDistance;
             int meshBatch = settings.Scheduler.MeshBatchSizeAt(drawDistance);
             _buildBacklogLimit = 2 * settings.Scheduler.BuildSlotsAt(drawDistance);
 
