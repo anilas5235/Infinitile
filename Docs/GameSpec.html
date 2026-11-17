@@ -103,8 +103,11 @@ dl.f dd ul{margin:0;padding-left:20px}
 .st{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.04em;padding:1px 8px;border-radius:999px;border:1px solid var(--should);color:var(--should)}
 q{font-style:italic}
 td > a:only-child{white-space:nowrap}
+.cols{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.cols pre{margin:0}
 @media (max-width: 960px){
   dl.f{grid-template-columns:1fr;gap:2px}
+  .cols{grid-template-columns:minmax(0,1fr)}
   dl.f dd{margin-bottom:6px}
 }
 </style>
@@ -120,6 +123,9 @@ td > a:only-child{white-space:nowrap}
     <li class="toc-part">Groups</li>
     <li><a href="#s2">2 · Game mechanics</a></li>
     <li><a href="#s3">3 · Worlds &amp; persistence</a></li>
+    <li><a href="#s3-3">3.3 · Save model (D2)</a></li>
+    <li><a href="#s3-6">3.6 · Persistence costs</a></li>
+    <li><a href="#s3-9">3.9 · Persistence phases</a></li>
     <li><a href="#s4">4 · Content</a></li>
     <li><a href="#s5">5 · Feedback &amp; feel</a></li>
     <li><a href="#s6">6 · UI &amp; menus</a></li>
@@ -137,7 +143,7 @@ td > a:only-child{white-space:nowrap}
   <span class="chip">Unity 6000.3.11f1 · C# · UI Toolkit · Input System</span>
   <span class="chip">30 items, all status later</span>
   <span class="chip">Focus decision 2026-11-17</span>
-  <span class="chip">Persistence decisions 2026-11-17 (§3.1)</span>
+  <span class="chip">Persistence concept and decisions 2026-11-17 (§3)</span>
 </div>
 
 <!-- ============================================================ -->
@@ -295,27 +301,268 @@ td > a:only-child{white-space:nowrap}
 
 <!-- ============================================================ -->
 <h2 id="s3">3 · Worlds and persistence</h2>
-<p>Today nothing is saved: block edits are lost when the world is built again (PR #70), and the inventory sits in <code>PlayerPrefs</code> (<code>InventoryStore</code>, DEC-113). The persistence concept of 2026-11-17 (by the persistence-concept session; concept only, nothing built) was moved here completely (<q>Move all</q>, owner, 2026-11-17). Its phases are P1 → P2 → P3 → P4, then P5.</p>
+<p>Today nothing is saved: block edits are lost when the world is built again (PR #70), and the inventory sits in <code>PlayerPrefs</code> (<code>InventoryStore</code>, DEC-113). On 2026-11-17 a concept session worked out how to save worlds, and the owner picked every open question. Nothing is built or scheduled. This section holds the full concept (v3), so the spec stands on its own; the concept's owner page <a href="https://claude.ai/artifact/UckXwFhf88JGEPGq9hVqfE">Persistence concept</a> is background only. Phases P1 → P4, then P5, are the items GAME-10…14 below.</p>
 <div class="box note">
-<p><strong>Origin.</strong> <q>replaced standard "made with unity" intro, make game menu with + multiple worlds, persistance of worlds, worlds settings like seed and so on.</q> Then: <q>add to TODO list: main menu with world selection</q> and <q>add to TODO list: save game and load game</q> (world edits, player position, inventory and hotbar). On the first draft, which saved only the changed voxels: <q>huge problem if we only save deltas a generator change will destroy the world.</q> — owner, 2026-11-17.</p>
+<p><strong>Origin.</strong> <q>replaced standard "made with unity" intro, make game menu with + multiple worlds, persistance of worlds, worlds settings like seed and so on.</q> Then: <q>add to TODO list: main menu with world selection</q> and <q>add to TODO list: save game and load game</q> (world edits, player position, inventory and hotbar). On the first draft, which saved only the changed voxels: <q>huge problem if we only save deltas a generator change will destroy the world.</q> Moving the concept here: <q>Move all</q>, then <q>persistence-concept results to the new spec than can be archived.</q> — owner, 2026-11-17.</p>
 </div>
+<p class="small">Word use: in this engine a <strong>chunk is a whole column</strong>, 32 × 256 × 32 voxels (8 partitions of 32³). A "world column" is one x/z column of 256 voxels. A <strong>kept chunk</strong> is a chunk saved whole and loaded from disk instead of being generated.</p>
 
 <h3 id="s3-1">3.1 Persistence decisions (owner, 2026-11-17)</h3>
-<p>Asked as options; binding. The question numbers are those of the concept.</p>
+<p>Asked as options; binding. The question numbers are those of the concept. The owner first picked deltas (Q1 A), regions 16 × 16 (Q2) and Deflate (Q3), then stopped at Q4 with the objection above. Q1 and Q4 were asked again as Q1′ and Q4′ (§3.7); Q2 and Q3 still hold.</p>
 <table>
 <tr><th>#</th><th>Pick</th></tr>
-<tr><td>Q1′</td><td><strong>D2:</strong> every edited chunk and a ring of 2 chunks around it (5 × 5 = 25 chunks) are saved whole as "kept chunks" and loaded from disk from then on; all other land is generated. Deltas were dropped after the owner's objection above. Option C (save every visited chunk) was rejected: about 1 GB per 10 min of flying.</td></tr>
-<tr><td>Q2</td><td>Region files of 16 × 16 chunks (512 × 512 blocks), rewritten whole and safely (temp file, replace, <code>.bak</code>).</td></tr>
+<tr><td>Q1′</td><td><strong>D2</strong> (D with N = 2): every edited chunk and a ring of 2 chunks around it (5 × 5 = 25 chunks) are saved whole as kept chunks; all other land is generated. Measured: 1 h of building ≈ 2.2 MB; flying writes nothing.</td></tr>
+<tr><td>Q2</td><td>Region files of 16 × 16 chunks (512 × 512 blocks), rewritten whole and safely.</td></tr>
 <tr><td>Q3</td><td>Deflate (<code>System.IO.Compression</code>).</td></tr>
-<tr><td>Q4′</td><td>Unedited land follows the current generator. <code>world.json</code> stamps the generator version and the settings hash; the world list marks "terrain updated" (a status, not a hint).</td></tr>
+<tr><td>Q4′</td><td>Unedited land follows the current generator. <code>world.json</code> stamps the generator version and the settings hash; the world list marks "terrain updated" (a status, not a hint). An "Update terrain" action and seam smoothing are later work (GAME-14).</td></tr>
 <tr><td>Q5</td><td>Backpack and hotbar per world, in <code>player.json</code>.</td></tr>
 <tr><td>Q6</td><td>Autosave every 5 min (changed regions only), plus when a changed region leaves memory, plus on quit.</td></tr>
-<tr><td>Q7</td><td>PR order P1 → P2 → P3 → P4.</td></tr>
-<tr><td>Q8</td><td>Create World asks name and seed (empty = random, text allowed).</td></tr>
+<tr><td>Q7</td><td>PR order P1 → P2 → P3 → P4 (P4 any time after the inventory PR and P1).</td></tr>
+<tr><td>Q8</td><td>Create World asks name and seed (empty = random, text allowed). Preset and mode come later, shown greyed.</td></tr>
 <tr><td>Q9</td><td>Delete: confirm dialog, then the folder is removed.</td></tr>
-<tr><td>Q10</td><td>Editor Play without the menu saves nothing: a throwaway world, like tests and the goal run (differs from the concept's first recommendation).</td></tr>
+<tr><td>Q10</td><td>Editor Play without the menu saves nothing: a throwaway world, like tests and the goal run. This differs from the concept's first recommendation.</td></tr>
 </table>
-<p class="small">Saved: kept chunks (interval runs, palette by block name and orientation), seed and generator stamp, player pose and movement mode, inventory, time of day, world meta (name, created, last played, play time, mode). Not saved: light (recomputed). Game settings (draw distance, frame rate, vSync, later key bindings and volumes) stay global in <code>PlayerPrefs</code>. Layout: <code>&lt;persistentDataPath&gt;/saves/&lt;name-slug&gt;-&lt;4 hex&gt;/</code> with <code>world.json</code> (written last, the commit point), <code>world.json.bak</code>, <code>player.json</code>, <code>worldgen.json</code> (reference only), <code>session.lock</code>, <code>region/r.X.Z.ivr</code>.</p>
+
+<h3 id="s3-2">3.2 How the game works today</h3>
+<p class="small">Facts read on master and <code>feature/hud-settings-menu</code>, 2026-11-17.</p>
+<table>
+<tr><th>Item</th><th>Today</th><th>Where</th></tr>
+<tr><td>Chunk</td><td>262 144 voxels, <code>ushort</code> ids, RLE interval list (<code>UnsafeIntervalList&lt;ushort&gt;</code>, node = value + cumulative end); 8 partitions, <code>OccupiedPartitions</code> bit mask</td><td><code>Data/Chunk.cs</code>, <code>VoxelConstants</code></td></tr>
+<tr><td>Generation</td><td><code>ChunkJob</code> (Burst, <code>FloatMode.Strict</code>, <code>CompileSynchronously</code>): a pure function of seed + <code>WorldGenConfig</code> + chunk position; about 5–7 ms per chunk per worker (forest species, DistanceBlend, caves on)</td><td><code>Jobs/Chunk/ChunkJob.cs</code>; DEC-45, 71, 73</td></tr>
+<tr><td>Seed</td><td>One global value, <code>VoxelEngineSettings.Seed = 1337</code>, read in <code>VoxelEngineProvider.ChunkDataScheduler</code></td><td><code>Settings/VoxelEngineSettings.cs</code></td></tr>
+<tr><td>Generator settings</td><td><code>WorldGenSettings</code> asset; <code>ToCanonicalJson(seed)</code> gives a deterministic, hashable JSON snapshot</td><td><code>WorldGen/Settings</code></td></tr>
+<tr><td>Light</td><td>Derived: <code>LightJob</code> per chunk from its 3 × 3 data, 0.76–1.06 ms per chunk on workers; edits run <code>LightEditJob</code> synchronously</td><td><code>Jobs/Light</code></td></tr>
+<tr><td>Block edit</td><td><code>VoxelWorld.SetVoxel</code> → <code>ChunkManager.SetVoxel</code> writes into the loaded chunk's interval list and raises <code>VoxelEdited(position, oldId)</code></td><td><code>World/ChunkManager.cs</code></td></tr>
+<tr><td>Unload</td><td>Eviction by distance when the store is full → <code>UnloadChunk</code> disposes the data</td><td><code>ChunkManager.RemoveChunkData</code></td></tr>
+<tr><td>Edits lost on</td><td>unload (walk away and back), <code>Regenerate</code>, <code>ChangeDrawDistance</code> (Esc menu, DEC-111), quitting</td><td><code>VoxelWorld.cs</code></td></tr>
+<tr><td>Voxel ids</td><td><code>"package:Name"</code> → base id in registration order; turned variants are appended after all bases and <strong>shift whenever a base voxel is added</strong>. ROT-02: data that is ever persisted stores the base id plus the orientation</td><td><code>TopLevelRegistry</code>, <code>VoxelVariantTable</code></td></tr>
+<tr><td>Player</td><td>Position + body yaw + <code>LookController.Pitch</code>; <code>PlayerControllerManager.Mode</code> Walking / Flying / Spectator; spawn waits for ground (<code>HoldUntilGrounded</code>)</td><td><code>Assets/Scripts/Player</code></td></tr>
+<tr><td>Settings</td><td><code>GameSettings</code> in <code>PlayerPrefs</code> (draw distance, frame rate, vSync); backpack and hotbar in <code>PlayerPrefs</code> by name (DEC-113)</td><td><code>UI/GameSettings.cs</code></td></tr>
+<tr><td>Time of day</td><td><code>DayNightCycle.TimeOfDay</code> (0–24)</td><td><code>Render/DayNightCycle.cs</code></td></tr>
+<tr><td>Scenes, file IO</td><td>Only <code>SampleScene</code>, no main menu; no file IO for game data (only the goal run writes its report)</td><td><code>Assets/Scenes</code></td></tr>
+<tr><td>Product</td><td><code>productName: Infinitile</code>, <code>companyName: anilas5235</code> → <code>%USERPROFILE%\AppData\LocalLow\anilas5235\Infinitile</code>. The concept's P0 (rename before any save ships) is done (release builds, PR #71).</td><td>ProjectSettings</td></tr>
+</table>
+<p class="small">Sizes (from the interval store numbers, DEC-110): a generated chunk has about 15–20 k runs (about 20 per world column): 60–80 KB raw, 15–25 KB deflated as a file record. A single edit as a delta would cost 4–6 bytes.</p>
+
+<h3 id="s3-3">3.3 Save model (D2)</h3>
+<table>
+<tr><th>Data</th><th>Saved?</th><th>Where</th><th>Note</th></tr>
+<tr><td>Block edits</td><td>Yes, as full snapshots of kept chunks</td><td><code>region/r.X.Z.ivr</code></td><td>Each edited chunk + the 5 × 5 chunks around it, stored whole, never generated again</td></tr>
+<tr><td>Light</td><td>No, recomputed</td><td>—</td><td>Derived; the light job is cheap on workers; saving it would double the files</td></tr>
+<tr><td>Seed + generator</td><td>Yes</td><td><code>world.json</code></td><td>Seed (int) + seed text, preset name, settings hash, game version that created it; <code>worldgen.json</code> = canonical JSON snapshot for reference</td></tr>
+<tr><td>Player</td><td>Yes</td><td><code>player.json</code></td><td>Position, yaw, pitch, movement mode, selected hotbar slot</td></tr>
+<tr><td>Inventory + hotbar</td><td>Yes, per world</td><td><code>player.json</code></td><td>By block <strong>name</strong> (+ orientation); count field reserved for survival</td></tr>
+<tr><td>Time of day</td><td>Yes</td><td><code>world.json</code></td><td><code>DayNightCycle.TimeOfDay</code></td></tr>
+<tr><td>World meta</td><td>Yes</td><td><code>world.json</code></td><td>Name, id, created, last played, play time, game mode (creative)</td></tr>
+<tr><td>Game settings</td><td>Stay global</td><td><code>PlayerPrefs</code></td><td>Draw distance, frame rate, vSync, later key bindings and volumes</td></tr>
+</table>
+<h4>Kept chunks</h4>
+<ul class="tight">
+  <li>The first edit in a chunk marks it <strong>edited</strong> and every chunk within 2 chunks of it (5 × 5 = 25) <strong>kept</strong>. A kept chunk is saved whole (its interval list as runs) and from then on loaded from disk.</li>
+  <li>The ring keeps the surroundings of a build (garden, path, the hill behind it) intact through a terrain update; the seam to regenerated land sits 64 blocks away. A ring of 1 would already cover all tree overhang (flora padding 11).</li>
+  <li>Ring chunks are always loaded when the edit happens (they are within 2 chunks of the player's reach), so they come from the same generator as the edited chunk.</li>
+  <li>Each record stores the generator version and settings hash that built it (diagnostics, a later "Update terrain").</li>
+  <li>Cost: one lone block edit keeps 25 chunks ≈ 0.5 MB; a typical hour of building in one area ≈ 2.2 MB (§3.6).</li>
+  <li>Light is recomputed for kept chunks as for any chunk.</li>
+</ul>
+
+<h3 id="s3-4">3.4 Files and format</h3>
+<pre><code>&lt;persistentDataPath&gt;/saves/          %USERPROFILE%\AppData\LocalLow\anilas5235\Infinitile\saves
+  my-island-3f9a/                    folder = name slug + 4 hex of the id (stable; rename keeps the folder)
+    world.json                       manifest (written last in a save = commit point)
+    world.json.bak                   previous good manifest
+    player.json                      player pose, mode, hotbar, backpack
+    worldgen.json                    canonical JSON of the generator settings (reference only)
+    session.lock                     "open in a game" lock (pid + time)
+    icon.png                         thumbnail (P5)
+    region/
+      r.0.0.ivr                      16 × 16 chunks = 512 × 512 blocks
+      r.-1.0.ivr
+      r.-1.0.ivr.bak                 previous version, kept by the atomic replace</code></pre>
+<div class="cols">
+<div class="box"><p><strong><code>world.json</code></strong> (example)</p>
+<pre><code>{
+  "format": 1,
+  "name": "My island",
+  "id": "3f9a1c2e-…",
+  "created": "2026-11-17T10:12:00Z",
+  "lastPlayed": "2026-11-17T12:40:00Z",
+  "playTimeSeconds": 8040,
+  "gameVersion": { "created": "1.0.0",
+                   "lastSaved": "1.1.0" },
+  "seed": 1931447125,
+  "seedText": "island",
+  "generator": { "preset": "Default",
+                 "settingsHash": "sha1:9c1e…",
+                 "generatorVersion": 1 },
+  "mode": "creative",
+  "timeOfDay": 14.25,
+  "spawn": [216, 140, 424]
+}</code></pre></div>
+<div class="box"><p><strong><code>player.json</code></strong> (example)</p>
+<pre><code>{
+  "format": 1,
+  "position": [216.5, 141.0, 424.5],
+  "yaw": 132.0, "pitch": -12.5,
+  "mode": "Flying",
+  "hotbar": { "selected": 3,
+    "slots": ["base:Grass",
+              "base:OakLog@east", null, …] },
+  "backpack": [
+    { "block": "base:Stone", "count": null }, … ]
+}</code></pre></div>
+</div>
+<h4>Region file <code>.ivr</code> (binary, little endian)</h4>
+<pre><code>Header   "IVRG" | u16 format | u8 regionSide (16) | u8 compression (0 none, 1 deflate) | i32 rx | i32 rz
+Table    256 × { u32 offset | u32 length | u32 crc32 | u8 kind }   kind 0 = none, 1 = snapshot edited, 2 = snapshot ring
+Records  per chunk, each compressed on its own:
+           u16 generatorVersion | u8[8] settingsHash prefix
+           u16 paletteCount; palette: { u8 len, utf8 "package:Name", u8 orientation }
+           u32 runCount;     runs:    { u16 palette index | varint length }</code></pre>
+<ul class="tight">
+  <li><strong>Size:</strong> a kept chunk is 15–20 k runs, 60–80 KB raw, 15–25 KB deflated. A region with a build area holds 25–110 records, ≈ 0.5–2.5 MB. The cache keeps records compressed, so a save deflates only changed chunks, then writes the whole file (≈ 10–30 ms of IO-thread time for 2 MB).</li>
+  <li><strong>Palette by name + orientation per record:</strong> new, removed and re-ordered voxels or packages don't break a save (ROT-02). A record is rewritten alone, without touching other chunks' palettes.</li>
+  <li><strong>Unknown name</strong> on load (voxel deleted or renamed): a visible placeholder block; the original name is kept, so the next save writes it back unchanged. A <code>voxel-renames.json</code> table (old → new) handles deliberate renames.</li>
+  <li><strong>Write = whole region file:</strong> serialise, write <code>r.X.Z.ivr.tmp</code>, flush to disk, <code>File.Replace(tmp, target, bak)</code>. Regions hold at most a few MB, so a rewrite is cheap and needs no sector allocator.</li>
+  <li><strong>Compression:</strong> Deflate through <code>System.IO.Compression</code> (in Unity's .NET Standard 2.1, Mono and IL2CPP, no package).</li>
+  <li><strong>Corruption:</strong> CRC per record. A bad record or unreadable file: the file is moved aside (<code>r.X.Z.ivr.corrupt-&lt;date&gt;</code>), the <code>.bak</code> is tried, else the chunks load as unedited. Never a crash.</li>
+</ul>
+<h4>Versions and migration</h4>
+<ul class="tight">
+  <li><code>format</code> integers in <code>world.json</code>, <code>player.json</code> and each region header. They are <strong>not</strong> the game's semver.</li>
+  <li>Older format → migration steps (1 → 2 → …) on load; the old folder is zipped to <code>saves/_backups/</code> before the first migrated save. Newer format than known → the world list shows it as "needs a newer version" and does not open it.</li>
+  <li>Game semver (from 1.0.0): a <strong>major</strong> bump only when a save can't be migrated (matches <code>Docs/Releases.md</code>: major = breaking what players already have). Generator tuning is minor: kept chunks are untouched by it.</li>
+</ul>
+
+<h3 id="s3-5">3.5 Runtime integration</h3>
+<pre><code>               main thread (budgeted items)                    IO thread                  job workers
+Focus update ──► RegionCache.Prefetch(load dist + 1 region) ──► read, parse table + palettes ──► (records ready)
+Data stage scan: chunk's region ready? no → skip this turn
+Data dispatch:   kept chunk?  yes → decode job: inflate record, runs → interval list (≈ 0.2–0.5 ms, worker)
+                              no  → ChunkJob as today (5–7 ms, worker)
+                 then light + mesh as today
+SetVoxel ──► VoxelEdited(pos, old) ──► KeepSet: chunk = edited, ring 2 = kept; chunk dirty
+Unload of a kept chunk ──► snapshot its interval list (1 item) ──► IO: deflate into the cached record, region dirty
+Autosave / quit / region leaves cache ──► snapshot dirty loaded kept chunks (1 item each) ──► IO: deflate,
+                                                                                write tmp + replace</code></pre>
+<ul class="tight">
+  <li><strong>KeepSet + RegionCache</strong> (new, owned by <code>VoxelWorld</code>, outside <code>ChunkManager</code>): which chunks are kept, and their latest records (compressed). Because they are not part of the chunk store, unload, <code>Regenerate</code> and <code>ChangeDrawDistance</code> keep edits even before anything is written: they rebuild <code>ChunkManager</code> and the schedulers, and the new scheduler gets the same cache. This also ends the loss within a session (walk away and back) where nothing goes to disk (tests, goal run, Editor Play).</li>
+  <li><strong>RegionCache:</strong> regions within the load distance + one region, plus every dirty one. A clean region outside that ring is dropped; a dirty one is saved first (in a session without disk it stays in memory instead).</li>
+  <li><strong>Gate:</strong> the data stage dispatches only a chunk whose region is ready (read, or known absent from the directory listing taken at world open). Prefetch runs ahead of the focus, so the gate should almost never hold a chunk.</li>
+  <li><strong>IO thread:</strong> one dedicated background thread, not a Unity job (file reads block, job workers must not). Palette names → ids are resolved there once per record, with a read-only dictionary built at world open.</li>
+  <li><strong>Decode job</strong> (Burst): inflated runs + id table → the chunk's interval list and <code>OccupiedPartitions</code>. Kept chunks skip <code>ChunkJob</code> entirely, so the generator's hot loop is not touched (no PrepareChunkMaps risk).</li>
+  <li><strong>Snapshot:</strong> copying a loaded chunk's interval list (15–20 k nodes) is a memcpy on the main thread; the conversion to runs + palette and Deflate run on the IO thread.</li>
+</ul>
+<h4>When to save</h4>
+<ul class="tight">
+  <li><strong>Autosave</strong> every 5 min (a setting later): only dirty regions + <code>player.json</code> + <code>world.json</code> (manifest last).</li>
+  <li><strong>A region leaves the cache</strong> while dirty → saved then.</li>
+  <li><strong>Quit / "Save and quit to title"</strong> → a synchronous final save (waits for the IO thread).</li>
+  <li><code>OnApplicationPause</code> / focus loss on desktop: not needed; a crash loses at most one autosave interval.</li>
+  <li><strong>Dirty tracking:</strong> a dirty bit per kept chunk (set by an edit in it; a ring chunk is dirty once, until its first snapshot) and per region; the player is written with every save.</li>
+</ul>
+<h4>Generator changes (Q4′)</h4>
+<ul class="tight">
+  <li>Kept chunks (edited + ring 2) never change: the build and 64 blocks around it stay exactly as built.</li>
+  <li>Every other chunk comes from the current generator. After a tuning release a seam (a step, a cut tree, a cave ending flat, a water edge) can appear on the chunk grid 64 blocks from a build; nowhere closer.</li>
+  <li><code>world.json</code> stamps <code>generatorVersion</code> + <code>settingsHash</code>; each record stamps the pair that built it. The world list shows "terrain updated" when the current pair differs from the one last played.</li>
+  <li><code>generatorVersion</code> is a constant in code, bumped by hand when generator code changes output; <code>settingsHash</code> comes from <code>WorldGenSettings.ToCanonicalJson</code>. The golden-hash test (P2) fails on any output change, so a missed bump is caught.</li>
+  <li>Float determinism no longer matters for saved land (it is stored, not regenerated). It only decides whether regenerated land matches on both sides of a seam on another machine (§3.7).</li>
+</ul>
+<h4>Tests, Editor and the goal run (Q10)</h4>
+<ul class="tight">
+  <li>No world session → nothing is read or written. That covers tests, the goal run (<code>AutomatedRun.Active</code>) and Editor Play without the menu: a throwaway world with the asset's seed, as today.</li>
+  <li>In all three, KeepSet and RegionCache still work in memory, so edits survive unload, <code>Regenerate</code> and <code>ChangeDrawDistance</code> within the session, and the save path can be tested without disk through an in-memory file layer.</li>
+  <li>Editor Play from the MainMenu scene (after P3) uses real worlds like a player build.</li>
+</ul>
+
+<h3 id="s3-6">3.6 Costs</h3>
+<h4>Against the frame budget (PERF-17, 2 ms)</h4>
+<table>
+<tr><th>Work</th><th>Thread</th><th>Cost (estimate)</th><th>Budget item</th></tr>
+<tr><td>Region ready check per chunk at dispatch</td><td>main</td><td>&lt; 1 µs (hash lookup)</td><td>inside the dispatch item</td></tr>
+<tr><td>Dispatch a kept chunk's decode job instead of <code>ChunkJob</code></td><td>main</td><td>same as a <code>ChunkJob</code> dispatch</td><td>inside the dispatch item</td></tr>
+<tr><td>Record an edit: mark chunk + ring</td><td>main</td><td>&lt; 1 µs (25 set inserts on the first edit)</td><td>part of the edit (which already runs a sync light job)</td></tr>
+<tr><td>Read + parse a region (≤ 2.5 MB, records stay compressed)</td><td>IO</td><td>1–5 ms</td><td>not on main</td></tr>
+<tr><td>Decode a kept chunk (inflate + runs → interval list)</td><td>worker</td><td>≈ 0.2–0.5 ms, against 5–7 ms generation</td><td>not on main</td></tr>
+<tr><td>Save: copy one kept chunk's interval list</td><td>main</td><td>20–60 µs (15–20 k nodes × 6 B)</td><td>one item per chunk, sliced by <code>FrameBudget</code></td></tr>
+<tr><td>Runs + palette + deflate one chunk</td><td>IO</td><td>≈ 1–2 ms</td><td>not on main</td></tr>
+<tr><td>Write a region (whole file)</td><td>IO</td><td>≈ 10–30 ms for 2 MB</td><td>not on main</td></tr>
+<tr><td>Save on quit</td><td>main waits</td><td>&lt; 1 s for typical worlds</td><td>quit only</td></tr>
+</table>
+<p>Performance pins for P2: the <code>ChunkJob</code> bench unchanged (it is not touched); goal run p95 and frames over 8.33 ms unchanged on a world with a build area; a PlayMode test that an autosave of 110 dirty kept chunks never puts a frame's scheduler time over the budget plus one item.</p>
+<h4>Disk use per session</h4>
+<p class="small">Assumptions: a snapshot chunk is 15–20 k runs, 60–80 KB raw, about 20 KB deflated (15–25 KB). Draw distance 12 loads about 25 × 25 chunks (31 × 31 with the margin).</p>
+<table>
+<tr><th>Session</th><th>A deltas</th><th>B edited only</th><th>D, N = 1</th><th>D, N = 2 (picked)</th><th>C every visited</th></tr>
+<tr><td>1 h building in one area (≈ 40 edited chunks in a 7 × 6 patch, ≈ 1 000 chunks visited)</td><td>0.1–0.5 MB</td><td>≈ 0.8 MB</td><td>72 chunks ≈ 1.4 MB</td><td>110 chunks ≈ 2.2 MB</td><td>≈ 20–25 MB</td></tr>
+<tr><td>10 min flying at 80 u/s, draw 12 (48 000 blocks = 1 500 chunks of path × 25–31 wide)</td><td>0</td><td>0</td><td>0</td><td>0</td><td>37–47 k chunks ≈ 0.75–0.95 GB</td></tr>
+<tr><td>Write load while flying</td><td>–</td><td>–</td><td>–</td><td>–</td><td>≈ 60 chunks/s, ≈ 1.2 MB/s, deflate ≈ 30–60 ms per second on the IO thread</td></tr>
+</table>
+<h4>Load per chunk (worker / IO thread; main thread unchanged)</h4>
+<table>
+<tr><th>Path</th><th>Cost</th></tr>
+<tr><td>Generate (today)</td><td>5–7 ms</td></tr>
+<tr><td>From a snapshot: read ≈ 20 KB from the cached region, inflate, rebuild the interval list, map names to ids</td><td>≈ 0.2–0.5 ms (10–30× faster than generating)</td></tr>
+<tr><td>Light (either way)</td><td>0.8–1.1 ms</td></tr>
+<tr><td>Deltas: generate + patch</td><td>5–7 ms + µs</td></tr>
+</table>
+
+<h3 id="s3-7">3.7 Generator changes and determinism</h3>
+<h4>Is generation bit-identical?</h4>
+<p class="small">Read on <code>feature/hud-settings-menu</code>, Burst 1.8.28, Mathematics 1.2.1, 2026-11-17.</p>
+<ul class="tight">
+  <li>Every job that runs the sampler is <code>[BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]</code> (GEN-16, guarded by a test in <code>ChunkJobTerrainFirstTests</code>). <code>CompileSynchronously</code> keeps the Editor from running the managed fallback while Burst compiles.</li>
+  <li>Noise is the project's own <code>SeededSimplex</code>: integer hash gradients + float add, mul, floor. No <code>Mathf</code>, <code>UnityEngine.Random</code> or <code>System.Random</code> in the generator. Flora spacing and placement are integer hashes.</li>
+  <li>Transcendental functions in shipped generation: only the cave worms (<code>math.sin</code>, <code>math.cos</code>, <code>math.atan2</code> in <code>Worms.cs</code>). <code>math.exp</code> sits in ParameterSpaceWeighting, which the shipped asset does not use (both blend methods are DistanceBlend). <code>math.sqrt</code> (NestedSpline) is exact under IEEE.</li>
+  <li>No Burst AOT settings file, so players use the defaults (x64 Windows/Linux: an SSE-level and an AVX2 variant, picked at run time by CPU). The Editor JIT-compiles for its own CPU.</li>
+</ul>
+<p>What that means:</p>
+<ul class="tight">
+  <li>Same machine, same build: identical (the existing determinism tests show it).</li>
+  <li>Windows vs Linux player on the same CPU family: very likely identical (same compiler and targets, no OS math library).</li>
+  <li>Different CPUs (AVX2 or not), and Editor vs player: probably identical for add, mul, floor, sqrt. Not guaranteed for the worms' sin, cos, atan2: Burst's own approximations may compile differently per target, and Burst gives no cross-platform promise (<code>FloatMode.Deterministic</code> is documented as reserved for future use; whether Strict rules out FMA fusing on AVX2 is not stated plainly).</li>
+  <li>Where a difference would show: almost nowhere on the surface (heights and thresholds round to whole blocks, so a last-bit change flips a block only at an exact boundary). Worm paths add sin/cos over many steps, so a cave wall could move by one block on another machine.</li>
+  <li>Burst disabled (Jobs menu or a Burst compile error): the jobs run in Mono, <code>math.sin</code> goes through <code>System.Math</code>, and caves differ for sure.</li>
+  <li>Not measured yet: no cross-machine or Editor-vs-player hash exists. Hence the golden-hash test (size S) in P2: hash the voxels of a fixed set of chunks (caves on, several biomes) per seed, store it, assert it in EditMode and in a development player on Windows and Linux.</li>
+  <li>Weight: a one-block difference matters only for deltas (an edit next to a cave wall). With snapshots the saved chunks are exact copies, so with D2 a difference can only show up as a seam. Generator <em>changes</em> (tuning releases) move terrain by tens of blocks and matter far more.</li>
+</ul>
+<h4>What a generator change does to each save model</h4>
+<table>
+<tr><th></th><th>A deltas</th><th>B edited only</th><th>D, ring N</th><th>C every visited</th></tr>
+<tr><td>Builds</td><td>Placed blocks stay, but the ground under and around them moves: a house floats or gets buried, a tunnel loses or gains walls, a filled hole sits on new terrain</td><td>Edited chunks stay exactly as they were</td><td>Edited chunks and N chunks around them stay exactly as they were</td><td>Everything seen stays exactly as it was</td></tr>
+<tr><td>Seams</td><td>None; the whole world comes from the new generator</td><td>Cliffs and steps on the 32-block grid right next to builds; trees cut at chunk borders; caves end flat; water edges hang</td><td>The same, moved 32 (N = 1) or 64 (N = 2) blocks away from the build; the garden, path and nearby hill stay</td><td>Only at the edge of the explored area; new biomes and blocks appear only in land never visited</td></tr>
+<tr><td>Tuning reaches the player</td><td>Everywhere</td><td>Everywhere except build chunks</td><td>Everywhere except build surroundings</td><td>Only in unexplored land</td></tr>
+<tr><td>Float determinism needed</td><td>Yes, for every chunk with edits</td><td>No (neighbours only touch the frozen chunks)</td><td>No</td><td>No</td></tr>
+</table>
+<ul class="tight">
+  <li>Trees and cave worms cross chunk borders (flora padding 11, worm padding = reach + radius). A ring of N = 1 (32 blocks) covers all flora overhang from the build chunk.</li>
+  <li>Seam smoothing (blending new terrain toward a frozen border) is possible with the blending code, but real work in the chunk job: P5.</li>
+  <li>A middle way for C (snapshot visited chunks only within a radius of builds or spawn) is D with a large N.</li>
+  <li>Any scheme can add an "Update terrain" action per world later: drop the unedited snapshots and regenerate (P5).</li>
+</ul>
+<p>The questions asked instead of Q1 and Q4, with the options offered:</p>
+<ul class="tight">
+  <li><strong>Q1′ What is kept for edited land?</strong> D, N = 2 (recommended, <strong>picked</strong>: builds can never be damaged by tuning, seams stay 64 blocks away, disk stays at MB, flying writes nothing) · D, N = 1 · C every visited chunk (safest, but about 1 GB per 10 min of flying) · A deltas only (smallest, but tuning moves ground under builds).</li>
+  <li><strong>Q4′ After a terrain update, unedited land:</strong> follows the new generator (recommended, <strong>picked</strong>; "terrain updated" status, a later "Update terrain" action) · stays as first generated (this forces C).</li>
+</ul>
+
+<h3 id="s3-8">3.8 Rejected options</h3>
+<p>The alternatives the owner was shown, with the reason each lost. "rec." marks the concept's recommendation at the time.</p>
+<table>
+<tr><th>Question</th><th>Picked</th><th>Rejected, and why</th></tr>
+<tr><td>Edits</td><td>D2: edited chunks + ring 2 as snapshots</td><td><b>A deltas</b> (first rec. and first pick): tiny on disk (bytes per edit), load = generation + µs patch, but after a generator change the ground moves under builds, and it needs float determinism for every edited chunk — the owner's objection. <b>B edited chunks only</b> (~20 KB each, decode 0.1–0.3 ms): cliffs at chunk borders right next to builds after a change. <b>D, N = 1</b>: seams 32 blocks from a build instead of 64. <b>C every visited chunk</b> (saves on every unload): a long flight = hundreds of MB (≈ 1 GB per 10 min), new terrain only far away.</td></tr>
+<tr><td>Files</td><td>Region 16 × 16 chunks, whole-file rewrite (rec.)</td><td><b>One file per chunk</b>: one open per edited chunk, many 4 KB clusters and Defender scans on Windows. <b>Region 32 × 32</b>: fewer files, but rewrites grow with big builds. With 16 × 16 a 2 km² world has ≈ 8–16 files, one read covers 256 chunks, prefetch per region.</td></tr>
+<tr><td>Format</td><td>JSON manifest + player, binary regions (rec.)</td><td><b>Everything JSON</b>: regions 5–10× bigger, slow to parse. <b>Everything binary</b>: the manifest can't be read or fixed by hand.</td></tr>
+<tr><td>Compression</td><td>Deflate, <code>System.IO.Compression</code> (rec.)</td><td><b>LZ4</b>: faster, 1.5–2.5× smaller (Deflate 2–4×), but a third-party package or an own port; Deflate's ~100 MB/s inflate is plenty for KB records. <b>None</b>: RLE only, bigger files.</td></tr>
+<tr><td>Old worlds' generator</td><td>Follow the current generator, store the hash (rec.)</td><td><b>Freeze the world's settings snapshot</b>: unedited terrain never shifts (until generator code changes), but tuning never reaches old worlds, new biomes and voxels never appear in them, and the settings would have to load from JSON into <code>WorldGenSettings</code> with asset references.</td></tr>
+<tr><td>Inventory</td><td>Per world, <code>player.json</code> (rec.)</td><td><b>Global (PlayerPrefs)</b>: one shelf everywhere, needs a move for survival later. <b>Per world, new worlds start from the last-used set</b>: also ready for survival; not picked.</td></tr>
+<tr><td>Light</td><td>Recompute (rec.)</td><td><b>Save</b>: about the size of the voxel data again on disk, stale after a generator change, and the regenerated part needs the light job anyway (0.8–1.1 ms per chunk on workers).</td></tr>
+<tr><td>Editor Play</td><td>Saves nothing (Q10)</td><td>The owner chose a throwaway world for Editor Play without the menu, like tests and the goal run; this differs from the concept's first recommendation.</td></tr>
+</table>
+
+<h3 id="s3-9">3.9 Phases</h3>
+<p>Order (Q7): P1 → P2 → P3 → P4; P4 may go any time after the inventory PR (#72, merged) and P1. P0 of the concept (rename the product to Infinitile before any save ships) is done. Each phase is one item below, with its scope, size, risks and tests.</p>
 
 <div class="item" id="GAME-10">
 <h3><span class="id">GAME-10</span>P1 World folder and player <span class="st">LATER</span></h3>
@@ -344,7 +591,7 @@ td > a:only-child{white-space:nowrap}
 <div class="item" id="GAME-12">
 <h3><span class="id">GAME-12</span>P3 Main menu, world list and per-world settings <span class="st">LATER</span></h3>
 <dl class="f">
-<dt>What</dt><dd>A MainMenu scene (build index 0, UI Toolkit, the block-menu look of PR #70). Title: Play, Settings (the existing page), Quit. World list: one card per world folder, sorted by last played (name, last played, play time, mode; thumbnail later), with Play, Rename, Delete and Create. Create asks name (default "World N") and seed (text; empty = random; numbers as is, text hashed with a stable FNV-1a); preset and game mode are shown greyed until they exist. Rename changes <code>world.json</code> only. Delete asks to confirm, then removes the folder; refused while the world's <code>session.lock</code> is held. The Esc menu gets "Save and quit to title" and shows "Saved" briefly after a save. Size M–L.</dd>
+<dt>What</dt><dd>A MainMenu scene (build index 0, UI Toolkit, the block-menu look of PR #70). Title: Play, Settings (the existing page), Quit. World list: one card per world folder, sorted by last played (name, last played, play time, mode; thumbnail later), with Play, Rename, Delete and Create. Create asks name (default "World N") and seed (text; empty = random; numbers as is, text hashed with a stable FNV-1a); preset and game mode are shown greyed until they exist. Rename changes <code>world.json</code> only. Delete asks to confirm, then removes the folder; refused while the world's <code>session.lock</code> is held. Play sets <code>WorldSession.Current</code> (folder, manifest) and loads the game scene; <code>VoxelWorld.Awake</code> takes the seed from the session as it takes <code>RequestedDrawDistance</code> today (a run-time override, the asset is not written); the player spawns at the saved pose and waits for ground (<code>HoldUntilGrounded</code>), a new world uses today's spawn. <code>session.lock</code> keeps two running copies from writing one world. The Esc menu gets "Save and quit to title" (it replaces Quit in the game) and shows "Saved" briefly after a save; the world list shows the "terrain updated" status (§3.5). Size M–L.</dd>
 <dt>Origin</dt><dd><q>make game menu with + multiple worlds</q>, <q>worlds settings like seed and so on</q>, <q>add to TODO list: main menu with world selection</q> — owner, 2026-11-17.</dd>
 <dt>Depends on</dt><dd>GAME-10, GAME-11. GAME-41 and GAME-51 hook into this menu.</dd>
 <dt>Open picks</dt><dd>Which further per-world settings beyond the seed (preset, game mode once GAME-01 exists). Risk: the scene switch must tear the world down cleanly (dispose order, domain-reload rules).</dd>
@@ -502,7 +749,7 @@ td > a:only-child{white-space:nowrap}
 <dt>What</dt><dd>Show the game version (<code>major.minor.patch</code>, from 1.0.0) in the Esc menu and later in the main menu. The release build writes it into <code>PlayerSettings.bundleVersion</code>, so the player reads it as <code>Application.version</code> (<code>ReleaseBuild.cs</code>, <code>Docs/Releases.md</code>). A version label is not a hint, so the UI rule allows it.</dd>
 <dt>Origin</dt><dd><q>add to TODO list: in-game version number in the menu</q> — owner, 2026-11-17.</dd>
 <dt>Depends on</dt><dd>— (GAME-12 for the main menu).</dd>
-<dt>Open picks</dt><dd>Where (a corner of the Esc menu, the settings page); what the Editor shows (the project's own <code>bundleVersion</code>, or "dev").</dd>
+<dt>Open picks</dt><dd>Where (a corner of the Esc menu, the settings page); what the Editor shows (the project's <code>bundleVersion</code> is <code>dev</code> outside a release build).</dd>
 <dt>Cost</dt><dd>None.</dd>
 </dl>
 </div>
@@ -510,7 +757,7 @@ td > a:only-child{white-space:nowrap}
 <div class="item" id="GAME-42">
 <h3><span class="id">GAME-42</span>Controls page in settings <span class="st">LATER</span></h3>
 <dl class="f">
-<dt>What</dt><dd>A Controls page in the settings menu: the key and button overview, maybe rebinding. F3 stays fixed (owner). The bindings come from <code>InputSystem_Actions.inputactions</code>; the Input System has interactive rebinding, and the overrides would be kept as JSON in <code>PlayerPrefs</code> (game settings stay global, §3.1).</dd>
+<dt>What</dt><dd>A Controls page in the settings menu: the key and button overview, maybe rebinding. F3 stays fixed (owner). The bindings come from <code>InputSystem_Actions.inputactions</code>; the Input System has interactive rebinding, and the overrides would be kept as JSON in <code>PlayerPrefs</code> (game settings stay global, §3.3).</dd>
 <dt>Origin</dt><dd><q>add to TODO list: in-game controls page in settings + controller support for the howl game</q> — owner, 2026-11-17 (first part; the second is GAME-60).</dd>
 <dt>Depends on</dt><dd>GAME-60 (the page shows gamepad bindings too).</dd>
 <dt>Open picks</dt><dd>Rebinding yes or no; mouse sensitivity and invert-Y on this page.</dd>
@@ -558,7 +805,7 @@ td > a:only-child{white-space:nowrap}
 <div class="item" id="GAME-52">
 <h3><span class="id">GAME-52</span>Sound settings page <span class="st">LATER</span></h3>
 <dl class="f">
-<dt>What</dt><dd>A sound page in the settings with volume sliders for Master, Music and Effects, driving exposed AudioMixer parameters. Kept globally in <code>PlayerPrefs</code> with the other game settings (§3.1).</dd>
+<dt>What</dt><dd>A sound page in the settings with volume sliders for Master, Music and Effects, driving exposed AudioMixer parameters. Kept globally in <code>PlayerPrefs</code> with the other game settings (§3.3).</dd>
 <dt>Origin</dt><dd>Owner's item above, part 2 (<q>sound settings</q>), 2026-11-17.</dd>
 <dt>Depends on</dt><dd>GAME-50.</dd>
 <dt>Open picks</dt><dd>A mute toggle; more groups (ambience, UI).</dd>
