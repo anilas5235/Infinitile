@@ -115,29 +115,24 @@ tiles['grass_swamp'] = recolour(load('grass1'), GREEN, 100, 1.0, .62)
 
 
 def torch():
-    """Torch (2026-11-17, cutout sprite of the Cross shape): a plank-coloured stick with a charred tip and a flame in
-    the lava palette, flat colours with soft edges like the Kenney plants. Drawn at 4x and scaled down."""
-    n = 128; ss = 4; S = lambda v: v * ss
-    im = Image.new('RGBA', (n * ss, n * ss), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
-    # stick: Kenney wood, a darker left side and a light plank stripe
-    d.rectangle([S(56), S(54), S(72) - 1, S(128) - 1], fill=(196, 134, 71, 255))
-    d.rectangle([S(56), S(54), S(60) - 1, S(128) - 1], fill=(170, 116, 61, 255))
-    d.rectangle([S(64), S(66), S(67) - 1, S(98) - 1], fill=(208, 142, 74, 255))
-    d.rectangle([S(62), S(106), S(65) - 1, S(120) - 1], fill=(180, 123, 65, 255))
-    # charred tip
-    d.rectangle([S(56), S(48), S(72) - 1, S(58) - 1], fill=(92, 62, 40, 255))
-
-    def drop(cx, top, bottom, half, col):
-        """A flame drop: round bottom of radius `half`, pointed top."""
-        cy = bottom - half
-        d.ellipse([S(cx - half), S(cy - half), S(cx + half), S(cy + half)], fill=col)
-        d.polygon([(S(cx - half), S(cy)), (S(cx + half), S(cy)), (S(cx + half * .25), S(top)),
-                   (S(cx - half * .1), S(top + 2))], fill=col)
-
-    drop(64, 10, 56, 17, (232, 106, 23, 255))   # lava orange
-    drop(64, 22, 54, 12, (255, 149, 19, 255))   # lava yellow-orange
-    drop(64, 34, 52, 7, (255, 222, 120, 255))   # pale core
-    return im.resize((n, n), Image.LANCZOS)
+    """Torch (2026-11-17, voxel style after the owner's "no flame"): the front view of the Torch shape, a 2/16 stick
+    (y 0..6/16) under a 4/16 ember cube (y 6..10/16). The shape's quads sample exactly these rectangles, so the tile is
+    also the flat inventory icon. Flat colours on the 16-texel grid (8 px per texel): Kenney plank wood with a dark and
+    a light edge and a charred top, the ember cube in rings of the lava palette."""
+    n = 128; t = 8
+    im = Image.new('RGBA', (n, n), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    box = lambda x0, y0, x1, y1, col: d.rectangle([x0, y0, x1 - 1, y1 - 1], fill=col + (255,))
+    # stick: texels x 7..9, rows 10..16 from the top
+    box(7 * t, 10 * t, 9 * t, 16 * t, (196, 134, 71))
+    box(7 * t, 10 * t, 7 * t + 4, 16 * t, (170, 116, 61))
+    box(9 * t - 4, 10 * t, 9 * t, 16 * t, (208, 142, 74))
+    box(7 * t, 10 * t, 9 * t, 11 * t, (92, 62, 40))   # charred under the ember
+    # ember cube: texels x 6..10, rows 6..10, rings from dark to the pale core
+    for inset, col in ((0, (196, 70, 18)), (4, (232, 106, 23)), (8, (255, 149, 19)), (12, (255, 222, 120))):
+        box(6 * t + inset, 6 * t + inset, 10 * t - inset, 10 * t - inset, col)
+    box(6 * t + 4, 6 * t + 4, 6 * t + 8, 6 * t + 8, (255, 149, 19))     # a hot speck on the orange ring
+    box(10 * t - 8, 10 * t - 8, 10 * t - 4, 10 * t - 4, (196, 70, 18))  # a dark speck
+    return im
 
 
 tiles['torch'] = torch()
