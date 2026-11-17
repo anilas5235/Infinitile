@@ -2,6 +2,12 @@
 
 A high-performance voxel engine built in Unity with procedurally generated terrain, in-game voxel editing, and GPU-driven rendering using compute shaders.
 
+## Download
+
+You can download Windows x64 and Linux x64 builds from the
+[Releases](https://github.com/anilas5235/Infinitile/releases) page. [Docs/Releases.md](Docs/Releases.md) describes how
+releases are made.
+
 ## Project Overview
 
 This is a modern voxel engine that demonstrates scalable world generation and rendering architecture. The engine generates infinite procedural terrain with caves, ores, and structures, allows real-time voxel placement and destruction, and renders the world using a hybrid approach combining CPU-side world management with GPU-driven point rendering and global buffers.

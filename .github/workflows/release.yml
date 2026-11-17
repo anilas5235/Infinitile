@@ -1,0 +1,187 @@
+# Builds the Windows x64 and Linux x64 players (Mono, release) with GameCI and publishes them as a GitHub release
+# vX.Y.Z. Run by hand (Actions → Release → Run workflow, or gh workflow run). How-to: Docs/Releases.md.
+# A pull request that changes the release pipeline runs the same builds as a check and publishes nothing.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which number goes up (major.minor.patch; rule in Docs/Releases.md). The first release, 1.0.0, needs major
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      highlights:
+        description: Highlights in Markdown, shown above the PR list (optional; gh workflow run -f takes several lines)
+        type: string
+        default: ''
+      pr_list:
+        description: Add GitHub's list of the pull requests merged since the last release
+        type: boolean
+        default: true
+      dry_run:
+        description: Build and pack only; no tag, no release (the archives stay as workflow artifacts for 7 days)
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - Assets/Engine/Editor/Build/ReleaseBuild.cs
+      - Tools/Release/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+      previous: ${{ steps.next.outputs.previous }}
+      publish: ${{ steps.next.outputs.publish }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+      - name: Next version
+        id: next
+        env:
+          BUMP: ${{ inputs.bump || 'patch' }}
+          PUBLISH: ${{ github.event_name == 'workflow_dispatch' && !inputs.dry_run }}
+        run: |
+          next=$(bash Tools/Release/next-version.sh "$BUMP")
+          read -r previous version <<< "$next"
+          if [ "$PUBLISH" = true ] && [ "$GITHUB_REF" != refs/heads/master ]; then
+            echo "::error::A release is published from master only (this run is on $GITHUB_REF); use dry_run elsewhere"
+            exit 1
+          fi
+          echo "previous=$previous" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
+          if [ "$PUBLISH" = true ]; then what="will be published as Latest"; else what="dry run: nothing is published"; fi
+          echo "::notice title=Version v$version::$BUMP after $previous; $what"
+          {
+            echo "# v$version"
+            echo
+            echo "**$BUMP** after \`$previous\`: $what."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - target: StandaloneWindows64
+            platform: windows-x64
+          - target: StandaloneLinux64
+            platform: linux-x64
+    steps:
+      - name: Check the Unity secrets
+        id: secrets
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          if [ -n "$UNITY_LICENSE" ] && [ -n "$UNITY_EMAIL" ] && [ -n "$UNITY_PASSWORD" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          message="The repository secrets UNITY_LICENSE, UNITY_EMAIL and UNITY_PASSWORD are needed (Docs/Releases.md)"
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            echo "::warning::$message; the build check is skipped"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::$message"
+            exit 1
+          fi
+
+      # The Unity image and the Library need more room than the runner has free.
+      - name: Free disk space
+        if: steps.secrets.outputs.ok == 'true'
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        with:
+          tool-cache: false
+          large-packages: false
+
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        if: steps.secrets.outputs.ok == 'true'
+
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        if: steps.secrets.outputs.ok == 'true'
+        with:
+          path: Library
+          # Keyed on packages and Unity version only: one cache per target that changes rarely, so the two
+          # targets stay within the repository's cache limit. Assets changed since then are imported in the build.
+          key: Library-${{ matrix.target }}-${{ hashFiles('Packages/packages-lock.json', 'ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: |
+            Library-${{ matrix.target }}-
+
+      - name: Build
+        if: steps.secrets.outputs.ok == 'true'
+        uses: game-ci/unity-builder@adaf7cd8f42fd48fbbf2d4f5f67ca30d87f819f1 # v5.0.1
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: ${{ matrix.target }}
+          buildName: Infinitile
+          buildsPath: build
+          buildMethod: Engine.Editor.Build.ReleaseBuild.BuildFromCommandLine
+          versioning: Custom
+          version: ${{ needs.version.outputs.version }}
+
+      - name: Pack
+        if: steps.secrets.outputs.ok == 'true'
+        run: bash Tools/Release/package.sh "build/${{ matrix.target }}" "${{ matrix.platform }}" "${{ needs.version.outputs.version }}" dist
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.secrets.outputs.ok == 'true'
+        with:
+          name: release-${{ matrix.platform }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish
+    needs: [version, build]
+    if: needs.version.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HIGHLIGHTS: ${{ inputs.highlights }}
+          PR_LIST: ${{ inputs.pr_list }}
+          VERSION: ${{ needs.version.outputs.version }}
+          PREVIOUS: ${{ needs.version.outputs.previous }}
+        run: |
+          printf '%s\n' "$HIGHLIGHTS" > "$RUNNER_TEMP/highlights.md"
+          bash Tools/Release/compose-notes.sh "v$VERSION" "$GITHUB_SHA" "$PREVIOUS" "$RUNNER_TEMP/highlights.md" "$PR_LIST" > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          ls -l dist
+          gh release create "v$VERSION" dist/* --target "$GITHUB_SHA" --title "Infinitile $VERSION" \
+            --notes-file "$RUNNER_TEMP/notes.md" --latest
