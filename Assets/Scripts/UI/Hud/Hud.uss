@@ -1,10 +1,13 @@
+/* In-game HUD. Laid out for 1920 × 1080 (the panel settings scale with the screen).
+   Panels: plain dark. Menus and the hotbar: chunky blocks with a thick bottom edge. */
+
 .hud {
     position: absolute;
     left: 0;
     top: 0;
     right: 0;
     bottom: 0;
-    color: rgb(235, 235, 235);
+    color: rgb(232, 236, 241);
     font-size: 14px;
 }
 
@@ -19,117 +22,404 @@
     -unity-background-scale-mode: scale-to-fit;
 }
 
+/* The display font (set from the HudController); bold default font until it is assigned. */
+.lil {
+    -unity-font-style: bold;
+}
+
+/* ── F3 panels ───────────────────────────────────────────────────────── */
+
 .column {
     position: absolute;
-    top: 12px;
-    width: 360px;
+    top: 20px;
 }
 
 .column--left {
-    left: 12px;
+    left: 20px;
+    width: 330px;
 }
 
 .column--right {
-    right: 12px;
+    right: 20px;
+    width: 360px;
 }
 
-.panel {
+.p {
+    margin-bottom: 10px;
+    padding: 12px 14px 14px 14px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.10);
+    border-radius: 6px;
+    background-color: rgba(14, 17, 22, 0.80);
+}
+
+.p__head {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 8px;
-    padding: 6px 10px 8px 10px;
-    border-radius: 4px;
-    background-color: rgba(0, 0, 0, 0.55);
 }
 
-.panel__title {
-    -unity-font-style: bold;
-    font-size: 13px;
-    color: rgb(255, 214, 120);
-    margin-bottom: 2px;
+.p__title {
     padding: 0;
-}
-
-.row {
-    padding: 0;
-    margin: 1px 0;
-    white-space: normal;
-}
-
-.row--strong {
+    margin: 0;
+    font-size: 11px;
+    letter-spacing: 1.5px;
     -unity-font-style: bold;
+    color: rgb(143, 153, 168);
 }
 
-.row--dim {
-    color: rgb(190, 190, 190);
+.p__meta {
+    padding: 0;
+    margin: 0;
     font-size: 12px;
-    margin-top: 4px;
+    color: rgb(154, 164, 178);
+}
+
+.kv {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin: 2px 0;
+    min-height: 19px;
+}
+
+.kv__k {
+    padding: 0;
+    margin: 0;
+    color: rgb(154, 164, 178);
+    font-size: 13px;
+}
+
+.kv__v {
+    padding: 0;
+    margin: 0;
+    font-size: 13px;
+    color: rgb(232, 236, 241);
+    -unity-text-align: middle-right;
+}
+
+.kv__v--strong {
+    -unity-font-style: bold;
+}
+
+.kv--small .kv__k {
+    font-size: 11px;
+}
+
+.cells {
+    flex-direction: row;
+    margin-top: 8px;
+}
+
+.cell {
+    flex-grow: 1;
+    flex-basis: 0;
+    margin-right: 4px;
+    padding: 5px 0 6px 0;
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.05);
+    align-items: center;
+}
+
+.cell:last-child {
+    margin-right: 0;
+}
+
+.cell__k {
+    padding: 0;
+    margin: 0;
+    font-size: 10px;
+    color: rgb(143, 153, 168);
+}
+
+.cell__v {
+    padding: 0;
+    margin: 0;
+    font-size: 13px;
+    color: rgb(232, 236, 241);
+}
+
+.tags {
+    flex-direction: row;
+}
+
+.tag {
+    margin-left: 4px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    background-color: rgba(255, 255, 255, 0.07);
+    color: rgb(200, 207, 217);
+}
+
+.tag--warn {
+    background-color: rgba(242, 179, 61, 0.18);
+    color: rgb(242, 179, 61);
+}
+
+.frame__big {
+    flex-direction: row;
+    align-items: flex-end;
+    margin-bottom: 6px;
+}
+
+.frame__fps {
+    padding: 0;
+    margin: 0 10px 0 0;
+    font-size: 30px;
+    -unity-font-style: bold;
+}
+
+.frame__ms {
+    padding: 0;
+    margin: 0 0 5px 0;
+    font-size: 15px;
+    color: rgb(127, 214, 154);
+}
+
+.frame__ms--slow {
+    color: rgb(242, 179, 61);
+}
+
+.bar {
+    height: 6px;
+    margin: 4px 0 4px 0;
+    border-radius: 3px;
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.bar__fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    border-radius: 3px;
+    background-color: rgb(242, 179, 61);
+}
+
+.bar__peak {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 2px;
+    left: 0;
+    background-color: rgb(232, 236, 241);
+}
+
+.tr {
+    flex-direction: row;
+    margin: 2px 0;
+}
+
+.tr--head Label {
+    font-size: 11px;
+    color: rgb(143, 153, 168);
+}
+
+.tr__name {
+    padding: 0;
+    margin: 0;
+    flex-grow: 1;
+    font-size: 13px;
+    color: rgb(154, 164, 178);
+}
+
+.tr__n {
+    padding: 0;
+    margin: 0;
+    width: 66px;
+    font-size: 13px;
+    -unity-text-align: middle-right;
+}
+
+.look__top {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.look__swatch {
+    width: 40px;
+    height: 40px;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.look__name {
+    padding: 0;
+    margin: 0;
+    font-size: 16px;
+    -unity-font-style: bold;
+}
+
+.look__id {
+    padding: 0;
+    margin: 0;
+    font-size: 12px;
+    color: rgb(154, 164, 178);
+}
+
+.look__empty {
+    padding: 4px 0;
+    margin: 0;
+    color: rgb(154, 164, 178);
+}
+
+/* ── Key hints ───────────────────────────────────────────────────────── */
+
+.hints {
+    position: absolute;
+    left: 20px;
+    bottom: 20px;
+    flex-direction: row;
 }
 
 .hint {
-    position: absolute;
-    left: 12px;
-    bottom: 10px;
-    font-size: 12px;
-    padding: 2px 8px;
-    border-radius: 4px;
-    background-color: rgba(0, 0, 0, 0.45);
+    flex-direction: row;
+    align-items: center;
+    margin-right: 8px;
+    padding: 4px 10px 4px 6px;
+    border-radius: 6px;
+    background-color: rgba(14, 17, 22, 0.70);
 }
+
+.hint__key {
+    padding: 1px 6px;
+    margin: 0 6px 0 0;
+    border-radius: 4px;
+    font-size: 12px;
+    -unity-font-style: bold;
+    color: rgb(242, 179, 61);
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.hint__text {
+    padding: 0;
+    margin: 0;
+    font-size: 13px;
+    color: rgb(200, 207, 217);
+}
+
+/* ── Hotbar ──────────────────────────────────────────────────────────── */
 
 .hotbar-area {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 12px;
+    bottom: 18px;
     align-items: center;
 }
 
 .voxel-name {
-    margin-bottom: 4px;
-    padding: 2px 10px;
-    border-radius: 4px;
-    background-color: rgba(0, 0, 0, 0.5);
-    font-size: 15px;
+    margin-bottom: 12px;
+    padding: 4px 14px 5px 14px;
+    border-radius: 8px;
+    font-size: 22px;
+    color: rgb(244, 241, 234);
+    background-color: rgba(14, 17, 22, 0.72);
 }
 
 .hotbar {
     flex-direction: row;
-    padding: 4px;
-    border-radius: 4px;
-    background-color: rgba(0, 0, 0, 0.5);
+    padding: 16px 10px 10px 10px;
+    border-radius: 16px;
+    border-bottom-width: 6px;
+    border-bottom-color: rgba(0, 0, 0, 0.45);
+    background-color: rgba(14, 17, 22, 0.62);
 }
 
-.slot {
-    width: 52px;
-    height: 52px;
-    margin: 2px;
+.hs {
+    width: 64px;
+    height: 64px;
+    margin: 0 4px;
+    border-radius: 11px;
     border-width: 2px;
-    border-color: rgba(255, 255, 255, 0.25);
-    border-radius: 3px;
+    border-bottom-width: 6px;
+    border-color: rgb(52, 59, 77);
+    border-bottom-color: rgb(22, 26, 35);
+    background-color: rgb(42, 48, 64);
+    transition-property: translate;
+    transition-duration: 0.08s;
+}
+
+.hs--on {
+    border-width: 3px;
+    border-bottom-width: 7px;
+    border-color: rgb(242, 179, 61);
+    border-bottom-color: rgb(185, 127, 22);
+    background-color: rgb(58, 66, 86);
+    translate: 0 -8px;
+}
+
+.hs__icon {
+    position: absolute;
+    left: 9px;
+    top: 4px;
+    right: 9px;
+    bottom: 3px;
+}
+
+.hs__num {
+    position: absolute;
+    left: 5px;
+    top: 1px;
+    padding: 0;
+    margin: 0;
+    font-size: 13px;
+    color: rgba(244, 241, 234, 0.55);
+}
+
+/* ── Scrollbars: any ScrollView with .hud-scroll ───────────────────────
+   A slim amber block on a dark track, no arrow buttons. */
+
+.hud-scroll .unity-scroller--vertical {
+    width: 14px;
+    margin-left: 6px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.hud-scroll .unity-scroller__low-button,
+.hud-scroll .unity-scroller__high-button {
+    display: none;
+}
+
+.hud-scroll .unity-scroller--vertical > .unity-scroller__slider {
+    margin: 0;
+}
+
+.hud-scroll .unity-scroller .unity-base-slider__tracker {
+    left: 0;
+    right: 0;
+    width: auto;
+    margin: 0;
+    border-width: 0;
+    border-radius: 7px;
     background-color: rgba(255, 255, 255, 0.08);
 }
 
-.slot--selected {
-    border-color: rgb(255, 255, 255);
-    background-color: rgba(255, 255, 255, 0.25);
+.hud-scroll .unity-scroller .unity-base-slider__dragger {
+    left: 0;
+    width: 14px;
+    margin: 0;
+    border-width: 0;
+    border-radius: 7px;
+    border-bottom-width: 4px;
+    border-bottom-color: rgb(185, 127, 22);
+    background-color: rgb(242, 179, 61);
 }
 
-.slot__icon {
-    position: absolute;
-    left: 6px;
-    top: 6px;
-    right: 6px;
-    bottom: 6px;
-    -unity-background-scale-mode: scale-to-fit;
-    -unity-background-image-tint-color: rgb(255, 255, 255);
+.hud-scroll .unity-scroller .unity-base-slider__dragger:hover {
+    background-color: rgb(250, 196, 92);
 }
 
-.slot__key {
-    position: absolute;
-    left: 2px;
-    top: 0;
-    padding: 0;
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.85);
+.hud-scroll .unity-scroller .unity-base-slider__dragger-border {
+    border-width: 0;
 }
+
+/* ── Voxel list (E) ──────────────────────────────────────────────────── */
 
 .voxel-search {
     position: absolute;
@@ -139,43 +429,39 @@
     bottom: 0;
     align-items: center;
     justify-content: center;
+    background-color: rgba(0, 0, 0, 0.35);
     /* Hidden until the HudController opens it. */
     display: none;
 }
 
 .voxel-search__panel {
     width: 60%;
-    max-width: 760px;
-    padding: 8px 10px 8px 10px;
-    background-color: rgba(0, 0, 0, 0.75);
+    max-width: 780px;
+    background-color: rgba(14, 17, 22, 0.92);
 }
 
 .voxel-search__field {
-    margin: 4px 0 6px 0;
+    margin: 0 0 8px 0;
     font-size: 14px;
 }
 
 .voxel-search__field .unity-text-field__input {
-    padding: 3px 6px;
-    color: rgb(235, 235, 235);
-    background-color: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.3);
-    border-radius: 3px;
-    --unity-cursor-color: rgb(235, 235, 235);
-    --unity-selection-color: rgba(255, 214, 120, 0.4);
+    padding: 5px 8px;
+    color: rgb(232, 236, 241);
+    background-color: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.18);
+    border-radius: 4px;
+    --unity-cursor-color: rgb(232, 236, 241);
+    --unity-selection-color: rgba(242, 179, 61, 0.4);
 }
 
 .voxel-search__field:focus .unity-text-field__input {
-    border-color: rgb(255, 214, 120);
+    border-color: rgb(242, 179, 61);
 }
 
-.voxel-search .slot__key {
-    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.9);
-}
-
-/* Four rows of slots (52px + 2 × 2px margin) whatever the number of results; more rows scroll. */
+/* Four rows of slots (56px + 2 × 3px margin) whatever the number of results; more rows scroll. */
 .voxel-search__results {
-    height: 224px;
+    height: 248px;
     flex-shrink: 0;
 }
 
@@ -184,12 +470,408 @@
     flex-wrap: wrap;
 }
 
-.voxel-search .slot:hover {
-    border-color: rgb(255, 214, 120);
-    background-color: rgba(255, 255, 255, 0.2);
+.voxel-search .hs {
+    width: 56px;
+    height: 56px;
+    margin: 3px;
+    border-bottom-width: 5px;
+}
+
+.voxel-search .hs:hover {
+    border-color: rgb(242, 179, 61);
+}
+
+.voxel-search .hs--on {
+    translate: 0 0;
 }
 
 .voxel-search__name {
-    margin-top: 4px;
+    margin-top: 6px;
     min-height: 18px;
+    padding: 0;
+    -unity-font-style: bold;
+}
+
+/* ── Esc menu ────────────────────────────────────────────────────────── */
+
+.menu {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    color: rgb(244, 241, 234);
+    /* Hidden until the HudController opens it. */
+    display: none;
+}
+
+.menu__dim {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.menu__main {
+    position: absolute;
+    left: 180px;
+    top: 190px;
+}
+
+.logo {
+    flex-direction: row;
+    margin-bottom: 26px;
+}
+
+.logo__tile {
+    width: 74px;
+    height: 74px;
+    margin-right: 6px;
+    border-radius: 10px;
+    border-bottom-width: 7px;
+    align-items: center;
+    justify-content: center;
+}
+
+.logo__letter {
+    padding: 0;
+    margin: 0;
+    font-size: 50px;
+    -unity-text-align: middle-center;
+}
+
+.menu__paused {
+    padding: 0;
+    margin: 0 0 22px 4px;
+    font-size: 22px;
+    letter-spacing: 3px;
+    color: rgb(242, 179, 61);
+}
+
+.big {
+    flex-direction: row;
+    align-items: center;
+    width: 440px;
+    height: 72px;
+    margin: 0 0 16px 0;
+    padding: 0 0 0 14px;
+    border-width: 0;
+    border-radius: 12px;
+    border-bottom-width: 7px;
+    transition-property: translate;
+    transition-duration: 0.06s;
+}
+
+.big:hover {
+    translate: 0 -2px;
+}
+
+.big:active {
+    translate: 0 3px;
+    border-bottom-width: 4px;
+}
+
+.big--accent {
+    background-color: rgb(242, 179, 61);
+    border-bottom-color: rgb(185, 127, 22);
+    color: rgb(42, 26, 0);
+}
+
+.big--accent:hover {
+    background-color: rgb(247, 192, 84);
+}
+
+.big--blue {
+    background-color: rgb(70, 80, 106);
+    border-bottom-color: rgb(38, 44, 59);
+    color: rgb(244, 241, 234);
+}
+
+.big--blue:hover {
+    background-color: rgb(82, 93, 122);
+}
+
+.big--dark {
+    background-color: rgb(53, 60, 78);
+    border-bottom-color: rgb(29, 33, 44);
+    color: rgb(244, 241, 234);
+}
+
+.big--dark:hover {
+    background-color: rgb(64, 72, 92);
+}
+
+.big__well {
+    width: 46px;
+    height: 46px;
+    margin-right: 18px;
+    border-radius: 9px;
+    background-color: rgba(0, 0, 0, 0.18);
+}
+
+.big__text {
+    padding: 0;
+    margin: 0;
+    font-size: 30px;
+}
+
+/* Settings page */
+
+.card {
+    position: absolute;
+    left: 180px;
+    top: 130px;
+    width: 860px;
+    padding: 22px 28px 30px 28px;
+    border-width: 2px;
+    border-bottom-width: 10px;
+    border-color: rgb(47, 54, 71);
+    border-bottom-color: rgb(18, 21, 29);
+    border-radius: 18px;
+    background-color: rgba(22, 26, 36, 0.95);
+    display: none;
+}
+
+.card__head {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.card__title {
+    padding: 0;
+    margin: 0 0 0 20px;
+    font-size: 40px;
+}
+
+.card__section {
+    padding: 0;
+    margin: 18px 0 8px 0;
+    font-size: 15px;
+    letter-spacing: 2px;
+    color: rgb(242, 179, 61);
+}
+
+.card__label {
+    padding: 0;
+    margin: 6px 0 8px 0;
+    font-size: 22px;
+}
+
+.card__label--inline {
+    margin: 0 18px 0 0;
+}
+
+.back {
+    flex-direction: row;
+    align-items: center;
+    height: 56px;
+    margin: 0;
+    padding: 0 18px 0 8px;
+    border-width: 0;
+    border-radius: 11px;
+    border-bottom-width: 6px;
+    border-bottom-color: rgb(38, 44, 59);
+    background-color: rgb(70, 80, 106);
+    color: rgb(244, 241, 234);
+}
+
+.back:hover {
+    background-color: rgb(82, 93, 122);
+}
+
+.back:active {
+    translate: 0 3px;
+    border-bottom-width: 3px;
+}
+
+.back__well {
+    width: 38px;
+    height: 38px;
+    margin-right: 10px;
+    border-radius: 8px;
+    background-color: rgba(0, 0, 0, 0.18);
+}
+
+.back__text {
+    padding: 0;
+    margin: 0;
+    font-size: 24px;
+}
+
+.tiles {
+    flex-direction: row;
+}
+
+.tiles:disabled {
+    opacity: 0.45;
+}
+
+.t {
+    min-width: 92px;
+    height: 60px;
+    margin: 0 10px 0 0;
+    padding: 0 16px;
+    border-width: 0;
+    border-radius: 10px;
+    border-bottom-width: 6px;
+    border-bottom-color: rgb(26, 30, 40);
+    background-color: rgb(52, 59, 77);
+    color: rgb(244, 241, 234);
+    font-size: 24px;
+    -unity-text-align: middle-center;
+}
+
+.t:hover {
+    background-color: rgb(64, 72, 92);
+}
+
+.t--on,
+.t--on:hover {
+    background-color: rgb(242, 179, 61);
+    border-bottom-color: rgb(185, 127, 22);
+    color: rgb(42, 26, 0);
+    translate: 0 -3px;
+}
+
+.t:disabled {
+    opacity: 1;
+}
+
+.badge {
+    position: absolute;
+    top: -12px;
+    right: -8px;
+    padding: 1px 6px 2px 6px;
+    margin: 0;
+    border-radius: 5px;
+    font-size: 13px;
+    color: rgb(23, 58, 16);
+    background-color: rgb(108, 195, 90);
+    rotate: 8deg;
+}
+
+.apply-line {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 16px;
+}
+
+.apply {
+    flex-direction: row;
+    align-items: center;
+    height: 56px;
+    margin: 0 18px 0 0;
+    padding: 0 22px 0 14px;
+    border-width: 0;
+    border-radius: 11px;
+    border-bottom-width: 6px;
+    border-bottom-color: rgb(62, 127, 51);
+    background-color: rgb(108, 195, 90);
+    color: rgb(23, 58, 16);
+}
+
+.apply:hover {
+    background-color: rgb(122, 208, 104);
+}
+
+.apply:active {
+    translate: 0 3px;
+    border-bottom-width: 3px;
+}
+
+.apply:disabled {
+    opacity: 0.4;
+}
+
+.apply__icon {
+    width: 28px;
+    height: 28px;
+    margin-right: 8px;
+}
+
+.apply__text {
+    padding: 0;
+    margin: 0;
+    font-size: 26px;
+}
+
+.warn {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 1;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border-width: 2px;
+    border-color: rgba(242, 179, 61, 0.45);
+    background-color: rgba(242, 179, 61, 0.10);
+}
+
+.warn__icon {
+    width: 24px;
+    height: 24px;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.warn__text {
+    padding: 0;
+    margin: 0;
+    font-size: 15px;
+    white-space: normal;
+    -unity-font-style: normal;
+    color: rgb(244, 225, 180);
+}
+
+.estimate {
+    padding: 0;
+    margin: 10px 0 0 0;
+    font-size: 15px;
+    -unity-font-style: normal;
+    color: rgb(154, 164, 178);
+}
+
+.switch-line {
+    flex-direction: row;
+    align-items: center;
+    margin: 6px 0 10px 0;
+}
+
+.switch {
+    width: 84px;
+    height: 44px;
+    margin: 0;
+    padding: 0;
+    border-width: 2px;
+    border-bottom-width: 6px;
+    border-radius: 12px;
+    border-color: rgb(26, 30, 40);
+    background-color: rgb(38, 43, 56);
+}
+
+.switch__knob {
+    position: absolute;
+    left: 4px;
+    top: 3px;
+    width: 32px;
+    height: 30px;
+    border-radius: 8px;
+    border-bottom-width: 4px;
+    border-bottom-color: rgb(96, 104, 120);
+    background-color: rgb(141, 150, 168);
+    transition-property: left;
+    transition-duration: 0.08s;
+}
+
+.switch--on {
+    border-color: rgb(76, 138, 66);
+    background-color: rgb(47, 90, 42);
+}
+
+.switch--on .switch__knob {
+    left: 42px;
+    border-bottom-color: rgb(62, 127, 51);
+    background-color: rgb(108, 195, 90);
 }

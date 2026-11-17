@@ -44,6 +44,15 @@ namespace Engine.Scripts.Render{
         /// <summary>Number of cameras that currently own culling buffers.</summary>
         internal int CameraCount => _cameras.Count;
 
+        /// <summary>Bytes of the cull lists of every camera.</summary>
+        internal long GpuBytes{
+            get{
+                long bytes = 0;
+                foreach (KeyValuePair<Camera, CameraCullState> pair in _cameras) bytes += pair.Value.GpuBytes;
+                return bytes;
+            }
+        }
+
         public void Dispose(){
             if (_isDisposed) return;
             foreach (KeyValuePair<Camera, CameraCullState> pair in _cameras) pair.Value.Dispose();
@@ -179,6 +188,15 @@ namespace Engine.Scripts.Render{
         internal bool TryGetLists(RenderBuffer buffer, out BufferCullLists lists){
             return _buffers.TryGetValue(buffer, out lists);
         }
+
+        /// <summary>Bytes of the cull lists of this camera.</summary>
+        internal long GpuBytes{
+            get{
+                long bytes = 0;
+                foreach (KeyValuePair<RenderBuffer, BufferCullLists> pair in _buffers) bytes += pair.Value.GpuBytes;
+                return bytes;
+            }
+        }
     }
 
     /// <summary>Main-pass and shadow-pass (created on first use) lists of one buffer for one camera.</summary>
@@ -197,6 +215,9 @@ namespace Engine.Scripts.Render{
         internal CullList Shadow => _shadow ??= new CullList(_buffer);
 
         internal bool HasShadow => _shadow != null;
+
+        /// <summary>Bytes of the main and the shadow list.</summary>
+        internal long GpuBytes => Main.GpuBytes + (_shadow?.GpuBytes ?? 0L);
 
         public void Dispose(){
             Main.Dispose();
@@ -234,6 +255,9 @@ namespace Engine.Scripts.Render{
         internal GraphicsBuffer VisiblePages{ get; }
         internal GraphicsBuffer Args{ get; }
         internal MaterialPropertyBlock PropertyBlock{ get; }
+
+        /// <summary>Bytes of the page list and the args.</summary>
+        internal long GpuBytes => Render.GpuBytes.Of(VisiblePages) + Render.GpuBytes.Of(Args);
 
         /// <summary>Visible page count of the last completed read-back (debug overlay only).</summary>
         internal uint LastVisibleCount{ get; private set; }

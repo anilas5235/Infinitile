@@ -3,44 +3,190 @@
     <ui:VisualElement name="hud" class="hud" picking-mode="Ignore">
         <ui:VisualElement name="crosshair" class="crosshair" picking-mode="Ignore" />
 
+        <!-- F3 panels, left column: the player, the world under them and the block they look at -->
         <ui:VisualElement name="debug-left" class="column column--left" picking-mode="Ignore">
-            <ui:VisualElement name="world-panel" class="panel" picking-mode="Ignore">
-                <ui:Label text="World" class="panel__title" />
-                <ui:Label name="position" class="row" />
-                <ui:Label name="chunk" class="row" />
-                <ui:Label name="biome" class="row row--strong" />
-                <ui:Label name="height" class="row" />
-                <ui:Label name="climate" class="row" />
-                <ui:Label name="generation" class="row" />
+            <ui:VisualElement name="player-panel" class="p" picking-mode="Ignore">
+                <ui:VisualElement class="p__head">
+                    <ui:Label text="PLAYER" class="p__title" />
+                    <ui:Label name="player-mode" class="p__meta" />
+                </ui:VisualElement>
+                <ui:VisualElement class="kv"><ui:Label text="Position" class="kv__k" /><ui:Label name="position" class="kv__v" /></ui:VisualElement>
+                <ui:VisualElement class="kv"><ui:Label text="Facing" class="kv__k" /><ui:Label name="facing" class="kv__v" /></ui:VisualElement>
+                <ui:VisualElement class="kv"><ui:Label text="Chunk" class="kv__k" /><ui:Label name="chunk" class="kv__v" /></ui:VisualElement>
+                <ui:VisualElement class="kv"><ui:Label text="Block in chunk" class="kv__k" /><ui:Label name="block-in-chunk" class="kv__v" /></ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="world-panel" class="p" picking-mode="Ignore">
+                <ui:VisualElement class="p__head">
+                    <ui:Label text="WORLD" class="p__title" />
+                    <ui:Label name="seed" class="p__meta" />
+                </ui:VisualElement>
+                <ui:VisualElement class="kv"><ui:Label text="Biome" class="kv__k" /><ui:Label name="biome" class="kv__v kv__v--strong" /></ui:VisualElement>
+                <ui:VisualElement class="kv"><ui:Label text="Ground" class="kv__k" /><ui:Label name="ground" class="kv__v" /></ui:VisualElement>
+                <ui:VisualElement class="kv"><ui:Label text="Water level" class="kv__k" /><ui:Label name="water-level" class="kv__v" /></ui:VisualElement>
+                <ui:VisualElement class="kv"><ui:Label text="Above ground" class="kv__k" /><ui:Label name="above-ground" class="kv__v" /></ui:VisualElement>
+                <ui:VisualElement name="climate" class="cells" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="look-panel" class="p" picking-mode="Ignore">
+                <ui:VisualElement class="p__head">
+                    <ui:Label text="LOOKING AT" class="p__title" />
+                    <ui:Label name="look-distance" class="p__meta" />
+                </ui:VisualElement>
+                <ui:VisualElement name="look-body">
+                    <ui:VisualElement class="look__top">
+                        <ui:VisualElement name="look-swatch" class="look__swatch" />
+                        <ui:VisualElement class="look__names">
+                            <ui:Label name="look-name" class="look__name" />
+                            <ui:Label name="look-id" class="look__id" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="kv"><ui:Label text="Block" class="kv__k" /><ui:Label name="look-block" class="kv__v" /></ui:VisualElement>
+                    <ui:VisualElement class="kv"><ui:Label text="Face" class="kv__k" /><ui:Label name="look-face" class="kv__v" /></ui:VisualElement>
+                    <ui:VisualElement class="kv"><ui:Label text="Chunk · local" class="kv__k" /><ui:Label name="look-chunk" class="kv__v" /></ui:VisualElement>
+                    <ui:VisualElement class="kv"><ui:Label text="Layer · shape" class="kv__k" /><ui:Label name="look-layer" class="kv__v" /></ui:VisualElement>
+                    <ui:VisualElement name="look-facing-row" class="kv"><ui:Label text="Facing" class="kv__k" /><ui:Label name="look-facing" class="kv__v" /></ui:VisualElement>
+                    <ui:VisualElement class="kv"><ui:Label text="Flags" class="kv__k" /><ui:VisualElement name="look-flags" class="tags" /></ui:VisualElement>
+                    <ui:VisualElement class="kv"><ui:Label text="Light" class="kv__k" /><ui:Label name="look-light" class="kv__v" /></ui:VisualElement>
+                    <ui:VisualElement name="look-attenuation-row" class="kv"><ui:Label text="Attenuation" class="kv__k" /><ui:Label name="look-attenuation" class="kv__v" /></ui:VisualElement>
+                    <ui:VisualElement name="look-emits-row" class="kv"><ui:Label text="Emits" class="kv__k" /><ui:Label name="look-emits" class="kv__v" /></ui:VisualElement>
+                </ui:VisualElement>
+                <ui:Label name="look-empty" text="No block in reach" class="look__empty" />
             </ui:VisualElement>
         </ui:VisualElement>
 
+        <!-- F3 panels, right column: the engine -->
         <ui:VisualElement name="debug-right" class="column column--right" picking-mode="Ignore">
-            <ui:VisualElement name="performance-panel" class="panel" picking-mode="Ignore">
-                <ui:Label text="Performance" class="panel__title" />
-                <ui:Label name="fps" class="row row--strong" />
-                <ui:Label name="vram" class="row" />
-                <ui:Label name="chunks" class="row" />
-                <ui:Label name="queues" class="row" />
-                <ui:Label text="Culling (visible / shadow / allocated pages)" class="row row--dim" />
+            <ui:VisualElement name="frame-panel" class="p" picking-mode="Ignore">
+                <ui:VisualElement class="p__head">
+                    <ui:Label text="FRAME" class="p__title" />
+                    <ui:Label name="frame-average" class="p__meta" />
+                </ui:VisualElement>
+                <ui:VisualElement class="frame__big">
+                    <ui:Label name="fps" class="frame__fps" />
+                    <ui:Label name="frame-ms" class="frame__ms" />
+                </ui:VisualElement>
+                <ui:VisualElement class="kv"><ui:Label text="Frame cap" class="kv__k" /><ui:Label name="frame-cap" class="kv__v" /></ui:VisualElement>
+                <ui:VisualElement class="kv"><ui:Label text="Main-thread budget" class="kv__k" /><ui:Label name="budget" class="kv__v" /></ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="streaming-panel" class="p" picking-mode="Ignore">
+                <ui:VisualElement class="p__head">
+                    <ui:Label text="STREAMING" class="p__title" />
+                    <ui:Label name="draw-distance" class="p__meta" />
+                </ui:VisualElement>
+                <ui:VisualElement class="kv"><ui:Label text="Chunks loaded" class="kv__k" /><ui:Label name="chunks" class="kv__v" /></ui:VisualElement>
+                <ui:VisualElement name="queues" class="cells" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="gpu-panel" class="p" picking-mode="Ignore">
+                <ui:VisualElement class="p__head">
+                    <ui:Label text="GPU MEMORY" class="p__title" />
+                    <ui:Label name="gpu-total" class="p__meta" />
+                </ui:VisualElement>
+                <ui:VisualElement class="kv"><ui:Label text="Interval store" class="kv__k" /><ui:Label name="gpu-store" class="kv__v" /></ui:VisualElement>
+                <ui:VisualElement name="gpu-bar" class="bar">
+                    <ui:VisualElement name="gpu-bar-fill" class="bar__fill" />
+                    <ui:VisualElement name="gpu-bar-peak" class="bar__peak" />
+                </ui:VisualElement>
+                <ui:VisualElement class="kv kv--small">
+                    <ui:Label name="gpu-usage" class="kv__k" />
+                    <ui:Label name="gpu-grows" class="kv__k" />
+                </ui:VisualElement>
+                <ui:VisualElement class="kv"><ui:Label text="Render buffers" class="kv__k" /><ui:Label name="gpu-render" class="kv__v" /></ui:VisualElement>
+                <ui:VisualElement class="kv"><ui:Label text="Build slots" class="kv__k" /><ui:Label name="gpu-slots" class="kv__v" /></ui:VisualElement>
+                <ui:VisualElement class="kv"><ui:Label text="Other" class="kv__k" /><ui:Label name="gpu-other" class="kv__v" /></ui:VisualElement>
+                <ui:VisualElement name="vram-row" class="kv"><ui:Label text="VRAM (Unity)" class="kv__k" /><ui:Label name="vram" class="kv__v" /></ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="culling-panel" class="p" picking-mode="Ignore">
+                <ui:VisualElement class="p__head">
+                    <ui:Label text="CULLING" class="p__title" />
+                    <ui:Label text="pages" class="p__meta" />
+                </ui:VisualElement>
+                <ui:VisualElement class="tr tr--head">
+                    <ui:Label text="Layer" class="tr__name" />
+                    <ui:Label text="visible" class="tr__n" />
+                    <ui:Label text="shadow" class="tr__n" />
+                    <ui:Label text="alloc" class="tr__n" />
+                </ui:VisualElement>
                 <ui:VisualElement name="culling" />
             </ui:VisualElement>
         </ui:VisualElement>
 
-        <ui:Label name="hint" class="hint" picking-mode="Ignore" />
+        <!-- key hints, shown with and without the panels -->
+        <ui:VisualElement name="hints" class="hints" picking-mode="Ignore" />
 
         <ui:VisualElement name="hotbar-area" class="hotbar-area" picking-mode="Ignore">
-            <ui:Label name="voxel-name" class="voxel-name" picking-mode="Ignore" />
+            <ui:Label name="voxel-name" class="voxel-name lil" picking-mode="Ignore" />
             <ui:VisualElement name="hotbar" class="hotbar" picking-mode="Ignore" />
         </ui:VisualElement>
 
         <ui:VisualElement name="voxel-search" class="voxel-search" picking-mode="Ignore">
-            <ui:VisualElement class="panel voxel-search__panel">
-                <ui:Label text="Voxels" class="panel__title" />
+            <ui:VisualElement class="p voxel-search__panel">
+                <ui:VisualElement class="p__head">
+                    <ui:Label text="VOXELS" class="p__title" />
+                </ui:VisualElement>
                 <ui:TextField name="voxel-search-field" class="voxel-search__field" />
-                <ui:ScrollView name="voxel-search-results" class="voxel-search__results" />
-                <ui:Label name="voxel-search-name" class="row row--strong voxel-search__name" />
-                <ui:Label text="Click or Enter (first match): put into the hotbar    Esc: close" class="row row--dim" />
+                <ui:ScrollView name="voxel-search-results" class="voxel-search__results hud-scroll" mode="Vertical" horizontal-scroller-visibility="Hidden" />
+                <ui:Label name="voxel-search-name" class="voxel-search__name" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Esc menu: a main page (Continue, Settings, Quit) and the settings page -->
+        <ui:VisualElement name="menu" class="menu lil" picking-mode="Ignore">
+            <ui:VisualElement name="menu-dim" class="menu__dim" picking-mode="Ignore" />
+
+            <ui:VisualElement name="menu-main" class="menu__main" picking-mode="Ignore">
+                <ui:VisualElement name="menu-logo" class="logo" picking-mode="Ignore" />
+                <ui:Label text="PAUSED" class="menu__paused" />
+                <ui:Button name="menu-continue" class="big big--accent">
+                    <ui:VisualElement name="menu-continue-icon" class="big__well" />
+                    <ui:Label text="Continue" class="big__text" />
+                </ui:Button>
+                <ui:Button name="menu-settings" class="big big--blue">
+                    <ui:VisualElement name="menu-settings-icon" class="big__well" />
+                    <ui:Label text="Settings" class="big__text" />
+                </ui:Button>
+                <ui:Button name="menu-quit" class="big big--dark">
+                    <ui:VisualElement name="menu-quit-icon" class="big__well" />
+                    <ui:Label text="Quit" class="big__text" />
+                </ui:Button>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="menu-settings-page" class="card">
+                <ui:VisualElement class="card__head">
+                    <ui:Button name="settings-back" class="back">
+                        <ui:VisualElement name="settings-back-icon" class="back__well" />
+                        <ui:Label text="Back" class="back__text" />
+                    </ui:Button>
+                    <ui:Label text="Settings" class="card__title" />
+                </ui:VisualElement>
+
+                <ui:Label text="World" class="card__section" />
+                <ui:Label text="Draw distance" class="card__label" />
+                <ui:VisualElement name="menu-draw-distance" class="tiles" />
+                <ui:VisualElement class="apply-line">
+                    <ui:Button name="menu-apply" class="apply">
+                        <ui:VisualElement name="menu-apply-icon" class="apply__icon" />
+                        <ui:Label text="Apply" class="apply__text" />
+                    </ui:Button>
+                    <ui:VisualElement class="warn">
+                        <ui:VisualElement name="menu-warn-icon" class="warn__icon" />
+                        <ui:Label text="Apply builds the world again around you. Your changes to it are lost." class="warn__text" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:Label name="menu-store-estimate" class="estimate" />
+
+                <ui:Label text="Display" class="card__section" />
+                <ui:VisualElement class="switch-line">
+                    <ui:Label text="VSync" class="card__label card__label--inline" />
+                    <ui:Button name="menu-vsync" class="switch">
+                        <ui:VisualElement class="switch__knob" />
+                    </ui:Button>
+                </ui:VisualElement>
+                <ui:Label text="Frame rate" class="card__label" />
+                <ui:VisualElement name="menu-frame-rate" class="tiles" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

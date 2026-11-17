@@ -37,15 +37,17 @@ namespace Engine.Tests.PlayMode{
             ChunkPool pool = PlayModeFixtures.GetPrivateField<ChunkPool>(world, "_chunkPool");
 
             // The player must not fall while the colliders under it are gone; its controllers stay off until the
-            // original terrain is back.
+            // original terrain is back. The focus is the player's camera, so the scripts of the whole player object
+            // are paused, not only the camera's.
             Transform focus = PlayModeFixtures.GetPrivateField<Transform>(world, "focus");
+            Transform player = focus.root;
+            Vector3 stood = player.position;
             List<Behaviour> paused = new();
-            foreach (MonoBehaviour behaviour in focus.GetComponentsInChildren<MonoBehaviour>()){
+            foreach (MonoBehaviour behaviour in player.GetComponentsInChildren<MonoBehaviour>()){
                 if (!behaviour.enabled) continue;
                 behaviour.enabled = false;
                 paused.Add(behaviour);
             }
-
             try{
                 int2 centre = world.Focus.Pos.xz;
 
@@ -92,6 +94,8 @@ namespace Engine.Tests.PlayMode{
                     if (Time.realtimeSinceStartup > deadline) break;
                     yield return null;
                 }
+
+                Assert.AreEqual(stood.y, player.position.y, 0.01f, "the player stays where it stood while the world is rebuilt");
             }
             finally{
                 foreach (Behaviour behaviour in paused) behaviour.enabled = true;

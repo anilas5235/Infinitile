@@ -72,7 +72,8 @@ namespace Engine.Scripts.Jobs.Core{
                     VoxelProfilerMarkers.SchedulerMesh, VoxelProfilerMarkers.SchedulerCollider
                 });
             Budget = new FrameBudget(settings.Scheduler.mainThreadBudgetMs,
-                capShare: settings.Scheduler.cappedFrameSpareShare);
+                capShare: settings.Scheduler.cappedFrameSpareShare,
+                fastCapShare: settings.Scheduler.fastCapBudgetShare);
 
             _chunkManager.OnRemeshRequested += OnRemesh;
             _chunkManager.OnLightInvalidated += OnLightInvalidated;
@@ -82,8 +83,10 @@ namespace Engine.Scripts.Jobs.Core{
         /// <summary>
         ///     The main-thread time the stages may spend per frame, from
         ///     <see cref="SchedulerSettings.mainThreadBudgetMs" /> and
-        ///     <see cref="SchedulerSettings.cappedFrameSpareShare" /> when the world is built; under a frame cap it
-        ///     grows with the cap that is in force in the frame (<see cref="FrameCap" />). The focus update is not
+        ///     <see cref="SchedulerSettings.cappedFrameSpareShare" /> and <see cref="SchedulerSettings.fastCapBudgetShare" />
+        ///     when the world is built; under a frame cap it follows the cap that is in force in the frame
+        ///     (<see cref="FrameCap" />): it grows under a cap slower than 120 frames per second and shrinks under a
+        ///     faster one. The focus update is not
         ///     part of it: it runs outside the tick, from a check every 0.5 s, when the focus moved to another
         ///     partition or its forward vector (quantised to 45°) changed.
         /// </summary>

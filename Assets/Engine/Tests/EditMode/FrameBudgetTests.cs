@@ -174,6 +174,27 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(expectedMs, FrameBudget.Effective(milliseconds, capPeriodMs, share), 1e-4f);
         }
 
+        // The shipped shares (0.5 above 8.33 ms, at most 0.3 of a faster cap's period) at the menu's frame rates
+        [TestCase(2f, 0f, 2f, TestName = "Shipped_Uncapped_2ms")]
+        [TestCase(2f, 1000f / 60f, 2f + 1000f / 240f, TestName = "Shipped_Cap60_6_17ms")]
+        [TestCase(2f, 1000f / 90f, 2f + 0.5f * (1000f / 90f - 1000f / 120f), TestName = "Shipped_Cap90_3_39ms")]
+        [TestCase(2f, 1000f / 120f, 2f, TestName = "Shipped_Cap120_2ms")]
+        [TestCase(2f, 1000f / 144f, 2f, TestName = "Shipped_Cap144_CeilingAbove2ms_2ms")]
+        [TestCase(2f, 1000f / 240f, 1.25f, TestName = "Shipped_Cap240_1_25ms")]
+        [TestCase(2f, 1000f / 300f, 1f, TestName = "Shipped_Cap300_1ms")]
+        [TestCase(0f, 1000f / 300f, 0f, TestName = "Shipped_NoLimit_StaysNoLimit")]
+        public void EffectiveBudget_ShippedShares(float milliseconds, float capPeriodMs, float expectedMs){
+            Assert.AreEqual(expectedMs, FrameBudget.Effective(milliseconds, capPeriodMs, 0.5f, 0.3f), 1e-4f);
+        }
+
+        [TestCase(2f, 1000f / 300f, 0f, 2f, TestName = "FastCapShareZero_Cap300_IsTheBudget")]
+        [TestCase(5f, 1000f / 300f, 3f, 1000f / 300f, TestName = "FastCapShareAboveOne_IsOne")]
+        [TestCase(2f, 1000f / 300f, 3f, 2f, TestName = "FastCapShare_NeverRaisesTheBudget")]
+        [TestCase(2f, 1000f / 60f, 0.3f, 2f, TestName = "FastCapShare_LeavesSlowCapsAlone")]
+        public void EffectiveBudget_FastCapShare(float milliseconds, float capPeriodMs, float fastShare, float expectedMs){
+            Assert.AreEqual(expectedMs, FrameBudget.Effective(milliseconds, capPeriodMs, 0f, fastShare), 1e-4f);
+        }
+
         /// <summary>Items of 1 ms that one frame lets run, after <see cref="FrameBudget.BeginFrame" /> with the cap.</summary>
         private static int ItemsOfOneMillisecond(FakeClock clock, FrameBudget budget, float capPeriodMs){
             budget.BeginFrame(capPeriodMs);
@@ -203,6 +224,18 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(2, ItemsOfOneMillisecond(clock, budget, 1000f / 144f), "144 frames cap: 2 ms");
             Assert.AreEqual(2, ItemsOfOneMillisecond(clock, budget, 0f), "the cap switched off again");
             Assert.AreEqual(2f, budget.EffectiveMilliseconds);
+            Assert.AreEqual(2f, budget.Milliseconds, "the setting itself does not change");
+        }
+
+        [Test]
+        public void UnderAFastCap_TheBudgetShrinks_AndFollowsTheCap(){
+            FakeClock clock = new();
+            FrameBudget budget = new(2f, clock.Now, TicksPerMillisecond, 0f, 0.3f);
+            Assert.IsTrue(budget.FollowsCap, "a fast-cap share alone follows the cap");
+            Assert.AreEqual(2, ItemsOfOneMillisecond(clock, budget, 0f), "uncapped: 2 ms");
+            Assert.AreEqual(1, ItemsOfOneMillisecond(clock, budget, 1000f / 300f), "300 frames cap: 1 ms");
+            Assert.AreEqual(1f, budget.EffectiveMilliseconds, 1e-4f);
+            Assert.AreEqual(2, ItemsOfOneMillisecond(clock, budget, 1000f / 60f), "60 frames cap, no spare share: 2 ms");
             Assert.AreEqual(2f, budget.Milliseconds, "the setting itself does not change");
         }
 
