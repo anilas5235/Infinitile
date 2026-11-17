@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Packs a release player for download: Windows as .zip, Linux as .tar.gz (keeps the executable bit). The folders
 # Unity marks as not to be shipped (*_DoNotShip, *_ButDontShipItWithYourGame) stay out. The archive holds one folder
-# Infinitile-<version>-<platform>/.
+# Infinitile-<version>-<platform>/. It fails when the player has no Burst library.
 #   Tools/Release/package.sh <player folder> <windows-x64|linux-x64> <version> <output folder>
 # Prints the archive's path. Runs on the GitHub runner (Ubuntu) and in Git Bash on Windows.
 set -euo pipefail
@@ -24,6 +24,17 @@ case "$platform" in
 esac
 if [ ! -f "$player/$executable" ]; then
   echo "no $executable in $player" >&2
+  exit 1
+fi
+# Without the Burst library the player runs every job as managed code, several times slower, and the build still
+# reports success (a Burst cross-compile failure is only a warning). Windows: Plugins/x86_64/, Linux: Plugins/ or
+# Plugins/x86_64/ depending on the Unity version.
+case "$platform" in
+  windows-x64) burst=lib_burst_generated.dll ;;
+  linux-x64) burst=lib_burst_generated.so ;;
+esac
+if [ -z "$(find "$player/${product}_Data/Plugins" -name "$burst" -type f 2> /dev/null)" ]; then
+  echo "no $burst under $player/${product}_Data/Plugins: Burst did not compile for $platform (see the Unity log)" >&2
   exit 1
 fi
 

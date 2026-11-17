@@ -25,6 +25,10 @@ The owner picks the bump each time a release is started:
 When a release has both, the bigger one wins. The workflow takes the highest `vX.Y.Z` tag and raises the chosen
 number. A lower number resets to 0, so `1.4.2` + minor gives `1.5.0`.
 
+> **The first release under this scheme needs bump `major`.** The highest tag is still `v0.3.0`, so the default
+> `patch` would publish `v0.3.1` and `minor` would publish `v0.4.0`. Only `major` gives `v1.0.0`. Every run writes the
+> computed version as the heading of its summary and as a notice. Check it in a dry run before publishing.
+
 ## One-time setup: Unity secrets (owner)
 
 The build on GitHub uses the owner's Unity Personal licence. Only the owner adds these three secrets, and they never
@@ -54,7 +58,11 @@ Releases are made from `master` and published straight away as **Latest**.
    lines work through `gh` (see below).
 4. **pr_list**: on by default. It appends GitHub's list of the pull requests merged since the last release.
 5. **dry_run**: on means build and pack only, with no tag and no release. The archives stay downloadable from the run
-   for 7 days.
+   for 7 days. The run summary starts with the version the run computed (for example `# v1.0.0`).
+
+Packing fails if a player has no Burst library: `Infinitile_Data/Plugins/x86_64/lib_burst_generated.dll` on Windows,
+`lib_burst_generated.so` on Linux. Both players are cross-built on the Linux runner, where a Burst compile failure is
+only a warning. Without that library the jobs would run as slow managed code.
 
 From a terminal, with highlights drafted in a file:
 
@@ -110,9 +118,17 @@ release player reads its version as `Application.version`. The Editor and other 
 player) read `dev`. Showing the version in a menu is a separate task.
 
 The product is called **Infinitile** (company `anilas5235`), so the player is `Infinitile.exe` / `Infinitile.x86_64`.
-Its saved settings and logs live in `%USERPROFILE%\AppData\LocalLow\anilas5235\Infinitile\` on Windows and
-`~/.config/unity3d/anilas5235/Infinitile/` on Linux. Settings saved under the old name (`DefaultCompany/voxel-game`)
-are not carried over.
+Where the player keeps its data:
+
+| | Windows | Linux |
+|---|---|---|
+| Settings and inventory (PlayerPrefs) | registry `HKCU\Software\anilas5235\Infinitile` | `~/.config/unity3d/anilas5235/Infinitile/prefs` |
+| `Player.log` and `persistentDataPath` | `%USERPROFILE%\AppData\LocalLow\anilas5235\Infinitile\` | `~/.config/unity3d/anilas5235/Infinitile/` |
+
+The Editor's own PlayerPrefs sit at `HKCU\Software\Unity\UnityEditor\anilas5235\Infinitile`.
+
+The rename from `DefaultCompany/voxel-game` to `anilas5235/Infinitile` resets the earlier dev settings and the
+inventory/hotbar once. Nothing under the old name is carried over.
 
 ## When something goes wrong
 

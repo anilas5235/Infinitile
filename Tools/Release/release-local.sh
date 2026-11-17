@@ -38,6 +38,11 @@ if [ -n "$highlights" ] && [ ! -f "$highlights" ]; then
   exit 1
 fi
 [ -z "$highlights" ] || highlights=$(cd "$(dirname "$highlights")" && pwd)/$(basename "$highlights")
+if [ "$dry_run" = false ] && [ "$yes" = false ] && [ ! -t 0 ]; then
+  # Found out now, not after the builds: without a terminal the publish question cannot be answered.
+  echo "no terminal to ask before publishing: pass --yes (or --dry-run)" >&2
+  exit 1
+fi
 
 here=$(cd "$(dirname "$0")" && pwd)
 cd "$(git -C "$here" rev-parse --show-toplevel)"
@@ -113,8 +118,9 @@ restore_build_changes() {
 }
 trap restore_build_changes EXIT
 
-build StandaloneWindows64 Win64 windows-x64 Infinitile.exe
+# Windows last, so the project's active build target stays Win64 for the Editor.
 build StandaloneLinux64 Linux64 linux-x64 Infinitile.x86_64
+build StandaloneWindows64 Win64 windows-x64 Infinitile.exe
 
 # --- pack and publish ---------------------------------------------------------------------------------------------
 archives=()
@@ -130,11 +136,16 @@ cat "$out/notes.md"
 echo "---"
 
 if [ "$dry_run" = true ]; then
-  echo "dry run: nothing published"
+  echo "dry run of $tag ($bump after $previous): nothing published"
   exit 0
 fi
 if [ "$yes" = false ]; then
-  read -r -p "Publish $tag as the latest release of $(gh repo view --json nameWithOwner --jq .nameWithOwner)? [y/N] " answer
+  answer=""
+  if ! read -r -p "Publish $tag as the latest release of $(gh repo view --json nameWithOwner --jq .nameWithOwner)? [y/N] " answer; then
+    echo >&2
+    echo "no answer (no terminal?): not published; run again with --yes to publish without the question" >&2
+    exit 1
+  fi
   [ "$answer" = y ] || [ "$answer" = Y ] || {
     echo "not published"
     exit 1
