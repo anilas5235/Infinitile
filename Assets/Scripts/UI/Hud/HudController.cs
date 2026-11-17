@@ -80,6 +80,11 @@ namespace UI{
             SetDebugPanels(showDebugPanels);
         }
 
+        // quitting may dispose the registry before OnDisable runs; save while it is still there
+        private void OnApplicationQuit(){
+            SaveBlocks();
+        }
+
         private void OnDisable(){
             if (voxelEditor) voxelEditor.OnVoxelIdChanged -= OnVoxelIdChanged;
             UnbindInventory();
@@ -186,12 +191,13 @@ namespace UI{
 
         /// <summary>
         ///     A HUD button without Unity's button look (the block styles itself, hover and press included); the shared
-        ///     <c>hud-btn</c> class centres its text, which Unity's <c>unity-button</c> class did before.
+        ///     <c>hud-btn</c> class centres its text, which Unity's <c>unity-button</c> class did before. It stays
+        ///     focusable, so the menu can be walked with keys and the gamepad; the inventory's buttons turn that off (the
+        ///     inventory has its own pad cursor).
         /// </summary>
         private static T PlainButton<T>(T button) where T : Button{
             button.RemoveFromClassList(Button.ussClassName);
             button.AddToClassList("hud-btn");
-            button.focusable = false;
             return button;
         }
 

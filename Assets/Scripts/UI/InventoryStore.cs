@@ -1,3 +1,4 @@
+using System.Text;
 using Engine.Scripts.Diagnostics;
 using Engine.Scripts.Inventory;
 using Engine.Scripts.VoxelConfig.Registry;
@@ -19,16 +20,18 @@ namespace UI{
             return inventory.TryLoadJson(PlayerPrefs.GetString(Key), name => IdOf(registry, name));
         }
 
-        /// <summary>Saves the inventory, unless a run is automated.</summary>
-        public static void Save(BlockInventory inventory, VoxelRegistry registry){
-            if (AutomatedRun.Active || registry == null) return;
+        /// <summary>Saves the inventory, unless a run is automated; false when nothing was saved.</summary>
+        public static bool Save(BlockInventory inventory, VoxelRegistry registry){
+            if (AutomatedRun.Active || registry == null) return false;
             PlayerPrefs.SetString(Key, inventory.ToJson(id => NameOf(registry, id)));
             PlayerPrefs.Save();
+            return true;
         }
 
         /// <summary>The base voxel id of a full name ("std:Grass"); 0 when there is no such voxel.</summary>
         public static ushort IdOf(VoxelRegistry registry, string fullName){
-            if (string.IsNullOrEmpty(fullName) || fullName.Length > FixedString32Bytes.UTF8MaxLengthInBytes) return 0;
+            if (string.IsNullOrEmpty(fullName) ||
+                Encoding.UTF8.GetByteCount(fullName) > FixedString32Bytes.UTF8MaxLengthInBytes) return 0;
             return registry.TryGetId(new FixedString32Bytes(fullName), out ushort id) ? registry.BaseOf(id) : (ushort)0;
         }
 

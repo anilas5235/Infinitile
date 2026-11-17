@@ -113,9 +113,22 @@ namespace UI{
             return visible;
         }
 
+        /// <summary>
+        ///     How many slots a row of <paramref name="grid" /> holds, as laid out: the backpack has
+        ///     <see cref="BlockInventory.BackpackColumns" />, the All tab wraps at its width (11 at 1920 x 1080).
+        /// </summary>
+        private int PadColumns(List<VisualElement> grid){
+            if (_tab == TabBackpack || grid.Count == 0) return BlockInventory.BackpackColumns;
+            float top = grid[0].layout.y;
+            if (float.IsNaN(top)) return BlockInventory.BackpackColumns;
+            int columns = 1;
+            while (columns < grid.Count && Mathf.Abs(grid[columns].layout.y - top) < 1f) columns++;
+            return columns;
+        }
+
         private void MovePad(Vector2Int direction){
             List<VisualElement> grid = PadGrid();
-            const int columns = BlockInventory.BackpackColumns;
+            int columns = PadColumns(grid);
             if (!_padOn){
                 // the first push shows the cursor where it was, or on the first slot
                 _padOn = true;
@@ -145,7 +158,7 @@ namespace UI{
                     else if (row < lastRow) _padIndex = grid.Count - 1;
                     else{
                         _padOnHotbar = true;
-                        _padIndex = Mathf.RoundToInt(x * (BlockInventory.HotbarSize - 1f) / (columns - 1f));
+                        _padIndex = Mathf.RoundToInt(x * (BlockInventory.HotbarSize - 1f) / Mathf.Max(columns - 1f, 1f));
                     }
                 }
             }

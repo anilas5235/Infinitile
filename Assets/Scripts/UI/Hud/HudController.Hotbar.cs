@@ -85,15 +85,17 @@ namespace UI{
             }
 
             _blocksDirty = false;
-            int current = voxelEditor ? _blocks.IndexOf(BlockInventory.Area.Hotbar, voxelEditor.voxelId) : -1;
+            int current = voxelEditor && voxelEditor.voxelId != 0
+                ? _blocks.IndexOf(BlockInventory.Area.Hotbar, voxelEditor.voxelId)
+                : -1;
             RefreshHotbar();
             SelectSlot(current >= 0 ? current : _selected);
         }
 
         private void SaveBlocks(){
             if (!_blocksDirty || !_blocksLoaded) return;
-            _blocksDirty = false;
-            InventoryStore.Save(_blocks, Registry());
+            // stays dirty when the save was skipped (the registry may already be gone on quit)
+            if (InventoryStore.Save(_blocks, Registry())) _blocksDirty = false;
         }
 
         private void OnBlocksChanged(){
@@ -101,7 +103,7 @@ namespace UI{
             RefreshHotbar();
             // the selected slot may hold another block now
             ushort id = _blocks.Get(BlockInventory.Area.Hotbar, _selected).Id;
-            if (voxelEditor && id != 0) voxelEditor.SelectVoxel(id);
+            SelectInEditor(id);
             ShowVoxelName(id);
             if (_invOpen) RefreshInventory();
         }
@@ -115,9 +117,16 @@ namespace UI{
             _selected = index;
             for (int i = 0; i < _slots.Count; i++) _slots[i].EnableInClassList("hs--on", i == index);
             ushort id = _blocks.Get(BlockInventory.Area.Hotbar, index).Id;
-            if (voxelEditor && id != 0) voxelEditor.SelectVoxel(id);
+            SelectInEditor(id);
             ShowVoxelName(id);
             if (_invOpen) RefreshInventory();
+        }
+
+        /// <summary>The voxel editor places the selected slot's block; an empty slot places nothing.</summary>
+        private void SelectInEditor(ushort id){
+            if (!voxelEditor) return;
+            if (id != 0) voxelEditor.SelectVoxel(id);
+            else voxelEditor.ClearSelection();
         }
 
         /// <summary>A pick (middle click) selects the slot holding the voxel, or puts it into the selected slot.</summary>

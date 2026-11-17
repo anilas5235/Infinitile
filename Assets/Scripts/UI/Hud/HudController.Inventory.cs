@@ -98,6 +98,7 @@ namespace UI{
             _searchField.RegisterCallback<FocusOutEvent>(OnSearchFocusOut);
             _searchField.RegisterCallback<KeyDownEvent>(OnSearchKeyDown, TrickleDown.TrickleDown);
             _invPanel.RegisterCallback<PointerMoveEvent>(OnPanelPointerMove);
+            _hotbar.RegisterCallback<PointerMoveEvent>(OnPanelPointerMove);
 
             BuildTabs();
             BuildChips();
@@ -118,6 +119,7 @@ namespace UI{
             _searchField.UnregisterCallback<FocusOutEvent>(OnSearchFocusOut);
             _searchField.UnregisterCallback<KeyDownEvent>(OnSearchKeyDown, TrickleDown.TrickleDown);
             _invPanel.UnregisterCallback<PointerMoveEvent>(OnPanelPointerMove);
+            _hotbar.UnregisterCallback<PointerMoveEvent>(OnPanelPointerMove);
         }
 
         private void BuildTabs(){
@@ -127,7 +129,7 @@ namespace UI{
             for (int i = 0; i < TabNames.Length; i++){
                 int index = i;
                 bool later = i > TabAll;
-                Button button = PlainButton(new Button());
+                Button button = PlainButton(new Button{ focusable = false });
                 button.AddToClassList("tab");
                 button.EnableInClassList("tab--later", later);
                 BlockIcon icon = new();
@@ -316,9 +318,12 @@ namespace UI{
             if (_invOpen && _tab == TabAll && !_padOn && _focusSearchFrame < 0) _focusSearchFrame = Time.frameCount + 1;
         }
 
-        /// <summary>While a block is hovered, 1–9 put it on the hotbar (HandleInventoryInput) instead of typing.</summary>
+        /// <summary>
+        ///     While a block is hovered and the search is empty, 1–9 put it on the hotbar (HandleInventoryInput) instead of
+        ///     typing; once the search holds text, digits type (a search by id).
+        /// </summary>
         private void OnSearchKeyDown(KeyDownEvent evt){
-            if (_hovered == null || IdAt(_hovered) == 0) return;
+            if (_hovered == null || IdAt(_hovered) == 0 || DigitsSearch()) return;
             bool digit = evt.keyCode is >= KeyCode.Alpha1 and <= KeyCode.Alpha9 || evt.character is >= '1' and <= '9';
             if (!digit) return;
             evt.StopImmediatePropagation();
@@ -452,8 +457,15 @@ namespace UI{
         }
 
         /// <summary>Hover + 1–9: the hovered block goes on that hotbar slot (a hotbar block swaps).</summary>
+        /// <summary>
+        ///     Digits go into the search once it holds text (a search by id); while it is empty they are hotbar keys.
+        /// </summary>
+        private bool DigitsSearch(){
+            return _searchField.value.Length > 0 && _searchField.focusController?.focusedElement == _searchField;
+        }
+
         private void HotbarKeyInInventory(int index){
-            if (index < 0 || index >= BlockInventory.HotbarSize) return;
+            if (index < 0 || index >= BlockInventory.HotbarSize || DigitsSearch()) return;
             ushort id = _hovered != null ? IdAt(_hovered) : (ushort)0;
             if (id == 0){
                 if (_searchField.focusController?.focusedElement != _searchField) SelectSlot(index);

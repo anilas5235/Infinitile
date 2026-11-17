@@ -1,11 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Engine.Scripts.Inventory;
 using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 using Area = Engine.Scripts.Inventory.BlockInventory.Area;
 
 namespace Engine.Tests.EditMode{
@@ -167,6 +169,24 @@ namespace Engine.Tests.EditMode{
             Assert.IsFalse(inventory.TryLoadJson("{ not json", IdOf));
             Assert.IsFalse(inventory.TryLoadJson("{}", IdOf));
             Assert.AreEqual(2, inventory.Get(Area.Hotbar, 0).Id, "a failed load changes nothing");
+        }
+
+        [Test]
+        public void TryLoadJson_RejectsASaveWhoseBlocksAllVanished(){
+            BlockInventory saved = new();
+            saved.Set(Area.Hotbar, 0, 2);
+            saved.Set(Area.Backpack, 4, 5);
+            string json = saved.ToJson(id => id == 2 ? "old:Grass" : "old:Stone");
+
+            BlockInventory inventory = new();
+            inventory.Set(Area.Hotbar, 1, 9);
+            LogAssert.Expect(LogType.Warning, new Regex("2 of 2 block names no longer exist"));
+            Assert.IsFalse(inventory.TryLoadJson(json, IdOf), "the caller falls back to its default hotbar");
+            Assert.AreEqual(9, inventory.Get(Area.Hotbar, 1).Id, "a rejected save changes nothing");
+
+            BlockInventory empty = new();
+            Assert.IsTrue(inventory.TryLoadJson(empty.ToJson(NameOf), IdOf), "an emptied inventory is a real save");
+            Assert.IsTrue(inventory.Get(Area.Hotbar, 1).IsEmpty);
         }
 
         [Test]

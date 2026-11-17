@@ -243,7 +243,11 @@ namespace Engine.Scripts.Inventory{
             return JsonUtility.ToJson(ToSaveData(nameOf));
         }
 
-        /// <summary>Loads JSON written by <see cref="ToJson" />; false (and nothing changed) for empty or broken JSON.</summary>
+        /// <summary>
+        ///     Loads JSON written by <see cref="ToJson" />; false (and nothing changed) for empty or broken JSON, and when
+        ///     the save names blocks but none of them exists any more (a renamed package), so the caller falls back to
+        ///     its defaults. Dropped names are logged.
+        /// </summary>
         public bool TryLoadJson(string json, Func<string, ushort> idOf){
             if (string.IsNullOrEmpty(json)) return false;
             SaveData data;
@@ -255,8 +259,30 @@ namespace Engine.Scripts.Inventory{
             }
 
             if (data == null || (data.hotbar == null && data.backpack == null)) return false;
+            int named = CountNamed(data.hotbar) + CountNamed(data.backpack);
+            int dropped = CountDropped(data.hotbar, idOf) + CountDropped(data.backpack, idOf);
+            if (dropped > 0)
+                Debug.LogWarning($"Inventory save: {dropped} of {named} block names no longer exist" +
+                                 (dropped == named ? "; the save is ignored." : "; their slots stay empty."));
+            if (named > 0 && dropped == named) return false;
             Load(data, idOf);
             return true;
+        }
+
+        private static int CountNamed(string[] names){
+            int count = 0;
+            if (names != null)
+                foreach (string name in names)
+                    if (!string.IsNullOrEmpty(name)) count++;
+            return count;
+        }
+
+        private static int CountDropped(string[] names, Func<string, ushort> idOf){
+            int count = 0;
+            if (names != null)
+                foreach (string name in names)
+                    if (!string.IsNullOrEmpty(name) && idOf(name) == 0) count++;
+            return count;
         }
 
         private BlockStack[] Slots(Area area){

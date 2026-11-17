@@ -23,7 +23,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         /// <summary>Water and lava.</summary>
         Liquids,
 
-        /// <summary>Blocks made to give light. The Light chip also lists every voxel that emits light.</summary>
+        /// <summary>Blocks made to give light. The Light chip lists the voxels of this category.</summary>
         Light,
 
         /// <summary>Made blocks: bricks, glass, cotton, slabs, workbench, oven.</summary>

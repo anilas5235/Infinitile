@@ -1,11 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
+using Engine.Scripts.Inventory;
 using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using Engine.Scripts.WorldGen.Core;
 using NUnit.Framework;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.TestTools;
 using UnityEngine.UIElements;
@@ -230,6 +232,111 @@ namespace Engine.Tests.PlayMode{
             Assert.AreEqual(DisplayStyle.None, inventory.resolvedStyle.display, "the inventory closes");
             Assert.AreEqual(DisplayStyle.Flex, hud.Q("crosshair").resolvedStyle.display, "crosshair back");
             Assert.IsEmpty(_problems, "warnings or errors while the HUD ran");
+        }
+
+        /// <summary>
+        ///     An empty selected hotbar slot places nothing (review M1): the voxel editor had kept the last block. A
+        ///     stone target is built in front of the camera; with the slot empty, holding place leaves the cell before
+        ///     it empty, and with stone in the slot the same press places stone there. The cells are restored.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator EmptyHotbarSlot_PlacesNothing(){
+            VisualElement hudRoot = FindHud(out UIDocument document);
+            Assert.IsNotNull(hudRoot, "no UIDocument with a \"hud\" element in the scene");
+            Component hud = document.GetComponent("HudController");
+            Assert.IsNotNull(hud, "HudController on the HUD document");
+            MonoBehaviour editor = null;
+            foreach (MonoBehaviour behaviour in Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None))
+                if (behaviour.GetType().Name == "VoxelEditor")
+                    editor = behaviour;
+            Assert.IsNotNull(editor, "VoxelEditor in the scene");
+
+            // the player (and its editor) turns on once the ground under the spawn is built, then falls onto it
+            float deadline = Time.realtimeSinceStartup + 60f;
+            while (!editor.isActiveAndEnabled && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.IsTrue(editor.isActiveAndEnabled, "the player did not spawn");
+            Camera camera = Camera.main;
+            Vector3 last = camera.transform.position;
+            int still = 0;
+            deadline = Time.realtimeSinceStartup + 10f; // the spawn is under water, where the player may drift
+            while (still < 30 && Time.realtimeSinceStartup < deadline){
+                yield return null;
+                still = (camera.transform.position - last).sqrMagnitude < 1e-6f ? still + 1 : 0;
+                last = camera.transform.position;
+            }
+
+            BlockInventory blocks = (BlockInventory)Private(hud, "_blocks");
+            int selected = (int)Private(hud, "_selected");
+            System.Reflection.FieldInfo place = editor.GetType().GetField("place");
+            System.Reflection.FieldInfo voxelId = editor.GetType().GetField("voxelId");
+            System.Reflection.MethodInfo lookAt = editor.GetType().GetMethod("GetLookAtVoxelPos", Instance);
+            VoxelRegistry registry = DataImporter.Instance.VoxelRegistry;
+            Assert.IsTrue(registry.TryGetId("std:Stone", out ushort stone));
+            VoxelWorld world = VoxelWorld.Instance;
+
+            // a stone 3.5 m ahead, and no solid block on the ray before it (water and air stay, so the player
+            // does not move); every changed cell is put back. The editor casts from the camera each fixed step.
+            Vector3 eye = camera.transform.position, forward = camera.transform.forward;
+            Vector3Int target = Vector3Int.FloorToInt(eye + forward * 3.5f);
+            Dictionary<Vector3Int, ushort> saved = new(){ { target, VoxelAt(world, target) } };
+            for (float t = 0.8f; t <= 3.5f; t += 0.05f){
+                Vector3Int cell = Vector3Int.FloorToInt(eye + forward * t);
+                ushort id = VoxelAt(world, cell);
+                if (!saved.ContainsKey(cell) && registry.TryGet(id, out Voxel voxel) && voxel.collision) saved[cell] = id;
+            }
+
+            ushort slotBefore = blocks.Get(BlockInventory.Area.Hotbar, selected).Id;
+            try{
+                foreach (Vector3Int cell in saved.Keys) world.SetVoxel(cell == target ? stone : (ushort)0, cell);
+                object[] args = { null, null, false };
+                deadline = Time.realtimeSinceStartup + 30f; // the collider bake of the edited partition
+                while (Time.realtimeSinceStartup < deadline){
+                    yield return new WaitForFixedUpdate();
+                    if ((bool)lookAt.Invoke(editor, args) && (Vector3Int)args[0] == target) break;
+                }
+
+                Assert.AreEqual(target, (Vector3Int)args[0], $"the editor looks at the stone (forward {forward})");
+                args[2] = true;
+                Assert.IsTrue((bool)lookAt.Invoke(editor, args));
+                Vector3Int cellBefore = (Vector3Int)args[0];
+                ushort original = VoxelAt(world, cellBefore);
+                if (!saved.ContainsKey(cellBefore)) saved[cellBefore] = original;
+
+                blocks.Set(BlockInventory.Area.Hotbar, selected, 0);
+                Assert.AreEqual(0, (ushort)voxelId.GetValue(editor), "an empty slot selects nothing");
+                place.SetValue(editor, true);
+                for (int i = 0; i < 5; i++) yield return new WaitForFixedUpdate();
+                place.SetValue(editor, false);
+                Assert.AreEqual(original, VoxelAt(world, cellBefore), "an empty slot placed a block");
+
+                blocks.Set(BlockInventory.Area.Hotbar, selected, stone);
+                Assert.AreEqual(stone, (ushort)voxelId.GetValue(editor), "a filled slot selects its block");
+                place.SetValue(editor, true);
+                yield return new WaitForFixedUpdate();
+                place.SetValue(editor, false);
+                Assert.AreEqual(stone, registry.BaseOf(VoxelAt(world, cellBefore)),
+                    "the same press with stone in the slot places stone");
+            }
+            finally{
+                place.SetValue(editor, false);
+                blocks.Set(BlockInventory.Area.Hotbar, selected, slotBefore);
+                foreach (KeyValuePair<Vector3Int, ushort> cell in saved) world.SetVoxel(cell.Value, cell.Key);
+            }
+
+            Assert.IsEmpty(_problems, "warnings or errors while placing");
+        }
+
+        private static ushort VoxelAt(VoxelWorld world, Vector3Int cell){
+            return world.GetVoxel(new int3(cell.x, cell.y, cell.z));
+        }
+
+        private const System.Reflection.BindingFlags Instance =
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+
+        private static object Private(Component component, string field){
+            System.Reflection.FieldInfo info = component.GetType().GetField(field, Instance);
+            Assert.IsNotNull(info, $"{component.GetType().Name}.{field}");
+            return info.GetValue(component);
         }
 
         private static List<string> Texts(VisualElement tiles){
