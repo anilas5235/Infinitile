@@ -179,11 +179,11 @@ cut dequeue loop: it loses no partition, meshes none twice and takes an entry in
    changes in `ProjectSettings/` and `Assets/Settings/` (shader prefilter flags, preloaded assets); they are
    not part of a change.
 2. Copy the whole folder `Builds/Mono/` to the other machine (any path; it needs write access next to the
-   executable, otherwise the result goes to `%USERPROFILE%\AppData\LocalLow\DefaultCompany\voxel-game\`).
+   executable, otherwise the result goes to `%USERPROFILE%\AppData\LocalLow\anilas5235\Infinitile\`).
 3. Close other programs, plug a laptop in, then start from a terminal in that folder:
 
    ```
-   .\voxel-game.exe -goalrun -goalrun-label <machine-name>
+   .\Infinitile.exe -goalrun -goalrun-label <machine-name>
    ```
 
    Do not touch mouse or keyboard and leave the window in front for the whole run (about 6 to 10 minutes; the
@@ -191,7 +191,7 @@ cut dequeue loop: it loses no partition, meshes none twice and takes an entry in
    for one draw distance only, `-screen-width 1920 -screen-height 1080 -screen-fullscreen 1` for a fixed
    window, `-goalrun-timeout <minutes>` (default 30).
 4. The result is `GoalRunResults/goal-run-<label>-<date>-<time>.txt` next to the executable. Send back that file
-   and `Player.log` (`%USERPROFILE%\AppData\LocalLow\DefaultCompany\voxel-game\Player.log`).
+   and `Player.log` (`%USERPROFILE%\AppData\LocalLow\anilas5235\Infinitile\Player.log`).
 
 ## Light
 

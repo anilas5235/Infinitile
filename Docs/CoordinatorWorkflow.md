@@ -267,7 +267,7 @@ memory, the spec and the repository alone.
   `PYTHONIOENCODING`, so call `sys.stdout.reconfigure(encoding='utf-8')` in the script; write
   files with `newline='\n'`.
 - Logs and results: `%LOCALAPPDATA%\Unity\Editor\Editor.log` (run finished, Burst errors,
-  crashes), `%USERPROFILE%\AppData\LocalLow\DefaultCompany\voxel-game\TestResults.xml` (latest
+  crashes), `%USERPROFILE%\AppData\LocalLow\anilas5235\Infinitile\TestResults.xml` (latest
   run only), `Temp\pipeline_test_status.json` for async PlayMode runs.
 - Syntax check without the Editor: `dotnet build Engine.Runtime.csproj -v:q -clp:ErrorsOnly
   -o <scratchpad>\build` (3–4 s, no Burst, no tests).

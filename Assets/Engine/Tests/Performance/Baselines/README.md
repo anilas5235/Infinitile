@@ -773,5 +773,5 @@ unity test --mode EditMode --filter Engine.Tests.Performance --output perf-resul
 ```
 
 The package writes the full results (samples, hardware, package versions) to
-`%USERPROFILE%\AppData\LocalLow\DefaultCompany\voxel-game\PerformanceTestResults.json`; copy that file
+`%USERPROFILE%\AppData\LocalLow\anilas5235\Infinitile\PerformanceTestResults.json`; copy that file
 here with a date prefix to record a new baseline.

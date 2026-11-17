@@ -1,0 +1,2 @@
+# Shell scripts run on the Linux release runner and in Git Bash: keep LF line ends.
+*.sh text eol=lf

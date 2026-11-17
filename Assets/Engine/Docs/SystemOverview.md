@@ -198,7 +198,7 @@ Copies built point data into the target render buffers and prepares page metadat
   ```
 
   The Editor log reports `[TestResultCollector] Run finished`; the results are in
-  `%USERPROFILE%\AppData\LocalLow\DefaultCompany\voxel-game\TestResults.xml`.
+  `%USERPROFILE%\AppData\LocalLow\anilas5235\Infinitile\TestResults.xml`.
 
 ## Important runtime entry points
 
