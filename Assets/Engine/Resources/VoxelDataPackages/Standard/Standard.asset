@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b3a837bc66f743fb862cb2ea1003ef5b, type: 3}
-  m_Name: Standart
+  m_Name: Standard
   m_EditorClassIdentifier: 
   packagePrefix: std
   voxel:

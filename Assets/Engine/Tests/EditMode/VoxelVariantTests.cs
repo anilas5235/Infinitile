@@ -127,7 +127,7 @@ namespace Engine.Tests.EditMode{
         }
 
         private VoxelRegistry StandardRegistry(out Voxel[] voxels){
-            VoxelDataPackage package = Resources.Load<VoxelDataPackage>("VoxelDataPackages/Standard/Standart");
+            VoxelDataPackage package = Resources.Load<VoxelDataPackage>("VoxelDataPackages/Standard/Standard");
             Assert.IsNotNull(package);
             voxels = package.voxel.Where(v => v).ToArray();
             VoxelRegistry registry = new();
