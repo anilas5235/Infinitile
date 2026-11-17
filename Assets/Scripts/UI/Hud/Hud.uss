@@ -22,6 +22,13 @@
     -unity-background-scale-mode: scale-to-fit;
 }
 
+/* Every HUD button (HudController.PlainButton): Unity's button class is removed, so the text is centred here, for
+   buttons with their own text (Put on hotbar, Sort by kind, chips, menu tiles) and inherited by label children. */
+.hud-btn {
+    -unity-text-align: middle-center;
+    white-space: nowrap;
+}
+
 /* The display font (set from the HudController); bold default font until it is assigned. */
 .lil {
     -unity-font-style: bold;
@@ -1093,7 +1100,6 @@
     background-color: rgb(52, 59, 77);
     color: rgb(244, 241, 234);
     font-size: 24px;
-    -unity-text-align: middle-center;
 }
 
 .t:hover {

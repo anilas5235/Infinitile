@@ -171,6 +171,11 @@ namespace Engine.Tests.PlayMode{
                     StringAssert.DoesNotContain("Esc", label.text, "no key text");
                     StringAssert.DoesNotContain("Drag", label.text, "no how-to text");
                 });
+                // every button text sits in the middle of its button (Unity's button class is removed, hud-btn centres)
+                inventory.Query<Button>().ForEach(button => {
+                    Assert.IsTrue(button.ClassListContains("hud-btn"), button.name + " is a HUD button");
+                    Assert.AreEqual(TextAnchor.MiddleCenter, button.resolvedStyle.unityTextAlign, button.name + " text centred");
+                });
 
                 // the Liquids chip narrows the list; Enter (PutFirstMatch) puts its first block on the hotbar
                 document.gameObject.SendMessage("SetTab", 1);

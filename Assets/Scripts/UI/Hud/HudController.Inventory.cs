@@ -76,10 +76,7 @@ namespace UI{
             _put = Root.Q<Button>("inv-put");
             _sort = Root.Q<Button>("inv-sort");
             _fill = Root.Q<Button>("inv-fill");
-            foreach (Button button in new[]{ _close, _put, _sort, _fill }){
-                button.RemoveFromClassList(Button.ussClassName);
-                button.focusable = false;
-            }
+            foreach (Button button in new[]{ _close, _put, _sort, _fill }) PlainButton(button);
 
             AddGlyph("inv-close-icon", GlyphKind.Close, Paper);
             AddGlyph("inv-search-icon", GlyphKind.Search, Accent);
@@ -131,8 +128,7 @@ namespace UI{
             for (int i = 0; i < TabNames.Length; i++){
                 int index = i;
                 bool later = i > TabAll;
-                Button button = new(){ focusable = false };
-                button.RemoveFromClassList(Button.ussClassName);
+                Button button = PlainButton(new Button());
                 button.AddToClassList("tab");
                 button.EnableInClassList("tab--later", later);
                 BlockIcon icon = new();
@@ -170,7 +166,7 @@ namespace UI{
                 Button chip = new(() => SetCategory(value)){
                     text = category == AllCategories ? "All" : ((VoxelCategory)category).ToString(), focusable = false
                 };
-                chip.RemoveFromClassList(Button.ussClassName);
+                PlainButton(chip);
                 chip.AddToClassList("cat");
                 UseDisplayFont(chip);
                 row.Add(chip);

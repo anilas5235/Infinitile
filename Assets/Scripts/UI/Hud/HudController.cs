@@ -184,6 +184,17 @@ namespace UI{
             RefreshHints();
         }
 
+        /// <summary>
+        ///     A HUD button without Unity's button look (the block styles itself, hover and press included); the shared
+        ///     <c>hud-btn</c> class centres its text, which Unity's <c>unity-button</c> class did before.
+        /// </summary>
+        private static T PlainButton<T>(T button) where T : Button{
+            button.RemoveFromClassList(Button.ussClassName);
+            button.AddToClassList("hud-btn");
+            button.focusable = false;
+            return button;
+        }
+
         private static void Show(VisualElement element, bool show){
             if (element != null) element.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
         }
