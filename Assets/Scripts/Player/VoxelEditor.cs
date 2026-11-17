@@ -26,7 +26,8 @@ namespace Player{
 
         /// <summary>
         ///     Currently selected voxel ID that will be placed in placement mode; always a base voxel, turned on
-        ///     placement to face the way it was placed.
+        ///     placement to face the way it was placed. 0 when nothing is selected (an empty hotbar slot): placing
+        ///     does nothing then.
         /// </summary>
         public ushort voxelId = 1;
 
@@ -40,6 +41,7 @@ namespace Player{
                 VoxelWorld.Instance.SetVoxel(0, voxelWorldPos);
             }
             else if (place){
+                if (voxelId == 0) return;
                 if (!GetLookAtVoxelPos(out Vector3Int voxelWorldPos, out RaycastHit hitInfo, true)) return;
                 if (Physics.CheckBox(voxelWorldPos + Vector3.one * .5f, Vector3.one * 0.45f)) return;
                 ushort id = VoxelPlacement.Resolve(DataImporter.Instance.VoxelRegistry, voxelId, hitInfo.normal,
@@ -97,6 +99,11 @@ namespace Player{
             if (id == 0 || id == voxelId) return;
             voxelId = id;
             OnVoxelIdChanged?.Invoke(voxelId);
+        }
+
+        /// <summary>Selects nothing (an empty hotbar slot): placing does nothing until a voxel is selected again.</summary>
+        public void ClearSelection(){
+            voxelId = 0;
         }
 
         /// <summary>

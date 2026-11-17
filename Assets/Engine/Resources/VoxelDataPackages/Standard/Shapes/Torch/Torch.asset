@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 33d8813f542849ba9f913f9b873fda02, type: 3}
+  m_Name: Torch
+  m_EditorClassIdentifier: Assembly-CSharp::Runtime.Engine.VoxelConfig.Data.VoxelShape
+  quads:
+  - quadDef: {fileID: 11400000, guid: 522f4a650118462c88c44937a32c9d49, type: 2}
+    drawCondition: 0
+  - quadDef: {fileID: 11400000, guid: 6dbef4a76a274a138ea0fb1c894cea78, type: 2}
+    drawCondition: 0
+  - quadDef: {fileID: 11400000, guid: c56d692ab50d4933b0e784dbcd038c97, type: 2}
+    drawCondition: 0
+  - quadDef: {fileID: 11400000, guid: 9ffe489719524df7807b3c9b89fcd5ad, type: 2}
+    drawCondition: 0
+  - quadDef: {fileID: 11400000, guid: 5030801ad8d4437e81c445de6aa3cca1, type: 2}
+    drawCondition: 0

@@ -37,8 +37,10 @@ namespace UI{
             if (_flat){
                 float size = Mathf.Min(rect.width, rect.height);
                 float fx = rect.x + (rect.width - size) * 0.5f, fy = rect.y + (rect.height - size) * 0.5f;
+                // half a pixel in from every edge: the tiles repeat, so a sample on the edge would pick up the
+                // opposite edge (a plant's opaque stem base drew a dashed line along the icon's top)
                 Quad(context, _top, TopTint, new Vector2(fx, fy), new Vector2(fx + size, fy),
-                    new Vector2(fx + size, fy + size), new Vector2(fx, fy + size));
+                    new Vector2(fx + size, fy + size), new Vector2(fx, fy + size), 0.5f / size);
                 return;
             }
 
@@ -58,11 +60,17 @@ namespace UI{
             Quad(context, _side, RightTint, centre, rightTop, rightBottom, low);
         }
 
-        /// <summary>One textured quad; corners clockwise from the texture's top left.</summary>
+        /// <summary>One textured quad; corners clockwise from the texture's top left; inset pulls the texture in.</summary>
         private static void Quad(MeshGenerationContext context, Texture2D texture, Color32 tint, Vector2 topLeft,
-            Vector2 topRight, Vector2 bottomRight, Vector2 bottomLeft){
+            Vector2 topRight, Vector2 bottomRight, Vector2 bottomLeft, float inset = 0f){
             MeshWriteData mesh = context.Allocate(4, 6, texture);
             Rect uv = mesh.uvRegion; // the texture may sit in an atlas
+            if (inset > 0f){
+                // inset is a share of the quad: the same share of the texture's rect
+                float du = uv.width * inset, dv = uv.height * inset;
+                uv = Rect.MinMaxRect(uv.xMin + du, uv.yMin + dv, uv.xMax - du, uv.yMax - dv);
+            }
+
             mesh.SetNextVertex(MakeVertex(topLeft, uv.xMin, uv.yMax, tint));
             mesh.SetNextVertex(MakeVertex(topRight, uv.xMax, uv.yMax, tint));
             mesh.SetNextVertex(MakeVertex(bottomRight, uv.xMax, uv.yMin, tint));
@@ -91,7 +99,9 @@ namespace UI{
         Exit,
         Back,
         Check,
-        Warning
+        Warning,
+        Close,
+        Search
     }
 
     /// <summary>A vector icon drawn in a 24 × 24 box scaled to the element, centred.</summary>
@@ -185,6 +195,25 @@ namespace UI{
                     painter.LineTo(P(12f, 14f));
                     painter.MoveTo(P(12f, 17.4f));
                     painter.LineTo(P(12f, 17.5f));
+                    painter.Stroke();
+                    break;
+                case GlyphKind.Close:
+                    painter.lineWidth = 3.4f * scale;
+                    painter.BeginPath();
+                    painter.MoveTo(P(5f, 5f));
+                    painter.LineTo(P(19f, 19f));
+                    painter.MoveTo(P(19f, 5f));
+                    painter.LineTo(P(5f, 19f));
+                    painter.Stroke();
+                    break;
+                case GlyphKind.Search:
+                    painter.BeginPath();
+                    painter.Arc(P(10f, 10f), 6.5f * scale, new Angle(0f, AngleUnit.Degree), new Angle(360f, AngleUnit.Degree));
+                    painter.Stroke();
+                    painter.lineWidth = 3.4f * scale;
+                    painter.BeginPath();
+                    painter.MoveTo(P(15f, 15f));
+                    painter.LineTo(P(20.5f, 20.5f));
                     painter.Stroke();
                     break;
             }

@@ -49,6 +49,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         /// </summary>
         public MeshLayer meshLayer;
 
+        /// <summary>The kind of block, for the inventory's category chips and its sort (set on every voxel).</summary>
+        [Tooltip("The kind of block: the inventory's category chips and its sort by kind")]
+        public VoxelCategory category;
+
         /// <summary>
         ///     If true, all faces are always rendered even when hidden by neighbors.
         /// </summary>
