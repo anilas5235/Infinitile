@@ -11,7 +11,8 @@ namespace Engine.Tests.PlayMode{
     /// <summary>
     ///     The UI Toolkit HUD of the game scene runs without errors, its world panel shows the biome of the column
     ///     under the camera, its GPU memory panel the engine's buffers, and the Esc menu opens, goes to its settings
-    ///     page and back, and closes. The HUD lives in the game assembly, so the test reads it by element names.
+    ///     page and back, and closes; the inventory opens with its backpack and block list, filters and closes. The
+    ///     HUD lives in the game assembly, so the test reads it by element names.
     /// </summary>
     public class HudTests{
         /// <summary>
@@ -45,7 +46,7 @@ namespace Engine.Tests.PlayMode{
             Assert.AreEqual(9, hud.Q("hotbar").childCount, "hotbar slots");
             StringAssert.Contains("FPS", hud.Q<Label>("fps").text);
             VisualElement hints = hud.Q("hints");
-            Assert.AreEqual(3, hints.childCount, "key hints: panels, voxels, menu");
+            Assert.AreEqual(3, hints.childCount, "key hints: panels, inventory, menu");
             Assert.AreEqual("F3", hints[0].Q<Label>().text, "the panels key");
 
             // the panels refresh every 0.1 s; wait for one refresh with the camera at rest
@@ -108,7 +109,7 @@ namespace Engine.Tests.PlayMode{
                 Assert.AreEqual(DisplayStyle.Flex, hud.Q("menu-settings-page").resolvedStyle.display, "settings page");
                 Assert.AreEqual(DisplayStyle.None, hud.Q("menu-main").resolvedStyle.display, "main page hidden");
                 CollectionAssert.AreEqual(new[]{ "4", "6", "8", "10", "12", "16" }, Texts(hud.Q("menu-draw-distance")));
-                VisualElement now = hud.Q(className: "badge")?.parent;
+                VisualElement now = hud.Q("menu-draw-distance").Q(className: "badge")?.parent;
                 Assert.IsNotNull(now, "the current draw distance has a badge");
                 Assert.AreEqual($"{VoxelWorld.Instance.DrawDistance}", ((Button)now).text);
                 Assert.IsTrue(now.ClassListContains("t--on"), "the current draw distance is picked");
@@ -130,6 +131,68 @@ namespace Engine.Tests.PlayMode{
 
             yield return null;
             Assert.AreEqual(DisplayStyle.None, menu.resolvedStyle.display, "the menu closes");
+            Assert.IsEmpty(_problems, "warnings or errors while the HUD ran");
+        }
+
+        [UnityTest]
+        public IEnumerator Inventory_OpensWithBackpackAndAllBlocks_FiltersAndCloses(){
+            for (int i = 0; i < 30; i++) yield return null;
+            VisualElement hud = FindHud(out UIDocument document);
+            Assert.IsNotNull(hud, "no UIDocument with a \"hud\" element in the scene");
+            Assert.AreEqual("inventory", hud.Q("hints")[1].Q<Label>(className: "hint__text").text, "inventory hint");
+
+            VisualElement inventory = hud.Q("inventory");
+            Assert.IsNotNull(inventory, "inventory element");
+            Assert.AreEqual(DisplayStyle.None, inventory.resolvedStyle.display, "the inventory starts closed");
+
+            // The HUD lives in the game assembly: open the inventory by message, as the inventory key does.
+            document.gameObject.SendMessage("SetInventory", true);
+            yield return null;
+            try{
+                Assert.AreEqual(DisplayStyle.Flex, inventory.resolvedStyle.display, "the inventory opens");
+                Assert.AreEqual(CursorLockMode.None, UnityEngine.Cursor.lockState, "the cursor is free");
+                Assert.AreEqual(DisplayStyle.None, hud.Q("crosshair").resolvedStyle.display, "crosshair hidden");
+                Assert.AreEqual(DisplayStyle.Flex, hud.Q("hotbar-area").resolvedStyle.display, "the hotbar stays");
+                Assert.IsTrue(hud.Q("hotbar").ClassListContains("hotbar--open"), "hotbar slots are drop targets");
+
+                Assert.AreEqual(72, hud.Q("inv-backpack-grid").childCount, "backpack slots");
+                VisualElement tabs = hud.Q("inv-tabs");
+                Assert.AreEqual(4, tabs.childCount, "tabs: backpack, all blocks, saved hotbars, found nearby");
+                Assert.AreEqual(2, tabs.Query(className: "badge").ToList().Count, "two tabs come later");
+
+                ScrollView all = hud.Q<ScrollView>("inv-all-grid");
+                int total = all.contentContainer.childCount;
+                Assert.Greater(total, 50, "one entry per base voxel");
+                Assert.AreEqual($"{total} blocks", hud.Q<Label>("inv-search-count").text);
+                inventory.Query<Label>().ForEach(label => {
+                    StringAssert.DoesNotContain("Esc", label.text, "no key text");
+                    StringAssert.DoesNotContain("Drag", label.text, "no how-to text");
+                });
+
+                // the Liquids chip narrows the list; Enter (PutFirstMatch) puts its first block on the hotbar
+                document.gameObject.SendMessage("SetTab", 1);
+                document.gameObject.SendMessage("SetCategory", 5); // VoxelCategory.Liquids
+                yield return null;
+                int shown = 0;
+                foreach (VisualElement slot in all.contentContainer.Children())
+                    if (slot.resolvedStyle.display == DisplayStyle.Flex)
+                        shown++;
+                Assert.Greater(shown, 0, "liquids shown");
+                Assert.Less(shown, total, "the chip filters");
+                Assert.AreEqual($"{shown} blocks", hud.Q<Label>("inv-search-count").text);
+                document.gameObject.SendMessage("PutFirstMatch");
+                yield return null;
+                string placed = hud.Q<Label>("voxel-name").text;
+                Assert.IsNotEmpty(placed, "the selected slot holds the block");
+                Assert.AreEqual(hud.Q<Label>("inv-aside-name").text, placed, "the side panel shows it");
+            }
+            finally{
+                document.gameObject.SendMessage("SetInventory", false);
+            }
+
+            yield return null;
+            Assert.AreEqual(DisplayStyle.None, inventory.resolvedStyle.display, "the inventory closes");
+            Assert.AreEqual(DisplayStyle.Flex, hud.Q("crosshair").resolvedStyle.display, "crosshair back");
             Assert.IsEmpty(_problems, "warnings or errors while the HUD ran");
         }
 

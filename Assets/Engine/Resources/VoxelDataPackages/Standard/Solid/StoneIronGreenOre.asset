@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   textureMode: 0
   meshLayer: 0
+  category: 2
   voxelType: 0
   alwaysRenderAllFaces: 0
   depthFadeDistance: -1

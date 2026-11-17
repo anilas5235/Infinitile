@@ -15,6 +15,7 @@ MonoBehaviour:
   package: {fileID: 0}
   textureMode: 0
   meshLayer: 0
+  category: 7
   alwaysRenderAllFaces: 0
   depthFadeDistance: -1
   surfaceAlpha: 1

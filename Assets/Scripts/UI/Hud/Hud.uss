@@ -419,77 +419,449 @@
     border-width: 0;
 }
 
-/* ── Voxel list (E) ──────────────────────────────────────────────────── */
+/* ── Inventory (E) ───────────────────────────────────────────────────── */
 
-.voxel-search {
+.inv {
     position: absolute;
     left: 0;
     top: 0;
     right: 0;
     bottom: 0;
-    align-items: center;
-    justify-content: center;
     background-color: rgba(0, 0, 0, 0.35);
     /* Hidden until the HudController opens it. */
     display: none;
 }
 
-.voxel-search__panel {
-    width: 60%;
-    max-width: 780px;
-    background-color: rgba(14, 17, 22, 0.92);
+.inv__panel {
+    position: absolute;
+    left: 230px;
+    top: 50px;
+    width: 1460px;
+    height: 800px;
+    padding: 24px 30px 30px 30px;
+    border-radius: 18px;
+    border-width: 2px;
+    border-bottom-width: 10px;
+    border-color: rgb(47, 54, 71);
+    border-bottom-color: rgb(18, 21, 29);
+    background-color: rgba(22, 26, 36, 0.95);
 }
 
-.voxel-search__field {
-    margin: 0 0 8px 0;
+.inv__head {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.inv__title {
+    margin: 0;
+    padding: 0;
+    font-size: 44px;
+    color: rgb(244, 241, 234);
+}
+
+.inv__close {
+    width: 56px;
+    height: 56px;
+    margin: 0;
+    padding: 0;
+    border-width: 0;
+    border-radius: 12px;
+    border-bottom-width: 6px;
+    border-bottom-color: rgb(38, 44, 59);
+    background-color: rgb(70, 80, 106);
+}
+
+.inv__close:hover {
+    background-color: rgb(84, 95, 124);
+}
+
+.inv__close:active {
+    border-bottom-width: 2px;
+    translate: 0 4px;
+}
+
+.inv__close-icon {
+    flex-grow: 1;
+}
+
+.inv__body {
+    flex-direction: row;
+    flex-grow: 1;
+}
+
+.inv__main {
+    flex-grow: 1;
+    margin-right: 28px;
+}
+
+/* Folder tabs: the open one joins the page below it. */
+.inv__tabs {
+    flex-direction: row;
+    align-items: flex-end;
+}
+
+.tab {
+    flex-direction: row;
+    align-items: center;
+    height: 50px;
+    margin: 0 6px 0 0;
+    padding: 0 16px 0 12px;
+    border-width: 0;
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    background-color: rgb(42, 48, 64);
+    color: rgb(200, 207, 217);
+}
+
+.tab:hover {
+    background-color: rgb(50, 57, 75);
+}
+
+.tab--on,
+.tab--on:hover {
+    height: 58px;
+    background-color: rgb(31, 36, 48);
+    color: rgb(244, 241, 234);
+}
+
+.tab--later {
+    opacity: 0.72;
+}
+
+.tab--later:hover {
+    background-color: rgb(42, 48, 64);
+}
+
+.tab__icon {
+    width: 28px;
+    height: 32px;
+    margin-right: 10px;
+}
+
+.tab__text {
+    margin: 0;
+    padding: 0;
+    font-size: 21px;
+}
+
+.tab__chip {
+    margin: 0 0 0 10px;
+    padding: 2px 8px 3px 8px;
+    border-radius: 7px;
     font-size: 14px;
+    -unity-font-style: bold;
+    color: rgb(200, 207, 217);
+    background-color: rgba(0, 0, 0, 0.3);
 }
 
-.voxel-search__field .unity-text-field__input {
-    padding: 5px 8px;
-    color: rgb(232, 236, 241);
-    background-color: rgba(255, 255, 255, 0.07);
-    border-color: rgba(255, 255, 255, 0.18);
-    border-radius: 4px;
-    --unity-cursor-color: rgb(232, 236, 241);
-    --unity-selection-color: rgba(242, 179, 61, 0.4);
+.tab .badge {
+    top: -10px;
+    right: -6px;
+    rotate: -5deg;
 }
 
-.voxel-search__field:focus .unity-text-field__input {
+.inv__page {
+    flex-grow: 1;
+    padding: 22px;
+    border-width: 2px;
+    border-color: rgb(47, 54, 71);
+    border-radius: 0 14px 14px 14px;
+    background-color: rgb(31, 36, 48);
+}
+
+.inv__backpack,
+.inv__all {
+    flex-grow: 1;
+}
+
+/* Twelve square slots a row. */
+.inv__grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 1008px;
+}
+
+.inv__actions {
+    flex-direction: row;
+    margin-top: 14px;
+}
+
+.sbtn {
+    height: 44px;
+    margin: 0 10px 0 0;
+    padding: 0 18px;
+    border-width: 0;
+    border-radius: 10px;
+    border-bottom-width: 5px;
+    border-bottom-color: rgb(38, 44, 59);
+    background-color: rgb(70, 80, 106);
+    color: rgb(244, 241, 234);
+    font-size: 18px;
+}
+
+.sbtn:hover {
+    background-color: rgb(84, 95, 124);
+}
+
+.sbtn:active {
+    border-bottom-width: 2px;
+    translate: 0 3px;
+}
+
+/* A block slot of the inventory, on the .hs look of the hotbar. */
+.is {
+    width: 76px;
+    height: 76px;
+    margin: 0 8px 8px 0;
+    border-radius: 10px;
+    border-width: 2px;
+    border-bottom-width: 5px;
+    border-color: rgb(49, 56, 73);
+    border-bottom-color: rgb(21, 24, 33);
+    background-color: rgb(37, 43, 57);
+}
+
+.is:hover,
+.is--cursor {
+    border-color: rgb(242, 179, 61);
+    border-bottom-color: rgb(185, 127, 22);
+    background-color: rgb(50, 57, 75);
+}
+
+.is--cursor {
+    border-width: 3px;
+    border-bottom-width: 6px;
+}
+
+/* The block of the selected hotbar slot. */
+.is--current {
+    background-color: rgb(58, 66, 86);
+}
+
+/* The slot a block is being dragged from. */
+.is--source .hs__icon {
+    opacity: 0.35;
+}
+
+.is .hs__icon {
+    left: 13px;
+    top: 7px;
+    right: 13px;
+    bottom: 6px;
+}
+
+/* While the inventory is open the hotbar slots are drop targets. */
+.hotbar--open .hs:hover,
+.hotbar--open .is--cursor {
     border-color: rgb(242, 179, 61);
 }
 
-/* Four rows of slots (56px + 2 × 3px margin) whatever the number of results; more rows scroll. */
-.voxel-search__results {
-    height: 248px;
+.hotbar--open .hs--on.is--cursor {
+    border-color: rgb(255, 220, 140);
+}
+
+.inv__filter {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.inv__search {
+    flex-direction: row;
+    align-items: center;
+    width: 380px;
+    height: 46px;
+    margin-right: 16px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border-width: 2px;
+    border-color: rgb(242, 179, 61);
+    background-color: rgb(18, 21, 29);
+}
+
+.inv__search-icon {
+    width: 24px;
+    height: 24px;
     flex-shrink: 0;
 }
 
-.voxel-search__results .unity-scroll-view__content-container {
+.inv__search-field {
+    flex-grow: 1;
+    margin: 0 6px;
+    font-size: 17px;
+}
+
+.inv__search-field .unity-text-field__input {
+    padding: 4px 4px;
+    border-width: 0;
+    color: rgb(244, 241, 234);
+    background-color: rgba(0, 0, 0, 0);
+    --unity-cursor-color: rgb(244, 241, 234);
+    --unity-selection-color: rgba(242, 179, 61, 0.4);
+}
+
+.inv__search-count {
+    margin: 0;
+    padding: 0;
+    font-size: 14px;
+    -unity-font-style: bold;
+    color: rgb(150, 160, 178);
+}
+
+.inv__chips {
     flex-direction: row;
     flex-wrap: wrap;
 }
 
-.voxel-search .hs {
-    width: 56px;
-    height: 56px;
-    margin: 3px;
-    border-bottom-width: 5px;
+.cat {
+    height: 38px;
+    margin: 0 8px 0 0;
+    padding: 0 14px;
+    border-width: 0;
+    border-radius: 9px;
+    border-bottom-width: 4px;
+    border-bottom-color: rgb(22, 26, 35);
+    background-color: rgb(42, 48, 64);
+    color: rgb(220, 226, 234);
+    font-size: 17px;
 }
 
-.voxel-search .hs:hover {
-    border-color: rgb(242, 179, 61);
+.cat:hover {
+    background-color: rgb(52, 59, 77);
 }
 
-.voxel-search .hs--on {
-    translate: 0 0;
+.cat--on,
+.cat--on:hover {
+    border-bottom-color: rgb(185, 127, 22);
+    background-color: rgb(242, 179, 61);
+    color: rgb(42, 26, 0);
 }
 
-.voxel-search__name {
-    margin-top: 6px;
-    min-height: 18px;
+.inv__scroll {
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.inv__scroll .unity-scroll-view__content-container {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+/* The block side panel: the hovered block, or the last one. */
+.inv__aside {
+    width: 320px;
+    flex-shrink: 0;
+    padding: 22px;
+    border-radius: 14px;
+    border-width: 2px;
+    border-bottom-width: 7px;
+    border-color: rgb(44, 51, 67);
+    border-bottom-color: rgb(18, 21, 29);
+    background-color: rgb(27, 32, 43);
+    align-items: stretch;
+}
+
+.inv__aside-icon {
+    width: 128px;
+    height: 128px;
+    align-self: center;
+    margin: 6px 0 14px 0;
+}
+
+.inv__aside-name {
+    margin: 0;
     padding: 0;
+    font-size: 32px;
+    -unity-text-align: middle-center;
+    white-space: normal;
+    color: rgb(244, 241, 234);
+}
+
+.inv__aside-meta {
+    margin: 2px 0 0 0;
+    padding: 0;
+    font-size: 14px;
+    -unity-text-align: middle-center;
+    color: rgb(150, 160, 178);
+}
+
+.inv__aside-chips {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 12px;
+}
+
+.inv__aside-chips .tag {
+    margin: 0 4px 4px 4px;
+    padding: 2px 8px 3px 8px;
+    font-size: 13px;
+}
+
+.inv__divider {
+    height: 2px;
+    margin: 14px 0;
+    background-color: rgb(52, 59, 77);
+}
+
+.inv__row {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.inv__row-k {
+    margin: 0;
+    padding: 0;
+    font-size: 15px;
+    color: rgb(150, 160, 178);
+}
+
+.inv__row-v {
+    margin: 0;
+    padding: 0;
+    font-size: 15px;
     -unity-font-style: bold;
+    color: rgb(232, 236, 241);
+}
+
+.inv__spacer {
+    flex-grow: 1;
+}
+
+.inv__put {
+    height: 54px;
+    margin: 0;
+    border-width: 0;
+    border-radius: 12px;
+    border-bottom-width: 6px;
+    border-bottom-color: rgb(185, 127, 22);
+    background-color: rgb(242, 179, 61);
+    color: rgb(42, 26, 0);
+    font-size: 22px;
+}
+
+.inv__put:hover {
+    background-color: rgb(250, 196, 92);
+}
+
+.inv__put:active {
+    border-bottom-width: 2px;
+    translate: 0 4px;
+}
+
+.inv__put:disabled {
+    opacity: 0.45;
+}
+
+/* The block under the pointer while it is dragged. */
+.inv__ghost {
+    position: absolute;
+    width: 64px;
+    height: 64px;
+    display: none;
 }
 
 /* ── Esc menu ────────────────────────────────────────────────────────── */

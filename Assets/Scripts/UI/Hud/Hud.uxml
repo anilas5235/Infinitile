@@ -122,15 +122,56 @@
             <ui:VisualElement name="hotbar" class="hotbar" picking-mode="Ignore" />
         </ui:VisualElement>
 
-        <ui:VisualElement name="voxel-search" class="voxel-search" picking-mode="Ignore">
-            <ui:VisualElement class="p voxel-search__panel">
-                <ui:VisualElement class="p__head">
-                    <ui:Label text="VOXELS" class="p__title" />
+        <!-- Inventory (E): folder tabs (backpack, all blocks, two for later), the block side panel; the hotbar
+             below stays visible and takes drops. Slots, tabs and chips are built by the HudController. -->
+        <ui:VisualElement name="inventory" class="inv" picking-mode="Ignore">
+            <ui:VisualElement name="inv-panel" class="inv__panel">
+                <ui:VisualElement class="inv__head">
+                    <ui:Label text="Inventory" class="inv__title lil" />
+                    <ui:Button name="inv-close" class="inv__close" focusable="false">
+                        <ui:VisualElement name="inv-close-icon" class="inv__close-icon" />
+                    </ui:Button>
                 </ui:VisualElement>
-                <ui:TextField name="voxel-search-field" class="voxel-search__field" />
-                <ui:ScrollView name="voxel-search-results" class="voxel-search__results hud-scroll" mode="Vertical" horizontal-scroller-visibility="Hidden" />
-                <ui:Label name="voxel-search-name" class="voxel-search__name" />
+                <ui:VisualElement class="inv__body">
+                    <ui:VisualElement class="inv__main">
+                        <ui:VisualElement name="inv-tabs" class="inv__tabs" />
+                        <ui:VisualElement name="inv-page" class="inv__page">
+                            <ui:VisualElement name="inv-backpack" class="inv__backpack">
+                                <ui:VisualElement name="inv-backpack-grid" class="inv__grid" />
+                                <ui:VisualElement class="inv__actions">
+                                    <ui:Button name="inv-sort" text="Sort by kind" class="sbtn lil" focusable="false" />
+                                    <ui:Button name="inv-fill" text="Fill hotbar" class="sbtn lil" focusable="false" />
+                                </ui:VisualElement>
+                            </ui:VisualElement>
+                            <ui:VisualElement name="inv-all" class="inv__all">
+                                <ui:VisualElement class="inv__filter">
+                                    <ui:VisualElement class="inv__search">
+                                        <ui:VisualElement name="inv-search-icon" class="inv__search-icon" />
+                                        <ui:TextField name="inv-search-field" class="inv__search-field" />
+                                        <ui:Label name="inv-search-count" class="inv__search-count" />
+                                    </ui:VisualElement>
+                                    <ui:VisualElement name="inv-chips" class="inv__chips" />
+                                </ui:VisualElement>
+                                <ui:ScrollView name="inv-all-grid" class="inv__scroll hud-scroll" mode="Vertical" horizontal-scroller-visibility="Hidden" focusable="false" />
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                    <ui:VisualElement name="inv-aside" class="inv__aside">
+                        <ui:VisualElement name="inv-aside-icon" class="inv__aside-icon" />
+                        <ui:Label name="inv-aside-name" class="inv__aside-name lil" />
+                        <ui:Label name="inv-aside-meta" class="inv__aside-meta" />
+                        <ui:VisualElement name="inv-aside-chips" class="inv__aside-chips" />
+                        <ui:VisualElement class="inv__divider" />
+                        <ui:VisualElement class="inv__row"><ui:Label text="In backpack" class="inv__row-k" /><ui:Label name="inv-aside-backpack" class="inv__row-v" /></ui:VisualElement>
+                        <ui:VisualElement class="inv__row"><ui:Label text="On hotbar" class="inv__row-k" /><ui:Label name="inv-aside-hotbar" class="inv__row-v" /></ui:VisualElement>
+                        <ui:VisualElement class="inv__row"><ui:Label text="Light" class="inv__row-k" /><ui:Label name="inv-aside-light" class="inv__row-v" /></ui:VisualElement>
+                        <ui:VisualElement class="inv__spacer" />
+                        <ui:Button name="inv-put" text="Put on hotbar" class="inv__put lil" focusable="false" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
             </ui:VisualElement>
+            <ui:VisualElement name="inv-ghost" class="inv__ghost" picking-mode="Ignore" />
         </ui:VisualElement>
 
         <!-- Esc menu: a main page (Continue, Settings, Quit) and the settings page -->

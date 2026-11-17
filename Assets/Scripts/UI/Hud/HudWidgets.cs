@@ -91,7 +91,9 @@ namespace UI{
         Exit,
         Back,
         Check,
-        Warning
+        Warning,
+        Close,
+        Search
     }
 
     /// <summary>A vector icon drawn in a 24 × 24 box scaled to the element, centred.</summary>
@@ -185,6 +187,25 @@ namespace UI{
                     painter.LineTo(P(12f, 14f));
                     painter.MoveTo(P(12f, 17.4f));
                     painter.LineTo(P(12f, 17.5f));
+                    painter.Stroke();
+                    break;
+                case GlyphKind.Close:
+                    painter.lineWidth = 3.4f * scale;
+                    painter.BeginPath();
+                    painter.MoveTo(P(5f, 5f));
+                    painter.LineTo(P(19f, 19f));
+                    painter.MoveTo(P(19f, 5f));
+                    painter.LineTo(P(5f, 19f));
+                    painter.Stroke();
+                    break;
+                case GlyphKind.Search:
+                    painter.BeginPath();
+                    painter.Arc(P(10f, 10f), 6.5f * scale, new Angle(0f, AngleUnit.Degree), new Angle(360f, AngleUnit.Degree));
+                    painter.Stroke();
+                    painter.lineWidth = 3.4f * scale;
+                    painter.BeginPath();
+                    painter.MoveTo(P(15f, 15f));
+                    painter.LineTo(P(20.5f, 20.5f));
                     painter.Stroke();
                     break;
             }

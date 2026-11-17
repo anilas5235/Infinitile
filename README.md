@@ -53,6 +53,7 @@ Assets/
 │   ├── Scripts/
 │   │   ├── Behaviour/         # Pooled chunk and partition GameObject components
 │   │   ├── Data/              # Chunk voxel and light data, chunk accessor
+│   │   ├── Inventory/         # Player block inventory model (hotbar + backpack, save by block name)
 │   │   ├── Jobs/              # Schedulers and job definitions
 │   │   ├── Render/            # GPU rendering pipeline (Post/: underwater fog, post-processing)
 │   │   ├── Settings/          # Engine settings and configuration
@@ -69,7 +70,7 @@ Assets/
 ├── Scenes/                    # Game scenes
 ├── Scripts/                   # Game-specific scripts (not part of the engine)
 │   ├── Player/                # Player controller and voxel editor
-│   └── UI/                    # HUD and in-game UI
+│   └── UI/                    # HUD, Esc menu and the inventory (E), inventory save (PlayerPrefs)
 ├── Settings/                  # Project settings
 ├── TextMesh Pro/              # TextMesh Pro assets and resources
 └── InputSystem_Actions.inputactions  # Input bindings

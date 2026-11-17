@@ -15,6 +15,7 @@ MonoBehaviour:
   package: {fileID: 11400000, guid: 0b9bdcf4baaa2be4cb46a27b55161ba9, type: 2}
   textureMode: 0
   meshLayer: 1
+  category: 5
   alwaysRenderAllFaces: 0
   depthFadeDistance: 12
   surfaceAlpha: 0.4

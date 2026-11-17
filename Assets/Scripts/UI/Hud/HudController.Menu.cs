@@ -157,7 +157,7 @@ namespace UI{
         /// <summary>Opens the menu on its main page, or closes it.</summary>
         public void SetMenu(bool open){
             if (_menu == null) return;
-            if (open && _searchOpen) SetVoxelSearch(false);
+            if (open && _invOpen) SetInventory(false);
             _menuOpen = open;
             _menu.style.display = open ? DisplayStyle.Flex : DisplayStyle.None;
             SetPlayerInput(!open);

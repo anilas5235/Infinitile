@@ -2,9 +2,9 @@ using UnityEngine.InputSystem;
 
 namespace UI{
     /// <summary>
-    ///     The "Hud" map of the project-wide input actions (InputSystem_Actions): panels, cursor, voxel list, menu,
-    ///     hotbar and the culling debug keys. Unlike the "Player" map it stays on while a menu or list is open, so
-    ///     the key that closes it still works.
+    ///     The "Hud" map of the project-wide input actions (InputSystem_Actions): panels, inventory (with its gamepad
+    ///     actions), menu, hotbar and the culling debug keys. Unlike the "Player" map it stays on while the menu or
+    ///     the inventory is open, so the key that closes it still works.
     /// </summary>
     public static class HudInput{
         /// <summary>The "Hud" action map, enabled; null when the project has no project-wide actions with that map.</summary>

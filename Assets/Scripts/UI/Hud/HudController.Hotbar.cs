@@ -1,58 +1,54 @@
-using System;
 using System.Collections.Generic;
+using Engine.Scripts.Inventory;
 using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
-using Unity.Collections;
-using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace UI{
     /// <summary>
-    ///     The hotbar (nine block slots, 1–9 or the wheel select one, the chosen slot is lifted) and the voxel list
-    ///     (Inventory key) that puts a clicked voxel into the chosen slot.
+    ///     The hotbar: nine block slots of the player's <see cref="BlockInventory" />; 1–9, the wheel or the shoulder
+    ///     buttons select one, the chosen slot is lifted and its block is the one placed.
     /// </summary>
     public partial class HudController{
-        private readonly List<SearchEntry> _searchEntries = new();
         private readonly List<VisualElement> _slots = new();
-        private int _focusSearchFrame = -1;
-        private VisualElement _search;
-        private int _searchBaseCount;
-        private TextField _searchField;
-        private Label _searchName;
-        private bool _searchOpen;
-        private ScrollView _searchResults;
+        private BlockInventory _blocks = new();
+        private bool _blocksDirty, _blocksLoaded;
+        private VisualElement _hotbar;
         private int _selected;
-        private ushort[] _slotIds = Array.Empty<ushort>();
         private Label _voxelName;
 
         private void BuildHotbar(){
             _voxelName = Root.Q<Label>("voxel-name");
-            VisualElement hotbar = Root.Q("hotbar");
-            hotbar.Clear();
+            _hotbar = Root.Q("hotbar");
+            _hotbar.Clear();
             _slots.Clear();
-            _slotIds = new ushort[math.min(hotbarVoxels.Length, 9)];
-            for (int i = 0; i < _slotIds.Length; i++){
+            for (int i = 0; i < BlockInventory.HotbarSize; i++){
                 VisualElement slot = CreateSlot($"{i + 1}");
-                slot.pickingMode = PickingMode.Ignore;
-                hotbar.Add(slot);
+                slot.pickingMode = PickingMode.Ignore; // pickable only while the inventory is open
+                RegisterSlot(slot, new SlotTag(SlotArea.Hotbar, i));
+                _hotbar.Add(slot);
                 _slots.Add(slot);
             }
 
-            ResolveHotbar();
+            _blocks = new BlockInventory();
+            _blocks.Changed += OnBlocksChanged;
+            _blocksLoaded = false;
+            LoadBlocks();
         }
 
-        /// <summary>A block slot of the hotbar or the voxel list: the voxel's cube icon with a label in the corner.</summary>
+        /// <summary>A block slot of the hotbar: the voxel's cube icon with its key in the corner.</summary>
         private static VisualElement CreateSlot(string keyText){
             VisualElement slot = new();
             slot.AddToClassList("hs");
             BlockIcon icon = new(){ name = "icon" };
             icon.AddToClassList("hs__icon");
+            slot.Add(icon);
+            if (keyText.Length == 0) return slot;
             Label key = new(keyText){ pickingMode = PickingMode.Ignore };
             key.AddToClassList("hs__num");
-            slot.Add(icon);
             slot.Add(key);
             return slot;
         }
@@ -70,187 +66,76 @@ namespace UI{
             icon.Set(top ? top : side, side, flat);
         }
 
-        private bool HotbarResolved(){
-            for (int i = 0; i < _slotIds.Length; i++)
-                if (_slotIds[i] == 0 && !string.IsNullOrEmpty(hotbarVoxels[i]))
-                    return false;
-            return true;
+        private static void SetIcon(BlockIcon icon, ushort id){
+            VoxelRegistry registry = Registry();
+            SetIcon(icon, id != 0 && registry != null && registry.TryGet(id, out Voxel voxel) ? voxel : null);
         }
 
-        /// <summary>Looks the slot names up in the voxel registry; slots of unknown names stay empty.</summary>
-        private void ResolveHotbar(){
+        /// <summary>
+        ///     Loads the saved hotbar and backpack once the registry has its voxels (it fills in the DataImporter's
+        ///     Awake); without a save, the hotbar gets <see cref="hotbarVoxels" /> and the backpack stays empty.
+        /// </summary>
+        private void LoadBlocks(){
             VoxelRegistry registry = Registry();
-            if (registry == null) return;
-            bool any = false;
-            for (int i = 0; i < _slotIds.Length; i++){
-                if (_slotIds[i] != 0 || string.IsNullOrEmpty(hotbarVoxels[i])) continue;
-                if (!registry.TryGetId(new FixedString32Bytes(hotbarVoxels[i]), out ushort id)) continue;
-                SetSlot(i, id);
-                any = true;
+            if (_blocksLoaded || registry == null || registry.BaseCount <= 1) return;
+            _blocksLoaded = true;
+            if (!InventoryStore.TryLoad(_blocks, registry)){
+                for (int i = 0; i < BlockInventory.HotbarSize && i < hotbarVoxels.Length; i++)
+                    _blocks.Set(BlockInventory.Area.Hotbar, i, InventoryStore.IdOf(registry, hotbarVoxels[i]));
             }
 
-            if (!any) return;
-            int current = voxelEditor ? Array.IndexOf(_slotIds, voxelEditor.voxelId) : -1;
+            _blocksDirty = false;
+            int current = voxelEditor ? _blocks.IndexOf(BlockInventory.Area.Hotbar, voxelEditor.voxelId) : -1;
+            RefreshHotbar();
             SelectSlot(current >= 0 ? current : _selected);
         }
 
-        private void SetSlot(int index, ushort id){
-            _slotIds[index] = id;
-            VoxelRegistry registry = Registry();
-            SetIcon(_slots[index].Q<BlockIcon>("icon"), registry != null && registry.TryGet(id, out Voxel voxel) ? voxel : null);
+        private void SaveBlocks(){
+            if (!_blocksDirty || !_blocksLoaded) return;
+            _blocksDirty = false;
+            InventoryStore.Save(_blocks, Registry());
+        }
+
+        private void OnBlocksChanged(){
+            _blocksDirty = true;
+            RefreshHotbar();
+            // the selected slot may hold another block now
+            ushort id = _blocks.Get(BlockInventory.Area.Hotbar, _selected).Id;
+            if (voxelEditor && id != 0) voxelEditor.SelectVoxel(id);
+            ShowVoxelName(id);
+            if (_invOpen) RefreshInventory();
+        }
+
+        private void RefreshHotbar(){
+            for (int i = 0; i < _slots.Count; i++)
+                SetIcon(_slots[i].Q<BlockIcon>("icon"), _blocks.Get(BlockInventory.Area.Hotbar, i).Id);
         }
 
         private void SelectSlot(int index){
             _selected = index;
             for (int i = 0; i < _slots.Count; i++) _slots[i].EnableInClassList("hs--on", i == index);
-            ushort id = _slotIds[index];
+            ushort id = _blocks.Get(BlockInventory.Area.Hotbar, index).Id;
             if (voxelEditor && id != 0) voxelEditor.SelectVoxel(id);
             ShowVoxelName(id);
+            if (_invOpen) RefreshInventory();
         }
 
         /// <summary>A pick (middle click) selects the slot holding the voxel, or puts it into the selected slot.</summary>
         private void OnVoxelIdChanged(ushort id){
-            if (_slotIds.Length == 0 || _slotIds[_selected] == id) return;
-            int existing = Array.IndexOf(_slotIds, id);
-            if (existing >= 0){
-                SelectSlot(existing);
-                return;
-            }
-
-            SetSlot(_selected, id);
-            ShowVoxelName(id);
+            if (!_blocksLoaded || _blocks.Get(BlockInventory.Area.Hotbar, _selected).Id == id) return;
+            int existing = _blocks.IndexOf(BlockInventory.Area.Hotbar, id);
+            if (existing >= 0) SelectSlot(existing);
+            else _blocks.Set(BlockInventory.Area.Hotbar, _selected, id);
         }
 
         private void ShowVoxelName(ushort id){
             VoxelRegistry registry = Registry();
-            _voxelName.text = registry != null && registry.TryGet(id, out Voxel voxel) ? voxel.name : "";
+            _voxelName.text = id != 0 && registry != null && registry.TryGet(id, out Voxel voxel) ? voxel.name : "";
             _voxelName.style.display = string.IsNullOrEmpty(_voxelName.text) ? DisplayStyle.None : DisplayStyle.Flex;
         }
 
         private static VoxelRegistry Registry(){
             return DataImporter.Instance ? DataImporter.Instance.VoxelRegistry : null;
-        }
-
-        // ── Voxel list ───────────────────────────────────────────────────────
-
-        private void BindVoxelSearch(){
-            _search = Root.Q("voxel-search");
-            _searchField = Root.Q<TextField>("voxel-search-field");
-            _searchResults = Root.Q<ScrollView>("voxel-search-results");
-            _searchName = Root.Q<Label>("voxel-search-name");
-            _searchField.textEdition.placeholder = "Name or id";
-            _searchField.RegisterValueChangedCallback(OnSearchChanged);
-            _searchField.RegisterCallback<FocusOutEvent>(OnSearchFocusOut);
-            _searchEntries.Clear();
-            _searchResults.Clear();
-            _searchBaseCount = 0;
-            _search.style.display = DisplayStyle.None;
-        }
-
-        private void OnSearchChanged(ChangeEvent<string> _){
-            FilterVoxelSearch();
-        }
-
-        /// <summary>
-        ///     A click on the scrollbar or the panel takes the focus from the field; it comes back a frame later, so
-        ///     typing goes on filtering.
-        /// </summary>
-        private void OnSearchFocusOut(FocusOutEvent _){
-            if (_searchOpen && _focusSearchFrame < 0) _focusSearchFrame = Time.frameCount + 1;
-        }
-
-        /// <summary>Opens or closes the voxel list; while it is open the cursor is free and the player's input is off.</summary>
-        private void SetVoxelSearch(bool open){
-            _searchOpen = open;
-            _search.style.display = open ? DisplayStyle.Flex : DisplayStyle.None;
-            SetPlayerInput(!open);
-            UpdateLayers();
-
-            if (!open){
-                _focusSearchFrame = -1;
-                _searchField.Blur();
-                return;
-            }
-
-            BuildVoxelSearch();
-            _searchField.SetValueWithoutNotify("");
-            FilterVoxelSearch();
-            _searchResults.scrollOffset = Vector2.zero;
-            // Focus a frame later, so the key that opened the list is not typed into the field.
-            _focusSearchFrame = Time.frameCount + 1;
-        }
-
-        /// <summary>
-        ///     One slot per base voxel in id order; turned variants are placed from their base. Rebuilt when the
-        ///     registry's voxel count changes (it fills in the DataImporter's Awake).
-        /// </summary>
-        private void BuildVoxelSearch(){
-            VoxelRegistry registry = Registry();
-            int baseCount = registry?.BaseCount ?? 0;
-            if (baseCount == _searchBaseCount) return;
-            _searchBaseCount = baseCount;
-            _searchEntries.Clear();
-            _searchResults.Clear();
-            for (ushort id = 1; id < baseCount; id++){
-                if (!registry.TryGet(id, out Voxel voxel)) continue;
-                string fullName = registry.TryGetName(id, out FixedString32Bytes name) ? name.ToString() : voxel.name;
-                ushort voxelId = id;
-                VisualElement slot = CreateSlot($"{id}");
-                SetIcon(slot.Q<BlockIcon>("icon"), voxel);
-                slot.RegisterCallback<ClickEvent>(_ => PickFromSearch(voxelId));
-                slot.RegisterCallback<PointerEnterEvent>(_ => _searchName.text = $"{fullName}   id {voxelId}");
-                slot.RegisterCallback<PointerLeaveEvent>(_ => _searchName.text = "");
-                _searchResults.Add(slot);
-                _searchEntries.Add(new SearchEntry{
-                    Id = voxelId, IdText = $"{id}", Name = fullName.ToLowerInvariant(), Slot = slot
-                });
-            }
-        }
-
-        /// <summary>Shows the voxels whose full name contains the query or whose id starts with it.</summary>
-        private void FilterVoxelSearch(){
-            string query = _searchField.value.Trim().ToLowerInvariant();
-            int shown = 0;
-            foreach (SearchEntry entry in _searchEntries){
-                entry.Visible = query.Length == 0 || entry.Name.Contains(query) ||
-                                entry.IdText.StartsWith(query, StringComparison.Ordinal);
-                entry.Slot.style.display = entry.Visible ? DisplayStyle.Flex : DisplayStyle.None;
-                entry.Slot.EnableInClassList("hs--on", voxelEditor && entry.Id == voxelEditor.voxelId);
-                if (entry.Visible) shown++;
-            }
-
-            _searchName.text = _searchEntries.Count == 0 ? "The voxels are not loaded yet."
-                : shown == 0 ? "No voxel matches."
-                : "";
-        }
-
-        private void PickFirstMatch(){
-            foreach (SearchEntry entry in _searchEntries)
-                if (entry.Visible){
-                    PickFromSearch(entry.Id);
-                    return;
-                }
-        }
-
-        /// <summary>Selects the slot holding the voxel, or puts it into the selected slot, and closes the list.</summary>
-        private void PickFromSearch(ushort id){
-            if (_slotIds.Length == 0){
-                if (voxelEditor) voxelEditor.SelectVoxel(id);
-            }
-            else{
-                int existing = Array.IndexOf(_slotIds, id);
-                if (existing < 0) SetSlot(_selected, id);
-                SelectSlot(existing >= 0 ? existing : _selected);
-            }
-
-            SetVoxelSearch(false);
-        }
-
-        private class SearchEntry{
-            public ushort Id;
-            public string IdText, Name;
-            public VisualElement Slot;
-            public bool Visible;
         }
     }
 }
