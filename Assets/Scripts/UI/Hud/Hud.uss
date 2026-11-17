@@ -784,9 +784,17 @@
     flex-shrink: 1;
 }
 
+/* 8 px above the first row, matching the slots' own 8 px margin under the last row, so neither
+   end of the grid touches the scroll view's edge. Absolute: in the flow, the viewport's hidden overflow
+   caps the wrapping container's auto height at the view's height, the scroll range then comes from the
+   slot rects alone and the last row's margin is lost (the last row sat flush with the bottom edge). */
 .inv__scroll .unity-scroll-view__content-container {
+    position: absolute;
+    left: 0;
+    right: 0;
     flex-direction: row;
     flex-wrap: wrap;
+    padding-top: 8px;
 }
 
 /* The block side panel: the hovered block, or the last one. */
