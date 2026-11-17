@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Engine.Scripts.Inventory;
 using Engine.Scripts.Render;
 using Player;
 using Unity.Profiling;
@@ -9,18 +10,18 @@ using Cursor = UnityEngine.Cursor;
 
 namespace UI{
     /// <summary>
-    ///     The in-game HUD (UI Toolkit, Hud.uxml): crosshair, key hints, a hotbar of voxels to place, the debug panels
-    ///     (player, world, the block looked at; frame, streaming, GPU memory, culling) and the Esc menu. All keys come
-    ///     from the "Hud" map of the project's input actions (see <see cref="HudInput" />): TogglePanels (F3) shows and
-    ///     hides the panels, Inventory (E) opens a list of every voxel that puts the clicked voxel into the hotbar, Menu
-    ///     (Esc) closes that list or opens and closes the menu. The cursor is free only while the list or the menu is
-    ///     open.
+    ///     The in-game HUD (UI Toolkit, Hud.uxml): crosshair, key hints, a hotbar of voxels to place, the inventory,
+    ///     the debug panels (player, world, the block looked at; frame, streaming, GPU memory, culling) and the Esc
+    ///     menu. All keys and gamepad buttons come from the "Hud" map of the project's input actions (see
+    ///     <see cref="HudInput" />): TogglePanels (F3) shows and hides the panels, Inventory (E, gamepad Select) opens
+    ///     the inventory, Menu (Esc, gamepad Start) closes the inventory or opens and closes the menu. The cursor is
+    ///     free only while the inventory or the menu is open.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public partial class HudController : MonoBehaviour{
         [SerializeField] private Texture2D crosshair;
 
-        [Tooltip("Voxels of hotbar slots 1–9 by full name (package:name). Middle click replaces the selected slot.")]
+        [Tooltip("The hotbar of a new player (no saved inventory), slots 1–9 by full name (package:name).")]
         [SerializeField] private string[] hotbarVoxels = {
             "std:Grass", "std:Dirt", "std:Stone", "std:Sand", "std:LogOak", "std:Planks", "std:Leaves", "std:Glass",
             "std:Water"
@@ -72,19 +73,24 @@ namespace UI{
             BindPanels();
             BuildHints();
             BuildHotbar();
-            BindVoxelSearch();
+            BindInventory();
             BindMenu();
             GameSettings.ApplyFrameCapAtStart();
             if (voxelEditor) voxelEditor.OnVoxelIdChanged += OnVoxelIdChanged;
             SetDebugPanels(showDebugPanels);
         }
 
+        // quitting may dispose the registry before OnDisable runs; save while it is still there
+        private void OnApplicationQuit(){
+            SaveBlocks();
+        }
+
         private void OnDisable(){
             if (voxelEditor) voxelEditor.OnVoxelIdChanged -= OnVoxelIdChanged;
-            if (_searchOpen) SetVoxelSearch(false);
+            UnbindInventory();
             UnbindMenu();
-            _searchField?.UnregisterValueChangedCallback(OnSearchChanged);
-            _searchField?.UnregisterCallback<FocusOutEvent>(OnSearchFocusOut);
+            SaveBlocks();
+            _blocks.Changed -= OnBlocksChanged;
             if (_cursorFree) SetCursorFree(false);
             _gfxMemory.Dispose();
             if (VoxelWorldRenderer.Instance) VoxelWorldRenderer.Instance.CollectCullingStats = false;
@@ -95,13 +101,8 @@ namespace UI{
             _frameTimeSum += Time.unscaledDeltaTime;
             _frames++;
 
+            if (!_blocksLoaded) LoadBlocks(); // the registry fills in the DataImporter's Awake
             HandleInput();
-            if (_searchOpen && _focusSearchFrame >= 0 && Time.frameCount >= _focusSearchFrame){
-                _focusSearchFrame = -1;
-                _searchField.Focus();
-            }
-
-            if (!HotbarResolved()) ResolveHotbar(); // the registry fills in the DataImporter's Awake
 
             if (Time.unscaledTime < _nextRefresh) return;
             _nextRefresh = Time.unscaledTime + refreshInterval;
@@ -126,6 +127,7 @@ namespace UI{
             _hotbarScroll = map?.FindAction("HotbarScroll");
             _hotbarPrevious = map?.FindAction("HotbarPrevious");
             _hotbarNext = map?.FindAction("HotbarNext");
+            BindInventoryInput(map);
         }
 
         private static bool Pressed(InputAction action){
@@ -134,31 +136,33 @@ namespace UI{
 
         private void HandleInput(){
             if (Pressed(_togglePanels)) SetDebugPanels(!showDebugPanels);
-            if (_searchOpen){
-                // Letters and digits type into the search field, so only the menu key closes the list.
-                if (Pressed(_menuAction)) SetVoxelSearch(false);
-                else if (Pressed(_confirm)) PickFirstMatch();
+            if (_invOpen){
+                // Letters and digits type into the search field and the Inventory key does not close it: only the
+                // menu key, the gamepad's Back and the close button do.
+                if (Pressed(_menuAction)) SetInventory(false);
+                else HandleInventoryInput();
             }
             else if (Pressed(_menuAction)){
                 MenuBack();
             }
             else if (!_menuOpen && Pressed(_inventory)){
-                SetVoxelSearch(true);
+                SetInventory(true);
             }
 
-            bool cursorFree = _searchOpen || _menuOpen;
+            bool cursorFree = _invOpen || _menuOpen;
             if (cursorFree != _cursorFree) SetCursorFree(cursorFree);
 
-            if (_slotIds.Length == 0 || _cursorFree) return;
+            if (_cursorFree) return;
+            const int size = BlockInventory.HotbarSize;
             if (Pressed(_hotbarSlot)){
                 int index = _hotbarSlot.GetBindingIndexForControl(_hotbarSlot.activeControl);
-                if (index >= 0 && index < _slotIds.Length) SelectSlot(index);
+                if (index >= 0 && index < size) SelectSlot(index);
             }
 
             int step = Pressed(_hotbarNext) ? 1 : Pressed(_hotbarPrevious) ? -1 : 0;
             float scroll = _hotbarScroll != null ? _hotbarScroll.ReadValue<float>() : 0f;
             if (scroll != 0f) step = scroll < 0f ? 1 : -1;
-            if (step != 0) SelectSlot((_selected + step + _slotIds.Length) % _slotIds.Length);
+            if (step != 0) SelectSlot((_selected + step + size) % size);
         }
 
         /// <summary>The F3 panels are switched on and not hidden behind the menu.</summary>
@@ -171,8 +175,8 @@ namespace UI{
         }
 
         /// <summary>
-        ///     Shows what goes with the current state: the menu hides the panels, hints, hotbar and crosshair; the voxel
-        ///     list hides the crosshair.
+        ///     Shows what goes with the current state: the menu hides the panels, hints, hotbar and crosshair; the
+        ///     inventory hides the crosshair.
         /// </summary>
         private void UpdateLayers(){
             bool play = !_menuOpen;
@@ -180,9 +184,21 @@ namespace UI{
             Show(_debugRight, PanelsVisible);
             Show(_hintRow, play);
             Show(_hotbarArea, play);
-            Show(_crosshair, play && !_searchOpen);
+            Show(_crosshair, play && !_invOpen);
             if (VoxelWorldRenderer.Instance) VoxelWorldRenderer.Instance.CollectCullingStats = PanelsVisible;
             RefreshHints();
+        }
+
+        /// <summary>
+        ///     A HUD button without Unity's button look (the block styles itself, hover and press included); the shared
+        ///     <c>hud-btn</c> class centres its text, which Unity's <c>unity-button</c> class did before. It stays
+        ///     focusable, so the menu can be walked with keys and the gamepad; the inventory's buttons turn that off (the
+        ///     inventory has its own pad cursor).
+        /// </summary>
+        private static T PlainButton<T>(T button) where T : Button{
+            button.RemoveFromClassList(Button.ussClassName);
+            button.AddToClassList("hud-btn");
+            return button;
         }
 
         private static void Show(VisualElement element, bool show){
@@ -190,8 +206,7 @@ namespace UI{
         }
 
         /// <summary>
-        ///     Unlocks the cursor and stops looking and editing while the cursor key is held, the voxel list or the
-        ///     menu is open.
+        ///     Unlocks the cursor and stops looking and editing while the inventory or the menu is open.
         /// </summary>
         private void SetCursorFree(bool free){
             _cursorFree = free;
@@ -203,7 +218,7 @@ namespace UI{
             voxelEditor.destruct = voxelEditor.place = false;
         }
 
-        /// <summary>Turns the player's input off while the voxel list or the menu is open, and on again.</summary>
+        /// <summary>Turns the player's input off while the inventory or the menu is open, and on again.</summary>
         private void SetPlayerInput(bool active){
             // Looked up on every switch-off: the player may spawn after the HUD, or be replaced.
             if (!active) _playerInput = FindFirstObjectByType<PlayerInput>();
@@ -230,7 +245,7 @@ namespace UI{
             _hintRow.Clear();
             _hints.Clear();
             AddHint(_togglePanels, "panels");
-            AddHint(_inventory, "voxels");
+            AddHint(_inventory, "inventory");
             AddHint(_menuAction, "menu");
         }
 

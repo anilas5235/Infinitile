@@ -82,7 +82,7 @@ namespace UI{
             }
 
             // Without Unity's button look: the blocks style themselves, hover and press included.
-            _menu.Query<Button>().ForEach(button => button.RemoveFromClassList(Button.ussClassName));
+            _menu.Query<Button>().ForEach(button => PlainButton(button));
 
             _menuContinue.clicked += CloseMenu;
             _menuSettingsButton.clicked += OpenSettingsPage;
@@ -146,8 +146,7 @@ namespace UI{
         }
 
         private static Button Tile(string text, Action clicked){
-            Button tile = new(clicked){ text = text };
-            tile.RemoveFromClassList(Button.ussClassName);
+            Button tile = PlainButton(new Button(clicked){ text = text });
             tile.AddToClassList("t");
             return tile;
         }
@@ -157,7 +156,7 @@ namespace UI{
         /// <summary>Opens the menu on its main page, or closes it.</summary>
         public void SetMenu(bool open){
             if (_menu == null) return;
-            if (open && _searchOpen) SetVoxelSearch(false);
+            if (open && _invOpen) SetInventory(false);
             _menuOpen = open;
             _menu.style.display = open ? DisplayStyle.Flex : DisplayStyle.None;
             SetPlayerInput(!open);

@@ -79,6 +79,13 @@ Important entry points:
 Chunk data containers shared by the jobs: `Chunk`, `ChunkVoxelData`, `ChunkLightData` (interval lists), the
 read-only `ChunkAccessor` of the mesh job, and the packed light format (`VoxelLight`, `VoxelLightTable`).
 
+### `Inventory`
+`BlockInventory`: the player's blocks, 9 hotbar and 72 backpack slots of `BlockStack` (voxel id and a count, unlimited
+in the creative mode), with swap, quick move, sort by kind, fill hotbar and a save by block name (`SaveData`, JSON), so
+a save survives new voxels and changed ids. The game's HUD shows it and keeps it in `PlayerPrefs`
+(`Assets/Scripts/UI`); the engine never reads it. A `Voxel`'s `category` (`VoxelCategory`) groups it in the
+inventory's block list.
+
 ### `Settings`
 Global engine and renderer settings used by scheduling, rendering, and pipeline configuration.
 

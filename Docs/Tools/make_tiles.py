@@ -112,6 +112,32 @@ tiles['grass_tall_jungle'] = recolour(load('grass3'), GREEN, 126, 1.05, .80)
 tiles['leaves_bush_swamp_transparent'] = recolour(load('leaves_transparent'), GREEN, 72, .92, .90)
 tiles['grass_swamp'] = recolour(load('grass1'), GREEN, 100, 1.0, .62)
 
+
+
+def torch():
+    """Torch (2026-11-17, third look after the owner's notes): the front view of the Torch shape, one 2/16 stick standing
+    in the block centre, 10/16 high; its top texels glow. The shape's quads sample exactly this rectangle (the top face
+    the two glowing rows), so the tile is also the flat inventory icon. Flat colours on the 16-texel grid (8 px per
+    texel): our plank wood in two tones, a charred band, a tip from the lava palette, pale yellow on top."""
+    n = 128; t = 8
+    im = Image.new('RGBA', (n, n), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    texel = lambda col, row, rgb: d.rectangle([col * t, row * t, col * t + t - 1, row * t + t - 1], fill=rgb + (255,))
+    rows = {  # texel row from the top: (left texel, right texel) of the stick, columns 7 and 8
+        6: ((255, 222, 120), (255, 240, 176)),  # pale yellow top
+        7: ((255, 149, 19), (255, 222, 120)),   # yellow-orange
+        8: ((232, 106, 23), (255, 149, 19)),    # lava orange
+        9: ((92, 62, 40), (110, 74, 46)),       # charred band
+    }
+    for row in range(10, 16): rows[row] = ((170, 116, 61), (196, 134, 71))  # plank wood: dark and light side
+    rows[12] = ((170, 116, 61), (208, 142, 74))  # one lighter grain texel
+    for row, (left, right) in rows.items():
+        texel(7, row, left)
+        texel(8, row, right)
+    return im
+
+
+tiles['torch'] = torch()
+
 for name, im in tiles.items():
     im.save(os.path.join(OUT, name + '.png'))
 
