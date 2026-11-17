@@ -27,25 +27,32 @@ namespace UI{
             MarkDirtyRepaint();
         }
 
+        /// <summary>Height of an isometric cube over its width: the top diamond and a vertical edge, each width / √3.</summary>
+        private const float CubeHeightPerWidth = 2f / 1.7320508f;
+
         private void Draw(MeshGenerationContext context){
             Rect rect = contentRect;
-            float size = Mathf.Min(rect.width, rect.height);
-            if (size <= 0f || !_top) return;
-            float x0 = rect.x + (rect.width - size) * 0.5f;
-            float y0 = rect.y + (rect.height - size) * 0.5f;
+            if (rect.width <= 0f || rect.height <= 0f || !_top) return;
 
             if (_flat){
-                Quad(context, _top, TopTint, new Vector2(x0, y0), new Vector2(x0 + size, y0),
-                    new Vector2(x0 + size, y0 + size), new Vector2(x0, y0 + size));
+                float size = Mathf.Min(rect.width, rect.height);
+                float fx = rect.x + (rect.width - size) * 0.5f, fy = rect.y + (rect.height - size) * 0.5f;
+                Quad(context, _top, TopTint, new Vector2(fx, fy), new Vector2(fx + size, fy),
+                    new Vector2(fx + size, fy + size), new Vector2(fx, fy + size));
                 return;
             }
 
-            // An isometric cube: a diamond on top (half as high as wide) over two side faces.
-            float cx = x0 + size * 0.5f, right = x0 + size;
-            float q = size * 0.25f, mid = y0 + size * 0.5f, bottom = y0 + size;
-            Vector2 top = new(cx, y0), leftTop = new(x0, y0 + q), rightTop = new(right, y0 + q);
-            Vector2 centre = new(cx, mid), leftBottom = new(x0, bottom - q), rightBottom = new(right, bottom - q);
-            Vector2 low = new(cx, bottom);
+            // An isometric cube, as wide as fits: a diamond on top over two side faces, every edge equally long on
+            // screen, so the cube is taller than wide.
+            float width = Mathf.Min(rect.width, rect.height / CubeHeightPerWidth);
+            float edge = width / 1.7320508f; // the diamond's height and the vertical edges
+            float x0 = rect.x + (rect.width - width) * 0.5f;
+            float y0 = rect.y + (rect.height - width * CubeHeightPerWidth) * 0.5f;
+            float cx = x0 + width * 0.5f, right = x0 + width;
+            float side = y0 + edge * 0.5f, mid = y0 + edge;
+            Vector2 top = new(cx, y0), leftTop = new(x0, side), rightTop = new(right, side);
+            Vector2 centre = new(cx, mid), leftBottom = new(x0, side + edge), rightBottom = new(right, side + edge);
+            Vector2 low = new(cx, mid + edge);
             Quad(context, _top, TopTint, leftTop, top, rightTop, centre);
             Quad(context, _side, LeftTint, leftTop, centre, low, leftBottom);
             Quad(context, _side, RightTint, centre, rightTop, rightBottom, low);

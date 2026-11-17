@@ -12,8 +12,9 @@ namespace UI{
     ///     The in-game HUD (UI Toolkit, Hud.uxml): crosshair, key hints, a hotbar of voxels to place, the debug panels
     ///     (player, world, the block looked at; frame, streaming, GPU memory, culling) and the Esc menu. All keys come
     ///     from the "Hud" map of the project's input actions (see <see cref="HudInput" />): TogglePanels (F3) shows and
-    ///     hides the panels, FreeCursor (held Alt) frees the cursor, Inventory (E) opens a list of every voxel that puts
-    ///     the clicked voxel into the hotbar, Menu (Esc) closes that list or opens and closes the menu.
+    ///     hides the panels, Inventory (E) opens a list of every voxel that puts the clicked voxel into the hotbar, Menu
+    ///     (Esc) closes that list or opens and closes the menu. The cursor is free only while the list or the menu is
+    ///     open.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public partial class HudController : MonoBehaviour{
@@ -37,7 +38,7 @@ namespace UI{
 
         private readonly List<HintChip> _hints = new();
 
-        private InputAction _confirm, _freeCursor, _hotbarNext, _hotbarPrevious, _hotbarScroll, _hotbarSlot,
+        private InputAction _confirm, _hotbarNext, _hotbarPrevious, _hotbarScroll, _hotbarSlot,
             _inventory, _menuAction, _togglePanels;
 
         private bool _cursorFree;
@@ -118,7 +119,6 @@ namespace UI{
         private void BindInput(){
             InputActionMap map = HudInput.Map();
             _togglePanels = map?.FindAction("TogglePanels");
-            _freeCursor = map?.FindAction("FreeCursor");
             _inventory = map?.FindAction("Inventory");
             _menuAction = map?.FindAction("Menu");
             _confirm = map?.FindAction("Confirm");
@@ -146,7 +146,7 @@ namespace UI{
                 SetVoxelSearch(true);
             }
 
-            bool cursorFree = _searchOpen || _menuOpen || (_freeCursor != null && _freeCursor.IsPressed());
+            bool cursorFree = _searchOpen || _menuOpen;
             if (cursorFree != _cursorFree) SetCursorFree(cursorFree);
 
             if (_slotIds.Length == 0 || _cursorFree) return;
@@ -231,7 +231,6 @@ namespace UI{
             _hints.Clear();
             AddHint(_togglePanels, "panels");
             AddHint(_inventory, "voxels");
-            AddHint(_freeCursor, "cursor");
             AddHint(_menuAction, "menu");
         }
 

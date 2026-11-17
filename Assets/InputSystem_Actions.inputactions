@@ -592,15 +592,6 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "FreeCursor",
-                    "type": "Button",
-                    "id": "3f280fa2-fa3c-40e4-b7f1-cee4e6eb2dba",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
                     "name": "Inventory",
                     "type": "Button",
                     "id": "ea6c3057-b172-4377-87b6-d1d2074c0e30",
@@ -691,17 +682,6 @@
                     "processors": "",
                     "groups": "Keyboard&Mouse",
                     "action": "TogglePanels",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "bf06544b-9a13-4a0d-8ed7-2ce83ad4bc40",
-                    "path": "<Keyboard>/leftAlt",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "Keyboard&Mouse",
-                    "action": "FreeCursor",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },

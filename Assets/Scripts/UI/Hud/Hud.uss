@@ -356,9 +356,9 @@
 .hs__icon {
     position: absolute;
     left: 9px;
-    top: 7px;
+    top: 4px;
     right: 9px;
-    bottom: 5px;
+    bottom: 3px;
 }
 
 .hs__num {

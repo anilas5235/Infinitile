@@ -45,7 +45,7 @@ namespace Engine.Tests.PlayMode{
             Assert.AreEqual(9, hud.Q("hotbar").childCount, "hotbar slots");
             StringAssert.Contains("FPS", hud.Q<Label>("fps").text);
             VisualElement hints = hud.Q("hints");
-            Assert.AreEqual(4, hints.childCount, "key hints: panels, voxels, cursor, menu");
+            Assert.AreEqual(3, hints.childCount, "key hints: panels, voxels, menu");
             Assert.AreEqual("F3", hints[0].Q<Label>().text, "the panels key");
 
             // the panels refresh every 0.1 s; wait for one refresh with the camera at rest

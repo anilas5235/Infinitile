@@ -22,7 +22,6 @@ namespace UI{
             if (alternative >= 0) text = text[..alternative];
             return text switch{
                 "Escape" => "Esc",
-                "Left Alt" or "Right Alt" => "Alt",
                 _ => text
             };
         }

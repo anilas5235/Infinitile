@@ -33,10 +33,13 @@ namespace Engine.Tests.PlayMode{
             Assert.AreEqual(PlayModeFixtures.BaselineDrawDistance, original);
             Assert.AreNotEqual(Smaller, original);
 
-            // The player must not fall while the colliders under it are gone.
+            // The player must not fall while the colliders under it are gone. The focus is the player's camera, so
+            // the scripts of the whole player object are paused, not only the camera's.
             Transform focus = PlayModeFixtures.GetPrivateField<Transform>(world, "focus");
+            Transform player = focus.root;
+            Vector3 stood = player.position;
             List<Behaviour> paused = new();
-            foreach (MonoBehaviour behaviour in focus.GetComponentsInChildren<MonoBehaviour>()){
+            foreach (MonoBehaviour behaviour in player.GetComponentsInChildren<MonoBehaviour>()){
                 if (!behaviour.enabled) continue;
                 behaviour.enabled = false;
                 paused.Add(behaviour);
@@ -73,6 +76,7 @@ namespace Engine.Tests.PlayMode{
                     "back at the original distance, the original store size");
                 Assert.AreEqual(before.BuildSlots, renderer.GpuMemory.BuildSlots);
                 yield return WaitUntilBuilt(world, renderer);
+                Assert.AreEqual(stood.y, player.position.y, 0.01f, "the player stays where it stood while the world is rebuilt");
 
                 Assert.Throws<ArgumentOutOfRangeException>(() => world.ChangeDrawDistance(0));
                 Assert.Throws<ArgumentOutOfRangeException>(() => world.ChangeDrawDistance(VoxelWorld.MaxDrawDistance + 1));
