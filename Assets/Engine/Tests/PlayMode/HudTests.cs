@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using Engine.Scripts.Inventory;
+using Engine.Scripts.Render;
 using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
@@ -14,10 +15,11 @@ using UnityEngine.UIElements;
 
 namespace Engine.Tests.PlayMode{
     /// <summary>
-    ///     The UI Toolkit HUD of the game scene runs without errors, its world panel shows the biome of the column
-    ///     under the camera, its GPU memory panel the engine's buffers, and the Esc menu opens, goes to its settings
-    ///     page and back, and closes; the inventory opens with its backpack and block list, filters and closes. The
-    ///     HUD lives in the game assembly, so the test reads it by element names.
+    ///     The UI Toolkit HUD of the game scene runs without errors, its F3 panels start hidden and F3 shows them, its
+    ///     world panel shows the biome of the column under the camera, its GPU memory panel the engine's buffers, and
+    ///     the Esc menu opens, goes to its settings page and back, and closes; the inventory opens with its backpack
+    ///     and block list, filters and closes. The HUD lives in the game assembly, so the test reads it by element
+    ///     names.
     /// </summary>
     public class HudTests{
         /// <summary>
@@ -54,6 +56,14 @@ namespace Engine.Tests.PlayMode{
             Assert.AreEqual(3, hints.childCount, "key hints: panels, inventory, menu");
             Assert.AreEqual("F3", hints[0].Q<Label>().text, "the panels key");
 
+            // the panels start hidden and do not read the culling counts back; F3 shows them
+            Assert.AreEqual(DisplayStyle.None, hud.Q("debug-left").resolvedStyle.display, "left panels hidden at start");
+            Assert.AreEqual(DisplayStyle.None, hud.Q("debug-right").resolvedStyle.display, "right panels hidden at start");
+            Assert.AreEqual("show panels", hints[0].Q<Label>(className: "hint__text").text, "the panels hint");
+            Assert.IsFalse(VoxelWorldRenderer.Instance.CollectCullingStats, "no culling readback while hidden");
+            yield return ShowPanels(hud);
+            Assert.AreEqual("hide panels", hints[0].Q<Label>(className: "hint__text").text, "the panels hint");
+
             // the panels refresh every 0.1 s; wait for one refresh with the camera at rest
             yield return new WaitForSecondsRealtime(0.25f);
             Vector3 pos = Camera.main.transform.position;
@@ -75,6 +85,8 @@ namespace Engine.Tests.PlayMode{
             VisualElement hud = FindHud(out UIDocument document);
             Assert.IsNotNull(hud, "no UIDocument with a \"hud\" element in the scene");
 
+            // shown, so the menu below has panels to hide
+            yield return ShowPanels(hud);
             yield return new WaitForSecondsRealtime(0.25f); // one refresh of the panels
             StringAssert.EndsWith(" ms", hud.Q<Label>("frame-ms").text);
             StringAssert.StartsWith("avg ", hud.Q<Label>("frame-average").text, "the frame time is marked as an average");
@@ -343,6 +355,15 @@ namespace Engine.Tests.PlayMode{
             List<string> texts = new();
             foreach (VisualElement tile in tiles.Children()) texts.Add(((Button)tile).text);
             return texts;
+        }
+
+        /// <summary>Shows the F3 panels (hidden at start) by message, as the panels key does, and checks them.</summary>
+        private static IEnumerator ShowPanels(VisualElement hud){
+            FindHud(out UIDocument document);
+            document.gameObject.SendMessage("SetDebugPanels", true);
+            yield return null;
+            Assert.AreEqual(DisplayStyle.Flex, hud.Q("debug-left").resolvedStyle.display, "left panels shown");
+            Assert.AreEqual(DisplayStyle.Flex, hud.Q("debug-right").resolvedStyle.display, "right panels shown");
         }
 
         private static VisualElement FindHud(){

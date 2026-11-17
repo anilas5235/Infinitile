@@ -711,7 +711,7 @@ MonoBehaviour:
   - std:Leaves
   - std:Glass
   - std:Water
-  showDebugPanels: 1
+  showDebugPanels: 0
   displayFont: {fileID: 12800000, guid: 3f719857cdd396540bd023a3b40d0ac5, type: 3}
   refreshInterval: 0.1
   voxelEditor: {fileID: 455605775}

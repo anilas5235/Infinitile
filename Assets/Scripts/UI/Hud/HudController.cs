@@ -27,7 +27,8 @@ namespace UI{
             "std:Water"
         };
 
-        [SerializeField] private bool showDebugPanels = true;
+        [Tooltip("The F3 debug panels show at start; hidden by default, F3 toggles them.")]
+        [SerializeField] private bool showDebugPanels;
 
         [Tooltip("Font of the menus, the hotbar numbers and the voxel name; the default font when empty.")]
         [SerializeField] private Font displayFont;
@@ -268,7 +269,7 @@ namespace UI{
         private void RefreshHints(){
             foreach (HintChip hint in _hints)
                 if (hint.Action == _togglePanels)
-                    hint.Text.text = showDebugPanels ? "hide panels" : hint.Base;
+                    hint.Text.text = showDebugPanels ? "hide panels" : "show panels";
         }
 
         private class HintChip{
