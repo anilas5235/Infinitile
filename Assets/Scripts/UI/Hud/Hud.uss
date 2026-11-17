@@ -875,35 +875,6 @@
     color: rgb(232, 236, 241);
 }
 
-.inv__spacer {
-    flex-grow: 1;
-}
-
-.inv__put {
-    height: 54px;
-    margin: 0;
-    border-width: 0;
-    border-radius: 12px;
-    border-bottom-width: 6px;
-    border-bottom-color: rgb(185, 127, 22);
-    background-color: rgb(242, 179, 61);
-    color: rgb(42, 26, 0);
-    font-size: 22px;
-}
-
-.inv__put:hover {
-    background-color: rgb(250, 196, 92);
-}
-
-.inv__put:active {
-    border-bottom-width: 2px;
-    translate: 0 4px;
-}
-
-.inv__put:disabled {
-    opacity: 0.45;
-}
-
 /* The block under the pointer while it is dragged. */
 .inv__ghost {
     position: absolute;

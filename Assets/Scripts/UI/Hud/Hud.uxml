@@ -163,11 +163,11 @@
                         <ui:Label name="inv-aside-meta" class="inv__aside-meta" />
                         <ui:VisualElement name="inv-aside-chips" class="inv__aside-chips" />
                         <ui:VisualElement class="inv__divider" />
-                        <ui:VisualElement class="inv__row"><ui:Label text="In backpack" class="inv__row-k" /><ui:Label name="inv-aside-backpack" class="inv__row-v" /></ui:VisualElement>
-                        <ui:VisualElement class="inv__row"><ui:Label text="On hotbar" class="inv__row-k" /><ui:Label name="inv-aside-hotbar" class="inv__row-v" /></ui:VisualElement>
+                        <ui:VisualElement class="inv__row"><ui:Label text="Package" class="inv__row-k" /><ui:Label name="inv-aside-package" class="inv__row-v" /></ui:VisualElement>
+                        <ui:VisualElement class="inv__row"><ui:Label text="Id" class="inv__row-k" /><ui:Label name="inv-aside-id" class="inv__row-v" /></ui:VisualElement>
+                        <ui:VisualElement class="inv__row"><ui:Label text="Layer" class="inv__row-k" /><ui:Label name="inv-aside-layer" class="inv__row-v" /></ui:VisualElement>
+                        <ui:VisualElement class="inv__row"><ui:Label text="Collision" class="inv__row-k" /><ui:Label name="inv-aside-collision" class="inv__row-v" /></ui:VisualElement>
                         <ui:VisualElement class="inv__row"><ui:Label text="Light" class="inv__row-k" /><ui:Label name="inv-aside-light" class="inv__row-v" /></ui:VisualElement>
-                        <ui:VisualElement class="inv__spacer" />
-                        <ui:Button name="inv-put" text="Put on hotbar" class="inv__put lil" focusable="false" />
                     </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>

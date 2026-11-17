@@ -207,6 +207,20 @@ namespace Engine.Tests.PlayMode{
                 string placed = hud.Q<Label>("voxel-name").text;
                 Assert.IsNotEmpty(placed, "the selected slot holds the block");
                 Assert.AreEqual(hud.Q<Label>("inv-aside-name").text, placed, "the side panel shows it");
+
+                // the side panel: Package, Id, Layer, Collision and Light rows, no button, no backpack or hotbar rows
+                Assert.IsNull(hud.Q("inv-put"), "no Put on hotbar button");
+                Assert.IsNull(hud.Q("inv-aside-backpack"), "no In backpack row");
+                Assert.IsNull(hud.Q("inv-aside-hotbar"), "no On hotbar row");
+                string fullId = hud.Q<Label>("inv-aside-id").text;
+                Assert.IsTrue(registry.TryGetId(fullId, out ushort placedId), "the Id row is the registry's string id");
+                Assert.IsTrue(registry.TryGet(placedId, out Voxel placedVoxel));
+                Assert.AreEqual(placed, placedVoxel.name, "the Id row names the shown block");
+                Assert.AreEqual(placedVoxel.package.name, hud.Q<Label>("inv-aside-package").text, "Package row");
+                Assert.AreEqual(placedVoxel.meshLayer.ToString(), hud.Q<Label>("inv-aside-layer").text, "Layer row");
+                Assert.AreEqual(placedVoxel.collision ? "solid" : "none", hud.Q<Label>("inv-aside-collision").text,
+                    "Collision row");
+                Assert.IsNotEmpty(hud.Q<Label>("inv-aside-light").text, "Light row");
             }
             finally{
                 document.gameObject.SendMessage("SetInventory", false);

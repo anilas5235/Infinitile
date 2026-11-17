@@ -41,9 +41,9 @@ namespace UI{
         private ScrollView _allGrid;
         private ushort _asideId;
         private BlockIcon _asideIcon, _ghost;
-        private Label _asideName, _asideMeta, _asideBackpack, _asideHotbar, _asideLight, _searchCount;
+        private Label _asideName, _asideMeta, _asidePackage, _asideFullId, _asideLayer, _asideCollision, _asideLight, _searchCount;
         private VisualElement _asideChips, _backpackPage, _allPage, _inv, _invPanel;
-        private Button _close, _put, _sort, _fill;
+        private Button _close, _sort, _fill;
         private SlotTag _hovered;
         private bool _invOpen;
         private Press _press;
@@ -69,14 +69,15 @@ namespace UI{
             _asideName = Root.Q<Label>("inv-aside-name");
             _asideMeta = Root.Q<Label>("inv-aside-meta");
             _asideChips = Root.Q("inv-aside-chips");
-            _asideBackpack = Root.Q<Label>("inv-aside-backpack");
-            _asideHotbar = Root.Q<Label>("inv-aside-hotbar");
+            _asidePackage = Root.Q<Label>("inv-aside-package");
+            _asideFullId = Root.Q<Label>("inv-aside-id");
+            _asideLayer = Root.Q<Label>("inv-aside-layer");
+            _asideCollision = Root.Q<Label>("inv-aside-collision");
             _asideLight = Root.Q<Label>("inv-aside-light");
             _close = Root.Q<Button>("inv-close");
-            _put = Root.Q<Button>("inv-put");
             _sort = Root.Q<Button>("inv-sort");
             _fill = Root.Q<Button>("inv-fill");
-            foreach (Button button in new[]{ _close, _put, _sort, _fill }) PlainButton(button);
+            foreach (Button button in new[]{ _close, _sort, _fill }) PlainButton(button);
 
             AddGlyph("inv-close-icon", GlyphKind.Close, Paper);
             AddGlyph("inv-search-icon", GlyphKind.Search, Accent);
@@ -90,7 +91,6 @@ namespace UI{
             ghost.Add(_ghost);
 
             _close.clicked += CloseInventory;
-            _put.clicked += PutAsideOnHotbar;
             _sort.clicked += SortBackpack;
             _fill.clicked += FillHotbar;
             _searchField.textEdition.placeholder = "Search blocks";
@@ -112,7 +112,6 @@ namespace UI{
             if (_inv == null) return;
             if (_invOpen) SetInventory(false);
             _close.clicked -= CloseInventory;
-            _put.clicked -= PutAsideOnHotbar;
             _sort.clicked -= SortBackpack;
             _fill.clicked -= FillHotbar;
             _searchField.UnregisterValueChangedCallback(OnSearchChanged);
@@ -360,11 +359,10 @@ namespace UI{
             Voxel voxel = null;
             bool known = id != 0 && registry != null && registry.TryGet(id, out voxel);
             SetIcon(_asideIcon, known ? voxel : null);
-            _put.SetEnabled(known);
             _asideChips.Clear();
             if (!known){
                 _asideName.text = _asideMeta.text = "";
-                _asideBackpack.text = _asideHotbar.text = _asideLight.text = "–";
+                _asidePackage.text = _asideFullId.text = _asideLayer.text = _asideCollision.text = _asideLight.text = "–";
                 return;
             }
 
@@ -378,14 +376,12 @@ namespace UI{
             if (voxel.topBottom) turns = turns.Length == 0 ? "top or bottom" : $"{turns}, top or bottom";
             _asideMeta.text = turns.Length == 0 ? $"id {id}" : $"id {id} · {turns}";
             if (voxel.category != VoxelCategory.None) AddAsideChip(voxel.category.ToString());
-            AddAsideChip(voxel.meshLayer.ToString());
-            if (voxel.collision) AddAsideChip("Collision");
-            if (voxel.lightEmission != Vector3Int.zero) AddAsideChip("Glows");
 
-            int inBackpack = _blocks.CountOf(BlockInventory.Area.Backpack, id);
-            _asideBackpack.text = inBackpack == 0 ? "–" : inBackpack == 1 ? "1 slot" : $"{inBackpack} slots";
-            int onHotbar = _blocks.IndexOf(BlockInventory.Area.Hotbar, id);
-            _asideHotbar.text = onHotbar < 0 ? "–" : $"slot {onHotbar + 1}";
+            // the same data as the F3 Looking-at panel: registry name, mesh layer, collider flag
+            _asidePackage.text = voxel.package ? voxel.package.name : "–";
+            _asideFullId.text = registry.TryGetName(id, out FixedString32Bytes fullName) ? fullName.ToString() : "–";
+            _asideLayer.text = voxel.meshLayer.ToString();
+            _asideCollision.text = voxel.collision ? "solid" : "none";
             _asideLight.text = voxel.lightEmission != Vector3Int.zero ? "gives light"
                 : voxel.lightAttenuation >= VoxelLightLimits.MaxLevel ? "blocks all"
                 : voxel.lightAttenuation <= 0 ? "lets all through"
@@ -402,10 +398,6 @@ namespace UI{
 
         private void PutOnHotbar(ushort id){
             if (id != 0) _blocks.Set(BlockInventory.Area.Hotbar, _selected, id);
-        }
-
-        private void PutAsideOnHotbar(){
-            PutOnHotbar(_asideId);
         }
 
         private void SortBackpack(){
