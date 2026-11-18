@@ -113,10 +113,10 @@
                 float4 ao_color = calc_ao_color(_AOColor, albedo, _AOCurve, extra.ao, _AOIntensity, _AOPower, uv);
 
                 // --- Light ---
-                float3 light = calc_voxel_light(IN.packed, uv);
+                float3 light = calc_voxel_light(IN.packed, uv, IN.shade);
 
                 // --- Final colour ---
-                return half4(apply_horizon_fog(ao_color.rgb * light * IN.shade, IN.positionWS), 1);
+                return half4(apply_horizon_fog(ao_color.rgb * light, IN.positionWS), 1);
             }
             ENDHLSL
         }

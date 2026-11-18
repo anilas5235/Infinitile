@@ -144,6 +144,8 @@ float4 calc_ao_color(const float4 ao_color, const float4 albedo, const float4 ao
 float _VoxelSkyBrightness;
 float4 _VoxelSkyTint;
 float _VoxelAmbient;
+// Unit direction towards the sun, set by VoxelWorldRenderer from the URP main light (zero without one).
+float4 _VoxelSunDirection;
 
 // Corner levels ul, ur, dr, dl interpolated over the face (as the AO).
 float interpolate_corners(const uint4 corners, float2 uv)
@@ -163,8 +165,9 @@ float3 light_curve(float3 level)
     return pow(0.85f, 15.0f - level);
 }
 
-// Light = max(skyCurve(sky) * brightness * tint, blockCurve(RGB)), never below the ambient.
-float3 calc_voxel_light(const uint4 packed, float2 uv)
+// Light = max(skyCurve(sky) * brightness * tint * face shade, blockCurve(RGB)), never below the ambient. The face
+// shade darkens only the sky light: a torch lights every side of a block alike.
+float3 calc_voxel_light(const uint4 packed, float2 uv, const float shade)
 {
     float sky = interpolate_corners(get_sky_light(packed), uv);
     float3 block = float3(
@@ -172,7 +175,7 @@ float3 calc_voxel_light(const uint4 packed, float2 uv)
         interpolate_corners(get_green_light(packed), uv),
         interpolate_corners(get_blue_light(packed), uv));
 
-    float3 sky_light = light_curve(sky) * _VoxelSkyBrightness * _VoxelSkyTint.rgb;
+    float3 sky_light = light_curve(sky) * _VoxelSkyBrightness * _VoxelSkyTint.rgb * shade;
     float3 light = max(sky_light, light_curve(block));
     return max(light, _VoxelAmbient);
 }
@@ -206,13 +209,21 @@ float3 apply_horizon_fog(const float3 color, const float3 positionWS)
     return lerp(color, horizon_fog_color(normalize(to_point)), fog);
 }
 
-// Face shade: a fixed brightness per face direction, so the sides of a block read apart. shade = (top, bottom,
-// ±x sides, ±z sides); a slanted quad (a plant's cross plane) blends between them by its normal.
+// Sun height (the y of the direction towards it) at which the face shade has turned fully to the sun.
+static const float SUN_SHADE_RISE = 0.2f;
+
+// Face shade: the brightness of a face by its direction, so the sides of a block read apart. shade = (top, bottom,
+// ±x sides, ±z sides). With the sun below the horizon (or no sun) the fixed values, a slanted quad (a plant's cross
+// plane) blending between them by its normal. While the sun is up, by the face's angle to the sun: the bottom
+// value facing away from it, the top value facing it (half Lambert), so the sunny side of a block is the brightest
+// and the shade moves with the day. The turn takes the sun's rise to SUN_SHADE_RISE.
 float face_shade(const float4 shade, const float3 normal)
 {
     const float3 n = abs(normal);
     const float sides = dot(n.xz, shade.zw) / max(n.x + n.z, 1e-4f);
-    return lerp(sides, normal.y >= 0.0f ? shade.x : shade.y, n.y);
+    const float by_direction = lerp(sides, normal.y >= 0.0f ? shade.x : shade.y, n.y);
+    const float by_sun = lerp(shade.y, shade.x, 0.5f * dot(normal, _VoxelSunDirection.xyz) + 0.5f);
+    return lerp(by_direction, by_sun, smoothstep(0.0f, SUN_SHADE_RISE, _VoxelSunDirection.y));
 }
 
 float calc_glow(const float glow_data)

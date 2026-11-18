@@ -116,12 +116,11 @@
                                                       _AOPower, IN.uv);
 
                 // --- Light, glow and face shade ---
-                const float3 light = calc_voxel_light(IN.packed, IN.uv);
+                const float3 light = calc_voxel_light(IN.packed, IN.uv, front ? IN.shade.x : IN.shade.y);
                 const float glow = calc_glow(get_glow(IN.packed));
-                const float shade = front ? IN.shade.x : IN.shade.y;
 
                 // --- Final colour ---
-                return half4(apply_horizon_fog(ao_color.rgb * light * glow * shade, IN.positionWS), 1);
+                return half4(apply_horizon_fog(ao_color.rgb * light * glow, IN.positionWS), 1);
             }
             ENDHLSL
         }

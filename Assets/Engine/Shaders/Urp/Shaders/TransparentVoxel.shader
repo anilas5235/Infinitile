@@ -91,9 +91,9 @@
             const float4 albedo = SAMPLE_TEXTURE2D_ARRAY(_Textures, sampler_Textures, IN.uv, get_tex_index(IN.packed));
             const float4 ao_color = calc_ao_color(_AOColor, albedo, _AOCurve, get_ao(IN.packed), _AOIntensity,
                                                   _AOPower, IN.uv);
-            const float3 light = calc_voxel_light(IN.packed, IN.uv);
+            const float3 light = calc_voxel_light(IN.packed, IN.uv, IN.shade);
             const float glow = calc_glow(get_glow(IN.packed));
-            return float4(ao_color.rgb * light * glow * IN.shade, albedo.w * get_surface_alpha(IN.packed));
+            return float4(ao_color.rgb * light * glow, albedo.w * get_surface_alpha(IN.packed));
         }
         ENDHLSL
 

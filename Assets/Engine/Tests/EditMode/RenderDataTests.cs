@@ -76,6 +76,20 @@ namespace Engine.Tests.EditMode{
             Assert.IsTrue(glass, "TransparentVoxel has no VoxelGlass pass");
         }
 
+        [TestCase("Custom/VoxelShader")]
+        [TestCase("Custom/CutoutVoxel")]
+        [TestCase("Custom/TransparentVoxel")]
+        public void VoxelShader_CompilesWithoutErrors(string name){
+            // The shaders share VoxelShaderCommon.hlsl (light, face shade); a broken include draws nothing, or pink,
+            // without failing any other test
+            Shader shader = Shader.Find(name);
+            Assert.IsNotNull(shader, name);
+            Assert.IsFalse(ShaderUtil.ShaderHasError(shader), name);
+            foreach (ShaderMessage message in ShaderUtil.GetShaderMessages(shader))
+                Assert.AreNotEqual(UnityEditor.Rendering.ShaderCompilerMessageSeverity.Error, message.severity,
+                    $"{name}: {message.message} (line {message.line})");
+        }
+
         [TestCase("Assets/Settings/PC_Renderer.asset")]
         [TestCase("Assets/Settings/Mobile_Renderer.asset")]
         public void Renderer_HasGlassFeature(string path){
