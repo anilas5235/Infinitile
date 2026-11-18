@@ -1,10 +1,10 @@
+using System;
 using System.Collections.Generic;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
-using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.World;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Collections;
@@ -12,7 +12,6 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Profiling;
-using UnityEngine;
 
 namespace Engine.Scripts.Jobs.Chunk{
     /// <summary>
@@ -33,9 +32,29 @@ namespace Engine.Scripts.Jobs.Chunk{
         private NativeList<int2> _jobs;
         private NativeParallelHashMap<int2, ChunkVoxelData> _results;
 
-        // Complete after a cut: the batch's chunks are in the store, the upload continues at this job
+        // Where a collect the budget cut stands: the next job of the batch to add (and upload), and whether the jobs
+        // that read the chunk the store evicts next were completed in an earlier item
+        private int _next;
+        private bool _evictionReadersDone;
+
+        // BatchAddInOneItem only: the batch's chunks are in the store, the upload continues at _next
         private bool _added;
-        private int _uploaded;
+
+        /// <summary>
+        ///     For measurements only (the comparison with the collect before 2026-11-18): true adds the whole batch to
+        ///     the chunk store in one item of work, with every eviction it needs, and uploads the chunks one item
+        ///     each after it. False (the default) makes every eviction and every add its own item. Change it only
+        ///     between two batches.
+        /// </summary>
+        internal bool BatchAddInOneItem;
+
+        /// <summary>
+        ///     Whether a job that reads the given chunk still runs on the worker threads (the collider mesh job, the
+        ///     light job, the collider bake while the pool renders the chunk); set by the
+        ///     <see cref="VoxelEngineScheduler" />, null means none. Under a frame budget the collect does not wait
+        ///     for such a job before an eviction: it ends the frame's turn and looks again in the next frame.
+        /// </summary>
+        internal Func<int2, bool> EvictionReadersRunning;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="ChunkScheduler" /> class with its own result collection.
@@ -89,51 +108,106 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
-        ///     Waits for the job to finish, transfers the results into the chunk store
-        ///     and clears temporary containers.
-        ///     Items of work for <paramref name="budget" />: adding the batch to the chunk store, and the upload of
-        ///     every chunk (the world hands its voxel data to the renderer). When the budget runs out in between,
-        ///     the next call continues with the next chunk.
+        ///     Waits for the job to finish and moves its chunks into the chunk store, in the order of the batch.
+        ///     Items of work for <paramref name="budget" />, per chunk of the batch: while the store is full, the
+        ///     wait for the jobs that read the chunk it evicts next (the collider mesh job, the light job with the
+        ///     apply of its batch, the collider bake while the pool renders the chunk) and then the eviction itself;
+        ///     then adding the chunk with its upload (the world hands its voxel data to the renderer). When the
+        ///     budget runs out in between, the next call continues at the item it stopped before. No other stage
+        ///     runs until the batch is in (<see cref="StageRing" />), so no job starts that reads a chunk between
+        ///     its wait and its eviction. Under a frame budget the wait never blocks: while a reader still runs
+        ///     (<see cref="EvictionReadersRunning" />) the call returns false without an item, and the next frame
+        ///     looks again.
         /// </summary>
         /// <param name="budget">The frame's budget; null means no limit.</param>
-        /// <returns>True when the batch is applied; false when the budget cut the call.</returns>
+        /// <returns>
+        ///     True when the batch is applied; false when the budget cut the call or a reader of the next eviction
+        ///     still runs.
+        /// </returns>
         internal bool Complete(FrameBudget budget = null){
             budget ??= FrameBudget.Unlimited;
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.DataGenComplete.Auto();
-#if VOXEL_TIMING_LOGS
-            double start = Time.realtimeSinceStartupAsDouble;
-#endif
             _handle.Complete();
+
+            if (BatchAddInOneItem ? !AddBatchInOneItem(budget) : !AddChunks(budget)) return false;
+
+            _jobs.Clear();
+            _next = 0;
+            _evictionReadersDone = false;
+            _added = false;
+            IsReady = true;
+            StopRecord();
+            return true;
+        }
+
+        /// <summary>
+        ///     Adds the batch chunk by chunk, from <see cref="_next" />: an item for the readers of the next eviction,
+        ///     one for the eviction and one for the add with the upload. A chunk's data leaves the result map in the
+        ///     item that adds it, so <see cref="Dispose" /> releases only the chunks that are not in the store yet.
+        /// </summary>
+        /// <returns>False when the budget cut the call or a reader of the next eviction still runs.</returns>
+        private bool AddChunks(FrameBudget budget){
+            for (; _next < _jobs.Length; _next++){
+                int2 position = _jobs[_next];
+                if (!_results.TryGetValue(position, out ChunkVoxelData data)) continue;
+
+                // Checked again after a cut: an unload in the frames between makes the eviction unnecessary
+                if (!_chunkManager.IsChunkLoaded(position) && _chunkManager.StoreFull){
+                    if (!_evictionReadersDone){
+                        if (budget.Limited && ReaderOfNextEvictionRuns()) return false;
+                        if (!budget.Next()) return false;
+
+                        using (VoxelProfilerMarkers.DataGenEvictWait.Auto()) _chunkManager.CompleteReadersOfNextEviction();
+                        _evictionReadersDone = true;
+                    }
+
+                    if (!budget.Next()) return false;
+
+                    // The focus may have changed the chunk to evict since its readers were completed; the unload
+                    // completes the readers of the chunk it takes
+                    using (VoxelProfilerMarkers.DataGenEvict.Auto()) _chunkManager.EvictNext();
+                }
+
+                _evictionReadersDone = false;
+                if (!budget.Next()) return false;
+
+                using (VoxelProfilerMarkers.DataGenAdd.Auto()){
+                    _results.Remove(position); // the store owns the chunk data from here on
+                    if (_chunkManager.AddChunk(position, data, out Data.Chunk chunk)) _world.RaiseChunkDataReady(chunk);
+                }
+            }
+
+            _results.Clear();
+            return true;
+        }
+
+        private bool ReaderOfNextEvictionRuns(){
+            return EvictionReadersRunning != null && _chunkManager.TryGetNextEviction(out int2 next) &&
+                   EvictionReadersRunning(next);
+        }
+
+        /// <summary>
+        ///     The collect before 2026-11-18 (see <see cref="BatchAddInOneItem" />): the whole batch with its
+        ///     evictions is one item, then the upload of every chunk is one item.
+        /// </summary>
+        /// <returns>False when the budget cut the call.</returns>
+        private bool AddBatchInOneItem(FrameBudget budget){
             if (!_added){
                 if (!budget.Next()) return false;
 
                 _chunkManager.AddChunks(_results);
                 _results.Clear(); // the store owns the chunk data from here on
                 _added = true;
-                _uploaded = 0;
+                _next = 0;
             }
-
-#if VOXEL_TIMING_LOGS
-            double totalTime = (Time.realtimeSinceStartupAsDouble - start) * 1000;
-            if (totalTime >= 1){
-                VoxelEngineLogger.Info<ChunkScheduler>(
-                    $"Built {_jobs.Length} ChunkData, Collected Results in <color=red>{totalTime:0.000}</color>ms"
-                );
-            }
-#endif
 
             // A chunk that was unloaded again in the frames a cut call waited is skipped
-            for (; _uploaded < _jobs.Length; _uploaded++){
+            for (; _next < _jobs.Length; _next++){
                 if (!budget.Next()) return false;
 
-                if (_chunkManager.TryGetChunk(_jobs[_uploaded], out Data.Chunk chunk))
-                    _world.RaiseChunkDataReady(chunk);
+                if (_chunkManager.TryGetChunk(_jobs[_next], out Data.Chunk chunk)) _world.RaiseChunkDataReady(chunk);
             }
 
-            _jobs.Clear();
-            _added = false;
-            IsReady = true;
-            StopRecord();
             return true;
         }
 

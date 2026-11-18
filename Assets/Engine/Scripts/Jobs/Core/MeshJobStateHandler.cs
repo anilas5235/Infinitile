@@ -184,7 +184,9 @@ namespace Engine.Scripts.Jobs.Core{
         ///     become active at once, with an empty mesh (see <see cref="CMeshBuildScheduler.ApplyEmpty" />). They
         ///     do not count against the batch, but a turn takes a limited number of them.
         ///     Items of work for the frame's budget: every <see cref="DequeueSlice" /> entries taken from the queue,
-        ///     every partition without a voxel (its claim in the pool) and the start of the mesh job. A dispatch the
+        ///     every partition without a voxel (its claim in the pool) and the start of the mesh job. Under the
+        ///     budget a claim does not wait for a running collider bake: the dispatch stops before it without an item
+        ///     and continues in the next frame. A dispatch the
         ///     budget cut keeps its partitions and continues where it stopped: a cut dequeue loop goes on filling
         ///     the same batch in the next frame, with that frame's focus. After a cut a partition without a voxel
         ///     that left the draw window or got a voxel in the meantime is skipped, and a partition with voxels
@@ -219,6 +221,9 @@ namespace Engine.Scripts.Jobs.Core{
                 // an empty mesh and its remesh flag consumed, the block would stay invisible and without collider.
                 if (_dispatchCut &&
                     (!IsInDrawWindow(partition, focus) || ChunkManager.PartitionHasVoxels(partition))) continue;
+                // Its claim would wait for a running bake: the dispatch stops without an item and goes on in the
+                // next frame (the bake finishes on the worker threads; no stage starts a new one meanwhile).
+                if (_cMeshBuildScheduler.EmptyClaimWaitsForBake(partition, budget)) return CutDispatch();
                 if (!budget.Next()) return CutDispatch();
 
                 _cMeshBuildScheduler.ApplyEmpty(partition);

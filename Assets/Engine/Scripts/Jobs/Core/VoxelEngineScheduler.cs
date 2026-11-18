@@ -78,6 +78,26 @@ namespace Engine.Scripts.Jobs.Core{
             _chunkManager.OnRemeshRequested += OnRemesh;
             _chunkManager.OnLightInvalidated += OnLightInvalidated;
             _chunkManager.OnChunkUnloaded += OnChunkUnloaded;
+
+            // Under a frame budget the data and mesh stages look whether a job they would wait for still runs and
+            // try again in the next frame, instead of blocking the main thread on it.
+            _chunkScheduler.EvictionReadersRunning = EvictionReadersRunning;
+            _cMeshBuildScheduler.BakeRunning = BakeRunning;
+        }
+
+        /// <summary>
+        ///     Whether a job that the eviction of <paramref name="position" /> would wait for still runs: the
+        ///     collider mesh job or the light job reading its voxel data, or the collider bake while the pool
+        ///     renders the chunk (the eviction reclaims it and clears its collider meshes).
+        /// </summary>
+        private bool EvictionReadersRunning(int2 position){
+            return (_chunkManager.IsReadByAccessor(position) && _cMeshBuildScheduler.Running) ||
+                   (_chunkManager.IsReadByLightJob(position) && _lightScheduler.Running) ||
+                   (_chunkPool.IsChunkActive(position) && _colliderBakeScheduler.Running);
+        }
+
+        private bool BakeRunning(){
+            return _colliderBakeScheduler.Running;
         }
 
         /// <summary>
@@ -114,8 +134,15 @@ namespace Engine.Scripts.Jobs.Core{
         internal void ScheduleUpdate(PriorityUtil.Focus focus){
             // The frame cap is read every frame: a settings menu can change it while the world runs
             Budget.BeginFrame(Budget.FollowsCap ? FrameCap.PeriodMs() : 0f);
-            _ring.Turn(focus, Budget);
+            LastStage = _ring.Turn(focus, Budget);
+            Budget.EndFrame();
         }
+
+        /// <summary>
+        ///     The stage that had the last frame's turn (0 data, 1 light, 2 mesh, 3 bake), or -1 when no stage had
+        ///     work; for measurements.
+        /// </summary>
+        internal int LastStage{ get; private set; } = -1;
 
         /// <summary>
         ///     Updates priorities of all queues and delegates focus update to managers/pool.
@@ -176,6 +203,8 @@ namespace Engine.Scripts.Jobs.Core{
         ///     Cleans up all sub-scheduler resources and event handlers.
         /// </summary>
         internal void Dispose(){
+            _chunkScheduler.EvictionReadersRunning = null;
+            _cMeshBuildScheduler.BakeRunning = null;
             _chunkScheduler.Dispose();
             _lightScheduler.Dispose();
             _cMeshBuildScheduler.Dispose();

@@ -77,6 +77,31 @@ namespace Engine.Scripts.Jobs.Core{
         internal int FramesCut{ get; private set; }
 
         /// <summary>
+        ///     For measurements: when true, the budget times the spans between <see cref="BeginFrame" />, every
+        ///     <see cref="Next" /> and <see cref="EndFrame" /> with the system clock (also without a limit). A span is
+        ///     an item of work with the bookkeeping around it, and the longest one of a frame is
+        ///     <see cref="LongestItemMs" />: what the budget can overshoot by. Off, it costs one check per item.
+        /// </summary>
+        internal bool TimeItems;
+
+        private long _itemStart;
+        private long _longestItem;
+
+        /// <summary>The longest span of the last frame in milliseconds (see <see cref="TimeItems" />).</summary>
+        internal float LongestItemMs => (float)(_longestItem * 1000d / Stopwatch.Frequency);
+
+        private void MarkItem(){
+            long now = Stopwatch.GetTimestamp();
+            _longestItem = Math.Max(_longestItem, now - _itemStart);
+            _itemStart = now;
+        }
+
+        /// <summary>Ends the frame's last span (see <see cref="TimeItems" />).</summary>
+        internal void EndFrame(){
+            if (TimeItems) MarkItem();
+        }
+
+        /// <summary>
         ///     The budget of a frame under a frame cap. A cap whose period is longer than <see cref="GoalFrameMs" />
         ///     adds <paramref name="capShare" /> of the part of <paramref name="capPeriodMs" /> above it to
         ///     <paramref name="milliseconds" />. A cap of 120 frames per second or faster limits the budget to
@@ -103,6 +128,11 @@ namespace Engine.Scripts.Jobs.Core{
         ///     cap. Only read when <see cref="FollowsCap" />.
         /// </param>
         internal void BeginFrame(float capPeriodMs = 0f){
+            if (TimeItems){
+                _itemStart = Stopwatch.GetTimestamp();
+                _longestItem = 0;
+            }
+
             if (!Limited) return;
 
             if (FollowsCap && capPeriodMs != _capPeriodMs){
@@ -125,6 +155,7 @@ namespace Engine.Scripts.Jobs.Core{
         ///     the first false every further call of the frame is false.
         /// </summary>
         internal bool Next(){
+            if (TimeItems) MarkItem();
             if (!Limited) return true;
             if (_first){
                 _first = false;

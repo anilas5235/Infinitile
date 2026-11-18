@@ -29,6 +29,14 @@ namespace Engine.Scripts.Jobs.Light{
         private JobHandle _handle;
         private NativeList<int2> _jobs;
         private NativeParallelHashMap<int2, ChunkLightData> _results;
+        private int _nextApply; // the next job of the batch whose light Complete applies; it continues there after a cut
+        private bool _applying; // Complete is applying: a listener's CompleteIfRunning returns at once
+
+        /// <summary>
+        ///     For measurements only: true makes <see cref="Complete" /> apply the whole batch in one item of the
+        ///     frame's budget, as the collect did before 2026-11-18.
+        /// </summary>
+        internal bool ApplyInOneItem;
 
         // Reused per edit
         private NativeArray<ChunkVoxelData> _editVoxels;
@@ -56,6 +64,9 @@ namespace Engine.Scripts.Jobs.Light{
         /// <summary>Gets a value indicating whether the scheduled batch has completed.</summary>
         internal bool IsComplete => _handle.IsCompleted;
 
+        /// <summary>True while a started batch's job has not finished on the worker threads.</summary>
+        internal bool Running => !IsReady && !_handle.IsCompleted;
+
         /// <summary>Starts a Burst light job for the given chunks (all 3 × 3 neighbourhoods must be loaded).</summary>
         internal void Start(HashSet<int2> jobs){
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.LightSchedule.Auto();
@@ -77,23 +88,45 @@ namespace Engine.Scripts.Jobs.Light{
         /// <summary>
         ///     Waits for the batch and hands the light to the chunks (a chunk unloaded meanwhile drops its result).
         ///     Applying only assigns light data and raises <see cref="VoxelWorld.ChunkLightChanged" />, so it is safe
-        ///     to run from the <see cref="CompleteIfRunning" /> callback as well.
+        ///     to run from the <see cref="CompleteIfRunning" /> callback as well; a listener's call while the light
+        ///     is applied returns at once.
+        ///     Items of work for <paramref name="budget" />: the light of every chunk of the batch. When the budget
+        ///     runs out in between, the batch stays unfinished (<see cref="IsReady" /> false) and the next call
+        ///     continues with the next chunk; <see cref="CompleteIfRunning" /> applies the rest at once.
         /// </summary>
-        internal void Complete(){
-            if (IsReady) return;
+        /// <param name="budget">The frame's budget; null means no limit.</param>
+        /// <returns>True when the batch is applied; false when the budget cut the call.</returns>
+        internal bool Complete(FrameBudget budget = null){
+            if (IsReady || _applying) return true;
+            budget ??= FrameBudget.Unlimited;
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.LightComplete.Auto();
             _handle.Complete();
-            IsReady = true; // before applying: listeners may trigger CompleteIfRunning again
 
-            for (int i = 0; i < _jobs.Length; i++){
-                int2 pos = _jobs[i];
-                if (!_results.TryGetValue(pos, out ChunkLightData light)) continue;
-                if (_chunkManager.ApplyLight(pos, light, out Data.Chunk chunk)) _world.RaiseChunkLightChanged(chunk);
+            _applying = true;
+            try{
+                if (ApplyInOneItem && !budget.Next()) return false;
+
+                while (_nextApply < _jobs.Length){
+                    if (!ApplyInOneItem && !budget.Next()) return false;
+
+                    int2 pos = _jobs[_nextApply++];
+                    if (!_results.TryGetValue(pos, out ChunkLightData light)) continue;
+
+                    _results.Remove(pos); // the chunk owns the light now; Dispose must not release it
+                    if (_chunkManager.ApplyLight(pos, light, out Data.Chunk chunk))
+                        _world.RaiseChunkLightChanged(chunk);
+                }
+            }
+            finally{
+                _applying = false;
             }
 
+            IsReady = true;
+            _nextApply = 0;
             _jobs.Clear();
             _results.Clear();
             StopRecord();
+            return true;
         }
 
         /// <summary>
@@ -102,7 +135,7 @@ namespace Engine.Scripts.Jobs.Light{
         ///     the light of the pre-edit data and updates it incrementally.
         /// </summary>
         internal void CompleteIfRunning(){
-            if (IsReady) return;
+            if (IsReady || _applying) return;
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.WaitLight.Auto();
             Complete();
         }

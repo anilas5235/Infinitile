@@ -97,22 +97,38 @@ The turn of a frame is bounded by time: `SchedulerSettings.mainThreadBudgetMs` (
 once when the world is built), plus the spare time of a slow capped frame (`SchedulerSettings.cappedFrameSpareShare`)
 and at most a share of a fast capped frame (`SchedulerSettings.fastCapBudgetShare`, see below).
 
-- **A turn is made of items of work.** An item is: adding a data batch to the chunk store, the upload of one
-  chunk to the renderer, the pool claim of one meshed partition, handing the meshes of a batch to Unity, one
-  partition without a voxel, one row of a queue scan, 32 entries the mesh dispatch takes from its queue
-  (`MeshJobStateHandler.DefaultDequeueSlice`), the apply of a light batch or of a bake batch, the start of a batch.
+- **A turn is made of items of work.** An item is: per chunk of a data batch, the wait for the jobs that read
+  the chunk the full store evicts next (collider mesh job, light job with its apply), that eviction, and adding
+  the chunk with its upload to the renderer; the pool claim of one meshed partition, handing the meshes of a
+  batch to Unity, one partition without a voxel, one row of a queue scan, 32 entries the mesh dispatch takes from
+  its queue (`MeshJobStateHandler.DefaultDequeueSlice`), the light of one chunk of a light batch, the apply of a
+  bake batch, the start of a batch.
+- **Under a budget a turn does not wait for a running job.** Before the data collect evicts a chunk that a
+  running job still reads (the collider mesh job, the light job, or the collider bake while the pool renders the
+  chunk: the eviction reclaims it and clears its collider meshes), before the mesh collect writes collider
+  meshes while a bake still runs, and before the mesh dispatch claims a pool partition for a partition without a
+  voxel while a bake runs (a claim clears a pooled partition and can reclaim a chunk), the turn ends without an
+  item and the stage looks again in the next frame (`ChunkScheduler.EvictionReadersRunning`,
+  `CMeshBuildScheduler.BakeRunning`, `CMeshBuildScheduler.EmptyClaimWaitsForBake`). The stage keeps its place, so no
+  other stage starts a job in between; the job finishes on the worker threads. Without a limit
+  (`VoxelEngineScheduler.CompleteRunning`, tests) the collects wait as before.
 - **`FrameBudget` is asked before every item.** The scheduler starts it once per frame. The first item of a
   frame always runs, so every frame makes progress; a later item runs only while time is left. It reads
   `Stopwatch.GetTimestamp` and allocates nothing.
 - **A cut turn keeps its place.** The stage whose turn ran out of time is first in line in the next frame and
   continues where it stopped; the other stages wait until that turn is finished (`StageRing`). So a batch is
   applied completely and in order, and no stage sees a batch another stage has applied in part.
-- **A started item is finished.** A frame can exceed the budget by one item. The largest items are adding a data
-  batch to the chunk store (up to a batch of chunks with their evictions), the apply of a light batch and handing
-  a mesh batch to Unity.
+- **A started item is finished.** A frame can exceed the budget by one item. The largest items are handing a
+  mesh batch to Unity and the wait for the readers of a data eviction (its wait for the light job applies the rest
+  of that job's batch). Until 2026-11-18 adding a whole data batch with its evictions was one item of 6 to 9 ms,
+  the mesh collect waited for a running bake inside its first item and a light batch was applied in one item
+  (spec §16.15). `ChunkScheduler.BatchAddInOneItem`, `CMeshBuildScheduler.WaitForBake` and
+  `LightScheduler.ApplyInOneItem` still switch those collects on, for measurements only.
 - **The world can change between the frames of a cut turn** (focus update, an edit, an unload). A cut mesh
   dispatch checks the draw window again for its partitions without a voxel and drops the partitions that lost a
-  chunk of their neighbourhood; a cut data collect skips a chunk that was unloaded again; a cut mesh collect
+  chunk of their neighbourhood; a cut data collect checks again whether the store is
+  still full before it evicts (an unload in between makes room, so it evicts nothing), and an edit reaches the
+  chunks it already added while the chunks it did not add refuse it like any chunk that is not loaded; a cut mesh collect
   claims no partition whose chunk is gone. A mesh dispatch cut while it takes its partitions from the queue goes
   on filling the same batch in the next frame, with that frame's focus. A partition without a voxel that a cut
   mesh dispatch still holds and that got a block in the meantime is not made active empty: it is left to the next
@@ -167,16 +183,26 @@ stage.
 
 `EmptyPartitionTests` covers a cut mesh dispatch, including a block placed in a partition it still holds, and a
 cut dequeue loop: it loses no partition, meshes none twice and takes an entry in every frame.
+`DataCollectCutTests` cuts a data collect after every item: one chunk added per item while the store has room,
+one eviction per chunk and no second one after a cut between eviction and add while it is full, no eviction
+after an unload between two calls, an edit in an added chunk kept and one in a pending chunk refused, a cut
+collect finished without a limit or disposed (the store and the scheduler release each chunk once), no item and
+no eviction while a reader of the next eviction runs, and a light collect cut after every chunk (an edit in a
+chunk the batch read applies the rest first). `ColliderMeshRaceTests` holds that the mesh collect under a budget
+claims nothing while a bake runs and when the dispatch stops before the claim of a partition without a voxel.
 
 ### Measuring
 
 - **Profiler markers** (`VoxelProfilerMarkers`, all named `Voxel.…`): `Voxel.Scheduler.{Data,Light,Mesh,Collider}`
   for the turn of each stage and `Voxel.Scheduler.{Collect,Scan,Dispatch}` for its three steps;
   `Voxel.Focus.*` for the focus update; `Voxel.MeshBuild.{WaitBake,Claim,Apply,Dequeue}` for the parts of the
-  mesh stage (`WaitBake` also covers completing the mesh job); `Voxel.Wait.*` where the main thread waits for a
+  mesh stage (`WaitBake` also covers completing the mesh job); `Voxel.DataGen.{EvictWait,Evict,Add}` for the
+  items of the data collect; `Voxel.Wait.*` where the main thread waits for a
   job whose data is about to change.
 - **The rig** (PlayMode test helpers): `PipelineProbe` samples per frame the queues, the stages' job states, the
-  renderer's waiting builds, the scheduler's milliseconds, the cut frames, the effective budget and the dequeue
+  renderer's waiting builds, the scheduler's milliseconds, the cut frames, the effective budget, the largest item of
+  work per frame with the stage it ran in (`FrameBudget.TimeItems`: the longest span between two asks of the
+  budget, which the probe switches on; "largest scheduler item" in the log) and the dequeue
   counts (`MeshJobStateHandler.Dequeued`, with `TrackRequeues` for the entries a scan queues again);
   `FrameAttribution` splits each frame's time by marker; `FrameHierarchy` records the profiler hierarchy of the
   longest frames. A flight takes the focus out of the player and switches the player off, then flies the focus at

@@ -40,7 +40,7 @@ namespace Engine.Tests.PlayMode{
         /// <summary>
         ///     The scheduler's time of a frame in parts that do not overlap and add up to <see cref="SchedulerRow" />
         ///     (every part is a marker row or what is left of one without the rows inside it). A chunk unload is
-        ///     not a part of its own: it runs inside "data complete" (eviction in AddChunks) and inside a mesh
+        ///     not a part of its own: it runs inside "data complete" (an eviction item of the data collect) and inside a mesh
         ///     claim (a claim in a full pool reclaims a chunk, and the world unloads its data).
         /// </summary>
         private static readonly string[] SchedulerParts ={
@@ -113,6 +113,11 @@ namespace Engine.Tests.PlayMode{
                 Voxel(6, "wait for light job + apply", VoxelProfilerMarkers.WaitLight),
                 Voxel(6, "wait for bake job", VoxelProfilerMarkers.WaitColliderBake),
                 Voxel(5, "gpu upload voxels / light", VoxelProfilerMarkers.GpuUploadChunk),
+                // The items of the data collect (since 2026-11-17); the rows above run inside them: the waits in
+                // the first, the unload in the second, the upload in the third
+                Voxel(5, "data item: wait for readers of the eviction", VoxelProfilerMarkers.DataGenEvictWait),
+                Voxel(5, "data item: eviction", VoxelProfilerMarkers.DataGenEvict),
+                Voxel(5, "data item: add + upload", VoxelProfilerMarkers.DataGenAdd),
                 Voxel(4, "light complete", VoxelProfilerMarkers.LightComplete),
                 Voxel(4, "mesh complete", VoxelProfilerMarkers.MeshBuildComplete),
                 // Before the first claim, on every collect and on every resume of a cut one; the bake wait in here

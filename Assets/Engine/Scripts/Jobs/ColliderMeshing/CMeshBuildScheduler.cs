@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Engine.Scripts.Behaviour;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Core;
@@ -107,6 +108,34 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         /// </summary>
         internal bool IsComplete => _handle.IsCompleted;
 
+        /// <summary>True while a started batch's job has not finished on the worker threads.</summary>
+        internal bool Running => !IsReady && !_handle.IsCompleted;
+
+        /// <summary>
+        ///     Whether a collider bake still runs on the worker threads; set by the
+        ///     <see cref="VoxelEngineScheduler" />, null means none. Under a frame budget <see cref="Complete" /> does
+        ///     not wait for it (the bake reads the collider meshes the call writes): it returns false and the next
+        ///     frame looks again.
+        /// </summary>
+        internal Func<bool> BakeRunning;
+
+        /// <summary>
+        ///     For measurements only: true makes <see cref="Complete" /> wait for a running bake under a frame
+        ///     budget too, as the collect did before 2026-11-18.
+        /// </summary>
+        internal bool WaitForBake;
+
+        /// <summary>
+        ///     Whether making the partition without a voxel at <paramref name="pos" /> active would wait for a
+        ///     running collider bake: its claim in the pool clears a pooled partition (and can reclaim a chunk) while
+        ///     the bake may read collider meshes. Under a frame budget the mesh dispatch then stops and looks again
+        ///     in the next frame instead of blocking.
+        /// </summary>
+        internal bool EmptyClaimWaitsForBake(int3 pos, FrameBudget budget){
+            return budget.Limited && !WaitForBake && BakeRunning != null && !_chunkPool.IsPartitionActive(pos) &&
+                   BakeRunning();
+        }
+
         /// <summary>
         ///     True while more partitions of earlier batches wait in the renderer for a GPU build slot than two rounds
         ///     of its slots take: the slots do not run empty between two mesh batches, and the waiting list stays
@@ -154,13 +183,16 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         ///     and colliders, recalculates bounds and logs timing information.
         ///     Items of work for <paramref name="budget" />: every claim of a partition in the pool, and the rest
         ///     (all meshes of the batch are assigned and applied in one call). When the budget runs out in between,
-        ///     the batch stays unapplied and the next call continues with the next claim.
+        ///     the batch stays unapplied and the next call continues with the next claim. Under a frame budget the
+        ///     call does not wait for a running collider bake (<see cref="BakeRunning" />): it returns false without
+        ///     an item, and the next frame looks again.
         /// </summary>
         /// <param name="budget">The frame's budget; null means no limit.</param>
-        /// <returns>True when the batch is applied; false when the budget cut the call.</returns>
+        /// <returns>True when the batch is applied; false when the budget cut the call or a bake still runs.</returns>
         internal bool Complete(FrameBudget budget = null){
             if (IsReady) return true;
             budget ??= FrameBudget.Unlimited;
+            if (budget.Limited && !WaitForBake && BakeRunning != null && BakeRunning()) return false;
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.MeshBuildComplete.Auto();
 #if VOXEL_TIMING_LOGS
             double start = Time.realtimeSinceStartupAsDouble;

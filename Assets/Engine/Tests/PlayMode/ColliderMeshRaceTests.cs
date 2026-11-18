@@ -154,6 +154,56 @@ namespace Engine.Tests.PlayMode{
         }
 
         [Test]
+        public void Complete_UnderABudget_WhileABakeRuns_LooksAgainInTheNextCall(){
+            // A running collider bake reads the meshes Complete writes. Under a frame budget Complete does not
+            // wait for it: it returns false without claiming anything, and a later call applies the batch once
+            // the bake is done. Without a limit it waits as before.
+            using SchedulerRig rig = new();
+            rig.StartCentreChunkBuild();
+            bool bakeRunning = true;
+            rig.Scheduler.BakeRunning = () => bakeRunning;
+            FrameBudget budget = new(1000f);
+
+            budget.BeginFrame();
+            Assert.IsFalse(rig.Scheduler.Complete(budget), "a running bake ends the call");
+            Assert.IsFalse(rig.Scheduler.IsReady);
+            Assert.IsFalse(rig.Pool.IsPartitionActive(new int3(0, 2, 0)), "nothing claimed while the bake runs");
+
+            bakeRunning = false;
+            budget.BeginFrame();
+            Assert.IsTrue(rig.Scheduler.Complete(budget), "the next call applies the batch");
+            Assert.IsTrue(rig.Pool.IsPartitionActive(new int3(0, 2, 0)), "batch results applied");
+
+            rig.StartCentreChunkBuild();
+            bakeRunning = true;
+            Assert.IsTrue(rig.Scheduler.Complete(), "without a limit the call does not look at the bake");
+        }
+
+        [Test]
+        public void EmptyClaim_UnderABudget_WaitsForTheBakeOnlyWhenItClaims(){
+            // The mesh dispatch stops before making a partition without a voxel active while a bake runs, but only
+            // under a budget, only when the claim takes a new partition, and not with the old wait switched on.
+            using SchedulerRig rig = new();
+            bool bakeRunning = true;
+            rig.Scheduler.BakeRunning = () => bakeRunning;
+            FrameBudget budget = new(1000f);
+            int3 empty = new(1, 3, 0);
+
+            Assert.IsTrue(rig.Scheduler.EmptyClaimWaitsForBake(empty, budget), "a new claim while the bake runs");
+            Assert.IsFalse(rig.Scheduler.EmptyClaimWaitsForBake(empty, FrameBudget.Unlimited), "no limit: it waits");
+            rig.Scheduler.WaitForBake = true;
+            Assert.IsFalse(rig.Scheduler.EmptyClaimWaitsForBake(empty, budget), "the old wait switched on");
+            rig.Scheduler.WaitForBake = false;
+
+            bakeRunning = false;
+            Assert.IsFalse(rig.Scheduler.EmptyClaimWaitsForBake(empty, budget), "no bake runs");
+            rig.Scheduler.ApplyEmpty(empty);
+            Assert.IsTrue(rig.Pool.IsPartitionActive(empty));
+            bakeRunning = true;
+            Assert.IsFalse(rig.Scheduler.EmptyClaimWaitsForBake(empty, budget), "an active partition claims nothing");
+        }
+
+        [Test]
         public void Dispose_WhileBuildJobRuns_DoesNotThrow(){
             // Leaving play mode mid-batch: the scheduler releases the batch's writable mesh data itself.
             SchedulerRig rig = new();
