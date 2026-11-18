@@ -99,7 +99,7 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 <div class="layout">
 <nav class="toc" aria-label="Contents">
   <div class="brand">World Generation Spec</div>
-  <div class="ver">v1.16 · 2026-11-18 · Terrain-first &amp; Biome-first</div>
+  <div class="ver">v1.17 · 2026-11-18 · Terrain-first &amp; Biome-first</div>
   <ol>
     <li><a href="#s0">0 · How to use this spec</a></li>
     <li class="toc-part">Part I · World generation</li>
@@ -159,6 +159,7 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
   <li><strong>Requirement keywords:</strong> <span class="kw must">MUST</span> is mandatory; <span class="kw should">SHOULD</span> is strongly recommended (deviate only with a stated reason in the commit/PR); <span class="kw may">MAY</span> is optional.</li>
   <li><strong>Requirement IDs</strong> are stable. Part E: <code>PERF-</code>, <code>CUL-</code>, <code>LGT-</code>. Part I: <code>GEN-</code>, <code>TRN-</code> (Terrain-first), <code>BIO-</code> (Biome-first), <code>BLD-</code>, <code>VEG-</code>, <code>INT-</code>, <code>TST-</code>, <code>TOOL-</code>. Part III: <code>RES-</code>, <code>EXP-</code>, <code>ANA-</code>. In Part II, §15–16 record finished work and have no requirement IDs; §17 continues the Part I prefixes (<code>GEN-30</code>…, <code>VEG-10</code>…, <code>TST-30</code>…, <code>PERF-10</code>, <code>INT-31</code>). §18 adds the prefix <code>ROT-</code> and §19 adds <code>CAV-</code>; both continue the shared ones (<code>TST-40</code>…, <code>TST-50</code>…, <code>PERF-11</code>, <code>PERF-12</code>, <code>INT-32</code>, <code>INT-33</code>, <code>DEC-47</code>…). Reference IDs in commit messages and PR descriptions only. Since the cleanup (§15, R8) the code and everything the Editor shows carry <strong>no</strong> spec references.</li>
   <li><strong>Decisions</strong> taken by the user are recorded in §14 (2026-10-17), §15.4 (2026-10-21), §17.8 (2026-10-24), §17.11 (2026-11-10, 2026-11-11, 2026-11-12, 2026-11-14), §18.6 (2026-10-25, 2026-10-26), §19.9 (2026-10-25) and §E1.1 (2026-11-14 … 2026-11-16) and are binding. If the agent hits a new design question, it asks the user instead of choosing silently.</li>
+  <li><strong>Scope (v1.16, 2026-11-17).</strong> The owner moved the project back to its focus: terrain-first world generation (and related work) and the engine core. Game mechanics, worlds and persistence, content, polish, UI, audio and input are in <a href="GameSpec.html">GameSpec.html</a> (IDs <code>GAME-nn</code>, status later) until the owner schedules them.</li>
   <li><strong>Placeholders.</strong> Numeric defaults (spline points, biome positions, biome height parameters, flora rules) are starting values so the world looks plausible. The user tunes them; the agent must not "optimise" them on its own (R5).</li>
 </ul>
 
