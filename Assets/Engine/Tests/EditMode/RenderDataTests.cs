@@ -76,6 +76,25 @@ namespace Engine.Tests.EditMode{
             Assert.IsTrue(glass, "TransparentVoxel has no VoxelGlass pass");
         }
 
+        [Test]
+        public void FaceShadeStrength_ShipsAtTheDefault_AndIsClamped(){
+            VoxelEngineSettings settings =
+                AssetDatabase.LoadAssetAtPath<VoxelEngineSettings>("Assets/EngineSettings/VoxelEngineSettings.asset");
+            Assert.IsNotNull(settings, "shipped engine settings missing");
+            Assert.AreEqual(RendererSettings.DefaultFaceShadeStrength, settings.Renderer.faceShadeStrength, 1e-6f);
+
+            float before = Shader.GetGlobalFloat(VoxelFaceShadeStrengthNameID);
+            try{
+                VoxelLightingGlobals.SetFaceShadeStrength(1.5f);
+                Assert.AreEqual(1f, Shader.GetGlobalFloat(VoxelFaceShadeStrengthNameID));
+                VoxelLightingGlobals.SetFaceShadeStrength(-1f);
+                Assert.AreEqual(0f, Shader.GetGlobalFloat(VoxelFaceShadeStrengthNameID));
+            }
+            finally{
+                Shader.SetGlobalFloat(VoxelFaceShadeStrengthNameID, before);
+            }
+        }
+
         [TestCase("Custom/VoxelShader")]
         [TestCase("Custom/CutoutVoxel")]
         [TestCase("Custom/TransparentVoxel")]

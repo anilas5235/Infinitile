@@ -104,6 +104,7 @@ namespace Engine.Scripts.Utils{
         public static readonly int VoxelFogParamsNameID = Shader.PropertyToID("_VoxelFogParams");
         public static readonly int VoxelFogCurveNameID = Shader.PropertyToID("_VoxelFogCurve");
         public static readonly int VoxelSunDirectionNameID = Shader.PropertyToID("_VoxelSunDirection");
+        public static readonly int VoxelFaceShadeStrengthNameID = Shader.PropertyToID("_VoxelFaceShadeStrength");
 
         // Volume fog of see-through liquids (VoxelRegistry, TransparentVoxel.shader)
         public static readonly int VoxelVolumeFogNameID = Shader.PropertyToID("_VoxelVolumeFog");

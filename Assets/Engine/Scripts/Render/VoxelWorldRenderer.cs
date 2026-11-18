@@ -262,6 +262,7 @@ namespace Engine.Scripts.Render{
 
             Light sun = RenderSettings.sun;
             VoxelLightingGlobals.SetSunDirection(sun ? -sun.transform.forward : Vector3.zero);
+            VoxelLightingGlobals.SetFaceShadeStrength(rSettings.faceShadeStrength);
         }
 
         /// <summary>

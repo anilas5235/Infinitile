@@ -68,6 +68,16 @@ namespace Engine.Scripts.Settings{
         [Min(0.01f)] public float fogSteepness = 3f;
 
         /// <summary>
+        ///     How strongly the face shade darkens the sides of a block (the <c>_FaceShade</c> values of the voxel
+        ///     materials and the shade by the sun's angle): 0 lights every face alike, 1 is the full shade. Read every
+        ///     frame, so it can be tuned in Play mode.
+        /// </summary>
+        [Range(0f, 1f)] public float faceShadeStrength = DefaultFaceShadeStrength;
+
+        /// <summary>The shipped <see cref="faceShadeStrength" /> (owner's pick, 2026-11-18).</summary>
+        public const float DefaultFaceShadeStrength = 0.7f;
+
+        /// <summary>
         ///     GPU frustum culling of render pages. Off draws every page that holds points, for debugging and
         ///     before/after comparison; the image must be identical.
         /// </summary>

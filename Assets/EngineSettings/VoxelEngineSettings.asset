@@ -28,6 +28,7 @@ MonoBehaviour:
     skyMaterial: {fileID: 2100000, guid: 55b32681e862f0d45b961d65ad529abc, type: 2}
     horizonFog: 0
     fogSteepness: 3
+    faceShadeStrength: 0.7
     gpuCulling: 1
     shadows: 0
   Scheduler:

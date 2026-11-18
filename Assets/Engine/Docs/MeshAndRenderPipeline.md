@@ -946,7 +946,9 @@ like opaque blocks with holes.
   - while the sun is up, by the face's angle to the sun (`_VoxelSunDirection`, half Lambert): the bottom value
     facing away from it, the top value facing it, so the sunny side is the brightest and the shade moves with the
     day; the blend from the fixed values takes the sun's rise to a height of 0.2 (`SUN_SHADE_RISE`);
-  - it darkens only the sky light (`calc_voxel_light`), so a torch lights every side of a block alike.
+  - it darkens only the sky light (`calc_voxel_light`), so a torch lights every side of a block alike;
+  - `RendererSettings.faceShadeStrength` (global `_VoxelFaceShadeStrength`, set every frame by
+    `VoxelWorldRenderer`, shipped 0.7) pulls the result towards 1: 0 lights every face alike, 1 is the full shade.
 - **Mipmaps.** `TexRegistry` builds the texture array with the mip chain of its sources (the smallest mip count
   among them). The 38 leaf and plant tiles have `mipMapsPreserveCoverage`, so their alpha coverage stays the same
   per mip and far leaves do not thin out.
@@ -958,6 +960,6 @@ like opaque blocks with holes.
 - **Packed z.** ao u8 | volume fog slot u6 | cut-out u1 | liquid top u1 | surface alpha u8 | glow u8. The volume
   fog slots shrink from 8 to 6 bits (63 liquids with fog).
 - **Tests.** `PointBuildTests.BuildPoints_SeeThroughFaceRules` (GPU build of small scenes: face counts and the
-  two flags); `RenderDataTests` (cut-out materials in queue AlphaTest, the three voxel shaders compile, the glass pass and the feature on both
+  two flags); `RenderDataTests` (cut-out materials in queue AlphaTest, the three voxel shaders compile, the shipped face shade strength, the glass pass and the feature on both
   renderers, `GPUVoxelDef` 96 bytes); `GpuConstantsTests` (`MESH_LAYER_TRANSPARENT`, `VOLUME_FOG_SLOT_MASK`,
   `LIQUID_SURFACE_DROP`).
