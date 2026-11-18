@@ -218,6 +218,17 @@ namespace Engine.Tests.PlayMode{
 
             internal float WindowCoverage;
 
+            /// <summary>
+            ///     Average collidable share during the flight: the focus column with its eight neighbours, and the
+            ///     columns within <see cref="GoalRunRig.NearRadius" /> of the focus.
+            /// </summary>
+            internal float PlayerCollidable;
+
+            internal float NearCollidable;
+
+            /// <summary>The scheduler's largest item of work during the flight, in milliseconds.</summary>
+            internal float FlightMaxItemMs;
+
             /// <summary>Partitions that went through a mesh job, and the ones without a voxel that needed none.</summary>
             internal int MeshedPartitions;
 
@@ -327,7 +338,7 @@ namespace Engine.Tests.PlayMode{
             Transform body = FlightBody(focus);
             Vector3 start = body.position;
             float flightStart = Time.realtimeSinceStartup;
-            double nearSum = 0, windowSum = 0;
+            double nearSum = 0, windowSum = 0, playerCollidableSum = 0, nearCollidableSum = 0;
             int coverageSamples = 0;
             PathGround ground = new();
             while (true){
@@ -339,6 +350,8 @@ namespace Engine.Tests.PlayMode{
                 if (probe.Frames % GoalRunRig.CoverageEveryFrames != 0) continue;
                 nearSum += probe.Coverage(NearRadius);
                 windowSum += probe.Coverage(draw);
+                playerCollidableSum += probe.CollidableShare(1);
+                nearCollidableSum += probe.CollidableShare(NearRadius);
                 coverageSamples++;
                 ground.Sample(world, focus);
             }
@@ -350,11 +363,16 @@ namespace Engine.Tests.PlayMode{
             ground.AssertBelow(focus);
             run.NearCoverage = (float)(nearSum / math.max(coverageSamples, 1));
             run.WindowCoverage = (float)(windowSum / math.max(coverageSamples, 1));
+            run.PlayerCollidable = (float)(playerCollidableSum / math.max(coverageSamples, 1));
+            run.NearCollidable = (float)(nearCollidableSum / math.max(coverageSamples, 1));
+            run.FlightMaxItemMs = probe.MaxItemMs(flightBegin, flightEnd);
             Debug.Log(probe.Report(label) + string.Format(inv,
                 "[PipelineProbe] {0}: flew {1:0} units ({2:0} chunks); meshed share of the columns within {3} of the " +
                 "focus: average {4:0.000}, at the end {5:0.000}; of the draw window: average {6:0.000}, at the end {7:0.000}",
                 label, distance, distance / ChunkWidth, NearRadius, run.NearCoverage, probe.Coverage(NearRadius),
-                run.WindowCoverage, probe.Coverage(draw)) + "\n" +
+                run.WindowCoverage, probe.Coverage(draw)) + string.Format(inv,
+                "; collidable share of the focus column and its neighbours: average {0:0.000}, within {1}: average {2:0.000}",
+                run.PlayerCollidable, NearRadius, run.NearCollidable) + "\n" +
                 probe.FrameTimes($"{label}, flight frames only", flightBegin, flightEnd) +
                 probe.ItemTimes($"{label}, flight frames only", flightBegin, flightEnd));
 

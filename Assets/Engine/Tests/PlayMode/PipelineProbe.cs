@@ -37,11 +37,13 @@ namespace Engine.Tests.PlayMode{
         private readonly Dictionary<int3, ChunkPartition> _meshMap;
         private readonly HashSet<int3> _colliderSet;
         private readonly ProfilerRecorder[] _recorders = new ProfilerRecorder[StageCount];
+        private readonly ProfilerRecorder _focusRecorder;
 
         // Main-thread work of the pipeline, per frame it ran in
         private static readonly string[] CostNames ={
             "data schedule", "data complete", "light schedule", "light complete", "mesh schedule", "mesh complete",
-            "bake schedule", "bake complete", "gpu build dispatch", "gpu build copy", "render buffer rebuild"
+            "bake schedule", "bake complete", "gpu build dispatch", "gpu build copy", "render buffer rebuild",
+            "focus update"
         };
 
         private readonly ProfilerRecorder[] _costRecorders;
@@ -59,6 +61,7 @@ namespace Engine.Tests.PlayMode{
         // The scheduler's largest item of work per frame (FrameBudget.TimeItems) and the stage whose turn it was
         private readonly List<float> _itemMs = new(1 << 16);
         private readonly List<int> _itemStage = new(1 << 16);
+        private readonly List<float> _focusItemMs = new(1 << 16); // the largest part of the focus update, 0 without
         private readonly bool _timedItemsBefore;
 
         private readonly int[] _framesIdle = new int[StageCount];
@@ -118,6 +121,7 @@ namespace Engine.Tests.PlayMode{
             _recorders[Light] = ProfilerRecorder.StartNew(VoxelProfilerMarkers.SchedulerLight);
             _recorders[Mesh] = ProfilerRecorder.StartNew(VoxelProfilerMarkers.SchedulerMesh);
             _recorders[Bake] = ProfilerRecorder.StartNew(VoxelProfilerMarkers.SchedulerCollider);
+            _focusRecorder = ProfilerRecorder.StartNew(VoxelProfilerMarkers.FocusUpdate);
 
             ProfilerMarker[] costs ={
                 VoxelProfilerMarkers.DataGenSchedule, VoxelProfilerMarkers.DataGenComplete,
@@ -125,7 +129,7 @@ namespace Engine.Tests.PlayMode{
                 VoxelProfilerMarkers.MeshBuildSchedule, VoxelProfilerMarkers.MeshBuildComplete,
                 VoxelProfilerMarkers.ColliderBakeSchedule, VoxelProfilerMarkers.ColliderBakeComplete,
                 VoxelProfilerMarkers.PointBuildDispatch, VoxelProfilerMarkers.PointBuildCopy,
-                VoxelProfilerMarkers.RenderRebuildBuffers
+                VoxelProfilerMarkers.RenderRebuildBuffers, VoxelProfilerMarkers.FocusUpdate
             };
             _costRecorders = new ProfilerRecorder[costs.Length];
             _costSumMs = new double[costs.Length];
@@ -192,6 +196,7 @@ namespace Engine.Tests.PlayMode{
         public void Dispose(){
             if (_world != null) _world.PartitionBuildRequested -= OnMeshBatch;
             for (int i = 0; i < StageCount; i++) _recorders[i].Dispose();
+            _focusRecorder.Dispose();
             for (int i = 0; i < _costRecorders.Length; i++) _costRecorders[i].Dispose();
             _dequeueRecorder.Dispose();
             if (_meshHandler != null) _meshHandler.TrackRequeues = false;
@@ -308,9 +313,20 @@ namespace Engine.Tests.PlayMode{
             float[] stageMax = new float[StageCount];
             int[] stageOver = new int[StageCount];
             int over = 0;
+            float focusMax = 0f;
+            int focusOver = 0, focusFrames = 0;
             for (int i = from; i < to; i++){
                 float ms = _itemMs[i];
                 if (ms > ItemLimitMs) over++;
+                float focusMs = _focusItemMs[i];
+                if (focusMs > 0f){
+                    focusFrames++;
+                    focusMax = math.max(focusMax, focusMs);
+                    if (focusMs > ItemLimitMs) focusOver++;
+                    // The frame's largest item was a part of the focus update, not the stage's
+                    if (focusMs >= ms) continue;
+                }
+
                 int stage = _itemStage[i];
                 if (stage < 0 || stage >= StageCount) continue;
                 stageMax[stage] = math.max(stageMax[stage], ms);
@@ -323,6 +339,8 @@ namespace Engine.Tests.PlayMode{
                 Distribution(_itemMs, from, to), over, ItemLimitMs));
             for (int i = 0; i < StageCount; i++)
                 text.Append(string.Format(inv, " {0} {1:0.000} / {2};", StageNames[i], stageMax[i], stageOver[i]));
+            text.Append(string.Format(inv, " focus update parts {0:0.000} / {1} (in {2} frames);", focusMax, focusOver,
+                focusFrames));
             text.AppendLine();
             return text.ToString();
         }
@@ -351,6 +369,14 @@ namespace Engine.Tests.PlayMode{
             return _stages.Coverage(radius);
         }
 
+        /// <summary>
+        ///     Share of the partitions in the columns within <paramref name="radius" /> chunks of the focus that are
+        ///     collidable.
+        /// </summary>
+        internal float CollidableShare(int radius){
+            return _stages.CollidableShare(radius);
+        }
+
         /// <summary>Takes one sample; call once per frame.</summary>
         internal void Sample(){
             Frames++;
@@ -362,7 +388,9 @@ namespace Engine.Tests.PlayMode{
             PeakPendingBuilds = math.max(PeakPendingBuilds, PipelineStages.PendingBuilds);
             if (_meshJobs.RendererBehind) _framesRendererBehind++;
 
-            long schedulerNs = 0;
+            // The scheduler's time holds the focus update (§16.16: its parts are items of the budget); with
+            // VoxelEngineScheduler.FocusInOneItem it runs outside the budget, and is counted all the same
+            long schedulerNs = _focusRecorder.LastValue;
             for (int i = 0; i < StageCount; i++){
                 schedulerNs += _recorders[i].LastValue;
                 if (!_stages.JobReady[i]()){
@@ -394,6 +422,7 @@ namespace Engine.Tests.PlayMode{
             // The scheduler ticks in Update, before this sample: the item time and the stage are this frame's
             _itemMs.Add(_scheduler.Budget.LongestItemMs);
             _itemStage.Add(_scheduler.LastStage);
+            _focusItemMs.Add(_scheduler.LongestFocusItemMs);
             SampleDequeue();
             _attribution?.Sample();
         }

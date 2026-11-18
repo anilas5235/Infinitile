@@ -29,7 +29,7 @@ namespace Engine.Tests.PlayMode{
         private const int WorstFrames = 8;
 
         /// <summary>The row <see cref="TableByRow" /> is keyed on for the main-thread budget of the scheduler.</summary>
-        internal const string SchedulerRow = "scheduler stages (sum)";
+        internal const string SchedulerRow = "scheduler: stages + focus update (sum)";
 
         /// <summary>Frames with the largest key row that <see cref="TableByRow" /> prints one by one.</summary>
         private const int LargestKeyFrames = 20;
@@ -48,7 +48,7 @@ namespace Engine.Tests.PlayMode{
             "mesh apply mesh data", "mesh complete rest (assign, empty colliders)", "bake complete",
             "collect outside the four completes", "step scan (any stage)", "data schedule", "light schedule",
             "mesh schedule", "bake schedule", "mesh dequeue", "dispatch rest (other dequeues, empty partitions)",
-            "stages outside collect, scan, dispatch"
+            "stages outside collect, scan, dispatch", "focus update"
         };
 
         private static readonly string[] StageRows ={ "stage data", "stage light", "stage mesh", "stage bake" };
@@ -98,7 +98,9 @@ namespace Engine.Tests.PlayMode{
                     "stage bake", "focus update", "gpu build complete", "gpu build dispatch", "render buffer rebuild"),
                 Unity(0, "PlayerLoop"),
                 Unity(1, "Update.ScriptRunBehaviourUpdate", "Update of all scripts"),
-                Total(2, SchedulerRow, "stage data", "stage light", "stage mesh", "stage bake"),
+                // The focus update runs in the scheduler's tick since §16.16, its parts items of the budget; with
+                // VoxelEngineScheduler.FocusInOneItem it runs in the coroutines and is counted here all the same
+                Total(2, SchedulerRow, "stage data", "stage light", "stage mesh", "stage bake", "focus update"),
                 Voxel(3, "stage data", VoxelProfilerMarkers.SchedulerData),
                 Voxel(3, "stage light", VoxelProfilerMarkers.SchedulerLight),
                 Voxel(3, "stage mesh", VoxelProfilerMarkers.SchedulerMesh),
@@ -146,18 +148,18 @@ namespace Engine.Tests.PlayMode{
                 Rest(4, "dispatch rest (other dequeues, empty partitions)", "step dispatch (any stage)",
                     "data schedule", "light schedule", "mesh schedule", "bake schedule", "mesh dequeue"),
                 Rest(3, "stages outside collect, scan, dispatch", SchedulerRow, "step collect (any stage)",
-                    "step scan (any stage)", "step dispatch (any stage)"),
+                    "step scan (any stage)", "step dispatch (any stage)", "focus update"),
+                Voxel(3, "focus update", VoxelProfilerMarkers.FocusUpdate),
+                Voxel(4, "focus data queue", VoxelProfilerMarkers.FocusData),
+                Voxel(4, "focus light queue", VoxelProfilerMarkers.FocusLight),
+                Voxel(4, "focus mesh queue", VoxelProfilerMarkers.FocusMesh),
+                Voxel(4, "focus bake queue", VoxelProfilerMarkers.FocusCollider),
+                Voxel(4, "focus chunk store queue", VoxelProfilerMarkers.FocusChunkStore),
+                Voxel(4, "focus pool queues", VoxelProfilerMarkers.FocusPool),
                 Voxel(2, "gpu build complete", VoxelProfilerMarkers.PointBuildComplete),
                 Voxel(3, "gpu build copy", VoxelProfilerMarkers.PointBuildCopy),
                 Voxel(2, "gpu build dispatch", VoxelProfilerMarkers.PointBuildDispatch),
-                Unity(1, "Update.ScriptRunDelayedDynamicFrameRate", "coroutines (focus update, the test)"),
-                Voxel(2, "focus update", VoxelProfilerMarkers.FocusUpdate),
-                Voxel(3, "focus data queue", VoxelProfilerMarkers.FocusData),
-                Voxel(3, "focus light queue", VoxelProfilerMarkers.FocusLight),
-                Voxel(3, "focus mesh queue", VoxelProfilerMarkers.FocusMesh),
-                Voxel(3, "focus bake queue", VoxelProfilerMarkers.FocusCollider),
-                Voxel(3, "focus chunk store queue", VoxelProfilerMarkers.FocusChunkStore),
-                Voxel(3, "focus pool queues", VoxelProfilerMarkers.FocusPool),
+                Unity(1, "Update.ScriptRunDelayedDynamicFrameRate", "coroutines (focus check, the test)"),
                 Unity(1, "PreLateUpdate.ScriptRunBehaviourLateUpdate", "LateUpdate of all scripts"),
                 Voxel(2, "render buffer rebuild", VoxelProfilerMarkers.RenderRebuildBuffers),
                 Unity(1, "FixedUpdate.PhysicsFixedUpdate"),

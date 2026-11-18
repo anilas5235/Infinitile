@@ -129,5 +129,23 @@ namespace Engine.Scripts.Diagnostics{
 
             return meshed / (float)total;
         }
+
+        /// <summary>
+        ///     Share of the partitions in the columns within <paramref name="radius" /> chunks of the focus that are
+        ///     collidable (collider baked, or known to need none).
+        /// </summary>
+        internal float CollidableShare(int radius){
+            int3 focus = _world.Focus.Pos;
+            ChunkPool pool = _world.Pool;
+            int collidable = 0, total = 0;
+            for (int x = -radius; x <= radius; x++)
+            for (int z = -radius; z <= radius; z++)
+            for (int y = 0; y < VoxelConstants.PartitionsPerChunk; y++){
+                total++;
+                if (pool.IsCollidable(new int3(focus.x + x, y, focus.z + z))) collidable++;
+            }
+
+            return collidable / (float)total;
+        }
     }
 }
