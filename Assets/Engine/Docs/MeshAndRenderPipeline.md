@@ -948,7 +948,7 @@ like opaque blocks with holes.
     day; the blend from the fixed values takes the sun's rise to a height of 0.2 (`SUN_SHADE_RISE`);
   - it darkens only the sky light (`calc_voxel_light`), so a torch lights every side of a block alike;
   - `RendererSettings.faceShadeStrength` (global `_VoxelFaceShadeStrength`, set every frame by
-    `VoxelWorldRenderer`, shipped 0.7) pulls the result towards 1: 0 lights every face alike, 1 is the full shade.
+    `VoxelWorldRenderer`, shipped 0.65) pulls the result towards 1: 0 lights every face alike, 1 is the full shade.
 - **Mipmaps.** `TexRegistry` builds the texture array with the mip chain of its sources (the smallest mip count
   among them). The 38 leaf and plant tiles have `mipMapsPreserveCoverage`, so their alpha coverage stays the same
   per mip and far leaves do not thin out.

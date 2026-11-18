@@ -75,7 +75,7 @@ namespace Engine.Scripts.Settings{
         [Range(0f, 1f)] public float faceShadeStrength = DefaultFaceShadeStrength;
 
         /// <summary>The shipped <see cref="faceShadeStrength" /> (owner's pick, 2026-11-18).</summary>
-        public const float DefaultFaceShadeStrength = 0.7f;
+        public const float DefaultFaceShadeStrength = 0.65f;
 
         /// <summary>
         ///     GPU frustum culling of render pages. Off draws every page that holds points, for debugging and
