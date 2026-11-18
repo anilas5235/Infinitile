@@ -45,29 +45,35 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         }
 
         /// <summary>
-        ///     Builds a <see cref="Texture2DArray" /> from all registered textures using point filtering and repeat wrapping.
+        ///     Builds a <see cref="Texture2DArray" /> from all registered textures using point filtering and repeat
+        ///     wrapping. It keeps the textures' mipmaps (as many levels as every texture has), so distant blocks do not
+        ///     shimmer; the importer's mipmaps keep the alpha coverage of leaves and plants where that is switched on.
         /// </summary>
         public void PrepareArray(){
             if (Count == 0) return;
+
+            int mipCount = int.MaxValue;
+            foreach (Texture2D tex in ForwardMap.Keys) mipCount = Math.Min(mipCount, tex.mipmapCount);
 
             Texture2DArray textureArray = new(
                 TextureSize,
                 TextureSize,
                 Count,
                 ForwardMap.First().Key.format,
+                mipCount,
                 false
             ){
                 filterMode = FilterMode.Point,
                 wrapMode = TextureWrapMode.Repeat
             };
-            // Copy each texture into the texture array
+            // Copy each texture with its mip levels into the texture array
             int index = 0;
             foreach (KeyValuePair<Texture2D, ushort> kvp in ForwardMap){
-                Graphics.CopyTexture(kvp.Key, 0, 0, textureArray, index, 0);
+                for (int mip = 0; mip < mipCount; mip++) Graphics.CopyTexture(kvp.Key, 0, mip, textureArray, index, mip);
                 index++;
             }
 
-            textureArray.Apply();
+            textureArray.Apply(false); // keep the copied mip levels
             TextureArray = textureArray;
         }
 

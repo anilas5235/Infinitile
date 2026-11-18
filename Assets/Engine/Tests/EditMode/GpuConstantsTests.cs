@@ -25,6 +25,8 @@ namespace Engine.Tests.EditMode{
             ["COMP_PAGE_SHIFT"] = CompPageShift,
             ["COMP_PAGE_MASK"] = CompPageMask,
             ["MESH_LAYER_SOLID"] = MeshLayerSolid,
+            ["MESH_LAYER_TRANSPARENT"] = MeshLayerTransparent,
+            ["VOLUME_FOG_SLOT_MASK"] = VolumeFogSlotMask,
             ["PREP_CHUNKS"] = PrepChunks,
             ["BOX_SIZE"] = PrepBoxSize,
             ["PREP_BOX_THREADS"] = PrepBoxThreads,
@@ -51,6 +53,17 @@ namespace Engine.Tests.EditMode{
             CollectionAssert.AreEquivalent(Expected.Keys, defines.Keys,
                 "every value define in the include needs its C# counterpart here, and the other way round");
             foreach ((string name, int value) in Expected) Assert.AreEqual(value, defines[name], name);
+        }
+
+        [Test]
+        public void LiquidSurfaceDrop_MatchesTheShader(){
+            // The vertex shader lowers a liquid's top; the camera's under-water check (VoxelPostProcessHandler) must
+            // use the same surface
+            Match m = Regex.Match(File.ReadAllText("Assets/Engine/Shaders/Urp/Shaders/VoxelShaderCommon.hlsl"),
+                @"static const float LIQUID_SURFACE_DROP = ([\d.]+)f;");
+            Assert.IsTrue(m.Success, "LIQUID_SURFACE_DROP not found");
+            Assert.AreEqual(LiquidSurfaceDrop, float.Parse(m.Groups[1].Value,
+                System.Globalization.CultureInfo.InvariantCulture), 1e-6f);
         }
 
         [Test]

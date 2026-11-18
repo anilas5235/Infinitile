@@ -13,7 +13,11 @@ struct VoxelVertexData
     float3 positionOS;
     float2 uv;
     uint4 packed;
+    float3 normal; // the quad's normal, for the face shade
 };
+
+// How far the surface of a liquid sits below the top of its top block (VoxelRenderConstants.LiquidSurfaceDrop).
+static const float LIQUID_SURFACE_DROP = 0.1f;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Vertex helpers
@@ -40,6 +44,7 @@ VoxelVertexData fetch_vertex_data(uint vertexID)
         v.positionOS = 0;
         v.uv = 0;
         v.packed = 0;
+        v.normal = 0;
         return v;
     }
 
@@ -53,41 +58,46 @@ VoxelVertexData fetch_vertex_data(uint vertexID)
 
     uint quadIndex = get_quad_index(p.packed);
     QuadData quad = _Quad_buffer[quadIndex];
-
+    v.normal = quad.normal;
+    float3 corner;
 
     // Triangle strip corners: two triangles forming a quad
     // Triangle 1: 00-01-02, Triangle 2: 02-01-03
     switch (cornerID)
     {
     case 0:
-        v.positionOS += quad.position00;
+        corner = quad.position00;
         v.uv = quad.uv00;
         break;
     case 1:
-        v.positionOS += quad.position01;
+        corner = quad.position01;
         v.uv = quad.uv01;
         break;
     case 2:
-        v.positionOS += quad.position02;
+        corner = quad.position02;
         v.uv = quad.uv02;
         break;
     case 3:
-        v.positionOS += quad.position02;
+        corner = quad.position02;
         v.uv = quad.uv02;
         break;
     case 4:
-        v.positionOS += quad.position01;
+        corner = quad.position01;
         v.uv = quad.uv01;
         break;
     case 5:
-        v.positionOS += quad.position03;
+        corner = quad.position03;
         v.uv = quad.uv03;
         break;
     default:
+        corner = 0;
         v.uv = 0;
         break;
     }
 
+    // The top layer of a liquid: its top corners sit lower, so a full lake does not fill its top block
+    if (get_liquid_top(p.packed) && corner.y > 0.5f) corner.y -= LIQUID_SURFACE_DROP;
+    v.positionOS += corner;
     return v;
 }
 
@@ -194,6 +204,15 @@ float3 apply_horizon_fog(const float3 color, const float3 positionWS)
     const float t = saturate((max(d.x, d.y) - _VoxelFogParams.x) * _VoxelFogParams.y);
     const float fog = (exp(_VoxelFogCurve.x * t) - 1.0f) * _VoxelFogCurve.y * _VoxelFogParams.z;
     return lerp(color, horizon_fog_color(normalize(to_point)), fog);
+}
+
+// Face shade: a fixed brightness per face direction, so the sides of a block read apart. shade = (top, bottom,
+// ±x sides, ±z sides); a slanted quad (a plant's cross plane) blends between them by its normal.
+float face_shade(const float4 shade, const float3 normal)
+{
+    const float3 n = abs(normal);
+    const float sides = dot(n.xz, shade.zw) / max(n.x + n.z, 1e-4f);
+    return lerp(sides, normal.y >= 0.0f ? shade.x : shade.y, n.y);
 }
 
 float calc_glow(const float glow_data)

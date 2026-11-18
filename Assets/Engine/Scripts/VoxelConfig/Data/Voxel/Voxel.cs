@@ -59,6 +59,13 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         public bool alwaysRenderAllFaces;
 
         /// <summary>
+        ///     Draws the voxel with a hard alpha edge (each pixel either drawn or not) in the cut-out pass with the
+        ///     opaque blocks, instead of blending it. Only for the transparent layer; two such full cubes share one face.
+        /// </summary>
+        [Tooltip("Hard alpha edge, drawn with the opaque blocks (leaves); transparent layer only")]
+        public bool alphaCutout;
+
+        /// <summary>
         ///     Depth (blocks behind the surface) over which a transparent voxel's alpha rises from the surface alpha to
         ///     1, so deep liquid turns opaque; zero or negative disables the depth fade.
         /// </summary>
@@ -268,6 +275,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
             ///     face towards it. Off for partial shapes such as slabs and plants.
             /// </summary>
             public bool HidesNeighbourFaces;
+
+            /// <summary>Drawn with a hard alpha edge in the cut-out pass (leaves); transparent layer only.</summary>
+            public bool AlphaCutout;
+
+            /// <summary>A liquid (category Liquids): the surface of its top layer sits a little below the block's top.</summary>
+            public bool Liquid;
 
             public uint2 Always;
             public uint2 Right;

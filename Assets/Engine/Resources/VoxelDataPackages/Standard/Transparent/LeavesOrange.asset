@@ -15,7 +15,8 @@ MonoBehaviour:
   textureMode: 0
   meshLayer: 1
   category: 4
-  alwaysRenderAllFaces: 1
+  alwaysRenderAllFaces: 0
+  alphaCutout: 1
   depthFadeDistance: -1
   glow: 0
   lightAttenuation: 1

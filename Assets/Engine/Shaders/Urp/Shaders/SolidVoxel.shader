@@ -6,6 +6,7 @@
         _AOCurve("AOCurve", Vector) = (0.75, 0.825, 0.9, 1)
         _AOIntensity("AOIntensity", Range(0, 1)) = 1
         _AOPower("AOPower", Range(1, 10)) = 1
+        _FaceShade("Face shade (top, bottom, x sides, z sides)", Vector) = (1, 0.62, 0.8, 0.88)
         [NoScaleOffset] _Textures ("Textures", 2DArray) = "" {}
     }
 
@@ -33,6 +34,7 @@
             float _AOIntensity;
             float _AOPower;
             float4 _AOCurve;
+            float4 _FaceShade;
         CBUFFER_END
 
         struct Varyings
@@ -41,6 +43,7 @@
             float2 uv : TEXCOORD0; // xy = tile UV
             uint4 packed : TEXCOORD1; // PointData.packed, layout in VoxelCommon.hlsl
             float3 positionWS : TEXCOORD2; // horizon fog
+            float shade : TEXCOORD3; // face shade
         };
 
         // ── Vertex shader with expansion ─────────────────────────────
@@ -53,6 +56,7 @@
             o.uv = v.uv;
             o.packed = v.packed;
             o.positionWS = TransformObjectToWorld(v.positionOS);
+            o.shade = face_shade(_FaceShade, v.normal);
             return o;
         }
         ENDHLSL
@@ -112,7 +116,7 @@
                 float3 light = calc_voxel_light(IN.packed, uv);
 
                 // --- Final colour ---
-                return half4(apply_horizon_fog(ao_color.rgb * light, IN.positionWS), 1);
+                return half4(apply_horizon_fog(ao_color.rgb * light * IN.shade, IN.positionWS), 1);
             }
             ENDHLSL
         }

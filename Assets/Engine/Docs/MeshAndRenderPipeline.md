@@ -454,7 +454,7 @@ only unpacked and interpolated, so day and night never re-propagate anything.
   - The 16 corner nibbles go into `PointData.packed.y` (sky | R << 16) and `.w` (G | B << 16), each channel as the
     four corners up-left, up-right, down-right, down-left (UV space, like AO). The point size is unchanged.
   - `PointLightPacking` is the C# port of the accessors and the corner average, used by the round-trip tests.
-- **Shading.** The solid and transparent shaders (foliage uses the transparent one) compute the light per
+- **Shading.** The solid, cut-out and transparent shaders (Version 1.11) compute the light per
   fragment. They interpolate each channel's corner levels bilinearly and apply the curve 0.85^(15 − level).
 
   ```
@@ -906,3 +906,53 @@ it returns an empty value while the renderer is not running.
 
 `DrawDistanceChangeTests` (PlayMode) holds that the store and the build slots follow a change and come back to
 their sizes, and that the world is uploaded again after it.
+
+# Version 1.11 (Cut-Out Leaves, Face Shade, Glass Pass, Liquid Top)
+
+## Description
+
+Leaves looked flat and their inner faces cut through each other: they were blended in the transparent queue with
+all six faces of every block drawn, so the faces sorted at random. Version 1.11 (WorldGenSpec DEC-118) draws them
+like opaque blocks with holes.
+
+- **Draws per layer.** Each `RenderBuffer` is drawn once per material of its manager, from the same culled pages.
+
+  | Layer | Material (shader) | Queue | What it draws |
+  | --- | --- | --- | --- |
+  | Solid | `VoxelSolidMat` (`Custom/VoxelShader`) | Geometry | everything |
+  | Transparent | `VoxelLeaves` (`Custom/CutoutVoxel`, `_VoxelPass` 3) | AlphaTest | the cut-out points (leaves) |
+  | Transparent | `VoxelTransparent` (`Custom/TransparentVoxel`) | Transparent | liquids (pass `UniversalForward`) |
+  | Transparent | same, pass `VoxelGlass` | after the skybox | glass and other blended see-through voxels |
+  | Foliage | `VoxelFoliage` (`Custom/CutoutVoxel`, `_VoxelPass` 0) | AlphaTest | everything |
+
+  `RenderBufferManager.WithCutoutPass` gives the transparent manager its two materials (cut-out first). The
+  `VoxelGlass` pass is not drawn by URP's own passes: `VoxelGlassFeature` (on `PC_Renderer` and
+  `Mobile_Renderer`) draws it at `AfterRenderingSkybox`, so glass is in the opaque colour copy that a liquid
+  surface in front reads. Glass is not in the depth copy (accepted). In each pass the vertex shader collapses the
+  quads that belong to another pass to one point, which the rasteriser drops.
+- **Cut-out.** `Voxel.alphaCutout` (set on the eight leaf voxels) marks a transparent-layer voxel as cut out
+  (`VoxelDef.AlphaCutout`). Its points carry the cut-out flag (`PointData.packed.z` bit 14). `CutoutVoxel` clips
+  at `_Cutoff` 0.5, writes depth, draws both sides (`Cull Off`), and a back face takes the shade of the face it
+  shows. Its `DepthOnly` pass clips too, so the depth copy has the holes.
+- **Face rules** (`should_render_face` in `PointBuilder.compute`):
+  - a full cube in the same or a lower layer hides the face (stone keeps its face towards water or leaves);
+  - two cut-out cubes share one face: the one towards +x, +y or +z;
+  - two different see-through voxels keep both faces (water against leaves or glass);
+  - the same see-through voxel culls.
+- **Face shade.** `_FaceShade` = (top, bottom, x sides, z sides) = (1, 0.62, 0.8, 0.88) on the solid, leaves and
+  transparent materials; the foliage material has (1, 1, 1, 1), so plants keep their look. A slanted quad blends
+  by its normal (`face_shade` in `VoxelShaderCommon.hlsl`).
+- **Mipmaps.** `TexRegistry` builds the texture array with the mip chain of its sources (the smallest mip count
+  among them). The 38 leaf and plant tiles have `mipMapsPreserveCoverage`, so their alpha coverage stays the same
+  per mip and far leaves do not thin out.
+- **Liquid top.** A liquid (category Liquids, `VoxelDef.Liquid`) whose upper neighbour is not the same voxel and
+  not a full opaque block is a liquid top (`packed.z` bit 15). The vertex shader lowers its top corners by
+  `LIQUID_SURFACE_DROP` 0.1 (`VoxelRenderConstants.LiquidSurfaceDrop`); `VoxelPostProcessHandler` uses the same
+  surface for the under-water check. Where a lowered top meets a full block of the same liquid at its side, a
+  0.1 slit can show (accepted).
+- **Packed z.** ao u8 | volume fog slot u6 | cut-out u1 | liquid top u1 | surface alpha u8 | glow u8. The volume
+  fog slots shrink from 8 to 6 bits (63 liquids with fog).
+- **Tests.** `PointBuildTests.BuildPoints_SeeThroughFaceRules` (GPU build of small scenes: face counts and the
+  two flags); `RenderDataTests` (cut-out materials in queue AlphaTest, the glass pass and the feature on both
+  renderers, `GPUVoxelDef` 96 bytes); `GpuConstantsTests` (`MESH_LAYER_TRANSPARENT`, `VOLUME_FOG_SLOT_MASK`,
+  `LIQUID_SURFACE_DROP`).

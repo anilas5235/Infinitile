@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Engine.Scripts.Utils.Logger;
 using Unity.Mathematics;
 using UnityEngine;
-using UnityEngine.Rendering;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
 
 namespace Engine.Scripts.Render{
@@ -14,7 +13,7 @@ namespace Engine.Scripts.Render{
     public class RenderBufferManager : IDisposable{
         private readonly string _layerName; // Material.name allocates on every read
         private readonly Material _material;
-        private readonly Material[] _passes; // drawn in order from the same culled pages; clones are owned
+        private readonly Material[] _passes; // drawn in order from the same culled pages
         private readonly Dictionary<int3, AllocInfo> _partitionAllocations = new();
         private readonly List<RenderBuffer> _renderBuffers = new();
         private bool _isDisposed;
@@ -39,21 +38,16 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     A manager for the transparent layer that draws its pages twice, from runtime clones of
-        ///     <paramref name="mat" /> (TransparentVoxel.shader): plain transparents such as leaves first, then the
-        ///     voxels with a volume slot (liquids). Inside one draw the order of the points follows the culled page
-        ///     list, so a depth-writing liquid surface would hide the leaves behind it in some frames and not in
-        ///     others.
+        ///     A manager for the transparent layer that draws its pages twice: with <paramref name="cutout" />
+        ///     (CutoutVoxel.shader, _VoxelPass 3) the cut-out points such as leaves, with the opaque blocks; with
+        ///     <paramref name="mat" /> (TransparentVoxel.shader) the blended ones, glass and liquids. Each material's
+        ///     passes skip the other points.
         /// </summary>
-        /// <param name="mat">The transparent material; it is not modified.</param>
-        public static RenderBufferManager WithVolumePass(Material mat){
-            if (mat == null || !mat.HasProperty(VoxelPassNameID)) return new RenderBufferManager(mat);
-
-            Material plain = new(mat){ name = mat.name, renderQueue = mat.renderQueue - 2 };
-            plain.SetFloat(VoxelPassNameID, 1f);
-            Material volume = new(mat){ name = mat.name + " (volume)", renderQueue = mat.renderQueue };
-            volume.SetFloat(VoxelPassNameID, 2f);
-            return new RenderBufferManager(plain, new[]{ plain, volume });
+        /// <param name="mat">The transparent material.</param>
+        /// <param name="cutout">The cut-out material; without one, only <paramref name="mat" /> draws.</param>
+        public static RenderBufferManager WithCutoutPass(Material mat, Material cutout){
+            if (mat == null || cutout == null) return new RenderBufferManager(mat);
+            return new RenderBufferManager(mat, new[]{ cutout, mat });
         }
 
         /// <summary>Name of the material, used to label this layer in the culling stats.</summary>
@@ -78,8 +72,6 @@ namespace Engine.Scripts.Render{
             if (_isDisposed) return;
 
             foreach (RenderBuffer buffer in _renderBuffers) buffer.Dispose();
-            if (_passes.Length > 1)
-                foreach (Material pass in _passes) CoreUtils.Destroy(pass); // DestroyImmediate outside play mode
 
             _renderBuffers.Clear();
             _partitionAllocations.Clear();

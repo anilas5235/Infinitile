@@ -2,6 +2,7 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Engine.Scripts.Render;
+using Engine.Scripts.Render.Post;
 using Engine.Scripts.Settings;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
@@ -42,19 +43,47 @@ namespace Engine.Tests.EditMode{
         #region materials
 
         [Test]
-        public void FoliageMaterial_DrawsBeforeTheLiquids(){
-            // Both layers write depth and share the transparent shader, and their draw bounds are equal, so within one
-            // queue the order is undefined: liquid drawn first hides the foliage behind it.
+        public void CutoutMaterials_DrawWithTheOpaqueBlocks(){
+            // Plants and leaves are cut out and drawn with the opaque blocks (queue AlphaTest), so they are in the
+            // colour and depth copies a liquid surface reads: seen from above, they show under the water.
             VoxelEngineSettings settings =
                 AssetDatabase.LoadAssetAtPath<VoxelEngineSettings>("Assets/EngineSettings/VoxelEngineSettings.asset");
             Assert.IsNotNull(settings, "shipped engine settings missing");
-            Material foliage = settings.Renderer.foliageMaterial;
             Material liquid = settings.Renderer.transparentMaterial;
-            Assert.IsNotNull(foliage);
             Assert.IsNotNull(liquid);
-            Assert.Less(foliage.renderQueue, liquid.renderQueue);
-            Assert.Greater(foliage.renderQueue, (int)UnityEngine.Rendering.RenderQueue.GeometryLast,
-                "foliage still blends over the opaque world");
+            Assert.GreaterOrEqual(liquid.renderQueue, (int)UnityEngine.Rendering.RenderQueue.Transparent);
+            foreach (Material cutout in new[]{ settings.Renderer.foliageMaterial, settings.Renderer.leavesMaterial }){
+                Assert.IsNotNull(cutout);
+                Assert.AreEqual("Custom/CutoutVoxel", cutout.shader.name, cutout.name);
+                Assert.AreEqual((int)UnityEngine.Rendering.RenderQueue.AlphaTest, cutout.renderQueue, cutout.name);
+            }
+
+            Assert.AreEqual(3f, settings.Renderer.leavesMaterial.GetFloat("_VoxelPass"),
+                "the leaves material draws only the cut-out points of the transparent buffer");
+            Assert.AreEqual(0f, settings.Renderer.foliageMaterial.GetFloat("_VoxelPass"));
+        }
+
+        [Test]
+        public void TransparentMaterial_HasGlassPassForTheGlassFeature(){
+            VoxelEngineSettings settings =
+                AssetDatabase.LoadAssetAtPath<VoxelEngineSettings>("Assets/EngineSettings/VoxelEngineSettings.asset");
+            Assert.IsNotNull(settings, "shipped engine settings missing");
+            Shader shader = settings.Renderer.transparentMaterial.shader;
+            bool glass = false;
+            for (int i = 0; i < shader.passCount; i++)
+                glass |= shader.FindPassTagValue(i, new UnityEngine.Rendering.ShaderTagId("LightMode")).name ==
+                         VoxelGlassFeature.LightMode;
+            Assert.IsTrue(glass, "TransparentVoxel has no VoxelGlass pass");
+        }
+
+        [TestCase("Assets/Settings/PC_Renderer.asset")]
+        [TestCase("Assets/Settings/Mobile_Renderer.asset")]
+        public void Renderer_HasGlassFeature(string path){
+            UnityEngine.Rendering.Universal.UniversalRendererData data =
+                AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.UniversalRendererData>(path);
+            Assert.IsNotNull(data, path);
+            Assert.IsTrue(data.rendererFeatures.Exists(f => f is VoxelGlassFeature && f.isActive),
+                "glass is drawn only by VoxelGlassFeature");
         }
 
         #endregion
@@ -79,13 +108,15 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void GpuVoxelDef_Is88Bytes(){
+        public void GpuVoxelDef_Is96Bytes(){
             Type type = typeof(VoxelRegistry).GetNestedType("GPUVoxelDef", BindingFlags.NonPublic);
             Assert.IsNotNull(type, "VoxelRegistry.GPUVoxelDef not found");
-            Assert.AreEqual(88, Marshal.SizeOf(type));
+            Assert.AreEqual(96, Marshal.SizeOf(type));
             Assert.AreEqual(76, (int)Marshal.OffsetOf(type, "LightAttenuation"), "HLSL VoxelDef offset");
             Assert.AreEqual(80, (int)Marshal.OffsetOf(type, "SurfaceAlpha"), "HLSL VoxelDef offset");
             Assert.AreEqual(84, (int)Marshal.OffsetOf(type, "HidesNeighbourFaces"), "HLSL VoxelDef offset");
+            Assert.AreEqual(88, (int)Marshal.OffsetOf(type, "AlphaCutout"), "HLSL VoxelDef offset");
+            Assert.AreEqual(92, (int)Marshal.OffsetOf(type, "Liquid"), "HLSL VoxelDef offset");
         }
 
         [Test]

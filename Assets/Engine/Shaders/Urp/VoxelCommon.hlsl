@@ -12,7 +12,7 @@ struct PointData
     float3 position; // Voxel position in partition local space
     // x: quadIndex(u16) | texIndex(u16)
     // y: sky (4 corners × u4) | red (4 corners × u4)
-    // z: ao(u8) | volumeFog(u8, slot, 0 = none) | surfaceAlpha(unorm8) | glow(u8)
+    // z: ao(u8) | volumeFog(u6, slot, 0 = none) | cutout(u1) | liquidTop(u1) | surfaceAlpha(unorm8) | glow(u8)
     // w: green (4 corners × u4) | blue (4 corners × u4)
     // Corner order inside each 16-bit channel: up-left, up-right, down-right, down-left (UV space).
     uint4 packed;
@@ -119,12 +119,34 @@ void set_ao(inout uint4 packed, uint ao)
 // Slot of the voxel's volume fog in _VoxelVolumeFog; 0 = none.
 uint get_volume_fog(in uint4 packed)
 {
-    return packed.z >> 8 & 0xFF;
+    return packed.z >> 8 & VOLUME_FOG_SLOT_MASK;
 }
 
 void set_volume_fog(inout uint4 packed, in uint slot)
 {
-    packed.z = (packed.z & 0xFFFF00FF) | ((slot & 0xFF) << 8); // bits 8-15
+    packed.z = (packed.z & ~(VOLUME_FOG_SLOT_MASK << 8)) | ((slot & VOLUME_FOG_SLOT_MASK) << 8); // bits 8-13
+}
+
+// Alpha cut-out (leaves): the pixel is either drawn or not, in the cut-out pass with the opaque blocks.
+bool get_cutout(in uint4 packed)
+{
+    return (packed.z >> 14 & 1) != 0;
+}
+
+void set_cutout(inout uint4 packed, in bool cutout)
+{
+    packed.z = (packed.z & ~(1u << 14)) | ((cutout ? 1u : 0u) << 14); // bit 14
+}
+
+// The top layer of a liquid: its top corners sit LIQUID_SURFACE_DROP below the block's top.
+bool get_liquid_top(in uint4 packed)
+{
+    return (packed.z >> 15 & 1) != 0;
+}
+
+void set_liquid_top(inout uint4 packed, in bool liquid_top)
+{
+    packed.z = (packed.z & ~(1u << 15)) | ((liquid_top ? 1u : 0u) << 15); // bit 15
 }
 
 // Scale of the texture alpha, 0-1.

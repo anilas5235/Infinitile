@@ -140,6 +140,7 @@ namespace Engine.Scripts.VoxelConfig{
             RendererSettings materials = world.Settings.Renderer;
             VoxelRegistry.ApplyToMaterial(materials.solidMaterial, MeshLayer.Solid);
             VoxelRegistry.ApplyToMaterial(materials.transparentMaterial, MeshLayer.Transparent);
+            VoxelRegistry.ApplyToMaterial(materials.leavesMaterial, MeshLayer.Transparent);
             VoxelRegistry.ApplyToMaterial(materials.foliageMaterial, MeshLayer.Foliage);
         }
 

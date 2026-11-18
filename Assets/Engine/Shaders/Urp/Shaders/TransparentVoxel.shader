@@ -6,9 +6,15 @@
         _AOCurve("AOCurve", Vector, 4) = (0.75, 0.825, 0.9, 1)
         _AOIntensity("AOIntensity", Range(0, 1)) = 1
         _AOPower("AOPower", Range(1, 10)) = 1
+        _FaceShade("Face shade (top, bottom, x sides, z sides)", Vector) = (1, 0.62, 0.8, 0.88)
         [NoScaleOffset] _Textures ("Textures", 2DArray) = "" {}
-        [HideInInspector] _VoxelPass ("Pass filter (0 all, 1 plain, 2 volume)", Float) = 0
     }
+
+    // The blended blocks of the transparent layer, from its buffer (the cut-out leaves in it are CutoutVoxel's):
+    // - VoxelGlass: glass and other plain see-through blocks, drawn by VoxelGlassFeature after the skybox and before
+    //   URP copies the opaque colour, so a liquid surface in front shows them in the scene behind it.
+    // - Universal Forward: the voxels with a volume slot (liquids), with URP's transparents.
+    // A pass's other quads collapse to a point and are not rasterised.
 
     SubShader
     {
@@ -34,7 +40,7 @@
             float _AOIntensity;
             float _AOPower;
             float4 _AOCurve;
-            float _VoxelPass;
+            float4 _FaceShade;
         CBUFFER_END
 
         struct Varyings
@@ -44,30 +50,82 @@
             uint4 packed : TEXCOORD1;
             float3 positionWS : TEXCOORD2; // horizon fog
             float4 positionSS : TEXCOORD3;
+            float shade : TEXCOORD4; // face shade
         };
 
-
         // ── Vertex shader with expansion ─────────────────────────────
-        Varyings vert(uint vertexID : SV_VertexID)
+        // volume_pass: draw the voxels with a volume slot (liquids), else the plain blended ones (glass)
+        Varyings vert_filtered(const uint vertexID, const bool volume_pass)
         {
             VoxelVertexData v = fetch_vertex_data(vertexID);
 
             Varyings o = (Varyings)0;
 
-            // VoxelWorldRenderer draws the layer twice: plain transparents (leaves, glass; _VoxelPass 1) before the
-            // voxels with a volume slot (liquids; _VoxelPass 2), so a liquid surface, which writes depth, never
-            // hides a leaf behind it. The other pass's quads collapse to a point and are not rasterised.
-            const bool volume = get_volume_fog(v.packed) != 0;
-            if (_VoxelPass > 0.5f && (_VoxelPass > 1.5f) != volume) return o;
+            if (get_cutout(v.packed) || (get_volume_fog(v.packed) != 0) != volume_pass) return o;
 
             o.positionCS = TransformObjectToHClip(v.positionOS);
             o.uv = v.uv;
             o.packed = v.packed;
             o.positionSS = ComputeScreenPos(o.positionCS);
             o.positionWS = TransformObjectToWorld(v.positionOS);
+            o.shade = face_shade(_FaceShade, v.normal);
             return o;
         }
+
+        Varyings vert_glass(uint vertexID : SV_VertexID)
+        {
+            return vert_filtered(vertexID, false);
+        }
+
+        Varyings vert_volume(uint vertexID : SV_VertexID)
+        {
+            return vert_filtered(vertexID, true);
+        }
+
+        TEXTURE2D_ARRAY(_Textures);
+        SAMPLER(sampler_Textures);
+
+        // The surface colour (texture, AO, light, glow and face shade) and its alpha.
+        float4 surface_color(const Varyings IN)
+        {
+            const float4 albedo = SAMPLE_TEXTURE2D_ARRAY(_Textures, sampler_Textures, IN.uv, get_tex_index(IN.packed));
+            const float4 ao_color = calc_ao_color(_AOColor, albedo, _AOCurve, get_ao(IN.packed), _AOIntensity,
+                                                  _AOPower, IN.uv);
+            const float3 light = calc_voxel_light(IN.packed, IN.uv);
+            const float glow = calc_glow(get_glow(IN.packed));
+            return float4(ao_color.rgb * light * glow * IN.shade, albedo.w * get_surface_alpha(IN.packed));
+        }
         ENDHLSL
+
+        // ═════════════════════════════════════════════════════════════
+        // Pass – Glass (VoxelGlassFeature, after the skybox)
+        // ═════════════════════════════════════════════════════════════
+        Pass
+        {
+            Name "Voxel Glass"
+            Tags
+            {
+                "LightMode" = "VoxelGlass"
+            }
+
+            Cull Off
+            ZTest LEqual
+            ZWrite On
+            Blend SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma target 4.5
+            #pragma vertex   vert_glass
+            #pragma fragment frag_glass
+
+            half4 frag_glass(Varyings IN) : SV_Target
+            {
+                const float4 color = surface_color(IN);
+                clip(color.a - 0.001f);
+                return half4(apply_horizon_fog(color.rgb, IN.positionWS), color.a);
+            }
+            ENDHLSL
+        }
 
         // ═════════════════════════════════════════════════════════════
         // Pass – Forward / Unlit
@@ -87,16 +145,13 @@
 
             HLSLPROGRAM
             #pragma target 4.5
-            #pragma vertex   vert
+            #pragma vertex   vert_volume
             #pragma fragment frag
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareOpaqueTexture.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
-
-            TEXTURE2D_ARRAY(_Textures);
-            SAMPLER(sampler_Textures);
 
             // Volume of see-through liquids, by slot (VoxelRegistry.VolumeFogDef); slot 0 = none.
             struct VolumeFog
@@ -120,26 +175,6 @@
             // Cosine of water's critical angle (refractive index 1.33): from inside, light from above only comes
             // through the surface closer than this to its normal (Snell's window).
             static const float CriticalCos = 0.66f;
-
-            struct FragExtraData
-            {
-                uint texture_index;
-                uint ao;
-                uint volume_fog;
-                float surface_alpha;
-                float glow;
-            };
-
-            FragExtraData unpack_frag_extra_data(uint4 packed)
-            {
-                FragExtraData data;
-                data.texture_index = get_tex_index(packed);
-                data.ao = get_ao(packed);
-                data.volume_fog = get_volume_fog(packed);
-                data.surface_alpha = get_surface_alpha(packed);
-                data.glow = get_glow(packed);
-                return data;
-            }
 
             // The opaque scene behind a surface pixel: its colour, how far behind the surface it lies (eye depth)
             // and whether it is the sky.
@@ -220,26 +255,15 @@
             // ── Fragment shader ───────────────────────────────────────
             half4 frag(Varyings IN, const bool front : SV_IsFrontFace) : SV_Target
             {
-                // --- Texture array sample ---
-                FragExtraData extra = unpack_frag_extra_data(IN.packed);
-                const float2 uv = IN.uv;
-                const float4 albedo = SAMPLE_TEXTURE2D_ARRAY(_Textures, sampler_Textures, uv, extra.texture_index);
+                // --- Surface: texture, AO, light, glow, face shade ---
+                const float4 surface = surface_color(IN);
+                float3 color = surface.rgb;
+                float alpha = surface.a;
 
-                // --- Ambient occlusion ---
-                const float4 ao_color = calc_ao_color(_AOColor, albedo, _AOCurve, extra.ao, _AOIntensity, _AOPower, uv);
-
-                // --- Light ---
-                const float3 light = calc_voxel_light(IN.packed, uv);
-
-                // --- Glow ---
-                const float glow = calc_glow(extra.glow);
-
-                float3 color = ao_color.rgb * light * glow;
-                float alpha = albedo.w * extra.surface_alpha;
-
-                if (extra.volume_fog != 0)
+                const uint volume_fog = get_volume_fog(IN.packed);
+                if (volume_fog != 0)
                 {
-                    const VolumeFog fog = _VoxelVolumeFog[extra.volume_fog];
+                    const VolumeFog fog = _VoxelVolumeFog[volume_fog];
                     const bool fogged = fog.fogged > 0.5f;
                     if (front)
                     {

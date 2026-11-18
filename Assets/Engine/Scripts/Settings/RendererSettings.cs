@@ -15,14 +15,21 @@ namespace Engine.Scripts.Settings{
         public Material solidMaterial;
 
         /// <summary>
-        ///     The material used to render transparent chunk surfaces.
+        ///     The material used to render the blended blocks of the transparent layer (TransparentVoxel.shader): glass
+        ///     in its VoxelGlass pass (VoxelGlassFeature) and liquids with URP's transparents.
         /// </summary>
         public Material transparentMaterial;
 
         /// <summary>
-        ///     The material used to render foliage chunk surfaces.
+        ///     The material used to render foliage chunk surfaces (CutoutVoxel.shader, all points).
         /// </summary>
         public Material foliageMaterial;
+
+        /// <summary>
+        ///     The material used to render the cut-out blocks of the transparent layer, such as leaves
+        ///     (CutoutVoxel.shader, _VoxelPass 3), with the opaque blocks.
+        /// </summary>
+        public Material leavesMaterial;
 
         /// <summary>
         ///     The compute shader used to build point data from voxel partitions.
