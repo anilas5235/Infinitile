@@ -205,7 +205,9 @@ namespace Engine.Scripts.Render{
             for (int i = 0; i < _maxInFlight; i++) _buildRequests[i] = new PartitionBuildRequest(default);
 
             _solidBufferManager = new RenderBufferManager(rSettings.solidMaterial);
-            _transparentBufferManager = RenderBufferManager.WithVolumePass(rSettings.transparentMaterial);
+            // the transparent layer's buffer holds the cut-out blocks (leaves) too, drawn with the opaque blocks
+            _transparentBufferManager =
+                RenderBufferManager.WithCutoutPass(rSettings.transparentMaterial, rSettings.cutoutMaterial);
             _foliageBufferManager = new RenderBufferManager(rSettings.foliageMaterial);
             _layers = new[]{ _solidBufferManager, _transparentBufferManager, _foliageBufferManager };
 
@@ -260,6 +262,7 @@ namespace Engine.Scripts.Render{
 
             Light sun = RenderSettings.sun;
             VoxelLightingGlobals.SetSunDirection(sun ? -sun.transform.forward : Vector3.zero);
+            VoxelLightingGlobals.SetFaceShadeStrength(rSettings.faceShadeStrength);
         }
 
         /// <summary>

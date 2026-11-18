@@ -12,6 +12,12 @@ namespace Engine.Scripts.Utils{
         public const int PointsPerPage = 256;
         public const int PagesPerBuffer = 1024;
 
+        /// <summary>
+        ///     How far the surface of a liquid sits below the top of its top block, in blocks (LIQUID_SURFACE_DROP in
+        ///     VoxelShaderCommon.hlsl), so a full lake does not fill its top block.
+        /// </summary>
+        public const float LiquidSurfaceDrop = 0.1f;
+
         #region Mirrored in Shaders/Urp/VoxelGpuConstants.hlsl (GpuConstantsTests compares them)
 
         /// <summary>Flat chunk index x * ChunkDepth * ChunkHeight + z * ChunkHeight + y, as shifts.</summary>
@@ -26,6 +32,14 @@ namespace Engine.Scripts.Utils{
         internal const int CompPageMask = (1 << CompPageShift) - 1;
 
         internal const int MeshLayerSolid = (int)MeshLayer.Solid;
+
+        internal const int MeshLayerTransparent = (int)MeshLayer.Transparent;
+
+        /// <summary>
+        ///     Volume fog slots fit in 6 bits of a point; the two bits above them flag alpha cut-out and the top
+        ///     layer of a liquid (VoxelCommon.hlsl). The registry hands out slots 1 to this value.
+        /// </summary>
+        internal const int VolumeFogSlotMask = 63;
 
         /// <summary>Chunks of a partition build: the partition's chunk and its eight neighbours.</summary>
         internal const int PrepChunks = 9;
@@ -90,10 +104,10 @@ namespace Engine.Scripts.Utils{
         public static readonly int VoxelFogParamsNameID = Shader.PropertyToID("_VoxelFogParams");
         public static readonly int VoxelFogCurveNameID = Shader.PropertyToID("_VoxelFogCurve");
         public static readonly int VoxelSunDirectionNameID = Shader.PropertyToID("_VoxelSunDirection");
+        public static readonly int VoxelFaceShadeStrengthNameID = Shader.PropertyToID("_VoxelFaceShadeStrength");
 
         // Volume fog of see-through liquids (VoxelRegistry, TransparentVoxel.shader)
         public static readonly int VoxelVolumeFogNameID = Shader.PropertyToID("_VoxelVolumeFog");
-        public static readonly int VoxelPassNameID = Shader.PropertyToID("_VoxelPass");
 
         // Sky material properties the horizon fog copies, so fogged terrain matches the sky behind it
         public static readonly int SkyHorizonColorNameID = Shader.PropertyToID("_HorizonColor");

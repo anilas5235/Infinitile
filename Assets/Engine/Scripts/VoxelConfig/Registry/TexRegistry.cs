@@ -45,29 +45,49 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         }
 
         /// <summary>
-        ///     Builds a <see cref="Texture2DArray" /> from all registered textures using point filtering and repeat wrapping.
+        ///     Builds a <see cref="Texture2DArray" /> from all registered textures using point filtering and repeat
+        ///     wrapping. It keeps the textures' mipmaps (as many levels as every texture has), so distant blocks do not
+        ///     shimmer; the importer's mipmaps keep the alpha coverage of leaves and plants where that is switched on.
+        ///     A tile with fewer levels than the others cuts the levels of the whole array; that logs a warning naming
+        ///     the tile (usually its import settings have mipmaps off).
         /// </summary>
         public void PrepareArray(){
             if (Count == 0) return;
+
+            int mipCount = int.MaxValue, maxMipCount = 0;
+            foreach (Texture2D tex in ForwardMap.Keys){
+                mipCount = Math.Min(mipCount, tex.mipmapCount);
+                maxMipCount = Math.Max(maxMipCount, tex.mipmapCount);
+            }
+
+            if (mipCount < maxMipCount){
+                string[] few = ForwardMap.Keys.Where(t => t.mipmapCount < maxMipCount)
+                    .Select(t => $"'{t.name}' ({t.mipmapCount})").ToArray();
+                VoxelEngineLogger.Warn<TexRegistry>(
+                    $"{few.Length} tile(s) have fewer mip levels than the other tiles ({maxMipCount}), so the whole " +
+                    $"texture array keeps only {mipCount}: {string.Join(", ", few)}. Switch on Generate Mipmaps in " +
+                    "their import settings.");
+            }
 
             Texture2DArray textureArray = new(
                 TextureSize,
                 TextureSize,
                 Count,
                 ForwardMap.First().Key.format,
+                mipCount,
                 false
             ){
                 filterMode = FilterMode.Point,
                 wrapMode = TextureWrapMode.Repeat
             };
-            // Copy each texture into the texture array
+            // Copy each texture with its mip levels into the texture array
             int index = 0;
             foreach (KeyValuePair<Texture2D, ushort> kvp in ForwardMap){
-                Graphics.CopyTexture(kvp.Key, 0, 0, textureArray, index, 0);
+                for (int mip = 0; mip < mipCount; mip++) Graphics.CopyTexture(kvp.Key, 0, mip, textureArray, index, mip);
                 index++;
             }
 
-            textureArray.Apply();
+            textureArray.Apply(false); // keep the copied mip levels
             TextureArray = textureArray;
         }
 

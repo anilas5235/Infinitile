@@ -21,6 +21,12 @@
 // MeshLayer.Solid (MeshLayerSolid)
 #define MESH_LAYER_SOLID 0
 
+// MeshLayer.Transparent (MeshLayerTransparent)
+#define MESH_LAYER_TRANSPARENT 1
+
+// Volume fog slots fit in 6 bits of PointData.packed.z; the two bits above are point flags (VolumeFogSlotMask)
+#define VOLUME_FOG_SLOT_MASK 63u
+
 // Partition build: the chunks of a build in PartitionBuildRequest order (PrepChunks), and the decompressed box,
 // the partition plus a 1-voxel border, BOX_SIZE voxels along each axis (PrepBoxSize)
 #define PREP_CHUNKS 9

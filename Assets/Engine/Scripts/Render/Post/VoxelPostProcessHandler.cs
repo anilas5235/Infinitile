@@ -4,7 +4,9 @@ using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
+using Unity.Collections;
 using UnityEngine;
+using static Engine.Scripts.Utils.VoxelRenderConstants;
 
 namespace Engine.Scripts.Render.Post{
     /// <summary>
@@ -37,10 +39,18 @@ namespace Engine.Scripts.Render.Post{
                 return;
             }
 
-            Vector3Int camPos = Vector3Int.FloorToInt(target.transform.position);
+            Vector3 position = target.transform.position;
+            Vector3Int camPos = Vector3Int.FloorToInt(position);
 
             // Base voxel: a turned variant shows its base's effects
             ushort voxelId = _voxelRegistry.BaseOf(VoxelWorld.Instance.GetVoxel(camPos.Int3()));
+
+            // The top layer of a liquid is drawn LiquidSurfaceDrop lower: above its surface the camera is in the
+            // voxel above
+            if (position.y - camPos.y > 1f - LiquidSurfaceDrop){
+                ushort above = _voxelRegistry.BaseOf(VoxelWorld.Instance.GetVoxel((camPos + Vector3Int.up).Int3()));
+                if (IsLiquidTop(_voxelRegistry, voxelId, above)) voxelId = above;
+            }
             if (voxelId != currentVoxelId){
                 currentVoxelId = voxelId;
                 UpdatePostProcessing(currentVoxelId);
@@ -52,15 +62,35 @@ namespace Engine.Scripts.Render.Post{
 
         /// <summary>
         ///     Height of the liquid's surface above <paramref name="camPos" />: the bottom of the first voxel up the
-        ///     column that is not <paramref name="liquid" /> (a base voxel id).
+        ///     column that is not <paramref name="liquid" /> (a base voxel id), less the drop of a liquid's top layer.
         /// </summary>
         private static float FindSurface(VoxelRegistry registry, Vector3Int camPos, ushort liquid){
             VoxelWorld world = VoxelWorld.Instance;
             int y = camPos.y + 1;
             int top = camPos.y + MaxSurfaceSearch;
-            while (y < top && registry.BaseOf(world.GetVoxel(new Vector3Int(camPos.x, y, camPos.z).Int3())) == liquid)
+            ushort above = liquid;
+            while (y < top){
+                above = registry.BaseOf(world.GetVoxel(new Vector3Int(camPos.x, y, camPos.z).Int3()));
+                if (above != liquid) break;
                 y++;
-            return y;
+            }
+
+            return IsLiquidTop(registry, liquid, above) ? y - LiquidSurfaceDrop : y;
+        }
+
+        /// <summary>
+        ///     True when <paramref name="voxelId" /> (a base id) is a liquid whose surface is drawn lower with
+        ///     <paramref name="above" /> (a base id) on top of it: another voxel that is not a full solid block, so a
+        ///     slab or another partial solid shape still lowers the surface. Same rule as PointBuilder.compute,
+        ///     is_liquid_top.
+        /// </summary>
+        internal static bool IsLiquidTop(VoxelRegistry registry, ushort voxelId, ushort above){
+            if (above == voxelId) return false;
+            NativeArray<Voxel.VoxelDef> defs = registry.GetVoxelGenData().VoxelRenderDefs;
+            if (!defs.IsCreated || voxelId >= defs.Length || !defs[voxelId].Liquid) return false;
+            if (above >= defs.Length) return true;
+            Voxel.VoxelDef top = defs[above];
+            return top.MeshLayer != MeshLayer.Solid || !top.HidesNeighbourFaces;
         }
 
         private void OnEnable(){

@@ -15,14 +15,21 @@ namespace Engine.Scripts.Settings{
         public Material solidMaterial;
 
         /// <summary>
-        ///     The material used to render transparent chunk surfaces.
+        ///     The material used to render the blended blocks of the transparent layer (TransparentVoxel.shader): glass
+        ///     in its VoxelGlass pass (VoxelGlassFeature) and liquids with URP's transparents.
         /// </summary>
         public Material transparentMaterial;
 
         /// <summary>
-        ///     The material used to render foliage chunk surfaces.
+        ///     The material used to render foliage chunk surfaces (CutoutVoxel.shader, all points).
         /// </summary>
         public Material foliageMaterial;
+
+        /// <summary>
+        ///     The material used to render the cut-out blocks of the transparent layer, such as leaves
+        ///     (CutoutVoxel.shader, _VoxelPass 3), with the opaque blocks.
+        /// </summary>
+        public Material cutoutMaterial;
 
         /// <summary>
         ///     The compute shader used to build point data from voxel partitions.
@@ -59,6 +66,16 @@ namespace Engine.Scripts.Settings{
         ///     ring clear for longer, near 0 is a straight ramp.
         /// </summary>
         [Min(0.01f)] public float fogSteepness = 3f;
+
+        /// <summary>
+        ///     How strongly the face shade darkens the sides of a block (the <c>_FaceShade</c> values of the voxel
+        ///     materials and the shade by the sun's angle): 0 lights every face alike, 1 is the full shade. Read every
+        ///     frame, so it can be tuned in Play mode.
+        /// </summary>
+        [Range(0f, 1f)] public float faceShadeStrength = DefaultFaceShadeStrength;
+
+        /// <summary>The shipped <see cref="faceShadeStrength" /> (owner's pick, 2026-11-18).</summary>
+        public const float DefaultFaceShadeStrength = 0.65f;
 
         /// <summary>
         ///     GPU frustum culling of render pages. Off draws every page that holds points, for debugging and

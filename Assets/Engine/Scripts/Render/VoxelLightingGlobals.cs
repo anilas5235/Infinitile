@@ -53,6 +53,14 @@ namespace Engine.Scripts.Render{
             return new Vector4(k, 1f / (Mathf.Exp(k) - 1f), 0f, 0f);
         }
 
+        /// <summary>
+        ///     Strength of the voxel shaders' face shade: 0 lights every face alike, 1 is the full shade
+        ///     (<see cref="Settings.RendererSettings.faceShadeStrength" />).
+        /// </summary>
+        public static void SetFaceShadeStrength(float strength){
+            Shader.SetGlobalFloat(VoxelFaceShadeStrengthNameID, Mathf.Clamp01(strength));
+        }
+
         /// <summary>Unit direction towards the sun for the sky's sun disc; zero hides it.</summary>
         public static void SetSunDirection(Vector3 towardsSun){
             Shader.SetGlobalVector(VoxelSunDirectionNameID, towardsSun);

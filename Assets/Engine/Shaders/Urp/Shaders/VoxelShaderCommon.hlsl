@@ -13,7 +13,11 @@ struct VoxelVertexData
     float3 positionOS;
     float2 uv;
     uint4 packed;
+    float3 normal; // the quad's normal, for the face shade
 };
+
+// How far the surface of a liquid sits below the top of its top block (VoxelRenderConstants.LiquidSurfaceDrop).
+static const float LIQUID_SURFACE_DROP = 0.1f;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Vertex helpers
@@ -40,6 +44,7 @@ VoxelVertexData fetch_vertex_data(uint vertexID)
         v.positionOS = 0;
         v.uv = 0;
         v.packed = 0;
+        v.normal = 0;
         return v;
     }
 
@@ -53,41 +58,46 @@ VoxelVertexData fetch_vertex_data(uint vertexID)
 
     uint quadIndex = get_quad_index(p.packed);
     QuadData quad = _Quad_buffer[quadIndex];
-
+    v.normal = quad.normal;
+    float3 corner;
 
     // Triangle strip corners: two triangles forming a quad
     // Triangle 1: 00-01-02, Triangle 2: 02-01-03
     switch (cornerID)
     {
     case 0:
-        v.positionOS += quad.position00;
+        corner = quad.position00;
         v.uv = quad.uv00;
         break;
     case 1:
-        v.positionOS += quad.position01;
+        corner = quad.position01;
         v.uv = quad.uv01;
         break;
     case 2:
-        v.positionOS += quad.position02;
+        corner = quad.position02;
         v.uv = quad.uv02;
         break;
     case 3:
-        v.positionOS += quad.position02;
+        corner = quad.position02;
         v.uv = quad.uv02;
         break;
     case 4:
-        v.positionOS += quad.position01;
+        corner = quad.position01;
         v.uv = quad.uv01;
         break;
     case 5:
-        v.positionOS += quad.position03;
+        corner = quad.position03;
         v.uv = quad.uv03;
         break;
     default:
+        corner = 0;
         v.uv = 0;
         break;
     }
 
+    // The top layer of a liquid: its top corners sit lower, so a full lake does not fill its top block
+    if (get_liquid_top(p.packed) && corner.y > 0.5f) corner.y -= LIQUID_SURFACE_DROP;
+    v.positionOS += corner;
     return v;
 }
 
@@ -134,6 +144,10 @@ float4 calc_ao_color(const float4 ao_color, const float4 albedo, const float4 ao
 float _VoxelSkyBrightness;
 float4 _VoxelSkyTint;
 float _VoxelAmbient;
+// Unit direction towards the sun, set by VoxelWorldRenderer from the URP main light (zero without one).
+float4 _VoxelSunDirection;
+// Strength of the face shade, 0 (every face alike) to 1 (RendererSettings.faceShadeStrength).
+float _VoxelFaceShadeStrength;
 
 // Corner levels ul, ur, dr, dl interpolated over the face (as the AO).
 float interpolate_corners(const uint4 corners, float2 uv)
@@ -153,8 +167,9 @@ float3 light_curve(float3 level)
     return pow(0.85f, 15.0f - level);
 }
 
-// Light = max(skyCurve(sky) * brightness * tint, blockCurve(RGB)), never below the ambient.
-float3 calc_voxel_light(const uint4 packed, float2 uv)
+// Light = max(skyCurve(sky) * brightness * tint * face shade, blockCurve(RGB)), never below the ambient. The face
+// shade darkens only the sky light: a torch lights every side of a block alike.
+float3 calc_voxel_light(const uint4 packed, float2 uv, const float shade)
 {
     float sky = interpolate_corners(get_sky_light(packed), uv);
     float3 block = float3(
@@ -162,7 +177,7 @@ float3 calc_voxel_light(const uint4 packed, float2 uv)
         interpolate_corners(get_green_light(packed), uv),
         interpolate_corners(get_blue_light(packed), uv));
 
-    float3 sky_light = light_curve(sky) * _VoxelSkyBrightness * _VoxelSkyTint.rgb;
+    float3 sky_light = light_curve(sky) * _VoxelSkyBrightness * _VoxelSkyTint.rgb * shade;
     float3 light = max(sky_light, light_curve(block));
     return max(light, _VoxelAmbient);
 }
@@ -194,6 +209,25 @@ float3 apply_horizon_fog(const float3 color, const float3 positionWS)
     const float t = saturate((max(d.x, d.y) - _VoxelFogParams.x) * _VoxelFogParams.y);
     const float fog = (exp(_VoxelFogCurve.x * t) - 1.0f) * _VoxelFogCurve.y * _VoxelFogParams.z;
     return lerp(color, horizon_fog_color(normalize(to_point)), fog);
+}
+
+// Sun height (the y of the direction towards it) at which the face shade has turned fully to the sun.
+static const float SUN_SHADE_RISE = 0.2f;
+
+// Face shade: the brightness of a face by its direction, so the sides of a block read apart. shade = (top, bottom,
+// ±x sides, ±z sides). With the sun below the horizon (or no sun) the fixed values, a slanted quad (a plant's cross
+// plane) blending between them by its normal. While the sun is up, by the face's angle to the sun: the bottom
+// value facing away from it, the top value facing it (half Lambert), so the sunny side of a block is the brightest
+// and the shade moves with the day. The turn takes the sun's rise to SUN_SHADE_RISE. _VoxelFaceShadeStrength pulls
+// the result towards 1.
+float face_shade(const float4 shade, const float3 normal)
+{
+    const float3 n = abs(normal);
+    const float sides = dot(n.xz, shade.zw) / max(n.x + n.z, 1e-4f);
+    const float by_direction = lerp(sides, normal.y >= 0.0f ? shade.x : shade.y, n.y);
+    const float by_sun = lerp(shade.y, shade.x, 0.5f * dot(normal, _VoxelSunDirection.xyz) + 0.5f);
+    const float shade_value = lerp(by_direction, by_sun, smoothstep(0.0f, SUN_SHADE_RISE, _VoxelSunDirection.y));
+    return lerp(1.0f, shade_value, _VoxelFaceShadeStrength);
 }
 
 float calc_glow(const float glow_data)
