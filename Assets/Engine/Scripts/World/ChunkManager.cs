@@ -124,35 +124,78 @@ namespace Engine.Scripts.World{
         }
 
         /// <summary>
-        ///     Adds newly generated chunks, evicts oldest if capacity exceeded. The manager owns every voxel list of
-        ///     the batch afterwards: a list goes to its chunk, and the list of a position that is already loaded is
-        ///     released here (with an error log; the loaded chunk keeps its data). The caller only clears its map.
+        ///     Adds newly generated chunks, evicts the farthest one first while the store is full (all in one call;
+        ///     the data stage adds and evicts chunk by chunk, see <see cref="AddChunk" />). The manager owns every
+        ///     voxel list of the batch afterwards: a list goes to its chunk, and the list of a position that is
+        ///     already loaded is released here (with an error log; the loaded chunk keeps its data). The caller
+        ///     only clears its map.
         /// </summary>
         internal void AddChunks(NativeParallelHashMap<int2, ChunkVoxelData> chunks){
             foreach (KeyValue<int2, ChunkVoxelData> pair in chunks){
-                int2 position = pair.Key;
-
-                if (_chunks.ContainsKey(position)){
-                    // Not an exception: thrown in the middle of the batch it would leave the lists added so far
-                    // with two owners (their chunk and the caller's map), and both dispose them.
-                    pair.Value.Dispose();
-                    VoxelEngineLogger.Error<ChunkManager>($"Chunk {position} already exists; the new data was dropped");
-                    continue;
-                }
-
-                if (_unloadingQueue.Count >= _chunkStoreSize) RemoveChunkData(_unloadingQueue.Dequeue());
-
-                Chunk chunk;
-                if (_chunkObjectPool.Count > 0){
-                    chunk = _chunkObjectPool.Pop();
-                    chunk.Reinit(position);
-                }
-                else chunk = new Chunk(position);
-
-                chunk.VoxelData = pair.Value;
-                _chunks.Add(position, chunk);
-                _unloadingQueue.Enqueue(position, PriorityUtil.EvictionPriority(ref position, ref _focus));
+                if (!_chunks.ContainsKey(pair.Key) && StoreFull) EvictNext();
+                AddChunk(pair.Key, pair.Value, out _);
             }
+        }
+
+        /// <summary>True when the store holds as many chunks as it may: adding one evicts one first.</summary>
+        internal bool StoreFull => _unloadingQueue.Count >= _chunkStoreSize;
+
+        /// <summary>
+        ///     Completes the jobs that read the chunk the store evicts next (see <see cref="CompleteReadersOf" />),
+        ///     so that <see cref="EvictNext" /> does not have to wait for them. The data stage makes this an item of
+        ///     its own; <see cref="UnloadChunk" /> still completes every reader itself.
+        /// </summary>
+        internal void CompleteReadersOfNextEviction(){
+            if (_unloadingQueue.Count > 0) CompleteReadersOf(_unloadingQueue.First);
+        }
+
+        /// <summary>The chunk <see cref="EvictNext" /> unloads; false when the store is empty.</summary>
+        internal bool TryGetNextEviction(out int2 position){
+            position = _unloadingQueue.Count > 0 ? _unloadingQueue.First : default;
+            return _unloadingQueue.Count > 0;
+        }
+
+        /// <summary>Whether the voxel data of the chunk is in the current <see cref="ChunkAccessor" /> (the mesh job reads it).</summary>
+        internal bool IsReadByAccessor(int2 position){
+            return _accessorMap.ContainsKey(position);
+        }
+
+        /// <summary>Whether the light job reads the voxel data of the chunk (see <see cref="GetLightJobChunks" />).</summary>
+        internal bool IsReadByLightJob(int2 position){
+            return _lightJobMap.ContainsKey(position);
+        }
+
+        /// <summary>Unloads the loaded chunk farthest from the focus (eviction); nothing when the store is empty.</summary>
+        internal void EvictNext(){
+            if (_unloadingQueue.Count > 0) RemoveChunkData(_unloadingQueue.Dequeue());
+        }
+
+        /// <summary>
+        ///     Adds one generated chunk; it does not evict (see <see cref="StoreFull" /> and <see cref="EvictNext" />).
+        ///     The manager owns <paramref name="data" /> afterwards: it goes to the chunk, or, when the position is
+        ///     already loaded, it is released here (with an error log; the loaded chunk keeps its data).
+        /// </summary>
+        /// <returns>True when the chunk was added.</returns>
+        internal bool AddChunk(int2 position, ChunkVoxelData data, out Chunk chunk){
+            if (_chunks.ContainsKey(position)){
+                // Not an exception: thrown in the middle of a batch it would leave the lists added so far with two
+                // owners (their chunk and the caller's map), and both dispose them.
+                data.Dispose();
+                VoxelEngineLogger.Error<ChunkManager>($"Chunk {position} already exists; the new data was dropped");
+                chunk = null;
+                return false;
+            }
+
+            if (_chunkObjectPool.Count > 0){
+                chunk = _chunkObjectPool.Pop();
+                chunk.Reinit(position);
+            }
+            else chunk = new Chunk(position);
+
+            chunk.VoxelData = data;
+            _chunks.Add(position, chunk);
+            _unloadingQueue.Enqueue(position, PriorityUtil.EvictionPriority(ref position, ref _focus));
+            return true;
         }
 
         /// <summary>

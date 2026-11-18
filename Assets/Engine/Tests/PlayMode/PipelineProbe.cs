@@ -56,6 +56,11 @@ namespace Engine.Tests.PlayMode{
         private readonly VoxelEngineScheduler _scheduler;
         private readonly int _framesCutAtStart;
 
+        // The scheduler's largest item of work per frame (FrameBudget.TimeItems) and the stage whose turn it was
+        private readonly List<float> _itemMs = new(1 << 16);
+        private readonly List<int> _itemStage = new(1 << 16);
+        private readonly bool _timedItemsBefore;
+
         private readonly int[] _framesIdle = new int[StageCount];
         private readonly int[] _framesRunning = new int[StageCount];
         private readonly int[] _framesFinished = new int[StageCount];
@@ -93,6 +98,8 @@ namespace Engine.Tests.PlayMode{
             VoxelEngineScheduler scheduler = world.Scheduler;
             _scheduler = scheduler;
             _framesCutAtStart = scheduler.Budget.FramesCut;
+            _timedItemsBefore = scheduler.Budget.TimeItems;
+            scheduler.Budget.TimeItems = true;
             _stages = new PipelineStages(world);
             MeshJobStateHandler mesh = scheduler.MeshHandler;
             _meshJobs = scheduler.MeshJobs;
@@ -188,6 +195,7 @@ namespace Engine.Tests.PlayMode{
             for (int i = 0; i < _costRecorders.Length; i++) _costRecorders[i].Dispose();
             _dequeueRecorder.Dispose();
             if (_meshHandler != null) _meshHandler.TrackRequeues = false;
+            if (_scheduler != null) _scheduler.Budget.TimeItems = _timedItemsBefore;
             _attribution?.Dispose();
         }
 
@@ -283,6 +291,51 @@ namespace Engine.Tests.PlayMode{
             return sample == 0 ? _framesCutAtStart : _framesCut[sample - 1];
         }
 
+        /// <summary>The limit an item of work is judged against: the budget without a frame cap (2 ms shipped).</summary>
+        internal const float ItemLimitMs = 2f;
+
+        /// <summary>
+        ///     The scheduler's largest item of work per frame in the samples <paramref name="from" /> (included) to
+        ///     <paramref name="to" /> (excluded), as one log line: the distribution over the frames, the frames with
+        ///     an item over <see cref="ItemLimitMs" />, and per stage the largest item and the frames over the limit.
+        ///     An item is the span between two asks of the budget (see <see cref="FrameBudget.TimeItems" />), so it
+        ///     holds the bookkeeping of the turn around it; the probe switches the timing on.
+        /// </summary>
+        internal string ItemTimes(string label, int from, int to){
+            CultureInfo inv = CultureInfo.InvariantCulture;
+            from = math.clamp(from, 0, _itemMs.Count);
+            to = math.clamp(to, from, _itemMs.Count);
+            float[] stageMax = new float[StageCount];
+            int[] stageOver = new int[StageCount];
+            int over = 0;
+            for (int i = from; i < to; i++){
+                float ms = _itemMs[i];
+                if (ms > ItemLimitMs) over++;
+                int stage = _itemStage[i];
+                if (stage < 0 || stage >= StageCount) continue;
+                stageMax[stage] = math.max(stageMax[stage], ms);
+                if (ms > ItemLimitMs) stageOver[stage]++;
+            }
+
+            StringBuilder text = new();
+            text.Append(string.Format(inv, "[PipelineProbe] {0}: largest scheduler item per frame ms {1}; {2} frames " +
+                                           "with an item over {3:0.##} ms; per stage (max ms / frames over):", label,
+                Distribution(_itemMs, from, to), over, ItemLimitMs));
+            for (int i = 0; i < StageCount; i++)
+                text.Append(string.Format(inv, " {0} {1:0.000} / {2};", StageNames[i], stageMax[i], stageOver[i]));
+            text.AppendLine();
+            return text.ToString();
+        }
+
+        /// <summary>The largest scheduler item of the samples <paramref name="from" /> to <paramref name="to" />.</summary>
+        internal float MaxItemMs(int from, int to){
+            from = math.clamp(from, 0, _itemMs.Count);
+            to = math.clamp(to, from, _itemMs.Count);
+            float max = 0f;
+            for (int i = from; i < to; i++) max = math.max(max, _itemMs[i]);
+            return max;
+        }
+
         /// <summary>
         ///     Forgets the completion times, so a second phase (the world settling after a flight) is timed from now.
         /// </summary>
@@ -338,6 +391,9 @@ namespace Engine.Tests.PlayMode{
             _schedulerMs.Add(schedulerNs * 1e-6f);
             _framesCut.Add(_scheduler.Budget.FramesCut);
             _effectiveBudgetMs.Add(_scheduler.Budget.EffectiveMilliseconds);
+            // The scheduler ticks in Update, before this sample: the item time and the stage are this frame's
+            _itemMs.Add(_scheduler.Budget.LongestItemMs);
+            _itemStage.Add(_scheduler.LastStage);
             SampleDequeue();
             _attribution?.Sample();
         }
@@ -511,6 +567,7 @@ namespace Engine.Tests.PlayMode{
                                                "waited for the renderer in {3} frames",
                 head, _stages.GpuDoneSeconds, _stages.GpuDoneFrame, _framesRendererBehind));
             text.Append(FrameTimes(label, 0, Frames));
+            text.Append(ItemTimes(label, 0, Frames));
             text.Append(head).Append(": main-thread ms per frame it ran in (avg / max / frames):");
             for (int i = 0; i < CostNames.Length; i++){
                 text.Append(string.Format(inv, " {0} {1:0.000} / {2:0.000} / {3};", CostNames[i],

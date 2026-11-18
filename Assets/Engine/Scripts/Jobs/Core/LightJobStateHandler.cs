@@ -74,15 +74,13 @@ namespace Engine.Scripts.Jobs.Core{
 
         /// <summary>
         ///     Applies the finished batch and wakes the mesh handler. A batch that was already completed and applied
-        ///     early (an edit or unload of a chunk it read) only clears the set. The batch is applied as one item
-        ///     of work, at the start of the turn.
+        ///     early (an edit or unload of a chunk it read) only clears the set. Every chunk's light is one item of
+        ///     work (<see cref="LightScheduler.Complete" />); a cut apply continues in the next turn.
         /// </summary>
         protected override StageTurn CollectResultsStep(FrameBudget budget){
             if (!_lightScheduler.IsReady){
                 if (!_lightScheduler.IsComplete) return StageTurn.None;
-                if (!budget.Next()) return StageTurn.Cut;
-
-                _lightScheduler.Complete();
+                if (!_lightScheduler.Complete(budget)) return StageTurn.Cut; // one item per chunk's light
             }
 
             Set.Clear();

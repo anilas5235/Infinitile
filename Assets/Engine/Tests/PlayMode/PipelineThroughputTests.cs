@@ -354,7 +354,9 @@ namespace Engine.Tests.PlayMode{
                 "[PipelineProbe] {0}: flew {1:0} units ({2:0} chunks); meshed share of the columns within {3} of the " +
                 "focus: average {4:0.000}, at the end {5:0.000}; of the draw window: average {6:0.000}, at the end {7:0.000}",
                 label, distance, distance / ChunkWidth, NearRadius, run.NearCoverage, probe.Coverage(NearRadius),
-                run.WindowCoverage, probe.Coverage(draw)));
+                run.WindowCoverage, probe.Coverage(draw)) + "\n" +
+                probe.FrameTimes($"{label}, flight frames only", flightBegin, flightEnd) +
+                probe.ItemTimes($"{label}, flight frames only", flightBegin, flightEnd));
 
             // The player stops; how long until the world around them is complete?
             probe.RestartCompletion();

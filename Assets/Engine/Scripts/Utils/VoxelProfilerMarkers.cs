@@ -16,6 +16,12 @@ namespace Engine.Scripts.Utils{
         internal static readonly ProfilerMarker DataGenSchedule = new("Voxel.DataGen.Schedule");
         internal static readonly ProfilerMarker DataGenComplete = new("Voxel.DataGen.Complete");
 
+        // The items of the data collect, inside DataGenComplete: per chunk of the batch the wait for the jobs that
+        // read the chunk the store evicts next, its eviction, and the add with the upload to the renderer
+        internal static readonly ProfilerMarker DataGenEvictWait = new("Voxel.DataGen.EvictWait");
+        internal static readonly ProfilerMarker DataGenEvict = new("Voxel.DataGen.Evict");
+        internal static readonly ProfilerMarker DataGenAdd = new("Voxel.DataGen.Add");
+
         // Light (LightScheduler / LightJob / LightEditJob)
         internal static readonly ProfilerMarker LightSchedule = new("Voxel.Light.Schedule");
         internal static readonly ProfilerMarker LightComplete = new("Voxel.Light.Complete");

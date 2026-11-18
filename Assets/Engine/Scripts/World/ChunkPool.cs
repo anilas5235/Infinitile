@@ -114,7 +114,7 @@ namespace Engine.Scripts.World{
         /// <summary>
         ///     Returns whether a chunk is active (rendered).
         /// </summary>
-        private bool IsChunkActive(int2 pos){
+        internal bool IsChunkActive(int2 pos){
             return _chunkMap.ContainsKey(pos);
         }
 

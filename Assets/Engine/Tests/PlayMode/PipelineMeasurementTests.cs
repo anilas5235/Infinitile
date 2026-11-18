@@ -318,6 +318,67 @@ namespace Engine.Tests.PlayMode{
             }
         }
 
+        /// <summary>
+        ///     The order of <see cref="DataCollectSplit_IsCompared" /> per frame cap: true is the collect before
+        ///     2026-11-18 (the data batch with its evictions in one item, the mesh collect waits for a running bake,
+        ///     the light batch applied in one item), false every eviction, data add and chunk's light its own item
+        ///     and no wait for a running reader or bake under the budget; A B B A.
+        /// </summary>
+        private static readonly bool[] DataCollectOrder ={ true, false, false, true };
+
+        [UnityTest]
+        [Order(11)]
+        [Timeout(3600000)]
+        public IEnumerator DataCollectSplit_IsCompared(){
+            // The capped flight (60 frames, with the attribution) and the uncapped flight through a world that is
+            // still being built, at the shipped draw distance, with the collects as before (data and light batch
+            // in one item, waits for running jobs) and split into per-chunk items that do not wait. The switches
+            // are set on the fresh world before the probe starts. Every run logs the
+            // largest scheduler item per frame and per stage ("largest scheduler item").
+            yield return PlayModeFixtures.LoadGameScene(drawDistance: PlayModeFixtures.ShippedDrawDistance);
+            int capped = PipelineThroughputTests.CappedFrameRate;
+            for (int i = 0; i < DataCollectOrder.Length; i++){
+                bool batch = DataCollectOrder[i];
+                yield return PipelineThroughputTests.FreshSceneAfterFlight();
+                yield return PipelineThroughputTests.FlyThroughBuildingWorld(capped,
+                    new PipelineThroughputTests.PipelineRun(), $"{DataCollectName(batch)}, capped part {i + 1}: ",
+                    PlayModeFixtures.ShippedDrawDistance, true, world => SetDataCollect(world, batch));
+            }
+
+            for (int i = 0; i < DataCollectOrder.Length; i++){
+                bool batch = DataCollectOrder[i];
+                yield return PipelineThroughputTests.FreshSceneAfterFlight();
+                yield return PipelineThroughputTests.FlyThroughBuildingWorld(0,
+                    new PipelineThroughputTests.PipelineRun(), $"{DataCollectName(batch)}, uncapped part {i + 1}: ",
+                    PlayModeFixtures.ShippedDrawDistance, false, world => SetDataCollect(world, batch));
+            }
+        }
+
+        [UnityTest]
+        [Order(12)]
+        [Timeout(3600000)]
+        public IEnumerator SplitCollect_UncappedIsAttributed(){
+            // Two uncapped flights with the split collects and the attribution: the attribution's largest frame per
+            // marker shows which part of a stage makes the items over 2 ms that remain in the uncapped flight.
+            yield return PlayModeFixtures.LoadGameScene(drawDistance: PlayModeFixtures.ShippedDrawDistance);
+            for (int i = 0; i < 2; i++){
+                yield return PipelineThroughputTests.FreshSceneAfterFlight();
+                yield return PipelineThroughputTests.FlyThroughBuildingWorld(0,
+                    new PipelineThroughputTests.PipelineRun(), $"{DataCollectName(false)}, uncapped attributed part {i + 1}: ",
+                    PlayModeFixtures.ShippedDrawDistance, true, world => SetDataCollect(world, false));
+            }
+        }
+
+        private static string DataCollectName(bool batchInOneItem){
+            return batchInOneItem ? "collect before the split" : "collect split per chunk";
+        }
+
+        private static void SetDataCollect(VoxelWorld world, bool batchInOneItem){
+            world.Scheduler.DataJobs.BatchAddInOneItem = batchInOneItem;
+            world.Scheduler.MeshJobs.WaitForBake = batchInOneItem;
+            world.Scheduler.LightJobs.ApplyInOneItem = batchInOneItem;
+        }
+
         private static void SetDequeueSlice(VoxelWorld world, int slice){
             VoxelEngineScheduler scheduler = PlayModeFixtures.GetPrivateField<VoxelEngineScheduler>(world, "_scheduler");
             PlayModeFixtures.GetPrivateField<MeshJobStateHandler>(scheduler, "_meshJobHandler").DequeueSlice = slice;

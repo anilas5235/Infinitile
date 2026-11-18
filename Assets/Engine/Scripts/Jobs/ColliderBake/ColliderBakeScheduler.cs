@@ -50,6 +50,9 @@ namespace Engine.Scripts.Jobs.ColliderBake{
         /// </summary>
         internal bool IsComplete => _handle.IsCompleted;
 
+        /// <summary>True while a started batch's job has not finished on the worker threads.</summary>
+        internal bool Running => !IsReady && !_handle.IsCompleted;
+
         /// <summary>
         ///     Starts scheduling collider build jobs for the given list of chunk positions.
         /// </summary>

@@ -91,8 +91,9 @@ namespace Engine.Scripts.Jobs.Core{
         }
 
         /// <summary>
-        ///     Collects results from completed chunk data generation and wakes up the light handler. The upload of
-        ///     every chunk is an item of work (see <see cref="ChunkScheduler.Complete" />).
+        ///     Collects results from completed chunk data generation and wakes up the light handler once the whole
+        ///     batch is in the store. Every eviction (with the wait for the jobs that read the evicted chunk) and
+        ///     every add with its upload is an item of work (see <see cref="ChunkScheduler.Complete" />).
         /// </summary>
         /// <param name="budget">The frame's budget.</param>
         /// <returns>None while the batch runs, Cut when the budget ran out inside the collect, otherwise Done.</returns>
