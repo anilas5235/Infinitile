@@ -923,13 +923,21 @@ like opaque blocks with holes.
   | Transparent | `VoxelCutout` (`Custom/CutoutVoxel`, `_VoxelPass` 3) | AlphaTest | the cut-out points (leaves) |
   | Transparent | `VoxelTransparent` (`Custom/TransparentVoxel`) | Transparent | liquids (pass `UniversalForward`) |
   | Transparent | same, pass `VoxelGlass` | after the skybox | glass and other blended see-through voxels |
+  | Transparent | same, pass `VoxelGlassOver` | after the transparents | the glass again, over liquid pixels |
   | Foliage | `VoxelFoliage` (`Custom/CutoutVoxel`, `_VoxelPass` 0) | AlphaTest | everything |
 
   `RenderBufferManager.WithCutoutPass` gives the transparent manager its two materials (cut-out first). The
   `VoxelGlass` pass is not drawn by URP's own passes: `VoxelGlassFeature` (on `PC_Renderer` and
   `Mobile_Renderer`) draws it at `AfterRenderingSkybox`, so glass is in the opaque colour copy that a liquid
-  surface in front reads. Glass is not in the depth copy (accepted). In each pass the vertex shader collapses the
-  quads that belong to another pass to one point, which the rasteriser drops.
+  surface in front reads. Glass is not in the depth copy (accepted). Glass writes no depth, so a liquid surface
+  behind it is still drawn. The liquid pass marks its pixels in the stencil (bit 64); the feature's second pass,
+  `VoxelGlassOver` at `AfterRenderingTransparents`, draws the glass again on those pixels where it lies in front of
+  the liquid's surface (depth test against the liquid's depth), so the liquid does not cover it. Glass under the
+  surface fails that depth test and shows through the liquid as before. Where a liquid lies behind glass, the
+  glass is also in the colour copy the liquid shows, so it counts twice there; in the play-test shots this did not
+  show. Without a cut-out material `RenderBufferManager.WithCutoutPass` logs a warning (leaves would not be
+  drawn). In each pass the vertex shader collapses the quads that belong to another pass to one point, which the
+  rasteriser drops.
 - **Cut-out.** `Voxel.alphaCutout` (set on the eight leaf voxels) marks a transparent-layer voxel as cut out
   (`VoxelDef.AlphaCutout`). Its points carry the cut-out flag (`PointData.packed.z` bit 14). `CutoutVoxel` clips
   at `_Cutoff` 0.5, writes depth, draws both sides (`Cull Off`), and a back face takes the shade of the face it
@@ -945,7 +953,7 @@ like opaque blocks with holes.
   - a full cube in the same or a lower layer hides the face (stone keeps its face towards water or leaves);
   - two cut-out cubes share one face: the one towards +x, +y or +z;
   - two different see-through voxels keep both faces (water against leaves or glass);
-  - the same see-through voxel culls.
+  - the same see-through voxel culls; turned variants of one voxel count as the same (`GPUVoxelDef.BaseId`).
 - **Face shade.** `_FaceShade` = (top, bottom, x sides, z sides) = (1, 0.62, 0.8, 0.88) on the solid, leaves and
   transparent materials; the foliage material has (1, 1, 1, 1), so plants keep their look. `face_shade` in
   `VoxelShaderCommon.hlsl`:
@@ -954,19 +962,23 @@ like opaque blocks with holes.
     facing away from it, the top value facing it, so the sunny side is the brightest and the shade moves with the
     day; the blend from the fixed values takes the sun's rise to a height of 0.2 (`SUN_SHADE_RISE`);
   - it darkens only the sky light (`calc_voxel_light`), so a torch lights every side of a block alike;
+  - a face seen from its back (`SV_IsFrontFace`, leaves, glass and liquids) takes the shade of the opposite face,
+    so the underside of a water surface is shaded like a bottom face;
   - `RendererSettings.faceShadeStrength` (global `_VoxelFaceShadeStrength`, set every frame by
     `VoxelWorldRenderer`, shipped 0.65) pulls the result towards 1: 0 lights every face alike, 1 is the full shade.
 - **Mipmaps.** `TexRegistry` builds the texture array with the mip chain of its sources (the smallest mip count
-  among them). The 38 leaf and plant tiles have `mipMapsPreserveCoverage`, so their alpha coverage stays the same
+  among them). A tile with fewer levels than the others logs a warning naming it. The 38 leaf and plant tiles have `mipMapsPreserveCoverage`, so their alpha coverage stays the same
   per mip and far leaves do not thin out.
 - **Liquid top.** A liquid (category Liquids, `VoxelDef.Liquid`) whose upper neighbour is not the same voxel and
   not a full opaque block is a liquid top (`packed.z` bit 15). The vertex shader lowers its top corners by
-  `LIQUID_SURFACE_DROP` 0.1 (`VoxelRenderConstants.LiquidSurfaceDrop`); `VoxelPostProcessHandler` uses the same
-  surface for the under-water check. Where a lowered top meets a full block of the same liquid at its side, a
+  `LIQUID_SURFACE_DROP` 0.1 (`VoxelRenderConstants.LiquidSurfaceDrop`); `VoxelPostProcessHandler.IsLiquidTop`
+  uses the same rule (a slab or other partial solid on the water still lowers it) for the under-water check. Where a lowered top meets a full block of the same liquid at its side, a
   0.1 slit can show (accepted).
 - **Packed z.** ao u8 | volume fog slot u6 | cut-out u1 | liquid top u1 | surface alpha u8 | glow u8. The volume
   fog slots shrink from 8 to 6 bits (63 liquids with fog).
 - **Tests.** `PointBuildTests.BuildPoints_SeeThroughFaceRules` (GPU build of small scenes: face counts and the
-  two flags); `RenderDataTests` (cut-out materials in queue AlphaTest, the three voxel shaders compile, the shipped face shade strength, the glass pass and the feature on both
-  renderers, `GPUVoxelDef` 96 bytes); `GpuConstantsTests` (`MESH_LAYER_TRANSPARENT`, `VOLUME_FOG_SLOT_MASK`,
+  two flags), `LiquidTop_CameraMatchesDrawnSurface` (camera check = drawn surface, also under slabs) and
+  `GpuVoxelDefs_CarryTheBaseVoxel`; `RenderDataTests` (cut-out materials in queue AlphaTest, the three voxel
+  shaders compile, the shipped face shade strength, both glass passes and the feature on both renderers, the
+  missing cut-out material warning, `GPUVoxelDef` 100 bytes); `RegistryTests.TexRegistry_TileWithFewerMips_WarnsAndNamesIt`; `GpuConstantsTests` (`MESH_LAYER_TRANSPARENT`, `VOLUME_FOG_SLOT_MASK`,
   `LIQUID_SURFACE_DROP`).

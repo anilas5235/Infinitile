@@ -288,6 +288,25 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void TexRegistry_TileWithFewerMips_WarnsAndNamesIt(){
+            TexRegistry registry = new(4);
+            Texture2D mipped = new(VoxelRegistry.TextureSize, VoxelRegistry.TextureSize, TextureFormat.RGBA32, true){
+                name = "Mipped"
+            };
+            try{
+                registry.Register(mipped);
+                registry.Register(_fixtures.CreateTexture("NoMips", new Color32(1, 2, 3, 4)));
+                LogAssert.Expect(LogType.Warning, new Regex(@"1 tile\(s\) have fewer mip levels.*'NoMips' \(1\)"));
+                registry.PrepareArray();
+                Assert.AreEqual(1, registry.TextureArray.mipmapCount, "the array keeps the levels every tile has");
+            }
+            finally{
+                registry.DestroyArray();
+                UnityEngine.Object.DestroyImmediate(mipped);
+            }
+        }
+
+        [Test]
         public void TexRegistry_RejectsNullWrongSizeAndMixedFormats(){
             TexRegistry registry = new(4);
             Assert.Throws<ArgumentNullException>(() => registry.Register(null));

@@ -291,7 +291,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                 _voxelEngineRenderGenData.VoxelRenderDefs[i] = def;
                 // An unregistered id blocks light like a solid block
                 byte attenuation = registered ? def.LightAttenuation : (byte)VoxelLightLimits.MaxLevel;
-                gpuVoxelDefData[i] = new GPUVoxelDef(def, attenuation);
+                gpuVoxelDefData[i] = new GPUVoxelDef(def, attenuation, BaseOf((ushort)i));
                 _lightTable.Set(i, attenuation, registered ? def.LightEmission : (ushort)0);
             }
 
@@ -485,8 +485,9 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             private uint HidesNeighbourFaces; // full cube: a neighbour of the same or a lower layer skips its face
             private uint AlphaCutout; // hard alpha edge, cut-out pass
             private uint Liquid; // the top layer's surface sits lower
+            private uint BaseId; // the base voxel: turned variants of one block count as the same block
 
-            public GPUVoxelDef(Voxel.VoxelDef def, byte lightAttenuation){
+            public GPUVoxelDef(Voxel.VoxelDef def, byte lightAttenuation, ushort baseId){
                 MeshLayer = (uint)def.MeshLayer;
                 AlwaysRenderAllFaces = def.AlwaysRenderAllFaces ? 1u : 0u;
                 VolumeFog = def.VolumeFog;
@@ -504,6 +505,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                 HidesNeighbourFaces = def.HidesNeighbourFaces ? 1u : 0u;
                 AlphaCutout = def.AlphaCutout ? 1u : 0u;
                 Liquid = def.Liquid ? 1u : 0u;
+                BaseId = baseId;
             }
         }
     }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using Engine.Scripts.Render;
 using Engine.Scripts.Render.Post;
 using Engine.Scripts.Settings;
@@ -12,6 +13,7 @@ using Unity.Collections;
 using Unity.Mathematics;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.TestTools;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
 using Object = UnityEngine.Object;
 
@@ -70,11 +72,29 @@ namespace Engine.Tests.EditMode{
                 AssetDatabase.LoadAssetAtPath<VoxelEngineSettings>("Assets/EngineSettings/VoxelEngineSettings.asset");
             Assert.IsNotNull(settings, "shipped engine settings missing");
             Shader shader = settings.Renderer.transparentMaterial.shader;
-            bool glass = false;
-            for (int i = 0; i < shader.passCount; i++)
-                glass |= shader.FindPassTagValue(i, new UnityEngine.Rendering.ShaderTagId("LightMode")).name ==
-                         VoxelGlassFeature.LightMode;
+            bool glass = false, over = false;
+            for (int i = 0; i < shader.passCount; i++){
+                string lightMode = shader.FindPassTagValue(i, new UnityEngine.Rendering.ShaderTagId("LightMode")).name;
+                glass |= lightMode == VoxelGlassFeature.LightMode;
+                over |= lightMode == VoxelGlassFeature.OverLightMode;
+            }
+
             Assert.IsTrue(glass, "TransparentVoxel has no VoxelGlass pass");
+            Assert.IsTrue(over, "TransparentVoxel has no VoxelGlassOver pass (glass in front of a liquid)");
+        }
+
+        [Test]
+        public void TransparentLayer_WithoutCutoutMaterial_Warns(){
+            _material = new Material(Shader.Find("Custom/TransparentVoxel")){ name = "TestTransparent" };
+            LogAssert.Expect(LogType.Warning, new Regex("No cut-out material next to 'TestTransparent'"));
+            LogAssert.Expect(LogType.Log, new Regex("Added new RenderBuffer for TestTransparent"));
+            _bufferManager = RenderBufferManager.WithCutoutPass(_material, null);
+            _bufferManager.Dispose();
+
+            // The test fixtures' empty RendererSettings have no materials at all: no warning
+            LogAssert.Expect(LogType.Log, new Regex("Added new RenderBuffer for <no material>"));
+            _bufferManager = RenderBufferManager.WithCutoutPass(null, null);
+            LogAssert.NoUnexpectedReceived();
         }
 
         [Test]
@@ -142,15 +162,16 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void GpuVoxelDef_Is96Bytes(){
+        public void GpuVoxelDef_Is100Bytes(){
             Type type = typeof(VoxelRegistry).GetNestedType("GPUVoxelDef", BindingFlags.NonPublic);
             Assert.IsNotNull(type, "VoxelRegistry.GPUVoxelDef not found");
-            Assert.AreEqual(96, Marshal.SizeOf(type));
+            Assert.AreEqual(100, Marshal.SizeOf(type));
             Assert.AreEqual(76, (int)Marshal.OffsetOf(type, "LightAttenuation"), "HLSL VoxelDef offset");
             Assert.AreEqual(80, (int)Marshal.OffsetOf(type, "SurfaceAlpha"), "HLSL VoxelDef offset");
             Assert.AreEqual(84, (int)Marshal.OffsetOf(type, "HidesNeighbourFaces"), "HLSL VoxelDef offset");
             Assert.AreEqual(88, (int)Marshal.OffsetOf(type, "AlphaCutout"), "HLSL VoxelDef offset");
             Assert.AreEqual(92, (int)Marshal.OffsetOf(type, "Liquid"), "HLSL VoxelDef offset");
+            Assert.AreEqual(96, (int)Marshal.OffsetOf(type, "BaseId"), "HLSL VoxelDef offset");
         }
 
         [Test]
@@ -163,7 +184,7 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(12, (int)Marshal.OffsetOf(type, "Glow"), "HLSL VoxelDef offset");
 
             Voxel.VoxelDef def = new(){ VolumeFog = 3, Glow = 200, SurfaceAlpha = 115 };
-            object gpuDef = Activator.CreateInstance(type, def, (byte)0);
+            object gpuDef = Activator.CreateInstance(type, def, (byte)0, (ushort)0);
             Assert.AreEqual(3u, (uint)field.GetValue(gpuDef));
             FieldInfo alpha = type.GetField("SurfaceAlpha", BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.IsNotNull(alpha, "GPUVoxelDef.SurfaceAlpha not found");

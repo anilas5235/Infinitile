@@ -12,8 +12,12 @@
 
     // The blended blocks of the transparent layer, from its buffer (the cut-out leaves in it are CutoutVoxel's):
     // - VoxelGlass: glass and other plain see-through blocks, drawn by VoxelGlassFeature after the skybox and before
-    //   URP copies the opaque colour, so a liquid surface in front shows them in the scene behind it.
-    // - Universal Forward: the voxels with a volume slot (liquids), with URP's transparents.
+    //   URP copies the opaque colour, so a liquid surface in front shows them in the scene behind it. No depth
+    //   write, so a liquid surface behind the glass is still drawn.
+    // - Universal Forward: the voxels with a volume slot (liquids), with URP's transparents. Marks its pixels in
+    //   the stencil (LIQUID_STENCIL).
+    // - VoxelGlassOver: the glass again, drawn by VoxelGlassFeature after the transparents, only on liquid pixels
+    //   and only where the glass lies in front of the liquid surface, so the liquid does not cover it.
     // A pass's other quads collapse to a point and are not rasterised.
 
     SubShader
@@ -50,7 +54,7 @@
             uint4 packed : TEXCOORD1;
             float3 positionWS : TEXCOORD2; // horizon fog
             float4 positionSS : TEXCOORD3;
-            float shade : TEXCOORD4; // face shade
+            float2 shade : TEXCOORD4; // face shade seen from the front, from the back
         };
 
         // ── Vertex shader with expansion ─────────────────────────────
@@ -68,7 +72,7 @@
             o.packed = v.packed;
             o.positionSS = ComputeScreenPos(o.positionCS);
             o.positionWS = TransformObjectToWorld(v.positionOS);
-            o.shade = face_shade(_FaceShade, v.normal);
+            o.shade = float2(face_shade(_FaceShade, v.normal), face_shade(_FaceShade, -v.normal));
             return o;
         }
 
@@ -85,15 +89,23 @@
         TEXTURE2D_ARRAY(_Textures);
         SAMPLER(sampler_Textures);
 
-        // The surface colour (texture, AO, light, glow and face shade) and its alpha.
-        float4 surface_color(const Varyings IN)
+        // The surface colour (texture, AO, light, glow and face shade) and its alpha; front: the side of the quad
+        // the camera sees (SV_IsFrontFace), so a face seen from inside the block is shaded like the opposite face.
+        float4 surface_color(const Varyings IN, const bool front)
         {
             const float4 albedo = SAMPLE_TEXTURE2D_ARRAY(_Textures, sampler_Textures, IN.uv, get_tex_index(IN.packed));
             const float4 ao_color = calc_ao_color(_AOColor, albedo, _AOCurve, get_ao(IN.packed), _AOIntensity,
                                                   _AOPower, IN.uv);
-            const float3 light = calc_voxel_light(IN.packed, IN.uv, IN.shade);
+            const float3 light = calc_voxel_light(IN.packed, IN.uv, front ? IN.shade.x : IN.shade.y);
             const float glow = calc_glow(get_glow(IN.packed));
             return float4(ao_color.rgb * light * glow, albedo.w * get_surface_alpha(IN.packed));
+        }
+
+        half4 frag_glass(Varyings IN, const bool front : SV_IsFrontFace) : SV_Target
+        {
+            const float4 color = surface_color(IN, front);
+            clip(color.a - 0.001f);
+            return half4(apply_horizon_fog(color.rgb, IN.positionWS), color.a);
         }
         ENDHLSL
 
@@ -110,20 +122,42 @@
 
             Cull Off
             ZTest LEqual
-            ZWrite On
+            ZWrite Off
             Blend SrcAlpha OneMinusSrcAlpha
 
             HLSLPROGRAM
             #pragma target 4.5
             #pragma vertex   vert_glass
             #pragma fragment frag_glass
+            ENDHLSL
+        }
 
-            half4 frag_glass(Varyings IN) : SV_Target
+        // ═════════════════════════════════════════════════════════════
+        // Pass – Glass over liquids (VoxelGlassFeature, after the transparents)
+        // ═════════════════════════════════════════════════════════════
+        Pass
+        {
+            Name "Voxel Glass Over Liquids"
+            Tags
             {
-                const float4 color = surface_color(IN);
-                clip(color.a - 0.001f);
-                return half4(apply_horizon_fog(color.rgb, IN.positionWS), color.a);
+                "LightMode" = "VoxelGlassOver"
             }
+
+            Cull Off
+            ZTest LEqual // the liquid wrote its depth: glass behind its surface stays under it
+            ZWrite Off
+            Blend SrcAlpha OneMinusSrcAlpha
+            Stencil
+            {
+                Ref 64 // LIQUID_STENCIL
+                ReadMask 64
+                Comp Equal
+            }
+
+            HLSLPROGRAM
+            #pragma target 4.5
+            #pragma vertex   vert_glass
+            #pragma fragment frag_glass
             ENDHLSL
         }
 
@@ -142,6 +176,13 @@
             ZTest LEqual
             ZWrite On
             Blend SrcAlpha OneMinusSrcAlpha
+            Stencil
+            {
+                Ref 64 // LIQUID_STENCIL: the pixels a liquid surface covers, for the VoxelGlassOver pass
+                WriteMask 64
+                Comp Always
+                Pass Replace
+            }
 
             HLSLPROGRAM
             #pragma target 4.5
@@ -256,7 +297,7 @@
             half4 frag(Varyings IN, const bool front : SV_IsFrontFace) : SV_Target
             {
                 // --- Surface: texture, AO, light, glow, face shade ---
-                const float4 surface = surface_color(IN);
+                const float4 surface = surface_color(IN, front);
                 float3 color = surface.rgb;
                 float alpha = surface.a;
 

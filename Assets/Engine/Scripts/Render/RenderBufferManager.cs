@@ -44,8 +44,15 @@ namespace Engine.Scripts.Render{
         ///     passes skip the other points.
         /// </summary>
         /// <param name="mat">The transparent material.</param>
-        /// <param name="cutout">The cut-out material; without one, only <paramref name="mat" /> draws.</param>
+        /// <param name="cutout">
+        ///     The cut-out material; without one, only <paramref name="mat" /> draws and the cut-out points (leaves)
+        ///     are not drawn at all, which logs a warning.
+        /// </param>
         public static RenderBufferManager WithCutoutPass(Material mat, Material cutout){
+            if (mat != null && cutout == null)
+                VoxelEngineLogger.Warn<RenderBufferManager>(
+                    $"No cut-out material next to '{mat.name}' (RendererSettings.cutoutMaterial): leaves and other " +
+                    "cut-out blocks are not drawn.");
             if (mat == null || cutout == null) return new RenderBufferManager(mat);
             return new RenderBufferManager(mat, new[]{ cutout, mat });
         }
@@ -180,7 +187,7 @@ namespace Engine.Scripts.Render{
             RenderBuffer rBuffer = new(_renderBuffers.Count);
             _renderBuffers.Add(rBuffer);
             VoxelEngineLogger.Info<RenderBufferManager>(
-                $"Added new RenderBuffer for {_material.name}. Total buffers: {_renderBuffers.Count}");
+                $"Added new RenderBuffer for {_layerName}. Total buffers: {_renderBuffers.Count}");
             return rBuffer;
         }
 

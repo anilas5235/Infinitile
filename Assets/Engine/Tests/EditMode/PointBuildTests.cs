@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using Engine.Scripts.Render;
+using Engine.Scripts.Render.Post;
 using Engine.Scripts.Utils.Collections;
 using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Data.Mesh;
@@ -171,6 +172,58 @@ namespace Engine.Tests.EditMode{
             RawPoint[] covered = BuildBlocks((0, 0, 0, water), (0, 1, 0, solid));
             Assert.AreEqual(5, covered.Length, "water under stone");
             Assert.IsFalse(covered.Any(p => p.LiquidTop), "water under stone");
+        }
+
+        /// <summary>
+        ///     The camera's liquid-top test (<see cref="VoxelPostProcessHandler.IsLiquidTop" />, which lowers the
+        ///     underwater fog's surface) agrees with the drawn surface (PointBuilder.compute, is_liquid_top): water under
+        ///     a slab or another partial solid shape is a liquid top, water under a full solid block is not.
+        /// </summary>
+        [Test]
+        public void LiquidTop_CameraMatchesDrawnSurface(){
+            VoxelRegistry registry = _importer.VoxelRegistry;
+            NativeArray<Voxel.VoxelDef> defs = registry.GetVoxelGenData().VoxelRenderDefs.GetSubArray(0, registry.BaseCount);
+            ushort water = Ids(defs, d => d.Liquid && d.MeshLayer == MeshLayer.Transparent)[0];
+            ushort[] partial = Ids(defs, d => d.MeshLayer == MeshLayer.Solid && !d.HidesNeighbourFaces);
+            ushort[] full = Ids(defs, d => d.MeshLayer == MeshLayer.Solid && d.HidesNeighbourFaces);
+            ushort[] seeThrough = Ids(defs, d => d.MeshLayer == MeshLayer.Transparent && !d.Liquid);
+            Assert.IsNotEmpty(partial, "a partial solid shape (slab)");
+            Assert.IsNotEmpty(full);
+            Assert.IsNotEmpty(seeThrough);
+
+            Assert.IsTrue(VoxelPostProcessHandler.IsLiquidTop(registry, water, 0), "water under air");
+            Assert.IsFalse(VoxelPostProcessHandler.IsLiquidTop(registry, water, water), "water under water");
+            Assert.IsFalse(VoxelPostProcessHandler.IsLiquidTop(registry, full[0], 0), "stone is no liquid");
+
+            foreach (ushort above in new[]{ (ushort)0, partial[0], full[0], seeThrough[0] }){
+                bool drawn = BuildBlocks((0, 0, 0, water), (0, 1, 0, above)).Any(p => p.LiquidTop);
+                Assert.AreEqual(drawn, VoxelPostProcessHandler.IsLiquidTop(registry, water, above),
+                    $"water under voxel {above} ({defs[above].MeshLayer})");
+            }
+
+            foreach (ushort above in partial)
+                Assert.IsTrue(VoxelPostProcessHandler.IsLiquidTop(registry, water, above),
+                    $"water under the partial solid voxel {above}");
+            foreach (ushort above in full)
+                Assert.IsFalse(VoxelPostProcessHandler.IsLiquidTop(registry, water, above),
+                    $"water under the full solid voxel {above}");
+        }
+
+        /// <summary>
+        ///     The GPU render definition of every id carries its base voxel (PointBuilder.compute compares base voxels,
+        ///     so turned variants of one see-through block or liquid count as the same block).
+        /// </summary>
+        [Test]
+        public void GpuVoxelDefs_CarryTheBaseVoxel(){
+            VoxelRegistry registry = _importer.VoxelRegistry;
+            GraphicsBuffer buffer = registry.VoxelRenderDefBuffer;
+            Assert.AreEqual(100, buffer.stride, "GPUVoxelDef stride");
+            const int words = 25, baseIdWord = 24;
+            uint[] data = new uint[buffer.count * words];
+            buffer.GetData(data);
+            Assert.Greater(buffer.count, registry.BaseCount, "the package has turned variants");
+            for (int id = 0; id < buffer.count; id++)
+                Assert.AreEqual((uint)registry.BaseOf((ushort)id), data[id * words + baseIdWord], $"voxel {id}");
         }
 
         /// <summary>

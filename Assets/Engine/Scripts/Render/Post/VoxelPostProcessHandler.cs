@@ -4,6 +4,7 @@ using Engine.Scripts.VoxelConfig.Data.Mesh;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
+using Unity.Collections;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
 
@@ -78,14 +79,18 @@ namespace Engine.Scripts.Render.Post{
         }
 
         /// <summary>
-        ///     True when <paramref name="voxelId" /> is a liquid whose surface is drawn lower with
-        ///     <paramref name="above" /> on top of it: another voxel that is not a solid block (PointBuilder.compute,
-        ///     is_liquid_top).
+        ///     True when <paramref name="voxelId" /> (a base id) is a liquid whose surface is drawn lower with
+        ///     <paramref name="above" /> (a base id) on top of it: another voxel that is not a full solid block, so a
+        ///     slab or another partial solid shape still lowers the surface. Same rule as PointBuilder.compute,
+        ///     is_liquid_top.
         /// </summary>
-        private static bool IsLiquidTop(VoxelRegistry registry, ushort voxelId, ushort above){
+        internal static bool IsLiquidTop(VoxelRegistry registry, ushort voxelId, ushort above){
             if (above == voxelId) return false;
-            if (!registry.TryGet(voxelId, out Voxel liquid) || liquid.category != VoxelCategory.Liquids) return false;
-            return !registry.TryGet(above, out Voxel aboveVoxel) || aboveVoxel.meshLayer != MeshLayer.Solid;
+            NativeArray<Voxel.VoxelDef> defs = registry.GetVoxelGenData().VoxelRenderDefs;
+            if (!defs.IsCreated || voxelId >= defs.Length || !defs[voxelId].Liquid) return false;
+            if (above >= defs.Length) return true;
+            Voxel.VoxelDef top = defs[above];
+            return top.MeshLayer != MeshLayer.Solid || !top.HidesNeighbourFaces;
         }
 
         private void OnEnable(){
