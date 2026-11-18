@@ -33,7 +33,7 @@ MonoBehaviour:
     chunkGenBatchSize: 8
     meshingBatchSize: 16
     partitionBuildBatchSize: 8
-    colliderBatchSize: 6
+    colliderBatchSize: 8
     lightBatchSize: 8
     referenceDrawDistance: 12
     mainThreadBudgetMs: 2
