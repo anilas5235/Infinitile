@@ -205,9 +205,9 @@ namespace Engine.Scripts.Render{
             for (int i = 0; i < _maxInFlight; i++) _buildRequests[i] = new PartitionBuildRequest(default);
 
             _solidBufferManager = new RenderBufferManager(rSettings.solidMaterial);
-            // the transparent layer's buffer holds the cut-out leaves too, drawn with the opaque blocks
+            // the transparent layer's buffer holds the cut-out blocks (leaves) too, drawn with the opaque blocks
             _transparentBufferManager =
-                RenderBufferManager.WithCutoutPass(rSettings.transparentMaterial, rSettings.leavesMaterial);
+                RenderBufferManager.WithCutoutPass(rSettings.transparentMaterial, rSettings.cutoutMaterial);
             _foliageBufferManager = new RenderBufferManager(rSettings.foliageMaterial);
             _layers = new[]{ _solidBufferManager, _transparentBufferManager, _foliageBufferManager };
 

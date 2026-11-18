@@ -21,7 +21,7 @@ MonoBehaviour:
     solidMaterial: {fileID: 2100000, guid: b6215133664aff74dad83d56615f47d0, type: 2}
     transparentMaterial: {fileID: 2100000, guid: e8e8dbf7c2062df49bf757b4e9d3a636, type: 2}
     foliageMaterial: {fileID: 2100000, guid: daf19eb8c4aeb474ebe2bb4b7e1f87a6, type: 2}
-    leavesMaterial: {fileID: 2100000, guid: 8f09acb658f14528aec3104037ad5f6f, type: 2}
+    cutoutMaterial: {fileID: 2100000, guid: 8f09acb658f14528aec3104037ad5f6f, type: 2}
     pointBuilder: {fileID: 7200000, guid: b253108f447042e389630ea3cd8affd1, type: 3}
     copyPoints: {fileID: 7200000, guid: d6821e19a578d8a468410694549d56e8, type: 3}
     pageCulling: {fileID: 7200000, guid: 7c3e1a9f5b2d4e8a9f0c6d1b2a3e4f50, type: 3}

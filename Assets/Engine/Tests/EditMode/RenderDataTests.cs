@@ -44,22 +44,23 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void CutoutMaterials_DrawWithTheOpaqueBlocks(){
-            // Plants and leaves are cut out and drawn with the opaque blocks (queue AlphaTest), so they are in the
-            // colour and depth copies a liquid surface reads: seen from above, they show under the water.
+            // Plants and the cut-out blocks of the transparent layer (leaves) are drawn with the opaque blocks (queue
+            // AlphaTest), so they are in the colour and depth copies a liquid surface reads: seen from above, they show
+            // under the water.
             VoxelEngineSettings settings =
                 AssetDatabase.LoadAssetAtPath<VoxelEngineSettings>("Assets/EngineSettings/VoxelEngineSettings.asset");
             Assert.IsNotNull(settings, "shipped engine settings missing");
             Material liquid = settings.Renderer.transparentMaterial;
             Assert.IsNotNull(liquid);
             Assert.GreaterOrEqual(liquid.renderQueue, (int)UnityEngine.Rendering.RenderQueue.Transparent);
-            foreach (Material cutout in new[]{ settings.Renderer.foliageMaterial, settings.Renderer.leavesMaterial }){
+            foreach (Material cutout in new[]{ settings.Renderer.foliageMaterial, settings.Renderer.cutoutMaterial }){
                 Assert.IsNotNull(cutout);
                 Assert.AreEqual("Custom/CutoutVoxel", cutout.shader.name, cutout.name);
                 Assert.AreEqual((int)UnityEngine.Rendering.RenderQueue.AlphaTest, cutout.renderQueue, cutout.name);
             }
 
-            Assert.AreEqual(3f, settings.Renderer.leavesMaterial.GetFloat("_VoxelPass"),
-                "the leaves material draws only the cut-out points of the transparent buffer");
+            Assert.AreEqual(3f, settings.Renderer.cutoutMaterial.GetFloat("_VoxelPass"),
+                "the cut-out material draws only the cut-out points of the transparent buffer");
             Assert.AreEqual(0f, settings.Renderer.foliageMaterial.GetFloat("_VoxelPass"));
         }
 

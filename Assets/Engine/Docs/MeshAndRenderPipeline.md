@@ -920,7 +920,7 @@ like opaque blocks with holes.
   | Layer | Material (shader) | Queue | What it draws |
   | --- | --- | --- | --- |
   | Solid | `VoxelSolidMat` (`Custom/VoxelShader`) | Geometry | everything |
-  | Transparent | `VoxelLeaves` (`Custom/CutoutVoxel`, `_VoxelPass` 3) | AlphaTest | the cut-out points (leaves) |
+  | Transparent | `VoxelCutout` (`Custom/CutoutVoxel`, `_VoxelPass` 3) | AlphaTest | the cut-out points (leaves) |
   | Transparent | `VoxelTransparent` (`Custom/TransparentVoxel`) | Transparent | liquids (pass `UniversalForward`) |
   | Transparent | same, pass `VoxelGlass` | after the skybox | glass and other blended see-through voxels |
   | Foliage | `VoxelFoliage` (`Custom/CutoutVoxel`, `_VoxelPass` 0) | AlphaTest | everything |
@@ -934,6 +934,13 @@ like opaque blocks with holes.
   (`VoxelDef.AlphaCutout`). Its points carry the cut-out flag (`PointData.packed.z` bit 14). `CutoutVoxel` clips
   at `_Cutoff` 0.5, writes depth, draws both sides (`Cull Off`), and a back face takes the shade of the face it
   shows. Its `DepthOnly` pass clips too, so the depth copy has the holes.
+- **Which voxels are cut out.** Every voxel whose texture alpha is only 0 or 1 draws cut-out (audit of
+  2026-11-18). On the transparent layer these are the eight leaf voxels (`RendererSettings.cutoutMaterial`,
+  `VoxelCutout.mat`). The whole foliage layer (grass, flowers, ferns, reeds, mushrooms, wheat, dead bush, rocks,
+  torch) is cut out through `VoxelFoliage`. Glass (glints at alpha 0.2–0.4), water (0.8) and lava (0.94) stay
+  blended. `VoxelFoliage` and `VoxelCutout` share the shader but not the material: the foliage buffer draws all
+  its points (`_VoxelPass` 0) without face shade, the transparent buffer only its cut-out points (`_VoxelPass` 3)
+  with it. Each buffer is drawn once per material either way, so one material would not save a draw.
 - **Face rules** (`should_render_face` in `PointBuilder.compute`):
   - a full cube in the same or a lower layer hides the face (stone keeps its face towards water or leaves);
   - two cut-out cubes share one face: the one towards +x, +y or +z;

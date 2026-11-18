@@ -29,7 +29,7 @@ namespace Engine.Scripts.Settings{
         ///     The material used to render the cut-out blocks of the transparent layer, such as leaves
         ///     (CutoutVoxel.shader, _VoxelPass 3), with the opaque blocks.
         /// </summary>
-        public Material leavesMaterial;
+        public Material cutoutMaterial;
 
         /// <summary>
         ///     The compute shader used to build point data from voxel partitions.

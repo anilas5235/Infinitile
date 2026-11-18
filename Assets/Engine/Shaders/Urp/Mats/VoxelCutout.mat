@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: VoxelLeaves
+  m_Name: VoxelCutout
   m_Shader: {fileID: 4800000, guid: bece9e46c95d42a2ae671f261e2458c3, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
