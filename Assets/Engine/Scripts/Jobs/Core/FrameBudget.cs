@@ -96,9 +96,17 @@ namespace Engine.Scripts.Jobs.Core{
             _itemStart = now;
         }
 
+        /// <summary>
+        ///     Ends the current span without asking for a new item, e.g. after the last part of a piece of work that
+        ///     wants to know its longest item (see <see cref="TimeItems" />).
+        /// </summary>
+        internal void EndItem(){
+            if (TimeItems) MarkItem();
+        }
+
         /// <summary>Ends the frame's last span (see <see cref="TimeItems" />).</summary>
         internal void EndFrame(){
-            if (TimeItems) MarkItem();
+            EndItem();
         }
 
         /// <summary>

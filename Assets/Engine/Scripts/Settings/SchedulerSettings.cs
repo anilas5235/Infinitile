@@ -46,7 +46,7 @@ namespace Engine.Scripts.Settings{
         /// </summary>
         [Tooltip("Number of partitions to bake per update for collider generation")]
         [Min(1)]
-        public int colliderBatchSize = 4;
+        public int colliderBatchSize = 8;
 
         /// <summary>
         ///     Number of chunks lit per light job batch. Read once when the world is built; at least 1 (a smaller

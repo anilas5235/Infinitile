@@ -231,7 +231,7 @@ namespace Engine.Scripts.World{
 
             if (newFocus.Equals(Focus)) return;
             Focus = newFocus;
-            _scheduler.FocusUpdate(Focus);
+            _scheduler.RequestFocusUpdate(Focus);
         }
 
         #region API

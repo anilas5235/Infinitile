@@ -71,8 +71,14 @@ flight. The scheduler gives one stage per frame a turn on the main thread, so a 
   is alone gets every frame.
 - **Queues stay inside their windows.** The focus update removes the queued entries that left the stage's window
   before it re-sorts the rest, so no queue holds more than its window (mesh: the draw window, 5000 partitions at
-  draw distance 12). It runs when a check every 0.5 s finds the focus in another partition or facing another
-  direction (the forward vector quantised to 45°), and once when the world starts or is regenerated.
+  draw distance 12). A check every 0.5 s requests it when it finds the focus in another partition or facing
+  another direction (the forward vector quantised to 45°). The update is seven items of the frame's budget (spec
+  §16.16, DEC-116): prune and re-sort the data, light, mesh and collider queues, the chunk store's eviction queue,
+  the pool's chunk queue and its partition queue. The largest part of a sprint flight at draw 12 took 1.0–1.9 ms.
+  The parts run at the start of the scheduler's frame, before any stage turn; while parts are left,
+  no stage works, so no stage dispatches from a queue that still has the old order. A new request starts the
+  parts again with the new focus. When the world starts or is regenerated the update runs at once in one piece
+  (`VoxelEngineScheduler.FocusUpdate`); `FocusInOneItem` makes every request do so, for measurements only.
 - **The mesh stage waits for the renderer.** Every meshed partition also needs a GPU build. While more than twice
   the GPU build slots wait in the renderer (`CMeshBuildScheduler.RendererBehind`), the mesh stage neither scans nor
   dispatches: it still collects a finished batch and otherwise passes the frame to the next stage. The partitions
@@ -81,8 +87,8 @@ flight. The scheduler gives one stage per frame a turn on the main thread, so a 
 - **The mesh batch and the GPU build slots follow the draw distance.** `SchedulerSettings.MeshBatchSizeAt` and
   `BuildSlotsAt` scale the two asset values with the side of the draw window, up to 32 and 16; they are read once,
   when the world is built or its draw distance changes (`MeshAndRenderPipeline.md`, version 1.9). The data, light and collider batch sizes are
-  read once as well, with at least 1. The class default of `colliderBatchSize` is 4; the shipped
-  `VoxelEngineSettings.asset` sets 6.
+  read once as well, with at least 1. `colliderBatchSize` is 8 in the class and in the shipped
+  `VoxelEngineSettings.asset` (spec §16.19, DEC-117).
 - **A partition without a voxel is not meshed.** `ChunkVoxelData.OccupiedPartitions` has one bit per partition of
   the chunk, set when generation or `SetVoxel` puts a voxel that is not air into it, and never cleared. The mesh
   stage takes a partition whose bit is clear from the queue and makes it active at once, with an empty mesh
@@ -137,8 +143,8 @@ and at most a share of a fast capped frame (`SchedulerSettings.fastCapBudgetShar
 - **Regenerating the world** (`VoxelWorld.Regenerate`) calls `CompleteRunning`, which completes and applies every
   running batch without the budget, a collect the budget cut included. Partitions a cut mesh dispatch still holds
   are dropped together with the old handlers.
-- **Not part of the budget:** the focus update (outside the turn, see above) and the renderer's GPU builds, which
-  have their own slot count.
+- **Not part of the budget:** the renderer's GPU builds, which have their own slot count. The focus update is part
+  of it since spec §16.16 (see above).
 - **A capped frame gives part of its spare time to the budget.** The budget is per frame, and a frame at 120
   frames per second is 8.33 ms; a frame cap with a longer period leaves that much more time in every frame. The
   budget of a capped frame is `mainThreadBudgetMs + cappedFrameSpareShare × (period − 8.33 ms)` (shipped share
@@ -195,7 +201,8 @@ claims nothing while a bake runs and when the dispatch stops before the claim of
 
 - **Profiler markers** (`VoxelProfilerMarkers`, all named `Voxel.…`): `Voxel.Scheduler.{Data,Light,Mesh,Collider}`
   for the turn of each stage and `Voxel.Scheduler.{Collect,Scan,Dispatch}` for its three steps;
-  `Voxel.Focus.*` for the focus update; `Voxel.MeshBuild.{WaitBake,Claim,Apply,Dequeue}` for the parts of the
+  `Voxel.Focus.Update` for the focus update and `Voxel.Focus.{Data,Light,Mesh,Collider,ChunkStore,Pool}` for its
+  parts (in the attribution under the scheduler row "scheduler: stages + focus update (sum)"); `Voxel.MeshBuild.{WaitBake,Claim,Apply,Dequeue}` for the parts of the
   mesh stage (`WaitBake` also covers completing the mesh job); `Voxel.DataGen.{EvictWait,Evict,Add}` for the
   items of the data collect; `Voxel.Wait.*` where the main thread waits for a
   job whose data is about to change.

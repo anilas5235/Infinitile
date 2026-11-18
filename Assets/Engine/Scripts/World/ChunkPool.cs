@@ -96,10 +96,24 @@ namespace Engine.Scripts.World{
         ///     Updates focus and queue priorities.
         /// </summary>
         internal void FocusUpdate(Focus focus){
+            FocusUpdateChunks(focus);
+            FocusUpdatePartitions(focus);
+        }
+
+        /// <summary>
+        ///     The first half of <see cref="FocusUpdate" />: sets the focus and reprioritises the chunk queue. The
+        ///     scheduler runs the two halves as separate items of the frame's budget.
+        /// </summary>
+        internal void FocusUpdateChunks(Focus focus){
             _focus = focus;
             // Static lambdas with explicit state (instance method groups allocate a delegate per call);
             // reclaim by plain distance
             _chunkQueue.UpdateAllPriorities(focus, static (f, pos) => EvictionPriority(ref pos, ref f));
+        }
+
+        /// <summary>The second half of <see cref="FocusUpdate" />: reprioritises the partition queue.</summary>
+        internal void FocusUpdatePartitions(Focus focus){
+            _focus = focus;
             _partitionQueue.UpdateAllPriorities(focus, static (f, pos) => EvictionPriority(ref pos, ref f));
         }
 

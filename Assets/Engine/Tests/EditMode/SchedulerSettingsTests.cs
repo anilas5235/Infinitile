@@ -51,6 +51,14 @@ namespace Engine.Tests.EditMode{
                 "class default");
         }
 
+        [Test]
+        public void ShippedSettings_BakeEightCollidersPerBatch(){
+            // The owner's pick of 2026-11-18 from batches 4, 6 and 8 (DEC-117): 8 halves the collider queue peak of a
+            // sprint flight at the same bake item cost; the class default is the same value
+            Assert.AreEqual(8, Shipped().colliderBatchSize, "collider batch of the shipped settings");
+            Assert.AreEqual(Shipped().colliderBatchSize, new SchedulerSettings().colliderBatchSize, "class default");
+        }
+
         [TestCase(2, 3, 2)]
         [TestCase(4, 6, 3)]
         [TestCase(8, 11, 5)]

@@ -106,9 +106,10 @@ namespace Engine.Scripts.Jobs.Core{
         ///     <see cref="SchedulerSettings.cappedFrameSpareShare" /> and <see cref="SchedulerSettings.fastCapBudgetShare" />
         ///     when the world is built; under a frame cap it follows the cap that is in force in the frame
         ///     (<see cref="FrameCap" />): it grows under a cap slower than 120 frames per second and shrinks under a
-        ///     faster one. The focus update is not
-        ///     part of it: it runs outside the tick, from a check every 0.5 s, when the focus moved to another
-        ///     partition or its forward vector (quantised to 45°) changed.
+        ///     faster one. The focus update is
+        ///     part of it since §16.16: the world asks for one from a check every 0.5 s, when the focus moved to
+        ///     another partition or its forward vector (quantised to 45°) changed, and its parts run first in the
+        ///     next ticks, one item each (see <see cref="RequestFocusUpdate" />).
         /// </summary>
         internal FrameBudget Budget{ get; set; }
 
@@ -134,6 +135,14 @@ namespace Engine.Scripts.Jobs.Core{
         internal void ScheduleUpdate(PriorityUtil.Focus focus){
             // The frame cap is read every frame: a settings menu can change it while the world runs
             Budget.BeginFrame(Budget.FollowsCap ? FrameCap.PeriodMs() : 0f);
+            LongestFocusItemMs = 0f;
+            if (FocusPending && !RunFocusParts()){
+                // The budget ran out between two parts: no stage works on queues that are only partly updated
+                LastStage = -1;
+                Budget.EndFrame();
+                return;
+            }
+
             LastStage = _ring.Turn(focus, Budget);
             Budget.EndFrame();
         }
@@ -144,19 +153,114 @@ namespace Engine.Scripts.Jobs.Core{
         /// </summary>
         internal int LastStage{ get; private set; } = -1;
 
+        #region Focus update
+
         /// <summary>
-        ///     Updates priorities of all queues and delegates focus update to managers/pool.
+        ///     The parts of a focus update, one item of the frame's budget each: the four stage queues (prune the
+        ///     entries outside the window, reprioritise the rest), the store's eviction queue and the pool's chunk
+        ///     and partition queues.
+        /// </summary>
+        internal const int FocusParts = 7;
+
+        private PriorityUtil.Focus _pendingFocus;
+        private int _focusPart = FocusParts;
+
+        /// <summary>
+        ///     For measurements (§16.16): when true, <see cref="RequestFocusUpdate" /> runs the whole focus update at
+        ///     once, outside the budget, as before §16.16.
+        /// </summary>
+        internal bool FocusInOneItem;
+
+        /// <summary>True while parts of the last requested focus update have not run yet.</summary>
+        internal bool FocusPending => _focusPart < FocusParts;
+
+        /// <summary>The parts of the last requested focus update that have not run yet.</summary>
+        internal int FocusPartsLeft => FocusParts - _focusPart;
+
+        /// <summary>
+        ///     The longest part of the focus update in the last frame in milliseconds, with the bookkeeping around
+        ///     it; 0 in a frame without one. Only measured while <see cref="FrameBudget.TimeItems" /> is on.
+        /// </summary>
+        internal float LongestFocusItemMs{ get; private set; }
+
+        /// <summary>
+        ///     Asks for a focus update: it runs at the start of the next ticks (see <see cref="ScheduleUpdate" />),
+        ///     one part per item of the frame's budget, before any stage has its turn. A request while parts of an
+        ///     older one are left starts the parts again with the new focus.
+        /// </summary>
+        /// <param name="focus">The new focus position.</param>
+        internal void RequestFocusUpdate(PriorityUtil.Focus focus){
+            if (FocusInOneItem){
+                _focusPart = FocusParts;
+                FocusUpdate(focus);
+                return;
+            }
+
+            _pendingFocus = focus;
+            _focusPart = 0;
+        }
+
+        /// <summary>
+        ///     Runs the pending parts of the focus update while the budget allows. Returns false when the budget ran
+        ///     out before the last part.
+        /// </summary>
+        private bool RunFocusParts(){
+            bool finished = true;
+            using (VoxelProfilerMarkers.FocusUpdate.Auto()){
+                while (_focusPart < FocusParts){
+                    if (!Budget.Next()){
+                        finished = false;
+                        break;
+                    }
+
+                    FocusPart(_focusPart++, _pendingFocus);
+                }
+            }
+
+            Budget.EndItem();
+            if (Budget.TimeItems) LongestFocusItemMs = Budget.LongestItemMs;
+            return finished;
+        }
+
+        private void FocusPart(int part, PriorityUtil.Focus focus){
+            switch (part){
+                case 0:
+                    using (VoxelProfilerMarkers.FocusData.Auto()) _dataJobHandler.FocusUpdate(focus);
+                    break;
+                case 1:
+                    using (VoxelProfilerMarkers.FocusLight.Auto()) _lightJobHandler.FocusUpdate(focus);
+                    break;
+                case 2:
+                    using (VoxelProfilerMarkers.FocusMesh.Auto()) _meshJobHandler.FocusUpdate(focus);
+                    break;
+                case 3:
+                    using (VoxelProfilerMarkers.FocusCollider.Auto()) _colliderJobHandler.FocusUpdate(focus);
+                    break;
+                case 4:
+                    using (VoxelProfilerMarkers.FocusChunkStore.Auto()) _chunkManager.FocusUpdate(focus);
+                    break;
+                case 5:
+                    using (VoxelProfilerMarkers.FocusPool.Auto()) _chunkPool.FocusUpdateChunks(focus);
+                    break;
+                default:
+                    using (VoxelProfilerMarkers.FocusPool.Auto()) _chunkPool.FocusUpdatePartitions(focus);
+                    break;
+            }
+        }
+
+        /// <summary>
+        ///     Runs every part of a focus update at once, outside the budget: prunes and reprioritises the queues
+        ///     of the stages, the store and the pool. Drops the parts of a requested update that are left. For
+        ///     <see cref="FocusInOneItem" /> and tests; the world asks with <see cref="RequestFocusUpdate" />.
         /// </summary>
         /// <param name="focus">The new focus position.</param>
         internal void FocusUpdate(PriorityUtil.Focus focus){
+            _focusPart = FocusParts;
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.FocusUpdate.Auto();
-            using (VoxelProfilerMarkers.FocusData.Auto()) _dataJobHandler.FocusUpdate(focus);
-            using (VoxelProfilerMarkers.FocusLight.Auto()) _lightJobHandler.FocusUpdate(focus);
-            using (VoxelProfilerMarkers.FocusMesh.Auto()) _meshJobHandler.FocusUpdate(focus);
-            using (VoxelProfilerMarkers.FocusCollider.Auto()) _colliderJobHandler.FocusUpdate(focus);
-            using (VoxelProfilerMarkers.FocusChunkStore.Auto()) _chunkManager.FocusUpdate(focus);
-            using (VoxelProfilerMarkers.FocusPool.Auto()) _chunkPool.FocusUpdate(focus);
+            for (int part = 0; part < FocusParts; part++) FocusPart(part, focus);
         }
+
+        #endregion
 
         /// <summary>
         ///     Handles remesh requests by waking up the mesh job handler.

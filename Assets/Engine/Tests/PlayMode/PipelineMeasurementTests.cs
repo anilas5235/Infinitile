@@ -49,6 +49,7 @@ namespace Engine.Tests.PlayMode{
         private int _savedReference;
         private float _savedBudget;
         private float _savedCapShare;
+        private int _savedColliderBatch;
 
         /// <summary>Takes the shared scheduler settings and remembers the shipped values for the tear-down.</summary>
         private void TakeSchedulerSettings(){
@@ -58,6 +59,7 @@ namespace Engine.Tests.PlayMode{
             _savedReference = _scheduler.referenceDrawDistance;
             _savedBudget = _scheduler.mainThreadBudgetMs;
             _savedCapShare = _scheduler.cappedFrameSpareShare;
+            _savedColliderBatch = _scheduler.colliderBatchSize;
         }
 
         [SetUp]
@@ -93,6 +95,7 @@ namespace Engine.Tests.PlayMode{
             _scheduler.referenceDrawDistance = _savedReference;
             _scheduler.mainThreadBudgetMs = _savedBudget;
             _scheduler.cappedFrameSpareShare = _savedCapShare;
+            _scheduler.colliderBatchSize = _savedColliderBatch;
             yield return PlayModeFixtures.ReloadWorldWithDrawDistance(PlayModeFixtures.ShippedDrawDistance);
             yield return PipelineThroughputTests.WaitForBuiltWorld();
         }
@@ -366,6 +369,105 @@ namespace Engine.Tests.PlayMode{
                 yield return PipelineThroughputTests.FlyThroughBuildingWorld(0,
                     new PipelineThroughputTests.PipelineRun(), $"{DataCollectName(false)}, uncapped attributed part {i + 1}: ",
                     PlayModeFixtures.ShippedDrawDistance, true, world => SetDataCollect(world, false));
+            }
+        }
+
+        /// <summary>
+        ///     The order of <see cref="FocusUpdateSpread_IsCompared" /> per frame cap: true is the focus update as
+        ///     before §16.16 (all parts at once, outside the budget, from the focus check), false its parts as items
+        ///     of the budget at the start of the tick; A B B A.
+        /// </summary>
+        private static readonly bool[] FocusOrder ={ true, false, false, true };
+
+        [UnityTest]
+        [Order(13)]
+        [Timeout(3600000)]
+        public IEnumerator FocusUpdateSpread_IsCompared(){
+            // §16.16: the capped (60 frames) and the uncapped sprint flight through a world that is still being
+            // built, at the shipped draw distance, with the attribution: the focus update in one piece outside the
+            // budget, and in parts inside it. The switch is set on the fresh world before the probe starts.
+            yield return PlayModeFixtures.LoadGameScene(drawDistance: PlayModeFixtures.ShippedDrawDistance);
+            int[] caps ={ PipelineThroughputTests.CappedFrameRate, 0 };
+            foreach (int cap in caps)
+                for (int i = 0; i < FocusOrder.Length; i++){
+                    bool inOne = FocusOrder[i];
+                    string name = inOne ? "focus update in one piece" : "focus update in budget items";
+                    string capName = cap > 0 ? "capped" : "uncapped";
+                    yield return PipelineThroughputTests.FreshSceneAfterFlight();
+                    yield return PipelineThroughputTests.FlyThroughBuildingWorld(cap,
+                        new PipelineThroughputTests.PipelineRun(), $"{name}, {capName} part {i + 1}: ",
+                        PlayModeFixtures.ShippedDrawDistance, true, world => world.Scheduler.FocusInOneItem = inOne);
+                }
+        }
+
+        /// <summary>
+        ///     Main-thread budgets of <see cref="BudgetValues_AreCompared" /> in the order of the runs (§16.17): every
+        ///     value twice, in the order A B C C B A.
+        /// </summary>
+        private static readonly float[] RecheckBudgets ={ 2f, 3f, 4f, 4f, 3f, 2f };
+
+        [UnityTest]
+        [Order(14)]
+        [Timeout(3600000)]
+        public IEnumerator BudgetValues_AreCompared(){
+            // §16.17: the uncapped sprint flight through a world that is still being built, at the shipped draw
+            // distance, once per budget, each in a world built again with it
+            yield return PlayModeFixtures.LoadGameScene(drawDistance: PlayModeFixtures.ShippedDrawDistance);
+            TakeSchedulerSettings();
+            for (int i = 0; i < RecheckBudgets.Length; i++){
+                _scheduler.mainThreadBudgetMs = RecheckBudgets[i];
+                string variant = string.Format(CultureInfo.InvariantCulture, "recheck budget {0:0.##} ms, part {1}: ",
+                    RecheckBudgets[i], i + 1);
+                yield return PipelineThroughputTests.FreshSceneAfterFlight();
+                yield return PipelineThroughputTests.FlyThroughBuildingWorld(0, new PipelineThroughputTests.PipelineRun(),
+                    variant, PlayModeFixtures.ShippedDrawDistance);
+            }
+        }
+
+        /// <summary>
+        ///     Shares of a capped frame's spare time of <see cref="CapShares_AreCompared" /> in the order of the runs
+        ///     (§16.17): every value twice, A B C C B A, with the shipped budget.
+        /// </summary>
+        private static readonly float[] RecheckShares ={ 0.5f, 0f, 1f, 1f, 0f, 0.5f };
+
+        [UnityTest]
+        [Order(15)]
+        [Timeout(3600000)]
+        public IEnumerator CapShares_AreCompared(){
+            // §16.17: the sprint flight under the 60 frames cap, once per share
+            yield return PlayModeFixtures.LoadGameScene(drawDistance: PlayModeFixtures.ShippedDrawDistance);
+            TakeSchedulerSettings();
+            int capped = PipelineThroughputTests.CappedFrameRate;
+            for (int i = 0; i < RecheckShares.Length; i++){
+                _scheduler.cappedFrameSpareShare = RecheckShares[i];
+                string variant = string.Format(CultureInfo.InvariantCulture, "recheck spare share {0:0.##}, part {1}: ",
+                    RecheckShares[i], i + 1);
+                yield return PipelineThroughputTests.FreshSceneAfterFlight();
+                yield return PipelineThroughputTests.FlyThroughBuildingWorld(capped,
+                    new PipelineThroughputTests.PipelineRun(), variant, PlayModeFixtures.ShippedDrawDistance);
+            }
+        }
+
+        /// <summary>
+        ///     Collider batch sizes of <see cref="ColliderBatchSizes_AreCompared" /> in the order of the runs (§16.19):
+        ///     the class's 4, the asset's 6 and 8, every value twice, A B C C B A.
+        /// </summary>
+        private static readonly int[] ColliderBatches ={ 4, 6, 8, 8, 6, 4 };
+
+        [UnityTest]
+        [Order(16)]
+        [Timeout(3600000)]
+        public IEnumerator ColliderBatchSizes_AreCompared(){
+            // §16.19: the uncapped sprint flight once per collider batch size: the bake queue's peak, the
+            // collidable share around the focus and the largest item
+            yield return PlayModeFixtures.LoadGameScene(drawDistance: PlayModeFixtures.ShippedDrawDistance);
+            TakeSchedulerSettings();
+            for (int i = 0; i < ColliderBatches.Length; i++){
+                _scheduler.colliderBatchSize = ColliderBatches[i];
+                string variant = $"collider batch {ColliderBatches[i]}, part {i + 1}: ";
+                yield return PipelineThroughputTests.FreshSceneAfterFlight();
+                yield return PipelineThroughputTests.FlyThroughBuildingWorld(0, new PipelineThroughputTests.PipelineRun(),
+                    variant, PlayModeFixtures.ShippedDrawDistance);
             }
         }
 
