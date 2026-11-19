@@ -1,7 +1,7 @@
 # Performance baselines
 
 Benchmarks live in `Assets/Engine/Tests/Performance` (assembly `Engine.Tests.Performance`,
-EditMode, Unity Performance Testing 3.2.0). Each benchmark warms up 3 times and takes
+EditMode, Unity Performance Testing 3.5.0 since 2026-11-19). Each benchmark warms up 3 times and takes
 20 measurements on a single worker (`job.Run()`), so the numbers are ms per unit of work,
 not throughput across all cores.
 
@@ -753,6 +753,73 @@ rows show as −0.55 ms; the shipped-tuning rows with caves gain about 0.1–0.1
 quarter of the columns. Rows without caves drift −1 to −4 % between the two runs, so the cave rows' gain net of that
 drift is the lattice row's. The interval-list row returns to its usual 10.4 ms from the 16.2 ms outlier of the
 previous entry.
+
+## 2026-11-19 — Unity 6000.3.28f1, new baseline (`2026-11-19-unity-28f1-editmode-baseline.json`)
+
+Same machine, Editor focused, mouse still, two runs back to back in one Editor session (run 2 is the file). The
+Editor moved from 6000.3.11f1 to 6000.3.28f1 (PR #78): Burst 1.8.28 → 1.8.31 (LLVM 23), Collections 2.6.2 → 2.7.1,
+Performance Testing 3.2.0 → 3.5.0, com.unity.pipeline 1.0.0. **Numbers from here on compare against this entry, not
+the 11f1 entries above**: the Burst code generator, Mono and the profiler changed with the Editor. The "11f1 last"
+column is the newest 11f1 entry of each sample group (2026-10-27); the code also changed since then (Phase G/O,
+leaf rendering, scheduler work), so the last column mixes the version step with code changes.
+
+With pipeline 1.0.0 the run is `unity command test run --mode editor --filter Engine.Tests.Performance
+--async-tests true --timeout 900`; the samples are in `TestResults.xml` (`##performancetestresult2:` lines), and
+`PerformanceTestResults.json` is not rewritten by this route, so the baseline file is built from those lines.
+
+| Sample group | Run 1 median | Run 2 median | Run 2 min / max | Run 1 → 2 | 11f1 last | Run 2 vs 11f1 last |
+|---|---|---|---|---|---|---|
+| CarveCaverns lattice ms/chunk | 1.16 ms | 1.10 ms | 1.09 / 1.15 | -5 % | 1.13 ms | -3 % |
+| CarveCaverns per voxel ms/chunk | 19.07 ms | 19.27 ms | 18.88 / 25.17 | +1 % | 19.51 ms | -1 % |
+| ChunkJob.Run TerrainFirst DistanceBlend beaches ms/chunk | 5.91 ms | 5.94 ms | 5.87 / 6.05 | +1 % | 5.87 ms | +1 % |
+| ChunkJob.Run BiomeFirst DistanceBlend beaches ms/chunk | 5.14 ms | 5.19 ms | 5.13 / 5.39 | +1 % | 5.15 ms | +1 % |
+| ChunkJob.Run BiomeFirst ms/chunk | 2.06 ms | 2.06 ms | 2.02 / 2.18 | +0 % | 2.04 ms | +1 % |
+| ChunkJob.Run TerrainFirst DistanceBlend caves on ms/chunk | 6.22 ms | 6.33 ms | 6.24 / 9.45 | +2 % | 6.22 ms | +2 % |
+| ChunkJob.Run TerrainFirst DistanceBlend caves off ms/chunk | 4.74 ms | 4.82 ms | 4.74 / 5.58 | +2 % | 4.75 ms | +1 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves on ms/chunk | 4.78 ms | 4.82 ms | 4.76 / 7.36 | +1 % | 4.74 ms | +2 % |
+| ChunkJob.Run BiomeFirst DistanceBlend caves off ms/chunk | 2.74 ms | 2.74 ms | 2.72 / 2.90 | +0 % | 2.75 ms | -0 % |
+| ChunkJob.Run TerrainFirst DistanceBlend cave worst case ms/chunk | 7.61 ms | 7.66 ms | 7.52 / 10.94 | +1 % | 7.50 ms | +2 % |
+| ChunkJob.Run BiomeFirst DistanceBlend cave worst case ms/chunk | 6.46 ms | 6.74 ms | 6.42 / 10.61 | +4 % | 6.39 ms | +6 % |
+| ChunkJob.Run TerrainFirst DistanceBlend forest species ms/chunk | 8.04 ms | 8.16 ms | 8.10 / 12.55 | +1 % | 7.74 ms | +5 % |
+| ChunkJob.Run BiomeFirst DistanceBlend forest species ms/chunk | 6.16 ms | 6.22 ms | 6.18 / 6.49 | +1 % | 5.91 ms | +5 % |
+| ChunkJob.Run TerrainFirst DistanceBlend largest reach ms/chunk | 7.11 ms | 7.11 ms | 7.07 / 10.69 | +0 % | 7.43 ms | -4 % |
+| ChunkJob.Run BiomeFirst DistanceBlend largest reach ms/chunk | 5.18 ms | 5.22 ms | 5.15 / 5.63 | +1 % | 5.54 ms | -6 % |
+| ChunkJob.Run TerrainFirst None ms/chunk | 3.23 ms | 3.23 ms | 3.21 / 3.29 | -0 % | 3.21 ms | +0 % |
+| ChunkJob.Run TerrainFirst DistanceBlend ms/chunk | 5.29 ms | 5.24 ms | 5.21 / 8.22 | -1 % | 5.21 ms | +1 % |
+| ChunkJob.Run TerrainFirst DistortedBoundary ms/chunk | 4.92 ms | 4.83 ms | 4.81 / 4.93 | -2 % | 4.85 ms | -0 % |
+| ChunkJob.Run TerrainFirst ParameterSpaceWeighting ms/chunk | 3.44 ms | 3.41 ms | 3.38 / 5.47 | -1 % | 3.30 ms | +3 % |
+| ChunkJob.Run BiomeFirst None ms/chunk | 2.46 ms | 2.45 ms | 2.41 / 2.51 | -0 % | 2.41 ms | +2 % |
+| ChunkJob.Run BiomeFirst DistanceBlend ms/chunk | 4.09 ms | 4.00 ms | 3.99 / 4.03 | -2 % | 4.00 ms | -0 % |
+| ChunkJob.Run BiomeFirst DistortedBoundary ms/chunk | 4.71 ms | 4.70 ms | 4.66 / 7.17 | -0 % | 4.73 ms | -1 % |
+| ChunkJob.Run BiomeFirst ParameterSpaceWeighting ms/chunk | 2.71 ms | 2.69 ms | 2.67 / 2.76 | -1 % | 2.61 ms | +3 % |
+| ChunkJob.Run TerrainFirst None flora ms/chunk | 3.40 ms | 3.35 ms | 3.34 / 3.46 | -1 % | 3.36 ms | -0 % |
+| ChunkJob.Run TerrainFirst DistanceBlend flora ms/chunk | 5.81 ms | 5.83 ms | 5.77 / 9.21 | +0 % | 5.79 ms | +1 % |
+| ChunkJob.Run TerrainFirst DistortedBoundary flora ms/chunk | 5.06 ms | 5.02 ms | 5.00 / 5.09 | -1 % | 5.07 ms | -1 % |
+| ChunkJob.Run TerrainFirst ParameterSpaceWeighting flora ms/chunk | 3.57 ms | 3.55 ms | 3.52 / 5.78 | -1 % | 3.48 ms | +2 % |
+| ChunkJob.Run BiomeFirst None flora ms/chunk | 2.63 ms | 2.57 ms | 2.55 / 2.61 | -2 % | 2.57 ms | -0 % |
+| ChunkJob.Run BiomeFirst DistanceBlend flora ms/chunk | 4.43 ms | 4.34 ms | 4.32 / 6.99 | -2 % | 4.35 ms | -0 % |
+| ChunkJob.Run BiomeFirst DistortedBoundary flora ms/chunk | 5.11 ms | 5.04 ms | 5.02 / 5.18 | -1 % | 5.10 ms | -1 % |
+| ChunkJob.Run BiomeFirst ParameterSpaceWeighting flora ms/chunk | 2.92 ms | 2.86 ms | 2.84 / 2.96 | -2 % | 2.80 ms | +2 % |
+| ChunkJob.Run TerrainFirst DistanceBlend snow strata ms/chunk | 6.30 ms | 6.27 ms | 6.23 / 9.95 | -0 % | 6.10 ms | +3 % |
+| ChunkJob.Run BiomeFirst DistanceBlend snow strata ms/chunk | 4.91 ms | 4.84 ms | 4.81 / 4.97 | -1 % | 4.69 ms | +3 % |
+| ChunkJob.Run TerrainFirst ms/chunk | 2.89 ms | 2.86 ms | 2.81 / 3.01 | -1 % | 2.86 ms | +0 % |
+| CMeshBuildJob.Run air ms/partition | 0.03 ms | 0.03 ms | 0.03 / 0.04 | -4 % | 0.02 ms | +95 % |
+| CMeshBuildJob.Run cave partitions caves on ms/partition | 0.60 ms | 0.59 ms | 0.58 / 0.87 | -1 % | 0.59 ms | +1 % |
+| CMeshBuildJob.Run cave partitions caves off ms/partition | 0.36 ms | 0.36 ms | 0.35 / 0.38 | -0 % | 0.35 ms | +2 % |
+| CMeshBuildJob.Run forest species ms/partition | 0.69 ms | 0.68 ms | 0.68 / 0.69 | -1 % | 0.69 ms | -1 % |
+| CMeshBuildJob.Run solid ms/partition | 0.63 ms | 0.63 ms | 0.62 / 0.77 | +0 % | 0.65 ms | -3 % |
+| CMeshBuildJob.Run surface ms/partition | 0.52 ms | 0.51 ms | 0.50 / 0.67 | -2 % | 0.51 ms | -1 % |
+| FrustumCulling.IsVisible 1024 pages us | 2371.65 us | 2352.45 us | 2339.90 / 2462.50 | -1 % | 2274.00 us | +3 % |
+| LightJob.Run forest species ms/chunk | 1.04 ms | 0.99 ms | 0.98 / 1.01 | -5 % | 1.06 ms | -7 % |
+| LightJob.Run lava pockets ms/chunk | 1.02 ms | 0.97 ms | 0.94 / 1.02 | -5 % | 1.04 ms | -7 % |
+| LightJob.Run natural terrain ms/chunk | 0.79 ms | 0.76 ms | 0.70 / 0.84 | -4 % | 0.78 ms | -3 % |
+| LightJob.Run worst case ms/chunk | 9.31 ms | 8.83 ms | 8.77 / 9.30 | -5 % | 8.73 ms | +1 % |
+| PageAllocator fill+release 1 buffer ms | 0.45 ms | 0.45 ms | 0.45 / 0.52 | -0 % | 0.45 ms | +1 % |
+| UnsafeIntervalList.Set 10k edits ms | 10.64 ms | 10.52 ms | 10.42 / 10.95 | -1 % | 10.36 ms | +2 % |
+
+Regression check: no row is more than 10 % slower than its 11f1 value except `CMeshBuildJob.Run air` (0.02 → 0.03 ms,
+a rounding-sized absolute step). Most rows are within ±3 %; the forest-species rows (+5 %) and the BiomeFirst cave worst
+case (+6 %) are the largest increases, the largest-reach (−4/−6 %) and light rows (−3…−7 %) the largest gains.
 
 ## Re-running
 
