@@ -10,7 +10,11 @@ namespace Engine.Scripts.Render.Post{
     ///     The glass writes no depth, so a liquid surface behind it is still drawn; after the transparents the
     ///     <see cref="OverLightMode" /> pass draws the glass again on the pixels a liquid covers (stencil) where the
     ///     glass lies in front of the liquid's surface (depth test), so the liquid does not hide it.
-    ///     Without this feature in the renderer, glass is not drawn.
+    ///     Before the transparents the <see cref="LiquidDepthLightMode" /> pass writes the liquids' depth, so the
+    ///     liquid surface draws only its nearest face per pixel: the culling appends the visible pages in a different
+    ///     order every frame, and two liquid faces behind each other would otherwise blend once or twice by that order
+    ///     (flicker per partition).
+    ///     Without this feature in the renderer, glass is not drawn and liquids seen through liquids flicker.
     /// </summary>
     public class VoxelGlassFeature : ScriptableRendererFeature{
         /// <summary>The LightMode tag of the glass pass.</summary>
@@ -19,17 +23,24 @@ namespace Engine.Scripts.Render.Post{
         /// <summary>The LightMode tag of the glass pass drawn over the liquids.</summary>
         public const string OverLightMode = "VoxelGlassOver";
 
+        /// <summary>The LightMode tag of the liquids' depth pass.</summary>
+        public const string LiquidDepthLightMode = "VoxelLiquidDepth";
+
         private GlassPass _pass;
+        private GlassPass _liquidDepthPass;
         private GlassPass _overPass;
 
         public override void Create(){
             _pass = new GlassPass(LightMode, "Voxel Glass", RenderPassEvent.AfterRenderingSkybox);
+            _liquidDepthPass = new GlassPass(LiquidDepthLightMode, "Voxel Liquid Depth",
+                RenderPassEvent.BeforeRenderingTransparents);
             _overPass = new GlassPass(OverLightMode, "Voxel Glass Over Liquids",
                 RenderPassEvent.AfterRenderingTransparents);
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData){
             renderer.EnqueuePass(_pass);
+            renderer.EnqueuePass(_liquidDepthPass);
             renderer.EnqueuePass(_overPass);
         }
 

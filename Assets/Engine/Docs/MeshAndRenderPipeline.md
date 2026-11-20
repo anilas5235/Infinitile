@@ -1036,11 +1036,22 @@ of the scene behind, no depth fade to opaque, no Snell's window, no opaque colou
   `m_RequireOpaqueTexture: 0` (the depth texture stays on for the depth tint). Glass is still drawn after the
   skybox and before the transparents, so a liquid surface in front blends over it; the double-counted glass of
   Version 1.11 is gone.
+- **Liquid depth pre-pass.** `PageCulling.compute` appends the visible pages in a different order every frame, so
+  two liquid faces behind each other (a lake's floor and its surface, seen from an air pocket under it, or water
+  through water across a chunk border) blended once or twice by that order: whole partitions flickered. The
+  `VoxelLiquidDepth` pass of `TransparentVoxel.shader` (`ColorMask 0`, `ZWrite On`, `Cull Off`, the liquid vertex
+  shader, no alpha test) writes the liquids' depth first; `VoxelGlassFeature` draws it at
+  `BeforeRenderingTransparents`, between the glass pass and the transparents. The forward pass then draws only the
+  nearest liquid face per pixel (`ZTest LEqual`). The depth texture is copied after the opaques, so the depth tint
+  still sees the floor. Without `VoxelGlassFeature` in the renderer the flicker comes back (owner's pick
+  "Depth pre-pass", 2026-11-20). Cost: one depth-only draw of the liquid pages per frame, not measured.
 - **Tests.** `WaterRenderingTests` (the chunk job keeps the column biomes, tint map size and slot wrap, the pixel
   layout and fallback, ensure/forget/new colours, a written chunk read back from the GPU, one mip rebuild after
   writes, the fog colour average, opaque copy off and depth on, the shipped water asset, biome colours close to one
   blue); `RegistryTests.VoxelRegistry_LiquidsAndDepthFades_GetVolumeSlots`
-  (slot rules and the 32-byte entries); `RenderDataTests.VolumeFogDef_Is32Bytes` and the shader compile check.
+  (slot rules and the 32-byte entries); `RenderDataTests.VolumeFogDef_Is32Bytes`,
+  `RenderDataTests.TransparentMaterial_HasGlassPassForTheGlassFeature` (also the liquid depth pass) and the shader
+  compile check.
 - **Measured** (2026-11-20, Editor, focused, `FrameTimeGoal_MainThread_IsAttributed` at draw distance 12, uncapped;
   master, branch, branch, master in one session; branch / second master run): standing frame p95 5.14, 4.33 / 4.35 ms;
   flight 80 u/s p95 7.66, 7.57 / 7.57 ms; flight 40 u/s p95 6.69, 6.59 / 6.52 ms. The GPU frame is 0.05 to 0.13 ms

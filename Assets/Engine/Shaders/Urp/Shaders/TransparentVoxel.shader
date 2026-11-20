@@ -14,6 +14,10 @@
     // - VoxelGlass: glass and other plain see-through blocks, drawn by VoxelGlassFeature after the skybox, before
     //   the transparents, so a liquid surface in front blends over them. No depth write, so a liquid surface
     //   behind the glass is still drawn.
+    // - VoxelLiquidDepth: the liquids' depth only, drawn by VoxelGlassFeature before the transparents, so the
+    //   liquid surface below draws only its nearest face per pixel. The culling appends the visible pages in a
+    //   different order every frame; without this pass two liquid faces behind each other (a lake's underside
+    //   and its surface above) were blended once or twice by that order and flickered per partition.
     // - Universal Forward: the voxels with a volume slot (liquids): a tinted, alpha-blended surface with a
     //   world-space pattern scrolling in two directions, coloured by the biome's water colour (world tint map),
     //   with URP's transparents. Marks its pixels in the stencil (LIQUID_STENCIL).
@@ -165,6 +169,35 @@
         }
 
         // ═════════════════════════════════════════════════════════════
+        // Pass – Liquid depth (VoxelGlassFeature, before the transparents)
+        // ═════════════════════════════════════════════════════════════
+        // Every liquid face counts as covering its whole quad (no alpha test): the liquids' textures have no holes.
+        Pass
+        {
+            Name "Voxel Liquid Depth"
+            Tags
+            {
+                "LightMode" = "VoxelLiquidDepth"
+            }
+
+            Cull Off
+            ZTest LEqual
+            ZWrite On
+            ColorMask 0
+
+            HLSLPROGRAM
+            #pragma target 4.5
+            #pragma vertex   vert_volume
+            #pragma fragment frag_depth
+
+            half4 frag_depth(Varyings IN) : SV_Target
+            {
+                return 0;
+            }
+            ENDHLSL
+        }
+
+        // ═════════════════════════════════════════════════════════════
         // Pass – Forward / Unlit
         // ═════════════════════════════════════════════════════════════
         Pass
@@ -176,8 +209,8 @@
             }
 
             Cull Off
-            ZTest LEqual
-            ZWrite On
+            ZTest LEqual // after VoxelLiquidDepth only the nearest liquid face passes
+            ZWrite On // the same depth again; keeps the liquid depth for the fog when the pre-pass is missing
             Blend SrcAlpha OneMinusSrcAlpha
             Stencil
             {

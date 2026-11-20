@@ -72,15 +72,18 @@ namespace Engine.Tests.EditMode{
                 AssetDatabase.LoadAssetAtPath<VoxelEngineSettings>("Assets/EngineSettings/VoxelEngineSettings.asset");
             Assert.IsNotNull(settings, "shipped engine settings missing");
             Shader shader = settings.Renderer.transparentMaterial.shader;
-            bool glass = false, over = false;
+            bool glass = false, over = false, liquidDepth = false;
             for (int i = 0; i < shader.passCount; i++){
                 string lightMode = shader.FindPassTagValue(i, new UnityEngine.Rendering.ShaderTagId("LightMode")).name;
                 glass |= lightMode == VoxelGlassFeature.LightMode;
                 over |= lightMode == VoxelGlassFeature.OverLightMode;
+                liquidDepth |= lightMode == VoxelGlassFeature.LiquidDepthLightMode;
             }
 
             Assert.IsTrue(glass, "TransparentVoxel has no VoxelGlass pass");
             Assert.IsTrue(over, "TransparentVoxel has no VoxelGlassOver pass (glass in front of a liquid)");
+            Assert.IsTrue(liquidDepth,
+                "TransparentVoxel has no VoxelLiquidDepth pass (liquid faces behind liquid faces flicker)");
         }
 
         [Test]
