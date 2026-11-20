@@ -1045,12 +1045,15 @@ of the scene behind, no depth fade to opaque, no Snell's window, no opaque colou
   nearest liquid face per pixel (`ZTest LEqual`). The depth texture is copied after the opaques, so the depth tint
   still sees the floor. Without `VoxelGlassFeature` in the renderer the flicker comes back (owner's pick
   "Depth pre-pass", 2026-11-20). Cost: one depth-only draw of the liquid pages per frame, not measured.
-- **Liquid faces off the neighbour's plane.** A liquid face next to leaves (or glass) lies in the plane of the
+- **Liquid depth pulled towards the camera.** A liquid face next to leaves (or glass) lies in the plane of the
   leaf face, and the two quads split into triangles along different diagonals, so from inside the water whole
-  triangles of the leaf showed through the water surface and changed as the camera moved. `vert_filtered` moves
-  every liquid face `LIQUID_FACE_INSET` (1/64 block) into its own block, and the depth pre-pass has `Offset 1, 1`,
-  so the forward pass, compiled separately, always passes for the nearest face. Checked in Play mode, camera in
-  water next to a leaf wall: green triangles before, an even water surface after.
+  triangles of the leaf showed through the water surface and changed as the camera moved. `vert_filtered` pulls
+  every liquid vertex `LIQUID_DEPTH_PULL` (1/128 block, at most half the distance) towards the camera along its
+  view ray: its place on screen stays the same, only its depth changes, so the liquid face wins against a face in
+  its own plane and no seams open. (A first try moved the faces 1/64 block into their block; that opened a visible
+  seam at every corner of a water body and was dropped.) The depth pre-pass has `Offset 1, 1`, so the forward
+  pass, compiled separately, always passes for the nearest face. Checked in Play mode: camera in water next to a
+  leaf wall (green triangles before, an even water surface after) and a water corner on sand (no seam).
 - **Icon.** The water tile is a grey pattern, so `Voxel.DisplayTint` (a liquid's surface tint, with biome tint
   times `Biome.DefaultWaterColor`) colours its inventory and hotbar icon (`BlockIcon.Set`).
 - **Tests.** `WaterRenderingTests` (the chunk job keeps the column biomes, tint map size and slot wrap, the pixel

@@ -25,8 +25,10 @@
     // - VoxelGlassOver: the glass again, drawn by VoxelGlassFeature after the transparents, only on liquid pixels
     //   and only where the glass lies in front of the liquid surface, so the liquid does not cover it.
     // A pass's other quads collapse to a point and are not rasterised.
-    // Liquid faces sit LIQUID_FACE_INSET inside their block, so a liquid face and the leaf face next to it (both
-    // drawn: two different see-through voxels keep both faces) are not in one plane and do not z-fight.
+    // A liquid's depth is pulled LIQUID_DEPTH_PULL towards the camera along the view ray (its place on screen stays
+    // the same, so no seams open at the block edges): a liquid face and the leaf face in the same plane (both drawn:
+    // two different see-through voxels keep both faces) split along different diagonals and z-fought per triangle;
+    // now the liquid face wins.
 
     SubShader
     {
@@ -67,8 +69,9 @@
         };
 
         // ── Vertex shader with expansion ─────────────────────────────
-        // How far a liquid face sits inside its block, off the plane of a neighbour's face (leaves, glass)
-        static const float LIQUID_FACE_INSET = 1.0f / 64.0f;
+        // How far a liquid vertex moves towards the camera along its view ray, in blocks: only its depth changes,
+        // so it wins against a face in its own plane (leaves); at most half the distance to the camera
+        static const float LIQUID_DEPTH_PULL = 1.0f / 128.0f;
 
         // volume_pass: draw the voxels with a volume slot (liquids), else the plain blended ones (glass)
         Varyings vert_filtered(const uint vertexID, const bool volume_pass)
@@ -78,13 +81,19 @@
             Varyings o = (Varyings)0;
 
             if (get_cutout(v.packed) || (get_volume_fog(v.packed) != 0) != volume_pass) return o;
-            if (volume_pass) v.positionOS -= v.normal * LIQUID_FACE_INSET;
+            o.positionWS = TransformObjectToWorld(v.positionOS);
+            float3 drawn_ws = o.positionWS;
+            if (volume_pass)
+            {
+                const float3 to_camera = GetCameraPositionWS() - drawn_ws;
+                const float distance = length(to_camera);
+                drawn_ws += to_camera * (min(LIQUID_DEPTH_PULL, 0.5f * distance) / max(distance, 1e-5f));
+            }
 
-            o.positionCS = TransformObjectToHClip(v.positionOS);
+            o.positionCS = TransformWorldToHClip(drawn_ws);
             o.uv = v.uv;
             o.packed = v.packed;
             o.positionSS = ComputeScreenPos(o.positionCS);
-            o.positionWS = TransformObjectToWorld(v.positionOS);
             o.shade = float2(face_shade(_FaceShade, v.normal), face_shade(_FaceShade, -v.normal));
             o.normal = v.normal;
             return o;
