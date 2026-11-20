@@ -228,6 +228,34 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(expected + 1f * .3f * .3f, BiomeClassifier.DistanceSquared(f, .8f, cfg.Biomes[0], cfg), 1e-6f, "6D adds λh (h − 0.5)²");
         }
 
+        [Test]
+        public void Classifier_HeightFloorCostsNothingAboveTheTarget(){
+            // DEC-120: a biome whose target height is a floor pays λh (h − t)² below its target and nothing above.
+            Biome b = Biome("B", .5f, .5f, .5f, .5f, 0f, 100, 1, new[]{ 1f }, 0);
+            b.TargetHeightIsFloor = true;
+            WorldGenConfig cfg = Config(1, b);
+            WorldFields f = new(){ T = .6f, F = .7f, C = .9f, E = .4f, PV = 1f };
+            float fiveD = BiomeClassifier.DistanceSquared(f, cfg.Biomes[0], cfg);
+            Assert.AreEqual(fiveD, BiomeClassifier.DistanceSquared(f, .8f, cfg.Biomes[0], cfg), 1e-6f, "above the floor: no height term");
+            Assert.AreEqual(fiveD, BiomeClassifier.DistanceSquared(f, .5f, cfg.Biomes[0], cfg), 1e-6f, "at the floor");
+            Assert.AreEqual(fiveD + 1f * .3f * .3f, BiomeClassifier.DistanceSquared(f, .2f, cfg.Biomes[0], cfg), 1e-6f, "below: λh (h − t)²");
+            Assert.AreEqual(fiveD, BiomeClassifier.DistanceSquared(f, cfg.Biomes[0], cfg), "5D (Biome-first) ignores the flag");
+
+            // Two biomes with the same climate and the same height target, one of them a floor (the shipped
+            // Badlands–Mountain pair, DEC-120): below and at the target both pay the same and the tie keeps the lower
+            // index; above it only the two-sided biome pays, so the floor biome takes the summits.
+            Biome floor = Biome("Floor", .5f, .5f, .5f, .5f, 0f, 0, 0, new float[6], 0);
+            Biome peak = Biome("Peak", .5f, .5f, .5f, .5f, 0f, 0, 0, new float[6], 0);
+            floor.TargetHeight = .85f;
+            floor.TargetHeightIsFloor = true;
+            peak.TargetHeight = .85f;
+            WorldGenConfig pair = Config(1, GenArchitecture.TerrainFirst, peak, floor);
+            WorldFields at = new(){ T = .5f, F = .5f, C = .5f, E = .5f, PV = 0f };
+            Assert.AreEqual(0, BiomeClassifier.Classify(at, .6f, pair), "below the targets both pay the same: tie keeps the lower index");
+            Assert.AreEqual(0, BiomeClassifier.Classify(at, .85f, pair), "at the targets: tie");
+            Assert.AreEqual(1, BiomeClassifier.Classify(at, .95f, pair), "above: the floor biome pays nothing, the two-sided one pays");
+        }
+
         // --- Sampler --------------------------------------------------------------------------------------------------
 
         [Test]

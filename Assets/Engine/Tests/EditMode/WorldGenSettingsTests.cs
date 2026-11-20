@@ -373,6 +373,9 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(0.35f, def.targetErosion);
             Assert.AreEqual(0.3f, def.targetPV);
             Assert.AreEqual(0.85f, def.targetElevation);
+            Assert.AreEqual(0, def.elevationIsFloor, "the height target is two-sided by default");
+            b.TargetHeightIsFloor = true;
+            Assert.AreEqual(1, b.ToStruct().elevationIsFloor);
             Assert.AreEqual(158f, def.heightOffset);
             Assert.AreEqual(14f, def.heightAmplitude);
             Assert.AreEqual(15f, def.jaggedness);

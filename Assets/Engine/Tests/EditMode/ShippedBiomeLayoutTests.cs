@@ -104,7 +104,9 @@ namespace Engine.Tests.EditMode{
             // Jungle hardly meet (2.2 % of the border edges), the Badlands domes carry no Mountain cap (10 %) and Mountain
             // holds only the summit of the dome that had a meadow (29 %, from 175), and less of Plains and Savanna lies
             // under water (35 % and 48 %). Since the massif tuning of 2026-11-12 the dome that had a meadow lies in a
-            // range: the meadow is gone and Mountain holds 15 % of the window, still only the high ground.
+            // range: the meadow is gone and Mountain holds 15 % of the window, still only the high ground. Since DEC-120
+            // (2026-11-20) Mountain is warmer and drier (T .35, F .35) and that range is Mountain climate: Mountain holds
+            // about half of the window (54 %, from 171), still the upper part of the range.
             WorldGenSettings settings = LoadShipped();
             string[] names = settings.Biomes.Names();
             int jungle = System.Array.IndexOf(names, "Jungle"), badlands = System.Array.IndexOf(names, "Badlands");
@@ -157,8 +159,8 @@ namespace Engine.Tests.EditMode{
                 float[] meadow = In(new int4(896, 640, 1088, 1024), mountain, out int dome);
                 TestContext.WriteLine($"Badlands dome with the meadow: Mountain {100.0 * meadow.Length / dome:F1} %" +
                                       (meadow.Length > 0 ? $", from {meadow[0]:F0}" : ""));
-                Assert.Less(meadow.Length, 0.2 * dome, "Badlands dome with the meadow: Mountain share");
-                if (meadow.Length > 0) Assert.Greater(meadow[0], 185f, "Badlands dome with the meadow: lowest Mountain column");
+                Assert.Less(meadow.Length, 0.65 * dome, "Badlands dome with the meadow: Mountain share");
+                if (meadow.Length > 0) Assert.Greater(meadow[0], 165f, "Badlands dome with the meadow: lowest Mountain column");
 
                 int4 tour = new(-1280, -1280, 1280, 1280);
                 foreach ((int b, double most) in new[]{ (plains, 0.28), (savanna, 0.32) }){
@@ -169,6 +171,93 @@ namespace Engine.Tests.EditMode{
                             wet++;
                     TestContext.WriteLine($"{names[b]}: {100.0 * wet / h.Length:F1} % under water");
                     Assert.Less(wet, most * h.Length, $"{names[b]}: share under water");
+                }
+            }
+            finally{
+                buffers.Height.Dispose();
+                buffers.HardBiome.Dispose();
+                cfg.Dispose();
+            }
+        }
+
+        [Test]
+        public void ShippedSettings_BadlandsCarryNoMountainCaps(){
+            // DEC-120 (owner report 2026-11-20: snow caps in Badlands, Badlands too common). Badlands and Mountain share
+            // the massif climate; with a two-sided height target the summits of a Badlands massif went to Mountain and
+            // took its snow (5 such patches in this window, 49 at 8192²). Since DEC-120 Badlands' height target is a
+            // floor at Mountain's target, so no summit of a Badlands massif turns Mountain by height alone, and the
+            // warmer, drier targets keep Badlands to the hot dry massifs (8.0 % of the world before, 11.6 % of land).
+            WorldGenSettings settings = LoadShipped();
+            string[] names = settings.Biomes.Names();
+            int badlands = System.Array.IndexOf(names, "Badlands"), mountain = System.Array.IndexOf(names, "Mountain");
+            WorldGenConfig cfg = settings.ToConfig(TestFixtures.Seed);
+            RegionBuffers buffers = new(){
+                Height = new NativeArray<float>(Size * Size, Allocator.TempJob),
+                HardBiome = new NativeArray<int>(Size * Size, Allocator.TempJob)
+            };
+            try{
+                WorldGenRequest request = new(){
+                    Config = cfg, Origin = new int2(-2048, -2048), Size = new int2(Size, Size), Stride = Stride
+                };
+                WorldGenApi.SampleRegion(request, ref buffers).Complete();
+                float[] height = buffers.Height.ToArray();
+                int[] biome = buffers.HardBiome.ToArray();
+
+                int land = 0, badlandsLand = 0, high = 0, badlandsHigh = 0;
+                for (int i = 0; i < biome.Length; i++){
+                    if (height[i] < cfg.WaterLevel) continue;
+                    land++;
+                    if (biome[i] == badlands) badlandsLand++;
+                    if (height[i] < 180f) continue;
+                    high++;
+                    if (biome[i] == badlands) badlandsHigh++;
+                }
+
+                // Mountain patches (4-connected) whose outer ring is mostly Badlands: a cap on a Badlands massif.
+                bool[] seen = new bool[biome.Length];
+                Stack<int> stack = new();
+                HashSet<int> ring = new();
+                int caps = 0, capCells = 0;
+                for (int start = 0; start < biome.Length; start++){
+                    if (seen[start] || biome[start] != mountain) continue;
+                    ring.Clear();
+                    int size = 0;
+                    seen[start] = true;
+                    stack.Push(start);
+                    while (stack.Count > 0){
+                        int i = stack.Pop();
+                        size++;
+                        int x = i % Size, z = i / Size;
+                        if (x > 0) Visit(i - 1);
+                        if (x < Size - 1) Visit(i + 1);
+                        if (z > 0) Visit(i - Size);
+                        if (z < Size - 1) Visit(i + Size);
+                    }
+
+                    int onBadlands = 0;
+                    foreach (int j in ring)
+                        if (biome[j] == badlands)
+                            onBadlands++;
+                    if (ring.Count == 0 || onBadlands * 2 <= ring.Count) continue;
+                    caps++;
+                    capCells += size;
+                }
+
+                TestContext.WriteLine($"Badlands {100.0 * badlandsLand / land:F1} % of land, {100.0 * badlandsHigh / high:F1} % " +
+                                      $"of the ground from 180; Mountain caps on Badlands: {caps} patches, {capCells} cells");
+                Assert.AreEqual(0, caps, "Mountain patches mostly surrounded by Badlands");
+                Assert.Less(badlandsLand, 0.07 * land, "Badlands share of land");
+                Assert.Less(badlandsHigh, 0.3 * high, "Badlands share of the ground from 180");
+
+                void Visit(int j){
+                    if (seen[j]) return;
+                    if (biome[j] != mountain){
+                        ring.Add(j);
+                        return;
+                    }
+
+                    seen[j] = true;
+                    stack.Push(j);
                 }
             }
             finally{

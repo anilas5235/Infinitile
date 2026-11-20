@@ -26,9 +26,13 @@ namespace Engine.Scripts.WorldGen.Classify{
                    + cfg.LambdaPV * dPV * dPV;
         }
 
-        /// <summary>6D squared distance including normalised height <paramref name="h" /> (Terrain-first).</summary>
+        /// <summary>
+        ///     6D squared distance including normalised height <paramref name="h" /> (Terrain-first). A biome whose
+        ///     target height is a floor (<c>elevationIsFloor</c>) pays no height distance above its target.
+        /// </summary>
         public static float DistanceSquared(in WorldFields f, float h, in Biome.BiomeDef b, in WorldGenConfig cfg){
             float dH = h - b.targetElevation;
+            if (b.elevationIsFloor != 0 && dH > 0f) dH = 0f;
             return DistanceSquared(f, b, cfg) + cfg.LambdaHeight * dH * dH;
         }
 

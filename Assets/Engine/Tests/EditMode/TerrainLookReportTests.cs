@@ -199,7 +199,8 @@ namespace Engine.Tests.EditMode{
                         ["Name"] = b.name,
                         ["Target"] = new[]{
                             b.TargetTemperature, b.TargetHumidity, b.TargetContinental, b.TargetErosion, b.TargetPV, b.TargetHeight
-                        }
+                        },
+                        ["HeightIsFloor"] = b.TargetHeightIsFloor
                     }).ToList(),
                     ["Splines"] = settings.Splines.ToTree()
                 };

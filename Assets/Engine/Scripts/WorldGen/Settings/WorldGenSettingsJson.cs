@@ -242,6 +242,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["TargetErosion"] = b.TargetErosion,
                 ["TargetPV"] = b.TargetPV,
                 ["TargetHeight"] = b.TargetHeight,
+                ["TargetHeightIsFloor"] = b.TargetHeightIsFloor,
                 ["HeightOffset"] = b.HeightOffset,
                 ["HeightAmplitude"] = b.HeightAmplitude,
                 ["OctaveWeights"] = b.OctaveWeights ?? Array.Empty<float>(),

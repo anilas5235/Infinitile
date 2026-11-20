@@ -75,6 +75,11 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
         [Tooltip("Target normalised height h in [0,1]; only used by the Terrain-first classifier.")]
         [Range(0f, 1f)] [SerializeField] public float TargetHeight = 0.5f;
 
+        [Tooltip("The target height is a floor: columns above it pay no height distance, only columns below it "
+                 + "(Terrain-first only). On for a biome that may hold every height from its target up, so a "
+                 + "neighbour with a higher target cannot win its summits by height alone.")]
+        [SerializeField] public bool TargetHeightIsFloor;
+
         // --- Biome-first height parameters ----------------------------------------------------------------------------
 
         [Tooltip("Base height Offset_b in blocks.")]
@@ -153,6 +158,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                 targetErosion = TargetErosion,
                 targetPV = TargetPV,
                 targetElevation = TargetHeight,
+                elevationIsFloor = TargetHeightIsFloor ? (byte)1 : (byte)0,
                 heightOffset = HeightOffset,
                 heightAmplitude = HeightAmplitude,
                 jaggedness = Jaggedness,
@@ -230,6 +236,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
             /// <summary>Target normalised height h in [0,1].</summary>
             public float targetElevation;
+
+            /// <summary>1 when <see cref="targetElevation" /> is a floor: no height distance above it.</summary>
+            public byte elevationIsFloor;
 
             public float heightOffset;
             public float heightAmplitude;

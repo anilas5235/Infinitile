@@ -831,7 +831,8 @@ flowchart LR
   detail octaves; the clamp to [Hmin, Hmax] is recorded. No biome takes part, so the height is continuous wherever
   the fields are.
 - **Classification** (`WorldSampler.SampleColumn`): the normalised height h = saturate((H − Hmin)/(Hmax − Hmin)) is the
-  sixth distance dimension with weight λ_h. A `HeightMethod` other than None is ignored with a warning in
+  sixth distance dimension with weight λ_h; a biome with `TargetHeightIsFloor` pays it only below its target (DEC-120).
+  A `HeightMethod` other than None is ignored with a warning in
   Terrain-first.
 - **Spline asset** (`WorldGen/Settings/TerrainSplineSet.cs`): a `ScriptableObject` with named splines, three root
   indices and `Notes`. `Validate` reports missing roots, unsorted or duplicate X, out-of-range X, cycles, nesting
