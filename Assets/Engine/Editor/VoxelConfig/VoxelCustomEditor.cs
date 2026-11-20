@@ -38,6 +38,8 @@ namespace Engine.Editor.VoxelConfig{
             if (voxelDef.meshLayer == MeshLayer.Transparent){
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("depthFadeDistance"));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("surfaceAlpha"));
+                if (voxelDef.category == VoxelCategory.Liquids && !voxelDef.alphaCutout)
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("liquidSurface"), true);
                 SerializedProperty usePostProcess = serializedObject.FindProperty("usePostProcess");
                 EditorGUILayout.PropertyField(usePostProcess);
                 if (usePostProcess.boolValue)

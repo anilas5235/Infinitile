@@ -106,8 +106,12 @@ namespace Engine.Scripts.Utils{
         public static readonly int VoxelSunDirectionNameID = Shader.PropertyToID("_VoxelSunDirection");
         public static readonly int VoxelFaceShadeStrengthNameID = Shader.PropertyToID("_VoxelFaceShadeStrength");
 
-        // Volume fog of see-through liquids (VoxelRegistry, TransparentVoxel.shader)
+        // Surface look of the liquids by volume slot (VoxelRegistry, TransparentVoxel.shader)
         public static readonly int VoxelVolumeFogNameID = Shader.PropertyToID("_VoxelVolumeFog");
+
+        // Biome water colour around the player (WaterTintMap, TransparentVoxel.shader); params x = 1 / size in texels
+        public static readonly int VoxelWaterTintNameID = Shader.PropertyToID("_VoxelWaterTint");
+        public static readonly int VoxelWaterTintParamsNameID = Shader.PropertyToID("_VoxelWaterTintParams");
 
         // Sky material properties the horizon fog copies, so fogged terrain matches the sky behind it
         public static readonly int SkyHorizonColorNameID = Shader.PropertyToID("_HorizonColor");

@@ -11,11 +11,12 @@
     }
 
     // The blended blocks of the transparent layer, from its buffer (the cut-out leaves in it are CutoutVoxel's):
-    // - VoxelGlass: glass and other plain see-through blocks, drawn by VoxelGlassFeature after the skybox and before
-    //   URP copies the opaque colour, so a liquid surface in front shows them in the scene behind it. No depth
-    //   write, so a liquid surface behind the glass is still drawn.
-    // - Universal Forward: the voxels with a volume slot (liquids), with URP's transparents. Marks its pixels in
-    //   the stencil (LIQUID_STENCIL).
+    // - VoxelGlass: glass and other plain see-through blocks, drawn by VoxelGlassFeature after the skybox, before
+    //   the transparents, so a liquid surface in front blends over them. No depth write, so a liquid surface
+    //   behind the glass is still drawn.
+    // - Universal Forward: the voxels with a volume slot (liquids): a tinted, alpha-blended surface with a
+    //   world-space pattern scrolling in two directions, coloured by the biome's water colour (world tint map),
+    //   with URP's transparents. Marks its pixels in the stencil (LIQUID_STENCIL).
     // - VoxelGlassOver: the glass again, drawn by VoxelGlassFeature after the transparents, only on liquid pixels
     //   and only where the glass lies in front of the liquid surface, so the liquid does not cover it.
     // A pass's other quads collapse to a point and are not rasterised.
@@ -55,6 +56,7 @@
             float3 positionWS : TEXCOORD2; // horizon fog
             float4 positionSS : TEXCOORD3;
             float2 shade : TEXCOORD4; // face shade seen from the front, from the back
+            nointerpolation float3 normal : TEXCOORD5; // the quad's normal, for the liquid's world-space pattern
         };
 
         // ── Vertex shader with expansion ─────────────────────────────
@@ -73,6 +75,7 @@
             o.positionSS = ComputeScreenPos(o.positionCS);
             o.positionWS = TransformObjectToWorld(v.positionOS);
             o.shade = float2(face_shade(_FaceShade, v.normal), face_shade(_FaceShade, -v.normal));
+            o.normal = v.normal;
             return o;
         }
 
@@ -189,154 +192,112 @@
             #pragma vertex   vert_volume
             #pragma fragment frag
 
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareOpaqueTexture.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 
-            // Volume of see-through liquids, by slot (VoxelRegistry.VolumeFogDef); slot 0 = none.
+            // Surface look of the liquids, by slot (VoxelRegistry.VolumeFogDef); slot 0 = none.
             struct VolumeFog
             {
-                float3 fogColor;
-                float density;
-                float3 lift;
-                float selfIllumination;
-                float3 gain;
-                float contrast;
-                float3 invGamma;
-                float saturation;
+                float3 tint;
+                float biomeTint;
                 float depthFade;
-                float depthDarkening;
-                float fogged;
-                float pad;
+                float depthAlpha;
+                float flowSpeed;
+                float patternStrength;
             };
 
             StructuredBuffer<VolumeFog> _VoxelVolumeFog;
 
-            // Cosine of water's critical angle (refractive index 1.33): from inside, light from above only comes
-            // through the surface closer than this to its normal (Snell's window).
-            static const float CriticalCos = 0.66f;
+            // The biome water colour around the player by world x/z (WaterTintMap): one texel per block column,
+            // repeating; _VoxelWaterTintParams.x = 1 / its size in texels.
+            TEXTURE2D(_VoxelWaterTint);
+            SAMPLER(sampler_linear_repeat);
+            float4 _VoxelWaterTintParams;
 
-            // The opaque scene behind a surface pixel: its colour, how far behind the surface it lies (eye depth)
-            // and whether it is the sky.
-            struct Behind
+            // The biome water colour at a world position: four bilinear taps one block apart diagonally, so the
+            // colour blends over about four blocks between biomes.
+            float3 biome_water_color(const float3 positionWS)
             {
-                float3 color;
-                float depth;
-                bool sky;
-            };
-
-            Behind sample_behind(const float4 positionSS)
-            {
-                const float2 uv = positionSS.xy / positionSS.w;
-                const float raw_depth = SampleSceneDepth(uv);
-
-                Behind behind;
-                behind.color = SampleSceneColor(uv);
-                #if UNITY_REVERSED_Z
-                behind.sky = raw_depth <= 0.0f;
-                #else
-                behind.sky = raw_depth >= 1.0f;
-                #endif
-                behind.depth = max(LinearEyeDepth(raw_depth, _ZBufferParams) - positionSS.w, 0.0f);
-                return behind;
+                const float d = _VoxelWaterTintParams.x;
+                const float2 uv = positionWS.xz * d;
+                float3 sum = SAMPLE_TEXTURE2D_LOD(_VoxelWaterTint, sampler_linear_repeat, uv + float2(-d, -d), 0).rgb;
+                sum += SAMPLE_TEXTURE2D_LOD(_VoxelWaterTint, sampler_linear_repeat, uv + float2(d, -d), 0).rgb;
+                sum += SAMPLE_TEXTURE2D_LOD(_VoxelWaterTint, sampler_linear_repeat, uv + float2(-d, d), 0).rgb;
+                sum += SAMPLE_TEXTURE2D_LOD(_VoxelWaterTint, sampler_linear_repeat, uv + float2(d, d), 0).rgb;
+                return sum * 0.25f;
             }
 
-            // Depth fade: 0 at the surface, 1 where the scene lies the volume's depth fade distance behind it.
-            float depth_fade(const VolumeFog fog, const float behind_depth)
+            // Whether a face is a top or bottom face (else a side).
+            bool is_horizontal(const float3 normal)
             {
-                return fog.depthFade > 0.0f ? saturate(behind_depth / fog.depthFade) : 0.0f;
+                const float3 n = abs(normal);
+                return n.y >= n.x && n.y >= n.z;
             }
 
-            // Light of the fog, as UnderwaterFog.shader: lit like an open-sky voxel, never below the ambient or
-            // the liquid's own light.
-            float3 fog_light(const VolumeFog fog)
+            // World-space texture coordinates of a face by its normal: top/bottom by x/z, the sides by their
+            // horizontal axis and y (v up), so the pattern runs on across blocks.
+            float2 world_uv(const float3 positionWS, const float3 normal)
             {
-                return max(_VoxelSkyBrightness * _VoxelSkyTint.rgb, max(_VoxelAmbient, fog.selfIllumination));
+                if (is_horizontal(normal)) return positionWS.xz;
+                return abs(normal.x) >= abs(normal.z) ? positionWS.zy : positionWS.xy;
             }
 
-            // Depth darkening: the fog gets darker with depth below the surface (exponential).
-            float darkening(const VolumeFog fog, const float depth)
+            // The liquid's texture pattern: two samples in world space scrolling in two directions (on the sides
+            // both run down), averaged. Gradients from the unscrolled coordinates, so the mip level stays steady.
+            float4 liquid_pattern(const float3 positionWS, const float3 normal, const uint tex, const float speed)
             {
-                return exp(-fog.depthDarkening * max(depth, 0.0f));
-            }
-
-            // The underwater colour grading, as URP's LutBuilderLdr applies the liquid's ColorAdjustments and
-            // LiftGammaGain overrides: contrast in LogC, lift/gamma/gain, global saturation.
-            float3 grade(const VolumeFog fog, float3 color)
-            {
-                color = LogCToLinear((LinearToLogC(color) - ACEScc_MIDGRAY) * fog.contrast + ACEScc_MIDGRAY);
-                color = max(0.0f, color);
-                color = color * fog.gain + fog.lift;
-                color = sign(color) * pow(abs(color), fog.invGamma);
-                const float luma = Luminance(color);
-                return luma + fog.saturation * (color - luma);
-            }
-
-            // The opaque scene behind the surface as the underwater view shows it before the grading:
-            // fogged with UnderwaterFog.shader's exp² fog over the distance the view ray travels through the
-            // liquid, darkened with depth as there. The depth fade hides it at least as much, so deep liquid turns
-            // into its fog. The sky behind counts as infinitely far.
-            float3 through_volume(const VolumeFog fog, const Behind behind, const float4 positionSS,
-                                  const float3 positionWS)
-            {
-                const float3 view = positionWS - _WorldSpaceCameraPos;
-                const float view_dist = length(view);
-                const float ray = behind.depth * view_dist / positionSS.w; // eye depth to distance along the ray
-                const float d = ray * fog.density;
-
-                // as dark as the liquid where the fog has mostly built up: the hit, or one fog length down the ray
-                const float reach = min(behind.sky ? 1e6f : ray, 1.0f / max(fog.density, 1e-4f));
-                const float3 fog_color = fog.fogColor * fog_light(fog) * darkening(fog, -view.y / view_dist * reach);
-
-                const float amount = behind.sky ? 1.0f : max(1.0f - exp(-d * d), depth_fade(fog, behind.depth));
-                return lerp(behind.color, fog_color, amount);
+                const float2 uv = world_uv(positionWS, normal);
+                const float2 dx = ddx(uv);
+                const float2 dy = ddy(uv);
+                const float t = _Time.y * speed;
+                const bool top = is_horizontal(normal);
+                const float2 flow_a = top ? float2(0.8f, 0.35f) : float2(0.0f, 1.0f);
+                const float2 flow_b = top ? float2(-0.45f, -0.9f) : float2(0.15f, 0.6f);
+                const float4 a = SAMPLE_TEXTURE2D_ARRAY_GRAD(_Textures, sampler_Textures, uv + flow_a * t, tex, dx, dy);
+                const float4 b = SAMPLE_TEXTURE2D_ARRAY_GRAD(_Textures, sampler_Textures,
+                                                            uv * 0.75f + flow_b * t + 0.37f, tex,
+                                                            dx * 0.75f, dy * 0.75f);
+                return 0.5f * (a + b);
             }
 
             // ── Fragment shader ───────────────────────────────────────
             half4 frag(Varyings IN, const bool front : SV_IsFrontFace) : SV_Target
             {
-                // --- Surface: texture, AO, light, glow, face shade ---
-                const float4 surface = surface_color(IN, front);
-                float3 color = surface.rgb;
-                float alpha = surface.a;
+                const uint tex = get_tex_index(IN.packed);
+                const VolumeFog liquid = _VoxelVolumeFog[get_volume_fog(IN.packed)];
 
-                const uint volume_fog = get_volume_fog(IN.packed);
-                if (volume_fog != 0)
+                // --- Pattern: the scrolling world-space texture around its mean colour ---
+                const float4 pattern = liquid_pattern(IN.positionWS, IN.normal, tex, liquid.flowSpeed);
+                const float3 mean = SAMPLE_TEXTURE2D_ARRAY_LOD(_Textures, sampler_Textures, float2(0.5f, 0.5f),
+                                                               tex, 16).rgb; // the last mip: the texture's mean
+                float3 albedo;
+                if (liquid.biomeTint > 0.5f)
                 {
-                    const VolumeFog fog = _VoxelVolumeFog[volume_fog];
-                    const bool fogged = fog.fogged > 0.5f;
-                    if (front)
-                    {
-                        // --- Seen from outside: with fog the surface lies over the fogged scene, both colour graded as
-                        // from inside; without, the depth fade raises the alpha to 1 ---
-                        const Behind behind = sample_behind(IN.positionSS);
-                        if (fogged)
-                        {
-                            const float3 scene = through_volume(fog, behind, IN.positionSS, IN.positionWS);
-                            return half4(apply_horizon_fog(grade(fog, lerp(scene, color, alpha)), IN.positionWS), 1);
-                        }
-                        alpha = lerp(alpha, 1.0f, depth_fade(fog, behind.depth));
-                    }
-                    else if (fogged)
-                    {
-                        // --- Seen from inside (the underwater post-process fogs the way here): outside Snell's
-                        // window the surface reflects the liquid below, which shows as its fog ---
-                        const float3 view = normalize(IN.positionWS - _WorldSpaceCameraPos);
-                        const float3 normal = normalize(cross(ddy(IN.positionWS), ddx(IN.positionWS)));
-                        const float window = smoothstep(CriticalCos - 0.04f, CriticalCos + 0.04f,
-                                                        abs(dot(view, normal)));
-                        const float3 reflected = fog.fogColor * fog_light(fog) *
-                            darkening(fog, abs(view.y) / max(fog.density, 1e-4f));
-                        color = lerp(reflected, color, window);
-                        alpha = lerp(1.0f, alpha, window);
-                    }
+                    // the biome colour carries the pattern's light and dark as a luminance ratio
+                    const float k = Luminance(pattern.rgb) / max(Luminance(mean), 1e-3f);
+                    albedo = biome_water_color(IN.positionWS) * (1.0f + (k - 1.0f) * liquid.patternStrength);
+                }
+                else
+                    albedo = mean + (pattern.rgb - mean) * liquid.patternStrength;
+                albedo *= liquid.tint;
+
+                // --- AO, light, glow, face shade (as the other voxels, by the quad's own uv) ---
+                const float4 ao_color = calc_ao_color(_AOColor, float4(albedo, 1.0f), _AOCurve, get_ao(IN.packed),
+                                                      _AOIntensity, _AOPower, IN.uv);
+                const float3 light = calc_voxel_light(IN.packed, IN.uv, front ? IN.shade.x : IN.shade.y);
+                const float3 color = ao_color.rgb * light * calc_glow(get_glow(IN.packed));
+                float alpha = pattern.a * get_surface_alpha(IN.packed);
+
+                // --- Depth tint: seen from outside, the alpha rises with the scene depth behind the surface ---
+                if (front && liquid.depthFade > 0.0f)
+                {
+                    const float2 screen_uv = IN.positionSS.xy / IN.positionSS.w;
+                    const float behind = max(LinearEyeDepth(SampleSceneDepth(screen_uv), _ZBufferParams) -
+                                             IN.positionSS.w, 0.0f);
+                    alpha = lerp(alpha, max(alpha, liquid.depthAlpha), saturate(behind / liquid.depthFade));
                 }
 
-                // --- Alpha clip ---
                 clip(alpha - 0.001f);
-
-                // --- Final colour ---
                 return half4(apply_horizon_fog(color, IN.positionWS), alpha);
             }
             ENDHLSL

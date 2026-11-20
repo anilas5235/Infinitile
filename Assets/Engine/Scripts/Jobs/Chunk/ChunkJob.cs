@@ -44,6 +44,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             GenerateVoxels(ref Config, chunkWorldPos, chunkVoxels, chunkColumns, true);
 
             WriteToChunkData(chunkVoxels, out voxelData);
+            WriteBiomes(chunkColumns, ref voxelData);
 
             chunkVoxels.Dispose();
             chunkColumns.Dispose();
@@ -87,6 +88,15 @@ namespace Engine.Scripts.Jobs.Chunk{
 
             caves.Dispose();
             floraGrid.Dispose();
+        }
+
+        /// <summary>
+        ///     Keeps the hard biome of every column with the chunk (<see cref="ChunkVoxelData.Biomes" />), for the
+        ///     water's biome colour. Same column order as <paramref name="columns" />.
+        /// </summary>
+        internal static void WriteBiomes(NativeArray<ChunkColumn> columns, ref ChunkVoxelData data){
+            data.CreateBiomes();
+            for (int i = 0; i < columns.Length; i++) data.Biomes[i] = (byte)math.min((int)columns[i].Biome, byte.MaxValue);
         }
 
         /// <summary>

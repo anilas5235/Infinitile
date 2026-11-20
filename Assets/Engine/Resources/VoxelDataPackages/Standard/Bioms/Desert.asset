@@ -69,3 +69,5 @@ MonoBehaviour:
     MinStackHeight: 1
     MaxStackHeight: 1
   RepresentativeColor: {r: 0.9899782, g: 1, b: 0, a: 1}
+  WaterColor: {r: 0.27, g: 0.6, b: 0.82, a: 1}
+  WaterFogColor: {r: 0.07, g: 0.27, b: 0.36, a: 1}

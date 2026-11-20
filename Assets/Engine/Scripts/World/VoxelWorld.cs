@@ -17,6 +17,7 @@ using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Mathematics;
 using UnityEngine;
+using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.World{
     /// <summary>
@@ -42,6 +43,8 @@ namespace Engine.Scripts.World{
         private bool _isShuttingDown;
 
         private string[] _biomeNames = Array.Empty<string>(); // of the config the chunk jobs use
+        private Color32[] _biomeWaterColors = Array.Empty<Color32>(); // same order, sRGB, for the water tint map
+        private Color[] _biomeWaterFogColors = Array.Empty<Color>(); // same order, for the underwater fog
 
         private VoxelEngineScheduler _scheduler;
 
@@ -150,11 +153,56 @@ namespace Engine.Scripts.World{
             RememberBiomeNames(settings.WorldGen);
         }
 
-        /// <summary>Biome names in config order, for <see cref="BiomeName" />.</summary>
+        /// <summary>
+        ///     Biome names and water colours in config order, for <see cref="BiomeName" />,
+        ///     <see cref="BiomeWaterColors" /> and <see cref="BiomeWaterFogColor" />. A missing biome gets the
+        ///     default colours.
+        /// </summary>
         private void RememberBiomeNames(WorldGenSettings worldGen){
             List<Biome> biomes = worldGen.ActiveBiomes();
             _biomeNames = new string[biomes.Count];
-            for (int i = 0; i < biomes.Count; i++) _biomeNames[i] = biomes[i] ? biomes[i].name : null;
+            _biomeWaterColors = new Color32[biomes.Count];
+            _biomeWaterFogColors = new Color[biomes.Count];
+            for (int i = 0; i < biomes.Count; i++){
+                Biome biome = biomes[i];
+                _biomeNames[i] = biome ? biome.name : null;
+                _biomeWaterColors[i] = biome ? biome.WaterColor : Biome.DefaultWaterColor;
+                _biomeWaterFogColors[i] = biome ? biome.WaterFogColor : Biome.DefaultWaterFogColor;
+            }
+
+            BiomeColorsVersion++;
+        }
+
+        /// <summary>
+        ///     Surface colour of a biome-tinted liquid per biome index (the column biomes of
+        ///     <see cref="ChunkVoxelData.Biomes" />), sRGB. Replaced, not changed, when the world is regenerated
+        ///     (<see cref="BiomeColorsVersion" />).
+        /// </summary>
+        internal Color32[] BiomeWaterColors => _biomeWaterColors;
+
+        /// <summary>Counts the replacements of <see cref="BiomeWaterColors" />; the tint map rewrites its chunks.</summary>
+        internal int BiomeColorsVersion{ get; private set; }
+
+        /// <summary>Underwater fog colour of biome <paramref name="index" />; a new biome's default when out of range.</summary>
+        internal Color BiomeWaterFogColor(int index){
+            return index >= 0 && index < _biomeWaterFogColors.Length ? _biomeWaterFogColors[index] : Biome.DefaultWaterFogColor;
+        }
+
+        /// <summary>
+        ///     Hard biome of the loaded column (<paramref name="x" />, <paramref name="z" />) as the chunk job kept it;
+        ///     false when its chunk is not loaded or has no column biomes.
+        /// </summary>
+        public bool TryGetColumnBiome(int x, int z, out int biome){
+            biome = 0;
+            if (ChunkManager == null) return false;
+            int2 chunkPos = new(FloorDiv(x, ChunkWidth), FloorDiv(z, ChunkDepth));
+            if (!ChunkManager.TryGetChunk(chunkPos, out Chunk chunk) || !chunk.VoxelData.HasBiomes) return false;
+            biome = chunk.VoxelData.GetBiome(x - chunkPos.x * ChunkWidth, z - chunkPos.y * ChunkDepth);
+            return true;
+        }
+
+        private static int FloorDiv(int a, int b){
+            return a >= 0 ? a / b : -((-a + b - 1) / b);
         }
 
         /// <summary>

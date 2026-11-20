@@ -8,6 +8,7 @@ using Engine.Scripts.Utils.Collections;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig;
+using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using Unity.Mathematics;
@@ -159,6 +160,9 @@ namespace Engine.Scripts.Render{
         private VoxelEngineSettings _settings;
 
         private RenderBufferManager _solidBufferManager;
+
+        // biome water colour of the drawn chunks for the liquid shader, sized from the draw distance
+        private WaterTintMap _waterTint;
         private RenderBufferManager _transparentBufferManager;
 
         protected override void Awake(){
@@ -230,6 +234,9 @@ namespace Engine.Scripts.Render{
                 _transparentBufferManager,
                 _foliageBufferManager
             );
+
+            _waterTint = new WaterTintMap(_settings.Chunk.ActiveDrawDistance, Biome.DefaultWaterColor);
+            _waterTint.SetGlobals();
         }
 
         /// <summary>
@@ -350,6 +357,8 @@ namespace Engine.Scripts.Render{
             SafeDispose(_foliageBufferManager);
 
             SafeDispose(_intervalStore);
+            SafeDispose(_waterTint);
+            _waterTint = null;
 
             _pendingBuilds.Clear();
             _pendingBuildSet.Clear();
@@ -562,6 +571,8 @@ namespace Engine.Scripts.Render{
                 // A chunk of the 3 x 3 neighbourhood was unloaded since the request; the relight re-requests the build.
                 if (!request.IsValid) continue;
 
+                EnsureWaterTint(PartitionToChunkPos(partition));
+
                 PointBuilderHandler handler = _pointBuilderHandlers[i];
                 try{
                     handler.BuildPoints(request, _intervalStore);
@@ -573,6 +584,17 @@ namespace Engine.Scripts.Render{
 
                 _inFlightBuilds[i] = new InFlightBuild(partition, handler);
             }
+        }
+
+        /// <summary>
+        ///     Writes the chunk's biome water colours into the tint map before its first partition is drawn (a
+        ///     no-op once the map holds them).
+        /// </summary>
+        private void EnsureWaterTint(int2 chunkPos){
+            if (_waterTint == null || world.ChunkManager == null) return;
+            if (!world.ChunkManager.TryGetChunk(chunkPos, out Chunk chunk)) return;
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.WaterTintUpload.Auto();
+            _waterTint.Ensure(chunkPos, chunk.VoxelData, world.BiomeWaterColors, world.BiomeColorsVersion);
         }
 
         private bool TryDequeuePendingBuild(out int3 partition){
@@ -677,6 +699,7 @@ namespace Engine.Scripts.Render{
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderRelease.Auto();
             if (_voxelLists.Remove(chunk, out IntervalRange voxelList)) _intervalStore.Release(ref voxelList);
             if (_lightLists.Remove(chunk, out IntervalRange lightList)) _intervalStore.Release(ref lightList);
+            _waterTint?.Forget(chunk);
         }
 
         /// <summary>

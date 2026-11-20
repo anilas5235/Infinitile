@@ -5,8 +5,8 @@ using UnityEngine.Rendering.Universal;
 namespace Engine.Scripts.Render.Post{
     /// <summary>
     ///     Draws the voxel glass (the <see cref="LightMode" /> pass of TransparentVoxel.shader) after the skybox and
-    ///     before URP copies the opaque colour. A liquid surface shows the opaque colour copy as the scene behind it,
-    ///     so glass under water stays visible from above; drawn after the skybox, the glass blends over the sky.
+    ///     before the transparents, so a liquid surface in front blends over it and glass under water stays visible
+    ///     from above; drawn after the skybox, the glass blends over the sky.
     ///     The glass writes no depth, so a liquid surface behind it is still drawn; after the transparents the
     ///     <see cref="OverLightMode" /> pass draws the glass again on the pixels a liquid covers (stencil) where the
     ///     glass lies in front of the liquid's surface (depth test), so the liquid does not hide it.

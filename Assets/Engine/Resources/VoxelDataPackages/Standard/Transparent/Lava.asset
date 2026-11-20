@@ -17,14 +17,17 @@ MonoBehaviour:
   category: 5
   alwaysRenderAllFaces: 0
   depthFadeDistance: 3
+  liquidSurface:
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    biomeTint: 0
+    flowSpeed: 0.05
+    patternStrength: 1
+    depthAlpha: 1
   glow: 48
   lightAttenuation: 15
   lightEmission: {x: 15, y: 9, z: 3}
   usePostProcess: 1
   postProcess:
-    postProcessColor: {r: 1, g: 0.75, b: 0.55, a: 0}
-    contrast: 10
-    saturation: 10
     enableFog: 1
     fogColor: {r: 1, g: 0.39, b: 0.12, a: 1}
     fogDensity: 0.2
