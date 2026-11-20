@@ -40,6 +40,11 @@ namespace Engine.Scripts.Render.Post{
         /// </summary>
         public static float SurfaceHeight;
 
+        /// <summary>
+        ///     How much the scene behind the fog takes on the fog colour's hue and the depth darkening (0-1).
+        /// </summary>
+        public static float SceneTint;
+
         [SerializeField] private Shader shader;
 
         private Material _material;
@@ -94,7 +99,7 @@ namespace Engine.Scripts.Render.Post{
                 _material.SetColor(FogColorId, FogColor);
                 _material.SetFloat(FogDensityId, FogDensity);
                 _material.SetFloat(FogEmissionId, SelfIllumination);
-                _material.SetVector(FogSurfaceId, new Vector4(SurfaceHeight, DepthDarkening));
+                _material.SetVector(FogSurfaceId, new Vector4(SurfaceHeight, DepthDarkening, SceneTint));
 
                 TextureHandle source = resources.activeColorTexture;
                 TextureDesc desc = renderGraph.GetTextureDesc(source);

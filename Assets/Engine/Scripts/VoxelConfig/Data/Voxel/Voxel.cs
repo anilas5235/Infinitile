@@ -66,18 +66,21 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         public bool alphaCutout;
 
         /// <summary>
-        ///     Depth (blocks behind the surface) over which a transparent voxel's alpha rises from the surface alpha to
-        ///     1, so deep liquid turns opaque; zero or negative disables the depth fade.
+        ///     Depth (blocks of scene behind the surface) over which a liquid's alpha rises from the surface alpha to
+        ///     <see cref="VoxelLiquidSurface.depthAlpha" />, so deep liquid reads darker; zero or negative disables it.
         /// </summary>
-        [Tooltip("Blocks behind the surface over which the alpha rises from the surface alpha to 1; <= 0 disables it")]
+        [Tooltip("Blocks behind the surface over which the alpha rises to the liquid's depth alpha; <= 0 disables it")]
         public float depthFadeDistance = -1f;
 
-        /// <summary>
-        ///     Scale of the texture alpha (see-through water); 1 keeps the texture alpha. A transparent voxel with
-        ///     post-process fog draws its surface with this alpha over the scene behind it, fogged and colour graded as from inside.
-        /// </summary>
-        [Tooltip("Scale of the texture alpha at the surface; with post-process fog the scene behind is fogged and graded as seen from inside")]
+        /// <summary>Scale of the texture alpha (see-through water); 1 keeps the texture alpha.</summary>
+        [Tooltip("Scale of the texture alpha at the surface")]
         [Range(0f, 1f)] public float surfaceAlpha = 1f;
+
+        /// <summary>
+        ///     Look of a liquid surface (tint, biome tint, scrolling pattern, depth alpha); only read for liquids of
+        ///     the transparent layer.
+        /// </summary>
+        public VoxelLiquidSurface liquidSurface = new();
 
         [Range(0, 255)] public int glow;
 
@@ -187,6 +190,20 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
                 VoxelTexMode.AllUnique => allUnique.First().Value,
                 _ => FindTex(null, condition)
             };
+        }
+
+        /// <summary>
+        ///     Colour an icon multiplies onto the display textures: for a liquid its surface tint, with biome tint onto
+        ///     the default water colour (the texture is only a grey pattern); white for every other voxel.
+        /// </summary>
+        public Color DisplayTint{
+            get{
+                if (category != VoxelCategory.Liquids) return Color.white;
+                VoxelLiquidSurface surface = liquidSurface ?? new VoxelLiquidSurface();
+                Color tint = surface.biomeTint ? Generation.Biome.DefaultWaterColor * surface.tint : surface.tint;
+                tint.a = 1f;
+                return tint;
+            }
         }
 
         private void OnValidate(){
@@ -303,32 +320,18 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
     }
 
     /// <summary>
-    ///     Optional per-voxel post-processing parameters such as color grading and fog.
+    ///     Optional per-voxel underwater view: the coloured fog drawn while the camera is inside the voxel.
     /// </summary>
     [Serializable]
     public class VoxelPostProcessData{
         /// <summary>
-        ///     Color tint (lift/gamma/gain) applied during post processing.
-        /// </summary>
-        public Color postProcessColor;
-
-        /// <summary>
-        ///     Contrast adjustment factor.
-        /// </summary>
-        public float contrast;
-
-        /// <summary>
-        ///     Saturation adjustment factor.
-        /// </summary>
-        public float saturation;
-
-        /// <summary>
-        ///     Enables additional fog for this voxel type.
+        ///     Enables the underwater fog for this voxel type.
         /// </summary>
         public bool enableFog;
 
         /// <summary>
-        ///     Fog color when <see cref="enableFog" /> is true; lit by the sky unless the voxel emits light.
+        ///     Fog color when <see cref="enableFog" /> is true; lit by the sky unless the voxel emits light. A
+        ///     biome-tinted liquid (<see cref="VoxelLiquidSurface.biomeTint" />) takes the biome's water fog colour instead.
         /// </summary>
         public Color fogColor = Color.gray;
 
@@ -342,5 +345,41 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         ///     water gets darker; 0 keeps the fog equally bright at every depth.
         /// </summary>
         [Min(0f)] public float depthDarkening;
+
+        /// <summary>
+        ///     How much the scene seen through the fog takes on the fog's hue and depth darkening (0 = untouched, 1 =
+        ///     fully), so near blocks look blue under water as well, not only the far ones.
+        /// </summary>
+        [Range(0f, 1f)] public float sceneTint;
+    }
+
+    /// <summary>
+    ///     Surface look of a liquid: a tinted, alpha-blended surface with a world-space pattern that scrolls in two
+    ///     directions (fragment shader only), optionally tinted by the biome's water colour.
+    /// </summary>
+    [Serializable]
+    public class VoxelLiquidSurface{
+        /// <summary>Colour multiplied onto the texture; with <see cref="biomeTint" /> it multiplies the biome colour.</summary>
+        [Tooltip("Colour multiplied onto the surface (and onto the biome colour with biome tint)")]
+        public Color tint = Color.white;
+
+        /// <summary>Colours the surface by the biome's water colour (soft ~4-block border between biomes).</summary>
+        [Tooltip("Colour by the biome's water colour; the underwater fog takes the biome's water fog colour")]
+        public bool biomeTint;
+
+        /// <summary>Scroll speed of the surface pattern in blocks per second; 0 = still.</summary>
+        [Tooltip("Pattern scroll speed in blocks per second, 0 = still")]
+        [Min(0f)] public float flowSpeed = 0.25f;
+
+        /// <summary>How much of the texture's light/dark pattern shows, 0 = flat colour, 1 = full pattern.</summary>
+        [Tooltip("Strength of the texture's light/dark pattern, 0 = flat colour")]
+        [Range(0f, 1f)] public float patternStrength = 1f;
+
+        /// <summary>
+        ///     Alpha the surface reaches over <see cref="Voxel.depthFadeDistance" /> blocks of scene behind it
+        ///     (deep water reads darker); never below the surface alpha.
+        /// </summary>
+        [Tooltip("Alpha reached over depthFadeDistance blocks of scene behind the surface")]
+        [Range(0f, 1f)] public float depthAlpha = 0.9f;
     }
 }

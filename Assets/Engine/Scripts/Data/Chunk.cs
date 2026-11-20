@@ -3,6 +3,7 @@ using Engine.Scripts.Utils.Collections;
 using Engine.Scripts.Utils.Extensions;
 using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using static Engine.Scripts.Utils.VoxelConstants;
 
@@ -149,6 +150,28 @@ namespace Engine.Scripts.Data{
         /// </summary>
         internal uint OccupiedPartitions;
 
+        /// <summary>
+        ///     Hard biome of every column (index into the active biome set), ChunkWidth x ChunkDepth bytes in column
+        ///     order (<c>z + x * ChunkDepth</c>), written by the chunk job; the water's biome colour reads it
+        ///     (<c>WaterTintMap</c>, underwater fog). Not created for data that did not come from the generator.
+        /// </summary>
+        internal UnsafeList<byte> Biomes;
+
+        /// <summary>True when <see cref="Biomes" /> holds the column biomes.</summary>
+        public bool HasBiomes => Biomes.IsCreated && Biomes.Length == ChunkWidth * ChunkDepth;
+
+        /// <summary>Hard biome of the chunk-local column (<paramref name="x" />, <paramref name="z" />); 0 without biomes.</summary>
+        public byte GetBiome(int x, int z){
+            return HasBiomes ? Biomes[z + x * ChunkDepth] : (byte)0;
+        }
+
+        /// <summary>Allocates <see cref="Biomes" /> (all 0); the chunk job fills it.</summary>
+        internal void CreateBiomes(){
+            if (Biomes.IsCreated) return;
+            Biomes = new UnsafeList<byte>(ChunkWidth * ChunkDepth, ChunkLists.Allocator);
+            Biomes.Resize(ChunkWidth * ChunkDepth, NativeArrayOptions.ClearMemory);
+        }
+
         /// <summary>True when partition <paramref name="partitionY" /> may hold a voxel that is not air.</summary>
         public bool PartitionHasVoxels(int partitionY){
             return (uint)partitionY < PartitionsPerChunk && (OccupiedPartitions & (1u << partitionY)) != 0;
@@ -161,6 +184,7 @@ namespace Engine.Scripts.Data{
         public ChunkVoxelData(int initCapacity){
             Data = new UnsafeIntervalList<ushort>(initCapacity, ChunkLists.Allocator);
             OccupiedPartitions = 0;
+            Biomes = default;
         }
 
         /// <summary>
@@ -212,6 +236,7 @@ namespace Engine.Scripts.Data{
         /// </summary>
         public void Dispose(){
             Data.Dispose();
+            if (Biomes.IsCreated) Biomes.Dispose();
         }
 
         private static int GetIndex(in int3 pos){

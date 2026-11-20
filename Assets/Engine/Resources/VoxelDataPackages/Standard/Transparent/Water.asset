@@ -17,20 +17,24 @@ MonoBehaviour:
   meshLayer: 1
   category: 5
   alwaysRenderAllFaces: 0
-  depthFadeDistance: 12
-  surfaceAlpha: 0.4
+  depthFadeDistance: 8
+  surfaceAlpha: 0.6
+  liquidSurface:
+    tint: {r: 1, g: 1, b: 1, a: 1}
+    biomeTint: 1
+    flowSpeed: 0.3
+    patternStrength: 1
+    depthAlpha: 0.9
   glow: 0
   lightAttenuation: 2
   lightEmission: {x: 0, y: 0, z: 0}
   usePostProcess: 1
   postProcess:
-    postProcessColor: {r: 0.88, g: 0.95, b: 1, a: 0}
-    contrast: 5
-    saturation: -10
     enableFog: 1
-    fogColor: {r: 0.1, g: 0.3, b: 0.4, a: 1}
-    fogDensity: 0.035
-    depthDarkening: 0.04
+    fogColor: {r: 0.02, g: 0.3, b: 1, a: 1}
+    fogDensity: 0.02
+    depthDarkening: 0.03
+    sceneTint: 0.8
   shape: {fileID: 11400000, guid: 4f233acb5e735874f81d54b07e03336a, type: 2}
   top: {fileID: 0}
   bottom: {fileID: 0}
@@ -39,5 +43,5 @@ MonoBehaviour:
   right: {fileID: 0}
   left: {fileID: 0}
   side: {fileID: 0}
-  all: {fileID: 2800000, guid: 7e204b64c0db5e543a5885920baee83c, type: 3}
+  all: {fileID: 2800000, guid: 9e89d9fd667947cabffaa8cdb9f5c9e3, type: 3}
   collision: 0

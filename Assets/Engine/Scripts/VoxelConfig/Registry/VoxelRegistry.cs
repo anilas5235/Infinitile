@@ -314,37 +314,36 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         }
 
         /// <summary>
-        ///     Gives a transparent voxel with post-process fog or a depth fade a volume slot. With fog, the scene seen
-        ///     through its surface gets the underwater fog and colour grading; the grading values are prepared
-        ///     as URP prepares them for the underwater view (VoxelPostProcessHandler). 0 for every other voxel.
+        ///     Gives a transparent, blended (not cut-out) voxel that is a liquid, has a depth fade or underwater fog
+        ///     a volume slot: the liquid surface look of TransparentVoxel.shader. 0 for every other voxel.
         /// </summary>
         private byte RegisterVolumeFog(Voxel so){
-            if (so.meshLayer != MeshLayer.Transparent) return 0;
+            if (so.meshLayer != MeshLayer.Transparent || so.alphaCutout) return 0;
+            bool liquid = so.category == VoxelCategory.Liquids;
             bool fogged = so.usePostProcess && so.postProcess.enableFog;
-            if (!fogged && so.depthFadeDistance <= 0f) return 0;
+            if (!liquid && !fogged && so.depthFadeDistance <= 0f) return 0;
             if (_volumeFogs.Count > VolumeFogSlotMask){ // slot 0 is "none"; points hold 6 bits
                 VoxelEngineLogger.Warn<VoxelRegistry>($"No volume fog slot left for '{so.name}'");
                 return 0;
             }
 
-            VoxelPostProcessData post = so.postProcess;
-            Vector3Int emission = so.lightEmission;
-            Vector4 color = post.postProcessColor;
-            (Vector4 lift, Vector4 invGamma, Vector4 gain) = ColorUtils.PrepareLiftGammaGain(color, color, color);
-            _volumeFogs.Add(new VolumeFogDef{
-                FogColor = new float3(post.fogColor.r, post.fogColor.g, post.fogColor.b),
-                Density = post.fogDensity,
-                Lift = ((float4)lift).xyz,
-                SelfIllumination = math.cmax(new float3(emission.x, emission.y, emission.z)) / VoxelLightLimits.MaxLevel,
-                Gain = ((float4)gain).xyz,
-                Contrast = post.contrast / 100f + 1f,
-                InvGamma = ((float4)invGamma).xyz,
-                Saturation = post.saturation / 100f + 1f,
-                DepthFade = math.max(so.depthFadeDistance, 0f),
-                DepthDarkening = fogged ? math.max(post.depthDarkening, 0f) : 0f,
-                Fogged = fogged ? 1f : 0f
-            });
+            _volumeFogs.Add(CreateVolumeFogDef(so));
             return (byte)(_volumeFogs.Count - 1);
+        }
+
+        /// <summary>The liquid surface entry of one voxel, as the shader reads it.</summary>
+        internal static VolumeFogDef CreateVolumeFogDef(Voxel so){
+            VoxelLiquidSurface surface = so.liquidSurface ?? new VoxelLiquidSurface();
+            Color tint = surface.tint;
+            float surfaceAlpha = math.saturate(so.surfaceAlpha);
+            return new VolumeFogDef{
+                Tint = new float3(tint.r, tint.g, tint.b),
+                BiomeTint = surface.biomeTint ? 1f : 0f,
+                DepthFade = math.max(so.depthFadeDistance, 0f),
+                DepthAlpha = math.max(math.saturate(surface.depthAlpha), surfaceAlpha),
+                FlowSpeed = math.max(surface.flowSpeed, 0f),
+                PatternStrength = math.saturate(surface.patternStrength)
+            };
         }
 
         /// <summary>
@@ -450,20 +449,17 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             _foliageTexRegistry.DestroyArray();
         }
 
-        /// <summary>One <c>_VoxelVolumeFog</c> entry, as <c>VolumeFog</c> in TransparentVoxel.shader.</summary>
-        private struct VolumeFogDef{
-            public float3 FogColor; // lit like the underwater fog
-            public float Density; // per block, exp² as UnderwaterFog.shader
-            public float3 Lift; // lift/gamma/gain of the underwater view, as ColorUtils.PrepareLiftGammaGain
-            public float SelfIllumination; // the fog's light floor, max emission / 15
-            public float3 Gain;
-            public float Contrast; // ColorAdjustments contrast as a factor, contrast / 100 + 1
-            public float3 InvGamma;
-            public float Saturation; // ColorAdjustments saturation as a factor, saturation / 100 + 1
-            public float DepthFade; // blocks over which the alpha rises to 1, 0 = off
-            public float DepthDarkening; // fraction of the fog's light lost per block below the surface (exp)
-            public float Fogged; // 1 = the scene behind is fogged and graded, 0 = depth fade only
-            public float Pad; // keeps the stride a multiple of 16 bytes
+        /// <summary>
+        ///     One <c>_VoxelVolumeFog</c> entry, as <c>VolumeFog</c> in TransparentVoxel.shader: the look of a liquid
+        ///     (or depth-faded) surface. 32 bytes.
+        /// </summary>
+        internal struct VolumeFogDef{
+            public float3 Tint; // multiplied onto the texture, or onto the biome water colour
+            public float BiomeTint; // 1 = colour by _VoxelWaterTint (world tint map), 0 = texture colour
+            public float DepthFade; // blocks of scene behind the surface over which alpha rises to DepthAlpha, 0 = off
+            public float DepthAlpha; // alpha reached over DepthFade blocks, never below the surface alpha
+            public float FlowSpeed; // pattern scroll in blocks per second
+            public float PatternStrength; // 0 = flat colour, 1 = full light/dark texture pattern
         }
 
         //TODO: Compacting?

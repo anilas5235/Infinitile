@@ -72,15 +72,18 @@ namespace Engine.Tests.EditMode{
                 AssetDatabase.LoadAssetAtPath<VoxelEngineSettings>("Assets/EngineSettings/VoxelEngineSettings.asset");
             Assert.IsNotNull(settings, "shipped engine settings missing");
             Shader shader = settings.Renderer.transparentMaterial.shader;
-            bool glass = false, over = false;
+            bool glass = false, over = false, liquidDepth = false;
             for (int i = 0; i < shader.passCount; i++){
                 string lightMode = shader.FindPassTagValue(i, new UnityEngine.Rendering.ShaderTagId("LightMode")).name;
                 glass |= lightMode == VoxelGlassFeature.LightMode;
                 over |= lightMode == VoxelGlassFeature.OverLightMode;
+                liquidDepth |= lightMode == VoxelGlassFeature.LiquidDepthLightMode;
             }
 
             Assert.IsTrue(glass, "TransparentVoxel has no VoxelGlass pass");
             Assert.IsTrue(over, "TransparentVoxel has no VoxelGlassOver pass (glass in front of a liquid)");
+            Assert.IsTrue(liquidDepth,
+                "TransparentVoxel has no VoxelLiquidDepth pass (liquid faces behind liquid faces flicker)");
         }
 
         [Test]
@@ -192,17 +195,15 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void VolumeFogDef_Is80Bytes(){
-            Type type = typeof(VoxelRegistry).GetNestedType("VolumeFogDef", BindingFlags.NonPublic);
-            Assert.IsNotNull(type, "VoxelRegistry.VolumeFogDef not found");
-            Assert.AreEqual(80, Marshal.SizeOf(type), "HLSL VolumeFog stride");
-            Assert.AreEqual(12, (int)Marshal.OffsetOf(type, "Density"), "HLSL VolumeFog offset");
-            Assert.AreEqual(28, (int)Marshal.OffsetOf(type, "SelfIllumination"), "HLSL VolumeFog offset");
-            Assert.AreEqual(44, (int)Marshal.OffsetOf(type, "Contrast"), "HLSL VolumeFog offset");
-            Assert.AreEqual(60, (int)Marshal.OffsetOf(type, "Saturation"), "HLSL VolumeFog offset");
-            Assert.AreEqual(64, (int)Marshal.OffsetOf(type, "DepthFade"), "HLSL VolumeFog offset");
-            Assert.AreEqual(68, (int)Marshal.OffsetOf(type, "DepthDarkening"), "HLSL VolumeFog offset");
-            Assert.AreEqual(72, (int)Marshal.OffsetOf(type, "Fogged"), "HLSL VolumeFog offset");
+        public void VolumeFogDef_Is32Bytes(){
+            Type type = typeof(VoxelRegistry.VolumeFogDef);
+            Assert.AreEqual(32, Marshal.SizeOf(type), "HLSL VolumeFog stride");
+            Assert.AreEqual(0, (int)Marshal.OffsetOf(type, "Tint"), "HLSL VolumeFog offset");
+            Assert.AreEqual(12, (int)Marshal.OffsetOf(type, "BiomeTint"), "HLSL VolumeFog offset");
+            Assert.AreEqual(16, (int)Marshal.OffsetOf(type, "DepthFade"), "HLSL VolumeFog offset");
+            Assert.AreEqual(20, (int)Marshal.OffsetOf(type, "DepthAlpha"), "HLSL VolumeFog offset");
+            Assert.AreEqual(24, (int)Marshal.OffsetOf(type, "FlowSpeed"), "HLSL VolumeFog offset");
+            Assert.AreEqual(28, (int)Marshal.OffsetOf(type, "PatternStrength"), "HLSL VolumeFog offset");
         }
 
         #endregion

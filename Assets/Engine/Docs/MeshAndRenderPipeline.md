@@ -982,3 +982,93 @@ like opaque blocks with holes.
   shaders compile, the shipped face shade strength, both glass passes and the feature on both renderers, the
   missing cut-out material warning, `GPUVoxelDef` 100 bytes); `RegistryTests.TexRegistry_TileWithFewerMips_WarnsAndNamesIt`; `GpuConstantsTests` (`MESH_LAYER_TRANSPARENT`, `VOLUME_FOG_SLOT_MASK`,
   `LIQUID_SURFACE_DROP`).
+
+# Version 1.12 (Simple Liquids, Biome Water Tint)
+
+## Description
+
+The owner found the water wrong as a whole and asked for a simple, Minecraft-like look with no complex vertex
+shader (WorldGenSpec DEC-119, 2026-11-20). Version 1.12 replaces the liquid pass of Version 1.11: no colour grading
+of the scene behind, no depth fade to opaque, no Snell's window, no opaque colour copy.
+
+- **Liquid surface** (`TransparentVoxel.shader`, pass `UniversalForward`). An alpha-blended surface, lit like every
+  other voxel (AO, propagated light, face shade, glow, horizon fog):
+  - **Pattern.** The voxel's texture is sampled twice in world space (top and bottom faces by x/z, the sides by
+    their horizontal axis and y), scrolled in two directions by `_Time.y × flowSpeed` (on the sides both run
+    down), and averaged. Gradients come from the unscrolled coordinates, so the mip level stays steady. Fragment
+    shader only; the vertex shader passes the quad's normal (`nointerpolation`).
+  - **Colour.** The texture's mean colour is its last mip. A biome-tinted liquid takes the biome water colour and
+    carries the pattern as a luminance ratio to the mean (`k = lum(pattern) / lum(mean)`, scaled by
+    `patternStrength`); any other liquid keeps its texture colour with the pattern scaled about the mean. Both are
+    multiplied by `tint`.
+  - **Alpha** = texture alpha × `surfaceAlpha`. Seen from outside, one scene-depth read raises it towards
+    `depthAlpha` over `depthFadeDistance` blocks of scene behind the surface (the short depth tint), so deep water
+    reads darker. Seen from below, the surface is the same tinted surface; the underwater fog covers the rest.
+- **Volume slot** (`VoxelRegistry.VolumeFogDef`, `_VoxelVolumeFog`, 32 bytes): tint (float3), biome tint, depth
+  fade, depth alpha, flow speed, pattern strength. A transparent voxel that is not cut out gets a slot when it is a
+  liquid (category Liquids), has a depth fade or has underwater fog. The names stay from Version 1.11.
+- **Voxel settings.** `Voxel.liquidSurface` (`VoxelLiquidSurface`: tint, biomeTint, flowSpeed, patternStrength,
+  depthAlpha), shown for liquids in the voxel inspector. `VoxelPostProcessData` keeps only the fog
+  (enableFog, fogColor, fogDensity, depthDarkening, sceneTint); the grading fields are gone.
+- **Biome per column.** The chunk job keeps the hard biome of every column with the chunk
+  (`ChunkVoxelData.Biomes`, 32 × 32 bytes, index `z + x × 32`, `ChunkJob.WriteBiomes`), freed with the chunk.
+  `Biome.WaterColor` and `Biome.WaterFogColor` give each biome its colours; `VoxelWorld` keeps them in config
+  order (`BiomeWaterColors`, `BiomeWaterFogColor`, `BiomeColorsVersion`).
+- **World tint map** (`WaterTintMap`). A repeating sRGB texture with one texel per block column, `2 × draw
+  distance + 4` chunks a side (28 chunks, 896² texels, 4.2 MB with mips at draw distance 12; 68 chunks, 24.9 MB at 32). A chunk owns the slot its position falls on (`((c mod N) + N) mod N` per axis); the drawn square never
+  puts two chunks on one slot. `VoxelWorldRenderer` writes a chunk's colours before it builds the chunk's first
+  partition (`EnsureWaterTint`, marker `Voxel.GpuUpload.WaterTint`): 1,024 pixels into a 32 × 32 staging texture,
+  then `Graphics.CopyTexture` into the slot. An evicted chunk is forgotten, new biome colours (a regenerated world)
+  forget all, and a draw distance change makes a new map. Globals `_VoxelWaterTint` and `_VoxelWaterTintParams`
+  (x = 1 / size, z = blend mip). The map keeps mips 0–2 (`BlendMip` 2: one texel per 4 × 4 columns, never across
+  a chunk); `UpdateMips` rebuilds them in `LateUpdate` when chunks were written that frame. The shader reads it by
+  world x/z: four bilinear taps two blocks apart diagonally from mip 2, so the colour blends over about 16 blocks
+  between biomes. The biome colours stay close to one blue (owner, 2026-11-20); only the Swamp is murky.
+- **Underwater.** `UnderwaterFogFeature` keeps its exp² fog with depth darkening. `VoxelPostProcessHandler` no
+  longer sets Lift/Gamma/Gain or Colour Adjustments; for a biome-tinted liquid the fog colour is the mean of the
+  biomes' water fog colours over 16 × 16 blocks around the camera (4 × 4 columns, 4 blocks apart, in linear light,
+  again when the camera's column changes). `sceneTint` (Water 0.8) tints the scene behind the fog with the fog
+  colour's hue and the depth darkening, so near blocks look blue as well; Water's fog is a saturated blue
+  (0.02, 0.30, 1.0) at density 0.02.
+- **Pattern tile.** Water uses an own greyscale tile, `KenneyDerived/water_ripples.png` (16 px per block, alpha 0.8,
+  `Docs/Tools/make_water_pattern.py`), with pattern strength 1; the Kenney water tile was almost flat.
+- **Opaque copy off.** No shader reads `_CameraOpaqueTexture` any more, so `PC_RPAsset` has
+  `m_RequireOpaqueTexture: 0` (the depth texture stays on for the depth tint). Glass is still drawn after the
+  skybox and before the transparents, so a liquid surface in front blends over it; the double-counted glass of
+  Version 1.11 is gone.
+- **Liquid depth pre-pass.** `PageCulling.compute` appends the visible pages in a different order every frame, so
+  two liquid faces behind each other (a lake's floor and its surface, seen from an air pocket under it, or water
+  through water across a chunk border) blended once or twice by that order: whole partitions flickered. The
+  `VoxelLiquidDepth` pass of `TransparentVoxel.shader` (`ColorMask 0`, `ZWrite On`, `Cull Off`, the liquid vertex
+  shader, no alpha test) writes the liquids' depth first; `VoxelGlassFeature` draws it at
+  `BeforeRenderingTransparents`, between the glass pass and the transparents. The forward pass then draws only the
+  nearest liquid face per pixel (`ZTest LEqual`). The depth texture is copied after the opaques, so the depth tint
+  still sees the floor. Without `VoxelGlassFeature` in the renderer the flicker comes back (owner's pick
+  "Depth pre-pass", 2026-11-20). Cost: one depth-only draw of the liquid pages per frame. Measured with the
+  goal run (bef7c14 / 28c7163 / 28c7163 / bef7c14, Editor, draw 12): standing over the sea the GPU frame is
+  0.3 to 0.4 ms longer (3.21, 3.20 against 2.83, 2.92 ms avg; frame p95 5.99, 5.80 against 5.02, 5.50 ms), the
+  main camera's URP render 0.03 ms; in the flights the difference stays inside the spread.
+- **Liquid depth pulled towards the camera.** A liquid face next to leaves (or glass) lies in the plane of the
+  leaf face, and the two quads split into triangles along different diagonals, so from inside the water whole
+  triangles of the leaf showed through the water surface and changed as the camera moved. `vert_filtered` pulls
+  every liquid vertex `LIQUID_DEPTH_PULL` (1/128 block, at most half the distance) towards the camera along its
+  view ray: its place on screen stays the same, only its depth changes, so the liquid face wins against a face in
+  its own plane and no seams open. (A first try moved the faces 1/64 block into their block; that opened a visible
+  seam at every corner of a water body and was dropped.) The depth pre-pass has `Offset 1, 1`, so the forward
+  pass, compiled separately, always passes for the nearest face. Checked in Play mode: camera in water next to a
+  leaf wall (green triangles before, an even water surface after) and a water corner on sand (no seam).
+- **Icon.** The water tile is a grey pattern, so `Voxel.DisplayTint` (a liquid's surface tint, with biome tint
+  times `Biome.DefaultWaterColor`) colours its inventory and hotbar icon (`BlockIcon.Set`).
+- **Tests.** `WaterRenderingTests` (the chunk job keeps the column biomes, tint map size and slot wrap, the pixel
+  layout and fallback, ensure/forget/new colours, a written chunk read back from the GPU, one mip rebuild after
+  writes, the fog colour average, opaque copy off and depth on, the shipped water asset, biome colours close to one
+  blue); `RegistryTests.VoxelRegistry_LiquidsAndDepthFades_GetVolumeSlots`
+  (slot rules and the 32-byte entries); `RenderDataTests.VolumeFogDef_Is32Bytes`,
+  `RenderDataTests.TransparentMaterial_HasGlassPassForTheGlassFeature` (also the liquid depth pass) and the shader
+  compile check.
+- **Measured** (2026-11-20, Editor, focused, `FrameTimeGoal_MainThread_IsAttributed` at draw distance 12, uncapped;
+  master, branch, branch, master in one session; branch / second master run): standing frame p95 5.14, 4.33 / 4.35 ms;
+  flight 80 u/s p95 7.66, 7.57 / 7.57 ms; flight 40 u/s p95 6.69, 6.59 / 6.52 ms. The GPU frame is 0.05 to 0.13 ms
+  longer on average (the liquid pass), the main thread is unchanged within the spread, and the tint upload costs
+  0.016 ms per frame on average (p95 0.099 ms) in the 80 u/s flight. The underwater fog pass is not in this run
+  (the rig stays above the terrain).

@@ -27,7 +27,7 @@ Shader "Hidden/Engine/UnderwaterFog"
             float4 _UnderwaterFogColor;
             float _UnderwaterFogDensity;
             float _UnderwaterFogEmission;
-            float4 _UnderwaterFogSurface; // x = height of the liquid's surface, y = depth darkening per block
+            float4 _UnderwaterFogSurface; // x = height of the liquid's surface, y = depth darkening per block, z = scene tint
 
             // Voxel lighting globals (VoxelShaderCommon.hlsl)
             float _VoxelSkyBrightness;
@@ -66,7 +66,13 @@ Shader "Hidden/Engine/UnderwaterFog"
 
                 // --- Exp² fog ---
                 const float fog = sky ? 1.0 : 1.0 - exp(-d * d);
-                return half4(lerp(scene.rgb, fog_color, fog), scene.a);
+                // --- Scene tint: what is seen through the liquid takes on the fog's hue (its colour at full
+                // brightness) and the depth darkening, so near blocks look blue too, not only the far ones ---
+                const float3 hue = _UnderwaterFogColor.rgb /
+                                   max(max(_UnderwaterFogColor.r, _UnderwaterFogColor.g), max(_UnderwaterFogColor.b, 1e-3));
+                const float tint = _UnderwaterFogSurface.z;
+                const float3 seen = scene.rgb * lerp(1.0, hue, tint) * lerp(1.0, darken, tint);
+                return half4(lerp(seen, fog_color, fog), scene.a);
             }
             ENDHLSL
         }

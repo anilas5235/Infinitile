@@ -63,7 +63,7 @@ namespace UI{
             Texture2D side = voxel.GetDisplayTexture(QuadDrawCondition.Forward);
             bool flat = voxel.meshLayer == MeshLayer.Foliage;
             Texture2D top = flat ? null : voxel.GetDisplayTexture(QuadDrawCondition.Up);
-            icon.Set(top ? top : side, side, flat);
+            icon.Set(top ? top : side, side, flat, voxel.DisplayTint);
         }
 
         private static void SetIcon(BlockIcon icon, ushort id){
