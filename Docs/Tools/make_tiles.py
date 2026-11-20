@@ -41,7 +41,7 @@ WHITE = lambda h, s, v: s < .22 and v > .8
 
 tiles = {}
 
-# --- Grass: the grass tops, sides and green plants are grey tint tiles (DEC-120, Docs/Tools/make_tint_tiles.py); the
+# --- Grass: the grass tops, sides and green plants are grey tint tiles (DEC-122, Docs/Tools/make_tint_tiles.py); the
 # biome colours them. Only the litter and other non-grass recolours stay here. ------------------------------------
 # Needle litter (podzol) for the Taiga forest floor.
 tiles['litter_top'] = recolour(load('grass_top'), GREEN, 26, .80, .58)

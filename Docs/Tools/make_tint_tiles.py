@@ -1,4 +1,4 @@
-"""Generator of the biome-tinted grass and plant tiles (DEC-120) in Assets/Engine/Resources/Artwork/KenneyDerived:
+"""Generator of the biome-tinted grass and plant tiles (DEC-122) in Assets/Engine/Resources/Artwork/KenneyDerived:
 greyscale versions of Kenney Voxel Pack tiles (CC0) whose tinted pixels have a linear mean of exactly TINT_GREY_MEAN, so
 the shader's biome colour (Biome.GrassColor / FoliageColor) is the mean colour the tinted part shows before light.
 Side tiles keep their dirt or stone and get an overlay tile (Voxel.biomeTintMask): alpha 255 where the side is tinted,

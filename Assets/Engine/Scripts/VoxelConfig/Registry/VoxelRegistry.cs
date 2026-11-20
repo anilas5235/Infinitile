@@ -26,7 +26,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         private readonly TexRegistry _solidTexRegistry = new(200);
         private readonly TexRegistry _transparentTexRegistry = new(100);
 
-        // Side overlays of the biome-tinted voxels (Voxel.biomeTintMask); the shaders read their alpha (DEC-120)
+        // Side overlays of the biome-tinted voxels (Voxel.biomeTintMask); the shaders read their alpha (DEC-122)
         private readonly TexRegistry _tintMaskRegistry = new(8);
 
         private readonly Registry<Voxel.VoxelDef> _voxelRenderDefRegistry = new(100);
@@ -275,7 +275,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         /// <summary>
         ///     The biome tint word of <paramref name="so" />'s textures on the faces of <paramref name="condition" />
         ///     (see <see cref="TexRegistry.TintWords" />); registers the side mask on first use. Leaves are not tinted
-        ///     (DEC-120), so a transparent voxel asking for a tint logs a warning and stays untinted.
+        ///     (DEC-122), so a transparent voxel asking for a tint logs a warning and stays untinted.
         /// </summary>
         private uint TintWord(Voxel so, QuadDrawCondition condition){
             (bool tinted, bool masked) = so.BiomeTintOf(condition);

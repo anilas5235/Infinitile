@@ -112,7 +112,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
         // --- Grass and plants -----------------------------------------------------------------------------------------
 
-        [Tooltip("Mean colour of the biome-tinted grass (grass block tops and side bands) in this biome; blended over about 16 blocks at the border (DEC-120).")]
+        [Tooltip("Mean colour of the biome-tinted grass (grass block tops and side bands) in this biome; blended over about 16 blocks at the border (DEC-122).")]
         [SerializeField] public Color GrassColor = DefaultGrassColor;
 
         [Tooltip("Mean colour of the biome-tinted plants (grass tufts, tall grass, ferns, reeds) in this biome; blended like the grass.")]

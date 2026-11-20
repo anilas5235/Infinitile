@@ -83,7 +83,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         public VoxelLiquidSurface liquidSurface = new();
 
         /// <summary>
-        ///     Colours the voxel by the biome's grass or plant colour (DEC-120): its textures are grey and the shader
+        ///     Colours the voxel by the biome's grass or plant colour (DEC-122): its textures are grey and the shader
         ///     multiplies the blended biome colour onto them. The top face is tinted whole, the bottom face of a
         ///     top/bottom/sides or six-sided voxel not at all, and every other face through <see cref="biomeTintMask" />
         ///     when set, else whole.
@@ -370,7 +370,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
     }
 
     /// <summary>
-    ///     Which biome colour a voxel takes (DEC-120); the value is the layer of the biome tint map
+    ///     Which biome colour a voxel takes (DEC-122); the value is the layer of the biome tint map
     ///     (<c>BiomeTintMap</c>, layer 0 is the water colour).
     /// </summary>
     public enum VoxelBiomeTint : byte{

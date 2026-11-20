@@ -18,7 +18,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         }
 
         /// <summary>
-        ///     The biome tint word of every registered texture by index (<c>_VoxelTexTint</c>, DEC-120): bits 0-1 the
+        ///     The biome tint word of every registered texture by index (<c>_VoxelTexTint</c>, DEC-122): bits 0-1 the
         ///     tint map layer (0 = none, see <see cref="Data.Voxel.VoxelBiomeTint" />), bit 2 set when the tint goes
         ///     through a mask, bits 16-31 the mask's slice in the mask array.
         /// </summary>

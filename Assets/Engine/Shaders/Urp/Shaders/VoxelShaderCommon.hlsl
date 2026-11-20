@@ -235,7 +235,7 @@ float calc_glow(const float glow_data)
     return 1.0f + glow_data / 8.0f;
 }
 
-// ── Biome tint (DEC-119, DEC-120) ─────────────────────────────────────────────────────────────────────────────────
+// ── Biome tint (DEC-119, DEC-122) ─────────────────────────────────────────────────────────────────────────────────
 // The biome colours around the player by world x/z (BiomeTintMap): slice 0 the water colour, 1 the grass colour,
 // 2 the plant colour; one texel per 4 x 4 block columns, repeating; _VoxelBiomeTintParams.x = 1 / map size in blocks.
 TEXTURE2D_ARRAY(_VoxelBiomeTint);

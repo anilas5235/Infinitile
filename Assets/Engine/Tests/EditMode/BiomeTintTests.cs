@@ -24,7 +24,7 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     The biome tint (DEC-119 water, DEC-120 grass and plants): the palette, the tint map's layers and slots,
+    ///     The biome tint (DEC-119 water, DEC-122 grass and plants): the palette, the tint map's layers and slots,
     ///     the per-texture tint words of the registry, the face rule, and the grey tiles and biome colours it needs.
     /// </summary>
     public class BiomeTintTests{

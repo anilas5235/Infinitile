@@ -80,7 +80,7 @@
             return o;
         }
 
-        // The forward pass's vertex shader: also the biome tint of the plant's texture (DEC-120); the depth pass
+        // The forward pass's vertex shader: also the biome tint of the plant's texture (DEC-122); the depth pass
         // leaves it out. The leaves pass (_VoxelPass 3) reads untinted words.
         Varyings vert_tinted(uint vertexID : SV_VertexID)
         {

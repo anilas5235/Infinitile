@@ -1078,7 +1078,7 @@ of the scene behind, no depth fade to opaque, no Snell's window, no opaque colou
 
 ## Description
 
-The owner asked for the per-biome colour of the water on grass and plants as well (WorldGenSpec DEC-120,
+The owner asked for the per-biome colour of the water on grass and plants as well (WorldGenSpec DEC-122,
 2026-11-20): grass tops and sides and the green plants take a biome colour, Minecraft style, from grey tiles. Tree
 leaves are not tinted (spec idea 16.8 stays open); flowers, mushrooms, rocks, wheat, the torch and the dead plants
 (GrassFDead, DeadBush) keep their colours. Version 1.13 extends the water tint of Version 1.12 to three layers.

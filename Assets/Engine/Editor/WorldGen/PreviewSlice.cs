@@ -135,7 +135,7 @@ namespace Engine.Editor.WorldGen{
 
         /// <summary>
         ///     Average colour of the voxel's side texture, weighted by alpha; a biome-tinted voxel takes the default
-        ///     (Plains) colour, on a masked side only over the overlay's share (DEC-120). Cached per voxel.
+        ///     (Plains) colour, on a masked side only over the overlay's share (DEC-122). Cached per voxel.
         /// </summary>
         private Color32 ColorOf(VoxelSo voxel){
             if (!voxel) return Unknown;

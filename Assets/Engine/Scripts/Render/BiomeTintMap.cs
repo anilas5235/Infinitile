@@ -9,7 +9,7 @@ using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.Render{
     /// <summary>
-    ///     The biome colours around the player (DEC-119, DEC-120): a texture array with one layer per
+    ///     The biome colours around the player (DEC-119, DEC-122): a texture array with one layer per
     ///     <see cref="BiomeTintPalette" /> layer (water, grass, plants), by world x/z, repeating every
     ///     <see cref="SizeChunks" /> chunks. One texel holds the mean colour of <see cref="BlendColumns" /> ×
     ///     <see cref="BlendColumns" /> block columns, and the shader blends four bilinear taps around a vertex

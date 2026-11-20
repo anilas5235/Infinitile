@@ -63,7 +63,7 @@ namespace UI{
             Texture2D side = voxel.GetDisplayTexture(QuadDrawCondition.Forward);
             bool flat = voxel.meshLayer == MeshLayer.Foliage;
             Texture2D top = flat ? null : voxel.GetDisplayTexture(QuadDrawCondition.Up);
-            // a biome-tinted grass side: dirt untinted, the grass band through the side overlay (DEC-120)
+            // a biome-tinted grass side: dirt untinted, the grass band through the side overlay (DEC-122)
             Texture2D overlay = flat || voxel.biomeTint == VoxelBiomeTint.None ? null : voxel.biomeTintMask;
             icon.Set(top ? top : side, side, flat, voxel.DisplayTint, voxel.DisplaySideTint, overlay);
         }

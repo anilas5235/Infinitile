@@ -24,7 +24,7 @@ namespace UI{
         ///     Shows a cube with these textures, or one flat texture; null textures draw nothing. tint multiplies
         ///     every face (a liquid's colour on its grey pattern); white when null. sideTint, when set, multiplies
         ///     the side faces instead, and overlay is drawn over both side faces multiplied by overlayTint (a
-        ///     biome-tinted grass side: the dirt untinted, the grass band through its overlay, DEC-120).
+        ///     biome-tinted grass side: the dirt untinted, the grass band through its overlay, DEC-122).
         /// </summary>
         public void Set(Texture2D top, Texture2D side, bool flat, Color? tint = null, Color? sideTint = null,
             Texture2D overlay = null, Color? overlayTint = null){

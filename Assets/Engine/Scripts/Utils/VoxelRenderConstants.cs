@@ -109,7 +109,7 @@ namespace Engine.Scripts.Utils{
         // Surface look of the liquids by volume slot (VoxelRegistry, TransparentVoxel.shader)
         public static readonly int VoxelVolumeFogNameID = Shader.PropertyToID("_VoxelVolumeFog");
 
-        // Biome water, grass and plant colours around the player (BiomeTintMap, VoxelShaderCommon.hlsl, DEC-120);
+        // Biome water, grass and plant colours around the player (BiomeTintMap, VoxelShaderCommon.hlsl, DEC-122);
         // params x = 1 / map size in blocks
         public static readonly int VoxelBiomeTintNameID = Shader.PropertyToID("_VoxelBiomeTint");
         public static readonly int VoxelBiomeTintParamsNameID = Shader.PropertyToID("_VoxelBiomeTintParams");
