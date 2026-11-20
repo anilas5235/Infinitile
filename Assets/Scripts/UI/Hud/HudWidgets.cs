@@ -13,17 +13,22 @@ namespace UI{
 
         private Texture2D _top, _side;
         private bool _flat;
+        private Color _tint = Color.white;
 
         public BlockIcon(){
             pickingMode = PickingMode.Ignore;
             generateVisualContent += Draw;
         }
 
-        /// <summary>Shows a cube with these textures, or one flat texture; null textures draw nothing.</summary>
-        public void Set(Texture2D top, Texture2D side, bool flat){
+        /// <summary>
+        ///     Shows a cube with these textures, or one flat texture; null textures draw nothing. tint multiplies
+        ///     every face (a liquid's colour on its grey pattern); white when null.
+        /// </summary>
+        public void Set(Texture2D top, Texture2D side, bool flat, Color? tint = null){
             _top = top;
             _side = side ? side : top;
             _flat = flat;
+            _tint = tint ?? Color.white;
             MarkDirtyRepaint();
         }
 
@@ -39,7 +44,7 @@ namespace UI{
                 float fx = rect.x + (rect.width - size) * 0.5f, fy = rect.y + (rect.height - size) * 0.5f;
                 // half a pixel in from every edge: the tiles repeat, so a sample on the edge would pick up the
                 // opposite edge (a plant's opaque stem base drew a dashed line along the icon's top)
-                Quad(context, _top, TopTint, new Vector2(fx, fy), new Vector2(fx + size, fy),
+                Quad(context, _top, Tinted(TopTint), new Vector2(fx, fy), new Vector2(fx + size, fy),
                     new Vector2(fx + size, fy + size), new Vector2(fx, fy + size), 0.5f / size);
                 return;
             }
@@ -55,9 +60,13 @@ namespace UI{
             Vector2 top = new(cx, y0), leftTop = new(x0, side), rightTop = new(right, side);
             Vector2 centre = new(cx, mid), leftBottom = new(x0, side + edge), rightBottom = new(right, side + edge);
             Vector2 low = new(cx, mid + edge);
-            Quad(context, _top, TopTint, leftTop, top, rightTop, centre);
-            Quad(context, _side, LeftTint, leftTop, centre, low, leftBottom);
-            Quad(context, _side, RightTint, centre, rightTop, rightBottom, low);
+            Quad(context, _top, Tinted(TopTint), leftTop, top, rightTop, centre);
+            Quad(context, _side, Tinted(LeftTint), leftTop, centre, low, leftBottom);
+            Quad(context, _side, Tinted(RightTint), centre, rightTop, rightBottom, low);
+        }
+
+        private Color32 Tinted(Color32 shade){
+            return (Color)shade * _tint;
         }
 
         /// <summary>One textured quad; corners clockwise from the texture's top left; inset pulls the texture in.</summary>

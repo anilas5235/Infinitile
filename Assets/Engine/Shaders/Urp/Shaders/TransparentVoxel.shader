@@ -17,13 +17,16 @@
     // - VoxelLiquidDepth: the liquids' depth only, drawn by VoxelGlassFeature before the transparents, so the
     //   liquid surface below draws only its nearest face per pixel. The culling appends the visible pages in a
     //   different order every frame; without this pass two liquid faces behind each other (a lake's underside
-    //   and its surface above) were blended once or twice by that order and flickered per partition.
+    //   and its surface above) were blended once or twice by that order and flickered per partition. A small
+    //   depth bias (Offset) lets the forward pass, compiled separately, pass for that nearest face in every pixel.
     // - Universal Forward: the voxels with a volume slot (liquids): a tinted, alpha-blended surface with a
     //   world-space pattern scrolling in two directions, coloured by the biome's water colour (world tint map),
     //   with URP's transparents. Marks its pixels in the stencil (LIQUID_STENCIL).
     // - VoxelGlassOver: the glass again, drawn by VoxelGlassFeature after the transparents, only on liquid pixels
     //   and only where the glass lies in front of the liquid surface, so the liquid does not cover it.
     // A pass's other quads collapse to a point and are not rasterised.
+    // Liquid faces sit LIQUID_FACE_INSET inside their block, so a liquid face and the leaf face next to it (both
+    // drawn: two different see-through voxels keep both faces) are not in one plane and do not z-fight.
 
     SubShader
     {
@@ -64,6 +67,9 @@
         };
 
         // ── Vertex shader with expansion ─────────────────────────────
+        // How far a liquid face sits inside its block, off the plane of a neighbour's face (leaves, glass)
+        static const float LIQUID_FACE_INSET = 1.0f / 64.0f;
+
         // volume_pass: draw the voxels with a volume slot (liquids), else the plain blended ones (glass)
         Varyings vert_filtered(const uint vertexID, const bool volume_pass)
         {
@@ -72,6 +78,7 @@
             Varyings o = (Varyings)0;
 
             if (get_cutout(v.packed) || (get_volume_fog(v.packed) != 0) != volume_pass) return o;
+            if (volume_pass) v.positionOS -= v.normal * LIQUID_FACE_INSET;
 
             o.positionCS = TransformObjectToHClip(v.positionOS);
             o.uv = v.uv;
@@ -184,6 +191,7 @@
             ZTest LEqual
             ZWrite On
             ColorMask 0
+            Offset 1, 1 // a little farther: the forward pass's own depth for the nearest face must pass LEqual
 
             HLSLPROGRAM
             #pragma target 4.5

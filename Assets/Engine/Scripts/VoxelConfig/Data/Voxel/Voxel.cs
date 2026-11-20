@@ -192,6 +192,20 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
             };
         }
 
+        /// <summary>
+        ///     Colour an icon multiplies onto the display textures: for a liquid its surface tint, with biome tint onto
+        ///     the default water colour (the texture is only a grey pattern); white for every other voxel.
+        /// </summary>
+        public Color DisplayTint{
+            get{
+                if (category != VoxelCategory.Liquids) return Color.white;
+                VoxelLiquidSurface surface = liquidSurface ?? new VoxelLiquidSurface();
+                Color tint = surface.biomeTint ? Generation.Biome.DefaultWaterColor * surface.tint : surface.tint;
+                tint.a = 1f;
+                return tint;
+            }
+        }
+
         private void OnValidate(){
             lightEmission = Vector3Int.Max(Vector3Int.zero,
                 Vector3Int.Min(lightEmission, Vector3Int.one * VoxelLightLimits.MaxLevel));
