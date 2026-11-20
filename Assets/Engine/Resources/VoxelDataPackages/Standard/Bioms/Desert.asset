@@ -71,3 +71,5 @@ MonoBehaviour:
   RepresentativeColor: {r: 0.9899782, g: 1, b: 0, a: 1}
   WaterColor: {r: 0.26, g: 0.51, b: 0.86, a: 1}
   WaterFogColor: {r: 0.04, g: 0.35, b: 0.98, a: 1}
+  GrassColor: {r: 0.7529412, g: 0.6980392, b: 0.3529412, a: 1}
+  FoliageColor: {r: 0.6901961, g: 0.6352941, b: 0.2823529, a: 1}

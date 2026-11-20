@@ -8,7 +8,6 @@ using Engine.Scripts.Utils.Collections;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.Utils.Logger;
 using Engine.Scripts.VoxelConfig;
-using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Registry;
 using Engine.Scripts.World;
 using Unity.Mathematics;
@@ -162,7 +161,7 @@ namespace Engine.Scripts.Render{
         private RenderBufferManager _solidBufferManager;
 
         // biome water colour of the drawn chunks for the liquid shader, sized from the draw distance
-        private WaterTintMap _waterTint;
+        private BiomeTintMap _biomeTint;
         private RenderBufferManager _transparentBufferManager;
 
         protected override void Awake(){
@@ -235,8 +234,8 @@ namespace Engine.Scripts.Render{
                 _foliageBufferManager
             );
 
-            _waterTint = new WaterTintMap(_settings.Chunk.ActiveDrawDistance, Biome.DefaultWaterColor);
-            _waterTint.SetGlobals();
+            _biomeTint = new BiomeTintMap(_settings.Chunk.ActiveDrawDistance, world.BiomeTintPalette);
+            _biomeTint.SetGlobals();
         }
 
         /// <summary>
@@ -278,7 +277,6 @@ namespace Engine.Scripts.Render{
         private void LateUpdate(){
             if (_isDestroyed) return;
             _culler.ReleaseStaleCameras(Time.frameCount);
-            _waterTint?.UpdateMips();
             if (!_buffersRebuildPending) return;
 
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderRebuildBuffers.Auto();
@@ -358,8 +356,8 @@ namespace Engine.Scripts.Render{
             SafeDispose(_foliageBufferManager);
 
             SafeDispose(_intervalStore);
-            SafeDispose(_waterTint);
-            _waterTint = null;
+            SafeDispose(_biomeTint);
+            _biomeTint = null;
 
             _pendingBuilds.Clear();
             _pendingBuildSet.Clear();
@@ -572,7 +570,7 @@ namespace Engine.Scripts.Render{
                 // A chunk of the 3 x 3 neighbourhood was unloaded since the request; the relight re-requests the build.
                 if (!request.IsValid) continue;
 
-                EnsureWaterTint(PartitionToChunkPos(partition));
+                EnsureBiomeTint(PartitionToChunkPos(partition));
 
                 PointBuilderHandler handler = _pointBuilderHandlers[i];
                 try{
@@ -588,15 +586,26 @@ namespace Engine.Scripts.Render{
         }
 
         /// <summary>
-        ///     Writes the chunk's biome water colours into the tint map before its first partition is drawn (a
-        ///     no-op once the map holds them).
+        ///     Writes the biome colours of the chunk and its eight neighbours into the tint map before the chunk's
+        ///     first partition is drawn (a no-op once the map holds them): the blend near a chunk edge reads the
+        ///     neighbour's texels, which the 3 x 3 neighbourhood of a build always has loaded.
         /// </summary>
-        private void EnsureWaterTint(int2 chunkPos){
-            if (_waterTint == null || world.ChunkManager == null) return;
-            if (!world.ChunkManager.TryGetChunk(chunkPos, out Chunk chunk)) return;
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.WaterTintUpload.Auto();
-            _waterTint.Ensure(chunkPos, chunk.VoxelData, world.BiomeWaterColors, world.BiomeColorsVersion);
+        private void EnsureBiomeTint(int2 chunkPos){
+            if (_biomeTint == null || world.ChunkManager == null) return;
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.BiomeTintUpload.Auto();
+            BiomeTintPalette palette = world.BiomeTintPalette;
+            for (int dx = -1; dx <= 1; dx++)
+            for (int dz = -1; dz <= 1; dz++){
+                int2 pos = chunkPos + new int2(dx, dz);
+                if (_biomeTint.Owns(pos) && palette.Version == _biomeTintVersion) continue;
+                if (!world.ChunkManager.TryGetChunk(pos, out Chunk chunk)) continue;
+                _biomeTint.Ensure(pos, chunk.VoxelData, palette);
+            }
+
+            _biomeTintVersion = palette.Version;
         }
+
+        private int _biomeTintVersion = int.MinValue;
 
         private bool TryDequeuePendingBuild(out int3 partition){
             while (_pendingBuilds.Count > 0){
@@ -700,7 +709,7 @@ namespace Engine.Scripts.Render{
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderRelease.Auto();
             if (_voxelLists.Remove(chunk, out IntervalRange voxelList)) _intervalStore.Release(ref voxelList);
             if (_lightLists.Remove(chunk, out IntervalRange lightList)) _intervalStore.Release(ref lightList);
-            _waterTint?.Forget(chunk);
+            _biomeTint?.Forget(chunk);
         }
 
         /// <summary>

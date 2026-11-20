@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73ce5c2ac5ec3364a915ef3d1b97af22, type: 3}
   m_Name: Taiga
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.VoxelConfig.Data.Generation.Biome
-  TopBlock: {fileID: 11400000, guid: fa38cc6053913e60f815722b37aa5c94, type: 2}
+  TopBlock: {fileID: 11400000, guid: 2e8eca1efe0447d4b845f277ce2ada8f, type: 2}
   UnderwaterTopBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
   UnderBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
@@ -122,3 +122,5 @@ MonoBehaviour:
     MinStackHeight: 1
     MaxStackHeight: 1
   RepresentativeColor: {r: 0.16, g: 0.42, b: 0.38, a: 1}
+  GrassColor: {r: 0.372549, g: 0.6039216, b: 0.3843137, a: 1}
+  FoliageColor: {r: 0.3098039, g: 0.5411765, b: 0.345098, a: 1}

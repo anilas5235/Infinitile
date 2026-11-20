@@ -41,21 +41,11 @@ WHITE = lambda h, s, v: s < .22 and v > .8
 
 tiles = {}
 
-# --- Grass per climate: top face and dirt side with the grass band -----------------------------------------------
-GRASS = {  # name: (hue, sat, val)
-    'dry': (52, .72, .90),      # Savanna: yellow-olive
-    'jungle': (128, 1.05, .80),  # Jungle: deep green
-    'taiga': (138, .80, .56),   # Taiga: dark fir green (round 2: darker and greener than the first 150 / .70 / .66)
-    'swamp': (84, .72, .68),    # Swamp: murky olive
-}
-for n, (h, s, v) in GRASS.items():
-    tiles[f'grass_{n}_top'] = recolour(load('grass_top'), GREEN, h, s, v)
-    tiles[f'dirt_grass_{n}'] = recolour(load('dirt_grass'), GREEN, h, s, v)
+# --- Grass: the grass tops, sides and green plants are grey tint tiles (DEC-120, Docs/Tools/make_tint_tiles.py); the
+# biome colours them. Only the litter and other non-grass recolours stay here. ------------------------------------
 # Needle litter (podzol) for the Taiga forest floor.
 tiles['litter_top'] = recolour(load('grass_top'), GREEN, 26, .80, .58)
 tiles['dirt_litter'] = recolour(load('dirt_grass'), GREEN, 26, .80, .58)
-# Mountain meadow (tour 2, 2026-11-11): Taiga grass on stone, so the step sides of a slope show stone and no dirt.
-tiles['stone_grass_taiga'] = recolour(load('stone_grass'), GREEN, *GRASS['taiga'])
 
 # --- Earth and stone ------------------------------------------------------------------------------------------------
 tiles['mud'] = recolour(load('dirt'), ALL, 24, .75, .52)
@@ -104,13 +94,8 @@ tiles['flowers_red'] = recolour(load('Flowers'), WHITE, 2, val=.92, sat_abs=.72)
 tiles['flowers_blue'] = recolour(load('Flowers'), WHITE, 215, val=.95, sat_abs=.62)
 tiles['flowers_yellow'] = recolour(recolour(load('Flowers'), lambda h, s, v: 30 <= h <= 60 and s > .5, 22, 1.0, .85),
                                    WHITE, 50, val=1.0, sat_abs=.70)
-tiles['fern'] = recolour(load('grass2'), GREEN, 132, 1.0, .72)
-tiles['reeds'] = recolour(load('grass4'), GREEN, 88, .75, .70)
-tiles['grass_tall_dry'] = recolour(load('grass3'), GREEN, 52, .70, 1.0)
-tiles['grass_tall_jungle'] = recolour(load('grass3'), GREEN, 126, 1.05, .80)
-# Swamp (round 2): its own bush leaves (yellow moss green, lighter than the willow's leaves_swamp) and a dark sedge tuft.
+# Swamp (round 2): its own bush leaves (yellow moss green, lighter than the willow's leaves_swamp).
 tiles['leaves_bush_swamp_transparent'] = recolour(load('leaves_transparent'), GREEN, 72, .92, .90)
-tiles['grass_swamp'] = recolour(load('grass1'), GREEN, 100, 1.0, .62)
 
 
 

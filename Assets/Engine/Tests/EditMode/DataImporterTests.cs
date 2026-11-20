@@ -235,7 +235,7 @@ namespace Engine.Tests.EditMode{
                 Assert.AreEqual(FloraVoxelClass.Leaves, cfg.VoxelClassOf(Id("std:LeavesBirch")));
                 Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:Reeds")));
                 Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:Fern")));
-                Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:GrassFTallDry")));
+                Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:GrassFTall")));
                 // Round 2 (2026-11-10): the Swamp's own bush leaves and grass plant.
                 Assert.AreEqual(FloraVoxelClass.Leaves, cfg.VoxelClassOf(Id("std:LeavesBushSwamp")));
                 Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:GrassFSwamp")));
@@ -383,7 +383,7 @@ namespace Engine.Tests.EditMode{
                 Voxel meadowVoxel = biomes[mountain].MeadowBlock;
                 Assert.AreEqual(biomes[mountain].StoneBlock, biomes[mountain].UnderBlock, "stone under the meadow");
                 Assert.AreEqual(biomes[mountain].StoneBlock.all, meadowVoxel.bottom, "meadow block: stone tile below");
-                Assert.AreEqual("stone_grass_taiga", meadowVoxel.side ? meadowVoxel.side.name : null, "meadow block: stone side");
+                Assert.AreEqual("stone_grass_tint", meadowVoxel.side ? meadowVoxel.side.name : null, "meadow block: stone side");
                 Assert.AreEqual(0, cfg.Biomes[mountain].soilGround);
                 Assert.AreEqual(Id(biomes[mountain].MeadowBlock.GetFullName().ToString()), cfg.Biomes[mountain].meadowBlock);
                 int spruce = System.Array.IndexOf(settings.FloraSpeciesNames(), "Spruce");

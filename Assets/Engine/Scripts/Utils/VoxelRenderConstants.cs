@@ -109,9 +109,14 @@ namespace Engine.Scripts.Utils{
         // Surface look of the liquids by volume slot (VoxelRegistry, TransparentVoxel.shader)
         public static readonly int VoxelVolumeFogNameID = Shader.PropertyToID("_VoxelVolumeFog");
 
-        // Biome water colour around the player (WaterTintMap, TransparentVoxel.shader); params x = 1 / size in texels
-        public static readonly int VoxelWaterTintNameID = Shader.PropertyToID("_VoxelWaterTint");
-        public static readonly int VoxelWaterTintParamsNameID = Shader.PropertyToID("_VoxelWaterTintParams");
+        // Biome water, grass and plant colours around the player (BiomeTintMap, VoxelShaderCommon.hlsl, DEC-120);
+        // params x = 1 / map size in blocks
+        public static readonly int VoxelBiomeTintNameID = Shader.PropertyToID("_VoxelBiomeTint");
+        public static readonly int VoxelBiomeTintParamsNameID = Shader.PropertyToID("_VoxelBiomeTintParams");
+
+        // Biome tint word per texture index of a layer's array (VoxelRegistry, set per material) and the side masks
+        public static readonly int VoxelTexTintNameID = Shader.PropertyToID("_VoxelTexTint");
+        public static readonly int VoxelTintMasksNameID = Shader.PropertyToID("_VoxelTintMasks");
 
         // Sky material properties the horizon fog copies, so fogged terrain matches the sky behind it
         public static readonly int SkyHorizonColorNameID = Shader.PropertyToID("_HorizonColor");

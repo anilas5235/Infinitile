@@ -44,7 +44,7 @@ namespace Engine.Scripts.Utils{
         internal static readonly ProfilerMarker RenderDraw = new("Voxel.Render.Draw");
         internal static readonly ProfilerMarker PointBuildComplete = new("Voxel.PointBuild.Complete");
         internal static readonly ProfilerMarker RenderRelease = new("Voxel.Render.Release");
-        internal static readonly ProfilerMarker WaterTintUpload = new("Voxel.GpuUpload.WaterTint");
+        internal static readonly ProfilerMarker BiomeTintUpload = new("Voxel.GpuUpload.BiomeTint");
 
         // The three steps of a stage's turn (JobStateHandler.Update), whatever the stage
         internal static readonly ProfilerMarker SchedulerCollect = new("Voxel.Scheduler.Collect");

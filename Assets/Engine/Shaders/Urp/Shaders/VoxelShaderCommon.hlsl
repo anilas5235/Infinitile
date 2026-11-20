@@ -235,4 +235,59 @@ float calc_glow(const float glow_data)
     return 1.0f + glow_data / 8.0f;
 }
 
+// ── Biome tint (DEC-119, DEC-120) ─────────────────────────────────────────────────────────────────────────────────
+// The biome colours around the player by world x/z (BiomeTintMap): slice 0 the water colour, 1 the grass colour,
+// 2 the plant colour; one texel per 4 x 4 block columns, repeating; _VoxelBiomeTintParams.x = 1 / map size in blocks.
+TEXTURE2D_ARRAY(_VoxelBiomeTint);
+SAMPLER(sampler_linear_repeat);
+float4 _VoxelBiomeTintParams;
+
+#define BIOME_TINT_WATER 0u
+
+// Linear-light mean of the tinted pixels of every grey tint tile (Docs/Tools/make_tint_tiles.py, Voxel.BiomeTintGreyMean),
+// so a tile multiplied by colour / TINT_GREY_MEAN shows the biome colour as its mean.
+#define TINT_GREY_MEAN 0.70f
+#define TINT_NO_MASK 0xFFFFu
+
+// The biome colour of tint map slice `layer` at a world position: four bilinear taps two blocks apart diagonally, so
+// the colour blends over about 16 blocks between biomes.
+float3 biome_tint_color(const float3 positionWS, const uint layer)
+{
+    const float d = 2.0f * _VoxelBiomeTintParams.x;
+    const float2 uv = positionWS.xz * _VoxelBiomeTintParams.x;
+    float3 sum = SAMPLE_TEXTURE2D_ARRAY_LOD(_VoxelBiomeTint, sampler_linear_repeat, uv + float2(-d, -d), layer, 0).rgb;
+    sum += SAMPLE_TEXTURE2D_ARRAY_LOD(_VoxelBiomeTint, sampler_linear_repeat, uv + float2(d, -d), layer, 0).rgb;
+    sum += SAMPLE_TEXTURE2D_ARRAY_LOD(_VoxelBiomeTint, sampler_linear_repeat, uv + float2(-d, d), layer, 0).rgb;
+    sum += SAMPLE_TEXTURE2D_ARRAY_LOD(_VoxelBiomeTint, sampler_linear_repeat, uv + float2(d, d), layer, 0).rgb;
+    return sum * 0.25f;
+}
+
+// Biome tint word per texture index of the material's texture array (VoxelRegistry): bits 0-1 the tint map slice
+// (0 = not tinted), bit 2 set when tinted through a mask, bits 16-31 the mask's slice in _VoxelTintMasks.
+StructuredBuffer<uint> _VoxelTexTint;
+
+// The tinted parts of the side faces (grass band over dirt): alpha 1 = tinted.
+TEXTURE2D_ARRAY(_VoxelTintMasks);
+SAMPLER(sampler_point_repeat);
+
+// The factor a texture's colour is multiplied by at a vertex (biome colour / TINT_GREY_MEAN; 1 when the texture is
+// not tinted) and its mask slice (TINT_NO_MASK = the whole face).
+void texture_tint(const uint texIndex, const float3 positionWS, out float3 factor, out uint mask)
+{
+    const uint word = _VoxelTexTint[texIndex];
+    const uint layer = word & 3u;
+    factor = layer != 0u ? biome_tint_color(positionWS, layer) * (1.0f / TINT_GREY_MEAN) : 1.0f;
+    mask = (word & 4u) != 0u ? word >> 16 : TINT_NO_MASK;
+}
+
+// The albedo with the biome tint: multiplied by factor where the mask says so (everywhere without a mask).
+float3 apply_texture_tint(const float3 albedo, const float3 factor, const uint mask, const float2 uv)
+{
+    const float2 dx = ddx(uv), dy = ddy(uv); // outside the branch: the mask can change inside a pixel quad
+    float m = 1.0f;
+    [branch] if (mask != TINT_NO_MASK)
+        m = SAMPLE_TEXTURE2D_ARRAY_GRAD(_VoxelTintMasks, sampler_point_repeat, uv, mask, dx, dy).a;
+    return albedo * lerp(1.0f, factor, m);
+}
+
 #endif

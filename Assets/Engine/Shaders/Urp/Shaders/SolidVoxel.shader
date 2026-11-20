@@ -44,6 +44,8 @@
             uint4 packed : TEXCOORD1; // PointData.packed, layout in VoxelCommon.hlsl
             float3 positionWS : TEXCOORD2; // horizon fog
             float shade : TEXCOORD3; // face shade
+            float3 tint : TEXCOORD4; // biome tint factor, 1 = none (texture_tint)
+            nointerpolation uint tintMask : TEXCOORD5; // mask slice, TINT_NO_MASK = the whole face
         };
 
         // ── Vertex shader with expansion ─────────────────────────────
@@ -57,6 +59,17 @@
             o.packed = v.packed;
             o.positionWS = TransformObjectToWorld(v.positionOS);
             o.shade = face_shade(_FaceShade, v.normal);
+            o.tint = 1.0f;
+            o.tintMask = TINT_NO_MASK;
+            return o;
+        }
+
+        // The forward pass's vertex shader: also the biome tint of the face's texture (DEC-120); the depth pass
+        // leaves it out.
+        Varyings vert_tinted(uint vertexID : SV_VertexID)
+        {
+            Varyings o = vert(vertexID);
+            texture_tint(get_tex_index(o.packed), o.positionWS, o.tint, o.tintMask);
             return o;
         }
         ENDHLSL
@@ -79,7 +92,7 @@
 
             HLSLPROGRAM
             #pragma target 4.5
-            #pragma vertex   vert
+            #pragma vertex   vert_tinted
             #pragma fragment frag
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -108,6 +121,7 @@
                 FragExtraData extra = unpack_frag_extra_data(IN.packed);
                 float2 uv = IN.uv;
                 float4 albedo = SAMPLE_TEXTURE2D_ARRAY(_Textures, sampler_Textures, uv, extra.texture_index);
+                albedo.rgb = apply_texture_tint(albedo.rgb, IN.tint, IN.tintMask, uv);
 
                 // --- Ambient occlusion ---
                 float4 ao_color = calc_ao_color(_AOColor, albedo, _AOCurve, extra.ao, _AOIntensity, _AOPower, uv);

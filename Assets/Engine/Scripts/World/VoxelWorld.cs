@@ -8,6 +8,7 @@ using Engine.Scripts.Jobs.ColliderBake;
 using Engine.Scripts.Jobs.ColliderMeshing;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Jobs.Light;
+using Engine.Scripts.Render;
 using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
@@ -43,7 +44,7 @@ namespace Engine.Scripts.World{
         private bool _isShuttingDown;
 
         private string[] _biomeNames = Array.Empty<string>(); // of the config the chunk jobs use
-        private Color32[] _biomeWaterColors = Array.Empty<Color32>(); // same order, sRGB, for the water tint map
+        private BiomeTintPalette _biomeTintPalette = BiomeTintPalette.FromBiomes(null, 0); // same order, tint map
         private Color[] _biomeWaterFogColors = Array.Empty<Color>(); // same order, for the underwater fog
 
         private VoxelEngineScheduler _scheduler;
@@ -154,33 +155,32 @@ namespace Engine.Scripts.World{
         }
 
         /// <summary>
-        ///     Biome names and water colours in config order, for <see cref="BiomeName" />,
-        ///     <see cref="BiomeWaterColors" /> and <see cref="BiomeWaterFogColor" />. A missing biome gets the
+        ///     Biome names and colours in config order, for <see cref="BiomeName" />,
+        ///     <see cref="BiomeTintPalette" /> and <see cref="BiomeWaterFogColor" />. A missing biome gets the
         ///     default colours.
         /// </summary>
         private void RememberBiomeNames(WorldGenSettings worldGen){
             List<Biome> biomes = worldGen.ActiveBiomes();
             _biomeNames = new string[biomes.Count];
-            _biomeWaterColors = new Color32[biomes.Count];
             _biomeWaterFogColors = new Color[biomes.Count];
             for (int i = 0; i < biomes.Count; i++){
                 Biome biome = biomes[i];
                 _biomeNames[i] = biome ? biome.name : null;
-                _biomeWaterColors[i] = biome ? biome.WaterColor : Biome.DefaultWaterColor;
                 _biomeWaterFogColors[i] = biome ? biome.WaterFogColor : Biome.DefaultWaterFogColor;
             }
 
             BiomeColorsVersion++;
+            _biomeTintPalette = BiomeTintPalette.FromBiomes(biomes, BiomeColorsVersion);
         }
 
         /// <summary>
-        ///     Surface colour of a biome-tinted liquid per biome index (the column biomes of
-        ///     <see cref="ChunkVoxelData.Biomes" />), sRGB. Replaced, not changed, when the world is regenerated
-        ///     (<see cref="BiomeColorsVersion" />).
+        ///     Water, grass and plant colours per biome index (the column biomes of
+        ///     <see cref="ChunkVoxelData.Biomes" />) for the biome tint map. Replaced, not changed, when the world is
+        ///     regenerated (<see cref="BiomeColorsVersion" />).
         /// </summary>
-        internal Color32[] BiomeWaterColors => _biomeWaterColors;
+        internal BiomeTintPalette BiomeTintPalette => _biomeTintPalette;
 
-        /// <summary>Counts the replacements of <see cref="BiomeWaterColors" />; the tint map rewrites its chunks.</summary>
+        /// <summary>Counts the replacements of <see cref="BiomeTintPalette" />; the tint map rewrites its chunks.</summary>
         internal int BiomeColorsVersion{ get; private set; }
 
         /// <summary>Underwater fog colour of biome <paramref name="index" />; a new biome's default when out of range.</summary>

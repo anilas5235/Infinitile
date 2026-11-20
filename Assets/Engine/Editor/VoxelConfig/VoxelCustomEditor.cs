@@ -31,6 +31,10 @@ namespace Engine.Editor.VoxelConfig{
 
             EditorGUILayout.PropertyField(serializedObject.FindProperty("alwaysRenderAllFaces"));
 
+            SerializedProperty biomeTint = serializedObject.FindProperty("biomeTint");
+            EditorGUILayout.PropertyField(biomeTint);
+            if (biomeTint.enumValueIndex != 0)
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("biomeTintMask"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("glow"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("lightAttenuation"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("lightEmission"));

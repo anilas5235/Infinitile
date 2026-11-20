@@ -82,6 +82,23 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         /// </summary>
         public VoxelLiquidSurface liquidSurface = new();
 
+        /// <summary>
+        ///     Colours the voxel by the biome's grass or plant colour (DEC-120): its textures are grey and the shader
+        ///     multiplies the blended biome colour onto them. The top face is tinted whole, the bottom face of a
+        ///     top/bottom/sides or six-sided voxel not at all, and every other face through <see cref="biomeTintMask" />
+        ///     when set, else whole.
+        /// </summary>
+        [Tooltip("Colour by the biome's grass or plant colour; the textures are grey")]
+        public VoxelBiomeTint biomeTint;
+
+        /// <summary>
+        ///     The tinted part of the side faces (grass band over dirt): the alpha says where the side is tinted, the
+        ///     colour is the side's grey there, so a block icon draws it tinted over the side. Null tints the side
+        ///     whole.
+        /// </summary>
+        [Tooltip("Side overlay: alpha = tinted part of the side faces (the grass band); empty tints the whole side")]
+        public Texture2D biomeTintMask;
+
         [Range(0, 255)] public int glow;
 
         /// <summary>
@@ -198,12 +215,50 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         /// </summary>
         public Color DisplayTint{
             get{
+                if (biomeTint != VoxelBiomeTint.None) return BiomeTintFactor(biomeTint);
                 if (category != VoxelCategory.Liquids) return Color.white;
                 VoxelLiquidSurface surface = liquidSurface ?? new VoxelLiquidSurface();
                 Color tint = surface.biomeTint ? Generation.Biome.DefaultWaterColor * surface.tint : surface.tint;
                 tint.a = 1f;
                 return tint;
             }
+        }
+
+        /// <summary>
+        ///     Colour an icon multiplies onto the side texture: white when <see cref="biomeTintMask" /> carries the
+        ///     tinted part (drawn over the side with <see cref="DisplayTint" />), else <see cref="DisplayTint" />.
+        /// </summary>
+        public Color DisplaySideTint => biomeTint != VoxelBiomeTint.None && biomeTintMask ? Color.white : DisplayTint;
+
+        /// <summary>
+        ///     The factor a grey tint tile is multiplied by to show the default biome colour of <paramref name="tint" />
+        ///     (as the shader does: linear colour / <see cref="BiomeTintGreyMean" />), gamma-encoded for UI tints.
+        /// </summary>
+        public static Color BiomeTintFactor(VoxelBiomeTint tint){
+            Color color = tint == VoxelBiomeTint.Foliage
+                ? Generation.Biome.DefaultFoliageColor
+                : Generation.Biome.DefaultGrassColor;
+            Color linear = color.linear / BiomeTintGreyMean;
+            linear.a = 1f;
+            return linear.gamma;
+        }
+
+        /// <summary>
+        ///     Linear-light mean of the tinted pixels of every grey tint tile (Docs/Tools/make_tint_tiles.py), so the
+        ///     biome colour is the mean colour the tinted part shows; TINT_GREY_MEAN in VoxelShaderCommon.hlsl.
+        /// </summary>
+        public const float BiomeTintGreyMean = 0.70f;
+
+        /// <summary>
+        ///     Whether the faces of <paramref name="condition" /> take the biome tint, and whether through
+        ///     <see cref="biomeTintMask" /> (see <see cref="biomeTint" />).
+        /// </summary>
+        public (bool tinted, bool masked) BiomeTintOf(QuadDrawCondition condition){
+            if (biomeTint == VoxelBiomeTint.None) return (false, false);
+            bool perFace = textureMode is VoxelTexMode.TopBottomSides or VoxelTexMode.SixSidesUnique;
+            if (perFace && condition == QuadDrawCondition.Up) return (true, false);
+            if (perFace && condition == QuadDrawCondition.Down) return (false, false);
+            return (true, biomeTintMask);
         }
 
         private void OnValidate(){
@@ -312,6 +367,21 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
             public bool IsSolid => MeshLayer == MeshLayer.Solid;
             public bool IsFoliage => MeshLayer == MeshLayer.Foliage;
         }
+    }
+
+    /// <summary>
+    ///     Which biome colour a voxel takes (DEC-120); the value is the layer of the biome tint map
+    ///     (<c>BiomeTintMap</c>, layer 0 is the water colour).
+    /// </summary>
+    public enum VoxelBiomeTint : byte{
+        /// <summary>The texture's own colour.</summary>
+        None = 0,
+
+        /// <summary>The biome's grass colour (grass block tops and side bands).</summary>
+        Grass = 1,
+
+        /// <summary>The biome's plant colour (grass tufts, tall grass, ferns, reeds).</summary>
+        Foliage = 2
     }
 
     /// <summary>Value range of the voxel light properties.</summary>
