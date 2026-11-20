@@ -244,7 +244,10 @@ namespace Engine.Tests.EditMode{
             // DEC-121 pushed the two further apart (Mountain T .25, Badlands T .9) and made the biomes larger, so the
             // check runs on 8192² at stride 8 (the same sample count): a 4096² window now holds one large hot massif
             // and is no longer a fair sample of the shares (Badlands 6.3 % of its land, 35 % of its high ground; 3.6 %
-            // and 28.8 % at 8192², 51.3 % of the high ground before DEC-120).
+            // and 28.8 % at 8192², 51.3 % of the high ground before DEC-120). Follow-up (owner 2026-11-20: "now have the
+            // mountian is no longer mountation"): without the peaks the smoothed class height sat 20–30 blocks under a
+            // massif's summits, so its flanks went to the lowland climate (15.4 % of the ground from 204 was neither
+            // Mountain nor Badlands); with the peaks in the class height and the Badlands floor at .95 it is 3.9 %.
             const int capStride = 8;
             WorldGenSettings settings = LoadShipped();
             string[] names = settings.Biomes.Names();
@@ -262,7 +265,7 @@ namespace Engine.Tests.EditMode{
                 float[] height = buffers.Height.ToArray();
                 int[] biome = buffers.HardBiome.ToArray();
 
-                int land = 0, badlandsLand = 0, high = 0, badlandsHigh = 0;
+                int land = 0, badlandsLand = 0, high = 0, badlandsHigh = 0, snow = 0, snowLowland = 0;
                 for (int i = 0; i < biome.Length; i++){
                     if (height[i] < cfg.WaterLevel) continue;
                     land++;
@@ -270,6 +273,9 @@ namespace Engine.Tests.EditMode{
                     if (height[i] < 180f) continue;
                     high++;
                     if (biome[i] == badlands) badlandsHigh++;
+                    if (height[i] < 204f) continue;
+                    snow++;
+                    if (biome[i] != badlands && biome[i] != mountain) snowLowland++;
                 }
 
                 // Mountain patches (4-connected) whose outer ring is mostly Badlands: a cap on a Badlands massif.
@@ -303,10 +309,12 @@ namespace Engine.Tests.EditMode{
                 }
 
                 TestContext.WriteLine($"Badlands {100.0 * badlandsLand / land:F1} % of land, {100.0 * badlandsHigh / high:F1} % " +
-                                      $"of the ground from 180; Mountain caps on Badlands: {caps} patches, {capCells} cells");
+                                      $"of the ground from 180; Mountain caps on Badlands: {caps} patches, {capCells} cells; " +
+                                      $"ground from 204 neither Mountain nor Badlands {100.0 * snowLowland / snow:F1} %");
                 Assert.AreEqual(0, caps, "Mountain patches mostly surrounded by Badlands");
                 Assert.Less(badlandsLand, 0.07 * land, "Badlands share of land");
                 Assert.Less(badlandsHigh, 0.3 * high, "Badlands share of the ground from 180");
+                Assert.Less(snowLowland, 0.06 * snow, "ground from 204 that is neither Mountain nor Badlands");
 
                 void Visit(int j){
                     if (seen[j]) return;

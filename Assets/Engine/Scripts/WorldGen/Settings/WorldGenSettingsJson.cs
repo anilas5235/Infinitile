@@ -36,6 +36,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["LambdaPV"] = s.LambdaPV,
                 ["BiomeHeightSmoothing"] = s.BiomeHeightSmoothing,
                 ["BiomeHeightOctaves"] = s.BiomeHeightOctaves,
+                ["BiomeHeightPeaks"] = s.BiomeHeightPeaks,
                 ["LambdaHeight"] = s.LambdaHeight,
                 ["HeightMin"] = s.HeightMin,
                 ["HeightMax"] = s.HeightMax,

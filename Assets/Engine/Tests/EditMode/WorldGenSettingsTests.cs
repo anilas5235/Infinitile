@@ -108,7 +108,10 @@ namespace Engine.Tests.EditMode{
             string changedSmoothing = s.ToCanonicalJson();
             Assert.AreNotEqual(changedSubmerged, changedSmoothing, "the classification smoothing takes part");
             s.BiomeHeightOctaves = 3;
-            Assert.AreNotEqual(changedSmoothing, s.ToCanonicalJson(), "its octave count takes part");
+            string changedOctaves = s.ToCanonicalJson();
+            Assert.AreNotEqual(changedSmoothing, changedOctaves, "its octave count takes part");
+            s.BiomeHeightPeaks = true;
+            Assert.AreNotEqual(changedOctaves, s.ToCanonicalJson(), "its peak switch takes part");
 
             Assert.AreNotEqual(s.ToCanonicalJson(), s.ToCanonicalJson(42), "seed overload adds the seed");
             StringAssert.Contains("\"Seed\": 42", s.ToCanonicalJson(42));
@@ -148,11 +151,13 @@ namespace Engine.Tests.EditMode{
 
             s.BiomeHeightSmoothing = 64f;
             s.BiomeHeightOctaves = 2;
+            s.BiomeHeightPeaks = true;
             WorldGenConfig on = s.ToConfig(1);
             try{
                 Assert.IsTrue(on.SmoothsClassHeight);
                 Assert.AreEqual(7, on.ClassHeightWeights.Length, "r = ceil(1.5 · 64 / 32) = 3");
                 Assert.AreEqual(2, on.ClassHeightOctaves);
+                Assert.IsTrue(on.ClassHeightPeaks);
             }
             finally{
                 on.Dispose();

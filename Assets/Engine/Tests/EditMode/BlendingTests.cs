@@ -609,11 +609,12 @@ namespace Engine.Tests.EditMode{
 
         // --- Smoothed classification height and submerged-only biomes (DEC-121) --------------------------------------
 
-        /// <summary>Terrain-first placeholder settings with the shipped smoothing (σ 64, two octaves) and Ocean submerged-only.</summary>
-        private WorldGenConfig SmoothedConfig(int seed, BlendMethod material){
+        /// <summary>Terrain-first placeholder settings with the shipped smoothing (σ 64, two octaves, peaks) and Ocean submerged-only.</summary>
+        private WorldGenConfig SmoothedConfig(int seed, BlendMethod material, int octaves = 2){
             WorldGenSettings s = Settings(GenArchitecture.TerrainFirst, material, BlendMethod.None);
             s.BiomeHeightSmoothing = 64f;
-            s.BiomeHeightOctaves = 2;
+            s.BiomeHeightOctaves = octaves;
+            s.BiomeHeightPeaks = true;
             s.Biomes.Biomes[5].SubmergedOnly = true;
             return Config(seed, s);
         }
@@ -679,6 +680,28 @@ namespace Engine.Tests.EditMode{
                 ClassHeightGrid none = default;
                 Assert.AreEqual(expected, ClassHeight.Sample(n * ClassHeight.NodeStride, cfg, none), 1e-3f, $"node {n}");
             }
+        }
+
+        [Test]
+        public void ClassHeight_RawNodeWithAllOctavesAndPeaksIsTheColumnHeight(){
+            // With every detail octave and the peaks the macro height is the terrain height itself; with the peaks off
+            // it differs wherever the jaggedness is not zero.
+            WorldGenConfig all = SmoothedConfig(19, BlendMethod.DistanceBlend, 64);
+            int jagged = 0;
+            for (int x = -20; x <= 20; x += 4)
+            for (int z = -20; z <= 20; z += 4){
+                int2 n = new(x, z);
+                float2 p = n * ClassHeight.NodeStride;
+                WorldFields f = ClimateFields.Sample(p, all.Climate);
+                TerrainFirstHeight.Sample(p, f, all, out float3 terrain, out float height, out _);
+                Assert.AreEqual(math.asuint(height), math.asuint(ClassHeight.RawNode(n, all)), $"node {n}");
+                if (terrain.z == 0f) continue;
+                all.ClassHeightPeaks = false;
+                if (ClassHeight.RawNode(n, all) != height) jagged++;
+                all.ClassHeightPeaks = true;
+            }
+
+            Assert.Greater(jagged, 0, "the peak switch changes the macro height where the land is jagged");
         }
 
         [Test]

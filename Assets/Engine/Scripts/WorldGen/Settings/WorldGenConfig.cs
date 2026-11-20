@@ -89,6 +89,9 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// <summary>Detail octaves in the macro height of the smoothed classification height.</summary>
         public int ClassHeightOctaves;
 
+        /// <summary>True when the peak noise enters the macro height of the smoothed classification height.</summary>
+        [MarshalAs(UnmanagedType.U1)] public bool ClassHeightPeaks;
+
         /// <summary>True when Terrain-first classifies with the smoothed height.</summary>
         public bool SmoothsClassHeight => ClassHeightWeights.Length > 0;
 

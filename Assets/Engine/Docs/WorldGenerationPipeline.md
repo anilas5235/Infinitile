@@ -833,8 +833,8 @@ flowchart LR
 - **Classification** (`WorldSampler.SampleColumn`): the normalised height h = saturate((H − Hmin)/(Hmax − Hmin)) is the
   sixth distance dimension with weight λ_h; a biome with `TargetHeightIsFloor` pays it only below its target (DEC-120).
   With `BiomeHeightSmoothing` σ > 0 (shipped 64) the class reads a smoothed height instead of the column's own
-  (`Classify/ClassHeight.cs`, DEC-121): the spline height with only the first `BiomeHeightOctaves` detail octaves and no
-  peaks, on raw nodes every 32 blocks, a separable Gaussian over those nodes, read bilinearly. `BlendCache` holds a
+  (`Classify/ClassHeight.cs`, DEC-121): the spline height with only the first `BiomeHeightOctaves` detail octaves, plus
+  the peaks J · P with `BiomeHeightPeaks` (shipped on, DEC-122), on raw nodes every 32 blocks, a separable Gaussian over those nodes, read bilinearly. `BlendCache` holds a
   `ClassHeightGrid` for the chunk or tile and every unwarped kernel tap of it; the pure path builds a small grid for the
   position, with the same bits. A biome with `SubmergedOnly` (Ocean) is excluded on a dry column, i.e. one whose top block
   floor(H) is at or above WaterLevel − 1 (`WorldSampler.IsDry`). A `HeightMethod` other than None is ignored with a

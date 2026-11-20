@@ -193,6 +193,7 @@ namespace Engine.Tests.EditMode{
                     ["GlobalOctaveWeights"] = settings.GlobalOctaveWeights,
                     ["BiomeHeightSmoothing"] = settings.BiomeHeightSmoothing,
                     ["BiomeHeightOctaves"] = settings.BiomeHeightOctaves,
+                    ["BiomeHeightPeaks"] = settings.BiomeHeightPeaks,
                     ["Lambda"] = new[]{
                         settings.LambdaTemperature, settings.LambdaHumidity, settings.LambdaContinental, settings.LambdaErosion,
                         settings.LambdaPV, settings.LambdaHeight

@@ -30,7 +30,7 @@ MonoBehaviour:
   TargetContinental: 0.64
   TargetErosion: 0.3
   TargetPV: 0.4
-  TargetHeight: 0.85
+  TargetHeight: 0.95
   TargetHeightIsFloor: 1
   SubmergedOnly: 0
   HeightOffset: 160

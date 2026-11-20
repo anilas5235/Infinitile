@@ -12,8 +12,9 @@ namespace Engine.Scripts.WorldGen.Classify{
     ///     biome follows the broad shape of the land and not every hill, ridge and peak.
     ///     <para>
     ///         Raw nodes on a world-aligned lattice every <see cref="NodeStride" /> blocks hold the macro height
-    ///         R = limit(Offset + Amp · Σ_{i &lt; K'} g_i N_i): the spline height with only the first
-    ///         <c>ClassHeightOctaves</c> detail octaves and without the peak noise. A smoothed node is the separable
+    ///         R = limit(Offset + Amp · Σ_{i &lt; K'} g_i N_i [+ J · P]): the spline height with only the first
+    ///         <c>ClassHeightOctaves</c> detail octaves, and with the peak noise only when <c>ClassHeightPeaks</c> is set
+    ///         (so a massif counts as high as its summits). A smoothed node is the separable
     ///         Gaussian S(n) = Σ_j w_j Σ_i w_i R(n + (i, j)) with the normalised weights
     ///         <see cref="WorldGenConfig.ClassHeightWeights" />, summed in this order (i, then j, both ascending). A
     ///         position reads the bilinear blend of its four surrounding smoothed nodes.
@@ -61,7 +62,9 @@ namespace Engine.Scripts.WorldGen.Classify{
                 if (g != 0f) detail += g * DetailOctaves.Sample(i, p, cfg.OctaveWavelengths[i], cfg.Seed);
             }
 
-            return HeightLimit.Apply(terrain.x + terrain.y * detail, cfg);
+            float h = terrain.x + terrain.y * detail;
+            if (cfg.ClassHeightPeaks && terrain.z != 0f) h += terrain.z * PeakNoise.Sample(p, cfg.PeakWavelength, cfg.Seed);
+            return HeightLimit.Apply(h, cfg);
         }
 
         /// <summary>

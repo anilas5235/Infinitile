@@ -67,14 +67,18 @@ namespace Engine.Scripts.WorldGen.Settings{
 
         [Tooltip("Terrain-first: standard deviation in blocks of the Gaussian that smooths the height the biome " +
                  "classification reads (0 = the column's own height). The smoothed height is the spline height with " +
-                 "only the first BiomeHeightOctaves detail octaves and no peaks, so a biome follows the broad land " +
-                 "and not every hill. At most 149 blocks.")]
+                 "only the first BiomeHeightOctaves detail octaves (and the peaks with BiomeHeightPeaks), so a biome " +
+                 "follows the broad land and not every hill. At most 149 blocks.")]
         [Range(0f, 149f)]
         public float BiomeHeightSmoothing;
 
         [Tooltip("Detail octaves in the smoothed classification height (the widest ones first).")]
         [Min(0)]
         public int BiomeHeightOctaves = 2;
+
+        [Tooltip("The peak noise enters the smoothed classification height, so a massif counts as high as its " +
+                 "summits and its slopes keep the high biomes (DEC-121 follow-up).")]
+        public bool BiomeHeightPeaks;
 
         [Header("Height")]
         public float HeightMin = 40f;

@@ -86,6 +86,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 LambdaHeight = settings.LambdaHeight,
                 ClassHeightWeights = Classify.ClassHeight.Weights(settings.BiomeHeightSmoothing),
                 ClassHeightOctaves = settings.BiomeHeightOctaves,
+                ClassHeightPeaks = settings.BiomeHeightPeaks,
                 HeightMin = settings.HeightMin,
                 HeightMax = settings.HeightMax,
                 HeightSoftBand = settings.HeightSoftBand,
