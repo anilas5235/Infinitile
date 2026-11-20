@@ -84,6 +84,8 @@ namespace Engine.Scripts.WorldGen.Settings{
                 LambdaErosion = settings.LambdaErosion,
                 LambdaPV = settings.LambdaPV,
                 LambdaHeight = settings.LambdaHeight,
+                ClassHeightWeights = Classify.ClassHeight.Weights(settings.BiomeHeightSmoothing),
+                ClassHeightOctaves = settings.BiomeHeightOctaves,
                 HeightMin = settings.HeightMin,
                 HeightMax = settings.HeightMax,
                 HeightSoftBand = settings.HeightSoftBand,

@@ -256,6 +256,35 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(1, BiomeClassifier.Classify(at, .95f, pair), "above: the floor biome pays nothing, the two-sided one pays");
         }
 
+        [Test]
+        public void Classifier_SubmergedOnlyBiomeNeverWinsADryColumn(){
+            // DEC-121: a submerged-only biome is excluded on a dry column (the next nearest wins) and classifies as
+            // usual under water; the forwarding overloads treat the column as submerged.
+            Biome sea = Biome("Sea", .5f, .5f, .5f, .5f, 0f, 100, 1, new[]{ 1f }, 0);
+            Biome land = Biome("Land", .9f, .9f, .9f, .9f, 0f, 140, 1, new[]{ 1f }, 0);
+            sea.SubmergedOnly = true;
+            WorldGenConfig cfg = Config(1, GenArchitecture.TerrainFirst, sea, land);
+            WorldFields f = new(){ T = .5f, F = .5f, C = .5f, E = .5f, PV = 0f };
+            Assert.AreEqual(0, BiomeClassifier.Classify(f, .3f, false, cfg), "under water: nearest");
+            Assert.AreEqual(1, BiomeClassifier.Classify(f, .3f, true, cfg), "dry: the next nearest");
+            Assert.AreEqual(0, BiomeClassifier.Classify(f, .3f, cfg), "no dry flag: submerged");
+            int hard = BiomeClassifier.Distances(f, .3f, true, true, cfg, out BlendWeights d);
+            Assert.AreEqual(1, hard);
+            Assert.AreEqual(BiomeClassifier.Excluded, d[0]);
+            Assert.AreEqual(BiomeClassifier.DistanceSquared(f, .3f, cfg.Biomes[1], cfg), d[1]);
+        }
+
+        [Test]
+        public void IsDry_FollowsTheTopBlockRule(){
+            // The top block sits at floor(H) and water fills y < WaterLevel: dry from floor(H) + 1 >= WaterLevel.
+            WorldGenConfig cfg = Config(1, PlaceholderBiomes());
+            float w = cfg.WaterLevel;
+            Assert.IsTrue(WorldSampler.IsDry(w - 1f, cfg));
+            Assert.IsTrue(WorldSampler.IsDry(w - 0.5f, cfg));
+            Assert.IsFalse(WorldSampler.IsDry(w - 1.01f, cfg));
+            Assert.IsFalse(WorldSampler.IsDry(w - 10f, cfg));
+        }
+
         // --- Sampler --------------------------------------------------------------------------------------------------
 
         [Test]

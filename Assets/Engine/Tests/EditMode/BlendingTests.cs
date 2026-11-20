@@ -607,6 +607,182 @@ namespace Engine.Tests.EditMode{
             }
         }
 
+        // --- Smoothed classification height and submerged-only biomes (DEC-121) --------------------------------------
+
+        /// <summary>Terrain-first placeholder settings with the shipped smoothing (σ 64, two octaves) and Ocean submerged-only.</summary>
+        private WorldGenConfig SmoothedConfig(int seed, BlendMethod material){
+            WorldGenSettings s = Settings(GenArchitecture.TerrainFirst, material, BlendMethod.None);
+            s.BiomeHeightSmoothing = 64f;
+            s.BiomeHeightOctaves = 2;
+            s.Biomes.Biomes[5].SubmergedOnly = true;
+            return Config(seed, s);
+        }
+
+        private delegate void FillFn(ref ClassHeightGrid grid, in WorldGenConfig cfg);
+
+        private delegate int ClassifyWithGridFn(in float2 q, in WorldGenConfig cfg, in ClassHeightGrid grid);
+
+        [Test]
+        public void ClassHeight_EntryPointsCompileWithBurst(){
+            // Fill and the grid overload of ClassifyAt are direct-call entry points; a Burst error would make them run
+            // managed silently.
+            Assert.IsTrue(BurstCompiler.IsEnabled, "Burst compilation is disabled in the Editor (Jobs > Burst)");
+            FunctionPointer<FillFn> fill = BurstCompiler.CompileFunctionPointer<FillFn>(ClassHeight.Fill);
+            FunctionPointer<ClassifyWithGridFn> classify =
+                BurstCompiler.CompileFunctionPointer<ClassifyWithGridFn>(WorldSampler.ClassifyAt);
+            Assert.IsTrue(fill.IsCreated && classify.IsCreated);
+
+            WorldGenConfig cfg = SmoothedConfig(5, BlendMethod.DistanceBlend);
+            ClassHeightGrid grid = ClassHeightGrid.Build(new int2(-40, -40), new int2(40, 40), cfg, Allocator.Temp);
+            try{
+                float2 q = new(13.5f, -27.25f);
+                Assert.AreEqual(WorldSampler.ClassifyAt(q, cfg), classify.Invoke(q, cfg, grid));
+            }
+            finally{
+                grid.Dispose();
+            }
+        }
+
+        [TestCase(1f)]
+        [TestCase(32f)]
+        [TestCase(64f)]
+        [TestCase(149f)]
+        public void ClassHeight_WeightsAreANormalisedSymmetricGaussian(float sigma){
+            FixedList64Bytes<float> w = ClassHeight.Weights(sigma);
+            int r = math.min(ClassHeight.MaxRadius, (int)math.ceil(1.5f * sigma / ClassHeight.NodeStride));
+            Assert.AreEqual(2 * r + 1, w.Length, "cut at 1.5 σ in whole nodes");
+            float sum = 0f;
+            for (int k = 0; k < w.Length; k++){
+                sum += w[k];
+                Assert.AreEqual(w[k], w[w.Length - 1 - k], "symmetric");
+                if (k > 0 && k <= r) Assert.Greater(w[k], w[k - 1], "rises towards the centre");
+            }
+
+            Assert.AreEqual(1f, sum, 1e-6f);
+            Assert.AreEqual(0, ClassHeight.Weights(0f).Length, "σ 0 is off");
+        }
+
+        [Test]
+        public void ClassHeight_IsTheSeparableGaussianOfTheMacroNodes(){
+            // At a node the bilinear read is the node itself: S(n) = Σ_j w_j Σ_i w_i R(n + (i, j)).
+            WorldGenConfig cfg = SmoothedConfig(77, BlendMethod.DistanceBlend);
+            int r = cfg.ClassHeightWeights.Length / 2;
+            Assert.AreEqual(3, r, "σ 64: r = ceil(1.5 · 64 / 32)");
+            foreach (int2 n in new[]{ new int2(0, 0), new int2(-7, 12), new int2(40, -33) }){
+                float expected = 0f;
+                for (int j = -r; j <= r; j++){
+                    float row = 0f;
+                    for (int i = -r; i <= r; i++) row += cfg.ClassHeightWeights[i + r] * ClassHeight.RawNode(n + new int2(i, j), cfg);
+                    expected += cfg.ClassHeightWeights[j + r] * row;
+                }
+
+                ClassHeightGrid none = default;
+                Assert.AreEqual(expected, ClassHeight.Sample(n * ClassHeight.NodeStride, cfg, none), 1e-3f, $"node {n}");
+            }
+        }
+
+        [Test]
+        public void ClassHeight_CachedGridIsBitIdenticalToThePurePath(){
+            WorldGenConfig cfg = SmoothedConfig(31, BlendMethod.DistanceBlend);
+            ClassHeightGrid grid = ClassHeightGrid.Build(new int2(-300, -200), new int2(260, 340), cfg, Allocator.Temp);
+            try{
+                Unity.Mathematics.Random rng = new(3);
+                ClassHeightGrid none = default;
+                for (int n = 0; n < 400; n++){
+                    float2 p = rng.NextFloat2(new float2(-300, -200), new float2(260, 340));
+                    Assert.AreEqual(math.asuint(ClassHeight.Sample(p, cfg, none)), math.asuint(ClassHeight.Sample(p, cfg, grid)), $"{p}");
+                    Assert.AreEqual(WorldSampler.ClassifyAt(p, cfg), WorldSampler.ClassifyAt(p, cfg, grid), $"{p}");
+                }
+            }
+            finally{
+                grid.Dispose();
+            }
+        }
+
+        [Test]
+        public void ClassHeight_SmoothedChunksAreBitIdenticalToThePureSampler(){
+            // The ChunkJob path (one cache with the class-height grid per chunk) against the pure sampler, which builds
+            // its own small grids, with the smoothing on and Ocean submerged-only.
+            WorldGenConfig cfg = SmoothedConfig(111, BlendMethod.DistanceBlend);
+            const int chunkCount = 8, columnsPerChunk = ChunkWidth * ChunkDepth;
+            Unity.Mathematics.Random rng = new(29);
+            NativeArray<int2> chunks = new(chunkCount, Allocator.TempJob);
+            NativeArray<int2> columns = new(chunkCount * columnsPerChunk, Allocator.TempJob);
+            NativeArray<ColumnSample> cached = new(columns.Length, Allocator.TempJob);
+            NativeArray<ColumnSample> pure = new(columns.Length, Allocator.TempJob);
+            try{
+                for (int c = 0; c < chunkCount; c++){
+                    chunks[c] = rng.NextInt2(-400, 400);
+                    for (int i = 0; i < columnsPerChunk; i++)
+                        columns[c * columnsPerChunk + i] = chunks[c] * new int2(ChunkWidth, ChunkDepth) + new int2(i % ChunkWidth, i / ChunkWidth);
+                }
+
+                JobHandle a = new CachedChunksJob{ Chunks = chunks, Config = cfg, Samples = cached }.Schedule(chunkCount, 1);
+                JobHandle b = new PureColumnsJob{ Columns = columns, Config = cfg, Samples = pure }.Schedule(columns.Length, 64);
+                JobHandle.CombineDependencies(a, b).Complete();
+
+                for (int n = 0; n < columns.Length; n++){
+                    ColumnSample x = cached[n], y = pure[n];
+                    string where = $"{columns[n]}";
+                    Assert.AreEqual(y.HardBiome, x.HardBiome, where);
+                    for (int w = 0; w < BlendWeights.Capacity; w++)
+                        Assert.AreEqual(math.asuint(y.MaterialWeights[w]), math.asuint(x.MaterialWeights[w]), $"w_mat[{w}] at {where}");
+                    Assert.AreEqual(y.SurfaceSource, x.SurfaceSource, where);
+                    Assert.AreEqual(math.asuint(y.Height), math.asuint(x.Height), where);
+                }
+            }
+            finally{
+                chunks.Dispose();
+                columns.Dispose();
+                cached.Dispose();
+                pure.Dispose();
+            }
+        }
+
+        [Test]
+        public void ClassHeight_OffLeavesTheClassificationOnTheColumnHeight(){
+            // σ 0 keeps the old behaviour: no grid in the cache, and the class is that of the column's own height.
+            WorldGenSettings s = Settings(GenArchitecture.TerrainFirst, BlendMethod.DistanceBlend, BlendMethod.None);
+            WorldGenConfig cfg = Config(9, s);
+            Assert.IsFalse(cfg.SmoothsClassHeight);
+            BlendCache cache = BlendCache.Build(cfg, new int2(0, 0), new int2(15, 15), 1, Allocator.Temp);
+            try{
+                Assert.IsFalse(cache.ClassHeight.IsCreated);
+            }
+            finally{
+                cache.Dispose();
+            }
+
+            Unity.Mathematics.Random rng = new(4);
+            for (int n = 0; n < 300; n++){
+                float2 q = rng.NextInt2(-3000, 3000);
+                WorldFields f = ClimateFields.Sample(q, cfg.Climate);
+                TerrainFirstHeight.Sample(q, f, cfg, out float3 _, out float height, out float _);
+                Assert.AreEqual(BiomeClassifier.Classify(f, WorldSampler.NormalizedHeight(height, cfg), WorldSampler.IsDry(height, cfg), cfg),
+                    WorldSampler.ClassifyAt(q, cfg), $"{q}");
+            }
+        }
+
+        [Test]
+        public void SubmergedOnly_DryColumnsNeverTakeTheBiome(){
+            // DEC-121: Ocean only where the top block is under water (the shipped climate, where the rule also has
+            // dry Ocean-climate columns to move, is ShippedBiomeLayoutTests.ShippedSettings_OceanOnlyUnderWater).
+            WorldGenConfig cfg = SmoothedConfig(1337, BlendMethod.None);
+            const int ocean = 5;
+            int submergedOcean = 0;
+            for (int x = -6000; x < 6000; x += 97)
+            for (int z = -6000; z < 6000; z += 101){
+                ColumnSample s = WorldSampler.SampleColumn(x, z, cfg);
+                bool dry = WorldSampler.IsDry(s.Height, cfg);
+                if (s.HardBiome == ocean){
+                    Assert.IsFalse(dry, $"Ocean on a dry column at ({x},{z}), H {s.Height}");
+                    submergedOcean++;
+                }
+            }
+
+            Assert.Greater(submergedOcean, 50, "Ocean under water");
+        }
+
         // --- Surface pick ---------------------------------------------------------------------------------------------
 
         [Test]

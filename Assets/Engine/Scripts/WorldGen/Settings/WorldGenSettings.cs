@@ -65,6 +65,17 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Tooltip("λ_h: weight of normalised height, Terrain-first only.")]
         public float LambdaHeight = 1f;
 
+        [Tooltip("Terrain-first: standard deviation in blocks of the Gaussian that smooths the height the biome " +
+                 "classification reads (0 = the column's own height). The smoothed height is the spline height with " +
+                 "only the first BiomeHeightOctaves detail octaves and no peaks, so a biome follows the broad land " +
+                 "and not every hill. At most 149 blocks.")]
+        [Range(0f, 149f)]
+        public float BiomeHeightSmoothing;
+
+        [Tooltip("Detail octaves in the smoothed classification height (the widest ones first).")]
+        [Min(0)]
+        public int BiomeHeightOctaves = 2;
+
         [Header("Height")]
         public float HeightMin = 40f;
 

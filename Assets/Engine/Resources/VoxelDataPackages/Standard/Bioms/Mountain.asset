@@ -23,7 +23,7 @@ MonoBehaviour:
   BeachBlock: {fileID: 0}
   BeachHeight: 3
   TargetHumidity: 0.35
-  TargetTemperature: 0.35
+  TargetTemperature: 0.25
   TargetContinental: 0.62
   TargetErosion: 0.3
   TargetPV: 0.5

@@ -90,7 +90,13 @@ namespace Engine.Scripts.WorldGen.Core{
                 // The height stage does not exist here.
                 TerrainFirstHeight.Sample(p, s.Fields, cfg, out s.TerrainParams, out s.Height, out unclamped);
                 s.NormalizedHeight = NormalizedHeight(s.Height, cfg);
-                s.HardBiome = BiomeClassifier.Distances(s.Fields, s.NormalizedHeight, true, cfg, out distancesSq);
+                // The class reads the smoothed height when configured (DEC-121); a dry column never takes a
+                // submerged-only biome such as Ocean.
+                float classHeight = cfg.SmoothsClassHeight
+                    ? NormalizedHeight(ClassHeight.Sample(p, cfg, cache.ClassHeight), cfg)
+                    : s.NormalizedHeight;
+                s.HardBiome = BiomeClassifier.Distances(s.Fields, classHeight, true, IsDry(s.Height, cfg), cfg,
+                    out distancesSq);
                 s.MaterialWeights = BlendMethods.Compute(BlendStage.Material, cfg.MaterialMethod, column, s.HardBiome,
                     distancesSq, cfg, cache);
                 s.HeightWeights = BlendWeights.OneHot(s.HardBiome);
@@ -169,6 +175,14 @@ namespace Engine.Scripts.WorldGen.Core{
             BiomeFirstHeight.Sample(p, BlendWeights.OneHot(hard), cfg, out height, out float _);
         }
 
+        /// <summary>
+        ///     True when the top block of a column with height <paramref name="height" /> is not under water: water fills
+        ///     y &lt; WaterLevel, so the top block at floor(H) is dry from WaterLevel − 1 up (the chunk's TopBlockOf rule).
+        /// </summary>
+        public static bool IsDry(float height, in WorldGenConfig cfg){
+            return (int)math.floor(height) + 1 >= cfg.WaterLevel;
+        }
+
         /// <summary>h = saturate((H − Hmin)/(Hmax − Hmin)).</summary>
         public static float NormalizedHeight(float height, in WorldGenConfig cfg){
             return math.saturate((height - cfg.HeightMin) / (cfg.HeightMax - cfg.HeightMin));
@@ -182,10 +196,22 @@ namespace Engine.Scripts.WorldGen.Core{
         /// </summary>
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
         public static int ClassifyAt(in float2 q, in WorldGenConfig cfg){
+            ClassHeightGrid none = default;
+            return ClassifyAt(q, cfg, none);
+        }
+
+        /// <summary>
+        ///     <see cref="ClassifyAt(in float2,in WorldGenConfig)" /> reading the smoothed classification height from
+        ///     <paramref name="classHeight" /> where it covers <paramref name="q" /> (same bits as without it).
+        ///     Direct-call entry point.
+        /// </summary>
+        [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
+        public static int ClassifyAt(in float2 q, in WorldGenConfig cfg, in ClassHeightGrid classHeight){
             WorldFields f = ClimateFields.Sample(q, cfg.Climate);
             if (cfg.Architecture != GenArchitecture.TerrainFirst) return BiomeClassifier.Classify(f, cfg);
             TerrainFirstHeight.Sample(q, f, cfg, out float3 _, out float height, out float _);
-            return BiomeClassifier.Classify(f, NormalizedHeight(height, cfg), cfg);
+            float h = cfg.SmoothsClassHeight ? ClassHeight.Sample(q, cfg, classHeight) : height;
+            return BiomeClassifier.Classify(f, NormalizedHeight(h, cfg), IsDry(height, cfg), cfg);
         }
 
         /// <summary>
@@ -193,7 +219,8 @@ namespace Engine.Scripts.WorldGen.Core{
         /// </summary>
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
         public static int ClassifyWarpedAt(in float2 q, in WorldGenConfig cfg){
-            return ClassifyAt(WarpField.Warp(q, cfg), cfg);
+            ClassHeightGrid none = default;
+            return ClassifyAt(WarpField.Warp(q, cfg), cfg, none);
         }
 
         /// <inheritdoc cref="SampleColumn(int,int,in WorldGenConfig,out ColumnSample)" />

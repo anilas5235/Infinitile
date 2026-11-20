@@ -26,8 +26,10 @@ MonoBehaviour:
   LambdaHumidity: 2
   LambdaContinental: 2
   LambdaErosion: 1
-  LambdaPV: 0.5
+  LambdaPV: 0
   LambdaHeight: 4
+  BiomeHeightSmoothing: 64
+  BiomeHeightOctaves: 2
   HeightMin: 50
   HeightMax: 240
   HeightSoftBand: 32
@@ -51,12 +53,12 @@ MonoBehaviour:
   WGain: 1.6
   ClimateFrequencyScale: 0.85
   temperatureProfile:
-    scale: 2000
+    scale: 4000
     persistance: 0.5
     lacunarity: 2
     octaves: 3
   humidityProfile:
-    scale: 1600
+    scale: 3200
     persistance: 0.5
     lacunarity: 2
     octaves: 3

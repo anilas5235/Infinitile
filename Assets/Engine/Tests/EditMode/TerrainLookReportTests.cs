@@ -191,6 +191,8 @@ namespace Engine.Tests.EditMode{
                     ["HeightMax"] = settings.HeightMax,
                     ["HeightSoftBand"] = settings.HeightSoftBand,
                     ["GlobalOctaveWeights"] = settings.GlobalOctaveWeights,
+                    ["BiomeHeightSmoothing"] = settings.BiomeHeightSmoothing,
+                    ["BiomeHeightOctaves"] = settings.BiomeHeightOctaves,
                     ["Lambda"] = new[]{
                         settings.LambdaTemperature, settings.LambdaHumidity, settings.LambdaContinental, settings.LambdaErosion,
                         settings.LambdaPV, settings.LambdaHeight
@@ -200,7 +202,8 @@ namespace Engine.Tests.EditMode{
                         ["Target"] = new[]{
                             b.TargetTemperature, b.TargetHumidity, b.TargetContinental, b.TargetErosion, b.TargetPV, b.TargetHeight
                         },
-                        ["HeightIsFloor"] = b.TargetHeightIsFloor
+                        ["HeightIsFloor"] = b.TargetHeightIsFloor,
+                        ["SubmergedOnly"] = b.SubmergedOnly
                     }).ToList(),
                     ["Splines"] = settings.Splines.ToTree()
                 };

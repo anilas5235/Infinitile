@@ -80,6 +80,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                  + "neighbour with a higher target cannot win its summits by height alone.")]
         [SerializeField] public bool TargetHeightIsFloor;
 
+        [Tooltip("Only columns under water may take this biome (Terrain-first only): a column whose top block is "
+                 + "dry never classifies to it, the next nearest biome takes it. On for Ocean.")]
+        [SerializeField] public bool SubmergedOnly;
+
         // --- Biome-first height parameters ----------------------------------------------------------------------------
 
         [Tooltip("Base height Offset_b in blocks.")]
@@ -159,6 +163,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                 targetPV = TargetPV,
                 targetElevation = TargetHeight,
                 elevationIsFloor = TargetHeightIsFloor ? (byte)1 : (byte)0,
+                submergedOnly = SubmergedOnly ? (byte)1 : (byte)0,
                 heightOffset = HeightOffset,
                 heightAmplitude = HeightAmplitude,
                 jaggedness = Jaggedness,
@@ -239,6 +244,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
             /// <summary>1 when <see cref="targetElevation" /> is a floor: no height distance above it.</summary>
             public byte elevationIsFloor;
+
+            /// <summary>1 when only submerged columns may take this biome (<see cref="Biome.SubmergedOnly" />).</summary>
+            public byte submergedOnly;
 
             public float heightOffset;
             public float heightAmplitude;
