@@ -3,6 +3,7 @@ using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Render;
 using Engine.Scripts.Render.Post;
+using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.VoxelConfig.Data.Voxel;
 using NUnit.Framework;
 using Unity.Collections;
@@ -10,6 +11,8 @@ using Unity.Mathematics;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.TestTools.Constraints;
+using Is = UnityEngine.TestTools.Constraints.Is;
 using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Tests.EditMode{
@@ -154,6 +157,41 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(30, untouched.b, 2);
         }
 
+        [Test]
+        public void TintMap_RebuildsItsBlendMipOnceAfterWrites(){
+            WriteTestBiomes();
+            WaterTintMap map = Map(1);
+            Color32[] colors ={ new(255, 0, 0, 255), new(0, 255, 0, 255), new(0, 0, 255, 255) };
+            Assert.AreEqual(WaterTintMap.BlendMip + 1, map.Texture.mipmapCount, "the shader reads the blend mip");
+            Assert.AreEqual(0, ChunkWidth % (1 << WaterTintMap.BlendMip), "a blend texel never spans two chunks");
+
+            Assert.IsTrue(map.UpdateMips(), "the cleared map builds its mips once");
+            Assert.IsFalse(map.UpdateMips(), "nothing written since");
+
+            map.Ensure(new int2(0, 0), _data, colors, 1);
+            map.Ensure(new int2(1, 0), _data, colors, 1);
+            Assert.IsTrue(map.MipsDirty);
+            Assert.IsTrue(map.UpdateMips(), "one rebuild for both chunks");
+            Assert.IsFalse(map.UpdateMips());
+            Assert.IsFalse(map.Ensure(new int2(0, 0), _data, colors, 1));
+            Assert.IsFalse(map.MipsDirty, "a chunk the map holds already writes nothing");
+        }
+
+        [Test]
+        public void TintMap_WritesChunksAndMipsWithoutAllocating(){
+            WriteTestBiomes();
+            WaterTintMap map = Map(1);
+            Color32[] colors ={ new(255, 0, 0, 255), new(0, 255, 0, 255), new(0, 0, 255, 255) };
+            map.Ensure(new int2(0, 0), _data, colors, 1); // warm-up
+            map.UpdateMips();
+            int x = 1;
+            Assert.That(() => {
+                    map.Ensure(new int2(x++, 0), _data, colors, 1);
+                    map.UpdateMips();
+                }, Is.Not.AllocatingGCMemory(),
+                "the renderer writes chunks during flight (AllocationTests)");
+        }
+
         private static Color32[] ReadBack(RenderTexture texture){
             RenderTexture previous = RenderTexture.active;
             Texture2D read = new(texture.width, texture.height, TextureFormat.RGBA32, false, false);
@@ -171,21 +209,21 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void FogColor_AveragesTheLoadedColumnsInLinearLight(){
-            // biome 0 left of x = 0, biome 1 from x = 0; column (5, *) not loaded
+            // biome 0 left of x = 0, biome 1 from x = 0; column (2, *) not loaded
             bool BiomeAt(int x, int z, out int biome){
                 biome = x < 0 ? 0 : 1;
-                return x != 1;
+                return x != 2;
             }
 
             Color[] colors ={ Color.black, Color.white };
             Color fallback = Color.magenta;
 
             Color mixed = VoxelPostProcessHandler.AverageBiomeColor(0, 0, BiomeAt, i => colors[i], fallback);
-            // columns x = -2..1: two black, one white (x = 1 is not loaded)
+            // sampled columns x = -6, -2, 2, 6: two black, one white (x = 2 is not loaded)
             Assert.AreEqual(Mathf.LinearToGammaSpace(1f / 3f), mixed.r, 1e-4f);
             Assert.AreEqual(1f, mixed.a);
 
-            Color inside = VoxelPostProcessHandler.AverageBiomeColor(-10, 0, BiomeAt, i => colors[i], fallback);
+            Color inside = VoxelPostProcessHandler.AverageBiomeColor(-20, 0, BiomeAt, i => colors[i], fallback);
             Assert.AreEqual(Color.black, inside);
 
             bool NoneLoaded(int x, int z, out int biome){
@@ -215,6 +253,27 @@ namespace Engine.Tests.EditMode{
             Assert.IsTrue(water.liquidSurface.biomeTint);
             Assert.Greater(water.depthFadeDistance, 0f, "the depth tint is on");
             Assert.GreaterOrEqual(water.liquidSurface.depthAlpha, water.surfaceAlpha);
+            Assert.Greater(water.postProcess.sceneTint, 0f, "the scene under water takes on the fog's blue");
+        }
+
+        [Test]
+        public void BiomeWaterColors_StayCloseToOneBlue(){
+            // Owner 2026-11-20: subtle shifts around one blue, only the Swamp's water is murky.
+            string[] guids = AssetDatabase.FindAssets("t:Biome",
+                new[]{ "Assets/Engine/Resources/VoxelDataPackages/Standard/Bioms" });
+            Assert.Greater(guids.Length, 5);
+            foreach (string guid in guids){
+                Biome biome = AssetDatabase.LoadAssetAtPath<Biome>(AssetDatabase.GUIDToAssetPath(guid));
+                if (biome.name == "Swamp") continue;
+                AssertClose(Biome.DefaultWaterColor, biome.WaterColor, 0.08f, biome.name + " water");
+                AssertClose(Biome.DefaultWaterFogColor, biome.WaterFogColor, 0.13f, biome.name + " fog");
+            }
+        }
+
+        private static void AssertClose(Color expected, Color actual, float delta, string what){
+            Assert.AreEqual(expected.r, actual.r, delta, what + " red");
+            Assert.AreEqual(expected.g, actual.g, delta, what + " green");
+            Assert.AreEqual(expected.b, actual.b, delta, what + " blue");
         }
     }
 }

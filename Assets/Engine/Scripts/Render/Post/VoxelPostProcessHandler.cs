@@ -31,8 +31,11 @@ namespace Engine.Scripts.Render.Post{
         /// </summary>
         private const int MaxSurfaceSearch = 64;
 
-        /// <summary>Columns averaged for the biome fog colour per side, about the shader's ~4-block border.</summary>
-        internal const int FogColorBlend = 4;
+        /// <summary>Width in blocks of the square the biome fog colour is averaged over, as the shader's ~16-block border.</summary>
+        internal const int FogColorBlend = 16;
+
+        /// <summary>Spacing in blocks of the columns sampled inside <see cref="FogColorBlend" /> (4 × 4 samples).</summary>
+        internal const int FogColorStep = 4;
 
         private bool _biomeFog;
         private Vector2Int _fogColumn = new(int.MinValue, int.MinValue);
@@ -118,16 +121,17 @@ namespace Engine.Scripts.Render.Post{
 
         /// <summary>
         ///     Mean of <paramref name="colorOf" /> over the <see cref="FogColorBlend" /> × <see cref="FogColorBlend" />
-        ///     columns around (<paramref name="x" />, <paramref name="z" />), averaged in linear light; the columns
-        ///     that are not loaded are left out, <paramref name="fallback" /> when none is.
+        ///     square around (<paramref name="x" />, <paramref name="z" />), sampled every <see cref="FogColorStep" />
+        ///     blocks (at the centres of the step cells) and averaged in linear light; the columns that are not loaded
+        ///     are left out, <paramref name="fallback" /> when none is.
         /// </summary>
         internal static Color AverageBiomeColor(int x, int z, ColumnBiome biomeAt, Func<int, Color> colorOf,
             Color fallback){
             Color sum = Color.clear;
             int count = 0;
-            int half = FogColorBlend / 2;
-            for (int dx = -half; dx < FogColorBlend - half; dx++)
-            for (int dz = -half; dz < FogColorBlend - half; dz++){
+            int first = -FogColorBlend / 2 + FogColorStep / 2; // -6, -2, 2, 6
+            for (int dx = first; dx < FogColorBlend / 2; dx += FogColorStep)
+            for (int dz = first; dz < FogColorBlend / 2; dz += FogColorStep){
                 if (!biomeAt(x + dx, z + dz, out int biome)) continue;
                 sum += colorOf(biome).linear;
                 count++;
@@ -172,6 +176,7 @@ namespace Engine.Scripts.Render.Post{
             _fogColumn = new Vector2Int(int.MinValue, int.MinValue); // the biome colour is looked up afresh
             UnderwaterFogFeature.FogDensity = info.postProcess.fogDensity;
             UnderwaterFogFeature.DepthDarkening = info.postProcess.depthDarkening;
+            UnderwaterFogFeature.SceneTint = info.postProcess.sceneTint;
             Vector3Int emission = info.lightEmission;
             UnderwaterFogFeature.SelfIllumination = Mathf.Max(emission.x, emission.y, emission.z) / 15f;
         }

@@ -331,6 +331,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         ///     water gets darker; 0 keeps the fog equally bright at every depth.
         /// </summary>
         [Min(0f)] public float depthDarkening;
+
+        /// <summary>
+        ///     How much the scene seen through the fog takes on the fog's hue and depth darkening (0 = untouched, 1 =
+        ///     fully), so near blocks look blue under water as well, not only the far ones.
+        /// </summary>
+        [Range(0f, 1f)] public float sceneTint;
     }
 
     /// <summary>

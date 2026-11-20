@@ -14,11 +14,16 @@ namespace Engine.Scripts.Render{
     ///     its position falls on; the map holds the drawn square (2 × draw distance + 1 chunks) with
     ///     <see cref="SlackChunks" /> to spare, so two drawn chunks never share a slot. A chunk's colours are written
     ///     before its partitions are built (<see cref="Ensure" />), from its column biomes
-    ///     (<see cref="ChunkVoxelData.Biomes" />), through one 32 × 32 staging texture copied into the map.
+    ///     (<see cref="ChunkVoxelData.Biomes" />), through one 32 × 32 staging texture copied into the map. The shader
+    ///     reads mip <see cref="BlendMip" /> (one texel per 4 × 4 columns), so the colour blends over about 16 blocks;
+    ///     <see cref="UpdateMips" /> rebuilds the mips once per frame after writes.
     /// </summary>
     internal sealed class WaterTintMap : IDisposable{
         /// <summary>Chunks the map holds beyond the drawn square, so a chunk leaving it frees its slot late.</summary>
         public const int SlackChunks = 3;
+
+        /// <summary>The mip the shader blends the biome colour from: 2^BlendMip columns per texel.</summary>
+        public const int BlendMip = 2;
 
         /// <summary>Chunks along one side of the map.</summary>
         public int SizeChunks{ get; }
@@ -29,8 +34,21 @@ namespace Engine.Scripts.Render{
         /// <summary>The tint texture, sRGB, bilinear, repeating.</summary>
         public RenderTexture Texture{ get; }
 
-        /// <summary>Bytes of the tint texture and its staging texture.</summary>
-        public long GpuBytes => 4L * (SizeTexels * (long)SizeTexels + ChunkWidth * ChunkDepth);
+        /// <summary>Bytes of the tint texture with its mips and of the staging texture.</summary>
+        public long GpuBytes{
+            get{
+                long texels = ChunkWidth * ChunkDepth;
+                for (int mip = 0; mip <= BlendMip; mip++){
+                    long side = SizeTexels >> mip;
+                    texels += side * side;
+                }
+
+                return 4L * texels;
+            }
+        }
+
+        /// <summary>Whether mip 0 changed since the mips were last built.</summary>
+        public bool MipsDirty{ get; private set; }
 
         private readonly int2[] _owners;
         private readonly bool[] _owned;
@@ -58,7 +76,9 @@ namespace Engine.Scripts.Render{
             _owned = new bool[SizeChunks * SizeChunks];
 
             Texture = new RenderTexture(new RenderTextureDescriptor(SizeTexels, SizeTexels,
-                GraphicsFormat.R8G8B8A8_SRGB, GraphicsFormat.None){ useMipMap = false, autoGenerateMips = false }){
+                GraphicsFormat.R8G8B8A8_SRGB, GraphicsFormat.None){
+                    useMipMap = true, autoGenerateMips = false, mipCount = BlendMip + 1
+                }){
                 name = "WaterTintMap",
                 filterMode = FilterMode.Bilinear,
                 wrapMode = TextureWrapMode.Repeat,
@@ -106,11 +126,20 @@ namespace Engine.Scripts.Render{
             if (_owners[slot].Equals(chunk)) _owned[slot] = false;
         }
 
-        /// <summary>Sets the tint texture and its scale as the shader globals.</summary>
+        /// <summary>Sets the tint texture, its scale and the blend mip as the shader globals.</summary>
         public void SetGlobals(){
             Shader.SetGlobalTexture(VoxelRenderConstants.VoxelWaterTintNameID, Texture);
             Shader.SetGlobalVector(VoxelRenderConstants.VoxelWaterTintParamsNameID,
-                new Vector4(1f / SizeTexels, SizeTexels, 0f, 0f));
+                new Vector4(1f / SizeTexels, SizeTexels, BlendMip, 0f));
+        }
+
+        /// <summary>Rebuilds the mips when chunks were written since the last call (once per frame, before drawing).</summary>
+        /// <returns>True when the mips were rebuilt.</returns>
+        public bool UpdateMips(){
+            if (!MipsDirty) return false;
+            Texture.GenerateMips();
+            MipsDirty = false;
+            return true;
         }
 
         /// <summary>
@@ -133,7 +162,7 @@ namespace Engine.Scripts.Render{
 
         private void Write(int2 chunk, in ChunkVoxelData data, Color32[] colors){
             FillPixels(data, colors, _defaultColor, _pixels);
-            _staging.SetPixelData(_pixels, 0);
+            _staging.GetPixelData<Color32>(0).CopyFrom(_pixels); // SetPixelData with an array allocates
             _staging.Apply(false, false);
             Graphics.CopyTexture(_staging, 0, 0, 0, 0, ChunkWidth, ChunkDepth, Texture, 0, 0,
                 Slot(chunk.x, SizeChunks) * ChunkWidth, Slot(chunk.y, SizeChunks) * ChunkDepth);
@@ -141,6 +170,7 @@ namespace Engine.Scripts.Render{
             int slot = SlotIndex(chunk);
             _owners[slot] = chunk;
             _owned[slot] = true;
+            MipsDirty = true;
         }
 
         private void Clear(){
@@ -150,6 +180,7 @@ namespace Engine.Scripts.Render{
             cmd.ClearRenderTarget(false, true, QualitySettings.activeColorSpace == ColorSpace.Linear ? clear.linear : clear);
             Graphics.ExecuteCommandBuffer(cmd);
             cmd.Release();
+            MipsDirty = true;
         }
 
         public void Dispose(){

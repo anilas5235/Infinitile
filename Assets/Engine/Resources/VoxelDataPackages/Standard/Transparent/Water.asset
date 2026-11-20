@@ -23,7 +23,7 @@ MonoBehaviour:
     tint: {r: 1, g: 1, b: 1, a: 1}
     biomeTint: 1
     flowSpeed: 0.3
-    patternStrength: 0.6
+    patternStrength: 1
     depthAlpha: 0.9
   glow: 0
   lightAttenuation: 2
@@ -31,9 +31,10 @@ MonoBehaviour:
   usePostProcess: 1
   postProcess:
     enableFog: 1
-    fogColor: {r: 0.1, g: 0.3, b: 0.4, a: 1}
-    fogDensity: 0.035
-    depthDarkening: 0.04
+    fogColor: {r: 0.02, g: 0.3, b: 1, a: 1}
+    fogDensity: 0.02
+    depthDarkening: 0.03
+    sceneTint: 0.8
   shape: {fileID: 11400000, guid: 4f233acb5e735874f81d54b07e03336a, type: 2}
   top: {fileID: 0}
   bottom: {fileID: 0}
@@ -42,5 +43,5 @@ MonoBehaviour:
   right: {fileID: 0}
   left: {fileID: 0}
   side: {fileID: 0}
-  all: {fileID: 2800000, guid: 7e204b64c0db5e543a5885920baee83c, type: 3}
+  all: {fileID: 2800000, guid: 9e89d9fd667947cabffaa8cdb9f5c9e3, type: 3}
   collision: 0

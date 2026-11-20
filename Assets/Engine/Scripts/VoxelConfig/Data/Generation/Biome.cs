@@ -98,17 +98,17 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
         // --- Water ----------------------------------------------------------------------------------------------------
 
-        [Tooltip("Colour of a biome-tinted liquid's surface (water) over this biome; blended over a few blocks at the border.")]
+        [Tooltip("Colour of a biome-tinted liquid's surface (water) over this biome; blended over about 16 blocks at the border; keep the biomes close to one blue.")]
         [SerializeField] public Color WaterColor = DefaultWaterColor;
 
         [Tooltip("Underwater fog colour in a biome-tinted liquid over this biome, before the sky light.")]
         [SerializeField] public Color WaterFogColor = DefaultWaterFogColor;
 
         /// <summary>Water colour of a new biome, and of a missing one.</summary>
-        public static readonly Color DefaultWaterColor = new(0.24f, 0.47f, 0.86f);
+        public static readonly Color DefaultWaterColor = new(0.24f, 0.46f, 0.86f);
 
         /// <summary>Underwater fog colour of a new biome, and of a missing one.</summary>
-        public static readonly Color DefaultWaterFogColor = new(0.06f, 0.22f, 0.38f);
+        public static readonly Color DefaultWaterFogColor = new(0.02f, 0.3f, 1f);
 
         public BiomeDef ToStruct(VoxelRegistry voxelRegistry){
             return ToStruct(v => voxelRegistry.GetIdOrThrow(v.GetFullName()));

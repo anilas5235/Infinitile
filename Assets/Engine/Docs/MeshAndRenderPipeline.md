@@ -1009,28 +1009,35 @@ of the scene behind, no depth fade to opaque, no Snell's window, no opaque colou
   liquid (category Liquids), has a depth fade or has underwater fog. The names stay from Version 1.11.
 - **Voxel settings.** `Voxel.liquidSurface` (`VoxelLiquidSurface`: tint, biomeTint, flowSpeed, patternStrength,
   depthAlpha), shown for liquids in the voxel inspector. `VoxelPostProcessData` keeps only the fog
-  (enableFog, fogColor, fogDensity, depthDarkening); the grading fields are gone.
+  (enableFog, fogColor, fogDensity, depthDarkening, sceneTint); the grading fields are gone.
 - **Biome per column.** The chunk job keeps the hard biome of every column with the chunk
   (`ChunkVoxelData.Biomes`, 32 × 32 bytes, index `z + x × 32`, `ChunkJob.WriteBiomes`), freed with the chunk.
   `Biome.WaterColor` and `Biome.WaterFogColor` give each biome its colours; `VoxelWorld` keeps them in config
   order (`BiomeWaterColors`, `BiomeWaterFogColor`, `BiomeColorsVersion`).
 - **World tint map** (`WaterTintMap`). A repeating sRGB texture with one texel per block column, `2 × draw
-  distance + 4` chunks a side (28 chunks, 896² texels, 3.2 MB at draw distance 12; 68 chunks, 18.9 MB at 32). A chunk owns the slot its position falls on (`((c mod N) + N) mod N` per axis); the drawn square never
+  distance + 4` chunks a side (28 chunks, 896² texels, 4.2 MB with mips at draw distance 12; 68 chunks, 24.9 MB at 32). A chunk owns the slot its position falls on (`((c mod N) + N) mod N` per axis); the drawn square never
   puts two chunks on one slot. `VoxelWorldRenderer` writes a chunk's colours before it builds the chunk's first
   partition (`EnsureWaterTint`, marker `Voxel.GpuUpload.WaterTint`): 1,024 pixels into a 32 × 32 staging texture,
   then `Graphics.CopyTexture` into the slot. An evicted chunk is forgotten, new biome colours (a regenerated world)
   forget all, and a draw distance change makes a new map. Globals `_VoxelWaterTint` and `_VoxelWaterTintParams`
-  (x = 1 / size). The shader reads it by world x/z: four bilinear taps one block apart diagonally, so the colour
-  blends over about four blocks between biomes.
+  (x = 1 / size, z = blend mip). The map keeps mips 0–2 (`BlendMip` 2: one texel per 4 × 4 columns, never across
+  a chunk); `UpdateMips` rebuilds them in `LateUpdate` when chunks were written that frame. The shader reads it by
+  world x/z: four bilinear taps two blocks apart diagonally from mip 2, so the colour blends over about 16 blocks
+  between biomes. The biome colours stay close to one blue (owner, 2026-11-20); only the Swamp is murky.
 - **Underwater.** `UnderwaterFogFeature` keeps its exp² fog with depth darkening. `VoxelPostProcessHandler` no
   longer sets Lift/Gamma/Gain or Colour Adjustments; for a biome-tinted liquid the fog colour is the mean of the
-  biomes' water fog colours over the 4 × 4 columns around the camera (in linear light, again when the camera's
-  column changes).
+  biomes' water fog colours over 16 × 16 blocks around the camera (4 × 4 columns, 4 blocks apart, in linear light,
+  again when the camera's column changes). `sceneTint` (Water 0.8) tints the scene behind the fog with the fog
+  colour's hue and the depth darkening, so near blocks look blue as well; Water's fog is a saturated blue
+  (0.02, 0.30, 1.0) at density 0.02.
+- **Pattern tile.** Water uses an own greyscale tile, `KenneyDerived/water_ripples.png` (16 px per block, alpha 0.8,
+  `Docs/Tools/make_water_pattern.py`), with pattern strength 1; the Kenney water tile was almost flat.
 - **Opaque copy off.** No shader reads `_CameraOpaqueTexture` any more, so `PC_RPAsset` has
   `m_RequireOpaqueTexture: 0` (the depth texture stays on for the depth tint). Glass is still drawn after the
   skybox and before the transparents, so a liquid surface in front blends over it; the double-counted glass of
   Version 1.11 is gone.
 - **Tests.** `WaterRenderingTests` (the chunk job keeps the column biomes, tint map size and slot wrap, the pixel
-  layout and fallback, ensure/forget/new colours, a written chunk read back from the GPU, the fog colour average,
-  opaque copy off and depth on, the shipped water asset); `RegistryTests.VoxelRegistry_LiquidsAndDepthFades_GetVolumeSlots`
+  layout and fallback, ensure/forget/new colours, a written chunk read back from the GPU, one mip rebuild after
+  writes, the fog colour average, opaque copy off and depth on, the shipped water asset, biome colours close to one
+  blue); `RegistryTests.VoxelRegistry_LiquidsAndDepthFades_GetVolumeSlots`
   (slot rules and the 32-byte entries); `RenderDataTests.VolumeFogDef_Is32Bytes` and the shader compile check.

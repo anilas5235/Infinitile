@@ -278,6 +278,7 @@ namespace Engine.Scripts.Render{
         private void LateUpdate(){
             if (_isDestroyed) return;
             _culler.ReleaseStaleCameras(Time.frameCount);
+            _waterTint?.UpdateMips();
             if (!_buffersRebuildPending) return;
 
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.RenderRebuildBuffers.Auto();
