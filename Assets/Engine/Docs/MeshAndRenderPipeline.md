@@ -1044,7 +1044,10 @@ of the scene behind, no depth fade to opaque, no Snell's window, no opaque colou
   `BeforeRenderingTransparents`, between the glass pass and the transparents. The forward pass then draws only the
   nearest liquid face per pixel (`ZTest LEqual`). The depth texture is copied after the opaques, so the depth tint
   still sees the floor. Without `VoxelGlassFeature` in the renderer the flicker comes back (owner's pick
-  "Depth pre-pass", 2026-11-20). Cost: one depth-only draw of the liquid pages per frame, not measured.
+  "Depth pre-pass", 2026-11-20). Cost: one depth-only draw of the liquid pages per frame. Measured with the
+  goal run (bef7c14 / 28c7163 / 28c7163 / bef7c14, Editor, draw 12): standing over the sea the GPU frame is
+  0.3 to 0.4 ms longer (3.21, 3.20 against 2.83, 2.92 ms avg; frame p95 5.99, 5.80 against 5.02, 5.50 ms), the
+  main camera's URP render 0.03 ms; in the flights the difference stays inside the spread.
 - **Liquid depth pulled towards the camera.** A liquid face next to leaves (or glass) lies in the plane of the
   leaf face, and the two quads split into triangles along different diagonals, so from inside the water whole
   triangles of the leaf showed through the water surface and changed as the camera moved. `vert_filtered` pulls
