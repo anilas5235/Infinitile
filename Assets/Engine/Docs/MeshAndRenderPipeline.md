@@ -1041,3 +1041,9 @@ of the scene behind, no depth fade to opaque, no Snell's window, no opaque colou
   writes, the fog colour average, opaque copy off and depth on, the shipped water asset, biome colours close to one
   blue); `RegistryTests.VoxelRegistry_LiquidsAndDepthFades_GetVolumeSlots`
   (slot rules and the 32-byte entries); `RenderDataTests.VolumeFogDef_Is32Bytes` and the shader compile check.
+- **Measured** (2026-11-20, Editor, focused, `FrameTimeGoal_MainThread_IsAttributed` at draw distance 12, uncapped;
+  master, branch, branch, master in one session; branch / second master run): standing frame p95 5.14, 4.33 / 4.35 ms;
+  flight 80 u/s p95 7.66, 7.57 / 7.57 ms; flight 40 u/s p95 6.69, 6.59 / 6.52 ms. The GPU frame is 0.05 to 0.13 ms
+  longer on average (the liquid pass), the main thread is unchanged within the spread, and the tint upload costs
+  0.016 ms per frame on average (p95 0.099 ms) in the 80 u/s flight. The underwater fog pass is not in this run
+  (the rig stays above the terrain).
