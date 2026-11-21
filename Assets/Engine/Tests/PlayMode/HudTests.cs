@@ -341,6 +341,122 @@ namespace Engine.Tests.PlayMode{
             Assert.IsEmpty(_problems, "warnings or errors while placing");
         }
 
+        /// <summary>
+        ///     The command console opens with the cursor free and the crosshair hidden, shows the commands that fit the
+        ///     typed word, completes with Tab and shows the usage; teleport lifts the player by 5 and closes the
+        ///     console; setvoxel puts stone into a cell; an error keeps the console open with a red line; closed, the
+        ///     newest lines stay. The player and the cell are put back.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Console_CompletesTeleportsAndSetsAVoxel(){
+            VisualElement hud = FindHud(out UIDocument document);
+            Assert.IsNotNull(hud, "no UIDocument with a \"hud\" element in the scene");
+            MonoBehaviour editor = null, player = null;
+            foreach (MonoBehaviour behaviour in Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)){
+                if (behaviour.GetType().Name == "VoxelEditor") editor = behaviour;
+                if (behaviour.GetType().Name == "PlayerManager") player = behaviour;
+            }
+
+            Assert.IsNotNull(editor, "VoxelEditor in the scene");
+            Assert.IsNotNull(player, "PlayerManager in the scene");
+            float deadline = Time.realtimeSinceStartup + 60f;
+            while (!editor.isActiveAndEnabled && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.IsTrue(editor.isActiveAndEnabled, "the player did not spawn");
+
+            VisualElement bar = hud.Q("con-bar"), suggest = hud.Q("con-suggest");
+            TextField field = hud.Q<TextField>("con-field");
+            Assert.IsNotNull(field, "console line");
+            Assert.AreEqual(DisplayStyle.None, bar.resolvedStyle.display, "the console starts closed");
+
+            VoxelWorld world = VoxelWorld.Instance;
+            Assert.IsTrue(DataImporter.Instance.VoxelRegistry.TryGetId("std:Stone", out ushort stone));
+            Vector3Int cell = Vector3Int.FloorToInt(player.transform.position) + new Vector3Int(2, 4, 0);
+            ushort original = VoxelAt(world, cell);
+            Vector3 start = player.transform.position;
+            bool moved = false;
+            try{
+                document.gameObject.SendMessage("SetConsole", true);
+                yield return null;
+                yield return null; // the line takes the focus a frame later
+                Assert.AreEqual(DisplayStyle.Flex, bar.resolvedStyle.display, "the console opens");
+                Assert.AreEqual(CursorLockMode.None, UnityEngine.Cursor.lockState, "the cursor is free");
+                Assert.AreEqual(DisplayStyle.None, hud.Q("crosshair").resolvedStyle.display, "crosshair hidden");
+                Assert.IsFalse(editor.enabled, "no block editing while typing");
+
+                // the commands that fit, then Tab: the name, the usage with <x> marked, "~ ~ ~" offered
+                field.value = "tele";
+                yield return null;
+                Assert.AreEqual(DisplayStyle.Flex, suggest.resolvedStyle.display, "suggestions shown");
+                CollectionAssert.AreEqual(new[]{ "teleport" }, LabelTexts(hud.Q("con-items")));
+                document.gameObject.SendMessage("ConsoleTab");
+                yield return null;
+                Assert.AreEqual("teleport ", field.value);
+                CollectionAssert.AreEqual(new[]{ "teleport", "<x>", "<y>", "<z>" }, LabelTexts(hud.Q("con-usage")));
+                Assert.IsTrue(hud.Q("con-usage")[1].ClassListContains("con__word--on"), "<x> is being typed");
+                CollectionAssert.AreEqual(new[]{ "~ ~ ~" }, LabelTexts(hud.Q("con-items")));
+
+                // "~" is where the player is now; the spawn is under water, where it may still drift
+                Vector3 before = player.transform.position;
+                document.gameObject.SendMessage("SubmitConsole", "tp ~ ~5 ~");
+                moved = true;
+                Vector3 lifted = player.transform.position - before;
+                Assert.AreEqual(5f, lifted.y, 1e-3f, "teleport lifts the player by 5");
+                Assert.AreEqual(0f, new Vector2(lifted.x, lifted.z).magnitude, 1e-3f, "x and z stay");
+                yield return null;
+                Assert.AreEqual(DisplayStyle.None, bar.resolvedStyle.display, "a command that ran closes the console");
+                StringAssert.StartsWith("Teleported to ", LastShownLine(hud).text, "the output stays");
+
+                document.gameObject.SendMessage("SetConsole", true);
+                document.gameObject.SendMessage("SubmitConsole", "tp ~ ~-5 ~");
+                moved = false;
+                document.gameObject.SendMessage("SetConsole", true);
+                document.gameObject.SendMessage("SubmitConsole", $"setvoxel {cell.x} {cell.y} {cell.z} std:Stone");
+                Assert.AreEqual(stone, VoxelAt(world, cell), "setvoxel puts stone");
+                StringAssert.StartsWith("Set std:Stone at ", LastShownLine(hud).text);
+
+                document.gameObject.SendMessage("SetConsole", true);
+                field.value = "setvoxel 0 999 0 std:Stone"; // Enter runs what the line holds
+                document.gameObject.SendMessage("SubmitConsole", field.value);
+                yield return null;
+                Assert.AreEqual(DisplayStyle.Flex, bar.resolvedStyle.display, "an error keeps the console open");
+                Assert.AreEqual("setvoxel 0 999 0 std:Stone", field.value, "the line stays to be fixed");
+                Label error = LastShownLine(hud);
+                Assert.AreEqual("y 999 is outside the world (0 to 255).", error.text);
+                Assert.IsTrue(error.ClassListContains("con__line--error"), "the error line is marked");
+            }
+            finally{
+                document.gameObject.SendMessage("SetConsole", false);
+                if (moved) player.transform.position = start;
+                world.SetVoxel(original, cell);
+            }
+
+            yield return null;
+            Assert.AreEqual(DisplayStyle.None, bar.resolvedStyle.display, "the console closes");
+            Assert.AreEqual(DisplayStyle.None, suggest.resolvedStyle.display, "suggestions hidden");
+            Assert.AreEqual(DisplayStyle.Flex, hud.Q("crosshair").resolvedStyle.display, "crosshair back");
+            Assert.AreEqual("y 999 is outside the world (0 to 255).", LastShownLine(hud).text,
+                "the newest lines stay a while after closing");
+            Assert.IsEmpty(_problems, "warnings or errors while the console ran");
+        }
+
+        private static List<string> LabelTexts(VisualElement parent){
+            List<string> texts = new();
+            foreach (VisualElement child in parent.Children())
+                if (child is Label label)
+                    texts.Add(label.text);
+            return texts;
+        }
+
+        /// <summary>The lowest output line of the console that is shown.</summary>
+        private static Label LastShownLine(VisualElement hud){
+            Label last = null;
+            foreach (VisualElement child in hud.Q("con-log").Children())
+                if (child.style.display == DisplayStyle.Flex) // set at once, the resolved style a frame later
+                    last = (Label)child;
+            Assert.IsNotNull(last, "a console line is shown");
+            return last;
+        }
+
         private static ushort VoxelAt(VoxelWorld world, Vector3Int cell){
             return world.GetVoxel(new int3(cell.x, cell.y, cell.z));
         }

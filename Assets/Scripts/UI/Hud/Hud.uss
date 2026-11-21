@@ -1265,3 +1265,130 @@
     border-bottom-color: rgb(62, 127, 51);
     background-color: rgb(108, 195, 90);
 }
+
+/* ── Command console (T, /) ──────────────────────────────────────────────
+   Bottom left, above the hotbar: output lines, then the usage of the command being typed and the completion list,
+   then the input line, a chunky block like the menu buttons. Closed, only the newest lines show and fade out. */
+
+.con {
+    position: absolute;
+    left: 20px;
+    bottom: 176px;
+    width: 900px;
+    justify-content: flex-end;
+}
+
+.con__log {
+    align-items: flex-start;
+}
+
+.con__line {
+    margin: 0;
+    padding: 3px 12px 4px 12px;
+    font-size: 17px;
+    white-space: normal;
+    max-width: 900px;
+    color: rgb(232, 236, 241);
+    background-color: rgba(14, 17, 22, 0.72);
+}
+
+.con__line--input {
+    color: rgb(150, 160, 178);
+}
+
+.con__line--error {
+    color: rgb(240, 113, 96);
+}
+
+.con__suggest {
+    align-self: flex-start;
+    min-width: 260px;
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border-width: 2px;
+    border-color: rgb(47, 54, 71);
+    background-color: rgba(22, 26, 36, 0.95);
+    display: none;
+}
+
+.con__usage {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.con__word {
+    margin: 0 8px 0 0;
+    padding: 0;
+    font-size: 16px;
+    color: rgb(150, 160, 178);
+}
+
+.con__word--name {
+    color: rgb(232, 236, 241);
+    -unity-font-style: bold;
+}
+
+.con__word--on {
+    color: rgb(242, 179, 61);
+    -unity-font-style: bold;
+}
+
+.con__items {
+    margin-top: 4px;
+}
+
+.con__item {
+    margin: 1px 0 0 0;
+    padding: 2px 8px 3px 8px;
+    border-radius: 5px;
+    font-size: 16px;
+    color: rgb(220, 226, 234);
+}
+
+.con__item--on {
+    color: rgb(18, 21, 29);
+    background-color: rgb(242, 179, 61);
+    -unity-font-style: bold;
+}
+
+.con__more {
+    color: rgb(150, 160, 178);
+}
+
+.con__bar {
+    flex-direction: row;
+    align-items: center;
+    height: 54px;
+    margin-top: 8px;
+    padding: 0 12px;
+    border-radius: 12px;
+    border-width: 2px;
+    border-bottom-width: 6px;
+    border-color: rgb(242, 179, 61);
+    border-bottom-color: rgb(166, 117, 30);
+    background-color: rgb(18, 21, 29);
+    display: none;
+}
+
+.con__prompt {
+    margin: 0 4px 0 2px;
+    padding: 0;
+    font-size: 24px;
+    color: rgb(242, 179, 61);
+}
+
+.con__field {
+    flex-grow: 1;
+    margin: 0 4px;
+    font-size: 19px;
+}
+
+.con__field .unity-text-field__input {
+    padding: 4px 4px;
+    border-width: 0;
+    color: rgb(244, 241, 234);
+    background-color: rgba(0, 0, 0, 0);
+    --unity-cursor-color: rgb(244, 241, 234);
+    --unity-selection-color: rgba(242, 179, 61, 0.4);
+}

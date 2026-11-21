@@ -174,6 +174,21 @@
             <ui:VisualElement name="inv-ghost" class="inv__ghost" picking-mode="Ignore" />
         </ui:VisualElement>
 
+        <!-- Command console (T, /): output lines, the usage of the command being typed and the completion list, and
+             the input line, at the bottom left above the hotbar. Lines are built by the HudController. While it is
+             closed only the newest output shows, fading out. -->
+        <ui:VisualElement name="console" class="con" picking-mode="Ignore">
+            <ui:VisualElement name="con-log" class="con__log" picking-mode="Ignore" />
+            <ui:VisualElement name="con-suggest" class="con__suggest" picking-mode="Ignore">
+                <ui:VisualElement name="con-usage" class="con__usage" picking-mode="Ignore" />
+                <ui:VisualElement name="con-items" class="con__items" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="con-bar" class="con__bar">
+                <ui:Label text="&gt;" class="con__prompt lil" picking-mode="Ignore" />
+                <ui:TextField name="con-field" class="con__field" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
         <!-- Esc menu: a main page (Continue, Settings, Quit) and the settings page -->
         <ui:VisualElement name="menu" class="menu lil" picking-mode="Ignore">
             <ui:VisualElement name="menu-dim" class="menu__dim" picking-mode="Ignore" />
