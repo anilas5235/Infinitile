@@ -153,7 +153,7 @@ namespace Engine.Scripts.Data{
         /// <summary>
         ///     Hard biome of every column (index into the active biome set), ChunkWidth x ChunkDepth bytes in column
         ///     order (<c>z + x * ChunkDepth</c>), written by the chunk job; the water's biome colour reads it
-        ///     (<c>WaterTintMap</c>, underwater fog). Not created for data that did not come from the generator.
+        ///     (<c>BiomeTintMap</c>, underwater fog). Not created for data that did not come from the generator.
         /// </summary>
         internal UnsafeList<byte> Biomes;
 

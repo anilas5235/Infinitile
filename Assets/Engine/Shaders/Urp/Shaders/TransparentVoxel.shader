@@ -258,26 +258,6 @@
 
             StructuredBuffer<VolumeFog> _VoxelVolumeFog;
 
-            // The biome water colour around the player by world x/z (WaterTintMap): one texel per block column,
-            // repeating; _VoxelWaterTintParams.x = 1 / its size in texels, z = the mip it is blended from.
-            TEXTURE2D(_VoxelWaterTint);
-            SAMPLER(sampler_linear_repeat);
-            float4 _VoxelWaterTintParams;
-
-            // The biome water colour at a world position: four bilinear taps two blocks apart diagonally from the
-            // blend mip (one texel per 4 x 4 columns), so the colour blends over about 16 blocks between biomes.
-            float3 biome_water_color(const float3 positionWS)
-            {
-                const float mip = _VoxelWaterTintParams.z;
-                const float d = 2.0f * _VoxelWaterTintParams.x;
-                const float2 uv = positionWS.xz * _VoxelWaterTintParams.x;
-                float3 sum = SAMPLE_TEXTURE2D_LOD(_VoxelWaterTint, sampler_linear_repeat, uv + float2(-d, -d), mip).rgb;
-                sum += SAMPLE_TEXTURE2D_LOD(_VoxelWaterTint, sampler_linear_repeat, uv + float2(d, -d), mip).rgb;
-                sum += SAMPLE_TEXTURE2D_LOD(_VoxelWaterTint, sampler_linear_repeat, uv + float2(-d, d), mip).rgb;
-                sum += SAMPLE_TEXTURE2D_LOD(_VoxelWaterTint, sampler_linear_repeat, uv + float2(d, d), mip).rgb;
-                return sum * 0.25f;
-            }
-
             // Whether a face is a top or bottom face (else a side).
             bool is_horizontal(const float3 normal)
             {
@@ -326,7 +306,7 @@
                 {
                     // the biome colour carries the pattern's light and dark as a luminance ratio
                     const float k = Luminance(pattern.rgb) / max(Luminance(mean), 1e-3f);
-                    albedo = biome_water_color(IN.positionWS) * (1.0f + (k - 1.0f) * liquid.patternStrength);
+                    albedo = biome_tint_color(IN.positionWS, BIOME_TINT_WATER) * (1.0f + (k - 1.0f) * liquid.patternStrength);
                 }
                 else
                     albedo = mean + (pattern.rgb - mean) * liquid.patternStrength;

@@ -120,6 +120,20 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
         /// <summary>Underwater fog colour of a new biome, and of a missing one.</summary>
         public static readonly Color DefaultWaterFogColor = new(0.02f, 0.3f, 1f);
 
+        // --- Grass and plants -----------------------------------------------------------------------------------------
+
+        [Tooltip("Mean colour of the biome-tinted grass (grass block tops and side bands) in this biome; blended over about 16 blocks at the border (DEC-122).")]
+        [SerializeField] public Color GrassColor = DefaultGrassColor;
+
+        [Tooltip("Mean colour of the biome-tinted plants (grass tufts, tall grass, ferns, reeds) in this biome; blended like the grass.")]
+        [SerializeField] public Color FoliageColor = DefaultFoliageColor;
+
+        /// <summary>Grass colour of a new biome, and of a missing one (Plains, #7cc24a).</summary>
+        public static readonly Color DefaultGrassColor = new(0x7c / 255f, 0xc2 / 255f, 0x4a / 255f);
+
+        /// <summary>Plant colour of a new biome, and of a missing one (Plains, #6aae3a).</summary>
+        public static readonly Color DefaultFoliageColor = new(0x6a / 255f, 0xae / 255f, 0x3a / 255f);
+
         public BiomeDef ToStruct(VoxelRegistry voxelRegistry){
             return ToStruct(v => voxelRegistry.GetIdOrThrow(v.GetFullName()));
         }

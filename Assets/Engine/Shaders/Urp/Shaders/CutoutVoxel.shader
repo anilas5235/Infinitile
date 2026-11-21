@@ -54,6 +54,8 @@
             uint4 packed : TEXCOORD1; // PointData.packed, layout in VoxelCommon.hlsl
             float3 positionWS : TEXCOORD2; // horizon fog
             float2 shade : TEXCOORD3; // face shade seen from the front, from the back
+            float3 tint : TEXCOORD4; // biome tint factor, 1 = none (texture_tint)
+            nointerpolation uint tintMask : TEXCOORD5; // mask slice, TINT_NO_MASK = the whole face
         };
 
         // ── Vertex shader with expansion ─────────────────────────────
@@ -73,6 +75,17 @@
             o.positionWS = TransformObjectToWorld(v.positionOS);
             // Faces are drawn from both sides (inside a crown the shared faces are seen from behind)
             o.shade = float2(face_shade(_FaceShade, v.normal), face_shade(_FaceShade, -v.normal));
+            o.tint = 1.0f;
+            o.tintMask = TINT_NO_MASK;
+            return o;
+        }
+
+        // The forward pass's vertex shader: also the biome tint of the plant's texture (DEC-122); the depth pass
+        // leaves it out. The leaves pass (_VoxelPass 3) reads untinted words.
+        Varyings vert_tinted(uint vertexID : SV_VertexID)
+        {
+            Varyings o = vert(vertexID);
+            texture_tint(get_tex_index(o.packed), o.positionWS, o.tint, o.tintMask);
             return o;
         }
 
@@ -103,13 +116,14 @@
 
             HLSLPROGRAM
             #pragma target 4.5
-            #pragma vertex   vert
+            #pragma vertex   vert_tinted
             #pragma fragment frag
 
             // ── Fragment shader ───────────────────────────────────────
             half4 frag(Varyings IN, const bool front : SV_IsFrontFace) : SV_Target
             {
-                const float4 albedo = sample_cutout(IN);
+                float4 albedo = sample_cutout(IN);
+                albedo.rgb = apply_texture_tint(albedo.rgb, IN.tint, IN.tintMask, IN.uv);
 
                 // --- Ambient occlusion ---
                 const float4 ao_color = calc_ao_color(_AOColor, albedo, _AOCurve, get_ao(IN.packed), _AOIntensity,

@@ -9,6 +9,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using Object = UnityEngine.Object;
 using VoxelSo = Engine.Scripts.VoxelConfig.Data.Voxel.Voxel;
+using VoxelBiomeTint = Engine.Scripts.VoxelConfig.Data.Voxel.VoxelBiomeTint;
 
 namespace Engine.Editor.WorldGen{
     /// <summary>
@@ -132,7 +133,10 @@ namespace Engine.Editor.WorldGen{
             return (_ids.Voxel(id), _heights[i]);
         }
 
-        /// <summary>Average colour of the voxel's side texture, weighted by alpha; cached per voxel.</summary>
+        /// <summary>
+        ///     Average colour of the voxel's side texture, weighted by alpha; a biome-tinted voxel takes the default
+        ///     (Plains) colour, on a masked side only over the overlay's share (DEC-122). Cached per voxel.
+        /// </summary>
         private Color32 ColorOf(VoxelSo voxel){
             if (!voxel) return Unknown;
             if (_colors.TryGetValue(voxel, out Color32 color)) return color;
@@ -144,12 +148,24 @@ namespace Engine.Editor.WorldGen{
                 // a mode without a side texture (unique quads not loaded): fall back below
             }
 
-            color = texture ? Average(texture) : Unknown;
+            color = texture ? Average(texture, out _) : Unknown;
+            if (texture && voxel.biomeTint != VoxelBiomeTint.None){
+                Color tint = voxel.DisplayTint;
+                if (voxel.biomeTintMask){
+                    Color32 band = Average(voxel.biomeTintMask, out float coverage);
+                    color = Color.Lerp((Color)color, (Color)band * tint, coverage);
+                }
+                else{
+                    color = (Color)color * tint;
+                }
+            }
+
             _colors[voxel] = color;
             return color;
         }
 
-        private static Color32 Average(Texture2D texture){
+        /// <param name="coverage">The texture's mean alpha.</param>
+        private static Color32 Average(Texture2D texture, out float coverage){
             Color32[] pixels;
             if (texture.isReadable){
                 pixels = texture.GetPixels32(Mathf.Min(texture.mipmapCount - 1, 3)); // a small mip is enough
@@ -174,6 +190,7 @@ namespace Engine.Editor.WorldGen{
                 sum += new float4(p.r * a, p.g * a, p.b * a, a);
             }
 
+            coverage = pixels.Length > 0 ? sum.w / pixels.Length : 0f;
             if (sum.w <= 0f) return Unknown;
             float3 rgb = sum.xyz / sum.w;
             return new Color32((byte)rgb.x, (byte)rgb.y, (byte)rgb.z, 255);

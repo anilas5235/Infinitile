@@ -159,7 +159,7 @@ namespace Engine.Tests.PlayMode{
                 Voxel(2, "gpu build complete", VoxelProfilerMarkers.PointBuildComplete),
                 Voxel(3, "gpu build copy", VoxelProfilerMarkers.PointBuildCopy),
                 Voxel(2, "gpu build dispatch", VoxelProfilerMarkers.PointBuildDispatch),
-                Voxel(3, "water tint upload", VoxelProfilerMarkers.WaterTintUpload),
+                Voxel(3, "biome tint upload", VoxelProfilerMarkers.BiomeTintUpload),
                 Unity(1, "Update.ScriptRunDelayedDynamicFrameRate", "coroutines (focus check, the test)"),
                 Unity(1, "PreLateUpdate.ScriptRunBehaviourLateUpdate", "LateUpdate of all scripts"),
                 Voxel(2, "render buffer rebuild", VoxelProfilerMarkers.RenderRebuildBuffers),
