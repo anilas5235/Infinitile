@@ -75,6 +75,16 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
         [Tooltip("Target normalised height h in [0,1]; only used by the Terrain-first classifier.")]
         [Range(0f, 1f)] [SerializeField] public float TargetHeight = 0.5f;
 
+        [Tooltip("The target height is a floor: columns above it pay no height distance, only columns below it "
+                 + "(Terrain-first only). On for a biome that may hold every height from its target up, so a "
+                 + "neighbour with a higher target cannot win its summits by height alone.")]
+        [SerializeField] public bool TargetHeightIsFloor;
+
+        [Tooltip("Only columns under water may take this biome (Terrain-first only): a column whose top block is "
+                 + "dry never classifies to it, the next nearest biome takes it. On for Ocean.")]
+        [SerializeField] [UnityEngine.Serialization.FormerlySerializedAs("SubmergedOnly")]
+        public bool IsUnderwaterBiome;
+
         // --- Biome-first height parameters ----------------------------------------------------------------------------
 
         [Tooltip("Base height Offset_b in blocks.")]
@@ -109,6 +119,20 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
         /// <summary>Underwater fog colour of a new biome, and of a missing one.</summary>
         public static readonly Color DefaultWaterFogColor = new(0.02f, 0.3f, 1f);
+
+        // --- Grass and plants -----------------------------------------------------------------------------------------
+
+        [Tooltip("Mean colour of the biome-tinted grass (grass block tops and side bands) in this biome; blended over about 16 blocks at the border (DEC-122).")]
+        [SerializeField] public Color GrassColor = DefaultGrassColor;
+
+        [Tooltip("Mean colour of the biome-tinted plants (grass tufts, tall grass, ferns, reeds) in this biome; blended like the grass.")]
+        [SerializeField] public Color FoliageColor = DefaultFoliageColor;
+
+        /// <summary>Grass colour of a new biome, and of a missing one (Plains, #7cc24a).</summary>
+        public static readonly Color DefaultGrassColor = new(0x7c / 255f, 0xc2 / 255f, 0x4a / 255f);
+
+        /// <summary>Plant colour of a new biome, and of a missing one (Plains, #6aae3a).</summary>
+        public static readonly Color DefaultFoliageColor = new(0x6a / 255f, 0xae / 255f, 0x3a / 255f);
 
         public BiomeDef ToStruct(VoxelRegistry voxelRegistry){
             return ToStruct(v => voxelRegistry.GetIdOrThrow(v.GetFullName()));
@@ -153,6 +177,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                 targetErosion = TargetErosion,
                 targetPV = TargetPV,
                 targetElevation = TargetHeight,
+                elevationIsFloor = TargetHeightIsFloor ? (byte)1 : (byte)0,
+                isUnderwaterBiome = IsUnderwaterBiome ? (byte)1 : (byte)0,
                 heightOffset = HeightOffset,
                 heightAmplitude = HeightAmplitude,
                 jaggedness = Jaggedness,
@@ -230,6 +256,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
             /// <summary>Target normalised height h in [0,1].</summary>
             public float targetElevation;
+
+            /// <summary>1 when <see cref="targetElevation" /> is a floor: no height distance above it.</summary>
+            public byte elevationIsFloor;
+
+            /// <summary>1 when only submerged columns may take this biome (<see cref="Biome.IsUnderwaterBiome" />).</summary>
+            public byte isUnderwaterBiome;
 
             public float heightOffset;
             public float heightAmplitude;

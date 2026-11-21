@@ -80,6 +80,21 @@ namespace Engine.Scripts.WorldGen.Settings{
         /// <summary>λ_h; Terrain-first only.</summary>
         public float LambdaHeight;
 
+        /// <summary>
+        ///     Normalised 1D Gaussian weights (2r + 1) of the smoothed classification height
+        ///     (<see cref="Classify.ClassHeight" />); empty: Terrain-first classifies with the column's own H.
+        /// </summary>
+        public FixedList64Bytes<float> ClassHeightWeights;
+
+        /// <summary>Detail octaves in the macro height of the smoothed classification height.</summary>
+        public int ClassHeightOctaves;
+
+        /// <summary>True when the peak noise enters the macro height of the smoothed classification height.</summary>
+        [MarshalAs(UnmanagedType.U1)] public bool ClassHeightPeaks;
+
+        /// <summary>True when Terrain-first classifies with the smoothed height.</summary>
+        public bool SmoothsClassHeight => ClassHeightWeights.Length > 0;
+
         // --- Height -------------------------------------------------------------------------------------------------
         public float HeightMin;
         public float HeightMax;

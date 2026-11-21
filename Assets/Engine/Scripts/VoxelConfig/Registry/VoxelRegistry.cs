@@ -26,6 +26,9 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         private readonly TexRegistry _solidTexRegistry = new(200);
         private readonly TexRegistry _transparentTexRegistry = new(100);
 
+        // Side overlays of the biome-tinted voxels (Voxel.biomeTintMask); the shaders read their alpha (DEC-122)
+        private readonly TexRegistry _tintMaskRegistry = new(8);
+
         private readonly Registry<Voxel.VoxelDef> _voxelRenderDefRegistry = new(100);
         private readonly List<VolumeFogDef> _volumeFogs = new();
 
@@ -45,9 +48,39 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         /// </summary>
         public GraphicsBuffer VolumeFogBuffer{ get; private set; }
 
-        /// <summary>Bytes of the voxel definition, quad, texture pair and volume fog buffers.</summary>
+        /// <summary>Biome tint word per texture of the solid, transparent and foliage arrays (<c>_VoxelTexTint</c>).</summary>
+        private readonly GraphicsBuffer[] _texTintBuffers = new GraphicsBuffer[3];
+
+        private Texture2DArray _emptyTintMasks;
+
+        /// <summary>
+        ///     The tinted parts of the biome-tinted side faces, one slice per <see cref="Voxel.biomeTintMask" />, as the
+        ///     global <c>_VoxelTintMasks</c> (the shaders read the alpha); one clear slice when no voxel has a mask.
+        /// </summary>
+        public Texture2DArray TintMaskArray{ get; private set; }
+
+        /// <summary>Bytes of the voxel definition, quad, texture pair, volume fog and texture tint buffers.</summary>
         internal long GpuBytes => Render.GpuBytes.Of(VoxelRenderDefBuffer) + Render.GpuBytes.Of(QuadBuffer) +
-                                  Render.GpuBytes.Of(QuadTexPairBuffer) + Render.GpuBytes.Of(VolumeFogBuffer);
+                                  Render.GpuBytes.Of(QuadTexPairBuffer) + Render.GpuBytes.Of(VolumeFogBuffer) +
+                                  Render.GpuBytes.Of(_texTintBuffers[0]) + Render.GpuBytes.Of(_texTintBuffers[1]) +
+                                  Render.GpuBytes.Of(_texTintBuffers[2]);
+
+        /// <summary>The biome tint words of <paramref name="layer" />'s textures by texture index (tests, tools).</summary>
+        internal IReadOnlyList<uint> TexTintWords(MeshLayer layer){
+            return GetTexRegistry(layer)?.TintWords ?? Array.Empty<uint>();
+        }
+
+        /// <summary>Texture index of <paramref name="tex" /> in <paramref name="layer" />'s array; false when unused.</summary>
+        internal bool TryGetTextureIndex(Texture2D tex, MeshLayer layer, out ushort index){
+            index = 0;
+            TexRegistry registry = GetTexRegistry(layer);
+            return registry != null && registry.TryGetId(tex, out index);
+        }
+
+        /// <summary>Slice of <paramref name="mask" /> in <see cref="TintMaskArray" />; false when no voxel uses it.</summary>
+        internal bool TryGetTintMaskSlice(Texture2D mask, out ushort slice){
+            return _tintMaskRegistry.TryGetId(mask, out slice);
+        }
         public NativeHashMap<FixedString32Bytes, Voxel.VoxelDef> VoxelMap{ get; private set; }
 
         /// <summary>Number of base voxel ids (air included); the turned variants follow after them.</summary>
@@ -111,7 +144,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             int baseIndex = _quadTexPairs.Count;
             int texPairsAdded = 0;
             foreach ((QuadDefinition qDef, Texture2D tex) in definition.GetQuadsAndTextures(condition)){
-                ushort texId = RegisterTexture(tex, definition.meshLayer);
+                ushort texId = RegisterTexture(tex, definition.meshLayer, TintWord(definition, condition));
                 ushort quadId = _quadRegistry.Register(qDef);
                 _quadTexPairs.Add(quadId | ((uint)texId << 16));
                 texPairsAdded++;
@@ -201,7 +234,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                  condition++){
                 QuadDrawCondition turned = VoxelOrientation.Remap(condition, rotation);
                 foreach ((QuadDefinition qDef, Texture2D tex) in so.GetQuadsAndTextures(condition)){
-                    ushort texId = RegisterTexture(tex, so.meshLayer);
+                    ushort texId = RegisterTexture(tex, so.meshLayer, TintWord(so, condition));
                     ushort quadId = _quadRegistry.RegisterRotated(qDef, rotation);
                     (pairs[(int)turned] ??= new List<uint>()).Add(quadId | ((uint)texId << 16));
                 }
@@ -225,13 +258,37 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             return new uint2((uint)baseIndex, (uint)(_quadTexPairs.Count - baseIndex));
         }
 
-        private ushort RegisterTexture(Texture2D tex, MeshLayer meshLayer){
+        private ushort RegisterTexture(Texture2D tex, MeshLayer meshLayer, uint tintWord = 0u){
+            TexRegistry registry = GetTexRegistry(meshLayer);
+            return registry?.Register(tex, tintWord) ?? 0;
+        }
+
+        private TexRegistry GetTexRegistry(MeshLayer meshLayer){
             return meshLayer switch{
-                MeshLayer.Solid => _solidTexRegistry.Register(tex),
-                MeshLayer.Transparent => _transparentTexRegistry.Register(tex),
-                MeshLayer.Foliage => _foliageTexRegistry.Register(tex),
-                _ => 0
+                MeshLayer.Solid => _solidTexRegistry,
+                MeshLayer.Transparent => _transparentTexRegistry,
+                MeshLayer.Foliage => _foliageTexRegistry,
+                _ => null
             };
+        }
+
+        /// <summary>
+        ///     The biome tint word of <paramref name="so" />'s textures on the faces of <paramref name="condition" />
+        ///     (see <see cref="TexRegistry.TintWords" />); registers the side mask on first use. Leaves are not tinted
+        ///     (DEC-122), so a transparent voxel asking for a tint logs a warning and stays untinted.
+        /// </summary>
+        private uint TintWord(Voxel so, QuadDrawCondition condition){
+            (bool tinted, bool masked) = so.BiomeTintOf(condition);
+            if (!tinted) return 0u;
+            if (so.meshLayer == MeshLayer.Transparent){
+                VoxelEngineLogger.Warn<VoxelRegistry>(
+                    $"Voxel '{so.name}' asks for a biome tint on the transparent layer, which has none; drawn untinted.");
+                return 0u;
+            }
+
+            uint word = (uint)so.biomeTint & 3u;
+            if (masked) word |= 4u | ((uint)_tintMaskRegistry.Register(so.biomeTintMask) << 16);
+            return word;
         }
 
         /// <summary>
@@ -250,6 +307,28 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             _transparentTexRegistry.PrepareArray();
             _foliageTexRegistry.PrepareArray();
             _quadRegistry.PrepareArray();
+            PrepareTintMasks();
+        }
+
+        private void PrepareTintMasks(){
+            _tintMaskRegistry.PrepareArray();
+            Texture2DArray masks = _tintMaskRegistry.TextureArray;
+            if (!masks){
+                // No masked voxel: one clear slice, so the global is never unbound
+                if (!_emptyTintMasks){
+                    _emptyTintMasks = new Texture2DArray(4, 4, 1, TextureFormat.RGBA32, false){
+                        name = "VoxelTintMasks (empty)", filterMode = FilterMode.Point,
+                        hideFlags = HideFlags.HideAndDontSave
+                    };
+                    _emptyTintMasks.SetPixels32(new Color32[16], 0);
+                    _emptyTintMasks.Apply(false, true);
+                }
+
+                masks = _emptyTintMasks;
+            }
+
+            TintMaskArray = masks;
+            Shader.SetGlobalTexture(VoxelTintMasksNameID, masks);
         }
 
         private void PrepareGeneratiionData(){
@@ -311,6 +390,15 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                 new GraphicsBuffer(Target.Structured, _volumeFogs.Count, Marshal.SizeOf<VolumeFogDef>());
             VolumeFogBuffer.SetData(_volumeFogs);
             Shader.SetGlobalBuffer(VoxelVolumeFogNameID, VolumeFogBuffer);
+
+            for (int layer = 0; layer < _texTintBuffers.Length; layer++){
+                IReadOnlyList<uint> words = TexTintWords((MeshLayer)layer);
+                uint[] data = new uint[Math.Max(words.Count, 1)];
+                for (int i = 0; i < words.Count; i++) data[i] = words[i];
+                _texTintBuffers[layer]?.Dispose();
+                _texTintBuffers[layer] = new GraphicsBuffer(Target.Structured, data.Length, sizeof(uint));
+                _texTintBuffers[layer].SetData(data);
+            }
         }
 
         /// <summary>
@@ -418,6 +506,8 @@ namespace Engine.Scripts.VoxelConfig.Registry{
                     VoxelEngineLogger.Error<VoxelRegistry>("Texture array is null, cannot assign to material.");
 
                 material.SetBuffer(QuadBufferNameID, QuadBuffer);
+                GraphicsBuffer tint = (int)solid < _texTintBuffers.Length ? _texTintBuffers[(int)solid] : null;
+                if (tint != null) material.SetBuffer(VoxelTexTintNameID, tint);
             }
             else
                 VoxelEngineLogger.Error<VoxelRegistry>("Voxel material is null, cannot assign texture array.");
@@ -443,6 +533,15 @@ namespace Engine.Scripts.VoxelConfig.Registry{
             QuadBuffer?.Dispose();
             QuadTexPairBuffer?.Dispose();
             VolumeFogBuffer?.Dispose();
+            for (int layer = 0; layer < _texTintBuffers.Length; layer++){
+                _texTintBuffers[layer]?.Dispose();
+                _texTintBuffers[layer] = null;
+            }
+
+            _tintMaskRegistry.DestroyArray();
+            if (_emptyTintMasks) CoreUtils.Destroy(_emptyTintMasks);
+            _emptyTintMasks = null;
+            TintMaskArray = null;
             if (VoxelMap.IsCreated) VoxelMap.Dispose();
             _solidTexRegistry.DestroyArray();
             _transparentTexRegistry.DestroyArray();
@@ -455,7 +554,7 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         /// </summary>
         internal struct VolumeFogDef{
             public float3 Tint; // multiplied onto the texture, or onto the biome water colour
-            public float BiomeTint; // 1 = colour by _VoxelWaterTint (world tint map), 0 = texture colour
+            public float BiomeTint; // 1 = colour by the water layer of _VoxelBiomeTint (BiomeTintMap), 0 = texture colour
             public float DepthFade; // blocks of scene behind the surface over which alpha rises to DepthAlpha, 0 = off
             public float DepthAlpha; // alpha reached over DepthFade blocks, never below the surface alpha
             public float FlowSpeed; // pattern scroll in blocks per second

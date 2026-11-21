@@ -235,7 +235,7 @@ namespace Engine.Tests.EditMode{
                 Assert.AreEqual(FloraVoxelClass.Leaves, cfg.VoxelClassOf(Id("std:LeavesBirch")));
                 Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:Reeds")));
                 Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:Fern")));
-                Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:GrassFTallDry")));
+                Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:GrassFTall")));
                 // Round 2 (2026-11-10): the Swamp's own bush leaves and grass plant.
                 Assert.AreEqual(FloraVoxelClass.Leaves, cfg.VoxelClassOf(Id("std:LeavesBushSwamp")));
                 Assert.AreEqual(FloraVoxelClass.Foliage, cfg.VoxelClassOf(Id("std:GrassFSwamp")));
@@ -383,7 +383,7 @@ namespace Engine.Tests.EditMode{
                 Voxel meadowVoxel = biomes[mountain].MeadowBlock;
                 Assert.AreEqual(biomes[mountain].StoneBlock, biomes[mountain].UnderBlock, "stone under the meadow");
                 Assert.AreEqual(biomes[mountain].StoneBlock.all, meadowVoxel.bottom, "meadow block: stone tile below");
-                Assert.AreEqual("stone_grass_taiga", meadowVoxel.side ? meadowVoxel.side.name : null, "meadow block: stone side");
+                Assert.AreEqual("stone_grass_tint", meadowVoxel.side ? meadowVoxel.side.name : null, "meadow block: stone side");
                 Assert.AreEqual(0, cfg.Biomes[mountain].soilGround);
                 Assert.AreEqual(Id(biomes[mountain].MeadowBlock.GetFullName().ToString()), cfg.Biomes[mountain].meadowBlock);
                 int spruce = System.Array.IndexOf(settings.FloraSpeciesNames(), "Spruce");
@@ -467,7 +467,8 @@ namespace Engine.Tests.EditMode{
             // hash of the anchor, so every variant is checked at all sampled columns; rare species (boulders) have
             // too few anchors in the sample to pick each of their variants there. A species the stride-8 sample
             // misses (a boulder every 25 000 to 100 000 columns, a few expected in the sample) gets a second pass at
-            // stride 1 over the 512² window where the biome of its most likely rule covers the most sampled columns.
+            // stride 1 over the 512² windows where the biome of its most likely rule covers the most sampled columns,
+            // densest first, up to four of them (since DEC-120 Badlands is rarer and one window of it can miss BoulderRed).
             LoadPackages();
             WorldGenConfig cfg = ShippedConfig(out WorldGenSettings settings);
             const int n = 512;
@@ -494,9 +495,11 @@ namespace Engine.Tests.EditMode{
                 List<string> passes = new();
                 for (int t = 0; t < grown.Length; t++){
                     if (grown[t] > 0) continue;
-                    int2 origin = DensestWindow(cfg, LikeliestBiome(cfg, t), buffers.HardBiome, request, n / 8);
-                    grown[t] = CountTree(cfg, treeOf, t, origin, n);
-                    passes.Add($"{settings.ActiveBiomes()[LikeliestBiome(cfg, t)].name} window at {origin} at stride 1 for tree {t}");
+                    foreach (int2 origin in DensestWindows(LikeliestBiome(cfg, t), buffers.HardBiome, request, n / 8).Take(4)){
+                        grown[t] = CountTree(cfg, treeOf, t, origin, n);
+                        passes.Add($"{settings.ActiveBiomes()[LikeliestBiome(cfg, t)].name} window at {origin} at stride 1 for tree {t}");
+                        if (grown[t] > 0) break;
+                    }
                 }
 
                 string summary = string.Join(", ", treeOf.Select(kv => {
@@ -535,26 +538,24 @@ namespace Engine.Tests.EditMode{
         }
 
         /// <summary>
-        ///     Block origin of the <paramref name="window" /> × <paramref name="window" /> sample window (in samples of
-        ///     <paramref name="request" />) in which <paramref name="biome" /> is the hard biome of the most columns.
+        ///     Block origins of the <paramref name="window" /> × <paramref name="window" /> sample windows (in samples of
+        ///     <paramref name="request" />) in which <paramref name="biome" /> is the hard biome of some column, the
+        ///     window with the most such columns first (ties keep the scan order).
         /// </summary>
-        private static int2 DensestWindow(in WorldGenConfig cfg, int biome, NativeArray<int> hardBiome, in WorldGenRequest request,
-            int window){
-            int n = request.Size.x, best = -1;
-            int2 origin = default;
+        private static List<int2> DensestWindows(int biome, NativeArray<int> hardBiome, in WorldGenRequest request, int window){
+            int n = request.Size.x;
+            List<(int count, int2 origin)> windows = new();
             for (int wx = 0; wx + window <= n; wx += window)
             for (int wz = 0; wz + window <= n; wz += window){
                 int count = 0;
                 for (int ix = wx; ix < wx + window; ix++)
                 for (int iz = wz; iz < wz + window; iz++)
                     if (hardBiome[iz * n + ix] == biome) count++;
-                if (count <= best) continue;
-                best = count;
-                origin = request.Origin + new int2(wx, wz) * request.Stride;
+                if (count > 0) windows.Add((count, request.Origin + new int2(wx, wz) * request.Stride));
             }
 
-            Assert.Greater(best, 0, $"biome {biome} is the hard biome of some sampled column");
-            return origin;
+            Assert.Greater(windows.Count, 0, $"biome {biome} is the hard biome of some sampled column");
+            return windows.OrderByDescending(w => w.count).Select(w => w.origin).ToList();
         }
 
         /// <summary>Columns of the <paramref name="size" />² block window at <paramref name="origin" /> that grow tree species <paramref name="tree" />.</summary>

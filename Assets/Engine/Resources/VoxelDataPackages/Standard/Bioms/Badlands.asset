@@ -26,11 +26,13 @@ MonoBehaviour:
   BeachBlock: {fileID: 11400000, guid: 9cf114b1c56383b448012d6a5b9d8b72, type: 2}
   BeachHeight: 3
   TargetHumidity: 0.03
-  TargetTemperature: 0.7
+  TargetTemperature: 0.9
   TargetContinental: 0.64
   TargetErosion: 0.3
   TargetPV: 0.4
-  TargetHeight: 0.64
+  TargetHeight: 0.95
+  TargetHeightIsFloor: 1
+  IsUnderwaterBiome: 0
   HeightOffset: 160
   HeightAmplitude: 18
   OctaveWeights:
@@ -85,3 +87,5 @@ MonoBehaviour:
   RepresentativeColor: {r: 0.86, g: 0.38, b: 0.14, a: 1}
   WaterColor: {r: 0.29, g: 0.47, b: 0.81, a: 1}
   WaterFogColor: {r: 0.07, g: 0.3, b: 0.88, a: 1}
+  GrassColor: {r: 0.627451, g: 0.5411765, b: 0.3058824, a: 1}
+  FoliageColor: {r: 0.5843137, g: 0.4980392, b: 0.2666667, a: 1}

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73ce5c2ac5ec3364a915ef3d1b97af22, type: 3}
   m_Name: Swamp
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.VoxelConfig.Data.Generation.Biome
-  TopBlock: {fileID: 11400000, guid: c65a98430aabac12d43726aee43c0ed4, type: 2}
+  TopBlock: {fileID: 11400000, guid: 2e8eca1efe0447d4b845f277ce2ada8f, type: 2}
   UnderwaterTopBlock: {fileID: 11400000, guid: 4c5d16a533e33ceca25a4271e39d70aa, type: 2}
   UnderBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
@@ -195,3 +195,5 @@ MonoBehaviour:
   RepresentativeColor: {r: 0.42, g: 0.33, b: 0.18, a: 1}
   WaterColor: {r: 0.32, g: 0.44, b: 0.3, a: 1}
   WaterFogColor: {r: 0.18, g: 0.3, b: 0.16, a: 1}
+  GrassColor: {r: 0.4313725, g: 0.4784314, b: 0.227451, a: 1}
+  FoliageColor: {r: 0.3607843, g: 0.4156863, b: 0.1882353, a: 1}

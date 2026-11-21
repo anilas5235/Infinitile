@@ -10,8 +10,19 @@ namespace Engine.Scripts.VoxelConfig.Registry{
     ///     Registers textures for voxel definitions and builds a shared <see cref="Texture2DArray" /> atlas.
     /// </summary>
     internal class TexRegistry : Registry<Texture2D>, IResourceRegistry<Texture2D>{
+        private readonly List<uint> _tintWords;
         private TextureFormat _texFormat;
-        public TexRegistry(int initCapacity) : base(initCapacity){ }
+
+        public TexRegistry(int initCapacity) : base(initCapacity){
+            _tintWords = new List<uint>(initCapacity);
+        }
+
+        /// <summary>
+        ///     The biome tint word of every registered texture by index (<c>_VoxelTexTint</c>, DEC-122): bits 0-1 the
+        ///     tint map layer (0 = none, see <see cref="Data.Voxel.VoxelBiomeTint" />), bit 2 set when the tint goes
+        ///     through a mask, bits 16-31 the mask's slice in the mask array.
+        /// </summary>
+        public IReadOnlyList<uint> TintWords => _tintWords;
 
         private static int TextureSize => VoxelRegistry.TextureSize;
 
@@ -26,6 +37,31 @@ namespace Engine.Scripts.VoxelConfig.Registry{
         /// <param name="tex">Texture to register.</param>
         /// <returns>Assigned texture index.</returns>
         public override ushort Register(Texture2D tex){
+            return Register(tex, 0u);
+        }
+
+        /// <summary>
+        ///     Registers a texture with its biome tint word (<see cref="TintWords" />). A texture registered again
+        ///     with another word keeps its first one and logs an error: a texture is tinted one way wherever it is
+        ///     drawn.
+        /// </summary>
+        public ushort Register(Texture2D tex, uint tintWord){
+            if (tex && TryGetId(tex, out ushort known)){
+                if (_tintWords[known] != tintWord){
+                    VoxelEngineLogger.Error<TexRegistry>(
+                        $"Texture '{tex.name}' is used with two biome tints (0x{_tintWords[known]:X} and " +
+                        $"0x{tintWord:X}); it keeps the first. Give the other voxel its own texture.");
+                }
+
+                return known;
+            }
+
+            ushort id = RegisterNew(tex);
+            _tintWords.Add(tintWord);
+            return id;
+        }
+
+        private ushort RegisterNew(Texture2D tex){
             if (!tex) throw new ArgumentNullException(nameof(tex), "Cannot register a null texture.");
 
             if (tex.width != TextureSize || tex.height != TextureSize){

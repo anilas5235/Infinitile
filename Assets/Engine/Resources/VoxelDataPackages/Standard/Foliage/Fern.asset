@@ -19,6 +19,8 @@ MonoBehaviour:
   alwaysRenderAllFaces: 0
   depthFadeDistance: -1
   surfaceAlpha: 1
+  biomeTint: 2
+  biomeTintMask: {fileID: 0}
   glow: 0
   lightAttenuation: 0
   lightEmission: {x: 0, y: 0, z: 0}
@@ -41,5 +43,5 @@ MonoBehaviour:
   right: {fileID: 0}
   left: {fileID: 0}
   side: {fileID: 0}
-  all: {fileID: 2800000, guid: b965166bc77302eddeaf501c3edad695, type: 3}
+  all: {fileID: 2800000, guid: dd48509bff9c4578887f00ea10b2f350, type: 3}
   collision: 0

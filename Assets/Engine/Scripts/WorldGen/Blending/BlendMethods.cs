@@ -1,3 +1,4 @@
+using Engine.Scripts.WorldGen.Classify;
 using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Burst;
@@ -33,11 +34,11 @@ namespace Engine.Scripts.WorldGen.Blending{
             switch (method){
                 case BlendMethod.DistanceBlend:
                     return height
-                        ? Kernel(p, cfg.HeightKernel, cfg.HeightTaps, cache.Unwarped, false, cfg)
-                        : Kernel(p, cfg.MaterialKernel, cfg.MaterialTaps, cache.Unwarped, false, cfg);
+                        ? Kernel(p, cfg.HeightKernel, cfg.HeightTaps, cache.Unwarped, false, cfg, cache.ClassHeight)
+                        : Kernel(p, cfg.MaterialKernel, cfg.MaterialTaps, cache.Unwarped, false, cfg, cache.ClassHeight);
                 case BlendMethod.DistortedBoundary:
                     return height
-                        ? Kernel(p, cfg.HeightKernel, cfg.HeightTaps, cache.Warped, true, cfg)
+                        ? Kernel(p, cfg.HeightKernel, cfg.HeightTaps, cache.Warped, true, cfg, cache.ClassHeight)
                         : BlendWeights.OneHot(WarpedClass(p, hard, cfg, cache.Warped));
                 case BlendMethod.ParameterSpaceWeighting:
                     return ParameterSpace(distancesSq, hard, height ? cfg.HeightSigma : cfg.MaterialSigma, cfg.BiomeCount);
@@ -71,10 +72,11 @@ namespace Engine.Scripts.WorldGen.Blending{
         ///     The taps are read from <paramref name="lattice" /> when it covers the window and evaluated
         ///     directly otherwise; both walk the same tap list in the same order, so the results are
         ///     bit-identical. A window without a boundary point returns one-hot weights without the sum,
-        ///     which equals the full sum exactly.
+        ///     which equals the full sum exactly. <paramref name="classHeight" /> caches the smoothed classification
+        ///     height (DEC-121) for the direct path; when it does not cover the window a small one is built for it.
         /// </summary>
         public static BlendWeights Kernel(int2 p, in KernelSet kernel, in NativeArray<KernelTap> taps,
-            in BlendLattice lattice, bool warped, in WorldGenConfig cfg){
+            in BlendLattice lattice, bool warped, in WorldGenConfig cfg, in ClassHeightGrid classHeight){
             int phase = kernel.Phase(p.x, p.y);
             int start = kernel.PhaseStart[phase];
             int end = start + kernel.PhaseCount[phase];
@@ -89,12 +91,20 @@ namespace Engine.Scripts.WorldGen.Blending{
                 }
             }
             else{
+                // Each tap would otherwise build its own smoothed-height grid; one for the window gives the same bits.
+                bool own = !warped && cfg.SmoothsClassHeight && cfg.Architecture == GenArchitecture.TerrainFirst
+                           && !classHeight.CoversWindow(p, kernel.Reach);
+                ClassHeightGrid window = own
+                    ? ClassHeightGrid.Build(p - kernel.Reach, p + kernel.Reach, cfg, Allocator.Temp)
+                    : classHeight;
                 for (int t = start; t < end; t++){
                     KernelTap tap = taps[t];
                     float2 q = p + tap.Offset;
-                    int cls = warped ? WorldSampler.ClassifyWarpedAt(q, cfg) : WorldSampler.ClassifyAt(q, cfg);
+                    int cls = warped ? WorldSampler.ClassifyWarpedAt(q, cfg) : WorldSampler.ClassifyAt(q, cfg, window);
                     Accumulate(ref acc, ref total, cls, tap.K);
                 }
+
+                if (own) window.Dispose();
             }
 
             int count = cfg.BiomeCount;

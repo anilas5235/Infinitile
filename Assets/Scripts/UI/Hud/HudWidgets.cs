@@ -11,9 +11,9 @@ namespace UI{
         private static readonly Color32 LeftTint = new(206, 206, 206, 255);
         private static readonly Color32 RightTint = new(160, 160, 160, 255);
 
-        private Texture2D _top, _side;
+        private Texture2D _top, _side, _overlay;
         private bool _flat;
-        private Color _tint = Color.white;
+        private Color _tint = Color.white, _sideTint = Color.white, _overlayTint = Color.white;
 
         public BlockIcon(){
             pickingMode = PickingMode.Ignore;
@@ -22,13 +22,19 @@ namespace UI{
 
         /// <summary>
         ///     Shows a cube with these textures, or one flat texture; null textures draw nothing. tint multiplies
-        ///     every face (a liquid's colour on its grey pattern); white when null.
+        ///     every face (a liquid's colour on its grey pattern); white when null. sideTint, when set, multiplies
+        ///     the side faces instead, and overlay is drawn over both side faces multiplied by overlayTint (a
+        ///     biome-tinted grass side: the dirt untinted, the grass band through its overlay, DEC-122).
         /// </summary>
-        public void Set(Texture2D top, Texture2D side, bool flat, Color? tint = null){
+        public void Set(Texture2D top, Texture2D side, bool flat, Color? tint = null, Color? sideTint = null,
+            Texture2D overlay = null, Color? overlayTint = null){
             _top = top;
             _side = side ? side : top;
             _flat = flat;
             _tint = tint ?? Color.white;
+            _sideTint = sideTint ?? _tint;
+            _overlay = overlay;
+            _overlayTint = overlayTint ?? _tint;
             MarkDirtyRepaint();
         }
 
@@ -44,7 +50,7 @@ namespace UI{
                 float fx = rect.x + (rect.width - size) * 0.5f, fy = rect.y + (rect.height - size) * 0.5f;
                 // half a pixel in from every edge: the tiles repeat, so a sample on the edge would pick up the
                 // opposite edge (a plant's opaque stem base drew a dashed line along the icon's top)
-                Quad(context, _top, Tinted(TopTint), new Vector2(fx, fy), new Vector2(fx + size, fy),
+                Quad(context, _top, Tinted(TopTint, _tint), new Vector2(fx, fy), new Vector2(fx + size, fy),
                     new Vector2(fx + size, fy + size), new Vector2(fx, fy + size), 0.5f / size);
                 return;
             }
@@ -60,13 +66,16 @@ namespace UI{
             Vector2 top = new(cx, y0), leftTop = new(x0, side), rightTop = new(right, side);
             Vector2 centre = new(cx, mid), leftBottom = new(x0, side + edge), rightBottom = new(right, side + edge);
             Vector2 low = new(cx, mid + edge);
-            Quad(context, _top, Tinted(TopTint), leftTop, top, rightTop, centre);
-            Quad(context, _side, Tinted(LeftTint), leftTop, centre, low, leftBottom);
-            Quad(context, _side, Tinted(RightTint), centre, rightTop, rightBottom, low);
+            Quad(context, _top, Tinted(TopTint, _tint), leftTop, top, rightTop, centre);
+            Quad(context, _side, Tinted(LeftTint, _sideTint), leftTop, centre, low, leftBottom);
+            Quad(context, _side, Tinted(RightTint, _sideTint), centre, rightTop, rightBottom, low);
+            if (!_overlay) return;
+            Quad(context, _overlay, Tinted(LeftTint, _overlayTint), leftTop, centre, low, leftBottom);
+            Quad(context, _overlay, Tinted(RightTint, _overlayTint), centre, rightTop, rightBottom, low);
         }
 
-        private Color32 Tinted(Color32 shade){
-            return (Color)shade * _tint;
+        private static Color32 Tinted(Color32 shade, Color tint){
+            return (Color)shade * tint;
         }
 
         /// <summary>One textured quad; corners clockwise from the texture's top left; inset pulls the texture in.</summary>

@@ -19,10 +19,10 @@ MonoBehaviour:
   SnowTopBlock: {fileID: 11400000, guid: dda8a6f1ece6d0243a39b247a2bd2a75, type: 2}
   FreezesWater: 1
   StrataBlock: {fileID: 11400000, guid: 2a1844411e45fba40a1da565a805687e, type: 2}
-  MeadowBlock: {fileID: 11400000, guid: 87c154a10b3d49b784bb1a879ff4c314, type: 2}
+  MeadowBlock: {fileID: 11400000, guid: 353f140206970744e9856f0241ad4fae, type: 2}
   BeachBlock: {fileID: 0}
   BeachHeight: 3
-  TargetHumidity: 0.5
+  TargetHumidity: 0.35
   TargetTemperature: 0.25
   TargetContinental: 0.62
   TargetErosion: 0.3
@@ -94,3 +94,5 @@ MonoBehaviour:
   RepresentativeColor: {r: 0.7207546, g: 0.7207546, b: 0.7207546, a: 1}
   WaterColor: {r: 0.25, g: 0.47, b: 0.88, a: 1}
   WaterFogColor: {r: 0.03, g: 0.31, b: 1, a: 1}
+  GrassColor: {r: 0.4784314, g: 0.654902, b: 0.4784314, a: 1}
+  FoliageColor: {r: 0.4196078, g: 0.6039216, b: 0.4196078, a: 1}

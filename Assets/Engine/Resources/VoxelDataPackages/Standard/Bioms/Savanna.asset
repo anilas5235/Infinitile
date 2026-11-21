@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73ce5c2ac5ec3364a915ef3d1b97af22, type: 3}
   m_Name: Savanna
   m_EditorClassIdentifier: Assembly-CSharp::Engine.Scripts.VoxelConfig.Data.Generation.Biome
-  TopBlock: {fileID: 11400000, guid: fc6fd7c9f9e5d4ece5862e15801580a6, type: 2}
+  TopBlock: {fileID: 11400000, guid: 2e8eca1efe0447d4b845f277ce2ada8f, type: 2}
   UnderwaterTopBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
   UnderBlock: {fileID: 11400000, guid: 6ee03e35bc53849489d1e199949d41c1, type: 2}
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
@@ -87,3 +87,5 @@ MonoBehaviour:
   RepresentativeColor: {r: 0.78, g: 0.66, b: 0.32, a: 1}
   WaterColor: {r: 0.26, g: 0.48, b: 0.83, a: 1}
   WaterFogColor: {r: 0.04, g: 0.31, b: 0.93, a: 1}
+  GrassColor: {r: 0.7215686, g: 0.6901961, b: 0.3058824, a: 1}
+  FoliageColor: {r: 0.6588235, g: 0.6117647, b: 0.2352941, a: 1}

@@ -1013,8 +1013,9 @@ of the scene behind, no depth fade to opaque, no Snell's window, no opaque colou
 - **Biome per column.** The chunk job keeps the hard biome of every column with the chunk
   (`ChunkVoxelData.Biomes`, 32 × 32 bytes, index `z + x × 32`, `ChunkJob.WriteBiomes`), freed with the chunk.
   `Biome.WaterColor` and `Biome.WaterFogColor` give each biome its colours; `VoxelWorld` keeps them in config
-  order (`BiomeWaterColors`, `BiomeWaterFogColor`, `BiomeColorsVersion`).
-- **World tint map** (`WaterTintMap`). A repeating sRGB texture with one texel per block column, `2 × draw
+  order (`BiomeWaterColors`, `BiomeWaterFogColor`, `BiomeColorsVersion`; since Version 1.13 the colours are a
+  `BiomeTintPalette`).
+- **World tint map** (`WaterTintMap`; Version 1.13 replaces it with `BiomeTintMap`, see there). A repeating sRGB texture with one texel per block column, `2 × draw
   distance + 4` chunks a side (28 chunks, 896² texels, 4.2 MB with mips at draw distance 12; 68 chunks, 24.9 MB at 32). A chunk owns the slot its position falls on (`((c mod N) + N) mod N` per axis); the drawn square never
   puts two chunks on one slot. `VoxelWorldRenderer` writes a chunk's colours before it builds the chunk's first
   partition (`EnsureWaterTint`, marker `Voxel.GpuUpload.WaterTint`): 1,024 pixels into a 32 × 32 staging texture,
@@ -1072,3 +1073,71 @@ of the scene behind, no depth fade to opaque, no Snell's window, no opaque colou
   longer on average (the liquid pass), the main thread is unchanged within the spread, and the tint upload costs
   0.016 ms per frame on average (p95 0.099 ms) in the 80 u/s flight. The underwater fog pass is not in this run
   (the rig stays above the terrain).
+
+# Version 1.13 (Biome Grass and Plant Tint)
+
+## Description
+
+The owner asked for the per-biome colour of the water on grass and plants as well (WorldGenSpec DEC-122,
+2026-11-20): grass tops and sides and the green plants take a biome colour, Minecraft style, from grey tiles. Tree
+leaves are not tinted (spec idea 16.8 stays open); flowers, mushrooms, rocks, wheat, the torch and the dead plants
+(GrassFDead, DeadBush) keep their colours. Version 1.13 extends the water tint of Version 1.12 to three layers.
+
+- **Palette** (`BiomeTintPalette`). Per layer (0 water, 1 grass, 2 plants, the values of `VoxelBiomeTint`) the
+  colour of every biome in config order, kept in linear light, and a default per layer (`Biome.DefaultWaterColor`,
+  `DefaultGrassColor` #7cc24a, `DefaultFoliageColor` #6aae3a: the Plains colours) for columns without a biome or a
+  biome the palette lacks. `Biome.GrassColor` and `Biome.FoliageColor` are new fields; every shipped biome has its
+  pair (plants a shade darker than the grass). `VoxelWorld.BiomeTintPalette` is rebuilt with a new version when
+  the biomes change.
+- **Tint map** (`BiomeTintMap`, was `WaterTintMap`). A repeating sRGB `Tex2DArray` render texture with one slice
+  per layer and one texel per 4 × 4 block columns (8 × 8 texels a chunk, the mean of its 16 columns in linear
+  light), `2 × draw distance + 4` chunks a side: 224² texels × 3 slices, 0.6 MB at draw distance 12 (Version 1.12:
+  4.2 MB with mips), 3.6 MB at 32. No mips: the texels are what the old blend mip held, so `UpdateMips` and its
+  `LateUpdate` call are gone. A chunk's three blocks go into one 8 × 24 staging texture (`FillPixels`, pixel
+  `x + (z + layer × 8) × 8`) and from there with three `Graphics.CopyTexture` calls into its slot; the slices are
+  cleared to the layer defaults. `VoxelWorldRenderer.EnsureBiomeTint` writes the chunk and its eight neighbours
+  that are loaded before the chunk's first partition is built (marker `Voxel.GpuUpload.BiomeTint`), so a chunk
+  border never blends with the default colour. Globals `_VoxelBiomeTint` (the array) and `_VoxelBiomeTintParams`
+  (x = 1 / size in blocks). `biome_tint_color(positionWS, layer)` in `VoxelShaderCommon.hlsl` takes the four
+  bilinear taps two blocks apart from mip 0 (the same blend over about 16 blocks); the liquid shader reads slice 0.
+- **Which texture is tinted.** The packed point data has no free bit, so the tint goes by texture: the registry
+  keeps a tint word per texture of each texture array (`TexRegistry.TintWords`, `_VoxelTexTint`, a
+  `StructuredBuffer<uint>` per layer material): bits 0–1 the layer, bit 2 masked, bits 16–31 the slice of the mask
+  in `_VoxelTintMasks` (a `Texture2DArray` of the voxels' `biomeTintMask` overlays, one clear slice when there is
+  none). A texture registered again with another word keeps its first and logs an error, so every voxel that shares
+  a tile is tinted the same way. A transparent voxel asking for a tint logs a warning and stays untinted.
+- **Face rule** (`Voxel.BiomeTintOf`). One texture for every face (AllSame, AllUnique): every face, through the
+  mask if one is set. Top/bottom/sides or six sides: the top fully, the bottom never, the sides through the mask,
+  or fully without one. Turned variants use the original face.
+- **Shaders.** `SolidVoxel.shader` and `CutoutVoxel.shader` run `vert_tinted` in the forward pass only (the depth
+  passes keep `vert`): it reads the word and, for a tinted texture, the biome colour / `TINT_GREY_MEAN` (0.70) into
+  a `float3` varying, with the mask slice as a `nointerpolation uint`. The fragment shader multiplies the albedo
+  before AO and light, `albedo × lerp(1, tint, mask alpha)`, the mask sampled with the albedo's gradients (taken
+  outside the branch). An untinted texture costs the buffer read in the vertex shader and nothing per pixel.
+- **Grey tiles** (`Docs/Tools/make_tint_tiles.py`, from the Kenney tiles). Every tinted pixel is turned grey with
+  its relative luminance kept and the mean scaled to a linear 0.70, so a biome colour is the mean the tinted part
+  shows before light. A grass side has its grass band greyed and an overlay with alpha 255 on that band and 0 on the
+  dirt (DXT5); the solid tiles are saved without alpha (DXT1). Tiles: `grass_top_tint` (Grass and StoneGrassy tops),
+  `dirt_grass_tint` + overlay, `stone_grass_tint` + overlay, `grass1_tint` (GrassFSwamp), `grass2_tint` (Fern),
+  `grass3_tint` (GrassFTall), `grass4_tint` (GrassF, Reeds), `grass_tan_tint` (GrassFDry).
+- **Folded blocks.** With the colour from the biome, the per-biome grass blocks were the same block: GrassDry,
+  GrassJungle, GrassSwamp and GrassTaiga are now Grass; StoneGrassyTaiga is StoneGrassy (now tinted too);
+  GrassFTallDry and GrassFTallJungle are one GrassFTall. Their tiles are gone from `make_tiles.py`.
+- **Icons and tools.** `Voxel.DisplayTint` is the default layer colour / 0.70 for a tinted voxel;
+  `DisplaySideTint` is white when the overlay carries the tint. `BlockIcon.Set` takes a side tint and an overlay
+  drawn over both side faces, so a grass icon shows green on the top and on the band and brown dirt. The world-gen
+  preview colours tinted voxels the same way (`PreviewSlice.ColorOf`); the voxel inspector shows `biomeTint` and,
+  when set, `biomeTintMask`.
+- **Tests.** `BiomeTintTests` (palette defaults and config order; tint map size and slot wrap; the pixel layout per
+  layer, the linear 4 × 4 mean and the defaults; ensure/forget/new palette; every slice of a written chunk read back
+  from the GPU; no allocation; the face rule and the icon tints; tint words and mask slices of the registry, the
+  clear fallback slice, a texture with two tints, a tinted transparent voxel; the shipped voxels, the folded blocks,
+  the grey tiles' mean, the overlays' binary alpha and the biome colours). The tint map tests left
+  `WaterRenderingTests`.
+- **Measured** (2026-11-21, Editor, unattended: the owner was away, the Editor was brought to the front by script
+  and stayed there; `FrameTimeGoal_MainThread_IsAttributed` at draw distance 12, uncapped; master, branch, branch,
+  master): the frame p95 stays within the run spread (standing 20–40 s 4.14 / 4.33 ms master, 4.22 / 4.13 ms branch;
+  flight 80 u/s 7.50 / 7.75 and 7.74 / 7.59 ms; flight 40 u/s 6.38 / 6.88 and 6.54 / 6.53 ms). The GPU frame is
+  0.13 ms longer standing (3.11 → 3.24 ms on average). The tint upload (`Voxel.GpuUpload.BiomeTint`, under the GPU
+  build dispatch, outside the scheduler budget) is about five times the water-only upload: in the 80 u/s flight
+  0.080 ms per frame on average, p95 0.46 ms, max 1.9 ms (master 0.016 / 0.10 / 0.47 ms).

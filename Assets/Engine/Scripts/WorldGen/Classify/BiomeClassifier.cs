@@ -12,6 +12,12 @@ namespace Engine.Scripts.WorldGen.Classify{
     /// </summary>
     [BurstCompile]
     public static class BiomeClassifier{
+        /// <summary>
+        ///     Distance of a biome a column may not take (an underwater biome on a dry column). Finite, so the
+        ///     parameter-space blend weight exp(−(d − d_min)/2σ²) is exactly 0 without an infinity.
+        /// </summary>
+        public const float Excluded = 1e30f;
+
         /// <summary>5D squared distance of the column fields to biome <paramref name="b" />.</summary>
         public static float DistanceSquared(in WorldFields f, in Biome.BiomeDef b, in WorldGenConfig cfg){
             float dT = f.T - b.targetTemperature;
@@ -26,9 +32,13 @@ namespace Engine.Scripts.WorldGen.Classify{
                    + cfg.LambdaPV * dPV * dPV;
         }
 
-        /// <summary>6D squared distance including normalised height <paramref name="h" /> (Terrain-first).</summary>
+        /// <summary>
+        ///     6D squared distance including normalised height <paramref name="h" /> (Terrain-first). A biome whose
+        ///     target height is a floor (<c>elevationIsFloor</c>) pays no height distance above its target.
+        /// </summary>
         public static float DistanceSquared(in WorldFields f, float h, in Biome.BiomeDef b, in WorldGenConfig cfg){
             float dH = h - b.targetElevation;
+            if (b.elevationIsFloor != 0 && dH > 0f) dH = 0f;
             return DistanceSquared(f, b, cfg) + cfg.LambdaHeight * dH * dH;
         }
 
@@ -55,12 +65,23 @@ namespace Engine.Scripts.WorldGen.Classify{
         ///     per column and shared by the hard class and method 4.
         /// </summary>
         public static int Distances(in WorldFields f, float h, bool withHeight, in WorldGenConfig cfg, out BlendWeights distancesSq){
+            return Distances(f, h, withHeight, false, cfg, out distancesSq);
+        }
+
+        /// <summary>
+        ///     <see cref="Distances(in WorldFields,float,bool,in WorldGenConfig,out BlendWeights)" /> for a column whose top
+        ///     block is <paramref name="dry" /> (not under water): a <see cref="Biome.BiomeDef.isUnderwaterBiome" /> biome then
+        ///     gets <see cref="Excluded" /> and never wins.
+        /// </summary>
+        public static int Distances(in WorldFields f, float h, bool withHeight, bool dry, in WorldGenConfig cfg,
+            out BlendWeights distancesSq){
             distancesSq = default;
             int count = cfg.BiomeCount;
             int best = -1;
             float bestDistance = float.MaxValue;
             for (int b = 0; b < count; b++){
-                float d = withHeight ? DistanceSquared(f, h, cfg.Biomes[b], cfg) : DistanceSquared(f, cfg.Biomes[b], cfg);
+                float d = dry && cfg.Biomes[b].isUnderwaterBiome != 0 ? Excluded
+                    : withHeight ? DistanceSquared(f, h, cfg.Biomes[b], cfg) : DistanceSquared(f, cfg.Biomes[b], cfg);
                 distancesSq[b] = d;
                 if (d < bestDistance){
                     bestDistance = d;
@@ -73,10 +94,19 @@ namespace Engine.Scripts.WorldGen.Classify{
 
         /// <summary>Hard 6D classification with normalised height (Terrain-first), same tie rule.</summary>
         public static int Classify(in WorldFields f, float h, in WorldGenConfig cfg){
+            return Classify(f, h, false, cfg);
+        }
+
+        /// <summary>
+        ///     <see cref="Classify(in WorldFields,float,in WorldGenConfig)" /> for a column whose top block is
+        ///     <paramref name="dry" />: <see cref="Biome.BiomeDef.isUnderwaterBiome" /> biomes are skipped then.
+        /// </summary>
+        public static int Classify(in WorldFields f, float h, bool dry, in WorldGenConfig cfg){
             int count = cfg.BiomeCount;
             int best = -1;
             float bestDistance = float.MaxValue;
             for (int b = 0; b < count; b++){
+                if (dry && cfg.Biomes[b].isUnderwaterBiome != 0) continue;
                 float d = DistanceSquared(f, h, cfg.Biomes[b], cfg);
                 if (d < bestDistance){
                     bestDistance = d;
