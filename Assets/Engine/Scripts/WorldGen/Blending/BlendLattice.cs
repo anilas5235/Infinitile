@@ -1,4 +1,5 @@
 using System;
+using Engine.Scripts.WorldGen.Classify;
 using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Collections;
@@ -40,10 +41,11 @@ namespace Engine.Scripts.WorldGen.Blending{
 
         /// <summary>
         ///     Classifies every lattice point that a kernel with reach <paramref name="reach" /> can touch from a
-        ///     column in [<paramref name="minColumn" />, <paramref name="maxColumn" />] (inclusive).
+        ///     column in [<paramref name="minColumn" />, <paramref name="maxColumn" />] (inclusive), reading the smoothed
+        ///     classification height from <paramref name="classHeight" /> where it covers a point.
         /// </summary>
         public static BlendLattice Build(int2 minColumn, int2 maxColumn, int reach, int stride, bool warped,
-            in WorldGenConfig cfg, Allocator allocator){
+            in WorldGenConfig cfg, in ClassHeightGrid classHeight, Allocator allocator){
             int2 lo = FloorDiv(minColumn - reach, stride);
             int2 hi = FloorDiv(maxColumn + reach, stride);
             BlendLattice lattice = new(){
@@ -58,7 +60,7 @@ namespace Engine.Scripts.WorldGen.Blending{
             for (int j = 0; j < lattice.Size.y; j++)
             for (int i = 0; i < lattice.Size.x; i++){
                 float2 q = lattice.Origin + new int2(i, j) * stride;
-                int cls = warped ? WorldSampler.ClassifyWarpedAt(q, cfg) : WorldSampler.ClassifyAt(q, cfg);
+                int cls = warped ? WorldSampler.ClassifyWarpedAt(q, cfg) : WorldSampler.ClassifyAt(q, cfg, classHeight);
                 lattice.Classes[j * lattice.Size.x + i] = (sbyte)cls;
             }
 
@@ -155,8 +157,17 @@ namespace Engine.Scripts.WorldGen.Blending{
         /// <summary>Most water probes a cache remembers; a larger area (a zoomed-out preview) probes directly.</summary>
         private const int MaxWaterProbes = 1 << 16;
 
+        /// <summary>Most smoothed classification-height nodes a cache holds; a larger area samples them directly.</summary>
+        private const int MaxClassHeightNodes = 1 << 18;
+
         public BlendLattice Unwarped;
         public BlendLattice Warped;
+
+        /// <summary>
+        ///     Smoothed classification heights (DEC-121) for the columns and every unwarped kernel tap of the block;
+        ///     default when the smoothing is off or the block is too large to cache.
+        /// </summary>
+        public ClassHeightGrid ClassHeight;
 
         /// <summary>
         ///     Water probe cells <see cref="WaterProbeOrigin" /> + (i, j) at [j × WaterProbeSize.x + i]: 0 not probed yet,
@@ -209,10 +220,20 @@ namespace Engine.Scripts.WorldGen.Blending{
                 latticeMax = (cache.WaterProbeOrigin + cache.WaterProbeSize - 1) * SurfaceCover.WaterProbeStride;
             }
 
+            if (!biomeFirst && cfg.SmoothsClassHeight){
+                long nodes = (long)((latticeMax.x - latticeMin.x + 2 * unwarpedReach) / Classify.ClassHeight.NodeStride + 3)
+                             * ((latticeMax.y - latticeMin.y + 2 * unwarpedReach) / Classify.ClassHeight.NodeStride + 3);
+                if (nodes <= MaxClassHeightNodes)
+                    cache.ClassHeight = ClassHeightGrid.Build(latticeMin - unwarpedReach, latticeMax + unwarpedReach, cfg,
+                        allocator);
+            }
+
             if (Worthwhile(unwarpedStride, unwarpedTaps, columnStep))
-                cache.Unwarped = BlendLattice.Build(latticeMin, latticeMax, unwarpedReach, unwarpedStride, false, cfg, allocator);
+                cache.Unwarped = BlendLattice.Build(latticeMin, latticeMax, unwarpedReach, unwarpedStride, false, cfg,
+                    cache.ClassHeight, allocator);
             if (Worthwhile(warpedStride, warpedTaps, columnStep))
-                cache.Warped = BlendLattice.Build(latticeMin, latticeMax, warpedReach, warpedStride, true, cfg, allocator);
+                cache.Warped = BlendLattice.Build(latticeMin, latticeMax, warpedReach, warpedStride, true, cfg,
+                    cache.ClassHeight, allocator);
             return cache;
         }
 
@@ -232,6 +253,7 @@ namespace Engine.Scripts.WorldGen.Blending{
         public void Dispose(){
             Unwarped.Dispose();
             Warped.Dispose();
+            ClassHeight.Dispose();
             if (WaterProbes.IsCreated) WaterProbes.Dispose();
         }
     }

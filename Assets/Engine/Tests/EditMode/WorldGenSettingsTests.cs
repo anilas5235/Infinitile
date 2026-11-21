@@ -98,7 +98,20 @@ namespace Engine.Tests.EditMode{
             Assert.AreNotEqual(baseline, changedLambda);
 
             s.Biomes.Biomes[0].Jaggedness = 3f;
-            Assert.AreNotEqual(changedLambda, s.ToCanonicalJson(), "inlined biome fields take part");
+            string changedBiome = s.ToCanonicalJson();
+            Assert.AreNotEqual(changedLambda, changedBiome, "inlined biome fields take part");
+
+            s.Biomes.Biomes[0].IsUnderwaterBiome = true;
+            string changedSubmerged = s.ToCanonicalJson();
+            Assert.AreNotEqual(changedBiome, changedSubmerged, "the underwater flag takes part");
+            s.BiomeHeightSmoothing = 64f;
+            string changedSmoothing = s.ToCanonicalJson();
+            Assert.AreNotEqual(changedSubmerged, changedSmoothing, "the classification smoothing takes part");
+            s.BiomeHeightOctaves = 3;
+            string changedOctaves = s.ToCanonicalJson();
+            Assert.AreNotEqual(changedSmoothing, changedOctaves, "its octave count takes part");
+            s.BiomeHeightPeaks = true;
+            Assert.AreNotEqual(changedOctaves, s.ToCanonicalJson(), "its peak switch takes part");
 
             Assert.AreNotEqual(s.ToCanonicalJson(), s.ToCanonicalJson(42), "seed overload adds the seed");
             StringAssert.Contains("\"Seed\": 42", s.ToCanonicalJson(42));
@@ -121,6 +134,35 @@ namespace Engine.Tests.EditMode{
         }
 
         // --- Terrain-first config -----------------------------------------------------------------------------------
+
+        [Test]
+        public void ToConfig_CarriesTheClassificationSmoothing(){
+            WorldGenSettings s = Settings(Biome("Plains", 6f, new[]{ 1f }));
+            s.Architecture = GenArchitecture.TerrainFirst;
+            s.Splines = Create<TerrainSplineSet>("Splines");
+            s.Splines.ResetToPlaceholders();
+            WorldGenConfig off = s.ToConfig(1);
+            try{
+                Assert.IsFalse(off.SmoothsClassHeight, "σ 0 by default: the class reads the column height");
+            }
+            finally{
+                off.Dispose();
+            }
+
+            s.BiomeHeightSmoothing = 64f;
+            s.BiomeHeightOctaves = 2;
+            s.BiomeHeightPeaks = true;
+            WorldGenConfig on = s.ToConfig(1);
+            try{
+                Assert.IsTrue(on.SmoothsClassHeight);
+                Assert.AreEqual(7, on.ClassHeightWeights.Length, "r = ceil(1.5 · 64 / 32) = 3");
+                Assert.AreEqual(2, on.ClassHeightOctaves);
+                Assert.IsTrue(on.ClassHeightPeaks);
+            }
+            finally{
+                on.Dispose();
+            }
+        }
 
         [Test]
         public void ToConfig_TerrainFirst_FlattensTheSplinesAndWarnsAboutAHeightMethod(){
@@ -373,6 +415,12 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(0.35f, def.targetErosion);
             Assert.AreEqual(0.3f, def.targetPV);
             Assert.AreEqual(0.85f, def.targetElevation);
+            Assert.AreEqual(0, def.elevationIsFloor, "the height target is two-sided by default");
+            b.TargetHeightIsFloor = true;
+            Assert.AreEqual(1, b.ToStruct().elevationIsFloor);
+            Assert.AreEqual(0, def.isUnderwaterBiome, "any column may take a biome by default");
+            b.IsUnderwaterBiome = true;
+            Assert.AreEqual(1, b.ToStruct().isUnderwaterBiome);
             Assert.AreEqual(158f, def.heightOffset);
             Assert.AreEqual(14f, def.heightAmplitude);
             Assert.AreEqual(15f, def.jaggedness);
