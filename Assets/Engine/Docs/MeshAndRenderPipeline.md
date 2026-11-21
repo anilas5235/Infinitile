@@ -1134,3 +1134,10 @@ leaves are not tinted (spec idea 16.8 stays open); flowers, mushrooms, rocks, wh
   clear fallback slice, a texture with two tints, a tinted transparent voxel; the shipped voxels, the folded blocks,
   the grey tiles' mean, the overlays' binary alpha and the biome colours). The tint map tests left
   `WaterRenderingTests`.
+- **Measured** (2026-11-21, Editor, unattended: the owner was away, the Editor was brought to the front by script
+  and stayed there; `FrameTimeGoal_MainThread_IsAttributed` at draw distance 12, uncapped; master, branch, branch,
+  master): the frame p95 stays within the run spread (standing 20–40 s 4.14 / 4.33 ms master, 4.22 / 4.13 ms branch;
+  flight 80 u/s 7.50 / 7.75 and 7.74 / 7.59 ms; flight 40 u/s 6.38 / 6.88 and 6.54 / 6.53 ms). The GPU frame is
+  0.13 ms longer standing (3.11 → 3.24 ms on average). The tint upload (`Voxel.GpuUpload.BiomeTint`, under the GPU
+  build dispatch, outside the scheduler budget) is about five times the water-only upload: in the 80 u/s flight
+  0.080 ms per frame on average, p95 0.46 ms, max 1.9 ms (master 0.016 / 0.10 / 0.47 ms).
