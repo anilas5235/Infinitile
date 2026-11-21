@@ -122,13 +122,14 @@ namespace Engine.Tests.Performance{
         ///     Give the biomes the placeholder flora rules (and solid top blocks, so plants can stand on
         ///     them); the species are in-memory voxels and a tree like the shipped one, with ids from 6 upwards.
         /// </param>
+        /// <param name="configure">Changes the settings before they become the config (null: the placeholder settings).</param>
         internal static GeneratorConfig CreatePlaceholderGeneratorConfig(GenArchitecture architecture, BlendMethod method,
-            Allocator allocator, List<Object> created, bool flora = false){
+            Allocator allocator, List<Object> created, bool flora = false, System.Action<WorldGenSettings> configure = null){
             Dictionary<Voxel, ushort> ids = new();
             System.Func<Voxel, ushort> voxelId = null;
             if (flora) voxelId = v => v ? ids[v] : (ushort)0;
             return CreatePlaceholderGeneratorConfig(architecture, method, allocator, created,
-                flora ? set => AddPlaceholderFlora(set, ids, created) : null, voxelId);
+                flora ? set => AddPlaceholderFlora(set, ids, created) : null, voxelId, configure);
         }
 
         /// <summary>
@@ -161,7 +162,8 @@ namespace Engine.Tests.Performance{
         }
 
         private static GeneratorConfig CreatePlaceholderGeneratorConfig(GenArchitecture architecture, BlendMethod method,
-            Allocator allocator, List<Object> created, System.Action<BiomeSet> addFlora, System.Func<Voxel, ushort> voxelId){
+            Allocator allocator, List<Object> created, System.Action<BiomeSet> addFlora, System.Func<Voxel, ushort> voxelId,
+            System.Action<WorldGenSettings> configure = null){
             GeneratorConfig config = CreateGeneratorConfig(allocator);
             config.WorldGen.Dispose(); // replaced by the six-biome world below
 
@@ -181,6 +183,7 @@ namespace Engine.Tests.Performance{
             settings.Biomes = set;
 
             addFlora?.Invoke(set);
+            configure?.Invoke(settings);
             config.WorldGen = settings.ToConfigWithVoxelIds(Seed, voxelId, allocator);
             for (int b = 0; b < config.WorldGen.BiomeCount; b++){
                 Biome.BiomeDef def = config.WorldGen.Biomes[b];

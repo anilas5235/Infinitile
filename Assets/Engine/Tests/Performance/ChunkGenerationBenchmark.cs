@@ -123,6 +123,25 @@ namespace Engine.Tests.Performance{
         }
 
         /// <summary>
+        ///     The Terrain-first flora world of <see cref="ChunkJob_Run_PerMethod_WithFlora_MsPerChunk" /> with
+        ///     DistanceBlend, classified on the column's own height (σ 0) or on the shipped smoothed class height (σ 64,
+        ///     two detail octaves, peaks; DEC-121, DEC-123), so the difference is the cost of the smoothed nodes.
+        /// </summary>
+        [Test]
+        [Performance]
+        public void ChunkJob_Run_ClassHeight_MsPerChunk([Values(0f, 64f)] float sigma){
+            BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
+            _config = BenchmarkFixtures.CreatePlaceholderGeneratorConfig(GenArchitecture.TerrainFirst, BlendMethod.DistanceBlend,
+                Allocator.Persistent, _created, true, s => {
+                    s.BiomeHeightSmoothing = sigma;
+                    s.BiomeHeightOctaves = 2;
+                    s.BiomeHeightPeaks = true;
+                });
+            Assert.AreEqual(sigma > 0f, _config.WorldGen.SmoothsClassHeight);
+            MeasurePerChunk($"ChunkJob.Run TerrainFirst DistanceBlend flora class height sigma {sigma:F0} ms/chunk");
+        }
+
+        /// <summary>
         ///     The flora world of <see cref="ChunkJob_Run_PerMethod_WithFlora_MsPerChunk" /> with DistanceBlend, where every
         ///     biome has a snow top block, freezing water and a strata block, so each column also decides snow, ice and
         ///     strata shift and every stone voxel is tested against the bands.

@@ -27,6 +27,8 @@ MonoBehaviour:
   TargetErosion: 0.5
   TargetPV: 0
   TargetHeight: 0.36
+  TargetHeightIsFloor: 0
+  IsUnderwaterBiome: 1
   HeightOffset: 100
   HeightAmplitude: 6
   OctaveWeights:
