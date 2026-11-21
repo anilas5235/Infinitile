@@ -836,7 +836,7 @@ flowchart LR
   (`Classify/ClassHeight.cs`, DEC-121): the spline height with only the first `BiomeHeightOctaves` detail octaves, plus
   the peaks J · P with `BiomeHeightPeaks` (shipped on, DEC-123), on raw nodes every 32 blocks, a separable Gaussian over those nodes, read bilinearly. `BlendCache` holds a
   `ClassHeightGrid` for the chunk or tile and every unwarped kernel tap of it; the pure path builds a small grid for the
-  position, with the same bits. A biome with `SubmergedOnly` (Ocean) is excluded on a dry column, i.e. one whose top block
+  position, with the same bits. A biome with `IsUnderwaterBiome` (Ocean) is excluded on a dry column, i.e. one whose top block
   floor(H) is at or above WaterLevel − 1 (`WorldSampler.IsDry`). A `HeightMethod` other than None is ignored with a
   warning in Terrain-first.
 - **Spline asset** (`WorldGen/Settings/TerrainSplineSet.cs`): a `ScriptableObject` with named splines, three root

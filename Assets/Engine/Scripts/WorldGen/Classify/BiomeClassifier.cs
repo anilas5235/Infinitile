@@ -13,7 +13,7 @@ namespace Engine.Scripts.WorldGen.Classify{
     [BurstCompile]
     public static class BiomeClassifier{
         /// <summary>
-        ///     Distance of a biome a column may not take (a submerged-only biome on a dry column). Finite, so the
+        ///     Distance of a biome a column may not take (an underwater biome on a dry column). Finite, so the
         ///     parameter-space blend weight exp(−(d − d_min)/2σ²) is exactly 0 without an infinity.
         /// </summary>
         public const float Excluded = 1e30f;
@@ -70,7 +70,7 @@ namespace Engine.Scripts.WorldGen.Classify{
 
         /// <summary>
         ///     <see cref="Distances(in WorldFields,float,bool,in WorldGenConfig,out BlendWeights)" /> for a column whose top
-        ///     block is <paramref name="dry" /> (not under water): a <see cref="Biome.BiomeDef.submergedOnly" /> biome then
+        ///     block is <paramref name="dry" /> (not under water): a <see cref="Biome.BiomeDef.isUnderwaterBiome" /> biome then
         ///     gets <see cref="Excluded" /> and never wins.
         /// </summary>
         public static int Distances(in WorldFields f, float h, bool withHeight, bool dry, in WorldGenConfig cfg,
@@ -80,7 +80,7 @@ namespace Engine.Scripts.WorldGen.Classify{
             int best = -1;
             float bestDistance = float.MaxValue;
             for (int b = 0; b < count; b++){
-                float d = dry && cfg.Biomes[b].submergedOnly != 0 ? Excluded
+                float d = dry && cfg.Biomes[b].isUnderwaterBiome != 0 ? Excluded
                     : withHeight ? DistanceSquared(f, h, cfg.Biomes[b], cfg) : DistanceSquared(f, cfg.Biomes[b], cfg);
                 distancesSq[b] = d;
                 if (d < bestDistance){
@@ -99,14 +99,14 @@ namespace Engine.Scripts.WorldGen.Classify{
 
         /// <summary>
         ///     <see cref="Classify(in WorldFields,float,in WorldGenConfig)" /> for a column whose top block is
-        ///     <paramref name="dry" />: <see cref="Biome.BiomeDef.submergedOnly" /> biomes are skipped then.
+        ///     <paramref name="dry" />: <see cref="Biome.BiomeDef.isUnderwaterBiome" /> biomes are skipped then.
         /// </summary>
         public static int Classify(in WorldFields f, float h, bool dry, in WorldGenConfig cfg){
             int count = cfg.BiomeCount;
             int best = -1;
             float bestDistance = float.MaxValue;
             for (int b = 0; b < count; b++){
-                if (dry && cfg.Biomes[b].submergedOnly != 0) continue;
+                if (dry && cfg.Biomes[b].isUnderwaterBiome != 0) continue;
                 float d = DistanceSquared(f, h, cfg.Biomes[b], cfg);
                 if (d < bestDistance){
                     bestDistance = d;

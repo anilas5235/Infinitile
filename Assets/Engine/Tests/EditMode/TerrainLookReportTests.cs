@@ -204,7 +204,7 @@ namespace Engine.Tests.EditMode{
                             b.TargetTemperature, b.TargetHumidity, b.TargetContinental, b.TargetErosion, b.TargetPV, b.TargetHeight
                         },
                         ["HeightIsFloor"] = b.TargetHeightIsFloor,
-                        ["SubmergedOnly"] = b.SubmergedOnly
+                        ["IsUnderwaterBiome"] = b.IsUnderwaterBiome
                     }).ToList(),
                     ["Splines"] = settings.Splines.ToTree()
                 };

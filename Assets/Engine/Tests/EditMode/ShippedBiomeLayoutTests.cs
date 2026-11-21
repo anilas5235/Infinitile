@@ -179,11 +179,11 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void ShippedSettings_OceanOnlyUnderWater(){
             // DEC-121 (owner 2026-11-20: "ocean biom should never be on colum that is above water level"). The Ocean
-            // climate reaches dry ground along the coasts (3.4 % of land before); Ocean is submerged-only, so those
+            // climate reaches dry ground along the coasts (3.4 % of land before); Ocean is an underwater biome, so those
             // columns take the next nearest biome. Without the flag the same window does have dry Ocean columns.
             WorldGenSettings shipped = LoadShipped();
             int ocean = System.Array.IndexOf(shipped.Biomes.Names(), "Ocean");
-            Assert.IsTrue(shipped.Biomes.Biomes[ocean].SubmergedOnly, "Ocean is submerged-only");
+            Assert.IsTrue(shipped.Biomes.Biomes[ocean].IsUnderwaterBiome, "Ocean is an underwater biome");
 
             int Dry(WorldGenSettings settings, out int oceanColumns){
                 WorldGenConfig cfg = settings.ToConfig(TestFixtures.Seed);
@@ -219,7 +219,7 @@ namespace Engine.Tests.EditMode{
             Biome oceanCopy = Object.Instantiate(shipped.Biomes.Biomes[ocean]);
             try{
                 oceanCopy.name = shipped.Biomes.Biomes[ocean].name;
-                oceanCopy.SubmergedOnly = false;
+                oceanCopy.IsUnderwaterBiome = false;
                 copy.Biomes.Biomes[ocean] = oceanCopy;
                 int dryWithout = Dry(copy, out int oceanWithout);
                 TestContext.WriteLine($"Ocean columns {oceanShipped}, dry {dryShipped}; without the flag {oceanWithout}, dry {dryWithout}");

@@ -607,15 +607,15 @@ namespace Engine.Tests.EditMode{
             }
         }
 
-        // --- Smoothed classification height and submerged-only biomes (DEC-121) --------------------------------------
+        // --- Smoothed classification height and underwater biomes (DEC-121) --------------------------------------
 
-        /// <summary>Terrain-first placeholder settings with the shipped smoothing (σ 64, two octaves, peaks) and Ocean submerged-only.</summary>
+        /// <summary>Terrain-first placeholder settings with the shipped smoothing (σ 64, two octaves, peaks) and Ocean as an underwater biome.</summary>
         private WorldGenConfig SmoothedConfig(int seed, BlendMethod material, int octaves = 2){
             WorldGenSettings s = Settings(GenArchitecture.TerrainFirst, material, BlendMethod.None);
             s.BiomeHeightSmoothing = 64f;
             s.BiomeHeightOctaves = octaves;
             s.BiomeHeightPeaks = true;
-            s.Biomes.Biomes[5].SubmergedOnly = true;
+            s.Biomes.Biomes[5].IsUnderwaterBiome = true;
             return Config(seed, s);
         }
 
@@ -725,7 +725,7 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void ClassHeight_SmoothedChunksAreBitIdenticalToThePureSampler(){
             // The ChunkJob path (one cache with the class-height grid per chunk) against the pure sampler, which builds
-            // its own small grids, with the smoothing on and Ocean submerged-only.
+            // its own small grids, with the smoothing on and Ocean as an underwater biome.
             WorldGenConfig cfg = SmoothedConfig(111, BlendMethod.DistanceBlend);
             const int chunkCount = 8, columnsPerChunk = ChunkWidth * ChunkDepth;
             Unity.Mathematics.Random rng = new(29);
@@ -787,7 +787,7 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void SubmergedOnly_DryColumnsNeverTakeTheBiome(){
+        public void UnderwaterBiome_DryColumnsNeverTakeTheBiome(){
             // DEC-121: Ocean only where the top block is under water (the shipped climate, where the rule also has
             // dry Ocean-climate columns to move, is ShippedBiomeLayoutTests.ShippedSettings_OceanOnlyUnderWater).
             WorldGenConfig cfg = SmoothedConfig(1337, BlendMethod.None);

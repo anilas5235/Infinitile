@@ -82,7 +82,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
         [Tooltip("Only columns under water may take this biome (Terrain-first only): a column whose top block is "
                  + "dry never classifies to it, the next nearest biome takes it. On for Ocean.")]
-        [SerializeField] public bool SubmergedOnly;
+        [SerializeField] [UnityEngine.Serialization.FormerlySerializedAs("SubmergedOnly")]
+        public bool IsUnderwaterBiome;
 
         // --- Biome-first height parameters ----------------------------------------------------------------------------
 
@@ -163,7 +164,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                 targetPV = TargetPV,
                 targetElevation = TargetHeight,
                 elevationIsFloor = TargetHeightIsFloor ? (byte)1 : (byte)0,
-                submergedOnly = SubmergedOnly ? (byte)1 : (byte)0,
+                isUnderwaterBiome = IsUnderwaterBiome ? (byte)1 : (byte)0,
                 heightOffset = HeightOffset,
                 heightAmplitude = HeightAmplitude,
                 jaggedness = Jaggedness,
@@ -245,8 +246,8 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
             /// <summary>1 when <see cref="targetElevation" /> is a floor: no height distance above it.</summary>
             public byte elevationIsFloor;
 
-            /// <summary>1 when only submerged columns may take this biome (<see cref="Biome.SubmergedOnly" />).</summary>
-            public byte submergedOnly;
+            /// <summary>1 when only submerged columns may take this biome (<see cref="Biome.IsUnderwaterBiome" />).</summary>
+            public byte isUnderwaterBiome;
 
             public float heightOffset;
             public float heightAmplitude;

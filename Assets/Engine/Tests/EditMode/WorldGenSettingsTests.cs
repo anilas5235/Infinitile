@@ -101,9 +101,9 @@ namespace Engine.Tests.EditMode{
             string changedBiome = s.ToCanonicalJson();
             Assert.AreNotEqual(changedLambda, changedBiome, "inlined biome fields take part");
 
-            s.Biomes.Biomes[0].SubmergedOnly = true;
+            s.Biomes.Biomes[0].IsUnderwaterBiome = true;
             string changedSubmerged = s.ToCanonicalJson();
-            Assert.AreNotEqual(changedBiome, changedSubmerged, "the submerged-only flag takes part");
+            Assert.AreNotEqual(changedBiome, changedSubmerged, "the underwater flag takes part");
             s.BiomeHeightSmoothing = 64f;
             string changedSmoothing = s.ToCanonicalJson();
             Assert.AreNotEqual(changedSubmerged, changedSmoothing, "the classification smoothing takes part");
@@ -418,9 +418,9 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(0, def.elevationIsFloor, "the height target is two-sided by default");
             b.TargetHeightIsFloor = true;
             Assert.AreEqual(1, b.ToStruct().elevationIsFloor);
-            Assert.AreEqual(0, def.submergedOnly, "any column may take a biome by default");
-            b.SubmergedOnly = true;
-            Assert.AreEqual(1, b.ToStruct().submergedOnly);
+            Assert.AreEqual(0, def.isUnderwaterBiome, "any column may take a biome by default");
+            b.IsUnderwaterBiome = true;
+            Assert.AreEqual(1, b.ToStruct().isUnderwaterBiome);
             Assert.AreEqual(158f, def.heightOffset);
             Assert.AreEqual(14f, def.heightAmplitude);
             Assert.AreEqual(15f, def.jaggedness);

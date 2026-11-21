@@ -32,7 +32,7 @@ MonoBehaviour:
   TargetPV: 0.4
   TargetHeight: 0.95
   TargetHeightIsFloor: 1
-  SubmergedOnly: 0
+  IsUnderwaterBiome: 0
   HeightOffset: 160
   HeightAmplitude: 18
   OctaveWeights:

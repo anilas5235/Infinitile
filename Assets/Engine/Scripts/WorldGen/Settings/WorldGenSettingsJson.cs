@@ -246,7 +246,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["TargetPV"] = b.TargetPV,
                 ["TargetHeight"] = b.TargetHeight,
                 ["TargetHeightIsFloor"] = b.TargetHeightIsFloor,
-                ["SubmergedOnly"] = b.SubmergedOnly,
+                ["IsUnderwaterBiome"] = b.IsUnderwaterBiome,
                 ["HeightOffset"] = b.HeightOffset,
                 ["HeightAmplitude"] = b.HeightAmplitude,
                 ["OctaveWeights"] = b.OctaveWeights ?? Array.Empty<float>(),

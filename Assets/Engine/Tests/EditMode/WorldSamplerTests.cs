@@ -257,12 +257,12 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void Classifier_SubmergedOnlyBiomeNeverWinsADryColumn(){
-            // DEC-121: a submerged-only biome is excluded on a dry column (the next nearest wins) and classifies as
+        public void Classifier_UnderwaterBiomeNeverWinsADryColumn(){
+            // DEC-121: an underwater biome is excluded on a dry column (the next nearest wins) and classifies as
             // usual under water; the forwarding overloads treat the column as submerged.
             Biome sea = Biome("Sea", .5f, .5f, .5f, .5f, 0f, 100, 1, new[]{ 1f }, 0);
             Biome land = Biome("Land", .9f, .9f, .9f, .9f, 0f, 140, 1, new[]{ 1f }, 0);
-            sea.SubmergedOnly = true;
+            sea.IsUnderwaterBiome = true;
             WorldGenConfig cfg = Config(1, GenArchitecture.TerrainFirst, sea, land);
             WorldFields f = new(){ T = .5f, F = .5f, C = .5f, E = .5f, PV = 0f };
             Assert.AreEqual(0, BiomeClassifier.Classify(f, .3f, false, cfg), "under water: nearest");

@@ -91,7 +91,7 @@ namespace Engine.Scripts.WorldGen.Core{
                 TerrainFirstHeight.Sample(p, s.Fields, cfg, out s.TerrainParams, out s.Height, out unclamped);
                 s.NormalizedHeight = NormalizedHeight(s.Height, cfg);
                 // The class reads the smoothed height when configured (DEC-121); a dry column never takes a
-                // submerged-only biome such as Ocean.
+                // underwater biome such as Ocean.
                 float classHeight = cfg.SmoothsClassHeight
                     ? NormalizedHeight(ClassHeight.Sample(p, cfg, cache.ClassHeight), cfg)
                     : s.NormalizedHeight;
