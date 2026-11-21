@@ -14,8 +14,9 @@ namespace UI{
     ///     the debug panels (player, world, the block looked at; frame, streaming, GPU memory, culling) and the Esc
     ///     menu. All keys and gamepad buttons come from the "Hud" map of the project's input actions (see
     ///     <see cref="HudInput" />): TogglePanels (F3) shows and hides the panels, Inventory (E, gamepad Select) opens
-    ///     the inventory, Menu (Esc, gamepad Start) closes the inventory or opens and closes the menu. The cursor is
-    ///     free only while the inventory or the menu is open.
+    ///     the inventory, Console (T, or typing "/") opens the command console, Menu (Esc, gamepad Start) closes the
+    ///     console or the inventory, or opens and closes the menu. The cursor is free only while the inventory, the
+    ///     console or the menu is open.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public partial class HudController : MonoBehaviour{
@@ -76,6 +77,7 @@ namespace UI{
             BuildHotbar();
             BindInventory();
             BindMenu();
+            BindConsole();
             GameSettings.ApplyFrameCapAtStart();
             if (voxelEditor) voxelEditor.OnVoxelIdChanged += OnVoxelIdChanged;
             SetDebugPanels(showDebugPanels);
@@ -88,6 +90,7 @@ namespace UI{
 
         private void OnDisable(){
             if (voxelEditor) voxelEditor.OnVoxelIdChanged -= OnVoxelIdChanged;
+            UnbindConsole();
             UnbindInventory();
             UnbindMenu();
             SaveBlocks();
@@ -104,6 +107,7 @@ namespace UI{
 
             if (!_blocksLoaded) LoadBlocks(); // the registry fills in the DataImporter's Awake
             HandleInput();
+            UpdateConsole();
 
             if (Time.unscaledTime < _nextRefresh) return;
             _nextRefresh = Time.unscaledTime + refreshInterval;
@@ -128,6 +132,7 @@ namespace UI{
             _hotbarScroll = map?.FindAction("HotbarScroll");
             _hotbarPrevious = map?.FindAction("HotbarPrevious");
             _hotbarNext = map?.FindAction("HotbarNext");
+            _consoleAction = map?.FindAction("Console");
             BindInventoryInput(map);
         }
 
@@ -137,7 +142,11 @@ namespace UI{
 
         private void HandleInput(){
             if (Pressed(_togglePanels)) SetDebugPanels(!showDebugPanels);
-            if (_invOpen){
+            if (_consoleOpen){
+                // every other key types into the line
+                if (Pressed(_menuAction)) SetConsole(false);
+            }
+            else if (_invOpen){
                 // Letters and digits type into the search field and the Inventory key does not close it: only the
                 // menu key, the gamepad's Back and the close button do.
                 if (Pressed(_menuAction)) SetInventory(false);
@@ -149,8 +158,13 @@ namespace UI{
             else if (!_menuOpen && Pressed(_inventory)){
                 SetInventory(true);
             }
+            else if (!_menuOpen && ConsoleOpenPressed(out string consoleText)){
+                ShowConsole(true, consoleText);
+            }
 
-            bool cursorFree = _invOpen || _menuOpen;
+            // a "/" typed anywhere else (the inventory's search field) opens nothing later
+            _slashTyped = false;
+            bool cursorFree = _invOpen || _menuOpen || _consoleOpen;
             if (cursorFree != _cursorFree) SetCursorFree(cursorFree);
 
             if (_cursorFree) return;
@@ -177,7 +191,7 @@ namespace UI{
 
         /// <summary>
         ///     Shows what goes with the current state: the menu hides the panels, hints, hotbar and crosshair; the
-        ///     inventory hides the crosshair.
+        ///     inventory and the console hide the crosshair.
         /// </summary>
         private void UpdateLayers(){
             bool play = !_menuOpen;
@@ -185,7 +199,7 @@ namespace UI{
             Show(_debugRight, PanelsVisible);
             Show(_hintRow, play);
             Show(_hotbarArea, play);
-            Show(_crosshair, play && !_invOpen);
+            Show(_crosshair, play && !_invOpen && !_consoleOpen);
             if (VoxelWorldRenderer.Instance) VoxelWorldRenderer.Instance.CollectCullingStats = PanelsVisible;
             RefreshHints();
         }
@@ -207,7 +221,7 @@ namespace UI{
         }
 
         /// <summary>
-        ///     Unlocks the cursor and stops looking and editing while the inventory or the menu is open.
+        ///     Unlocks the cursor and stops looking and editing while the inventory, the console or the menu is open.
         /// </summary>
         private void SetCursorFree(bool free){
             _cursorFree = free;
@@ -219,7 +233,7 @@ namespace UI{
             voxelEditor.destruct = voxelEditor.place = false;
         }
 
-        /// <summary>Turns the player's input off while the inventory or the menu is open, and on again.</summary>
+        /// <summary>Turns the player's input off while the inventory, the console or the menu is open, and on again.</summary>
         private void SetPlayerInput(bool active){
             // Looked up on every switch-off: the player may spawn after the HUD, or be replaced.
             if (!active) _playerInput = FindFirstObjectByType<PlayerInput>();

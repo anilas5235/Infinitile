@@ -300,7 +300,7 @@ The <code>id</code> is the package prefix: lower case, short, unique.</dd>
 <div class="item" id="GAME-MOD-03">
 <h3><span class="id">GAME-MOD-03</span>Script mods and event API <span class="st hi">LATER · HIGH PRIORITY</span></h3>
 <dl class="f">
-<dt>What</dt><dd>Mods with behaviour. The game raises events at fixed places on the main thread: block placed, block broken, chunk generated, block tick (GAME-04), world loaded, a tick per second. Mods react through a small game API: read and set a voxel, give an item, show a message. The event API is the same whatever the script language is.</dd>
+<dt>What</dt><dd>Mods with behaviour. The game raises events at fixed places on the main thread: block placed, block broken, chunk generated, block tick (GAME-04), world loaded, a tick per second. Mods react through a small game API: read and set a voxel, give an item, show a message. The event API is the same whatever the script language is. Console commands are one such hook already: a mod registers its own commands in the command registry (WorldGenSpec DEC-124).</dd>
 <dt>Origin</dt><dd>Modding goal — owner, 2026-11-17.</dd>
 <dt>Depends on</dt><dd>GAME-MOD-02; GAME-04 for block ticks; GAME-02 for item drops.</dd>
 <dt>Open picks</dt><dd><ul class="tight">

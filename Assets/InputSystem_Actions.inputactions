@@ -601,6 +601,15 @@
                     "initialStateCheck": false
                 },
                 {
+                    "name": "Console",
+                    "type": "Button",
+                    "id": "8f9e740e-9ba8-4d32-9895-bf466f44b727",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "Menu",
                     "type": "Button",
                     "id": "af780df7-bbee-4ca0-96dd-3b7e590ce811",
@@ -774,6 +783,17 @@
                     "processors": "",
                     "groups": "Keyboard&Mouse",
                     "action": "Inventory",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "7c943b7b-b28a-4483-9f94-1c70bd768bf8",
+                    "path": "<Keyboard>/t",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Console",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
