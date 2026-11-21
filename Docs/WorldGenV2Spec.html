@@ -1,0 +1,1378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WorldGen v2 Spec</title>
+<meta name="description" content="Design spec for WorldGen v2: a data-defined noise graph with full 3D terrain density, per-biome parameter boxes, surface rule lists, climate snow and ice, river valleys and noise caves, with phases, tests and measurements, the owner decisions DEC-125 to DEC-146 and a review of every earlier decision.">
+<style>
+:root{
+  --bg:#fbfaf7; --surface:#ffffff; --surface-2:#f2f0ea; --text:#1d1f22; --muted:#5d636b;
+  --border:#dedad0; --accent:#2f6f5e; --accent-soft:#e3efe9; --warn:#9a5b00; --warn-soft:#fbf0dc;
+  --bad:#a33a2b; --bad-soft:#f8e4e0; --code-bg:#f4f2ec; --must:#2f6f5e; --should:#3d5a8a; --may:#6b6b6b;
+  --tf:#2f6f5e; --bf:#8a4f2f;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15171a; --surface:#1c1f23; --surface-2:#23272c; --text:#e6e4df; --muted:#a0a6ad;
+    --border:#33383f; --accent:#7cc4ad; --accent-soft:#1f3530; --warn:#e3b05c; --warn-soft:#3a2f1c;
+    --bad:#ec8a7a; --bad-soft:#3b2220; --code-bg:#22262b; --must:#7cc4ad; --should:#9db7e8; --may:#a0a6ad;
+    --tf:#7cc4ad; --bf:#e2a27e;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15171a; --surface:#1c1f23; --surface-2:#23272c; --text:#e6e4df; --muted:#a0a6ad;
+  --border:#33383f; --accent:#7cc4ad; --accent-soft:#1f3530; --warn:#e3b05c; --warn-soft:#3a2f1c;
+  --bad:#ec8a7a; --bad-soft:#3b2220; --code-bg:#22262b; --must:#7cc4ad; --should:#9db7e8; --may:#a0a6ad;
+  --tf:#7cc4ad; --bf:#e2a27e;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 "Inter","Segoe UI",system-ui,-apple-system,sans-serif}
+.layout{display:grid;grid-template-columns:270px minmax(0,1fr);max-width:1320px;margin:0 auto}
+nav.toc{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:28px 18px 40px 22px;border-right:1px solid var(--border);font-size:14px}
+nav.toc .brand{font-weight:700;font-size:15px;margin-bottom:4px}
+nav.toc .ver{color:var(--muted);font-size:12.5px;margin-bottom:18px}
+nav.toc ol{list-style:none;padding:0;margin:0}
+nav.toc li{margin:2px 0}
+nav.toc a{color:var(--muted);text-decoration:none;display:block;padding:3px 8px;border-radius:6px}
+nav.toc a:hover{background:var(--surface-2);color:var(--text)}
+main{padding:36px 48px 120px;min-width:0}
+h1{font-size:30px;line-height:1.25;margin:0 0 6px;letter-spacing:-.01em}
+h2{font-size:23px;margin:56px 0 12px;padding-top:12px;border-top:1px solid var(--border);letter-spacing:-.005em}
+h3{font-size:18px;margin:32px 0 8px}
+h4{font-size:15.5px;margin:22px 0 6px}
+p,li{max-width:78ch}
+a{color:var(--accent)}
+.sub{color:var(--muted);margin:0 0 18px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 26px}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+code,pre,kbd{font-family:"JetBrains Mono","Cascadia Code",Consolas,ui-monospace,monospace;font-size:13.5px}
+code{background:var(--code-bg);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;overflow-x:auto;line-height:1.5}
+pre code{background:none;padding:0}
+pre.math{border-left:3px solid var(--accent)}
+table{border-collapse:collapse;width:100%;margin:12px 0 18px;font-size:14.5px;display:block;overflow-x:auto}
+th,td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top}
+th{background:var(--surface-2);font-weight:600}
+td code{white-space:nowrap}
+.box{border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin:16px 0;background:var(--surface)}
+.box.note{border-left:4px solid var(--accent);background:var(--accent-soft)}
+.box.warn{border-left:4px solid var(--warn);background:var(--warn-soft)}
+.box.bad{border-left:4px solid var(--bad);background:var(--bad-soft)}
+.box > :first-child{margin-top:0}.box > :last-child{margin-bottom:0}
+.req{border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin:10px 0;background:var(--surface)}
+.req .id{font-family:"JetBrains Mono",Consolas,monospace;font-weight:700;font-size:13px;margin-right:8px}
+.kw{font-size:11.5px;font-weight:700;letter-spacing:.04em;padding:1px 7px;border-radius:4px;border:1px solid currentColor;margin-right:8px}
+.kw.must{color:var(--must)}.kw.should{color:var(--should)}.kw.may{color:var(--may)}
+.req p{margin:4px 0}
+.tf{color:var(--tf);font-weight:600}.bf{color:var(--bf);font-weight:600}
+.diagram{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin:16px 0;overflow-x:auto}
+.diagram svg{display:block;min-width:820px;width:100%;height:auto}
+.diagram .bx{fill:var(--surface-2);stroke:var(--border)}
+.diagram .bx.tfb{stroke:var(--tf)}.diagram .bx.bfb{stroke:var(--bf)}
+.diagram text{fill:var(--text);font:13px "Inter","Segoe UI",system-ui,sans-serif}
+.diagram text.lane{font-weight:700;font-size:14px}
+.diagram text.lane.t{fill:var(--tf)}.diagram text.lane.b{fill:var(--bf)}
+.diagram text.small{fill:var(--muted);font-size:11.5px}
+.diagram .ar{stroke:var(--muted);stroke-width:1.5;fill:none;marker-end:url(#arrow)}
+.diagram marker path{fill:var(--muted)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cols > .box{margin:0}
+ul.tight li{margin:2px 0}
+.phase{border:1px solid var(--border);border-radius:10px;padding:12px 18px;margin:14px 0;background:var(--surface)}
+.phase h4{margin-top:4px}
+.small{font-size:13.5px;color:var(--muted)}
+.part{margin:64px 0 0;padding:14px 18px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);font-size:20px;font-weight:700}
+.part span{display:inline-block;margin-right:10px;padding:2px 10px;border-radius:999px;background:var(--accent);color:var(--bg);font-size:13px;vertical-align:middle}
+.part + h2{border-top:none;margin-top:24px}
+nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text)}
+@media (max-width: 960px){
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:none;border-bottom:1px solid var(--border);padding:18px 16px}
+  main{padding:24px 16px 80px}
+  .cols{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <div class="brand">WorldGen v2 Spec</div>
+  <div class="ver">v1.1 · 2026-11-21 · Phase V0, nothing built</div>
+  <ol>
+    <li><a href="#s0">0 · How to use this spec</a></li>
+    <li class="toc-part">Part A · Design</li>
+    <li><a href="#s1">1 · Goals &amp; scope</a></li>
+    <li><a href="#s2">2 · Architecture</a></li>
+    <li><a href="#s3">3 · Noise graph</a></li>
+    <li><a href="#s4">4 · Parameters</a></li>
+    <li><a href="#s5">5 · Terrain density</a></li>
+    <li><a href="#s6">6 · Biomes</a></li>
+    <li><a href="#s7">7 · Surface rules</a></li>
+    <li><a href="#s8">8 · Snow, ice &amp; tree line</a></li>
+    <li><a href="#s9">9 · Fluids &amp; rivers</a></li>
+    <li><a href="#s10">10 · Caves, ores &amp; lava</a></li>
+    <li><a href="#s11">11 · Flora</a></li>
+    <li><a href="#s12">12 · Blending</a></li>
+    <li><a href="#s13">13 · Tooling &amp; world report</a></li>
+    <li><a href="#s14">14 · Moddability</a></li>
+    <li><a href="#s15">15 · Determinism &amp; identity</a></li>
+    <li class="toc-part">Part B · Plan</li>
+    <li><a href="#s16">16 · Phases V0–V8</a></li>
+    <li><a href="#s17">17 · Tests &amp; measurements</a></li>
+    <li class="toc-part">Part C · Decisions</li>
+    <li><a href="#s18">18 · Owner decisions</a></li>
+    <li><a href="#s19">19 · Agent defaults</a></li>
+    <li><a href="#s20">20 · Earlier decisions in v2</a></li>
+    <li><a href="#s21">21 · Risks</a></li>
+    <li><a href="#s22">22 · Sources</a></li>
+  </ol>
+</nav>
+
+<main>
+<h1>WorldGen v2 — 3D noise-graph world generation</h1>
+<p class="sub">Design spec for the rewrite of the world generator in <code>Assets/Engine</code>, written for a coding agent and for the owner's review. Minecraft Java 1.18 and later is the reference for the overall method; where v2 differs or adds something, the spec marks it as its own extension. Nothing in this spec is built yet.</p>
+<div class="meta">
+  <span class="chip">Unity · Burst · Jobs · C#</span>
+  <span class="chip">Phase V0: spec only</span>
+  <span class="chip">Owner decisions 2026-11-21: DEC-125…146 (§18)</span>
+  <span class="chip">Budget 7.2 ms per chunk (DEC-129)</span>
+  <span class="chip">Replaces Terrain-first biome selection, Biome-first and worm caves at the switch (V7)</span>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s0">0 · How to use this spec</h2>
+<ul>
+  <li><strong>Status.</strong> Phase V0: this spec is the design, and no runtime code exists. The owner's decisions of 2026-11-21 (DEC-125…146, §18) are binding. The agent defaults (AD-01…26, §19) fill the gaps the decisions leave open; they stand unless the owner changes them while reviewing this spec.</li>
+  <li><strong>Relation to <a href="WorldGenSpec.html">WorldGenSpec.html</a>.</strong> That spec stays the record of the shipped generator until the switch (Phase V7, §16). v2 replaces its Terrain-first biome selection (the classifier with class height), the Biome-first architecture, every blend method except DistanceBlend and None, and the worm caves. Everything else there stays in force: Part E (performance, scheduler, culling, lighting), rotated voxels, tree species, the palette and the engine cleanup. §20 checks every earlier decision against v2.</li>
+  <li><strong>Ground rules.</strong> The rules R1–R8 of WorldGenSpec.html §2 apply unchanged. In short: keep layers and dispose every native container (R1); Burst-compatible code without virtual dispatch (R2); every generated value is a pure function of seed, position and settings (R3); no silent tuning (R5); name real sources and mark own extensions, never invent a source (R6); no spec IDs, phase names, dates or history in code or in anything the Editor shows (R8).</li>
+  <li><strong>Requirement keywords:</strong> <span class="kw must">MUST</span> is mandatory; <span class="kw should">SHOULD</span> is strongly recommended (deviate only with a reason stated in the commit or PR); <span class="kw may">MAY</span> is optional.</li>
+  <li><strong>IDs.</strong> Requirements use the prefix <code>W2-</code>: <code>W2-ARC</code> architecture, <code>W2-NG</code> noise graph, <code>W2-DEN</code> terrain density, <code>W2-BIO</code> biomes, <code>W2-SRF</code> surface rules, <code>W2-CLM</code> snow, ice and tree line, <code>W2-FLD</code> fluids, <code>W2-RIV</code> rivers, <code>W2-CAV</code> caves, ores and lava, <code>W2-FLO</code> flora, <code>W2-BLD</code> blending, <code>W2-TOOL</code> tooling, <code>W2-MOD</code> moddability, <code>W2-ID</code> identity, <code>W2-PERF</code> performance, <code>W2-TST</code> tests, <code>W2-MIG</code> migration. Agent defaults are <code>AD-nn</code>. Decision numbers continue the v1 list, so every <code>DEC-nnn</code> is unique across both specs.</li>
+  <li><strong>Placeholders.</strong> Box edges, shares, wavelengths, depths, thresholds and every value called a <em>start value</em> are placeholders. The owner sets them with the preview window, the sweep and the world report; the agent must not tune them on its own (R5).</li>
+  <li><strong>Read order:</strong> §1 → §2 → the section of the current phase (§16 points to it) → §17 for its tests and measurements. Before any benchmark, timing or build batch the agent asks the owner first, so the Editor can be focused (§17.5).</li>
+</ul>
+
+<!-- ============================================================ -->
+<div class="part" id="partA"><span>Part A</span> Design</div>
+
+<h2 id="s1">1 · Goals &amp; scope</h2>
+<h3 id="s1-1">1.1 Goals</h3>
+<p>The owner's priorities for v2 are <strong>performance, moddability, and an interesting, continuous world</strong>. In practice:</p>
+<ol>
+  <li><strong>One generator built like Minecraft's 1.18+ generator:</strong> climate parameters from noise, a full 3D terrain density, biomes picked by parameter boxes, surfaces by rule lists, noise caves (DEC-125…134).</li>
+  <li><strong>Data, not code:</strong> noises, terrain shape, biome placement, surfaces and caves are data: a noise graph, biome files and rule lists. Tuning and mods change data only (DEC-126, GameSpec GAME-MOD-04).</li>
+  <li><strong>A continuous world:</strong> biomes follow large, smooth climate fields and never read the column height, so they change slowly and keep their place on slopes (DEC-127).</li>
+  <li><strong>Fast:</strong> at most 7.2 ms per chunk on the benchmark row (DEC-129); the 120 fps goal at p95 is unchanged (DEC-104).</li>
+  <li><strong>Checked, not hoped for:</strong> a validator rejects bad layouts before a world is built, and a world report measures the look targets on fixed seeds (§13).</li>
+</ol>
+
+<h3 id="s1-2">1.2 Problems of v1 and how v2 answers them</h3>
+<p>The common root of the v1 problems: the 6D classifier read the column height, and every problem needed its own tuning round (the last one was PR #81). v2 removes the height from the biome choice and checks the layout before it is used.</p>
+<table>
+<thead><tr><th>Problem in v1 (state after PR #81)</th><th>Answer in v2</th><th>Checked by</th></tr></thead>
+<tbody>
+<tr><td>Snow caps in Badlands</td><td>Snow comes from climate temperature cooled with height (DEC-130). Hot biomes carry a <em>never snows</em> flag (§8.4).</td><td>World report: snow in never-snow biomes = 0</td></tr>
+<tr><td>Badlands too common</td><td>Badlands gets its own small box: hot, dry massifs (§6.4). Box sizes are picked on the sweep (DEC-136).</td><td>Badlands share of land and of ground ≥ 180</td></tr>
+<tr><td>Biomes change too fast</td><td>The biome reads only the climate parameters, never the column height (AD-07).</td><td>Median patch size; 8 km windows</td></tr>
+<tr><td>Massif flanks lose Mountain</td><td>Mountain's box covers the massif footprint in continentalness and erosion, so the flanks stay Mountain (DEC-81 kept, §6.4).</td><td>Mountain ring test</td></tr>
+<tr><td>Badlands next to Jungle, e.g. at (−1587, −6813)</td><td>The validator refuses a layout in which an implausible pair can touch, corners included (§6.6).</td><td>Validator; world report: implausible edges = 0</td></tr>
+<tr><td>Ocean on land</td><td>Dry-column rule: an Ocean box on a dry column gives way to the nearest land box (§6.5).</td><td>World report: Ocean on dry columns = 0</td></tr>
+<tr><td>Jungle under water on 62 % of its columns</td><td>Jungle's box lies inland, where the terrain shape keeps the ground above the sea (§6.4, §5.2).</td><td>Jungle wet share</td></tr>
+<tr><td>Lopsided shares in 4–8 km windows</td><td>Box sizes and climate wavelengths are picked on a measured sweep (DEC-136).</td><td>Every common biome in ≥ 90 % of 8 km windows</td></tr>
+</tbody>
+</table>
+
+<h3 id="s1-3">1.3 Constraints</h3>
+<ul>
+  <li><strong>Frame rate:</strong> 120 fps at p95 with no micro-stutters the player notices (DEC-104). Generation runs in Burst jobs under the scheduler's per-frame budget (DEC-105, DEC-116) and adds no main-thread work.</li>
+  <li><strong>Cost:</strong> at most 7.2 ms per chunk on the benchmark row <code>ChunkJob.Run</code> Terrain-first, DistanceBlend, flora, caves on (DEC-129: +25 % over 5.75 ms, the row's value on master on 2026-11-21).</li>
+  <li><strong>Small hot loops:</strong> extra code inside one big pass once slowed the whole pass by 35 % (the <code>PrepareChunkMaps</code> case). New work goes into its own pass, and every change is measured.</li>
+  <li><strong>Pure function:</strong> every voxel, biome id and flora placement is a pure function of (seed, position, settings) (R3). Chunk borders and padding agree bit for bit.</li>
+  <li><strong>Burst and memory:</strong> <code>FloatMode.Strict</code>; no managed types or virtual dispatch in jobs; no <code>Allocator.Domain</code> inside a job (DEC-103). Scratch memory is allocated once per job, not per column, because <code>Allocator.Temp</code> memory inside a job is freed only when the job completes.</li>
+</ul>
+
+<h3 id="s1-4">1.4 Signed-off targets that v2 keeps</h3>
+<ul class="tight">
+  <li>The massif ranges of candidate A (DEC-108) and the points of the third world tour (DEC-109): draw distance 12, fog off, fallen logs only where their tree grows.</li>
+  <li>The ten biomes and their palette: Plains, Desert, Mountain, Forest, Ocean, Taiga, Savanna, Badlands, Jungle, Swamp, with the extended Kenney tiles and voxels.</li>
+  <li>Caves on everywhere (DEC-61) and the same in every biome (DEC-58), with ores, lava and bedrock (DEC-59).</li>
+  <li>Flora per biome: species, densities, groves, clearings, boulders and fallen logs (DEC-30…33, 45, 83, 84, 91, 97, 98).</li>
+  <li>The preview window as the main tuning tool, and a report test as the tuning measure.</li>
+  <li>Sea level 124 (water fills y &lt; 124) and the height limit 255.</li>
+</ul>
+
+<h3 id="s1-5">1.5 Out of scope for v2.0</h3>
+<ul class="tight">
+  <li><strong>Biome-first.</strong> The owner: Biome-first will be a completely different world generator with its own settings and assets, out of scope for now. The v1 Biome-first code is deleted together with v1 at the switch (DEC-137).</li>
+  <li>Part III research tooling (parked with Biome-first).</li>
+  <li>Aquifers, cave biomes and flora under overhangs: optional Phase V8 (§16).</li>
+  <li>Structures, fluid simulation, and persistence changes beyond the generator version and the settings hash (§15).</li>
+  <li>A graphical node editor for the noise graph (AD-19).</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="s2">2 · Architecture</h2>
+<h3 id="s2-1">2.1 Overview</h3>
+<p>A chunk (32 × 256 × 32) is generated in nine passes. P1–P3 work on columns, P4–P5 on voxels, P6–P9 finish the chunk. The noise graph (§3) supplies every noise-derived value; biome files and rule lists supply the rest. The terrain does not depend on the biomes: P4 needs only P1, so biome changes never move the ground.</p>
+<div class="diagram" role="img" aria-label="Pass order of a v2 chunk">
+<svg viewBox="0 0 960 240" xmlns="http://www.w3.org/2000/svg">
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker></defs>
+  <rect class="bx" x="10" y="90" width="150" height="64" rx="8"/>
+  <text class="lane" x="22" y="114">Data</text>
+  <text class="small" x="22" y="132">graph, biome files,</text>
+  <text class="small" x="22" y="147">rule lists, settings</text>
+  <rect class="bx tfb" x="200" y="20" width="170" height="56" rx="8"/>
+  <text class="lane" x="212" y="44">P1 · 2D outputs</text>
+  <text class="small" x="212" y="63">climate, surface, masks</text>
+  <rect class="bx tfb" x="400" y="20" width="170" height="56" rx="8"/>
+  <text class="lane" x="412" y="44">P2 · Biomes</text>
+  <text class="small" x="412" y="63">wetness, boxes, dry rule</text>
+  <rect class="bx tfb" x="600" y="20" width="170" height="56" rx="8"/>
+  <text class="lane" x="612" y="44">P3 · Blend</text>
+  <text class="small" x="612" y="63">DistanceBlend</text>
+  <rect class="bx bfb" x="200" y="160" width="170" height="56" rx="8"/>
+  <text class="lane" x="212" y="184">P4 · 3D density</text>
+  <text class="small" x="212" y="203">terrain + caves, cells</text>
+  <rect class="bx bfb" x="400" y="160" width="170" height="56" rx="8"/>
+  <text class="lane" x="412" y="184">P5 · Fill + rules</text>
+  <text class="small" x="412" y="203">fluids, surface rules</text>
+  <rect class="bx" x="600" y="160" width="74" height="56" rx="8"/>
+  <text class="lane" x="612" y="184">P6</text>
+  <text class="small" x="612" y="203">Ores</text>
+  <rect class="bx" x="688" y="160" width="74" height="56" rx="8"/>
+  <text class="lane" x="700" y="184">P7</text>
+  <text class="small" x="700" y="203">Bedrock</text>
+  <rect class="bx" x="776" y="160" width="74" height="56" rx="8"/>
+  <text class="lane" x="788" y="184">P8</text>
+  <text class="small" x="788" y="203">Flora</text>
+  <rect class="bx" x="864" y="160" width="74" height="56" rx="8"/>
+  <text class="lane" x="876" y="184">P9</text>
+  <text class="small" x="876" y="203">Write</text>
+  <path class="ar" d="M160,106 L198,54"/>
+  <path class="ar" d="M160,140 L198,186"/>
+  <path class="ar" d="M370,48 L398,48"/>
+  <path class="ar" d="M570,48 L598,48"/>
+  <path class="ar" d="M285,76 L285,158"/>
+  <path class="ar" d="M685,76 L685,118 L485,118 L485,158"/>
+  <path class="ar" d="M370,188 L398,188"/>
+  <path class="ar" d="M570,188 L598,188"/>
+  <path class="ar" d="M674,188 L686,188"/>
+  <path class="ar" d="M762,188 L774,188"/>
+  <path class="ar" d="M850,188 L862,188"/>
+</svg>
+</div>
+
+<h3 id="s2-2">2.2 Pass order</h3>
+<table>
+<thead><tr><th>Pass</th><th>Work</th><th>Reads</th><th>Writes</th></tr></thead>
+<tbody>
+<tr><td>P1 · 2D outputs</td><td>Evaluates the 2D outputs of the graph on the padded corner lattice (stride 4; the chunk plus the padding the blend and the rules need) and interpolates them per column.</td><td>Graph, seed</td><td>T, F, C, E, W, PV; <code>preliminary_surface</code>; <code>lava_mask</code>; <code>river</code>; 2D rule noises</td></tr>
+<tr><td>P2 · Biomes</td><td>Wetness test near sea level (§6.5); box lookup per column from the interpolated parameters; dry-column rule.</td><td>P1, biome boxes</td><td>Hard biome and wet flag per column, chunk and padding</td></tr>
+<tr><td>P3 · Blend</td><td>DistanceBlend over the padded biome map (§12).</td><td>P2</td><td>Surface-source biome and flora weights per column</td></tr>
+<tr><td>P4 · 3D density</td><td><code>terrain_density</code> and <code>cave_density</code> at the chunk's lattice corners with slab skipping; trilinear interpolation with the uniform-cell test (§5.3, §5.4).</td><td>P1, graph</td><td>Voxel class: solid, terrain air or carved</td></tr>
+<tr><td>P5 · Fill + rules</td><td>Fluids and ice by the fluid rule (§9.1); surface rule lists from the top down, within the rule depth (§7).</td><td>P3, P4, rule lists</td><td>Blocks</td></tr>
+<tr><td>P6 · Ores</td><td>Ore rules in list order, each replacing only its host block (§10.6).</td><td>P5</td><td>Blocks</td></tr>
+<tr><td>P7 · Bedrock</td><td>Bottom layer at y 0–2 as in v1.</td><td>—</td><td>Blocks</td></tr>
+<tr><td>P8 · Flora</td><td>Anchors at the terrain top; flora padding 11 (§11).</td><td>P3, P4, padding search, flora rules</td><td>Blocks</td></tr>
+<tr><td>P9 · Write</td><td>Voxel runs, heightmap (top of the terrain), biome id per column.</td><td>P2, P5–P8</td><td>Chunk data</td></tr>
+</tbody>
+</table>
+
+<h3 id="s2-3">2.3 Code layout</h3>
+<p>v2 is built beside v1 until the switch (AD-22). Code names describe what the code does (for example <code>NoiseGraph</code>, <code>BiomeBoxLookup</code>, <code>SurfaceRuleList</code>); they never contain “v2” or a phase name (R8), because after the switch they are the only generator.</p>
+<table>
+<thead><tr><th>Folder (under <code>Assets/Engine</code>)</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td><code>Scripts/WorldGen/Graph/</code></td><td>Graph data and JSON form, compiler, interval rules, graph validator, Burst interpreter</td></tr>
+<tr><td><code>Scripts/WorldGen/Density/</code></td><td>Terrain cells, slab bounds, fluid rule, fill</td></tr>
+<tr><td><code>Scripts/WorldGen/Biomes/</code></td><td>Biome boxes, compiled lookup, wetness test, layout validator</td></tr>
+<tr><td><code>Scripts/WorldGen/Surface/</code></td><td>Rule lists, conditions, actions, snow and ice</td></tr>
+<tr><td><code>Scripts/WorldGen/Noise/</code>, <code>Flora/</code>, <code>Blending/</code></td><td>Reused: seeded simplex and hashes; flora species and placement; DistanceBlend</td></tr>
+<tr><td><code>Scripts/WorldGen/Caves/</code>, <code>Classify/</code>, <code>Height/</code>, <code>Core/</code></td><td>v1 code; unchanged until the switch, then deleted or reduced to what v2 reuses (§16, V7)</td></tr>
+<tr><td><code>Scripts/Jobs/Chunk/</code></td><td>The new chunk job beside <code>ChunkJob</code></td></tr>
+<tr><td><code>Editor/WorldGen/</code></td><td>Preview window: graph outputs, Layout tab, sweep, validator messages</td></tr>
+<tr><td><code>Tests/</code></td><td>New EditMode tests per phase (§17)</td></tr>
+</tbody>
+</table>
+
+<h3 id="s2-4">2.4 Cost plan</h3>
+<p>Estimates per chunk on the benchmark row, from the v1 costs of comparable work (Terrain-first rows: the DistanceBlend lattice about +2.0 ms over None, flora about +0.6 ms, caves about +1.5 ms). Every phase measures its passes and updates this table.</p>
+<table>
+<thead><tr><th>Pass</th><th>Estimate (ms)</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td>2D outputs</td><td>0.4–0.6</td><td>Stride 4, padded lattice</td></tr>
+<tr><td>Biome lookup</td><td>0.15–0.25</td><td>Compiled lookup, chunk and padding</td></tr>
+<tr><td>Wetness test</td><td>0.05–0.2</td><td>Only columns whose surface may cross sea level</td></tr>
+<tr><td>Blend</td><td>1.5–2.0</td><td>DistanceBlend per column, as in v1</td></tr>
+<tr><td>3D terrain + caves</td><td>1.0–1.6</td><td>Cells 4×8×4, slab skipping, uniform cells</td></tr>
+<tr><td>Fill + fluids</td><td>0.4–0.7</td><td></td></tr>
+<tr><td>Surface rules</td><td>0.3–0.5</td><td>Column bitmask, rule depth</td></tr>
+<tr><td>Ores</td><td>0.2–0.3</td><td></td></tr>
+<tr><td>Flora</td><td>0.6–0.7</td><td>As in v1</td></tr>
+<tr><td>Flora padding search</td><td>0.1–0.3</td><td>Terrain top of the padding columns</td></tr>
+<tr><td>Write</td><td>0.3–0.4</td><td></td></tr>
+<tr><td><strong>Sum</strong></td><td><strong>5.0–7.6</strong></td><td>Budget 7.2 (DEC-129); the upper end needs the levers below</td></tr>
+</tbody>
+</table>
+
+<h3 id="s2-5">2.5 Levers</h3>
+<ul class="tight">
+  <li><strong>Blend lattice at stride 4:</strong> −0.5…−1.0 ms; needs a look check of the borders.</li>
+  <li><strong>Cell size:</strong> 4×8×4 is the start (2,673 corners per chunk); 4×4×4 doubles the vertical corners and is measured in V2.</li>
+  <li><strong>Skipping:</strong> slab bounds and uniform cells (§5.4) are built in from V2.</li>
+  <li><strong>Octave counts</strong> of the 3D terrain noise and the cave noises.</li>
+  <li><strong>Own cave lattice</strong> with its own cell size (V6).</li>
+  <li><strong>Generated code:</strong> C# Burst code generated from the shipped graph, if the interpreter costs too much (§3.7).</li>
+</ul>
+
+<div class="req"><span class="id">W2-ARC-01</span><span class="kw must">MUST</span>Generate a chunk in the pass order P1–P9 of §2.2. Each pass is its own loop; no pass grows into another's loop.</div>
+<div class="req"><span class="id">W2-ARC-02</span><span class="kw must">MUST</span>Build v2 beside v1: a world setting selects the generator, and v1 behaves as before until the switch (AD-22).</div>
+<div class="req"><span class="id">W2-ARC-03</span><span class="kw must">MUST</span>Allocate scratch memory once per job or worker, never per column; no <code>Allocator.Domain</code> inside a job (DEC-103).</div>
+<div class="req"><span class="id">W2-ARC-04</span><span class="kw must">MUST</span>Compute padding values with the same pure functions as the chunk's own values, so neighbouring chunks agree bit for bit.</div>
+<div class="req"><span class="id">W2-PERF-01</span><span class="kw must">MUST</span>Stay at or below 7.2 ms per chunk on the benchmark row (DEC-129). The gate is in V6; every earlier phase reports its pass costs against §2.4.</div>
+<div class="req"><span class="id">W2-PERF-02</span><span class="kw must">MUST</span>Add no main-thread work per frame; the chunk job runs under the scheduler's budget (DEC-105, DEC-116).</div>
+
+<!-- ============================================================ -->
+<h2 id="s3">3 · Noise graph</h2>
+<h3 id="s3-1">3.1 What it is</h3>
+<p>Minecraft 1.18+ computes its terrain from density functions: where the final density is above 0 the default block is placed (Minecraft Wiki, “Noise router”, “Density function”). v2 uses the same idea with its own node set: a data-defined graph of noises and operations with named outputs (DEC-126). The graph replaces v1's fixed climate fields, terrain splines and cave noises.</p>
+
+<h3 id="s3-2">3.2 Data</h3>
+<ul>
+  <li><strong>Noises:</strong> name, kind (2D or 3D simplex), octaves, base wavelength, lacunarity, gain, amplitude. The seed of a noise is a hash of the world seed and the noise's name, so adding a noise never shifts the others.</li>
+  <li><strong>Nodes:</strong> an operation, its inputs (nodes or noises) and its constants.</li>
+  <li><strong>Outputs:</strong> named nodes the generator reads (§3.6).</li>
+  <li>The graph is an asset with a JSON form (sorted keys), used by mods and by the settings hash (§15).</li>
+</ul>
+
+<h3 id="s3-3">3.3 Node set</h3>
+<table>
+<thead><tr><th>Group</th><th>Nodes</th></tr></thead>
+<tbody>
+<tr><td>Inputs</td><td><code>x</code>, <code>y</code>, <code>z</code> (block coordinates), <code>const</code></td></tr>
+<tr><td>Noise</td><td><code>simplex2</code>, <code>simplex3</code> (the own seeded simplex with hash gradients, DEC-01), <code>fbm</code> (octave sum), <code>ridged</code> (1 − |n| per octave), <code>shift</code> (offsets the coordinates of its input by other nodes: domain warp)</td></tr>
+<tr><td>Arithmetic</td><td><code>add</code>, <code>mul</code>, <code>min</code>, <code>max</code>, <code>abs</code>, <code>neg</code>, <code>square</code>, <code>cube</code>, <code>clamp</code>, <code>lerp</code>, <code>smoothstep</code></td></tr>
+<tr><td>Shaping</td><td><code>half_negative</code> (v/2 where v &lt; 0), <code>quarter_negative</code> (v/4 where v &lt; 0), <code>soft_clamp</code> (clamp to [−1, 1], then 1.5v − 0.5v³), <code>range_choice</code> (one of two inputs, chosen by the range of a third), <code>y_gradient</code> (linear in y between two heights, clamped), <code>spline</code> (nested spline over other nodes, as v1's nested splines: ≤ 16 points per spline, depth ≤ 8)</td></tr>
+<tr><td>Not allowed</td><td><code>sin</code>, <code>cos</code>, <code>exp</code>, <code>log</code>, powers with a fraction: no transcendental functions (W2-ID-02)</td></tr>
+</tbody>
+</table>
+
+<h3 id="s3-4">3.4 Compiler</h3>
+<p>The compiler turns the graph into flat programs, one for the 2D outputs and one for the 3D outputs: topological order, constant folding, common subexpression elimination and register allocation. Every node has an interval rule: bounds of its output from bounds of its inputs (a noise's bound comes from its octave amplitudes). The bounds drive the slab skipping (§5.4), the wetness early-out (§6.5) and parts of the layout validator (§6.6).</p>
+
+<h3 id="s3-5">3.5 Interpreter</h3>
+<p>A batched Burst loop: one <code>switch</code> per instruction, and inside each case a loop over lanes, which Burst can vectorise. 2D lanes are one row of the padded corner lattice. 3D lanes are the active y corners of one corner column (at most 33 with cell height 8). Scratch: 64 registers × 33 lanes × 4 bytes ≈ 8.4 KB per worker.</p>
+
+<h3 id="s3-6">3.6 Outputs</h3>
+<table>
+<thead><tr><th>Output</th><th>Dim</th><th>Range</th><th>Used by</th></tr></thead>
+<tbody>
+<tr><td><code>temperature</code>, <code>humidity</code>, <code>continentalness</code>, <code>erosion</code>, <code>weirdness</code></td><td>2D</td><td>[−1, 1]</td><td>Biome boxes (§6), snow (§8), terrain splines (§5)</td></tr>
+<tr><td><code>pv</code></td><td>2D</td><td>[−1, 1]</td><td>Terrain splines, rivers (§9.2)</td></tr>
+<tr><td><code>preliminary_surface</code></td><td>2D</td><td>blocks</td><td>Terrain density, depth, rules, wetness early-out, flora padding</td></tr>
+<tr><td><code>terrain_density</code></td><td>3D</td><td>&gt; 0 is terrain</td><td>P4</td></tr>
+<tr><td><code>cave_density</code></td><td>3D</td><td>≤ 0 carves; optional</td><td>P4 (absent: no caves)</td></tr>
+<tr><td><code>lava_mask</code></td><td>2D</td><td>[0, 1]</td><td>Lava pockets (§10.4)</td></tr>
+<tr><td><code>river</code></td><td>2D</td><td>[0, 1]; optional</td><td>Surface rules, mods</td></tr>
+<tr><td>Further named 2D outputs</td><td>2D</td><td>any</td><td><code>noise_threshold</code> conditions (beach, forest floor, borders)</td></tr>
+</tbody>
+</table>
+<p>Depth is derived, not an output: D = (<code>preliminary_surface</code> − y) / 128, after Minecraft's depth (about 0 at the surface, +1/128 per block down).</p>
+
+<h3 id="s3-7">3.7 Limits and fallback</h3>
+<p>Limits (start values): at most 512 instructions, 64 registers and 64 noises per graph. The graph validator rejects cycles, unknown names, missing required outputs and graphs over the limits, and names the file and node.</p>
+<p>V1 measures the interpreter against hand-written Burst code for the same graph (v1's climate fields). If the overhead is above +15 % (the top of the +5–15 % estimate given with DEC-126), an Editor step generates C# Burst code for the shipped graph; the interpreter stays for mods and the preview.</p>
+
+<div class="req"><span class="id">W2-NG-01</span><span class="kw must">MUST</span>Take every terrain, climate, cave and mask value from the graph. Flora and ores keep their own seeded noises, which are already per-rule data.</div>
+<div class="req"><span class="id">W2-NG-02</span><span class="kw must">MUST</span>Seed each noise from a hash of the world seed and the noise's name.</div>
+<div class="req"><span class="id">W2-NG-03</span><span class="kw must">MUST</span>Give the compiled program the same values as a direct, uncompiled evaluation of the graph (bit for bit on sampled points).</div>
+<div class="req"><span class="id">W2-NG-04</span><span class="kw must">MUST</span>Keep the interval rules sound: every sampled value lies inside its computed bound.</div>
+<div class="req"><span class="id">W2-NG-05</span><span class="kw must">MUST</span>Reject invalid graphs at load with the file and node named; never generate from an invalid graph.</div>
+<div class="req"><span class="id">W2-NG-06</span><span class="kw should">SHOULD</span>Keep the interpreter's overhead within +15 % of hand-written code; otherwise use generated code for the shipped graph (§3.7).</div>
+
+<!-- ============================================================ -->
+<h2 id="s4">4 · Parameters</h2>
+<h3 id="s4-1">4.1 The six parameters</h3>
+<p>As in Minecraft 1.18+ (Minecraft Wiki, “Biome”, “World generation”): temperature, humidity, continentalness, erosion, weirdness and depth, with peaks and valleys derived from weirdness. The start noises use v1's effective wavelengths, so the first v2 world has v1's climate scale (AD-10).</p>
+<table>
+<thead><tr><th>Symbol</th><th>Parameter</th><th>Role</th><th>Start noise</th></tr></thead>
+<tbody>
+<tr><td>T</td><td>temperature</td><td>Climate; snow and ice (§8)</td><td>2D fbm, wavelength 4706, 3 octaves</td></tr>
+<tr><td>F</td><td>humidity</td><td>Climate</td><td>3765, 3 octaves</td></tr>
+<tr><td>C</td><td>continentalness</td><td>Ocean or land; terrain height</td><td>3765, 5 octaves, domain warp 1800 (2 octaves), strength 400</td></tr>
+<tr><td>E</td><td>erosion</td><td>Flat or rugged; massifs</td><td>1882, 4 octaves</td></tr>
+<tr><td>W</td><td>weirdness</td><td>Peaks and valleys; rivers</td><td>1176, 3 octaves; W = clamp(1.6 · n)</td></tr>
+<tr><td>PV</td><td>peaks and valleys</td><td>Terrain splines</td><td>PV = 1 − |3|W| − 2| (after Minecraft)</td></tr>
+<tr><td>D</td><td>depth</td><td>Reserved for cave biomes</td><td>(<code>preliminary_surface</code> − y) / 128; v2.0 uses depth 0 only</td></tr>
+</tbody>
+</table>
+<p class="small">The wavelengths are the shipped v1 asset's values divided by its climate frequency scale 0.85 (T 4000, F 3200, C 3200, E 1600, W 1000).</p>
+
+<h3 id="s4-2">4.2 Range and independence</h3>
+<ul>
+  <li>Every parameter lies in [−1, 1] (AD-05). v1 values in [0, 1] convert by 2v − 1; for example v1's freeze temperature 0.2 becomes −0.6.</li>
+  <li>v1 bent humidity and temperature with continentalness (DEC-06). v2 drops that coupling (AD-04): the parameters are independent noises, which keeps the boxes easy to read. The graph can add a coupling back as data.</li>
+</ul>
+
+<h3 id="s4-3">4.3 Bands (start values)</h3>
+<ul>
+  <li><strong>C</strong>, after Minecraft's bands: deep ocean −1…−0.455, ocean −0.455…−0.19, coast −0.19…−0.11, near inland −0.11…0.03, mid inland 0.03…0.3, far inland 0.3…1.</li>
+  <li><strong>PV</strong>, after Minecraft's slices: valleys −1…−0.85, low −0.85…−0.2, mid −0.2…0.2, high 0.2…0.7, peaks 0.7…1.</li>
+  <li><strong>T and F:</strong> five bands each at the 20 % quantiles of the land columns, measured by the sweep tool (AD-11). With a T spread of about 0.35 the edges lie near −0.29, −0.09, 0.09 and 0.29.</li>
+  <li><strong>E:</strong> the massif footprint (E ≤ −0.38) and the terrain splines. Minecraft uses seven erosion levels; v2 starts with fewer and adds levels where a box or a spline needs them.</li>
+</ul>
+
+<h3 id="s4-4">4.4 Sampling</h3>
+<p>The 2D outputs are computed at stride 4 on the padded corner lattice and interpolated bilinearly per column; with wavelengths of 192 blocks and more nothing visible is lost. An output with shorter wavelengths (the blend's border noise has 28) carries a per-column flag and is evaluated for every column instead. A column's biome comes from its interpolated parameters (AD-07), so it is smooth at every scale and the same in a chunk and in its neighbour's padding.</p>
+
+<div class="req"><span class="id">W2-NG-07</span><span class="kw must">MUST</span>Clamp the five climate outputs and PV to [−1, 1].</div>
+<div class="req"><span class="id">W2-NG-08</span><span class="kw must">MUST</span>Sample the 2D outputs on a world-aligned stride-4 lattice (points at multiples of 4 in world coordinates) and interpolate per column; outputs flagged per column are evaluated for every column.</div>
+
+<!-- ============================================================ -->
+<h2 id="s5">5 · Terrain density</h2>
+<h3 id="s5-1">5.1 Form</h3>
+<p>Full 3D density (DEC-125). As in Minecraft, a voxel is terrain where the density is above 0. The split into a smooth part from splines and a 3D noise term that fades out underground is an own extension.</p>
+<pre class="math"><code>density(x, y, z) = K · (S + J · P − y) / 64  +  w(y) · N3(x, y, z)      then the top slide
+
+S   = 124 + O(C, E, PV)        offset spline: the base height
+J   = J(C, E, PV) ≥ 0          jaggedness spline: how much the peaks add
+P   = (1 − |n|)²               peak noise, wavelength 192 (start)
+K   = K(C, E, PV) &gt; 0          factor spline: large = flat, plain-like; small = overhangs
+N3  = 3D fbm noise with amplitude A
+w   = 1 above preliminary_surface − 16, fading smoothly to 0 at preliminary_surface − 32
+top slide: density pulled to −1 by a smooth step between y 223 and 255
+
+preliminary_surface = S + J · P
+Δmax = 64 · A / Kmin           the furthest the 3D noise can move the real surface
+                               away from preliminary_surface (Kmin from the interval rules)</code></pre>
+<p>Below <code>preliminary_surface</code> − 32 the rock is plain solid and N3 is not evaluated (AD-24). The top slide replaces v1's soft height limit.</p>
+
+<h3 id="s5-2">5.2 Terrain shape (start)</h3>
+<p>New Minecraft-like terrain built from scratch (DEC-128); no bit-identical anchor to v1. The splines are data and start roughly like this:</p>
+<ul>
+  <li><strong>Offset over C:</strong> below sea level in the ocean bands, crossing sea level in the coast band, rising inland. From the near-inland band on the ground stays above sea level except in river valleys, which keeps lowland biomes such as Jungle dry (§6.4).</li>
+  <li><strong>Erosion:</strong> high E flattens, low E raises. Low E in the mid and far inland bands makes the massifs; v1's massif shape (on C and E with PV inside, peak wavelength 192) is the start, and the re-tune target is the ranges of candidate A (DEC-108).</li>
+  <li><strong>PV:</strong> hills on the peaks slices, valleys on the valleys slice; the valleys slice also makes the rivers (§9.2).</li>
+</ul>
+
+<h3 id="s5-3">5.3 Cells and interpolation</h3>
+<p>The density is evaluated on a world-aligned corner lattice and interpolated trilinearly per voxel. Minecraft also evaluates its density on coarse cells and interpolates (Minecraft Wiki, “Noise router”); its exact cell size is not claimed here. v2 starts with cells of 4 × 8 × 4 blocks (AD-06): 9 × 33 × 9 = 2,673 corners per chunk. Cells of 4 × 4 × 4 (9 × 65 × 9 = 5,265 corners) are measured in V2 and used only if 4 × 8 × 4 looks blocky on steep faces.</p>
+<p>Terrain and cave densities are interpolated separately, because P5 must tell terrain air (water below sea level) from carved air (dry, §9.1).</p>
+
+<h3 id="s5-4">5.4 Skipping</h3>
+<ul>
+  <li><strong>Slab bounds.</strong> For each corner column and 32-block slab, the interval rules bound <code>terrain_density</code> and <code>cave_density</code> over the slab. A terrain bound below 0 makes every corner of the slab non-terrain; a terrain bound and a cave bound both above 0 make every corner solid. Corners whose sign is known are not evaluated.</li>
+  <li><strong>Uniform cells.</strong> Trilinear interpolation is a convex combination of the 8 corners, so when all 8 corners have the same sign, every voxel of the cell has that sign. Such cells are filled without per-voxel interpolation. The test is exact, not an estimate.</li>
+</ul>
+
+<h3 id="s5-5">5.5 Overhangs and floating pieces</h3>
+<p>The 3D noise makes overhangs, arches and now and then a floating piece. v2.0 allows a moderate amount (DEC-142): overhangs and arches on cliffs and steep slopes, rare floating pieces, and most of the land still reads as hills and mountains. The world report counts floating solid pieces and the overhang share; the owner sets the final strength in the V2 tour.</p>
+
+<h3 id="s5-6">5.6 Heightmap</h3>
+<p>The chunk's heightmap is the top of the terrain: the highest voxel of each column with terrain density above 0, before carving (DEC-60 and v1's CAV-04 kept). Light, the camera, spawn, flora and the preview read it.</p>
+
+<div class="req"><span class="id">W2-DEN-01</span><span class="kw must">MUST</span>Use the density form of §5.1, with every spline and noise in graph data.</div>
+<div class="req"><span class="id">W2-DEN-02</span><span class="kw must">MUST</span>Place lattice corners at world-aligned positions (multiples of the cell size), so chunks agree at their borders.</div>
+<div class="req"><span class="id">W2-DEN-03</span><span class="kw must">MUST</span>Produce exactly the same voxels with slab skipping and uniform cells as with per-voxel evaluation.</div>
+<div class="req"><span class="id">W2-DEN-04</span><span class="kw must">MUST</span>Leave no terrain above y 255; bedrock and the cave floor stay as in v1.</div>
+<div class="req"><span class="id">W2-DEN-05</span><span class="kw must">MUST</span>Interpolate terrain and cave densities separately.</div>
+<div class="req"><span class="id">W2-DEN-06</span><span class="kw should">SHOULD</span>Measure 4 × 8 × 4 against 4 × 4 × 4 cells in V2 and report cost and look.</div>
+
+<!-- ============================================================ -->
+<h2 id="s6">6 · Biomes</h2>
+<h3 id="s6-1">6.1 Boxes</h3>
+<p>Per-biome parameter boxes (DEC-127), in Minecraft's format: a biome is placed by intervals per parameter (Minecraft Wiki, “Biome”). Each biome file holds one or more boxes; a box is an interval for T, F, C, E and W plus a depth interval. v2.0 evaluates depth 0 only; the depth interval is reserved for cave biomes (V8). A biome can hold several boxes, for example one inside the massif footprint and one outside.</p>
+
+<h3 id="s6-2">6.2 Choosing a biome</h3>
+<ul>
+  <li>A column's parameters lie in at most one box: overlapping boxes are an error (AD-09).</li>
+  <li>A point in no box takes the nearest box. The distance is the sum of the squared distances to each interval (0 inside it), unweighted; ties go to the order of the BiomeSet. Minecraft also takes the closest box outside all boxes; its exact distance form is not claimed here.</li>
+  <li>The choice reads only the climate parameters at depth 0, never the column height (AD-07).</li>
+</ul>
+
+<h3 id="s6-3">6.3 Compiled lookup</h3>
+<p>The boxes compile into a grid whose lines are the box edges, so every grid cell lies inside one box or in a gap; one binary search per parameter finds the cell. A gap cell stores the boxes that can be nearest somewhere in the cell, and the column picks among them. If the grid would exceed 2<sup>20</sup> cells, a tree replaces it. The lookup gives the brute-force result on every sampled point and costs at most 0.2 ms per chunk including padding.</p>
+
+<h3 id="s6-4">6.4 Starting layout</h3>
+<p>A placeholder. The sweep sets the sizes (DEC-136, §6.7).</p>
+<ul class="tight">
+  <li><strong>Ocean:</strong> C below −0.19 (the ocean and deep ocean bands), every T and F.</li>
+  <li><strong>Lowland:</strong> C from −0.19 up, outside the massif footprint: the T × F table below. The coast band uses the same table; beaches come from the surface rules (§7).</li>
+  <li><strong>Massif footprint:</strong> C ≥ 0.18 and E ≤ −0.38: Mountain, except T4 with F0–F1, which is Badlands. T4 F2 stays Mountain as a buffer.</li>
+</ul>
+<table>
+<thead><tr><th>T band (cold → hot)</th><th>F0 (dry)</th><th>F1</th><th>F2</th><th>F3</th><th>F4 (wet)</th></tr></thead>
+<tbody>
+<tr><td>T0</td><td>Plains</td><td>Taiga</td><td>Taiga</td><td>Taiga</td><td>Taiga</td></tr>
+<tr><td>T1</td><td>Plains</td><td>Plains</td><td>Forest</td><td>Taiga</td><td>Taiga</td></tr>
+<tr><td>T2</td><td>Plains</td><td>Plains</td><td>Forest</td><td>Forest</td><td>Swamp</td></tr>
+<tr><td>T3</td><td>Savanna</td><td>Savanna</td><td>Plains</td><td>Forest</td><td>Swamp</td></tr>
+<tr><td>T4</td><td>Desert</td><td>Desert</td><td>Savanna</td><td>Jungle</td><td>Jungle</td></tr>
+</tbody>
+</table>
+<p>Each cell holds 4 % of the lowland: Plains 24 %, Taiga 24 %, Forest 16 %, Savanna 12 %, Swamp 8 %, Desert 8 %, Jungle 8 %. Badlands lives only in hot, dry massifs (two of the 25 climate cells of the footprint); its share of land is set on the sweep against the report target (§13.5).</p>
+<p>The implausible pairs of the BiomeSet are Jungle–Badlands, Jungle–Desert, Taiga–Desert, Taiga–Jungle, Taiga–Badlands, Taiga–Savanna, Swamp–Desert and Swamp–Badlands. None of them touches in the starting layout, corners included.</p>
+
+<h3 id="s6-5">6.5 Wetness and the dry-column rule</h3>
+<ul>
+  <li><strong>Wet column:</strong> the terrain is air at y 123, the top water layer (AD-08). The value at y 123 comes from the two corner layers around it (y 120 and 128 with 4 × 8 × 4 cells), interpolated the same way as in P4.</li>
+  <li><strong>Early-out:</strong> a corner column with <code>preliminary_surface</code> − 128 &gt; Δmax is surely dry; one with 120 − <code>preliminary_surface</code> &gt; Δmax is surely wet. Only corner columns in between evaluate the two layers.</li>
+  <li><strong>Dry-column rule:</strong> when the lookup gives a water biome (a flag in the biome file; only Ocean in the shipped set) on a dry column, the column takes the nearest land box instead, by the same distance rule. A land biome on a wet column keeps its biome (lakes, rivers).</li>
+  <li>The <code>near_water</code> rule condition (§7.2) uses the same wet flags on the stride-4 corner grid: a wet column within 16 blocks, probed every 4 blocks (DEC-44).</li>
+</ul>
+
+<h3 id="s6-6">6.6 Layout validator</h3>
+<p>Runs when settings load and live in the preview. Errors stop the world from generating; the preview shows them on the layout.</p>
+<table>
+<thead><tr><th>Check</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>Two boxes overlap</td><td>Error</td></tr>
+<tr><td>An implausible pair are neighbours. Two boxes are neighbours when, in every parameter, the gap between their intervals is at most ε: the largest step of that parameter between neighbouring columns (from the graph's bounds, or sampled). Corners count.</td><td>Error</td></tr>
+<tr><td>The nearest-box fill of a gap makes an implausible pair neighbours</td><td>Error</td></tr>
+<tr><td>A dry-column substitute forms an implausible pair with a neighbour of its water box or with another substitute next to it</td><td>Error</td></tr>
+<tr><td>More than 255 biomes (AD-20)</td><td>Error</td></tr>
+<tr><td>A never-snow biome can reach its snow line (§8.4)</td><td>Warning</td></tr>
+<tr><td>A box that no land column reaches</td><td>Warning</td></tr>
+</tbody>
+</table>
+
+<h3 id="s6-7">6.7 Sweep</h3>
+<p>The owner picks biome sizes and balance on a measured sweep (DEC-136). The Layout tab and an explicit test run a set of candidate layouts and wavelength sets on the five fixed seeds (DEC-10) and report per candidate: shares, median patch size, 8 km window coverage, wet shares and the targets of §13.5. The owner picks from the table; nothing is picked automatically (R5). Start targets: median patch ≥ 1 km²; every common biome in ≥ 90 % of 8 km windows.</p>
+
+<h3 id="s6-8">6.8 Biome ids written</h3>
+<p>Each column stores its hard biome: the box result after the dry-column rule. The tint map, the water tint and the fog read it (DEC-119, DEC-122). The surface-source biome, DistanceBlend's choice (§12), drives the surface rules (AD-25).</p>
+
+<div class="req"><span class="id">W2-BIO-01</span><span class="kw must">MUST</span>Choose a biome from the climate parameters at depth 0 only, never from the column height.</div>
+<div class="req"><span class="id">W2-BIO-02</span><span class="kw must">MUST</span>Treat overlapping boxes as an error and fill gaps with the nearest box (unweighted, ties by biome order).</div>
+<div class="req"><span class="id">W2-BIO-03</span><span class="kw must">MUST</span>Give the compiled lookup the brute-force result on every sampled point.</div>
+<div class="req"><span class="id">W2-BIO-04</span><span class="kw must">MUST</span>Apply the dry-column rule with the wetness test of §6.5.</div>
+<div class="req"><span class="id">W2-BIO-05</span><span class="kw must">MUST</span>Refuse a layout with implausible neighbours, corners, gap fill and dry-column substitutes included.</div>
+<div class="req"><span class="id">W2-BIO-06</span><span class="kw must">MUST</span>Keep a column's biome a pure function of its position: the blend padding reads the neighbours' biomes.</div>
+<div class="req"><span class="id">W2-BIO-07</span><span class="kw should">SHOULD</span>Keep the lookup at or below 0.2 ms per chunk including padding.</div>
+
+<!-- ============================================================ -->
+<h2 id="s7">7 · Surface rules</h2>
+<h3 id="s7-1">7.1 Lists</h3>
+<p>Minecraft chooses surface blocks with one rule tree of conditions and sequences (Minecraft Wiki, “Surface rule”). v2 uses rule lists (DEC-133), which are easier to read and to extend by mods:</p>
+<ol>
+  <li><strong>global-before</strong> (for example snow),</li>
+  <li>the list of the column's <strong>surface-source biome</strong> (§12; AD-25),</li>
+  <li><strong>global-after</strong> (for example a mod's fallback).</li>
+</ol>
+<p>For each solid voxel the lists run in this order and the first rule whose condition holds acts. When no rule matches, the voxel keeps the default block (stone). A rule is a condition and an action. Rules see the final solid mask after P4, so cave walls and the undersides of overhangs are surfaces like any other.</p>
+
+<h3 id="s7-2">7.2 Conditions</h3>
+<table>
+<thead><tr><th>Condition</th><th>True when</th><th>Evaluated per</th></tr></thead>
+<tbody>
+<tr><td><code>biome</code></td><td>The surface-source biome is in a list (for the global lists)</td><td>Column</td></tr>
+<tr><td><code>stone_depth_above(n, noise)</code></td><td>At most n solid voxels lie between this voxel and the nearest non-solid voxel above it (water, air or lava); a named noise may add to n. <code>floor</code> is n = 0.</td><td>Voxel</td></tr>
+<tr><td><code>stone_depth_below(n, noise)</code></td><td>The same towards the nearest non-solid voxel below it. <code>ceiling</code> is n = 0.</td><td>Voxel</td></tr>
+<tr><td><code>y_above(h, wobble)</code></td><td>y ≥ h plus an optional named noise</td><td>Voxel (a y threshold)</td></tr>
+<tr><td><code>above_preliminary_surface(margin)</code></td><td>y ≥ <code>preliminary_surface</code> − margin</td><td>Voxel (a y threshold)</td></tr>
+<tr><td><code>water_depth(min, max)</code></td><td>The number of water voxels directly above the run's top voxel lies in [min, max]; 0 means dry</td><td>Run</td></tr>
+<tr><td><code>sky_open</code></td><td>No solid voxel lies above the run's top voxel</td><td>Run</td></tr>
+<tr><td><code>temperature(below)</code></td><td>T<sub>eff</sub> (§8.1) is below a value</td><td>Voxel (a y threshold: T<sub>eff</sub> falls with y in a column)</td></tr>
+<tr><td><code>steep(rise)</code></td><td><code>preliminary_surface</code> rises by at least <code>rise</code> blocks (start 4) across the column in x or z. It reads the 2D surface, not the voxels, so it is pure and known in the padding.</td><td>Column</td></tr>
+<tr><td><code>noise_threshold(name, min, max)</code></td><td>A named 2D graph output, or a flora rule's density noise, lies in [min, max]</td><td>Column</td></tr>
+<tr><td><code>near_water</code></td><td>A wet column (§6.5) lies within 16 blocks, probed every 4 blocks (DEC-44)</td><td>Column</td></tr>
+<tr><td><code>river(min)</code></td><td>The <code>river</code> output (§9.2) is at least <code>min</code></td><td>Column</td></tr>
+<tr><td><code>not</code>, <code>all</code>, <code>any</code></td><td>Logic over other conditions</td><td>—</td></tr>
+</tbody>
+</table>
+
+<h3 id="s7-3">7.3 Actions</h3>
+<ul class="tight">
+  <li><code>block</code>: place one block.</li>
+  <li><code>bands</code>: strata by y. The band number is ⌊(y + shift) / period⌋ with a warped shift, and the block is the palette entry at that number modulo the palette length (v1's band palette, GEN-42 and DEC-85; start: period 7, thickness 2, warp 4 at wavelength 64).</li>
+  <li><code>sequence</code>: a nested list; its first matching rule acts. If none matches, the outer list goes on.</li>
+  <li><code>condition</code>: a nested rule with its own condition and action.</li>
+</ul>
+
+<h3 id="s7-4">7.4 v1 surfaces as rules</h3>
+<p>Every v1 surface feature becomes a rule with the v1 values as start values. Top rules are wrapped in <code>above_preliminary_surface</code> with a margin of Δmax (AD-17), so grass and dirt appear on the real surface, on overhangs and in cave mouths near it, but never on a deep cave floor.</p>
+<table>
+<thead><tr><th>v1 feature</th><th>Rule in v2</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td>Top, under and stone block per biome</td><td><code>floor</code> → top block; <code>stone_depth_above</code>(under depth, noise) → under block; below that the biome's stone block or the default</td><td>Biome list</td></tr>
+<tr><td>Underwater top block (GEN-30, DEC-31)</td><td><code>floor</code> and <code>water_depth</code> ≥ 1 → the biome's underwater top block, or its under block when it has none. Comes before the top block rule.</td><td>Biome list</td></tr>
+<tr><td>Ocean floor of sand</td><td>Ocean's underwater top block is sand</td><td>Ocean's list</td></tr>
+<tr><td>Patchy beaches (GEN-40, DEC-33) and the water test (DEC-44)</td><td><code>floor</code>, dry, from the water surface up to h<sub>b</sub> − 1 blocks above it (h<sub>b</sub> from the beach noise: maximum 3, threshold 0.45, wavelength 128) and <code>near_water</code> → the biome's beach block</td><td>Biome list</td></tr>
+<tr><td>Forest floor (GEN-43)</td><td><code>floor</code>, dry and <code>noise_threshold</code>(Trees density ≥ 1.5) → Litter in the Taiga</td><td>Biome list</td></tr>
+<tr><td>Meadow (GEN-44, DEC-88) with stone under it (GEN-46, DEC-95)</td><td><code>floor</code>, dry, below the tree line (§8.5) → the biome's meadow block (Mountain: StoneGrassy, which shows stone on its sides)</td><td>Biome list</td></tr>
+<tr><td>Snow above the snow line (GEN-35, GEN-36)</td><td>The snow rule of §8.2</td><td>global-before</td></tr>
+<tr><td>Strata and Badlands bands (GEN-35, GEN-42, DEC-40, DEC-85)</td><td><code>bands</code> with the biome's strata block and palette</td><td>Biome list</td></tr>
+<tr><td>Patchy border between two biomes' materials (DEC-87)</td><td>Not a rule: DistanceBlend chooses the surface-source biome with its border noise (§12)</td><td>P3</td></tr>
+<tr><td>Ice</td><td>Not a rule: the fluid pass (§8.3)</td><td>P5</td></tr>
+</tbody>
+</table>
+<p>The order inside a biome list follows v1 (GEN-45): underwater top, then beach, then forest floor, then meadow, then top block; snow in global-before covers all of them.</p>
+
+<h3 id="s7-5">7.5 Cost</h3>
+<ul>
+  <li>Column-constant conditions are evaluated once per column into a bitmask.</li>
+  <li>The <strong>rule depth</strong> R is the deepest stone-depth bound of any rule, noise included. A voxel that lies more than R below the nearest non-solid voxel above it and more than R above the nearest one below it is an <strong>interior voxel</strong>.</li>
+  <li>Interior voxels take the column's <strong>interior plan</strong>: the rules resolved once per column for interior voxels, at most four y ranges, each with a block or a bands action. Only voxels near a surface run the full lists.</li>
+</ul>
+
+<h3 id="s7-6">7.6 Rule validator</h3>
+<ul class="tight">
+  <li>Unknown blocks, biomes, noises or outputs: error, with the file and rule named.</li>
+  <li>A condition that can decide interior voxels must be column-constant or a y threshold; anything else is an error.</li>
+  <li>The caverns' cover (§10.2) must be at least the top rules' margin plus R, so a covered cavern never opens inside the top rules' reach: error otherwise.</li>
+  <li>A rule after an unconditional rule in the same list can never act: warning.</li>
+</ul>
+
+<div class="req"><span class="id">W2-SRF-01</span><span class="kw must">MUST</span>Run global-before, the surface-source biome's list and global-after in this order; the first matching rule acts, and a voxel no rule matches keeps the default block.</div>
+<div class="req"><span class="id">W2-SRF-02</span><span class="kw must">MUST</span>Evaluate the rules on the final solid mask, after the fluid rule and before the ores.</div>
+<div class="req"><span class="id">W2-SRF-03</span><span class="kw must">MUST</span>Evaluate column-constant conditions once per column.</div>
+<div class="req"><span class="id">W2-SRF-04</span><span class="kw must">MUST</span>Give interior voxels the blocks a full per-voxel evaluation would give (tested on every voxel of sampled chunks).</div>
+<div class="req"><span class="id">W2-SRF-05</span><span class="kw must">MUST</span>Reject rule lists that fail the checks of §7.6, with the file and rule named.</div>
+<div class="req"><span class="id">W2-SRF-06</span><span class="kw should">SHOULD</span>Keep the surface rules at or below 0.5 ms per chunk.</div>
+
+<!-- ============================================================ -->
+<h2 id="s8">8 · Snow, ice &amp; tree line</h2>
+<h3 id="s8-1">8.1 Effective temperature</h3>
+<pre class="math"><code>T_eff(x, y, z) = T(x, z) − L · max(0, y − 124) + wobble(x, z)</code></pre>
+<p>Snow and ice follow the climate temperature cooled with height, in every biome (DEC-130, DEC-131). This is an own extension: Minecraft uses each biome's base temperature, lowered with height above a fixed level (Minecraft Wiki, “Biome”). It has the form of v1's <code>SurfaceCover</code> temperature (GEN-36): climate temperature, a lapse above the water and a freeze noise once per column. T and the wobble are column values; only the lapse is per voxel.</p>
+
+<h3 id="s8-2">8.2 Snow</h3>
+<p>The snow rule sits in global-before: a <code>floor</code> voxel that is dry and <code>sky_open</code>, with T<sub>eff</sub> &lt; T<sub>snow</sub>, in a biome without the never-snow flag, takes the snow block (shipped: Snow; a biome file may name its own). Start values (AD-12), set so that the median Mountain temperature of the starting layout (about 0) keeps v1's snow line of 210 ± 6:</p>
+<ul class="tight">
+  <li>L = 0.0055 per block; T<sub>snow</sub> = −0.473; wobble ±0.033 (±6 blocks), wavelength 64.</li>
+  <li>The snow line is y<sub>s</sub>(T) = 124 + (T − T<sub>snow</sub>) / L.</li>
+</ul>
+<table>
+<thead><tr><th>T</th><th>Snow line</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td>≥ 0.29</td><td>above 262: never reached under the top slide</td><td>The hottest band (Desert, Savanna, Jungle, Badlands)</td></tr>
+<tr><td>0</td><td>210</td><td>The middle band, most Mountain</td></tr>
+<tr><td>−0.3</td><td>about 156</td><td>Cold Taiga and Plains hills</td></tr>
+<tr><td>≤ −0.473</td><td>sea level</td><td>The coldest lowland: snow down to the water</td></tr>
+</tbody>
+</table>
+<p>After the sweep (V3) the owner re-fits L and T<sub>snow</sub> on the chosen layout, so the median Mountain temperature gives 210 again.</p>
+
+<h3 id="s8-3">8.3 Ice</h3>
+<p>In the fluid pass, the top water layer (y 123) freezes where T<sub>eff</sub> &lt; T<sub>ice</sub> = −0.6, v1's freeze temperature 0.2 in the v2 range (AD-13). Since T<sub>ice</sub> &lt; T<sub>snow</sub>, every frozen shore also carries snow down to the water, as v1's GEN-36 asks, and the wobble gives the ice a ragged edge. The FreezesWater flag goes (DEC-131 replaces DEC-65).</p>
+
+<h3 id="s8-4">8.4 Never-snow biomes</h3>
+<ul>
+  <li>A biome file may carry a <em>never snows</em> flag (shipped: Badlands, Desert, Savanna, Jungle). The snow rule and the ice skip a column whose surface-source biome has it, so snow and ice agree at a border.</li>
+  <li>The flag is a filter, not the main tool: with the starting layout the hot band's snow line already lies above the terrain. The layout validator warns when a never-snow biome could reach its snow line: when y<sub>s</sub>(lowest T of its boxes) − 6 lies below the highest ground of its boxes, bounded by the interval rules. Such a biome would show a hard snow edge at its border.</li>
+  <li>The world report checks snow in never-snow biomes (0) and counts hard snow edges.</li>
+</ul>
+
+<h3 id="s8-5">8.5 Tree line and meadow</h3>
+<ul>
+  <li>T<sub>tree</sub> = T<sub>snow</sub> + 15 · L ≈ −0.39: the tree line lies 15 blocks below the snow line, with its own wobble of ±8 blocks at wavelength 64 (v1's VEG-51 values). At T 0 it lies at 195, as in v1 (DEC-86).</li>
+  <li>The tree line never lies below y 170 (DEC-139, start value): y<sub>tree</sub> = max(170, 124 + (T − T<sub>tree</sub>) / L) + its wobble. In cold land the forests reach up to 170 even where the snow line lies far lower.</li>
+  <li>Flora rules with <code>StopsAtTreeLine</code> stop above it. Below it, trees, fallen logs and boulders may stand on the snow block, so cold forests stay forests under snow (DEC-139, AD-26); small plants keep VEG-52 and grow neither on snow nor on bare stone.</li>
+  <li>Below the tree line a dry floor takes its biome's meadow block (GEN-44). On Mountain: meadow, then bare stone above the tree line, then snow above the snow line (DEC-88).</li>
+</ul>
+
+<h3 id="s8-6">8.6 What changes against v1</h3>
+<div class="box warn">
+<ul class="tight">
+  <li><strong>DEC-65 is reversed.</strong> Snow and ice are no longer limited to Mountain: the coldest lowland (T below −0.473, about 9 % of the land with a T spread of 0.35) is snowy down to the sea and has ice on its water, and cold Taiga and Plains hills are snowy above about 156. Their forests keep their trees under the snow (DEC-139).</li>
+  <li><strong>DEC-96's snow allowance in Badlands goes:</strong> Badlands never snows.</li>
+  <li>The fixed snow line (210 ± 6) and tree line (195 ± 8) become climate lines that pass through 210 and 195 at T 0; the tree line never drops below 170 (DEC-139).</li>
+</ul>
+</div>
+
+<div class="req"><span class="id">W2-CLM-01</span><span class="kw must">MUST</span>Compute T<sub>eff</sub> as in §8.1, with T and the wobble once per column.</div>
+<div class="req"><span class="id">W2-CLM-02</span><span class="kw must">MUST</span>Place snow only on dry, sky-open floors with T<sub>eff</sub> below T<sub>snow</sub>, outside never-snow biomes.</div>
+<div class="req"><span class="id">W2-CLM-03</span><span class="kw must">MUST</span>Freeze the water layer at y 123 where T<sub>eff</sub> is below T<sub>ice</sub>, outside never-snow biomes.</div>
+<div class="req"><span class="id">W2-CLM-04</span><span class="kw must">MUST</span>Derive the tree line from the snow line (15 blocks lower, own wobble, never below y 170) and use it for the meadow and the tree rules.</div>
+<div class="req"><span class="id">W2-CLM-05</span><span class="kw must">MUST</span>Refuse settings with T<sub>ice</sub> at or above T<sub>snow</sub>, so a frozen shore always carries snow.</div>
+<div class="req"><span class="id">W2-CLM-06</span><span class="kw must">MUST</span>Let trees, fallen logs and boulders stand on the snow block below the tree line; keep small plants off snow (VEG-52).</div>
+
+<!-- ============================================================ -->
+<h2 id="s9">9 · Fluids &amp; rivers</h2>
+<h3 id="s9-1">9.1 Fluid rule</h3>
+<p>Every voxel is classified from its two interpolated densities (AD-01):</p>
+<table>
+<thead><tr><th>terrain_density</th><th>cave_density</th><th>y</th><th>Voxel</th></tr></thead>
+<tbody>
+<tr><td>&gt; 0</td><td>&gt; 0</td><td>any</td><td>Solid; the surface rules choose the block</td></tr>
+<tr><td>&gt; 0</td><td>≤ 0</td><td>≤ 5</td><td>Lava, in every column (DEC-77, AD-02)</td></tr>
+<tr><td>&gt; 0</td><td>≤ 0</td><td>&gt; 5</td><td>Air: a dry cave</td></tr>
+<tr><td>≤ 0</td><td>any</td><td>&lt; 124</td><td>Water; ice at y 123 where cold (§8.3)</td></tr>
+<tr><td>≤ 0</td><td>any</td><td>≥ 124</td><td>Air</td></tr>
+</tbody>
+</table>
+<ul>
+  <li><strong>Water is never carved</strong> (DEC-78, AD-03): caves carve solid terrain only. A cave can still reach a lake bed or the seabed and leave a wall of standing water next to dry air. The engine has no flowing water, so the wall stays; the world report counts such walls.</li>
+  <li><strong>Enclosed water:</strong> a pocket of terrain air below sea level that the 3D noise closes off is water by the rule. The world report counts these pockets.</li>
+  <li><strong>CaveWaterMargin</strong> (setting, default 0): a band, in blocks below the terrain surface under sea level, in which caves do not carve. 0 keeps DEC-78's behaviour; it is the lever if the V6 tour finds the water walls ugly (DEC-140: the walls are counted and judged there).</li>
+  <li><strong>Aquifer hook:</strong> the dry-cave row is where aquifers would later choose water, lava or air per region, as Minecraft's aquifer does with its barrier, fluid level and lava noises (Minecraft Wiki, “Noise router”). v2.0 keeps caves dry (DEC-135); aquifers are V8.</li>
+</ul>
+
+<h3 id="s9-2">9.2 Rivers</h3>
+<p>Rivers are Minecraft's valleys (DEC-132): the valleys slice of PV (PV ≤ −0.85, which is |W| ≤ 0.05) gets a low offset in the terrain splines (Minecraft Wiki, “World generation”). In v2:</p>
+<ul>
+  <li>Where the land around is low, the offset spline lowers S in the valleys slice to 3–5 blocks below sea level, and the fluid rule fills the bed with water.</li>
+  <li>Where the land is high, the valley stays above sea level and dry: a gorge without water (AD-14, DEC-141). There is no water above sea level.</li>
+  <li>No River biome: a river column keeps its land biome (a land biome on a wet column keeps it, §6.5). The <code>river</code> output, clamp(1 − |W| / 0.05, 0, 1), lets rules and mods dress the banks and the bed.</li>
+  <li>Start: rivers about 600 blocks apart. Their width follows the slope of W at its zero line; V5 measures both.</li>
+</ul>
+
+<div class="req"><span class="id">W2-FLD-01</span><span class="kw must">MUST</span>Classify every voxel by the fluid rule of §9.1.</div>
+<div class="req"><span class="id">W2-FLD-02</span><span class="kw must">MUST</span>Never carve water: a voxel with terrain density ≤ 0 below sea level is water whatever its cave density.</div>
+<div class="req"><span class="id">W2-FLD-03</span><span class="kw must">MUST</span>Make every carved voxel at y ≤ 5 lava, in every column.</div>
+<div class="req"><span class="id">W2-FLD-04</span><span class="kw must">MUST</span>Count water walls and enclosed water in the world report.</div>
+<div class="req"><span class="id">W2-RIV-01</span><span class="kw must">MUST</span>Make rivers through the valleys slice of the terrain splines only: no river noise and no River biome in v2.0.</div>
+<div class="req"><span class="id">W2-RIV-02</span><span class="kw must">MUST</span>Keep every river at sea level: a bed below 124 fills by the fluid rule, and a valley above it stays dry.</div>
+<div class="req"><span class="id">W2-RIV-03</span><span class="kw should">SHOULD</span>Provide the <code>river</code> output for rules and mods.</div>
+
+<!-- ============================================================ -->
+<h2 id="s10">10 · Caves, ores &amp; lava</h2>
+<h3 id="s10-1">10.1 Form</h3>
+<p>Caves are noise terms of the density, the owner's pick “Minecraft-style noise caves” (DEC-134). The terms and their start shapes below are v2's own and start from v1's Phase K values:</p>
+<pre class="math"><code>cave_density = min(caverns, tunnels, passages, lava_pockets)        ≤ 0 carves</code></pre>
+<ul class="tight">
+  <li>Caves carve solid terrain only, never water (§9.1), and never at y ≤ 2 (bedrock).</li>
+  <li>The graph gives caves no biome input: they are the same everywhere (DEC-58) and on everywhere (DEC-61).</li>
+  <li>Caves stay dry; aquifers are V8 (DEC-135).</li>
+</ul>
+
+<h3 id="s10-2">10.2 Caverns</h3>
+<ul>
+  <li><strong>Shape:</strong> v1's halls (CAV-10, DEC-79). A 3D fbm at wavelength 96 across and 48 up, sampled at a position that two warp noises (wavelength 64) shift by up to 20 blocks, plus a detail octave (wavelength 28, amplitude 0.3) folded at its zero crossings (1 − 2|n| − 0.3).</li>
+  <li><strong>Height band:</strong> y 4…90. The threshold rises towards the top of the band and falls towards its floor, so caverns close off at the top and are widest just above the floor (DEC-75, DEC-76). In the graph this is a <code>y_gradient</code>.</li>
+  <li><strong>Mask:</strong> a 2D noise lets caverns form on about 15 % of the area. Its edge fades over 0.1 of mask value with a smooth step (DEC-67).</li>
+  <li><strong>Cover:</strong> caverns carve only below <code>preliminary_surface</code> − Cover. Start: Cover = Δmax + 8, so at least 8 blocks of rock lie over a cavern (v1's Cover 8).</li>
+  <li><strong>Entrances:</strong> an entrance mask on about 3 % of the land (v1's share) lifts the cover, so a cavern can open to the sky there: rare, large cave mouths (DEC-55). v1 used this mask for worm shafts; v2 has no worms.</li>
+  <li>v1's pillars go. A mod or a later round can add them back as a graph term.</li>
+</ul>
+
+<h3 id="s10-3">10.3 Tunnels and passages</h3>
+<ul>
+  <li><strong>Tunnels:</strong> max(|a|, |b|) − r, with two 3D noises a and b (AD-15). A tunnel follows the line where both noises are zero, so it winds through the rock and crosses other tunnels and caverns. This is the spaghetti form that DEC-54 did not choose in v1; the owner's pick of noise caves now takes it.</li>
+  <li><strong>Radius:</strong> r follows a slow noise. Start: at least 2.5 blocks, so the player can walk through.</li>
+  <li><strong>Interpolation:</strong> a tunnel that is thinner than a cell is tall can fall between two corner layers and vanish or break into beads. With cells 8 high a tunnel needs a radius of about 4; with an own cave lattice of cells 4 high, 2.5 is enough. V6 measures both, and the owner picks (AD-06, DEC-143).</li>
+  <li><strong>Surface:</strong> tunnels have no cover and may break dry ground anywhere (DEC-77). They stop at water like every cave.</li>
+  <li><strong>Passages</strong> (optional): the same form with a smaller radius under a mask. Off in the start graph.</li>
+</ul>
+
+<h3 id="s10-4">10.4 Lava</h3>
+<ul>
+  <li><strong>Lava pockets</strong> (DEC-56): inside the lava mask (a 2D noise on about 40 % of the area, CAV-30), a flat 3D noise (wavelength 32 across, strongly squashed in y) carves in the band y 3…10 (CAV-31). The fluid rule makes their voxels at y ≤ 5 lava and those above air: a lava surface under a low air gap. The mask fades over 0.1 (DEC-67), and the pockets stay under the caverns' cover (DEC-68).</li>
+  <li><strong>Lava level:</strong> every carved voxel at y ≤ 5 is lava, in every column (DEC-77, AD-02).</li>
+  <li>Lava emits light as before; the light job is measured again on lava chunks (CAV-50).</li>
+</ul>
+
+<h3 id="s10-5">10.5 Connected caves</h3>
+<p>DEC-74's goal stays: no tunnel on its own. Noise tunnels are long lines that cross each other and the caverns, so they form networks without connector logic. The cave report checks this: the share of carved voxels in a sample window that belong to a component of at least 1,000 voxels or reach the window's edge (start target ≥ 95 %, a placeholder).</p>
+
+<h3 id="s10-6">10.6 Ores</h3>
+<p>v1's ore veins stay (CAV-40, CAV-41, DEC-59): 16³ cells, hashed vein seeds and short random-walk blobs. The ore rules run in list order and each replaces only its host block (DEC-69). They now run after the fill and the surface rules (P6, AD-16), so they see the final blocks. Ores never replace air, so caves still expose veins in their walls, as in v1, where the ores came before the caves.</p>
+
+<h3 id="s10-7">10.7 Bedrock</h3>
+<p>Unchanged (CAV-42): y 0 is always bedrock, y 1 and y 2 are bedrock where a 3D hash falls below 0.5 and 0.25.</p>
+
+<div class="box warn"><p><strong>What changes against v1:</strong> worms, connector worms, worm shafts and pillars go (DEC-134 replaces DEC-54, 57, 66, 70, 71, 73, 75 and 76). Tunnels now come from noise, the option DEC-54 left out. Caves near water follow DEC-78 (AD-03).</p></div>
+
+<div class="req"><span class="id">W2-CAV-01</span><span class="kw must">MUST</span>Carve only terrain voxels with cave density ≤ 0, never water and never at y ≤ 2.</div>
+<div class="req"><span class="id">W2-CAV-02</span><span class="kw must">MUST</span>Give the cave terms no biome input, so caves are the same in every biome.</div>
+<div class="req"><span class="id">W2-CAV-03</span><span class="kw must">MUST</span>Keep caverns and lava pockets under their cover, except caverns inside the entrance mask.</div>
+<div class="req"><span class="id">W2-CAV-04</span><span class="kw must">MUST</span>Keep tunnels passable: at least 2 blocks wide and not broken into beads by the interpolation.</div>
+<div class="req"><span class="id">W2-CAV-05</span><span class="kw must">MUST</span>Place ores after the surface rules, in list order, each replacing only its host block.</div>
+<div class="req"><span class="id">W2-CAV-06</span><span class="kw must">MUST</span>Keep v1's bedrock layer.</div>
+<div class="req"><span class="id">W2-CAV-07</span><span class="kw should">SHOULD</span>Reach the cave report's connectivity target of §10.5.</div>
+
+<!-- ============================================================ -->
+<h2 id="s11">11 · Flora</h2>
+<h3 id="s11-1">11.1 Anchor</h3>
+<p>A column's flora anchor is the top of the terrain: its highest voxel with terrain density above 0 (§5.6). Flora grows there only when that voxel is not carved, and a tree only when the voxel under its trunk is solid (v1's CAV-04). v2.0 grows no flora on cave floors or under overhangs; that is an idea for V8 (AD-18).</p>
+
+<h3 id="s11-2">11.2 Padding search</h3>
+<p>A tree anchored in the flora padding (11 blocks) is stamped by every chunk it reaches, so each chunk needs the anchors of its padding columns. The padding search evaluates a padding column's terrain density only between <code>preliminary_surface</code> − Δmax and <code>preliminary_surface</code> + Δmax, where its top must lie, from the same world-aligned corners. It therefore finds the voxel that the chunk owning the column finds. Cost: 0.1–0.3 ms (§2.4).</p>
+
+<h3 id="s11-3">11.3 Rules</h3>
+<ul>
+  <li>Species, densities, groves, clearings, boulders, fallen logs, water plants and the exact density pre-filter stay as they are (DEC-30…33, 45, 83, 84, 91, 97, 98).</li>
+  <li>The flora weights come from DistanceBlend, so the flora roll stays apart from the surface pick (DEC-04).</li>
+  <li>The tree line comes from the climate (§8.5). The ground checks (soil, height above water) read the final blocks.</li>
+  <li>DEC-72's test tiers stay; whether the flora fixture still turns caves off is decided in V6.</li>
+</ul>
+
+<div class="req"><span class="id">W2-FLO-01</span><span class="kw must">MUST</span>Anchor flora at the top of the terrain and skip anchors whose voxel is carved.</div>
+<div class="req"><span class="id">W2-FLO-02</span><span class="kw must">MUST</span>Find padding anchors with the bounded search of §11.2, which gives the same voxel as the chunk that owns the column.</div>
+<div class="req"><span class="id">W2-FLO-03</span><span class="kw must">MUST</span>Keep the flora rules, species and the density pre-filter unchanged.</div>
+<div class="req"><span class="id">W2-FLO-04</span><span class="kw must">MUST</span>Apply the tree line of §8.5 to rules that stop at the tree line.</div>
+
+<!-- ============================================================ -->
+<h2 id="s12">12 · Blending</h2>
+<ul>
+  <li>v2 ships DistanceBlend and keeps None for tests (DEC-138). The other v1 methods are deleted at the switch (V7).</li>
+  <li>DistanceBlend works on materials and flora only, with v1's start values (width 32, border wavelength 28, σ 0.04). It writes the surface-source biome per column, which the surface rules read (§7), and the flora weights (§11). Its border noise gives the patchy, wavy material border of DEC-87; the noise is evaluated per column (§4.4).</li>
+  <li>The blend never changes the terrain: v2 has no height stage (DEC-38 is replaced), because the terrain does not depend on the biome.</li>
+  <li>Cost: about 1.5–2.0 ms, the largest single pass (§2.4). Lever: the blend lattice at stride 4 (−0.5…−1.0 ms), after a look check of the borders (V8).</li>
+</ul>
+
+<div class="req"><span class="id">W2-BLD-01</span><span class="kw must">MUST</span>Ship DistanceBlend for materials and flora, and None; no other blend method after the switch.</div>
+<div class="req"><span class="id">W2-BLD-02</span><span class="kw must">MUST</span>Never let the blend change the terrain.</div>
+<div class="req"><span class="id">W2-BLD-03</span><span class="kw may">MAY</span>Sample the blend lattice at stride 4 once the borders pass the owner's look check.</div>
+
+<!-- ============================================================ -->
+<h2 id="s13">13 · Tooling &amp; world report</h2>
+<h3 id="s13-1">13.1 Preview window</h3>
+<p>The preview window stays the main tuning tool. It adds:</p>
+<ul class="tight">
+  <li>every named graph output as a map, and the 3D outputs in the cross-section;</li>
+  <li>the hard and the surface-source biome maps;</li>
+  <li>the cross-section with terrain, caves, water, lava and the blocks of the rules (DEC-60);</li>
+  <li>the compare view as before: A is the asset, B the preview overrides.</li>
+</ul>
+
+<h3 id="s13-2">13.2 Layout tab</h3>
+<p>Shows the biome boxes as a T × F grid for each region of C and E, marks neighbour pairs and implausible pairs, and shows the validator's messages live. Edits go to the B overrides first, so A stays as shipped until the owner saves.</p>
+
+<h3 id="s13-3">13.3 Sweep</h3>
+<p>Runs the candidate layouts and wavelength sets of §6.7 and shows their table. The owner picks; nothing is picked automatically.</p>
+
+<h3 id="s13-4">13.4 World report</h3>
+<p>The world report replaces v1's terrain look report and stays the tuning measure. It is an explicit EditMode test over the five fixed seeds (DEC-10): maps of 8192² blocks at stride 8 for shares and patches, 4096² at stride 4 for heights and edges, and sample windows of full chunks for voxel counts. It prints one table per seed and the targets of §13.5 with pass or fail.</p>
+
+<h3 id="s13-5">13.5 Targets</h3>
+<p>Start values; the owner sets the final ones. The share bounds come from v1's shipped-world tests (AD-23); v1's checks of single tour spots are dropped, because the spots lose their biomes.</p>
+<table>
+<thead><tr><th>Target</th><th>Start value</th><th>From</th></tr></thead>
+<tbody>
+<tr><td>Ocean on dry columns</td><td>0</td><td>Problem list; TST-66</td></tr>
+<tr><td>Edges between implausible pairs</td><td>0</td><td>DEC-89, DEC-94; TST-66 allowed 1 %</td></tr>
+<tr><td>Snow in never-snow biomes</td><td>0</td><td>DEC-120</td></tr>
+<tr><td>Badlands share of the land</td><td>&lt; 7 %</td><td>TST-65, TST-66</td></tr>
+<tr><td>Badlands share of the ground at 180 and above</td><td>&lt; 30 %</td><td>TST-65, TST-66</td></tr>
+<tr><td>Ground at 204 and above that is neither Mountain nor Badlands</td><td>&lt; 6 %</td><td>TST-67</td></tr>
+<tr><td>Mountain patches whose outer ring is more than half Badlands</td><td>0</td><td>TST-65</td></tr>
+<tr><td>Jungle height at p95</td><td>&lt; 182</td><td>TST-66 (DEC-93)</td></tr>
+<tr><td>Jungle median height</td><td>140–145</td><td>DEC-80</td></tr>
+<tr><td>Jungle columns under water</td><td>&lt; 20 %</td><td>Problem list (62 % after PR #81)</td></tr>
+<tr><td>Plains / Savanna columns under water</td><td>&lt; 28 % / &lt; 32 %</td><td>TST-66 (DEC-99)</td></tr>
+<tr><td>Land in single-biome patches smaller than 64 × 64</td><td>&lt; 2 %</td><td>GEN-33</td></tr>
+<tr><td>Median patch size</td><td>≥ 1 km²</td><td>Problem list: biomes change too fast</td></tr>
+<tr><td>Common biomes present in 8 km windows</td><td>each in ≥ 90 % of the windows</td><td>Problem list: lopsided windows</td></tr>
+<tr><td>Snow line at the median Mountain temperature</td><td>210 ± 20</td><td>v1 snow line 210</td></tr>
+<tr><td>Carved voxels in caves connected as in §10.5</td><td>≥ 95 %</td><td>DEC-74</td></tr>
+</tbody>
+</table>
+<p>Reported without a target: floating solid pieces, the overhang share, water walls, enclosed water, the carved and the lava share, cave openings to the sky, hard snow edges, river spacing and width, and the steep share per biome.</p>
+
+<div class="req"><span class="id">W2-TOOL-01</span><span class="kw must">MUST</span>Show every named graph output in the preview.</div>
+<div class="req"><span class="id">W2-TOOL-02</span><span class="kw must">MUST</span>Run the graph, layout and rule validators live in the preview and show their messages.</div>
+<div class="req"><span class="id">W2-TOOL-03</span><span class="kw must">MUST</span>Provide the world report as an explicit test over the five fixed seeds, with the targets of §13.5.</div>
+<div class="req"><span class="id">W2-TOOL-04</span><span class="kw must">MUST</span>Leave every pick on the sweep to the owner (R5).</div>
+
+<!-- ============================================================ -->
+<h2 id="s14">14 · Moddability</h2>
+<ul>
+  <li><strong>Data:</strong> the noise graph, the biome files (boxes, blocks, flags, rule list, flora rules), the global rule lists, the ore rules and the world settings. This is GameSpec's GAME-MOD-04, world generation through data.</li>
+  <li><strong>What a mod can do:</strong> add or replace noises, nodes and outputs; add biomes with their boxes (255 biomes at most, AD-20); add or replace rules; add ore rules. Data merges by name in load order.</li>
+  <li><strong>Checks:</strong> the graph, layout and rule validators run on the merged data before a world generates. An error names the mod, the file and the node, and the world does not generate. As in v1, a broken biome file outside the set is skipped and one inside it is an error (DEC-22).</li>
+  <li><strong>No mod code in the chunk job:</strong> the interpreter runs every graph, within the limits of §3.7.</li>
+</ul>
+<div class="req"><span class="id">W2-MOD-01</span><span class="kw must">MUST</span>Keep everything that shapes the world in data a mod can add to or replace.</div>
+<div class="req"><span class="id">W2-MOD-02</span><span class="kw must">MUST</span>Validate the merged data before a world generates, naming the mod, file and node of every error.</div>
+<div class="req"><span class="id">W2-MOD-03</span><span class="kw must">MUST</span>Run no mod code inside the chunk job.</div>
+<div class="req"><span class="id">W2-MOD-04</span><span class="kw should">SHOULD</span>Document the node set, the conditions, the actions and the biome file format for mod authors at the switch.</div>
+
+<!-- ============================================================ -->
+<h2 id="s15">15 · Determinism &amp; identity</h2>
+<ul>
+  <li><strong>Pure function:</strong> every voxel, biome id and flora placement depends only on the seed, the position and the merged data (R3). The jobs keep <code>FloatMode.Strict</code> and synchronous Burst compilation (GameSpec §3.7).</li>
+  <li><strong>No transcendental functions:</strong> GameSpec §3.7 found the worms' sin, cos and atan2 to be the only functions in shipped generation without a cross-machine promise. They go with the worms. v2's nodes use only the four basic operations, min, max, abs, floor and sqrt, which IEEE 754 defines exactly.</li>
+  <li><strong>Identity:</strong> a world stores <code>generatorVersion</code> 2 and the settings hash, a hash of the canonical JSON (sorted keys) of the merged data. Land that was never edited follows the generator; edited chunks are saved (the D2 save model).</li>
+  <li><strong>Golden hashes</strong> (V7): the voxel hashes of a fixed set of chunks per seed (caves on, several biomes), checked in EditMode and in a development player on Windows and Linux (GameSpec §3.7). A change that moves them must be intended, and its PR updates them.</li>
+</ul>
+<div class="req"><span class="id">W2-ID-01</span><span class="kw must">MUST</span>Keep every generated value a pure function of seed, position and merged data, the same in the chunk and in the padding.</div>
+<div class="req"><span class="id">W2-ID-02</span><span class="kw must">MUST</span>Use no transcendental functions in generation: only the four basic operations, min, max, abs, floor and sqrt.</div>
+<div class="req"><span class="id">W2-ID-03</span><span class="kw must">MUST</span>Store the generator version and the settings hash with each world.</div>
+<div class="req"><span class="id">W2-ID-04</span><span class="kw must">MUST</span>Add golden voxel hashes at the switch and keep them passing.</div>
+
+<!-- ============================================================ -->
+<div class="part" id="partB"><span>Part B</span> Plan</div>
+
+<h2 id="s16">16 · Phases V0–V8</h2>
+<p>Each phase is one PR on its own branch, in order: the graph core comes before the terrain (DEC-145). v1 stays the default generator and unchanged until V7 (AD-22). Every phase ends with its tests green, its measurements reported against §2.4, and, where it changes the look, a world tour with the owner. The owner sets look values; the agent does not tune them on its own (R5).</p>
+
+<div class="phase">
+<h4>V0 · Spec</h4>
+<ul class="tight">
+  <li>This document. The owner reviews the agent defaults (§19) and the flags of the decision review (§20.4).</li>
+  <li>The owner answered the open questions of the review on 2026-11-21 (DEC-139…146, §18.2).</li>
+  <li>Exit: the owner reviews the updated spec on PR #83 and merges it; V1 then starts from master (DEC-146).</li>
+</ul>
+</div>
+
+<div class="phase">
+<h4>V1 · Graph core (§3, §4)</h4>
+<ul class="tight">
+  <li>Work: graph data and its JSON form, compiler, interval rules, graph validator, batched Burst interpreter; a start graph with the five climate parameters and PV; the preview shows every output.</li>
+  <li>Tests: each node against a scalar reference; compiled equals uncompiled bit for bit; interval soundness on random points; noise seeds by name; equal values at shared corners of neighbouring chunks; the validator rejects cycles, unknown names and graphs over the limits.</li>
+  <li>Measurement: the interpreter against hand-written Burst code for the same climate fields.</li>
+  <li>Gate: overhead ≤ +15 %, otherwise generated code for the shipped graph (§3.7).</li>
+</ul>
+</div>
+
+<div class="phase">
+<h4>V2 · Terrain density (§5)</h4>
+<ul class="tight">
+  <li>Work: the terrain splines, peak noise and 3D noise; cells, slab bounds, uniform cells and the top slide; the new chunk job beside <code>ChunkJob</code> with a placeholder fill (stone, water, air; no rules yet); the world setting that selects the generator; the density cross-section in the preview.</li>
+  <li>Re-tune: the massifs towards the ranges of candidate A (DEC-108), judged in a world tour.</li>
+  <li>Tests: skipping and uniform cells give the per-voxel result; neighbouring chunks agree at their borders; no terrain above 255; the heightmap is the top terrain voxel.</li>
+  <li>Measurements: cells 4 × 8 × 4 against 4 × 4 × 4 (cost and look); the cost of P1 and P4; heights per region; the overhang share and floating pieces; the light job, the light margin 14 and the interval store again (DEC-27, DEC-46, DEC-110), because overhangs make more runs and more light work.</li>
+  <li>Gate: the owner signs off the terrain's look, with a moderate amount of overhangs as the target (DEC-142); P1 and P4 within their rows of §2.4.</li>
+</ul>
+</div>
+
+<div class="phase">
+<h4>V3 · Biomes (§6)</h4>
+<ul class="tight">
+  <li>Work: boxes in the biome files, the compiled lookup, the wetness test, the dry-column rule, the layout validator, the Layout tab, the sweep and the world report; the starting layout of §6.4; the hard biome id per column.</li>
+  <li>Tests: the lookup equals brute force on sampled points and in every gap cell; overlaps are errors; nearest box and ties; the dry-column rule; the validator finds implausible neighbours at corners, in the gap fill and among dry-column substitutes; at most 255 biomes; equal biomes in a chunk and in its neighbour's padding.</li>
+  <li>Measurements: the lookup, the wetness test and the 256-bit biome masks (DEC-144) against §2.4; the sweep table on the five seeds.</li>
+  <li>Owner picks: layout and wavelengths on the sweep (DEC-136), recorded as a new DEC.</li>
+</ul>
+</div>
+
+<div class="phase">
+<h4>V4 · Surface rules, snow and ice (§7, §8)</h4>
+<ul class="tight">
+  <li>Work: rule lists, conditions, actions, the interior plan and the rule validator; the v1 surfaces as rules (§7.4); snow, ice, tree line and meadow. Until V6 the rules read the hard biome (blend None).</li>
+  <li>Tests: the v1 surface behaviour on built columns (beach band, underwater top, meadow below the tree line, snow over all of them); the interior plan equals the full evaluation; validator errors; the snow line formula; ice only at y 123 below T<sub>ice</sub>; the never-snow filter. Ported: <code>BeachTests</code>, <code>SurfaceCoverTests</code>, <code>UnderwaterTopBlockTests</code>.</li>
+  <li>Calibration: L and T<sub>snow</sub> on the picked layout (§8.2).</li>
+  <li>Measurements: rule cost; snow line at the median Mountain temperature; hard snow edges.</li>
+  <li>Gate: the owner signs off in a world tour.</li>
+</ul>
+</div>
+
+<div class="phase">
+<h4>V5 · Rivers (§9.2)</h4>
+<ul class="tight">
+  <li>Work: the valleys slice in the offset spline; the <code>river</code> output; start rules for banks and beds.</li>
+  <li>Tests: river water only below 124; no water above 124; the valleys slice equals |W| ≤ 0.05.</li>
+  <li>Measurements: river spacing, width and share of columns; the wet shares of §13.5 again.</li>
+  <li>Gate: the owner signs off in a world tour.</li>
+</ul>
+</div>
+
+<div class="phase">
+<h4>V6 · Caves, ores, lava, flora and blend (§10, §11, §12)</h4>
+<ul class="tight">
+  <li>Work: caverns, tunnels, passages and lava pockets; cover, entrance mask and <code>CaveWaterMargin</code>; ores after the fill; bedrock; flora with the terrain-top anchor and the padding search; DistanceBlend for materials and flora; an own cave lattice if the measurements call for it.</li>
+  <li>Tests: carving rules of W2-CAV; tunnels stay passable; ores replace only their host; the flora anchor and the padding search. Ported: <code>FloraChunkTests</code>, <code>CaveTests</code>, <code>CaveReportTests</code>, <code>BlendingTests</code> (two methods). DEC-72's caves-off fixture is checked again.</li>
+  <li>Measurements: the benchmark row against 7.2 ms; the tunnel radius against an own cave lattice, for the owner to pick (DEC-143); the light job on lava chunks; the interval store; the cave report.</li>
+  <li>Gate: at most 7.2 ms per chunk (DEC-129); the owner signs off in a world tour, the water walls included (DEC-140).</li>
+</ul>
+</div>
+
+<div class="phase">
+<h4>V7 · Switch</h4>
+<ul class="tight">
+  <li>Work: v2 becomes the only generator. Delete v1 Terrain-first and Biome-first (DEC-137), the other blend methods, the classifier with its class height, the worms, and their tests. Store <code>generatorVersion</code> 2 and the settings hash; add golden hashes; update <code>WorldGenSpec.html</code>, the pipeline document and the mod documentation (W2-MOD-04).</li>
+  <li>Measurements: new benchmark baselines; the 120 fps goal run in a player build (DEC-104), with p95, p99, max and the frames over 8.33 ms.</li>
+  <li>Exit: the owner signs off; v2 ships with the next real release.</li>
+</ul>
+</div>
+
+<div class="phase">
+<h4>V8 · Optional</h4>
+<ul class="tight">
+  <li>Aquifers (DEC-135), cave biomes through the depth parameter, flora on cave floors and under overhangs, the blend lattice at stride 4, pillars in caverns, thin passages on in the shipped graph.</li>
+  <li>Each item is offered to the owner as its own decision.</li>
+</ul>
+</div>
+
+<div class="req"><span class="id">W2-MIG-01</span><span class="kw must">MUST</span>Keep v1 the default generator, unchanged, until V7.</div>
+<div class="req"><span class="id">W2-MIG-02</span><span class="kw must">MUST</span>At V7, delete v1 Terrain-first, Biome-first, the other blend methods, the classifier and the worms, together with their tests.</div>
+<div class="req"><span class="id">W2-MIG-03</span><span class="kw must">MUST</span>Land each phase as its own PR, with its tests and measurements in the PR description.</div>
+
+<!-- ============================================================ -->
+<h2 id="s17">17 · Tests &amp; measurements</h2>
+<h3 id="s17-1">17.1 New tests</h3>
+<p>Each phase adds the tests listed in §16 as EditMode tests. Long reports (the world report, the sweep and the cave report) are explicit tests in the long tier, as v1's reports are.</p>
+
+<h3 id="s17-2">17.2 Kept tests</h3>
+<p>Kept as they are: <code>HashAndSimplexTests</code>, <code>NoiseTests</code>, <code>NestedSplineTests</code>, <code>TreeGalleryTests</code>, <code>TreeShapeTests</code>, <code>FloraPlacementTests</code>, <code>FloraDensityTests</code>, <code>BottomLayerTests</code>, <code>BiomeTintTests</code>. <code>HeightLimitTests</code> is re-targeted to the top slide.</p>
+
+<h3 id="s17-3">17.3 Ported tests</h3>
+<table>
+<thead><tr><th>Test</th><th>Becomes</th><th>Phase</th></tr></thead>
+<tbody>
+<tr><td><code>ClimateFieldTests</code></td><td>Graph outputs for the climate parameters</td><td>V1</td></tr>
+<tr><td><code>WorldGenSettingsTests</code>, <code>SplinePlotsTests</code>, <code>SampleSliceTests</code>, <code>WorldSamplerTests</code></td><td>Settings, terrain splines, cross-sections and the sampler of v2</td><td>V2</td></tr>
+<tr><td><code>ShippedBiomeLayoutTests</code></td><td>Starting layout and layout validator</td><td>V3</td></tr>
+<tr><td><code>TerrainLookReportTests</code></td><td>World report</td><td>V3</td></tr>
+<tr><td><code>BiomeBoundaryStatsTests</code>, <code>PreviewCompareTests</code></td><td>Border statistics and the compare view on v2</td><td>V3</td></tr>
+<tr><td><code>BeachTests</code>, <code>SurfaceCoverTests</code>, <code>UnderwaterTopBlockTests</code></td><td>Surface rules, snow and ice</td><td>V4</td></tr>
+<tr><td><code>FloraChunkTests</code>, <code>CaveTests</code>, <code>CaveReportTests</code>, <code>BlendingTests</code></td><td>Flora anchor, noise caves, cave report, DistanceBlend and None</td><td>V6</td></tr>
+</tbody>
+</table>
+
+<h3 id="s17-4">17.4 Retired at the switch</h3>
+<p><code>ChunkJobBiomeFirstTests</code>, <code>BiomeFirstCalibrationTests</code>, <code>ChunkJobTerrainFirstTests</code>, the tests of the deleted blend methods, of the class height and of the worms. <code>CaveCarvingBenchmark</code> gives way to v2 rows in <code>ChunkGenerationBenchmark</code>.</p>
+
+<h3 id="s17-5">17.5 How measurements are taken</h3>
+<ul>
+  <li><strong>Ask first.</strong> Before every benchmark, timing or build batch the agent asks the owner, so the Editor can be focused: an unfocused Editor reads 15–40 % slow. The agent says at once when the batch is done.</li>
+  <li><strong>One Editor at a time</strong> on this machine. The agent checks which project the open Editor has before timing.</li>
+  <li><strong>ABBA order:</strong> A, B, B, A with medians, so drift cancels. Frame runs report p95, p99, max and the frames over 8.33 ms (DEC-104).</li>
+  <li><strong>Baseline:</strong> the benchmark row <code>ChunkJob.Run</code> Terrain-first, DistanceBlend, flora, caves on: 5.75 ms on master on 2026-11-21 (Unity 6000.3.28f1). Timings from older Editor versions are not comparable.</li>
+  <li><strong>Hot loops:</strong> extra code in one pass once slowed it by 35 % (<code>PrepareChunkMaps</code>), so every change to a pass is measured on its own.</li>
+</ul>
+
+<div class="req"><span class="id">W2-TST-01</span><span class="kw must">MUST</span>Add each phase's tests in the phase's PR.</div>
+<div class="req"><span class="id">W2-TST-02</span><span class="kw must">MUST</span>Keep v1's tests green until V7, and the kept tests green throughout.</div>
+<div class="req"><span class="id">W2-TST-03</span><span class="kw must">MUST</span>Run the world report, the sweep and the cave report as explicit tests.</div>
+<div class="req"><span class="id">W2-TST-04</span><span class="kw must">MUST</span>Ask the owner before every benchmark, timing or build batch, and measure in ABBA order.</div>
+
+<!-- ============================================================ -->
+<div class="part" id="partC"><span>Part C</span> Decisions</div>
+
+<h2 id="s18">18 · Owner decisions (DEC-125…146)</h2>
+<h3 id="s18-1">18.1 Design picks (DEC-125…138)</h3>
+<p>The owner picked these on 2026-11-21 from option questions with the agent's recommendation first. They are binding for v2. Six picks differ from the recommendation: DEC-125, 126, 128, 129, 134 and 137. Costs are estimates per chunk on the benchmark row; §2.4 has the current plan.</p>
+<table>
+<thead><tr><th>DEC</th><th>Question</th><th>Options (recommendation first)</th><th>Owner's pick</th><th>Cost · where</th></tr></thead>
+<tbody>
+<tr><td>DEC-125</td><td>Terrain form</td><td>A. 2.5D height now, a 3D band later (recommended)<br>B. A 3D band near the surface from the start<br>C. Full 3D density<br>D. 2.5D only</td><td><strong>C. Full 3D density</strong> (not the recommendation)</td><td>2.5D −0.1…+0.3 ms, band +0.3–0.6 ms, full 3D +1.5–3 ms · §5</td></tr>
+<tr><td>DEC-126</td><td>How noises and fields are defined</td><td>A. Fixed fields, all values as data (recommended)<br>B. A data-defined noise graph</td><td><strong>B. Noise graph</strong> (not the recommendation)</td><td>Interpreter +5–15 % over hand-written code; V1 gate, generated code as fallback · §3, §4</td></tr>
+<tr><td>DEC-127</td><td>Biome placement</td><td>Asked twice. First: A. Class × climate table (recommended), B. Free parameter boxes, C. Point targets without height. The owner: “I am not sure: my prios are performance, modability, interesting &amp; continues world”. Asked again against these priorities:<br>A. Per-biome parameter boxes (recommended)<br>B. One shared class × climate table<br>C. Point targets without height</td><td><strong>A. Per-biome parameter boxes</strong></td><td>Lookup 0.15–0.25 ms · §6</td></tr>
+<tr><td>DEC-128</td><td>Terrain shape</td><td>A. Today's terrain as the first density (recommended)<br>B. A new Minecraft-like terrain from scratch</td><td><strong>B. New Minecraft-like terrain</strong> (not the recommendation)</td><td>Re-tuned towards the ranges of candidate A in V2 (DEC-108) · §5.2</td></tr>
+<tr><td>DEC-129</td><td>Cost budget per chunk</td><td>A. At most +10 % (6.3 ms), gate in V2 (recommended)<br>B. No slower than today (5.75 ms)<br>C. At most +25 % (7.2 ms)</td><td><strong>C. 7.2 ms</strong> (not the recommendation)</td><td>Estimate 5.0–7.6 ms; the upper end needs the levers · §2.4, §2.5, gate in V6</td></tr>
+<tr><td>DEC-130</td><td>Snow</td><td>A. Climate temperature cooled with height (recommended)<br>B. Biome base temperature (as Minecraft)<br>C. Keep DEC-65</td><td><strong>A. Climate temperature</strong></td><td>Part of the surface rules · §8.1, §8.2</td></tr>
+<tr><td>DEC-131</td><td>Ice</td><td>A. Freeze by climate temperature (recommended)<br>B. Keep the FreezesWater flag<br>C. No ice in v2.0</td><td><strong>A. Climate temperature</strong></td><td>Part of the fluid pass · §8.3</td></tr>
+<tr><td>DEC-132</td><td>Rivers</td><td>A. Minecraft-like valleys, no River biome (recommended)<br>B. An own river noise<br>C. Minecraft-like valleys plus a River biome<br>D. No rivers in v2.0</td><td><strong>A. Valleys, no River biome</strong></td><td>No own pass: a slice of the terrain splines · §9.2</td></tr>
+<tr><td>DEC-133</td><td>Surface rules</td><td>A. Rule lists (recommended)<br>B. One rule tree (as Minecraft)<br>C. Today's fixed fields as data</td><td><strong>A. Rule lists</strong></td><td>0.3–0.5 ms · §7</td></tr>
+<tr><td>DEC-134</td><td>Caves</td><td>A. Keep the Phase K caves as passes (recommended)<br>B. Halls into the graph, worms stay<br>C. Minecraft-style noise caves</td><td><strong>C. Noise caves</strong> (not the recommendation)</td><td>+0.5–1 ms over the Phase K caves · §10</td></tr>
+<tr><td>DEC-135</td><td>Aquifers</td><td>A. Dry caves now, aquifers later (recommended)<br>B. Minecraft-like aquifers in v2.0<br>C. Dry caves, no aquifers planned</td><td><strong>A. Dry now, aquifers later</strong></td><td>None now; hook in §9.1, work in V8</td></tr>
+<tr><td>DEC-136</td><td>Biome sizes and balance</td><td>A. Pick on a measured sweep (recommended)<br>B. Big biomes first<br>C. Balance first</td><td><strong>A. Measured sweep</strong></td><td>Tool work only · §6.7, §13.3, picked in V3</td></tr>
+<tr><td>DEC-137</td><td>Biome-first</td><td>Asked twice. First: A. Biome-first on the v2 core with a shared layout (recommended), B. Its own copy of the v1 classifier, C. Frozen v1. The owner: “biom-first will be a completly different word generator with seperate setting and assets. out of scope for now.” Asked again what happens to the v1 code:<br>A. Split it out and freeze it (recommended)<br>B. Delete it with v1<br>C. Keep v1 whole until then</td><td><strong>B. Delete with v1</strong> (not the recommendation)</td><td>None; deleted at the switch · §1.5, V7</td></tr>
+<tr><td>DEC-138</td><td>Blend methods</td><td>A. The shipped method only: DistanceBlend, plus None (recommended)<br>B. All four methods as a module</td><td><strong>A. DistanceBlend and None</strong></td><td>DistanceBlend 1.5–2.0 ms as in v1 · §12</td></tr>
+</tbody>
+</table>
+
+<h3 id="s18-2">18.2 Answers to the open questions (DEC-139…146)</h3>
+<p>The owner answered the open questions of the spec review on 2026-11-21, again as option questions with the recommendation first. Seven answers follow the recommendation; DEC-144 does not.</p>
+<table>
+<thead><tr><th>DEC</th><th>Question</th><th>Options (recommendation first)</th><th>Owner's pick</th><th>Changes · where</th></tr></thead>
+<tbody>
+<tr><td>DEC-139</td><td>Cold lowlands</td><td>A. Snowy forests: snow down to the sea, trees keep growing in the snow, the tree line only on high ground (recommended)<br>B. Tundra: the coldest lowland is treeless<br>C. Green lowlands: no snow and no tree line below about y 150<br>D. Like v1: snow only on Mountain</td><td><strong>A. Snowy forests</strong></td><td>Tree line never below y 170; trees, fallen logs and boulders on snow (AD-12, AD-26) · §8.5, §8.6</td></tr>
+<tr><td>DEC-140</td><td>Water walls next to caves</td><td>A. Count them, judge them in the V6 tour (recommended)<br>B. Seal lake and sea beds: caves stop a few blocks under them<br>C. Flood caves below sea level under water</td><td><strong>A. Count, judge in V6</strong></td><td>Confirms AD-03; <code>CaveWaterMargin</code> stays 0 until the tour · §9.1, V6</td></tr>
+<tr><td>DEC-141</td><td>Valleys on high land</td><td>A. Dry gorges (recommended)<br>B. Valleys fade out inland<br>C. Water at any height (a water level per valley)</td><td><strong>A. Dry gorges</strong></td><td>Confirms AD-14 · §9.2, V5</td></tr>
+<tr><td>DEC-142</td><td>Amount of 3D terrain</td><td>A. Moderate (recommended)<br>B. Dramatic<br>C. Subtle</td><td><strong>A. Moderate</strong></td><td>Target of the V2 tour; the owner sets the strength · §5.5, V2</td></tr>
+<tr><td>DEC-143</td><td>Tunnels against the cell size</td><td>A. Measure in V6, then pick (recommended)<br>B. Roomy tunnels (radius about 4) on 4 × 8 × 4 cells<br>C. 4 × 4 × 4 cells everywhere</td><td><strong>A. Measure in V6</strong></td><td>Confirms AD-06 and AD-15 · §10.3, V6</td></tr>
+<tr><td>DEC-144</td><td>Biome cap</td><td>A. 64 (recommended)<br>B. 16, as specified<br>C. 255</td><td><strong>C. 255</strong> (not the recommendation)</td><td>Byte ids and 256-bit biome masks, measured in V3 (AD-20) · §6.6, §14</td></tr>
+<tr><td>DEC-145</td><td>Phase order</td><td>A. Graph core first (recommended)<br>B. Terrain look first, with a hand-written prototype<br>C. Both in parallel</td><td><strong>A. Graph core first</strong></td><td>V1 before V2, as planned · §16</td></tr>
+<tr><td>DEC-146</td><td>The spec PR</td><td>A. The owner reviews the updated spec, then merges it (recommended)<br>B. Keep it open during V1<br>C. Merge now, read later</td><td><strong>A. Review, then merge</strong></td><td>V1 starts from master after the merge · §16 (V0)</td></tr>
+</tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="s19">19 · Agent defaults (AD-01…26)</h2>
+<p>The owner's decisions leave these points open. The agent filled them with the defaults below; they stand unless the owner changes them while reviewing this spec (V0). Values are start values (§0). On 2026-11-21 the owner confirmed AD-03, AD-06, AD-14 and AD-15 and changed AD-12 and AD-20 (DEC-139…144); AD-26 follows from DEC-139.</p>
+<table>
+<thead><tr><th>AD</th><th>Default</th><th>Why</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td>AD-01</td><td>One fluid rule classifies every voxel from its terrain and cave density and its height.</td><td>Keeps the fill a pure function per voxel.</td><td>§9.1</td></tr>
+<tr><td>AD-02</td><td>Every carved voxel at y ≤ 5 is lava, in every column; the lava mask only shapes the pockets above.</td><td>DEC-77 holds.</td><td>§9.1, §10.4</td></tr>
+<tr><td>AD-03</td><td>Water is never carved; caves carve solid terrain only. <code>CaveWaterMargin</code> defaults to 0.</td><td>DEC-78 holds; the margin is the lever if water walls look bad. Confirmed by DEC-140.</td><td>§9.1, §10</td></tr>
+<tr><td>AD-04</td><td>Continentalness no longer bends temperature and humidity: the parameters are independent noises.</td><td>Boxes stay easy to read; the graph can add a coupling again.</td><td>§4</td></tr>
+<tr><td>AD-05</td><td>Every parameter lies in [−1, 1]; v1 values in [0, 1] convert by 2v − 1.</td><td>One range for all six parameters.</td><td>§4</td></tr>
+<tr><td>AD-06</td><td>Density cells of 4 × 8 × 4 blocks; 4 × 4 × 4 is measured in V2; an own cave lattice with cells 4 high is measured in V6.</td><td>Half the corners of 4 × 4 × 4; thin tunnels may need the finer lattice. Confirmed by DEC-143.</td><td>§5.3, §10.3</td></tr>
+<tr><td>AD-07</td><td>A column's biome comes from its interpolated climate parameters at depth 0, never from the column height.</td><td>The height made v1's biomes change fast; interpolated values agree across chunk borders.</td><td>§4, §6.2</td></tr>
+<tr><td>AD-08</td><td>A column is wet when the terrain is air at y 123, the top water layer.</td><td>One test per column.</td><td>§6.5</td></tr>
+<tr><td>AD-09</td><td>Overlapping boxes are an error; outside every box the nearest box wins, by unweighted distance; ties go to the biome listed first.</td><td>No hidden order effects; deterministic gap fill.</td><td>§6.2</td></tr>
+<tr><td>AD-10</td><td>The start noises use v1's effective wavelengths.</td><td>The first v2 world has v1's climate scale; the sweep changes it (DEC-136).</td><td>§4</td></tr>
+<tr><td>AD-11</td><td>Temperature and humidity bands at the 20 % quantiles of the land columns.</td><td>Even bands; the edges move with the sweep.</td><td>§4.3</td></tr>
+<tr><td>AD-12</td><td>Snow: L = 0.0055 per block, T<sub>snow</sub> = −0.473, wobble ±6 blocks at wavelength 64; the never-snow flag is a filter plus a validator warning; the tree line lies 15 blocks below the snow line with its own ±8 wobble at wavelength 64, and never below y 170 (DEC-139).</td><td>Puts v1's snow line 210 ± 6 and tree line 195 ± 8 at temperature 0; the floor keeps the cold forests (DEC-139).</td><td>§8.2, §8.4, §8.5</td></tr>
+<tr><td>AD-13</td><td>Water at y 123 freezes where T<sub>eff</sub> &lt; −0.6.</td><td>v1's freeze temperature 0.2 in the v2 range.</td><td>§8.3</td></tr>
+<tr><td>AD-14</td><td>River valleys hold water only below sea level; a high valley is a dry gorge.</td><td>The engine has no flowing water. Confirmed by DEC-141.</td><td>§9.2</td></tr>
+<tr><td>AD-15</td><td>Tunnels are max(|a|, |b|) − r from two 3D noises, with r ≥ 2.5.</td><td>Long, connected tubes; r keeps them passable. Confirmed by DEC-143.</td><td>§10.3</td></tr>
+<tr><td>AD-16</td><td>Ores run after the fill and the surface rules.</td><td>Ore rules see the final blocks.</td><td>§10.6</td></tr>
+<tr><td>AD-17</td><td>Top rules are wrapped in <code>above_preliminary_surface</code> with a margin of Δmax.</td><td>Grass and dirt on overhang tops, not deep in the rock.</td><td>§7.4</td></tr>
+<tr><td>AD-18</td><td>Flora grows on the top terrain only; none on cave floors or under overhangs in v2.0.</td><td>Keeps v1's flora pass; the rest is V8.</td><td>§11.1</td></tr>
+<tr><td>AD-19</td><td>No graphical node editor: the graph is a data file; the preview shows every output.</td><td>A node editor is a large tool of its own.</td><td>§1.5</td></tr>
+<tr><td>AD-20</td><td>At most 255 biomes in a set (DEC-144): biome ids are bytes, and biome sets (rule conditions, never-snow, implausible pairs) are 256-bit masks.</td><td>The owner's pick: room for large biome mods; the mask cost is measured in V3.</td><td>§6.6, §14</td></tr>
+<tr><td>AD-21</td><td>Requirement ids use the prefix W2-, agent defaults AD-nn; DEC numbers continue the v1 list.</td><td>Ids stay unique across both specs.</td><td>§0</td></tr>
+<tr><td>AD-22</td><td>v2 is built beside v1 until the switch; a world setting selects the generator.</td><td>v1 stays playable and comparable.</td><td>§2, §16</td></tr>
+<tr><td>AD-23</td><td>v1's shipped-world share bounds (TST-63…67) are the start targets of the world report; its checks of single tour spots are dropped.</td><td>Tour spots do not carry over to a new world shape.</td><td>§13.5</td></tr>
+<tr><td>AD-24</td><td>The 3D noise fades from full strength at preliminary_surface − 16 to 0 at preliminary_surface − 32; the top slide runs from 223 to 255.</td><td>Solid deep rock costs nothing; a soft height limit under 255.</td><td>§5.1</td></tr>
+<tr><td>AD-25</td><td>The surface rules read the surface-source biome (DistanceBlend's choice); the written biome id is the hard biome.</td><td>Patchy borders (DEC-87) with a stable tint, water tint and fog.</td><td>§6.8, §7.1</td></tr>
+<tr><td>AD-26</td><td>Below the tree line, trees, fallen logs and boulders may stand on the snow block; small plants keep VEG-52 and stay off snow.</td><td>DEC-139 asks for forests in the snow; grass and flowers on snow would look wrong.</td><td>§8.5</td></tr>
+</tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="s20">20 · Earlier decisions in v2</h2>
+<p>The owner asked: “review my decisions, see if they are even relevant to the new world gen”, and then “also the v1 decisions”. This section checks every decision of WorldGenSpec.html (DEC-01…124), the decisions kept only in the phase notes, and the 14 v2 picks.</p>
+
+<h3 id="s20-1">20.1 How the review was done</h3>
+<ul class="tight">
+  <li>Each v1 decision was read in WorldGenSpec.html, in its DEC row and in the section it points to, and got one verdict.</li>
+  <li><em>Kept, new mechanism</em> means the goal stays and v2 reaches it another way; the tour of the phase that builds it checks the look again.</li>
+  <li><em>Replaced</em> decisions stay in WorldGenSpec.html as the record of v1; at the switch (V7) that spec marks them as replaced.</li>
+  <li>The flags for the owner are in §20.4.</li>
+</ul>
+
+<table>
+<thead><tr><th>Verdict</th><th>Count</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><strong>Stands</strong></td><td>56</td><td>Not world generation, or not touched by v2. Nothing to do.</td></tr>
+<tr><td><strong>Kept</strong></td><td>32</td><td>World generation; v2 keeps the rule or value as it is.</td></tr>
+<tr><td><strong>Kept, new mechanism</strong></td><td>20</td><td>The goal stays; v2 reaches it another way, so its look is checked again in the phase tour.</td></tr>
+<tr><td><strong>Replaced</strong></td><td>14</td><td>A v2 pick or the v2 design overrides it.</td></tr>
+<tr><td><strong>Void</strong></td><td>2</td><td>Its subject no longer exists in v2.</td></tr>
+<tr><td><strong>Total</strong></td><td>124</td><td>DEC-01…DEC-124 of WorldGenSpec.html</td></tr>
+</tbody>
+</table>
+<h3 id="s20-2">20.2 The v1 decisions by verdict</h3>
+<h4>Stands (56)</h4>
+<table>
+<thead><tr><th>DEC</th><th>Decision</th><th>In v2</th></tr></thead>
+<tbody>
+<tr><td>DEC-07</td><td>Testing</td><td>v2 tests use the Unity Test Framework.</td></tr>
+<tr><td>DEC-08</td><td>Research tooling</td><td>Research stays second priority and outside generation. Part III is parked (DEC-137).</td></tr>
+<tr><td>DEC-09</td><td>Tests</td><td>v2 adds its own unit tests (§17).</td></tr>
+<tr><td>DEC-11</td><td>Order of work</td><td>Historical order of work.</td></tr>
+<tr><td>DEC-12</td><td>Tooling</td><td>v2 phases use the Unity CLI.</td></tr>
+<tr><td>DEC-13</td><td>Culling (F-20)</td><td>Engine; v2 does not touch it.</td></tr>
+<tr><td>DEC-14</td><td>Chunk eviction (F-23)</td><td>Engine; v2 does not touch it.</td></tr>
+<tr><td>DEC-15</td><td>Performance</td><td>Performance stays a goal; v2 has a cost plan per pass (§2.4).</td></tr>
+<tr><td>DEC-16</td><td>Order</td><td>Historical order of work.</td></tr>
+<tr><td>DEC-17</td><td>Culling scope</td><td>Engine; v2 does not touch it.</td></tr>
+<tr><td>DEC-18</td><td>Lighting scope</td><td>Engine; v2 does not touch it. Light under overhangs is measured (§21).</td></tr>
+<tr><td>DEC-19</td><td>Game scripts and engine internals</td><td>Public API; v2 adds named outputs to the region API.</td></tr>
+<tr><td>DEC-20</td><td>Load and update distance</td><td>Engine; unchanged.</td></tr>
+<tr><td>DEC-21</td><td>Voxel materials</td><td>Engine; unchanged.</td></tr>
+<tr><td>DEC-23</td><td>C# / HLSL constants</td><td>Engine; unchanged.</td></tr>
+<tr><td>DEC-24</td><td>LookController mouse delta × deltaTime</td><td>Unchanged.</td></tr>
+<tr><td>DEC-25</td><td>Project structure</td><td>The project structure rules apply to the v2 code.</td></tr>
+<tr><td>DEC-26</td><td>Improvement ideas before Part III</td><td>Historical.</td></tr>
+<tr><td>DEC-27</td><td>Interval store start size</td><td>Kept, but re-measured in V2: 3D terrain makes more runs per column.</td></tr>
+<tr><td>DEC-28</td><td>OD-R3 region size (Part III)</td><td>Part III value; parked with Part III.</td></tr>
+<tr><td>DEC-29</td><td>Flaky PlayMode test SchedulerEvictionTests.UnloadChunk_RaisesEvictionAndReleasesRenderBuffer</td><td>Fixed on 2026-11-08.</td></tr>
+<tr><td>DEC-34</td><td>New voxel assets</td><td>New voxel assets need the owner&#x27;s approval; v2 needs none so far.</td></tr>
+<tr><td>DEC-35</td><td>Further fixes</td><td>Historical.</td></tr>
+<tr><td>DEC-36</td><td>Place in the order of work</td><td>Historical order of work.</td></tr>
+<tr><td>DEC-41</td><td>See-through water</td><td>Water rendering; already replaced by DEC-119.</td></tr>
+<tr><td>DEC-42</td><td>HUD</td><td>HUD; unchanged.</td></tr>
+<tr><td>DEC-43</td><td>Sky for the horizon fog</td><td>Sky rendering; the fog is off since DEC-109.</td></tr>
+<tr><td>DEC-46</td><td>Light on forest terrain</td><td>Accepted light cost; re-measured in V2 and V6, since overhangs give the light pass more work.</td></tr>
+<tr><td>DEC-47</td><td>Which voxels rotate</td><td>Rotated voxels; unchanged.</td></tr>
+<tr><td>DEC-48</td><td>Rotation modes</td><td>Rotated voxels; unchanged.</td></tr>
+<tr><td>DEC-49</td><td>How the orientation is stored</td><td>Rotated voxels; unchanged.</td></tr>
+<tr><td>DEC-50</td><td>What rotates</td><td>Rotated voxels; unchanged.</td></tr>
+<tr><td>DEC-52</td><td>Shipped modes</td><td>Rotated voxels; unchanged.</td></tr>
+<tr><td>DEC-53</td><td>Place in the spec and the order of work</td><td>Historical order of work.</td></tr>
+<tr><td>DEC-62</td><td>Holes next to a slab (ROT-05 check)</td><td>Rendering; unchanged.</td></tr>
+<tr><td>DEC-63</td><td>Workbench</td><td>Unchanged.</td></tr>
+<tr><td>DEC-100</td><td>Mesh backlog: how the stages share the frames</td><td>Scheduler; v2 chunk jobs run under it.</td></tr>
+<tr><td>DEC-101</td><td>Fixed or scaled mesh batch and GPU build slots</td><td>Scheduler; unchanged.</td></tr>
+<tr><td>DEC-102</td><td>Partitions that need no mesh</td><td>Scheduler; unchanged.</td></tr>
+<tr><td>DEC-103</td><td>Editor crash at domain reload</td><td>Binding for v2 jobs: no Domain memory inside a job.</td></tr>
+<tr><td>DEC-104</td><td>Performance goal</td><td>Binding; the 120 fps goal run comes in V7.</td></tr>
+<tr><td>DEC-105</td><td>Main-thread work per frame</td><td>Binding; v2 adds no main-thread work.</td></tr>
+<tr><td>DEC-106</td><td>Budget under a frame cap</td><td>Scheduler; unchanged.</td></tr>
+<tr><td>DEC-107</td><td>Slow mesh dequeue</td><td>Scheduler; unchanged.</td></tr>
+<tr><td>DEC-110</td><td>Interval store pre-sized</td><td>Re-measured in V2: 3D terrain makes more runs.</td></tr>
+<tr><td>DEC-111</td><td>Esc settings menu and HUD GPU memory</td><td>UI; unchanged.</td></tr>
+<tr><td>DEC-112</td><td>HUD and menu redesign</td><td>UI; unchanged.</td></tr>
+<tr><td>DEC-113</td><td>Player inventory</td><td>Inventory; unchanged.</td></tr>
+<tr><td>DEC-114</td><td>Torch</td><td>Content; unchanged.</td></tr>
+<tr><td>DEC-115</td><td>Data collect split per chunk</td><td>Scheduler; unchanged.</td></tr>
+<tr><td>DEC-116</td><td>Focus update as budget items; budget values re-checked</td><td>Scheduler; unchanged.</td></tr>
+<tr><td>DEC-117</td><td>Collider batch size 8</td><td>Scheduler; unchanged.</td></tr>
+<tr><td>DEC-118</td><td>Leaf rendering: cut-out leaves, face shade, glass pass, lowered liquid top</td><td>Rendering; unchanged.</td></tr>
+<tr><td>DEC-119</td><td>Simple, Minecraft-like liquids with a biome water tint</td><td>Rendering; the tint map reads the per-column biome id, which v2 keeps writing.</td></tr>
+<tr><td>DEC-122</td><td>Biome colours on grass and plants</td><td>Rendering; the grass and plant tints read the per-column biome id, which v2 keeps writing.</td></tr>
+<tr><td>DEC-124</td><td>Command console</td><td>Console; teleport and setvoxel work unchanged.</td></tr>
+</tbody>
+</table>
+<h4>Kept (32)</h4>
+<table>
+<thead><tr><th>DEC</th><th>Decision</th><th>In v2</th></tr></thead>
+<tbody>
+<tr><td>DEC-01</td><td>Noise basis</td><td>Own seeded simplex with hash gradients: the graph&#x27;s noise nodes. Seeds come from the world seed and the noise name.</td></tr>
+<tr><td>DEC-02</td><td>Water / ocean</td><td>Ocean stays a biome (a box over low continentalness). Water level stays 124.</td></tr>
+<tr><td>DEC-03</td><td>5th biome (later extensibility test)</td><td>Forest stays one of the ten biomes.</td></tr>
+<tr><td>DEC-04</td><td>Flora biome pick</td><td>DistanceBlend keeps the flora roll apart from the surface pick.</td></tr>
+<tr><td>DEC-10</td><td>Seeds</td><td>The five fixed seeds are the seeds of the world report and the sweep.</td></tr>
+<tr><td>DEC-22</td><td>Broken biome assets</td><td>Broken biome files: skipped outside the set, an error inside. Validator errors name the file.</td></tr>
+<tr><td>DEC-30</td><td>How tree variants are defined</td><td>Parametric tree species unchanged.</td></tr>
+<tr><td>DEC-32</td><td>New tree kinds</td><td>Tree kinds unchanged.</td></tr>
+<tr><td>DEC-33</td><td>Related ideas</td><td>Groves, clearings, boulders and fallen logs unchanged; patchy beaches become a rule with a noise condition.</td></tr>
+<tr><td>DEC-39</td><td>How to fix mini-biomes and neighbours</td><td>Tuning stays in data (graph, boxes, rules), never in code.</td></tr>
+<tr><td>DEC-45</td><td>Pre-filter with density noise</td><td>Exact density pre-filter for flora unchanged.</td></tr>
+<tr><td>DEC-51</td><td>Rotated voxels in generation</td><td>Rotated logs and branches in generation unchanged.</td></tr>
+<tr><td>DEC-58</td><td>Variation across the world</td><td>Caves are the same everywhere: no per-biome cave factor.</td></tr>
+<tr><td>DEC-59</td><td>Extras</td><td>Ores and the bedrock layer stay.</td></tr>
+<tr><td>DEC-60</td><td>Tooling</td><td>Preview cross-section and cave buffers in the region API stay; the heightmap means the top of the terrain.</td></tr>
+<tr><td>DEC-61</td><td>Settings switch</td><td>Caves on everywhere, in the code defaults too.</td></tr>
+<tr><td>DEC-64</td><td>Axis of a branch voxel</td><td>Branch axis per step unchanged.</td></tr>
+<tr><td>DEC-69</td><td>Ore rule order</td><td>Ore rules in list order, each replaces only its host. Ores now run after the fill (AD-16).</td></tr>
+<tr><td>DEC-72</td><td>Flora tests without caves</td><td>The test tiers stay; whether the flora fixture still turns the caves off is decided in V6.</td></tr>
+<tr><td>DEC-77</td><td>Worms break the surface anywhere; lava below the level everywhere</td><td>Tunnels may break dry ground anywhere; every cave voxel at y ≤ 5 is lava in every column (AD-02).</td></tr>
+<tr><td>DEC-78</td><td>Caves carve up to water</td><td>Only the water voxels are protected: caves carve solid terrain only, so water is never carved and lake beds may open. Water walls are counted (AD-03).</td></tr>
+<tr><td>DEC-82</td><td>Looks and unused palette blocks</td><td>The palette uses carry over; the forest floor and the bands are rules now.</td></tr>
+<tr><td>DEC-83</td><td>Boulders per biome</td><td>Boulders per biome unchanged.</td></tr>
+<tr><td>DEC-84</td><td>Flooded Swamp</td><td>Swamp plants in shallow water unchanged.</td></tr>
+<tr><td>DEC-85</td><td>Badlands bands</td><td>Multi-colour Badlands bands (a bands action).</td></tr>
+<tr><td>DEC-87</td><td>Borders between surface materials</td><td>Patchy, wavy material border (DistanceBlend border noise) unchanged.</td></tr>
+<tr><td>DEC-90</td><td>Look values of this round</td><td>Look values stay as starting values; the tree line follows the snow line now (DEC-130).</td></tr>
+<tr><td>DEC-91</td><td>Boulders in the ground</td><td>Boulder sink unchanged.</td></tr>
+<tr><td>DEC-95</td><td>Dirt stripes on the steps of grass slopes</td><td>Stone under the meadow (a rule).</td></tr>
+<tr><td>DEC-97</td><td>Boulders on slopes show their full height downhill</td><td>Boulder sink on slopes unchanged.</td></tr>
+<tr><td>DEC-98</td><td>Crown colours that stand out</td><td>Taiga without Birch unchanged.</td></tr>
+<tr><td>DEC-109</td><td>Points of the third world tour</td><td>Draw distance 12, fog off, fallen logs only where their tree grows: unchanged.</td></tr>
+</tbody>
+</table>
+<h4>Kept, new mechanism (20)</h4>
+<table>
+<thead><tr><th>DEC</th><th>Decision</th><th>In v2</th></tr></thead>
+<tbody>
+<tr><td>DEC-31</td><td>Top block under water</td><td>The per-biome underwater top block becomes a rule in the biome&#x27;s list (floor under water).</td></tr>
+<tr><td>DEC-37</td><td>Fixes from the play-test review</td><td>The goals stay: blending on (DEC-138), fewer mini-biomes (boxes and the sweep), plausible neighbours (validator), ice and snow shores (climate).</td></tr>
+<tr><td>DEC-40</td><td>Mountain detail</td><td>The snow line comes from the climate (DEC-130); strata are a bands rule.</td></tr>
+<tr><td>DEC-44</td><td>Beaches away from water</td><td>The beach water test becomes a rule condition: a wet column within 16 blocks, probed every 4 blocks.</td></tr>
+<tr><td>DEC-55</td><td>Openings to the surface</td><td>Caverns keep a cover and rare entrances through a mask; tunnels may open anywhere on dry ground (DEC-77).</td></tr>
+<tr><td>DEC-56</td><td>Lava</td><td>Lava pockets near y 5 on about 40 % of the area, now a term of the cave density gated by the lava mask.</td></tr>
+<tr><td>DEC-67</td><td>Mask edges</td><td>Caverns and lava pockets fade out over 0.1 of mask value, now a smooth step in the graph.</td></tr>
+<tr><td>DEC-68</td><td>Lava pockets and the column limits</td><td>Lava pockets stay under the same cover as the caverns.</td></tr>
+<tr><td>DEC-74</td><td>Linked worms</td><td>The goal stays: no tunnel on its own. Noise tunnels form networks; the cave report checks it.</td></tr>
+<tr><td>DEC-79</td><td>Hall shapes: warp and ridged detail</td><td>The hall shape (warp, second octave, fold) becomes the starting shape of the cavern noise.</td></tr>
+<tr><td>DEC-80</td><td>Height of the Jungle</td><td>Jungle median 140–145 becomes a world-report target.</td></tr>
+<tr><td>DEC-81</td><td>Mountain patches</td><td>Mountain only up high and in large patches: Mountain&#x27;s box covers the massifs in continentalness and erosion.</td></tr>
+<tr><td>DEC-86</td><td>Trees on high ground</td><td>Tree line and ground check stay; the tree line now lies 15 blocks below the climate snow line.</td></tr>
+<tr><td>DEC-88</td><td>Trees on Mountain after DEC-86 (its ground is bare stone)</td><td>Meadow below the tree line, then rock, then snow: rules in the biome lists, so every biome can have one.</td></tr>
+<tr><td>DEC-89</td><td>Badlands–Jungle border, which grew with DEC-80</td><td>Badlands and Jungle stay apart by climate distance between their boxes; the validator forbids the pair.</td></tr>
+<tr><td>DEC-93</td><td>West Jungle at 129–192, steep, next to Mountain</td><td>Jungle stays lowland and not steep: a world-report target (p95 below 182).</td></tr>
+<tr><td>DEC-94</td><td>Badlands and Jungle touch at five places in the west</td><td>Climates apart, no forced Savanna strip: box layout plus validator.</td></tr>
+<tr><td>DEC-96</td><td>Meadow with spruces and a grey cap inside Badlands</td><td>Badlands keeps its own tops (rules). The snow allowance is gone: Badlands never snows (DEC-130).</td></tr>
+<tr><td>DEC-99</td><td>Savanna and Plains below the water level</td><td>Plains and Savanna mostly dry: world-report targets (under water below 28 % and 32 %).</td></tr>
+<tr><td>DEC-108</td><td>Which massif candidate ships</td><td>The ranges of candidate A are the target of the new terrain&#x27;s re-tune (DEC-128).</td></tr>
+</tbody>
+</table>
+<h4>Replaced (14)</h4>
+<table>
+<thead><tr><th>DEC</th><th>Decision</th><th>In v2</th></tr></thead>
+<tbody>
+<tr><td>DEC-06</td><td>Continental → humidity/temperature coupling</td><td>Continentalness no longer bends temperature and humidity. The six parameters are independent (AD-04); the graph can add a coupling again.</td></tr>
+<tr><td>DEC-38</td><td>Blend methods of the shipped settings</td><td>No height stage any more: the terrain does not depend on the biome. DistanceBlend works on materials and flora only (DEC-138).</td></tr>
+<tr><td>DEC-54</td><td>Kinds of caves</td><td>Noise caves (DEC-134): caverns plus tunnels from two noises, which is the spaghetti form DEC-54 left out. Worms and pillars go.</td></tr>
+<tr><td>DEC-57</td><td>Worm reach</td><td>No worms (DEC-134).</td></tr>
+<tr><td>DEC-65</td><td>Snow and ice outside cold biomes</td><td>Snow and ice follow the climate in every biome (DEC-130, DEC-131). The FreezesWater flag goes.</td></tr>
+<tr><td>DEC-66</td><td>Worm buffers (CAV-22)</td><td>No worms (DEC-134).</td></tr>
+<tr><td>DEC-70</td><td>Worm pitch</td><td>No worms (DEC-134).</td></tr>
+<tr><td>DEC-71</td><td>Entrance test at worm starts</td><td>No worm starts (DEC-134).</td></tr>
+<tr><td>DEC-73</td><td>Play-test picks: entrance shafts, more worms, unblended start height</td><td>No worm shafts (DEC-134); the caverns keep the entrance mask.</td></tr>
+<tr><td>DEC-75</td><td>Play-test tuning of the links: spread junctions, no steep targets, halls on the floor</td><td>Already superseded by DEC-76; its hall band (widest at the floor) carries into the cavern height profile.</td></tr>
+<tr><td>DEC-76</td><td>Three layers: halls, random worms, connector worms</td><td>No worm layers (DEC-134).</td></tr>
+<tr><td>DEC-120</td><td>Badlands: no Mountain caps, less common</td><td>Height floor and climate targets go with the classifier; boxes (DEC-127) and climate snow (DEC-130) answer the problem; its bounds become world-report targets.</td></tr>
+<tr><td>DEC-121</td><td>Bigger biomes, Mountain and Badlands apart, no Ocean on land</td><td>Class height, PV out of the distance and the Ocean flag go with the classifier; the dry-column rule keeps Ocean off land; the wavelengths come from the sweep (DEC-136).</td></tr>
+<tr><td>DEC-123</td><td>Massifs keep their high biomes</td><td>Peaks in the class height go with the classifier; Mountain&#x27;s box covers the whole massif.</td></tr>
+</tbody>
+</table>
+<h4>Void (2)</h4>
+<table>
+<thead><tr><th>DEC</th><th>Decision</th><th>In v2</th></tr></thead>
+<tbody>
+<tr><td>DEC-05</td><td>Warp amplitude in method 3</td><td>Method 3 is deleted with v1 (DEC-138).</td></tr>
+<tr><td>DEC-92</td><td>Border noise and the method comparison</td><td>The method comparison of Part III loses its subject: only DistanceBlend and None remain, and Part III is parked.</td></tr>
+</tbody>
+</table>
+<h3 id="s20-3">20.3 Decisions recorded only in phase notes</h3>
+<p>Decisions the owner gave during earlier phases that were kept in the session notes but never got a DEC row. Only the ones that touch world generation are listed.</p>
+<table>
+<thead><tr><th>Decision</th><th>Verdict</th><th>In v2</th></tr></thead>
+<tbody>
+<tr><td>Preview window is the main tuning tool (2026-10-18)</td><td>Kept</td><td>§13; the Layout tab and the graph outputs are added.</td></tr>
+<tr><td>WorldGenSettings owns the climate (2026-10-18)</td><td>Replaced</td><td>The noise graph owns the parameters (DEC-126).</td></tr>
+<tr><td>WaterLevel lives on WorldGenSettings (2026-10-18)</td><td>Kept</td><td>Sea level 124 is a v2 setting.</td></tr>
+<tr><td>Ocean top block is sand (2026-10-18)</td><td>Kept</td><td>Ocean&#x27;s rule list.</td></tr>
+<tr><td>Biome targets of the old classifier (2026-10-18)</td><td>Replaced</td><td>Boxes (DEC-127).</td></tr>
+<tr><td>Shipped asset is Terrain-first (2026-10-18)</td><td>Replaced</td><td>v2 ships at the switch (V7).</td></tr>
+<tr><td>Legacy generator not important (2026-10-18)</td><td>Void</td><td>Long gone.</td></tr>
+<tr><td>Spatial-blend budget misses accepted for now (2026-10-18)</td><td>Replaced</td><td>The 7.2 ms budget (DEC-129).</td></tr>
+<tr><td>DistanceBlend flora cost +11…13 % accepted (2026-10-20)</td><td>Replaced</td><td>The 7.2 ms budget (DEC-129).</td></tr>
+<tr><td>Preview compare: A = asset, B = preview overrides (2026-10-20)</td><td>Kept</td><td>Unchanged.</td></tr>
+<tr><td>Implausible pairs live on the BiomeSet (2026-10-20)</td><td>Kept, new mechanism</td><td>They become an error of the layout validator, not only a preview overlay.</td></tr>
+<tr><td>Desert flora quartered, Forest Birch 25 %, flora padding 11 (2026-10-25)</td><td>Kept</td><td>Flora unchanged; padding 11 sizes the top-solid ring (§11).</td></tr>
+<tr><td>Soft height limit, ten biomes, snow line 210 (2026-11-10)</td><td>Kept, new mechanism</td><td>Ten biomes kept; the limit becomes the top slide 223…255; 210 is the snow calibration point.</td></tr>
+<tr><td>The report test is the tuning tool (2026-11-09)</td><td>Kept, new mechanism</td><td>The v2 world report (§13.4).</td></tr>
+<tr><td>Massifs on C and E with PV inside, peak wavelength 192 (2026-11-12)</td><td>Kept, new mechanism</td><td>Starting shape of the v2 offset spline and peak noise.</td></tr>
+<tr><td>Palette wiring rules: DXT1/DXT5, reach ≤ 6 (2026-11-10)</td><td>Kept</td><td>Assets; unchanged.</td></tr>
+<tr><td>Light curve 0.85, light margin 14 (2026-10-21)</td><td>Stands</td><td>The margin is re-checked with overhangs in V2.</td></tr>
+<tr><td>GPU pool 8 per column; big refactors go to the ideas list (2026-10-20)</td><td>Stands</td><td>Unchanged.</td></tr>
+</tbody>
+</table>
+
+<h3 id="s20-4">20.4 Flags for the owner</h3>
+<div class="box warn">
+<p>These results change or reverse something the owner signed off. They stand with the v2 picks unless the owner says otherwise. The owner's answers of 2026-11-21 (DEC-139…146) are noted where they apply.</p>
+<ol>
+  <li><strong>DEC-65 is reversed</strong> (DEC-130, DEC-131). Snow and ice follow the climate in every biome without the never-snow flag: the coldest lowland (about 9 % of the land at the start values) is snowy down to the sea, cold Taiga and Plains hills are snowy above about 156, and cold shores freeze (§8.6). The owner chose snowy forests (DEC-139): trees keep growing in the snow, since the tree line never lies below y 170.</li>
+  <li><strong>DEC-96's snow allowance is gone:</strong> Badlands never snows.</li>
+  <li><strong>DEC-54 is reversed</strong> (DEC-134). Tunnels come from noise, the form DEC-54 left out; worms, worm shafts and pillars go.</li>
+  <li><strong>DEC-78 holds over the cave design:</strong> water is never carved, so a cave can open a lake bed or the seabed and leave a wall of standing water. The world report counts the walls, and the owner judges them in the V6 tour (DEC-140); <code>CaveWaterMargin</code> is the lever (AD-03).</li>
+  <li><strong>DEC-77 holds over the lava mask:</strong> every carved voxel at y ≤ 5 is lava in every column; the mask only shapes the pockets above (AD-02).</li>
+  <li><strong>DEC-06 is dropped:</strong> continentalness no longer bends temperature and humidity (AD-04).</li>
+  <li><strong>DEC-38:</strong> there is no height stage any more, because the terrain does not depend on the biome. DistanceBlend still costs about 1.5–2 ms for materials and flora.</li>
+  <li><strong>Tree line:</strong> v1's fixed line at 195 ± 8 becomes a climate line 15 blocks below the snow line, with its own ±8 wobble; at temperature 0 it still lies at 195, and it never drops below 170 (AD-12, DEC-139).</li>
+  <li><strong>DEC-120, 121 and 123:</strong> their classifier values (the Badlands height floor, the class-height peaks, the Ocean flag) are not carried over. The climate wavelengths of the shipped settings, which DEC-121 made larger, are only the start values of the sweep (AD-10). Their goals become world-report targets (§13.5).</li>
+  <li><strong>Part III research is parked</strong> with Biome-first (DEC-137): DEC-28 waits with it, and DEC-92 loses its subject.</li>
+  <li><strong>DEC-74's goal stays:</strong> no tunnel stands on its own; the cave report checks it (§10.5).</li>
+  <li><strong>DEC-72</strong> (flora tests without caves) is decided again in V6.</li>
+  <li><strong>DEC-27, DEC-110</strong> (interval store) and <strong>DEC-46</strong> (light on forest terrain) are measured again in V2 and V6, since overhangs give these passes more work.</li>
+  <li><strong>Implausible pairs</strong> become an error of the layout validator instead of a preview overlay (§6.6).</li>
+</ol>
+</div>
+
+<h3 id="s20-5">20.5 The v2 picks</h3>
+<p>All 14 picks (DEC-125…138) stay relevant: none is overtaken by another pick or by an earlier decision. How they fit together:</p>
+<ul class="tight">
+  <li>DEC-125 (full 3D) is the largest new cost, and DEC-129 (7.2 ms) bounds it; the levers of §2.5 sit between them.</li>
+  <li>DEC-126 (noise graph) carries the data of DEC-127 (boxes), DEC-133 (rules) and DEC-134 (caves): each reads named graph outputs.</li>
+  <li>DEC-130 and DEC-131 replace DEC-65 together (flag 1).</li>
+  <li>DEC-134 and DEC-135 give dry noise caves now, with the aquifer hook kept for V8.</li>
+  <li>DEC-136 sets the values that DEC-127's boxes need.</li>
+  <li>DEC-137 and DEC-138 remove v1's other generator and blend methods at the switch.</li>
+  <li>DEC-139…146 answer the open questions of the review: they refine DEC-130 (forests in the snow), DEC-134 (tunnels, water walls) and the plan, and DEC-144 widens the biome cap for mods.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="s21">21 · Risks</h2>
+<table>
+<thead><tr><th>Risk</th><th>Effect</th><th>Answer</th><th>Phase</th></tr></thead>
+<tbody>
+<tr><td>Interpreter cost</td><td>The graph interpreter is slower than hand-written code.</td><td>Gate ≤ +15 %; otherwise generated C# from the shipped graph (§3.7).</td><td>V1</td></tr>
+<tr><td>3D cost</td><td>The 3D density and the caves exceed their 1.0–1.6 ms row.</td><td>Slab bounds, uniform cells, octave counts, cell size (§2.5); the 7.2 ms gate.</td><td>V2, V6</td></tr>
+<tr><td>Thin tunnels</td><td>With cells 8 high, tunnels of radius 2.5 fall between corner layers and break into beads.</td><td>Radius about 4, or an own cave lattice with cells 4 high (AD-06); V6 measures both, and the owner picks (DEC-143).</td><td>V6</td></tr>
+<tr><td>Water walls</td><td>Caves next to lakes and the sea leave walls of standing water (DEC-78).</td><td>Counted in the world report and judged in the V6 tour (DEC-140); <code>CaveWaterMargin</code> as the lever.</td><td>V6</td></tr>
+<tr><td>Light</td><td>Overhangs and lava chunks give the light pass more work; the light margin 14 may not be enough.</td><td>Light job and margin measured again (DEC-46).</td><td>V2, V6</td></tr>
+<tr><td>Interval store</td><td>3D terrain makes more runs per column than the store's start size expects.</td><td>Measured again (DEC-27, DEC-110).</td><td>V2</td></tr>
+<tr><td>Floating pieces</td><td>The 3D noise leaves small pieces of rock in the air.</td><td>Counted in V2; the fade and the amplitude bound them; the owner judges them in the V2 tour against a moderate amount (DEC-142).</td><td>V2</td></tr>
+<tr><td>Snow reversal</td><td>The owner chose snow down to the sea in cold lowlands, with forests in it (DEC-139); the snowy share may still look too large in the tour.</td><td>T<sub>snow</sub> and L are re-fitted in V4; the tree line floor at y 170 keeps the forests (flag 1 of §20.4).</td><td>V4</td></tr>
+<tr><td>Sweep</td><td>No layout meets every target of §13.5 at once.</td><td>The owner picks the trade-off on the sweep table (DEC-136).</td><td>V3</td></tr>
+<tr><td>Validator strictness</td><td>The neighbour test with ε at corners refuses layouts that would look fine.</td><td>The error names both boxes and the parameter; ε comes from measured steps, not a guess.</td><td>V3</td></tr>
+<tr><td>Mod limits</td><td>The graph limits block larger mods; 256-bit biome masks (DEC-144) cost more than small ones.</td><td>Limits are validator settings, raised only with a measurement; the masks are measured in V3.</td><td>V1, V3</td></tr>
+<tr><td>Hot loops</td><td>Code added to a pass slows the whole pass (the <code>PrepareChunkMaps</code> case).</td><td>Own passes (W2-ARC-01); every change measured on its own.</td><td>All</td></tr>
+<tr><td>Blend cost</td><td>DistanceBlend stays the largest row at 1.5–2.0 ms.</td><td>Blend lattice at stride 4 (§2.5, V8).</td><td>V6, V8</td></tr>
+<tr><td>Determinism</td><td>Float results differ between machines or Burst versions.</td><td><code>FloatMode.Strict</code>, no transcendental functions (W2-ID-02), golden hashes.</td><td>V1, V7</td></tr>
+</tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="s22">22 · Sources</h2>
+<ul>
+  <li><strong>Minecraft Wiki</strong> (<a href="https://minecraft.wiki">minecraft.wiki</a>), pages “World generation”, “Biome”, “Noise router”, “Surface rule” (material rule) and “Density function”, checked on 2026-11-21. The wiki documents Java Edition 26.x, and several functions changed after 1.18; the spec takes only facts these pages confirm and marks everything else as its own extension (R6). v2 copies no Minecraft code or data, only the method.</li>
+  <li><strong>Internal:</strong> <a href="WorldGenSpec.html">WorldGenSpec.html</a> (v1, its DEC list and requirements), <a href="GameSpec.html">GameSpec.html</a> §3.7 (generator changes and determinism) and GAME-MOD-04 (world generation through data).</li>
+</ul>
+
+</main>
+</div>
+</body>
+</html>
