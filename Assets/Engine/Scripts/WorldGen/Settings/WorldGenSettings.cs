@@ -77,7 +77,7 @@ namespace Engine.Scripts.WorldGen.Settings{
         public int BiomeHeightOctaves = 2;
 
         [Tooltip("The peak noise enters the smoothed classification height, so a massif counts as high as its " +
-                 "summits and its slopes keep the high biomes (DEC-121 follow-up).")]
+                 "summits and its slopes keep the high biomes (DEC-123).")]
         public bool BiomeHeightPeaks;
 
         [Header("Height")]
