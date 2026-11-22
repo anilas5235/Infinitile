@@ -103,6 +103,7 @@ namespace Engine.Tests.EditMode{
 
         private static void CheckAgainstInterpreter<TPrograms>(CompiledNoiseGraph graph, string label) where TPrograms : struct, IGraphPrograms{
             Assert.AreEqual(graph.CodeHash, default(TPrograms).CodeHash, $"{typeof(TPrograms).Name} is out of date");
+            Assert.AreEqual(graph.Sizes, default(TPrograms).Sizes, $"{typeof(TPrograms).Name} is out of date");
             foreach (int2 origin in Origins)
             foreach (uint seed in Seeds){
                 using GraphRegionResult interpreted = GraphEvaluator.EvaluateRegion(graph, seed, origin, new int2(32, 32), true, true, true);
@@ -165,6 +166,27 @@ namespace Engine.Tests.EditMode{
             Assert.IsTrue(GraphEvaluator.HasGeneratedCode(graph));
             Assert.IsFalse(GraphEvaluator.HasGeneratedCode(other));
             Assert.Throws<ArgumentException>(() => GraphEvaluator.EvaluateRegion<ShippedNoiseGraphCode>(other, 1u, int2.zero, new int2(16, 16), false));
+        }
+
+        /// <summary>Claims the shipped graph's code hash with other table sizes, as a graph with a colliding hash would.</summary>
+        private unsafe struct CollidingPrograms : IGraphPrograms{
+            public ulong CodeHash => default(ShippedNoiseGraphCode).CodeHash;
+            public GraphTableSizes Sizes => new(1, 1, 1, 1, 1, 0, 0);
+
+            public void Run(int program, in GraphCode code, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters){
+                code.Run(code.Programs[program], registers, scratch, lanes, seed, ref counters);
+            }
+        }
+
+        [Test]
+        public void SameHashWithOtherTableSizes_RunsNoGeneratedCode(){
+            GraphCompileResult shipped = ShippedNoiseGraph.Compile();
+            Assert.IsTrue(shipped.Succeeded, string.Join("\n", shipped.Messages));
+            using CompiledNoiseGraph graph = shipped.Graph;
+            Assert.AreEqual(default(ShippedNoiseGraphCode).Sizes, graph.Sizes);
+            Assert.IsTrue(GraphEvaluator.Fits<ShippedNoiseGraphCode>(graph));
+            Assert.IsFalse(GraphEvaluator.Fits<CollidingPrograms>(graph));
+            Assert.Throws<ArgumentException>(() => GraphEvaluator.EvaluateRegion<CollidingPrograms>(graph, 1u, int2.zero, new int2(16, 16), false));
         }
 
         [Test]

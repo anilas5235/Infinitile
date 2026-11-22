@@ -110,6 +110,7 @@ namespace Engine.Scripts.WorldGen.Graph{
                     Values = values
                 }.Run();
 
+                bool octavesFinite = CheckOctaves(octaves);
                 GraphNode[] prepared = nodes.ToArray();
                 SplinePoint[] preparedPoints = points.ToArray();
                 Fold(prepared, preparedPoints, constant, values);
@@ -119,6 +120,7 @@ namespace Engine.Scripts.WorldGen.Graph{
                 using NativeArray<SplineInfo> foldedSplines = new(_splines.ToArray(), Allocator.TempJob);
                 using NativeArray<SplinePoint> foldedPoints = new(_points.ToArray(), Allocator.TempJob);
                 using NativeArray<GraphBounds> foldedBounds = Bounds(foldedNodes, foldedSplines, foldedPoints, entries, octaves, Allocator.TempJob);
+                if (octavesFinite) CheckBounds(foldedBounds);
 
                 List<GraphOutputInfo> outputs = Stage(foldedBounds);
                 int instructions = _code.Count;
@@ -164,6 +166,42 @@ namespace Engine.Scripts.WorldGen.Graph{
                     InstructionCount = instructions,
                     NoiseCount = _ir.NoiseDefinitionCount
                 };
+            }
+
+            private static bool Finite(float v){
+                return !float.IsNaN(v) && !float.IsInfinity(v);
+            }
+
+            /// <summary>
+            ///     Reports each noise whose octave table left the float range (a gain or lacunarity raised to many
+            ///     octaves, or a tiny wavelength): every value of such a noise would be NaN. False when one did.
+            /// </summary>
+            private bool CheckOctaves(NativeArray<NoiseOctave> octaves){
+                HashSet<int> reported = new();
+                foreach (NoiseEntry e in _ir.Entries)
+                    for (int o = e.OctaveStart; o < e.OctaveStart + e.OctaveCount; o++){
+                        NoiseOctave octave = octaves[o];
+                        if (Finite(octave.FrequencyXZ) && Finite(octave.FrequencyY) && Finite(octave.Amplitude)) continue;
+                        if (reported.Add(e.Definition))
+                            Error(null, $"Noise \"{_ir.NoiseNames[e.Definition]}\": its octaves leave the float range; use a smaller gain or "
+                                        + "lacunarity, fewer octaves or a longer wavelength.");
+                        break;
+                    }
+
+                return reported.Count == 0;
+            }
+
+            /// <summary>
+            ///     Reports the first node whose bound is not finite: its values can overflow, so the bound promises
+            ///     nothing (and NaN would follow from inf − inf or 0 · inf).
+            /// </summary>
+            private void CheckBounds(NativeArray<GraphBounds> bounds){
+                for (int f = 0; f < bounds.Length; f++){
+                    GraphBounds b = bounds[f];
+                    if (Finite(b.Min) && Finite(b.Max)) continue;
+                    Error(null, $"\"{_names[f]}\": its values can leave the float range (bound {b}); clamp it or use smaller numbers.");
+                    return;
+                }
             }
 
             private int ProgramIndex(GraphStage stage, int cellHeight){
@@ -370,20 +408,35 @@ namespace Engine.Scripts.WorldGen.Graph{
                 HashSet<int> visited = new();
                 HashSet<int> inputNodes = new();
 
-                void Visit(int f){
-                    if (!visited.Add(f) || IsTrivial(f)) return;
+                // True when f is new and computed here, so its operands are visited next.
+                bool Enter(int f){
+                    if (!visited.Add(f) || IsTrivial(f)) return false;
                     (bool input, GraphSlotSource source, int slot) b = boundary(f);
-                    if (b.input){
-                        inputs.Add((f, b.source, b.slot));
-                        inputNodes.Add(f);
-                        return;
-                    }
-
-                    foreach (int o in Operands(f)) Visit(o);
-                    order.Add(f);
+                    if (!b.input) return true;
+                    inputs.Add((f, b.source, b.slot));
+                    inputNodes.Add(f);
+                    return false;
                 }
 
-                foreach ((int node, int _) in roots) Visit(node);
+                // Depth first with an explicit stack, operands in order, so a long chain of named nodes never
+                // nests calls; the input and slot order is that of the recursive walk.
+                Stack<(int node, IEnumerator<int> operands)> stack = new();
+                foreach ((int node, int _) in roots){
+                    if (!Enter(node)) continue;
+                    stack.Push((node, Operands(node).GetEnumerator()));
+                    while (stack.Count > 0){
+                        (int f, IEnumerator<int> operands) = stack.Peek();
+                        if (operands.MoveNext()){
+                            int o = operands.Current;
+                            if (Enter(o)) stack.Push((o, Operands(o).GetEnumerator()));
+                            continue;
+                        }
+
+                        stack.Pop();
+                        operands.Dispose();
+                        order.Add(f);
+                    }
+                }
 
                 // Constants that need a register: everything except K operands and spline point values.
                 HashSet<int> materialised = new();

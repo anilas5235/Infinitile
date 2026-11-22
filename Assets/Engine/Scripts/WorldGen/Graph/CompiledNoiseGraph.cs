@@ -61,6 +61,51 @@ namespace Engine.Scripts.WorldGen.Graph{
         public int LatticeValueCount, ColumnOutputCount, MarkerCount, VoxelOutputCount;
     }
 
+    /// <summary>
+    ///     Lengths of a graph's tables. Generated code reads the running graph's tables with offsets of the graph it
+    ///     was made from, so it runs only a graph with the same sizes as well as the same code hash.
+    /// </summary>
+    internal readonly struct GraphTableSizes : IEquatable<GraphTableSizes>{
+        public readonly int Instructions, Programs, Slots, Entries, Octaves, Points, Markers;
+
+        public GraphTableSizes(int instructions, int programs, int slots, int entries, int octaves, int points, int markers){
+            Instructions = instructions;
+            Programs = programs;
+            Slots = slots;
+            Entries = entries;
+            Octaves = octaves;
+            Points = points;
+            Markers = markers;
+        }
+
+        public static GraphTableSizes Of(in GraphData d){
+            return new GraphTableSizes(Length(d.Instructions), Length(d.Programs), Length(d.Slots), Length(d.Entries), Length(d.Octaves),
+                Length(d.Points), Length(d.MarkerCellHeights));
+        }
+
+        private static int Length<T>(NativeArray<T> array) where T : struct{
+            return array.IsCreated ? array.Length : 0;
+        }
+
+        public bool Equals(GraphTableSizes o){
+            return Instructions == o.Instructions && Programs == o.Programs && Slots == o.Slots && Entries == o.Entries && Octaves == o.Octaves &&
+                   Points == o.Points && Markers == o.Markers;
+        }
+
+        public override bool Equals(object obj){
+            return obj is GraphTableSizes o && Equals(o);
+        }
+
+        public override int GetHashCode(){
+            return HashCode.Combine(Instructions, Programs, Slots, Entries, Octaves, Points, Markers);
+        }
+
+        public override string ToString(){
+            return $"{Instructions} instructions, {Programs} programs, {Slots} slots, {Entries} noise entries, {Octaves} octaves, {Points} spline points, "
+                   + $"{Markers} markers";
+        }
+    }
+
     /// <summary>64-bit FNV-1a over the fields of a graph's tables (float fields by their bits), in table order.</summary>
     internal static class GraphCodeHash{
         private const ulong Offset = 14695981039346656037UL;
@@ -173,6 +218,8 @@ namespace Engine.Scripts.WorldGen.Graph{
         }
 
         public GraphData Tables => Data;
+
+        internal GraphTableSizes Sizes => GraphTableSizes.Of(Data);
 
         public GraphOutputInfo Output(string name){
             foreach (GraphOutputInfo o in Outputs)

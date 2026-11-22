@@ -14,6 +14,7 @@ namespace Engine.Tests.Performance{
     /// <summary>Generated programs of one noise graph; see <see cref="IGraphPrograms" />.</summary>
     internal unsafe struct TerrainCavesBenchmarkCode : IGraphPrograms{
         public ulong CodeHash => 0x200ACDA1820F7F7EUL;
+        public GraphTableSizes Sizes => new(35, 5, 15, 6, 15, 17, 3);
 
         public void Run(int program, in GraphCode code, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters){
             switch (program){
@@ -236,6 +237,7 @@ namespace Engine.Tests.Performance{
     /// <summary>Generated programs of one noise graph; see <see cref="IGraphPrograms" />.</summary>
     internal unsafe struct ArithmeticChainBenchmarkCode : IGraphPrograms{
         public ulong CodeHash => 0x6FA95BC1CA14AE35UL;
+        public GraphTableSizes Sizes => new(38, 2, 3, 1, 1, 0, 1);
 
         public void Run(int program, in GraphCode code, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters){
             switch (program){

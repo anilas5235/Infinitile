@@ -328,12 +328,16 @@ namespace Engine.Scripts.WorldGen.Graph{
         /// <summary>Code hash of the graph the programs belong to (<see cref="CompiledNoiseGraph.CodeHash" />); 0 for any graph.</summary>
         ulong CodeHash{ get; }
 
+        /// <summary>Table sizes of the graph the programs belong to; checked with the hash before generated code runs.</summary>
+        GraphTableSizes Sizes{ get; }
+
         void Run(int program, in GraphCode code, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters);
     }
 
     /// <summary>The interpreter, for any graph.</summary>
     internal unsafe struct InterpretedPrograms : IGraphPrograms{
         public ulong CodeHash => 0;
+        public GraphTableSizes Sizes => default;
 
         public void Run(int program, in GraphCode code, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters){
             code.Run(code.Programs[program], registers, scratch, lanes, seed, ref counters);
@@ -488,10 +492,19 @@ namespace Engine.Scripts.WorldGen.Graph{
 
         /// <summary>
         ///     True when <paramref name="graph" /> is the graph the shipped generated code was made from (same code
-        ///     hash); any other graph, a mod's or an edited one, runs in the interpreter.
+        ///     hash and table sizes); any other graph, a mod's or an edited one, runs in the interpreter.
         /// </summary>
         public static bool HasGeneratedCode(CompiledNoiseGraph graph){
-            return graph.CodeHash == default(ShippedNoiseGraphCode).CodeHash;
+            return Fits<ShippedNoiseGraphCode>(graph);
+        }
+
+        /// <summary>
+        ///     True when <typeparamref name="TPrograms" /> was generated from <paramref name="graph" />: the code hash
+        ///     and the table sizes match, so a hash collision alone never runs code against tables it does not fit.
+        /// </summary>
+        internal static bool Fits<TPrograms>(CompiledNoiseGraph graph) where TPrograms : struct, IGraphPrograms{
+            TPrograms programs = default;
+            return programs.CodeHash == graph.CodeHash && programs.Sizes.Equals(graph.Sizes);
         }
 
         /// <summary>
@@ -513,7 +526,7 @@ namespace Engine.Scripts.WorldGen.Graph{
         /// </summary>
         internal static GraphRegionResult EvaluateRegion<TPrograms>(CompiledNoiseGraph graph, uint seed, int2 origin, int2 size, bool evaluate3D,
             bool interpolateColumns = false) where TPrograms : struct, IGraphPrograms{
-            if (default(TPrograms).CodeHash != graph.CodeHash)
+            if (!Fits<TPrograms>(graph))
                 throw new ArgumentException($"{typeof(TPrograms).Name} was generated from another graph; regenerate it.");
             GraphRegionResult r = Allocate(graph, origin, size, evaluate3D, interpolateColumns, out GraphRegionJob job);
             job.Seed = seed;

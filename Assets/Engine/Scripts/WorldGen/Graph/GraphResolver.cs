@@ -26,6 +26,9 @@ namespace Engine.Scripts.WorldGen.Graph{
         public readonly List<ResolvedOutput> Outputs = new();
         public int NoiseDefinitionCount;
 
+        /// <summary>Name of each noise definition, by the index <see cref="NoiseEntry.Definition" /> holds.</summary>
+        public readonly List<string> NoiseNames = new();
+
         public int Add(GraphNode node, string name){
             Nodes.Add(node);
             NodeNames.Add(name);
@@ -85,6 +88,7 @@ namespace Engine.Scripts.WorldGen.Graph{
         private readonly GraphIr _ir = new();
         private readonly Dictionary<string, int> _named = new(StringComparer.Ordinal);
         private readonly List<string> _visiting = new();
+        private readonly HashSet<string> _reportedCycles = new(StringComparer.Ordinal);
         private readonly Dictionary<(string noise, int mode), int> _entries = new();
         private readonly Dictionary<string, int> _definitionIndex = new(StringComparer.Ordinal);
         private readonly int[] _inputs ={ -1, -1, -1 };
@@ -129,6 +133,7 @@ namespace Engine.Scripts.WorldGen.Graph{
             int index = 0;
             foreach (NoiseDefinition n in _graph.Noises.Values){
                 _definitionIndex[n.Name] = index++;
+                _ir.NoiseNames.Add(n.Name);
                 CheckNoise(n);
             }
 
@@ -136,9 +141,12 @@ namespace Engine.Scripts.WorldGen.Graph{
             if (_graph.Noises.Count > GraphLimits.MaxNoises)
                 Error(null, $"The graph has {_graph.Noises.Count} noises; the limit is {GraphLimits.MaxNoises}.");
 
-            foreach (string name in _graph.Nodes.Keys)
+            foreach (string name in _graph.Nodes.Keys){
                 if (Array.IndexOf(InputNames, name) >= 0)
                     Error(name, $"\"{name}\" is the name of a coordinate input and cannot name a node.");
+                // Messages name a field as node.field, so a dot would make them point at another node.
+                if (name.IndexOf('.') >= 0) Error(name, $"\"{name}\": a node name cannot contain \".\".");
+            }
 
             foreach (string required in requiredOutputs)
                 if (!_graph.Outputs.ContainsKey(required))
@@ -232,27 +240,46 @@ namespace Engine.Scripts.WorldGen.Graph{
                 if (string.CompareOrdinal(cycle[i], cycle[first]) < 0)
                     first = i;
             List<string> names = cycle.Skip(first).Concat(cycle.Take(first)).ToList();
-            Error(names[0], $"Cycle: {string.Join(" → ", names.Append(names[0]))}.");
             foreach (string name in cycle) _named[name] = -1;
+            // A node that reads the same name twice meets the cycle twice; report it once.
+            if (!_reportedCycles.Add(string.Join(" → ", names))) return;
+            Error(names[0], $"Cycle: {string.Join(" → ", names.Append(names[0]))}.");
         }
 
-        /// <summary>Every string a node's fields may name another node with, inline nodes and spline points included.</summary>
+        /// <summary>Fields that hold a number or a noise name, never a node reference.</summary>
+        private static readonly HashSet<string> ValueFields = new(StringComparer.Ordinal){
+            "noise", "interpolation", "min", "max", "from", "to", "fromY", "toY", "fromValue", "toValue", "cellHeight"
+        };
+
+        /// <summary>
+        ///     Every string a node's reference fields may name another node with, inline nodes and spline point values
+        ///     included. Unknown ops and fields and fields that hold numbers are skipped: resolving the node reports
+        ///     them, and a wrong string there is a bad field, not a cycle.
+        /// </summary>
         private static IEnumerable<string> NamedReferences(object value){
             switch (value){
                 case string s:
                     yield return s;
                     break;
                 case Dictionary<string, object> fields:
+                    if (!fields.TryGetValue("op", out object opValue) || opValue is not string op || op == "const" ||
+                        !Fields.TryGetValue(op, out (string[] required, string[] optional) allowed))
+                        yield break;
                     foreach (KeyValuePair<string, object> field in fields){
-                        if (field.Key is "op" or "noise" or "interpolation") continue;
+                        if (ValueFields.Contains(field.Key) || (Array.IndexOf(allowed.required, field.Key) < 0 && Array.IndexOf(allowed.optional, field.Key) < 0))
+                            continue;
+                        if (field.Key == "points"){
+                            if (field.Value is not List<object> points) continue;
+                            foreach (object point in points)
+                                if (point is Dictionary<string, object> p && p.TryGetValue("value", out object pointValue))
+                                    foreach (string name in NamedReferences(pointValue))
+                                        yield return name;
+                            continue;
+                        }
+
                         foreach (string name in NamedReferences(field.Value)) yield return name;
                     }
 
-                    break;
-                case List<object> list:
-                    foreach (object item in list)
-                    foreach (string name in NamedReferences(item))
-                        yield return name;
                     break;
             }
         }

@@ -149,6 +149,49 @@ namespace Engine.Tests.EditMode{
             Assert.GreaterOrEqual(graph.Tables.ColumnProgram, 0);
         }
 
+        /// <summary>
+        ///     The voxel program's own lanes at every block, which the corner comparison of
+        ///     <see cref="CheckAgainstDirect" /> cannot see: 3D outputs of the coordinates and 3D noise alone equal the
+        ///     direct evaluation, and a 3D output over a 2D value equals its product with the interpolated column value.
+        /// </summary>
+        [Test]
+        public void VoxelOutputs_EqualDirectAtEveryBlock(){
+            GraphBuilder g = new GraphBuilder()
+                .Noise("volume", NoiseKind.Simplex3, 2, 40f, 20f)
+                .Noise("flat", NoiseKind.Simplex2, 2, 60f)
+                .Output("coordinates", Op("mul", ("a", Op("add", ("a", "x"), ("b", "y"))), ("b", Op("sub", ("a", "z"), ("b", Op("mul", ("a", "y"), ("b", 3.0)))))))
+                .Output("noise", Op("add", ("a", Noise("simplex3", "volume")), ("b", Op("mul", ("a", Noise("fbm", "volume")), ("b", "y")))))
+                .Output("flat", Noise("fbm", "flat"))
+                .Output("over_flat", Op("mul", ("a", "y"), ("b", Noise("fbm", "flat"))));
+            using CompiledNoiseGraph graph = CompileOrFail(g.Graph);
+            GraphOutputInfo coordinates = graph.Output("coordinates"), noise = graph.Output("noise"), flat = graph.Output("flat"), overFlat = graph.Output("over_flat");
+            Assert.IsTrue(coordinates.Is3D && noise.Is3D && overFlat.Is3D && !flat.Is3D);
+            Assert.AreEqual(0, graph.Tables.MarkerCount);
+
+            int2 size = new(16, 16);
+            foreach (int2 origin in new[]{ new int2(0, 0), new int2(-52, 28) }){
+                using GraphRegionResult region = GraphEvaluator.EvaluateRegion(graph, Seed, origin, size, true, true);
+                List<float3> positions = new();
+                for (int z = 0; z < size.y; z++)
+                for (int x = 0; x < size.x; x++)
+                for (int y = 0; y < GraphLimits.WorldHeight; y++)
+                    positions.Add(new float3(origin.x + x, y, origin.y + z));
+                float[] direct = graph.EvaluateDirect(positions, new[]{ coordinates.ReferenceNode, noise.ReferenceNode }, Seed);
+
+                int i = 0;
+                for (int z = 0; z < size.y; z++)
+                for (int x = 0; x < size.x; x++)
+                for (int y = 0; y < GraphLimits.WorldHeight; y++, i++){
+                    string at = $"({origin.x + x}, {y}, {origin.y + z})";
+                    float c = region.Voxel(coordinates.VoxelOutput, x, y, z), n = region.Voxel(noise.VoxelOutput, x, y, z);
+                    if (!SameValue(c, direct[2 * i])) Assert.Fail($"coordinates at {at}: compiled {c:R}, direct {direct[2 * i]:R}");
+                    if (!SameValue(n, direct[2 * i + 1])) Assert.Fail($"noise at {at}: compiled {n:R}, direct {direct[2 * i + 1]:R}");
+                    float expected = y * region.Column2D(flat.LatticeValue, x, z), o = region.Voxel(overFlat.VoxelOutput, x, y, z);
+                    if (!SameValue(o, expected)) Assert.Fail($"over_flat at {at}: compiled {o:R}, y · interpolated column {expected:R}");
+                }
+            }
+        }
+
         [Test]
         public void RandomGraphs_CompiledEqualsDirect_AndBoundsAreSound(){
             const int graphs = 80;

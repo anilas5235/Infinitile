@@ -89,7 +89,9 @@ namespace Engine.Editor.WorldGen{
             GraphData d = graph.Tables;
             s.Append("    /// <summary>Generated programs of one noise graph; see <see cref=\"IGraphPrograms\" />.</summary>\n");
             s.Append($"    internal unsafe struct {typeName} : IGraphPrograms{{\n");
-            s.Append($"        public ulong CodeHash => 0x{graph.CodeHash:X16}UL;\n\n");
+            s.Append($"        public ulong CodeHash => 0x{graph.CodeHash:X16}UL;\n");
+            GraphTableSizes z = graph.Sizes;
+            s.Append($"        public GraphTableSizes Sizes => new({z.Instructions}, {z.Programs}, {z.Slots}, {z.Entries}, {z.Octaves}, {z.Points}, {z.Markers});\n\n");
             s.Append("        public void Run(int program, in GraphCode code, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters){\n");
             s.Append("            switch (program){\n");
             for (int p = 0; p < d.Programs.Length; p++){

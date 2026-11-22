@@ -189,6 +189,70 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void LongChainOfNamedNodes_IsAnErrorNotAStackOverflow(){
+            // Far longer than a call stack is deep: resolving, folding and building the program never nest per node.
+            const int length = 100000;
+            GraphBuilder chain = new GraphBuilder().Node("c0", Op("mul", ("a", "x"), ("b", 1.5)));
+            for (int i = 1; i < length; i++) chain.Node($"c{i}", Op("add", ("a", $"c{i - 1}"), ("b", "z")));
+            chain.Output("o", $"c{length - 1}");
+            AssertError(Compile(chain.Graph), null, $"the limit is {GraphLimits.MaxInstructions}");
+        }
+
+        [Test]
+        public void Validator_RejectsNoiseSettingsThatOverflow(){
+            GraphBuilder g = new GraphBuilder()
+                .Noise("loud", NoiseKind.Simplex2, GraphLimits.MaxOctaves, 100f, 0f, 2f, 400f)
+                .Noise("fast", NoiseKind.Simplex3, GraphLimits.MaxOctaves, 100f, 50f, 1000f)
+                .Noise("calm", NoiseKind.Simplex2, GraphLimits.MaxOctaves, 100f, 0f, 2f, 0.5f)
+                .Output("a", Noise("fbm", "loud"))
+                .Output("b", Noise("ridged", "fast"))
+                .Output("c", Noise("fbm", "calm"));
+            GraphCompileResult r = Compile(g.Graph);
+            AssertError(r, null, "Noise \"loud\": its octaves leave the float range");
+            AssertError(r, null, "Noise \"fast\": its octaves leave the float range");
+            Assert.IsFalse(r.Errors.Any(m => m.Text.Contains("\"calm\"")), string.Join("\n", r.Messages));
+        }
+
+        [Test]
+        public void Validator_RejectsValuesThatCanOverflow(){
+            GraphBuilder power = new GraphBuilder().Node("huge", Op("cube", ("in", Op("cube", ("in", "x"))))).Output("o", "huge");
+            AssertError(Compile(power.Graph), null, "\"huge\": its values can leave the float range");
+
+            GraphBuilder product = new GraphBuilder().Node("folded", Op("mul", ("a", 1e30), ("b", 1e30))).Output("o", Op("add", ("a", "folded"), ("b", "x")));
+            AssertError(Compile(product.Graph), null, "\"folded\": its values can leave the float range");
+        }
+
+        [Test]
+        public void Validator_ReportsEachCycleOnce(){
+            GraphBuilder g = new GraphBuilder()
+                .Node("a", Op("abs", ("in", "b")))
+                .Node("b", Op("add", ("a", "a"), ("b", "a")))
+                .Output("o", "a");
+            GraphCompileResult r = Compile(g.Graph);
+            AssertError(r, "a", "Cycle: a → b → a");
+            Assert.AreEqual(1, r.Errors.Count(m => m.Text.Contains("Cycle")), string.Join("\n", r.Messages));
+        }
+
+        [Test]
+        public void Validator_ReportsANameInANumberFieldAsABadField(){
+            GraphBuilder g = new GraphBuilder()
+                .Node("b", Op("smoothstep", ("in", "x"), ("from", "b"), ("to", 1.0)))
+                .Node("c", Op("clamp", ("in", "x"), ("min", "c"), ("max", 1.0)))
+                .Output("o", "b")
+                .Output("p", "c");
+            GraphCompileResult r = Compile(g.Graph);
+            AssertError(r, "b", "\"from\" must be a number");
+            AssertError(r, "c", "\"min\" must be a number");
+            Assert.IsFalse(r.Errors.Any(m => m.Text.Contains("Cycle")), string.Join("\n", r.Messages));
+        }
+
+        [Test]
+        public void Validator_RejectsADotInANodeName(){
+            GraphBuilder g = new GraphBuilder().Node("terrain.base", Op("abs", ("in", "x"))).Output("o", "terrain.base");
+            AssertError(Compile(g.Graph), "terrain.base", "cannot contain \".\"");
+        }
+
+        [Test]
         public void GraphValidator_ReportsTheSameMessagesWithoutKeepingAGraph(){
             GraphBuilder g = new GraphBuilder().Node("user", Op("add", ("a", "missing"), ("b", 1.0))).Output("o", "user");
             List<GraphMessage> messages = GraphValidator.Validate(g.Graph, File, Array.Empty<string>());

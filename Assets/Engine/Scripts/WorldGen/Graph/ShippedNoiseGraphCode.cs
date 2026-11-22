@@ -13,6 +13,7 @@ namespace Engine.Scripts.WorldGen.Graph{
     /// <summary>Generated programs of one noise graph; see <see cref="IGraphPrograms" />.</summary>
     internal unsafe struct ShippedNoiseGraphCode : IGraphPrograms{
         public ulong CodeHash => 0x01B92CECC10C0B20UL;
+        public GraphTableSizes Sizes => new(22, 1, 6, 7, 22, 2, 0);
 
         public void Run(int program, in GraphCode code, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters){
             switch (program){
