@@ -27,11 +27,12 @@ namespace Engine.Editor.WorldGen{
 
         public static readonly DensityChunkClass[] Classes = (DensityChunkClass[])Enum.GetValues(typeof(DensityChunkClass));
 
-        // Chunk coordinates (in chunks), eight per class, from the finder on the fixture graph with Seed.
-        private static readonly int2[] Ocean ={ };
-        private static readonly int2[] Coast ={ };
-        private static readonly int2[] Lowland ={ };
-        private static readonly int2[] Massif ={ };
+        // Chunk coordinates (in chunks), eight per class, from the finder on the fixture graph with Seed (radius 512, step 8,
+        // water level 124), made 2026-11-22.
+        private static readonly int2[] Ocean ={ new int2(0, -16), new int2(-16, 0), new int2(-8, -16), new int2(8, -16), new int2(-16, -16), new int2(0, -24), new int2(-24, 0), new int2(-8, -24) };
+        private static readonly int2[] Coast ={ new int2(0, 0), new int2(0, 8), new int2(16, 0), new int2(24, -8), new int2(8, 24), new int2(32, 8), new int2(8, 32), new int2(24, 40) };
+        private static readonly int2[] Lowland ={ new int2(0, -8), new int2(-8, 0), new int2(-8, -8), new int2(0, 16), new int2(16, 8), new int2(-8, 16), new int2(16, -16), new int2(-16, 16) };
+        private static readonly int2[] Massif ={ new int2(-16, 32), new int2(-24, 32), new int2(-16, 40), new int2(-24, 40), new int2(56, 48), new int2(48, 56), new int2(-32, -80), new int2(-40, -80) };
 
         /// <summary>The chunks of <paramref name="c" />, in chunk coordinates.</summary>
         public static IReadOnlyList<int2> Chunks(DensityChunkClass c){

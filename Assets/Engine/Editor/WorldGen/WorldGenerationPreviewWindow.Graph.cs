@@ -12,7 +12,8 @@ namespace Engine.Editor.WorldGen{
     ///     validator messages, the program sizes and the work counters, and draws every output. 2D outputs are top
     ///     views of the framed region (exact values at every sample); 3D outputs are a vertical x–y slice through the
     ///     centre of the view at one sample per block. Colours run from blue (negative) through grey to red
-    ///     (positive), scaled by the output's bound; magenta marks a value outside its bound.
+    ///     (positive), scaled by the output's bound; magenta marks a value outside its bound. A graph with the terrain
+    ///     outputs also gets the density cross-section (WorldGenerationPreviewWindow.Density.cs).
     /// </summary>
     public partial class WorldGenerationPreviewWindow{
         private const double GraphRebuildDelaySeconds = 0.15;
@@ -106,6 +107,8 @@ namespace Engine.Editor.WorldGen{
                     EditorGUI.DrawRect(rect, new Color(0.1f, 0.1f, 0.1f, 1f));
                     GUI.DrawTexture(rect, view.Texture, ScaleMode.StretchToFill, false);
                 }
+
+                DrawDensityView();
             }
             EditorGUILayout.EndScrollView();
         }
@@ -198,6 +201,7 @@ namespace Engine.Editor.WorldGen{
                 }
             }
 
+            BuildDensityView(graph, seed, origin, extent);
             _graphMilliseconds = watch.Elapsed.TotalMilliseconds;
         }
 
@@ -239,6 +243,7 @@ namespace Engine.Editor.WorldGen{
                 if (view.Texture)
                     DestroyImmediate(view.Texture);
             _graphViews.Clear();
+            DestroyDensityTexture();
         }
 
         private void DisposeGraphCompile(){

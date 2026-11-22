@@ -258,7 +258,7 @@ namespace Engine.Tests.EditMode{
         /// </summary>
         [Test]
         public void VoxelHash_OfTheFixtureChunks(){
-            const ulong expected = 0x0UL;
+            const ulong expected = 0x72AF39D7F38C0191UL;
             ulong actual = VoxelHash();
             Assert.AreEqual(expected, actual, $"voxel hash 0x{actual:X16}");
         }
@@ -287,10 +287,10 @@ namespace Engine.Tests.EditMode{
         private static readonly DensityChunkClass[] ClassValues = DensityFixture.Classes;
 
         private static readonly Dictionary<DensityChunkClass, string> ExpectedCounters = new(){
-            [DensityChunkClass.Ocean] = "",
-            [DensityChunkClass.Coast] = "",
-            [DensityChunkClass.Lowland] = "",
-            [DensityChunkClass.Massif] = ""
+            [DensityChunkClass.Ocean] = "8 chunks: corner columns 648, corners 4448, blocks by range 13416 / by sign 2345 / mixed 623, interpolated 79744, solid 844817; graph: lattice 4232, columns 0, corners 4448, voxels 0 in 0 cells, noise 2D 97336 / 3D 17792, instructions 18720 (315544 lane ops), interpolated 79744",
+            [DensityChunkClass.Coast] = "8 chunks: corner columns 648, corners 4888, blocks by range 13150 / by sign 2560 / mixed 674, interpolated 86272, solid 1049000; graph: lattice 4232, columns 0, corners 4888, voxels 0 in 0 cells, noise 2D 97336 / 3D 19552, instructions 18720 (320384 lane ops), interpolated 86272",
+            [DensityChunkClass.Lowland] = "8 chunks: corner columns 648, corners 3883, blocks by range 13858 / by sign 1968 / mixed 558, interpolated 71424, solid 1144771; graph: lattice 4232, columns 0, corners 3883, voxels 0 in 0 cells, noise 2D 97336 / 3D 15532, instructions 18720 (309329 lane ops), interpolated 71424",
+            [DensityChunkClass.Massif] = "8 chunks: corner columns 648, corners 8342, blocks by range 10514 / by sign 4869 / mixed 1001, interpolated 128128, solid 1575542; graph: lattice 4232, columns 0, corners 8342, voxels 0 in 0 cells, noise 2D 97336 / 3D 33368, instructions 18720 (358378 lane ops), interpolated 128128"
         };
 
         #endregion
