@@ -311,13 +311,13 @@ namespace Engine.Tests.EditMode{
         /// </summary>
         [Test]
         public void ShippedGraph_OutputsOnFixedColumnsMatchTheGoldenHash(){
-            const uint expected = 0x4F6C471Fu;
+            const uint expected = 0x2A05FBD8u; // V2: the terrain outputs and the massif re-tune
             using CompiledNoiseGraph graph = ShippedNoiseGraph.Compile().Graph;
             float2[] columns = GoldenColumns();
             float[] lattice = GraphEvaluator.SampleLattice(graph, Seed, columns, out _);
             // Output by output in name order, so the hash does not depend on where the compiler keeps a value.
             List<float> values = new();
-            foreach (GraphOutputInfo output in graph.Outputs.Where(o => !o.Is3D).OrderBy(o => o.Name, StringComparer.Ordinal))
+            foreach (GraphOutputInfo output in graph.Outputs.Where(o => !o.Is3D && !o.BoundOnly).OrderBy(o => o.Name, StringComparer.Ordinal))
                 for (int p = 0; p < columns.Length; p++)
                     values.Add(lattice[output.LatticeValue * columns.Length + p]);
             uint hash = HashValues(values);
@@ -330,8 +330,8 @@ namespace Engine.Tests.EditMode{
             using CompiledNoiseGraph graph = ShippedNoiseGraph.Compile().Graph;
             float2[] points = GoldenColumns();
             GraphEvaluator.SampleLattice(graph, Seed, points, out GraphWorkCounters counters);
-            // Octaves: continentalness 5 + warp 2 × 2 + erosion 4 + humidity 3 + temperature 3 + weirdness 3.
-            const int samplesPerPoint = 22;
+            // Octaves: continentalness 5 + warp 2 × 2 + erosion 4 + humidity 3 + temperature 3 + weirdness 3 + peak 1.
+            const int samplesPerPoint = 23;
             Assert.AreEqual(points.Length, counters.LatticePoints);
             Assert.AreEqual((long)samplesPerPoint * points.Length, counters.NoiseSamples2D);
             Assert.AreEqual(0, counters.NoiseSamples3D);
@@ -339,7 +339,7 @@ namespace Engine.Tests.EditMode{
             using GraphRegionResult region = GraphEvaluator.EvaluateRegion(graph, Seed, new int2(-64, 32), new int2(32, 32), true);
             Assert.AreEqual(9 * 9, region.Counters.LatticePoints, "a chunk's lattice is 9 × 9 points");
             Assert.AreEqual(samplesPerPoint * 81, region.Counters.NoiseSamples2D);
-            Assert.AreEqual(0, region.Counters.Voxels, "the shipped graph has no 3D outputs yet");
+            Assert.Greater(region.Counters.NoiseSamples3D, 0, "the terrain density is 3D (N3)");
         }
 
         [Test]

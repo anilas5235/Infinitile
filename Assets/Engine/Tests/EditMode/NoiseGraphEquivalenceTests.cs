@@ -519,6 +519,7 @@ namespace Engine.Tests.EditMode{
                         }
 
                         double? derivative = random.Next(2) == 0 ? Constant(random, 2) : null;
+                        if (linear) derivative = null; // drawn all the same, so the random stream stays as before
                         list.Add(Point(location, value, derivative));
                         location += 0.05 + Math.Round(random.NextDouble() * 1.5, 3);
                     }

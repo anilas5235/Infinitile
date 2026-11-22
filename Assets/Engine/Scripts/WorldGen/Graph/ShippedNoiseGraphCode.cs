@@ -15,8 +15,8 @@ using Unity.Mathematics;
 namespace Engine.Scripts.WorldGen.Graph{
     /// <summary>Generated programs of one noise graph; see <see cref="IGraphPrograms" />.</summary>
     internal unsafe struct ShippedNoiseGraphCode : IGraphPrograms{
-        public ulong CodeHash => 0x1FD0D06D1A8D4E8DUL;
-        public GraphTableSizes Sizes => new(74, 3, 13, 9, 27, 148, 1);
+        public ulong CodeHash => 0x00657916E6850DF0UL;
+        public GraphTableSizes Sizes => new(75, 3, 13, 9, 27, 148, 1);
 
         public void Run(int program, in GraphCode code, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters){
             switch (program){
@@ -33,8 +33,8 @@ namespace Engine.Scripts.WorldGen.Graph{
                     break;
                 case 2:
                     Lattice(registers, code.Points, lanes, seed);
-                    counters.Instructions += 63;
-                    counters.InstructionLanes += 63L * lanes;
+                    counters.Instructions += 64;
+                    counters.InstructionLanes += 64L * lanes;
                     counters.NoiseSamples2D += 23L * lanes;
                     break;
                 default:
@@ -85,7 +85,7 @@ namespace Engine.Scripts.WorldGen.Graph{
             }
         }
 
-        /// <summary>Lattice program: 63 instructions, 17 registers.</summary>
+        /// <summary>Lattice program: 64 instructions, 17 registers.</summary>
         private static void Lattice(float* r, SplinePoint* points, int lanes, uint seed){
             int quads = (lanes + 3) >> 2;
             float4* sv = stackalloc float4[48];
@@ -202,23 +202,23 @@ namespace Engine.Scripts.WorldGen.Graph{
                 sv[1] = r9;
                 sv[2] = r10;
                 r12 = GraphKernels.Spline(r3, points + 40, sv, 3, 2);
-                sv[0] = math.asfloat(0x41800000u);
-                sv[1] = math.asfloat(0x41B00000u);
-                sv[2] = math.asfloat(0x42200000u);
-                sv[3] = math.asfloat(0x42500000u);
-                sv[4] = math.asfloat(0x42700000u);
+                sv[0] = math.asfloat(0x42200000u);
+                sv[1] = math.asfloat(0x42380000u);
+                sv[2] = math.asfloat(0x42800000u);
+                sv[3] = math.asfloat(0x42980000u);
+                sv[4] = math.asfloat(0x42A80000u);
                 r8 = GraphKernels.Spline(r7, points + 43, sv, 5, 2);
-                sv[0] = math.asfloat(0x41200000u);
-                sv[1] = math.asfloat(0x41800000u);
-                sv[2] = math.asfloat(0x41F00000u);
-                sv[3] = math.asfloat(0x42200000u);
-                sv[4] = math.asfloat(0x42400000u);
+                sv[0] = math.asfloat(0x42080000u);
+                sv[1] = math.asfloat(0x42200000u);
+                sv[2] = math.asfloat(0x42580000u);
+                sv[3] = math.asfloat(0x42800000u);
+                sv[4] = math.asfloat(0x42900000u);
                 r9 = GraphKernels.Spline(r7, points + 48, sv, 5, 2);
-                sv[0] = math.asfloat(0xC0400000u);
-                sv[1] = math.asfloat(0x40000000u);
-                sv[2] = math.asfloat(0x41ACCCCDu);
-                sv[3] = math.asfloat(0x42100000u);
-                sv[4] = math.asfloat(0x42580000u);
+                sv[0] = math.asfloat(0x41500000u);
+                sv[1] = math.asfloat(0x41900000u);
+                sv[2] = math.asfloat(0x42166666u);
+                sv[3] = math.asfloat(0x42500000u);
+                sv[4] = math.asfloat(0x428C0000u);
                 r10 = GraphKernels.Spline(r7, points + 53, sv, 5, 2);
                 sv[0] = math.asfloat(0xC0800000u);
                 sv[1] = math.asfloat(0x00000000u);
@@ -238,23 +238,23 @@ namespace Engine.Scripts.WorldGen.Graph{
                 sv[3] = r13;
                 sv[4] = r14;
                 r15 = GraphKernels.Spline(r3, points + 68, sv, 5, 2);
-                sv[0] = math.asfloat(0x41B00000u);
-                sv[1] = math.asfloat(0x41E00000u);
-                sv[2] = math.asfloat(0x42380000u);
-                sv[3] = math.asfloat(0x42680000u);
-                sv[4] = math.asfloat(0x42840000u);
+                sv[0] = math.asfloat(0x42380000u);
+                sv[1] = math.asfloat(0x42500000u);
+                sv[2] = math.asfloat(0x428C0000u);
+                sv[3] = math.asfloat(0x42A40000u);
+                sv[4] = math.asfloat(0x42B40000u);
                 r8 = GraphKernels.Spline(r7, points + 73, sv, 5, 2);
-                sv[0] = math.asfloat(0x41800000u);
-                sv[1] = math.asfloat(0x41B00000u);
-                sv[2] = math.asfloat(0x42100000u);
-                sv[3] = math.asfloat(0x42380000u);
-                sv[4] = math.asfloat(0x42580000u);
+                sv[0] = math.asfloat(0x42200000u);
+                sv[1] = math.asfloat(0x42380000u);
+                sv[2] = math.asfloat(0x42700000u);
+                sv[3] = math.asfloat(0x428C0000u);
+                sv[4] = math.asfloat(0x429C0000u);
                 r9 = GraphKernels.Spline(r7, points + 78, sv, 5, 2);
-                sv[0] = math.asfloat(0xC0400000u);
-                sv[1] = math.asfloat(0x40000000u);
-                sv[2] = math.asfloat(0x41ACCCCDu);
-                sv[3] = math.asfloat(0x42100000u);
-                sv[4] = math.asfloat(0x42580000u);
+                sv[0] = math.asfloat(0x41500000u);
+                sv[1] = math.asfloat(0x41900000u);
+                sv[2] = math.asfloat(0x42166666u);
+                sv[3] = math.asfloat(0x42500000u);
+                sv[4] = math.asfloat(0x428C0000u);
                 r10 = GraphKernels.Spline(r7, points + 83, sv, 5, 2);
                 sv[0] = math.asfloat(0xC0800000u);
                 sv[1] = math.asfloat(0x00000000u);
@@ -325,9 +325,10 @@ namespace Engine.Scripts.WorldGen.Graph{
                 r9 = r8 + math.asfloat(0x42F80000u);
                 r8 = r6 * r10;
                 r6 = r9 + r8;
+                r8 = math.clamp(r6, math.asfloat(0xC2800000u), math.asfloat(0x437A0000u));
                 sv[0] = math.asfloat(0x40048312u);
                 sv[1] = math.asfloat(0x41000000u);
-                r8 = GraphKernels.Spline(r3, points + 138, sv, 2, 2);
+                r6 = GraphKernels.Spline(r3, points + 138, sv, 2, 2);
                 sv[0] = math.asfloat(0x3F800000u);
                 sv[1] = math.asfloat(0x3F800000u);
                 sv[2] = math.asfloat(0x40350481u);
@@ -335,10 +336,10 @@ namespace Engine.Scripts.WorldGen.Graph{
                 r9 = GraphKernels.Spline(r3, points + 140, sv, 4, 2);
                 sv[0] = math.asfloat(0x40350481u);
                 sv[1] = math.asfloat(0x41000000u);
-                sv[2] = r8;
+                sv[2] = r6;
                 sv[3] = r9;
                 r10 = GraphKernels.Spline(r4, points + 144, sv, 4, 2);
-                r8 = math.clamp(r4, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
+                r6 = math.clamp(r4, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
                 r4 = math.clamp(r3, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
                 {
                     float4 nx = r0, nz = r2;
@@ -359,11 +360,11 @@ namespace Engine.Scripts.WorldGen.Graph{
                     r7 = n;
                 }
                 r11 = math.clamp(r7, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
-                ((float4*)(r + 1024))[q] = r8;
+                ((float4*)(r + 768))[q] = r6;
                 ((float4*)(r + 512))[q] = r4;
                 ((float4*)(r + 1280))[q] = r10;
                 ((float4*)(r + 1152))[q] = r9;
-                ((float4*)(r + 768))[q] = r6;
+                ((float4*)(r + 1024))[q] = r8;
                 ((float4*)(r + 384))[q] = r3;
                 ((float4*)(r + 1408))[q] = r11;
                 ((float4*)(r + 640))[q] = r5;
