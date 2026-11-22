@@ -51,7 +51,11 @@ namespace Engine.Editor.WorldGen{
 
         /// <summary>The graph toggle of the view toolbar.</summary>
         private void DrawGraphToggle(){
-            _graphView = EditorGUILayout.ToggleLeft("Graph outputs", _graphView, GUILayout.Width(105f));
+            bool on = EditorGUILayout.ToggleLeft("Graph outputs", _graphView, GUILayout.Width(105f));
+            if (on != _graphView){
+                _graphView = on;
+                if (on) _layoutView = false;
+            }
         }
 
         private void DrawGraphViews(){

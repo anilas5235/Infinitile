@@ -1,0 +1,14 @@
+{
+  "formatVersion": 1,
+  "biomes": [
+    {
+      "name": "Heath",
+      "base": "Plains",
+      "water": false,
+      "boxes": [
+        { "temperature": [-1, -0.28], "humidity": [-1, -0.28], "continentalness": [-0.19, 0.18] }
+      ]
+    }
+  ],
+  "implausible": [ ["Heath", "Desert"] ]
+}

@@ -14,6 +14,7 @@ using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Data.Generation;
+using Engine.Scripts.WorldGen.Biomes;
 using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Mathematics;
@@ -403,6 +404,68 @@ namespace Engine.Scripts.World{
         /// <summary>Name of biome <paramref name="index" /> of <see cref="TrySampleColumn" />; null when out of range.</summary>
         public string BiomeName(int index){
             return index >= 0 && index < _biomeNames.Length ? _biomeNames[index] : null;
+        }
+
+        /// <summary>The target of <see cref="TryLocate" /> that finds the highest peak nearby.</summary>
+        public const string PeakTarget = "peak";
+
+        /// <summary>
+        ///     What <see cref="TryLocate" /> finds: the biome names of the layout and <see cref="PeakTarget" />; empty
+        ///     unless the density generator runs.
+        /// </summary>
+        public IReadOnlyList<string> LocateTargets{
+            get{
+                if (_isShuttingDown || _chunkScheduler?.Graph == null || !_chunkScheduler.WorldGen.Layout.HasBoxes) return Array.Empty<string>();
+                List<string> targets = new();
+                foreach (string name in _biomeNames)
+                    if (!string.IsNullOrEmpty(name))
+                        targets.Add(name);
+                targets.Add(PeakTarget);
+                return targets;
+            }
+        }
+
+        /// <summary>
+        ///     The nearest column of a biome, or the highest peak within <see cref="BiomeLocator.PeakRadius" />, from
+        ///     the density generator's 2D program and biome lookup without generating chunks (WorldGen v2 §13.6): x and
+        ///     z of the column, y one block above its top terrain voxel (at least the water level for wet columns).
+        /// </summary>
+        public bool TryLocate(string target, Vector3 from, out Vector3Int position, out string error){
+            position = default;
+            if (_isShuttingDown || _chunkScheduler?.Graph == null || !_chunkScheduler.WorldGen.Layout.HasBoxes){
+                error = "Only the density generator can locate places.";
+                return false;
+            }
+
+            WorldGenConfig cfg = _chunkScheduler.WorldGen;
+            int2 start = new(Mathf.FloorToInt(from.x), Mathf.FloorToInt(from.z));
+            int2 at;
+            int top;
+            bool wet = false;
+            if (string.Equals(target, PeakTarget, StringComparison.OrdinalIgnoreCase)){
+                if (!BiomeLocator.FindPeak(_chunkScheduler.Graph, cfg.Layout, cfg.Seed, start, out at, out top)){
+                    error = "No peak found.";
+                    return false;
+                }
+            }
+            else{
+                int biome = Array.FindIndex(_biomeNames, n => string.Equals(n, target, StringComparison.OrdinalIgnoreCase));
+                if (biome < 0 || biome > byte.MaxValue){
+                    error = $"Unknown biome '{target}'.";
+                    return false;
+                }
+
+                if (!BiomeLocator.FindBiome(_chunkScheduler.Graph, cfg.Layout, cfg.Seed, start, (byte)biome, out at, out top, out wet)){
+                    error = $"No {_biomeNames[biome]} within {BiomeLocator.MaxBiomeRadius} blocks.";
+                    return false;
+                }
+            }
+
+            int y = top + 1;
+            if (wet) y = Math.Max(y, cfg.WaterLevel + 1);
+            position = new Vector3Int(at.x, Math.Clamp(y, 0, ChunkHeight - 1), at.y);
+            error = null;
+            return true;
         }
 
         /// <summary>

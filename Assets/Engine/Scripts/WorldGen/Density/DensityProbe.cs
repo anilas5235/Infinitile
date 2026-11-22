@@ -20,7 +20,38 @@ namespace Engine.Scripts.WorldGen.Density{
         /// <summary>[x][z][y] voxel ids of the placeholder fill (only with <see cref="DensityChunk.PassFill" />).</summary>
         public NativeArray<ushort> Voxels;
 
+        /// <summary>[x · 32 + z]: the hard biome (with <see cref="DensityChunk.PassFill" /> and a layout).</summary>
+        public NativeArray<byte> Biomes;
+
+        /// <summary>[x · 32 + z]: the surface-source biome (from <see cref="DensityChunk.PassBlend" />).</summary>
+        public NativeArray<byte> Surface;
+
+        /// <summary>[z][x] over the padded biome map (64², chunk − 16): hard biomes and wet flags (from <see cref="DensityChunk.PassBiomes" />).</summary>
+        public NativeArray<byte> PaddedHard, PaddedWet;
+
+        /// <summary>[parameter][z][x] over the biome lattice (17², chunk − 16, step 4): the climate P2 read (from <see cref="DensityChunk.PassBiomes" />).</summary>
+        public NativeArray<float> BiomeClimate;
+
+        /// <summary>Parameter <paramref name="p" /> (T, F, C, E, W) at biome lattice point (<paramref name="i" />, <paramref name="j" />), i and j in 0 … 16.</summary>
+        public float ClimateAt(int p, int i, int j){
+            return BiomeClimate[(p * DensityLayout.BiomeLattice + j) * DensityLayout.BiomeLattice + i];
+        }
+
+        /// <summary>[x · 32 + z]: the blend's 4 largest weights (from <see cref="DensityChunk.PassBlend" />).</summary>
+        public NativeArray<int4> BlendBiomes;
+
+        public NativeArray<float4> BlendWeights;
+
         public DensityWorkCounters Counters;
+
+        /// <summary>The hard biome of padded column (<paramref name="x" />, <paramref name="z" />) relative to the chunk origin (−16 … 47).</summary>
+        public byte PaddedHardAt(int x, int z){
+            return PaddedHard[(z + DensityLayout.BiomePadding) * DensityLayout.BiomeSpan + x + DensityLayout.BiomePadding];
+        }
+
+        public bool PaddedWetAt(int x, int z){
+            return PaddedWet[(z + DensityLayout.BiomePadding) * DensityLayout.BiomeSpan + x + DensityLayout.BiomePadding] != 0;
+        }
 
         public bool IsSolid(int x, int y, int z){
             return Solid[(x * DensityLayout.ChunkSize + z) * DensityLayout.Height + y] != 0;
@@ -30,6 +61,13 @@ namespace Engine.Scripts.WorldGen.Density{
             if (Solid.IsCreated) Solid.Dispose();
             if (Heightmap.IsCreated) Heightmap.Dispose();
             if (Voxels.IsCreated) Voxels.Dispose();
+            if (Biomes.IsCreated) Biomes.Dispose();
+            if (Surface.IsCreated) Surface.Dispose();
+            if (PaddedHard.IsCreated) PaddedHard.Dispose();
+            if (PaddedWet.IsCreated) PaddedWet.Dispose();
+            if (BiomeClimate.IsCreated) BiomeClimate.Dispose();
+            if (BlendBiomes.IsCreated) BlendBiomes.Dispose();
+            if (BlendWeights.IsCreated) BlendWeights.Dispose();
         }
     }
 
@@ -84,7 +122,14 @@ namespace Engine.Scripts.WorldGen.Density{
                 Origin = origin,
                 Solid = new NativeArray<byte>(DensityLayout.Voxels, Allocator.TempJob),
                 Heightmap = new NativeArray<short>(DensityLayout.Columns, Allocator.TempJob),
-                Voxels = new NativeArray<ushort>(DensityLayout.Voxels, Allocator.TempJob)
+                Voxels = new NativeArray<ushort>(DensityLayout.Voxels, Allocator.TempJob),
+                Biomes = new NativeArray<byte>(DensityLayout.Columns, Allocator.TempJob),
+                Surface = new NativeArray<byte>(DensityLayout.Columns, Allocator.TempJob),
+                PaddedHard = new NativeArray<byte>(DensityLayout.BiomeSpan * DensityLayout.BiomeSpan, Allocator.TempJob),
+                PaddedWet = new NativeArray<byte>(DensityLayout.BiomeSpan * DensityLayout.BiomeSpan, Allocator.TempJob),
+                BiomeClimate = new NativeArray<float>(5 * DensityLayout.BiomeLattice * DensityLayout.BiomeLattice, Allocator.TempJob),
+                BlendBiomes = new NativeArray<int4>(DensityLayout.Columns, Allocator.TempJob),
+                BlendWeights = new NativeArray<float4>(DensityLayout.Columns, Allocator.TempJob)
             };
             return new DensityProbeJob<TPrograms>{
                 Terrain = terrain,
@@ -95,6 +140,13 @@ namespace Engine.Scripts.WorldGen.Density{
                 Solid = result.Solid,
                 Heightmap = result.Heightmap,
                 Voxels = result.Voxels,
+                Biomes = result.Biomes,
+                Surface = result.Surface,
+                PaddedHard = result.PaddedHard,
+                PaddedWet = result.PaddedWet,
+                BiomeClimate = result.BiomeClimate,
+                BlendBiomes = result.BlendBiomes,
+                BlendWeights = result.BlendWeights,
                 Counters = new NativeArray<DensityWorkCounters>(1, Allocator.TempJob)
             };
         }

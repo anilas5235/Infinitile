@@ -45,6 +45,7 @@ namespace Engine.Tests.Performance{
             _config = BenchmarkFixtures.CreateGeneratorConfig(Allocator.Persistent);
             _config.WorldGen.Seed = DensityFixture.Seed;
             _config.WorldGen.DensityStoneVoxel = BenchmarkFixtures.Stone;
+            DensityFixture.UseShippedBiomes(ref _config.WorldGen);
         }
 
         [OneTimeTearDown]
@@ -91,6 +92,18 @@ namespace Engine.Tests.Performance{
         [Performance]
         public void DensityChunk_Terrain_Cell4_MsPerChunk([ValueSource(nameof(Classes))] DensityChunkClass c){
             MeasureProbe<DensityFixtureCell4Code>(_graph4, c, DensityChunk.PassTerrain, $"DensityChunk P1+P4 terrain cells 4x4x4 {c} ms/chunk");
+        }
+
+        [Test]
+        [Performance]
+        public void DensityChunk_Biomes_MsPerChunk([ValueSource(nameof(Classes))] DensityChunkClass c){
+            MeasureProbe<DensityFixtureCode>(_graph, c, DensityChunk.PassBiomes, $"DensityChunk P1+P4+P2 biomes {c} ms/chunk");
+        }
+
+        [Test]
+        [Performance]
+        public void DensityChunk_Blend_MsPerChunk([ValueSource(nameof(Classes))] DensityChunkClass c){
+            MeasureProbe<DensityFixtureCode>(_graph, c, DensityChunk.PassBlend, $"DensityChunk P1+P4+P2+P3 blend {c} ms/chunk");
         }
 
         /// <summary>The engine's chunk job over the class's chunks: the passes, the placeholder fill and the RLE.</summary>

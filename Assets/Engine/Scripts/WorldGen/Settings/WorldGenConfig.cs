@@ -177,6 +177,12 @@ namespace Engine.Scripts.WorldGen.Settings{
         [ReadOnly] public NativeArray<Biome.BiomeDef> Biomes;
 
         /// <summary>
+        ///     WorldGen v2 (the density generator only): the merged biome layout with its compiled lookups and the blocks
+        ///     per biome id (§6). Owned; not created for v1.
+        /// </summary>
+        public Engine.Scripts.WorldGen.Biomes.BiomeLayoutData Layout;
+
+        /// <summary>
         ///     Effective Biome-first octave coefficients a_{b,i} = HeightAmplitude_b × OctaveWeights_{b,i},
         ///     flattened as [b × K + i]. Owned.
         /// </summary>
@@ -293,6 +299,7 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (FloraDenseMultiBlockBiomes.IsCreated) FloraDenseMultiBlockBiomes.Dispose();
             if (VoxelClasses.IsCreated) VoxelClasses.Dispose();
             Caves.Dispose();
+            Layout.Dispose();
         }
     }
 }

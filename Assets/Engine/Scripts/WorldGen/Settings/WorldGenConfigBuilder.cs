@@ -162,6 +162,12 @@ namespace Engine.Scripts.WorldGen.Settings{
                 FloraConfigBuilder.Build(active, voxelId, variantOf, settings.TreeSpacingRadius, settings.FloraDensityNoise, allocator, ref cfg, settings);
 
                 BuildCaves(caves, voxelId, allocator, ref cfg.Caves);
+
+                // WorldGen v2: the base game's layout from the BiomeSet; the validator runs where the graph is (§6.6).
+                // Other generators get an empty layout, so the jobs that carry the config see valid containers.
+                cfg.Layout = settings.Generator == WorldGenerator.Density
+                    ? Engine.Scripts.WorldGen.Biomes.BiomeLayoutData.Create(Engine.Scripts.WorldGen.Biomes.BiomeLayout.FromBiomeSet(settings.Biomes), voxelId, allocator)
+                    : Engine.Scripts.WorldGen.Biomes.BiomeLayoutData.Empty(allocator);
             }
             catch{
                 cfg.Dispose();

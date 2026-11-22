@@ -976,6 +976,22 @@
     }
   },
   "noises": {
+    "blend_border": {
+      "amplitude": 0.56,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 1,
+      "wavelength": 28
+    },
+    "blend_border_detail": {
+      "amplitude": 0.24,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 1,
+      "wavelength": 9.3333
+    },
     "continentalness": {
       "amplitude": 1,
       "gain": 0.5,
@@ -1014,7 +1030,7 @@
       "kind": "simplex2",
       "lacunarity": 2,
       "octaves": 3,
-      "wavelength": 3765
+      "wavelength": 5271
     },
     "peaks": {
       "amplitude": 1,
@@ -1030,7 +1046,7 @@
       "kind": "simplex2",
       "lacunarity": 2,
       "octaves": 3,
-      "wavelength": 4706
+      "wavelength": 6588.4
     },
     "terrain_detail": {
       "amplitude": 0.5,
@@ -1051,6 +1067,26 @@
     }
   },
   "outputs": {
+    "blend_border": {
+      "in": {
+        "a": 0.5,
+        "b": {
+          "a": {
+            "noise": "blend_border",
+            "op": "fbm"
+          },
+          "b": {
+            "noise": "blend_border_detail",
+            "op": "fbm"
+          },
+          "op": "add"
+        },
+        "op": "add"
+      },
+      "max": 0.96,
+      "min": 0.04,
+      "op": "clamp"
+    },
     "continentalness": "continentalness_curve",
     "erosion": "erosion_value",
     "factor": "terrain_factor",

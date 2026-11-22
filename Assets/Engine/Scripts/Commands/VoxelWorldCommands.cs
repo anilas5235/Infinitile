@@ -12,7 +12,7 @@ namespace Engine.Scripts.Commands{
     ///     <see cref="ICommandWorld" /> over the running <see cref="VoxelWorld" /> and the voxel registry: the base
     ///     voxels by full id (turned variants are placed from their base), and <see cref="VoxelWorld.SetVoxel" />.
     /// </summary>
-    public sealed class VoxelWorldCommands : ICommandWorld{
+    public sealed class VoxelWorldCommands : ICommandWorld, ICommandLocator{
         private int _indexedCount = -1;
         private VoxelNameIndex _voxels = new(System.Array.Empty<(ushort, string)>());
 
@@ -40,6 +40,21 @@ namespace Engine.Scripts.Commands{
         public bool SetVoxel(ushort id, Vector3Int position){
             VoxelWorld world = VoxelWorld.Instance;
             return world && world.SetVoxel(id, position);
+        }
+
+        public IReadOnlyList<string> LocateTargets{
+            get{
+                VoxelWorld world = VoxelWorld.Instance;
+                return world ? world.LocateTargets : System.Array.Empty<string>();
+            }
+        }
+
+        public bool Locate(string target, Vector3 from, out Vector3Int position, out string error){
+            VoxelWorld world = VoxelWorld.Instance;
+            if (world) return world.TryLocate(target, from, out position, out error);
+            position = default;
+            error = "There is no world.";
+            return false;
         }
 
         private static IEnumerable<(ushort, string)> BaseVoxels(VoxelRegistry registry){

@@ -311,6 +311,12 @@ namespace Engine.Scripts.WorldGen.Graph{
         public static readonly string[] Terrain ={ TerrainDensity, PreliminarySurface, Factor, TerrainNoise, TopSlideStart };
 
         /// <summary>
+        ///     The threshold of DistanceBlend's surface pick in 0…1 (§12, DEC-87), a per-column output: the patchy, wavy
+        ///     material border. Without it the threshold is 0.5.
+        /// </summary>
+        public const string BlendBorder = "blend_border";
+
+        /// <summary>
         ///     Highest bound preliminary_surface may have: y 255 plus half a block for the interval rules' margins
         ///     (their sum over a chain of additions reaches a few hundredths at this size).
         /// </summary>
