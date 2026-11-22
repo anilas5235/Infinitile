@@ -247,15 +247,66 @@ namespace Engine.Tests.Performance{
             }
         }
 
-        /// <summary>Voxel runs per column of the class's chunks (the interval store's size), printed per class.</summary>
+        /// <summary>
+        ///     Counts per class, printed (no timing): voxel runs per column (the interval store's size); visible faces per
+        ///     chunk (a stone face towards air or water, inside the chunk and towards the ring chunks; the GPU mesh has
+        ///     four vertices per face before merging); partitions per chunk that hold voxels and that have a visible face
+        ///     (the ones the GPU pool gets a slot for).
+        /// </summary>
         [Test]
         public void DensityChunks_RunsPerColumn([ValueSource(nameof(Classes))] DensityChunkClass c){
             NativeParallelHashMap<int2, ChunkVoxelData> chunks = GenerateWithRings(c);
             try{
-                long runs = 0;
+                long runs = 0, faces = 0, occupied = 0, withFaces = 0;
                 IReadOnlyList<int2> centers = DensityFixture.Chunks(c);
-                foreach (int2 chunk in centers) runs += chunks[chunk].GetData().CompressedLength;
-                Debug.Log($"density {c}: {(double)runs / centers.Count:F0} runs per chunk, {(double)runs / centers.Count / (ChunkWidth * ChunkDepth):F2} per column");
+                Dictionary<int2, ushort[]> expanded = new();
+
+                ushort[] Expand(int2 key){
+                    if (expanded.TryGetValue(key, out ushort[] v)) return v;
+                    var list = chunks[key].GetData();
+                    v = new ushort[list.Length];
+                    for (int i = 0; i < v.Length; i++) v[i] = list.Get(i);
+                    return expanded[key] = v;
+                }
+
+                ushort water = _config.WorldGen.WaterVoxel;
+                bool Open(int2 chunk, int x, int y, int z){
+                    if (y < 0) return false;
+                    if (y >= ChunkHeight) return true;
+                    int2 key = chunk + new int2(x < 0 ? -1 : x >= ChunkWidth ? 1 : 0, z < 0 ? -1 : z >= ChunkDepth ? 1 : 0);
+                    x = (x + ChunkWidth) % ChunkWidth;
+                    z = (z + ChunkDepth) % ChunkDepth;
+                    ushort id = Expand(key)[(x * ChunkDepth + z) * ChunkHeight + y];
+                    return id == 0 || id == water;
+                }
+
+                foreach (int2 chunk in centers){
+                    ChunkVoxelData data = chunks[chunk];
+                    runs += data.GetData().CompressedLength;
+                    ushort[] v = Expand(chunk);
+                    for (int p = 0; p < PartitionsPerChunk; p++){
+                        if (data.PartitionHasVoxels(p)) occupied++;
+                        long before = faces;
+                        for (int x = 0; x < ChunkWidth; x++)
+                        for (int z = 0; z < ChunkDepth; z++)
+                        for (int y = p * PartitionHeight; y < (p + 1) * PartitionHeight; y++){
+                            ushort id = v[(x * ChunkDepth + z) * ChunkHeight + y];
+                            if (id == 0 || id == water) continue;
+                            if (Open(chunk, x + 1, y, z)) faces++;
+                            if (Open(chunk, x - 1, y, z)) faces++;
+                            if (Open(chunk, x, y + 1, z)) faces++;
+                            if (Open(chunk, x, y - 1, z)) faces++;
+                            if (Open(chunk, x, y, z + 1)) faces++;
+                            if (Open(chunk, x, y, z - 1)) faces++;
+                        }
+
+                        if (faces > before) withFaces++;
+                    }
+                }
+
+                double n = centers.Count;
+                Debug.Log($"density {c}: {runs / n:F0} runs per chunk, {runs / n / (ChunkWidth * ChunkDepth):F2} per column; " +
+                          $"{faces / n:F0} visible faces per chunk; partitions with voxels {occupied / n:F2}, with visible faces {withFaces / n:F2} per chunk");
             }
             finally{
                 DisposeChunks(chunks);

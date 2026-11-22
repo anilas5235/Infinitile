@@ -99,7 +99,7 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 <div class="layout">
 <nav class="toc" aria-label="Contents">
   <div class="brand">WorldGen v2 Spec</div>
-  <div class="ver">v1.3 · 2026-11-22 · Phase V1, graph core built</div>
+  <div class="ver">v1.4 · 2026-11-22 · Phase V2, terrain density built</div>
   <ol>
     <li><a href="#s0">0 · How to use this spec</a></li>
     <li class="toc-part">Part A · Design</li>
@@ -132,10 +132,10 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 
 <main>
 <h1>WorldGen v2 — 3D noise-graph world generation</h1>
-<p class="sub">Design spec for the rewrite of the world generator in <code>Assets/Engine</code>, written for a coding agent and for the owner's review. Minecraft Java 1.18 and later is the reference for the overall method; where v2 differs or adds something, the spec marks it as its own extension. The graph core (§3, Phase V1) is built; the rest is design.</p>
+<p class="sub">Design spec for the rewrite of the world generator in <code>Assets/Engine</code>, written for a coding agent and for the owner's review. Minecraft Java 1.18 and later is the reference for the overall method; where v2 differs or adds something, the spec marks it as its own extension. The graph core (§3, Phase V1) and the terrain density (§5, Phase V2) are built; the rest is design.</p>
 <div class="meta">
   <span class="chip">Unity · Burst · Jobs · C#</span>
-  <span class="chip">Phase V1: graph core built</span>
+  <span class="chip">Phases V1–V2: graph core and terrain density built</span>
   <span class="chip">Owner decisions 2026-11-21: DEC-125…160 (§18)</span>
   <span class="chip">Budget 8 ms per chunk on the benchmark fixture (DEC-147)</span>
   <span class="chip">Replaces Terrain-first biome selection, Biome-first and worm caves at the switch (V7)</span>
@@ -330,6 +330,19 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 <tr><td><strong>Sum</strong></td><td><strong>3.6–7.3</strong></td><td>Budget 8 (DEC-147); the upper end leaves 0.7 ms for what the plan misses, so the levers below stay in the plan</td></tr>
 </tbody>
 </table>
+<p><strong>Measured in V2</strong> (2026-11-22, Editor focused, ABBA, single worker, medians over the fixture's four classes; <code>DensityChunkBenchmark</code>):</p>
+<table>
+<thead><tr><th>Row</th><th>Ocean</th><th>Coast</th><th>Lowland</th><th>Massif</th><th>Mean</th><th>Plan</th></tr></thead>
+<tbody>
+<tr><td>P1 (the 2D outputs of the V2 graph on 23 × 23 lattice columns)</td><td>0.20</td><td>0.19</td><td>0.22</td><td>0.21</td><td><strong>0.20</strong></td><td>0.5–0.8</td></tr>
+<tr><td>P1 + 3D terrain, cells 4 × 8 × 4</td><td>0.27</td><td>0.27</td><td>0.36</td><td>0.34</td><td>0.31 (terrain <strong>0.11</strong>)</td><td>terrain 0.6–1.4</td></tr>
+<tr><td>P1 + 3D terrain, cells 4 × 4 × 4</td><td>0.29</td><td>0.30</td><td>0.35</td><td>0.38</td><td>0.33 (terrain 0.13)</td><td></td></tr>
+<tr><td>Chunk job (P1, terrain, placeholder fill, bottom layer, run-length encoding)</td><td>0.55</td><td>0.54</td><td>0.55</td><td>0.60</td><td>0.56</td><td></td></tr>
+<tr><td>Light job on the density chunks</td><td>0.77</td><td>0.55</td><td>0.45</td><td>0.47</td><td>0.56</td><td>v1 natural terrain 1.02</td></tr>
+<tr><td>Collider meshes, all 8 partitions, per chunk</td><td>1.71</td><td>2.13</td><td>1.96</td><td>3.05</td><td>2.21</td><td>v1 0.52 per surface partition</td></tr>
+</tbody>
+</table>
+<p>The terrain is cheap because the Δ windows are narrow: K is large on most land, so few corners are computed and most cells are filled by range or by sign (the work counters in <code>DensityTerrainTests</code> list them). P1 grows when V3 adds the biome, border and rule noises. Counts per chunk (no timing): voxel runs 3.00 / 2.25 / 2.00 / 2.14 per column (ocean / coast / lowland / massif); visible stone faces 1,259 / 1,657 / 1,277 / 2,775; partitions holding voxels 4.0 / 4.9 / 5.0 / 7.4, of which 1.4 / 1.8 / 1.0 / 2.6 have a visible face and take a GPU pool slot. The v1 reference in the same batch: <code>ChunkJob_Run_Caves_MsPerChunk</code> Terrain-first 6.39 ms with caves on, 4.85 ms with caves off. The running budget after V2 is 5.4 ms: P1 0.20 and terrain 0.11 measured, plus the upper estimates of every other row. That is within 8 ms.</p>
 <p><strong>Running budget.</strong> Every phase reports the measured rows of the passes built so far plus the upper estimates of the rest. If that sum exceeds 8 ms, the phase does not close until the owner has picked a lever (§2.5), so a lever never changes a look that was already signed off (W2-PERF-04).</p>
 <p><strong>Work counters.</strong> From V1 on, every pass counts its work units per chunk class: noise samples, corners, mixed cells, interpolated voxels and rule calls. EditMode tests assert the counts (W2-TST-05), so a change in the work shows up without a timing run.</p>
 
@@ -484,16 +497,18 @@ P   = (1 − |n|)²               peak noise, wavelength 192 (start)
 K   = K(C, E, PV) &gt; 0          factor spline: large = flat, plain-like; small = overhangs
 N3  = 3D fbm noise with amplitude A
 w   = 1 above preliminary_surface − 16, fading smoothly to 0 at preliminary_surface − 32
-top slide: density pulled to −1 by a smooth step between y 223 and 255
+top slide: density pulled to −1 by a smooth step between y 235 and 255
 
-preliminary_surface = S + J · P
+preliminary_surface = knee(S + J · P)   identity up to y 206, then bending
+                                        monotonically towards y 240 (V2)
 A           = bound of the N3 term (interval rules); K = the factor output
 Δup(x, z)   = 64 · A / K(x, z)       the furthest the real surface can lie above
                                      preliminary_surface
 Δdown(x, z) = min(32, Δup(x, z))     the furthest it can lie below: under
                                      preliminary_surface − 32 the rock is solid</code></pre>
 <p>Below <code>preliminary_surface</code> − 32 the rock is plain solid and N3 is not evaluated (AD-24). The graph validator rejects a graph whose <code>preliminary_surface</code> bound reaches above y 255, so this shortcut always lies below the top slide. The top slide replaces v1's soft height limit.</p>
-<p>P1 derives Δup and Δdown per column. They size six things: the corner-column ranges (§5.4), the wetness early-out (§6.5), the top rules' margin (§7.4), the rule depth (§7.6), the caverns' cover (§10.2) and the flora ring search (§11.2). Start values (AD-27): A = 0.25 and K from 1 (rugged) to 8 (flat), so Δup is 16 blocks on rugged ground and 2 on flat ground; N3 with 3 octaves at wavelength 64 across and 32 up. Minecraft notes that its preliminary surface should generally lie below the real terrain height (Minecraft Wiki, “Noise router”); v2 bounds the difference on both sides.</p>
+<p><strong>As built (V2).</strong> The terrain is a set of five graph outputs that come together: <code>terrain_density</code> (an <code>interpolated</code> marker itself, so its corner signs decide uniform cells), <code>preliminary_surface</code> and <code>factor</code> (2D, factor above 0), and the bound-only <code>terrain_noise</code> (its bound is A) and <code>top_slide_start</code> (a constant). Any of the last four makes a graph a terrain graph; <code>terrain_density</code> alone stays an ordinary 3D output. The compiler rejects a <code>preliminary_surface</code> whose bound passes y 255 (the check allows 255.5, the top of voxel 255). The shipped graph does not clamp the preliminary surface: a hard cap let it run into the top slide, which planed massif summits flat at about 240, so a monotone spline (the knee above) keeps it exact up to 206 and bends it towards 240. Monotone splines have no overshoot, so the knee's bound is 240. Monotone splines use Fritsch–Carlson tangents (the harmonic mean of the neighbouring slopes, zero at a local extremum); a cubic spline with constant point values uses the same tangents. Until the surface rules exist (V4), the placeholder fill takes terrain from <code>WorldGenSettings.DensityStoneVoxel</code>, or the first biome's stone block when it is unset.</p>
+<p>P1 derives Δup and Δdown per column. They size six things: the corner-column ranges (§5.4), the wetness early-out (§6.5), the top rules' margin (§7.4), the rule depth (§7.6), the caverns' cover (§10.2) and the flora ring search (§11.2). Values (AD-27, picked on the look prototype, DEC-159): A = 0.5 and K from 1 (rugged) to 8 (flat), so Δup is 32 blocks on rugged ground and 4 on flat ground; N3 with 4 octaves at wavelength 128 across and 48 up; peak noise wavelength 192; top slide from 235 to 255. Minecraft notes that its preliminary surface should generally lie below the real terrain height (Minecraft Wiki, “Noise router”); v2 bounds the difference on both sides.</p>
 
 <h3 id="s5-2">5.2 Terrain shape (start)</h3>
 <p>New Minecraft-like terrain built from scratch (DEC-128); no bit-identical anchor to v1. The splines are data and start roughly like this:</p>
@@ -502,9 +517,20 @@ A           = bound of the N3 term (interval rules); K = the factor output
   <li><strong>Erosion:</strong> high E flattens, low E raises. Low E in the mid and far inland bands makes the massifs; v1's massif shape (on C and E with PV inside, peak wavelength 192) is the start, and the re-tune target is the ranges of candidate A (DEC-108).</li>
   <li><strong>PV:</strong> hills on the peaks slices, valleys on the valleys slice; the valleys slice also makes the rivers (§9.2).</li>
 </ul>
+<p><strong>Massif re-tune (V2).</strong> Measured with the explicit report <code>DensityLook_Report</code> on 4096² columns around the origin, seed 1337, against candidate A (DEC-108: 11.0 % of the ground at y 180 or higher in 42 areas, the largest 0.62 / 0.40 / 0.30 km²; 3.4 % at y 210 or higher; highest y 233):</p>
+<table>
+<thead><tr><th>Graph</th><th>≥ 180</th><th>Areas</th><th>Largest (km²)</th><th>≥ 210</th><th>≥ 235</th><th>p99.9</th></tr></thead>
+<tbody>
+<tr><td>Look-prototype start values</td><td>2.4 %</td><td>62</td><td>0.17</td><td>0.3 %</td><td>0.01 %</td><td>–</td></tr>
+<tr><td>Massif raised (hard cap 250)</td><td>9.7 %</td><td>39</td><td>0.69 / 0.36 / 0.25</td><td>3.2 %</td><td>0.48 %</td><td>240</td></tr>
+<tr><td><strong>Shipped: raised + knee 206 → 240</strong></td><td>9.7 %</td><td>39</td><td>0.69 / 0.36 / 0.25</td><td>2.9 %</td><td>0.05 %</td><td>233</td></tr>
+</tbody>
+</table>
+<p>The raise: the massif C point moves from 0.18 to 0.12 in the offset and jaggedness splines; the offset gains +24 at E ≤ −0.25 (the core, knot moved from −0.38) and +16 at E −0.05 (the flank, knot moved from −0.2). On the shipped graph, 0.71 % of the land columns have air under their top above the water (about 8 air voxels per such column). There are 15 floating pieces inside single chunks in the window, about 0.001 per chunk. The water covers 40 % of the columns world-wide and 51 % in this window, which spans about one C wavelength. The ocean bands (DEC-148, about 30 %) cover 30.3 %; the rest is lakes and low coast. V3 states the sea share with the biomes.</p>
 
 <h3 id="s5-3">5.3 Cells and interpolation</h3>
 <p>The density is evaluated on a world-aligned corner lattice and interpolated trilinearly per voxel. Minecraft does the same: vanilla 1.21.4's <code>noise_settings/overworld.json</code> has <code>size_horizontal</code> 1 and <code>size_vertical</code> 2, and a cell is <code>size_horizontal</code> · 4 by <code>size_vertical</code> · 4 blocks, so its cells are 4 × 8 × 4 (Minecraft Wiki, “Density function”; vanilla data, §22). v2 starts terrain cells at 4 × 8 × 4 blocks (AD-06): 9 × 33 × 9 = 2,673 corners per chunk. Cells of 4 × 4 × 4 (9 × 65 × 9 = 5,265 corners) are measured in V2 and used only if 4 × 8 × 4 looks blocky on steep faces.</p>
+<p><strong>Measured in V2.</strong> Cells 4 × 4 × 4 cost about 0.02 ms more per chunk on the fixture (terrain 0.13 against 0.11 ms, §2.4). On the shipped graph they leave the heights unchanged and double the overhangs: 1.37 % of the land columns against 0.71 %, and 38 floating pieces against 15 in the 4096² window. The owner signed off the look with 4 × 8 × 4 cells (2026-11-22), so v2 keeps them; 4 × 4 × 4 is the cheap lever if later phases want more overhangs.</p>
 <p>What is interpolated is set by the graph's <code>interpolated</code> markers (§3.3), each with its own cell height. Terrain and cave terms sit under separate markers, because P5 must tell terrain air (water below sea level) from carved air (dry, §9.1). The noises of the caverns and the lava pockets are interpolated on cells 4 high (DEC-155): their vertical detail (wavelength 14 for the hall detail, 8 for the lava pockets) is too fine for cells 8 high. Their bands, masks and the hall fold are applied per voxel, and the voxel program combines the cave terms per voxel (§10.1). Minecraft builds its noodle caves the same way: each noise sits in its own <code>interpolated</code>, and <code>abs</code> and <code>max</code> act per block outside it (vanilla 1.21.4 <code>density_function/overworld/caves/noodle.json</code>).</p>
 
 <h3 id="s5-4">5.4 Skipping</h3>
@@ -1014,6 +1040,7 @@ w = w_snow for snow, w_ice for ice (own noises, as in v1)</code></pre>
   <li>Tests: the corner ranges and uniform cells give the same voxels as the interpolation of the full lattice; neighbouring chunks agree at their borders; no terrain above 255; the heightmap is the top terrain voxel; a voxel hash over fixed chunks (W2-ID-05); work counters per chunk class.</li>
   <li>Measurements: cells 4 × 8 × 4 against 4 × 4 × 4 (cost and look); the cost of P1 and P4; heights per region; the overhang share and floating pieces; the light job, the light margin 14 and the interval store again (DEC-27, DEC-46, DEC-110), because overhangs make more runs and more light work; mesh build per partition, vertices per chunk, voxel runs per column, collider build and GPU pool use on the fixture's classes (W2-PERF-03); the running budget.</li>
   <li>Gate: the owner signs off the terrain's look, with a moderate amount of overhangs as the target (DEC-142); P1 and the terrain part of P4 within their rows of §2.4; the running budget at or below 8 ms.</li>
+  <li>Result (2026-11-22): the owner signed off the look in a world tour. The massifs were re-tuned towards candidate A, and a soft knee replaced the clamp of the preliminary surface (§5.1, §5.2). P1 is 0.20 ms and the 3D terrain 0.11 ms, both under their rows. The running budget is 5.4 ms (§2.4). Cells stay 4 × 8 × 4 (§5.3).</li>
 </ul>
 </div>
 
@@ -1121,7 +1148,7 @@ w = w_snow for snow, w_ice for ice (own noises, as in v1)</code></pre>
   <li><strong>Ask first.</strong> Before every benchmark, timing or build batch the agent asks the owner, so the Editor can be focused: an unfocused Editor reads 15–40 % slow. The agent says at once when the batch is done.</li>
   <li><strong>One Editor at a time</strong> on this machine. The agent checks which project the open Editor has before timing.</li>
   <li><strong>ABBA order:</strong> A, B, B, A with medians, so drift cancels. Frame runs report p95, p99, max and the frames over 8.33 ms (DEC-104).</li>
-  <li><strong>Benchmark fixture</strong> (DEC-147, built in V2): a fixed test world under <code>Tests/</code> (graph, boxes, rule lists, cave and ore rules) that does not move with tuning, and a fixed list of chunks by class: ocean, coast, lowland, massif, cavern mask open, lava mask open. Everything is on: caverns, tunnels, lava, ores, bedrock, flora and DistanceBlend. The row reports each class and the mean; the budget of 8 ms binds the mean.</li>
+  <li><strong>Benchmark fixture</strong> (DEC-147, built in V2): a fixed test world under <code>Tests/</code> (graph, boxes, rule lists, cave and ore rules) that does not move with tuning, and a fixed list of chunks by class: ocean, coast, lowland, massif, cavern mask open, lava mask open. Everything is on: caverns, tunnels, lava, ores, bedrock, flora and DistanceBlend. The row reports each class and the mean; the budget of 8 ms binds the mean. As built in V2: the frozen graph is <code>Tests/Fixtures/DensityFixture/NoiseGraph.json</code> (the start graph before the massif re-tune), seed 1337, water level 124. The class lists (<code>DensityFixture.cs</code>) hold eight chunks each, the nearest to the origin on a grid of every 8th chunk, classed by the preliminary surface at their 9 × 9 corner columns: ocean lies wholly 12 blocks or more under the water, a coast crosses the water level, a lowland stays 2 to 26 blocks above it, and a massif reaches y 190. Later phases add the cavern and lava classes. The voxel hash (W2-ID-05) and the work counters (W2-TST-05) run on these lists, so tuning the shipped graph moves neither.</li>
   <li><strong>v1 reference:</strong> <code>ChunkJob_Run_Caves_MsPerChunk</code>, the v1 row with the shipped caves, lava, ores and bedrock: 6.33 ms with caves on and 4.82 ms with caves off (baseline of 2026-11-19, Unity 6000.3.28f1). The old reference row (<code>ChunkJob.Run</code> Terrain-first, DistanceBlend, flora, caves on: 5.75 ms on master on 2026-11-21) runs a placeholder world without lava, ores or bedrock. Timings from older Editor versions are not comparable.</li>
   <li><strong>Hot loops:</strong> extra code in one pass once slowed it by 35 % (<code>PrepareChunkMaps</code>), so every change to a pass is measured on its own.</li>
 </ul>
@@ -1233,10 +1260,10 @@ w = w_snow for snow, w_ice for ice (own noises, as in v1)</code></pre>
 <tr><td>AD-21</td><td>Requirement ids use the prefix W2-, agent defaults AD-nn; DEC numbers continue the v1 list.</td><td>Ids stay unique across both specs.</td><td>§0</td></tr>
 <tr><td>AD-22</td><td>v2 is built beside v1 until the switch; a world setting selects the generator.</td><td>v1 stays playable and comparable.</td><td>§2, §16</td></tr>
 <tr><td>AD-23</td><td>v1's shipped-world share bounds (TST-63…67) are the start targets of the world report; its checks of single tour spots are dropped.</td><td>Tour spots do not carry over to a new world shape.</td><td>§13.5</td></tr>
-<tr><td>AD-24</td><td>The 3D noise fades from full strength at preliminary_surface − 16 to 0 at preliminary_surface − 32; the top slide runs from 223 to 255.</td><td>Solid deep rock costs nothing; a soft height limit under 255.</td><td>§5.1</td></tr>
+<tr><td>AD-24</td><td>The 3D noise fades from full strength at preliminary_surface − 16 to 0 at preliminary_surface − 32; the top slide runs from 235 to 255 (DEC-159; 223 before the look prototype).</td><td>Solid deep rock costs nothing; a soft height limit under 255.</td><td>§5.1</td></tr>
 <tr><td>AD-25</td><td>The surface rules read the surface-source biome (DistanceBlend's choice); the written biome id is the hard biome.</td><td>Patchy borders (DEC-87) with a stable tint, water tint and fog.</td><td>§6.8, §7.1</td></tr>
 <tr><td>AD-26</td><td>Below the tree line, trees, fallen logs and boulders may stand on the snow block; small plants keep VEG-52 and stay off snow.</td><td>DEC-139 asks for forests in the snow; grass and flowers on snow would look wrong.</td><td>§8.5</td></tr>
-<tr><td>AD-27</td><td>Per column, Δup = 64 · A / K and Δdown = min(32, Δup), from the bound A of the N3 term and the factor K. Start values: A = 0.25 and K from 1 (rugged) to 8 (flat), so Δup is 16 to 2 blocks; N3 with 3 octaves at wavelength 64 across and 32 up.</td><td>The real surface lies within [<code>preliminary_surface</code> − Δdown, <code>preliminary_surface</code> + Δup]; a window per column keeps the skipping tight on flat land, where one global value would not. The look prototype (DEC-159) and the V2 tour set the final values.</td><td>§5.1, §5.4</td></tr>
+<tr><td>AD-27</td><td>Per column, Δup = 64 · A / K and Δdown = min(32, Δup), from the bound A of the N3 term and the factor K. Values after the look prototype (DEC-159): A = 0.5 and K from 1 (rugged) to 8 (flat), so Δup is 32 to 4 blocks; N3 with 4 octaves at wavelength 128 across and 48 up.</td><td>The real surface lies within [<code>preliminary_surface</code> − Δdown, <code>preliminary_surface</code> + Δup]; a window per column keeps the skipping tight on flat land, where one global value would not. The look prototype (DEC-159) and the V2 tour set the final values.</td><td>§5.1, §5.4</td></tr>
 <tr><td>AD-28</td><td>DistanceBlend computes its kernel at stride 2, as v1, and keeps the 4 largest weights per column; v1 holds 16 dense weights (<code>BlendWeights.Capacity</code>).</td><td>255 biomes (DEC-144) need sparse weights; stride 4 is the next lever (§2.5).</td><td>§2.2, §12</td></tr>
 <tr><td>AD-29</td><td>Every rule has a name, unique in its list; a mod inserts a rule before or after a named rule, appends it, or replaces a rule by name.</td><td>A first-match list needs defined places for the rules that several mods add.</td><td>§7.1, §14</td></tr>
 <tr><td>AD-30</td><td>The compiler does no float arithmetic in managed code: constant folding, spline tangents and interval bounds run through the Burst interpreter, and every bound except a constant's is widened by a margin of 1e-4 · max(1, m), m the larger magnitude of its ends (relative since V1, §3.4), as v1's <code>SkipMargin</code>.</td><td>Managed code and Burst may round differently; folding in Burst gives the Editor and a player the same bits.</td><td>§3.4, §15</td></tr>
@@ -1438,7 +1465,7 @@ w = w_snow for snow, w_ice for ice (own noises, as in v1)</code></pre>
 <tr><td>Preview compare: A = asset, B = preview overrides (2026-10-20)</td><td>Kept</td><td>Unchanged.</td></tr>
 <tr><td>Implausible pairs live on the BiomeSet (2026-10-20)</td><td>Kept, new mechanism</td><td>They become an error of the layout validator, not only a preview overlay.</td></tr>
 <tr><td>Desert flora quartered, Forest Birch 25 %, flora padding 11 (2026-10-25)</td><td>Kept</td><td>Flora unchanged; padding 11 sizes the ring search (§11.2).</td></tr>
-<tr><td>Soft height limit, ten biomes, snow line 210 (2026-11-10)</td><td>Kept, new mechanism</td><td>Ten biomes kept; the limit becomes the top slide 223…255; 210 is the snow calibration point.</td></tr>
+<tr><td>Soft height limit, ten biomes, snow line 210 (2026-11-10)</td><td>Kept, new mechanism</td><td>Ten biomes kept; the limit becomes the top slide 235…255; 210 is the snow calibration point.</td></tr>
 <tr><td>The report test is the tuning tool (2026-11-09)</td><td>Kept, new mechanism</td><td>The v2 world report (§13.4).</td></tr>
 <tr><td>Massifs on C and E with PV inside, peak wavelength 192 (2026-11-12)</td><td>Kept, new mechanism</td><td>Starting shape of the v2 offset spline and peak noise.</td></tr>
 <tr><td>Palette wiring rules: DXT1/DXT5, reach ≤ 6 (2026-11-10)</td><td>Kept</td><td>Assets; unchanged.</td></tr>
