@@ -1,0 +1,150 @@
+{
+  "formatVersion": 1,
+  "nodes": {
+    "continentalness_curve": {
+      "coordinate": "continentalness_warped",
+      "interpolation": "linear",
+      "op": "spline",
+      "points": [
+        {
+          "location": -1,
+          "value": -1
+        },
+        {
+          "location": 1,
+          "value": 1
+        }
+      ]
+    },
+    "continentalness_warped": {
+      "in": {
+        "noise": "continentalness",
+        "op": "fbm"
+      },
+      "op": "shift",
+      "x": {
+        "a": {
+          "noise": "continentalness_warp_x",
+          "op": "fbm"
+        },
+        "b": 400,
+        "op": "mul"
+      },
+      "z": {
+        "a": {
+          "noise": "continentalness_warp_z",
+          "op": "fbm"
+        },
+        "b": 400,
+        "op": "mul"
+      }
+    },
+    "peaks_valleys": {
+      "a": 1,
+      "b": {
+        "in": {
+          "a": {
+            "a": 3,
+            "b": {
+              "in": "weirdness_value",
+              "op": "abs"
+            },
+            "op": "mul"
+          },
+          "b": 2,
+          "op": "sub"
+        },
+        "op": "abs"
+      },
+      "op": "sub"
+    },
+    "weirdness_value": {
+      "in": {
+        "a": {
+          "noise": "weirdness",
+          "op": "fbm"
+        },
+        "b": 1.6,
+        "op": "mul"
+      },
+      "max": 1,
+      "min": -1,
+      "op": "clamp"
+    }
+  },
+  "noises": {
+    "continentalness": {
+      "amplitude": 1,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 5,
+      "wavelength": 3765
+    },
+    "continentalness_warp_x": {
+      "amplitude": 1,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 2,
+      "wavelength": 1800
+    },
+    "continentalness_warp_z": {
+      "amplitude": 1,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 2,
+      "wavelength": 1800
+    },
+    "erosion": {
+      "amplitude": 1,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 4,
+      "wavelength": 1882
+    },
+    "humidity": {
+      "amplitude": 1,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 3,
+      "wavelength": 3765
+    },
+    "temperature": {
+      "amplitude": 1,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 3,
+      "wavelength": 4706
+    },
+    "weirdness": {
+      "amplitude": 1,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 3,
+      "wavelength": 1176
+    }
+  },
+  "outputs": {
+    "continentalness": "continentalness_curve",
+    "erosion": {
+      "noise": "erosion",
+      "op": "fbm"
+    },
+    "humidity": {
+      "noise": "humidity",
+      "op": "fbm"
+    },
+    "pv": "peaks_valleys",
+    "temperature": {
+      "noise": "temperature",
+      "op": "fbm"
+    },
+    "weirdness": "weirdness_value"
+  }
+}
