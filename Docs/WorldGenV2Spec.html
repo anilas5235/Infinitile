@@ -99,7 +99,7 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 <div class="layout">
 <nav class="toc" aria-label="Contents">
   <div class="brand">WorldGen v2 Spec</div>
-  <div class="ver">v1.2 · 2026-11-21 · Phase V0, nothing built</div>
+  <div class="ver">v1.3 · 2026-11-22 · Phase V1, graph core built</div>
   <ol>
     <li><a href="#s0">0 · How to use this spec</a></li>
     <li class="toc-part">Part A · Design</li>
@@ -132,10 +132,10 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 
 <main>
 <h1>WorldGen v2 — 3D noise-graph world generation</h1>
-<p class="sub">Design spec for the rewrite of the world generator in <code>Assets/Engine</code>, written for a coding agent and for the owner's review. Minecraft Java 1.18 and later is the reference for the overall method; where v2 differs or adds something, the spec marks it as its own extension. Nothing in this spec is built yet.</p>
+<p class="sub">Design spec for the rewrite of the world generator in <code>Assets/Engine</code>, written for a coding agent and for the owner's review. Minecraft Java 1.18 and later is the reference for the overall method; where v2 differs or adds something, the spec marks it as its own extension. The graph core (§3, Phase V1) is built; the rest is design.</p>
 <div class="meta">
   <span class="chip">Unity · Burst · Jobs · C#</span>
-  <span class="chip">Phase V0: spec only</span>
+  <span class="chip">Phase V1: graph core built</span>
   <span class="chip">Owner decisions 2026-11-21: DEC-125…160 (§18)</span>
   <span class="chip">Budget 8 ms per chunk on the benchmark fixture (DEC-147)</span>
   <span class="chip">Replaces Terrain-first biome selection, Biome-first and worm caves at the switch (V7)</span>
@@ -144,7 +144,7 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 <!-- ============================================================ -->
 <h2 id="s0">0 · How to use this spec</h2>
 <ul>
-  <li><strong>Status.</strong> Phase V0: this spec is the design, and no runtime code exists. The owner's decisions of 2026-11-21 (DEC-125…160, §18) are binding. The agent defaults (AD-01…30, §19) fill the gaps the decisions leave open; they stand unless the owner changes them while reviewing this spec.</li>
+  <li><strong>Status.</strong> Phase V1: the graph core of §3 is built beside v1 and not used by the game yet (AD-22); the rest of this spec is the design. §3.7 holds V1's measurements. The owner's decisions of 2026-11-21 (DEC-125…160, §18) are binding. The agent defaults (AD-01…30, §19) fill the gaps the decisions leave open; they stand unless the owner changes them while reviewing this spec.</li>
   <li><strong>Relation to <a href="WorldGenSpec.html">WorldGenSpec.html</a>.</strong> That spec stays the record of the shipped generator until the switch (Phase V7, §16). v2 replaces its Terrain-first biome selection (the classifier with class height), the Biome-first architecture, every blend method except DistanceBlend and None, and the worm caves. Everything else there stays in force: Part E (performance, scheduler, culling, lighting), rotated voxels, tree species, the palette and the engine cleanup. §20 checks every earlier decision against v2.</li>
   <li><strong>Ground rules.</strong> The rules R1–R8 of WorldGenSpec.html §2 apply unchanged. In short: keep layers and dispose every native container (R1); Burst-compatible code without virtual dispatch (R2); every generated value is a pure function of seed, position and settings (R3); no silent tuning (R5); name real sources and mark own extensions, never invent a source (R6); no spec IDs, phase names, dates or history in code or in anything the Editor shows (R8).</li>
   <li><strong>Requirement keywords:</strong> <span class="kw must">MUST</span> is mandatory; <span class="kw should">SHOULD</span> is strongly recommended (deviate only with a reason stated in the commit or PR); <span class="kw may">MAY</span> is optional.</li>
@@ -298,14 +298,14 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 <table>
 <thead><tr><th>Folder (under <code>Assets/Engine</code>)</th><th>Content</th></tr></thead>
 <tbody>
-<tr><td><code>Scripts/WorldGen/Graph/</code></td><td>Graph data and JSON form, compiler, interval rules, graph validator, Burst interpreter</td></tr>
+<tr><td><code>Scripts/WorldGen/Graph/</code></td><td>Graph data and JSON form, compiler, interval rules, graph validator, Burst interpreter, the generated code of the shipped graph</td></tr>
 <tr><td><code>Scripts/WorldGen/Density/</code></td><td>Terrain and cave cells, corner-column ranges, fluid rule, fill</td></tr>
 <tr><td><code>Scripts/WorldGen/Biomes/</code></td><td>Biome boxes, compiled lookup, wetness test, layout validator</td></tr>
 <tr><td><code>Scripts/WorldGen/Surface/</code></td><td>Rule lists, conditions, actions, snow and ice</td></tr>
 <tr><td><code>Scripts/WorldGen/Noise/</code>, <code>Flora/</code>, <code>Blending/</code></td><td>Reused: seeded simplex and hashes; flora species and placement; DistanceBlend</td></tr>
 <tr><td><code>Scripts/WorldGen/Caves/</code>, <code>Classify/</code>, <code>Height/</code>, <code>Core/</code></td><td>v1 code; unchanged until the switch, then deleted or reduced to what v2 reuses (§16, V7)</td></tr>
 <tr><td><code>Scripts/Jobs/Chunk/</code></td><td>The new chunk job beside <code>ChunkJob</code></td></tr>
-<tr><td><code>Editor/WorldGen/</code></td><td>Preview window: graph outputs, Layout tab, sweep, validator messages</td></tr>
+<tr><td><code>Editor/WorldGen/</code></td><td>Preview window: graph outputs, Layout tab, sweep, validator messages; the graph code generator</td></tr>
 <tr><td><code>Tests/</code></td><td>New EditMode tests per phase (§17)</td></tr>
 </tbody>
 </table>
@@ -344,7 +344,7 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
   <li><strong>Octave counts</strong> of the 3D terrain noise and the cave noises.</li>
   <li><strong>Cave cell height:</strong> data on each <code>interpolated</code> marker (4 or 8). Caverns and lava pockets start at 4 (DEC-155); the tunnels' lattice is measured in V6a (DEC-143, DEC-151).</li>
   <li><strong>Tunnel region mask:</strong> a 2D mask that limits tunnels to part of the area, so the corner ranges can skip them below the surface elsewhere. It changes the look, so the owner decides (V6a).</li>
-  <li><strong>Generated code:</strong> C# Burst code generated from the shipped graph, if the interpreter costs too much (§3.7).</li>
+  <li><strong>Generated code:</strong> C# Burst code generated from the shipped graph, if the interpreter costs too much. Built in V1: the shipped graph runs as generated code (§3.7).</li>
 </ul>
 
 <div class="req"><span class="id">W2-ARC-01</span><span class="kw must">MUST</span>Generate a chunk in the pass order P1–P9 of §2.2. Each pass is its own loop; no pass grows into another's loop.</div>
@@ -364,8 +364,8 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 
 <h3 id="s3-2">3.2 Data</h3>
 <ul>
-  <li><strong>Noises:</strong> name, kind (2D or 3D simplex), octaves, base wavelength, lacunarity, gain, amplitude. The seed of a noise is a hash of the world seed and the noise's name, so adding a noise never shifts the others.</li>
-  <li><strong>Nodes:</strong> an operation, its inputs (nodes or noises) and its constants.</li>
+  <li><strong>Noises:</strong> name, kind (2D or 3D simplex), octaves, base wavelength, lacunarity, gain, amplitude; a 3D noise may give its own wavelength along y (<code>wavelengthY</code>, default: the base wavelength). The seed of a noise is a hash of the world seed and the noise's name, so adding a noise never shifts the others.</li>
+  <li><strong>Nodes:</strong> an operation, its inputs (nodes or noises) and its constants. The bounds of <code>clamp</code>, <code>smoothstep</code> and <code>range_choice</code>, the heights and values of <code>y_gradient</code> and the locations and derivatives of spline points are constants; every other operand may be a node.</li>
   <li><strong>Outputs:</strong> named nodes the generator reads (§3.6).</li>
   <li>The graph is an asset with a JSON form (sorted keys), used by mods and by the settings hash (§15).</li>
 </ul>
@@ -375,17 +375,18 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 <thead><tr><th>Group</th><th>Nodes</th></tr></thead>
 <tbody>
 <tr><td>Inputs</td><td><code>x</code>, <code>y</code>, <code>z</code> (block coordinates), <code>const</code></td></tr>
-<tr><td>Noise</td><td><code>simplex2</code>, <code>simplex3</code> (the own seeded simplex with hash gradients, DEC-01), <code>fbm</code> (octave sum divided by the sum of the octave amplitudes, as in v1), <code>ridged</code> (1 − |n| per octave), <code>shift</code> (offsets the coordinates of its input by other nodes: domain warp)</td></tr>
+<tr><td>Noise</td><td><code>simplex2</code>, <code>simplex3</code> (the own seeded simplex with hash gradients, DEC-01), <code>fbm</code> (octave sum divided by the sum of the octave amplitudes, as in v1), <code>ridged</code> (1 − |n| per octave), <code>shift</code> (offsets the coordinates of its input by other nodes: domain warp; its input is a noise node, and the offsets are added to the coordinates before the octave frequencies scale them)</td></tr>
 <tr><td>Arithmetic</td><td><code>add</code>, <code>sub</code>, <code>mul</code>, <code>min</code>, <code>max</code>, <code>abs</code>, <code>neg</code>, <code>square</code>, <code>cube</code>, <code>clamp</code>, <code>lerp</code>, <code>smoothstep</code></td></tr>
-<tr><td>Shaping</td><td><code>half_negative</code> (v/2 where v &lt; 0), <code>quarter_negative</code> (v/4 where v &lt; 0), <code>soft_clamp</code> (clamp to [−1, 1], then 1.5v − 0.5v³), <code>range_choice</code> (one of two inputs, chosen by the range of a third), <code>y_gradient</code> (linear in y between two heights, clamped), <code>spline</code> (nested spline over other nodes, as v1's nested splines: ≤ 16 points per spline, depth ≤ 8)</td></tr>
+<tr><td>Shaping</td><td><code>half_negative</code> (v/2 where v &lt; 0), <code>quarter_negative</code> (v/4 where v &lt; 0), <code>soft_clamp</code> (clamp to [−1, 1], then 1.5v − 0.5v³), <code>range_choice</code> (one of two inputs, chosen by the range of a third), <code>y_gradient</code> (linear in y between two heights, clamped), <code>spline</code> (nested spline over other nodes, as v1's nested splines: ≤ 16 points per spline, depth ≤ 8; cubic segments by default, <code>linear</code> on request; a point's derivative is optional and 0 when left out, except in a cubic spline where no point gives one and every value is a constant: there the compiler derives monotone Fritsch–Carlson tangents, as v1's curves)</td></tr>
 <tr><td>Markers</td><td><code>interpolated</code> (cell height 4 or 8): its input is evaluated at the lattice corners and interpolated trilinearly per voxel; every node above it runs per voxel, only in cells the skipping leaves open (§5.4). The idea and the name follow Minecraft's <code>interpolated</code> density function (Minecraft Wiki, “Density function”); newer Minecraft versions also moved the cell size onto it (“Noise settings”).</td></tr>
 <tr><td>Not allowed</td><td><code>sin</code>, <code>cos</code>, <code>exp</code>, <code>log</code>, powers with a fraction: no transcendental functions (W2-ID-02). Division only by a constant, through <code>mul</code>.</td></tr>
 </tbody>
 </table>
 
 <h3 id="s3-4">3.4 Compiler</h3>
-<p>The compiler turns the graph into three flat programs: the <strong>2D program</strong> (nodes that do not depend on y, run on the stride-4 column lattice), the <strong>corner program</strong> (the inputs of the <code>interpolated</code> markers, run at the lattice corners) and the <strong>voxel program</strong> (the nodes above the markers, run per voxel after the interpolation, only in cells the skipping leaves open). 2D values enter the corner and voxel programs broadcast to every lane of a column. Each program gets topological order, constant folding, common subexpression elimination and register allocation.</p>
-<p>The compiler does no float arithmetic in managed code (AD-30). Settings load runs in Mono in the Editor and in the player's runtime in a build, and managed floats can differ from Burst's (the reason for v1's GEN-16). Constant subgraphs, spline tangents and interval bounds are computed by running them through the Burst interpreter (<code>FloatMode.Strict</code>, compiled synchronously). Every bound is widened by a fixed margin (start 1e-4, as v1's <code>SkipMargin</code>), so a bound that is one ulp off never makes the skipping wrong.</p>
+<p>The compiler turns the graph into three flat programs: the <strong>2D program</strong> (nodes that do not depend on y, run on the stride-4 column lattice), the <strong>corner program</strong> (the inputs of the <code>interpolated</code> markers, run at the lattice corners) and the <strong>voxel program</strong> (the nodes above the markers, run per voxel after the interpolation, only in cells the skipping leaves open). A per-column 2D output adds a column program, the 2D nodes it needs run on every column. There is one corner program per cell height in use. 2D values enter the corner programs exactly (corner columns are lattice columns) and the voxel program interpolated bilinearly per column, broadcast to every lane of a column. Each program gets topological order, constant folding, common subexpression elimination (on <code>add</code> and <code>mul</code> operand order only, never an algebraic rewrite that changes bits) and register allocation.</p>
+<p>Exact values at the lattice: lerp(a, b, t) is a + t (b − a), so an interpolated value at a lattice column or corner height is the direct value bit for bit, except that −0 may come out as +0. Tests compare with that one exception.</p>
+<p>The compiler does no float arithmetic in managed code (AD-30). Settings load runs in Mono in the Editor and in the player's runtime in a build, and managed floats can differ from Burst's (the reason for v1's GEN-16). Constant subgraphs, spline tangents and interval bounds are computed by running them through the Burst interpreter (<code>FloatMode.Strict</code>, compiled synchronously). Every bound except a constant's is widened by a margin of 1e-4 · max(1, m), with m the larger magnitude of its two ends (start 1e-4, as v1's <code>SkipMargin</code>; relative above 1, because a fixed 1e-4 is below the rounding of values in blocks such as a surface height near 200), so a bound that is one ulp off never makes the skipping wrong.</p>
 <p>Every node has an interval rule: bounds of its output from bounds of its inputs. A noise's bound comes from its octave amplitudes; <code>fbm</code> divides by the amplitude sum, so its bound is its amplitude. <code>spline</code>: the hull of the bounds of its point values, widened by each cubic segment's overshoot (bounded from its tangents). <code>shift</code>: the bound of the noise it moves, since moving the coordinates never changes a noise's range. <code>range_choice</code>: the union of both branches; both branches are evaluated on every lane, and the choice is a select. The bounds drive the corner-column ranges (§5.4), the wetness early-out (§6.5) and parts of the layout validator (§6.6).</p>
 
 <h3 id="s3-5">3.5 Interpreter</h3>
@@ -410,17 +411,27 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 <p>Depth is derived, not an output: D = (<code>preliminary_surface</code> − y) / 128, after Minecraft's depth (about 0 at the surface, +1/128 per block down).</p>
 
 <h3 id="s3-7">3.7 Limits and fallback</h3>
-<p>Limits (start values): at most 512 instructions, 64 registers and 64 noises per graph. The graph validator rejects cycles, unknown names, missing required outputs and graphs over the limits, and names the file and node.</p>
+<p>Limits (start values): at most 512 instructions, 64 registers and 64 noises per graph, 16 octaves per noise, 16 points per spline and splines nested 8 deep. The graph validator rejects cycles, unknown names, missing required outputs and graphs over the limits, and names the file and node. A file nested more than 64 objects or arrays deep is rejected before it is read, and names are resolved without recursion, so a malformed file is an error, not a stack overflow.</p>
 <p>V1 measures three things: (a) nanoseconds per <code>simplex2</code> and <code>simplex3</code> sample in the lane kernel, against v1's scalar call; (b) a test program shaped like terrain plus caves (2D, corner and voxel programs with markers) on real lane lengths, against hand-written Burst code for the same graph; (c) the dispatch overhead on an arithmetic-heavy graph with few noises. v1's climate fields alone would hide the dispatch cost, because both sides spend almost all their time in simplex calls. If the overhead in (b) is above +15 % (the top of the +5–15 % estimate given with DEC-126), an Editor step generates C# Burst code for the shipped graph, one statement per instruction of the flat program. The interpreter stays for mods and the preview, and a test compares the two bit for bit (W2-NG-03).</p>
+<p><strong>Measured in V1</strong> (Burst, <code>FloatMode.Strict</code>, one worker, A-B-B-A order, medians of 20 runs per block):</p>
+<table>
+<thead><tr><th>Measurement</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>(a) simplex2 / simplex3 per sample</td><td>Lane kernel 5.2 / 12.9 ns against 41.5 / 82.5 ns for v1's scalar call: 8.0× and 6.4×, bit for bit equal</td></tr>
+<tr><td>(b) terrain plus caves, ms per 32 × 32 chunk</td><td>Interpreter 0.98, hand-written 0.81–0.86: +14 to +22 % (the hand-written side moved by 6 % between compiles of the same code); generated code 0.86, within ±1 % of hand-written</td></tr>
+<tr><td>(c) arithmetic chain (37 instructions per voxel)</td><td>Interpreter 1.63, hand-written 1.13–1.15: +42 to +45 %; generated code 1.05, 7.6 % faster than hand-written</td></tr>
+</tbody>
+</table>
+<p>Work per chunk in (b): 9,945 2D and 23,814 3D noise samples, 7,938 corners, 786,432 interpolated marker values, 1.37 million instruction lanes. The gate value sits at or above +15 %, so V1 built the generated code. An Editor menu item (Infinitile &gt; Generate Noise Graph Code) writes <code>ShippedNoiseGraphCode.cs</code>: one method per program, one statement per instruction, values in locals instead of register rows, the same kernels in the same order as the interpreter. The code carries a hash over every field of the compiled tables. A graph with another hash (a mod, an edited file) runs in the interpreter, and an EditMode test fails while the committed file differs from what the generator makes. Tests compare generated code and interpreter bit for bit on the shipped graph, on a graph with every operation (2D and 3D, both cell heights) and on the terrain-plus-caves graph.</p>
 
 <div class="req"><span class="id">W2-NG-01</span><span class="kw must">MUST</span>Take every terrain, climate, cave and mask value from the graph. Flora and ores keep their own seeded noises, which are already per-rule data.</div>
 <div class="req"><span class="id">W2-NG-02</span><span class="kw must">MUST</span>Seed each noise from a hash of the world seed and the noise's name.</div>
-<div class="req"><span class="id">W2-NG-03</span><span class="kw must">MUST</span>Give the compiled program the same values as a direct, uncompiled evaluation of the graph, and generated code the same values as the interpreter (bit for bit on sampled points).</div>
+<div class="req"><span class="id">W2-NG-03</span><span class="kw must">MUST</span>Give the compiled program the same values as a direct, uncompiled evaluation of the graph, and generated code the same values as the interpreter (bit for bit on sampled points; at interpolated lattice points −0 may come out as +0, §3.4).</div>
 <div class="req"><span class="id">W2-NG-04</span><span class="kw must">MUST</span>Keep the interval rules sound: every sampled value lies inside its computed bound, on the shipped graph and on random graphs (§16, V1).</div>
 <div class="req"><span class="id">W2-NG-05</span><span class="kw must">MUST</span>Reject invalid graphs at load with the file and node named; never generate from an invalid graph.</div>
-<div class="req"><span class="id">W2-NG-06</span><span class="kw should">SHOULD</span>Keep the interpreter's overhead within +15 % of hand-written code on the terrain-plus-caves test program; otherwise use generated code for the shipped graph (§3.7).</div>
+<div class="req"><span class="id">W2-NG-06</span><span class="kw should">SHOULD</span>Keep the interpreter's overhead within +15 % of hand-written code on the terrain-plus-caves test program; otherwise use generated code for the shipped graph (§3.7). V1 measured +14 to +22 % and built the generated code.</div>
 <div class="req"><span class="id">W2-NG-09</span><span class="kw must">MUST</span>Provide the <code>interpolated</code> marker from V1: the compiler emits the 2D, corner and voxel programs, and every node above a marker runs per voxel after the trilinear interpolation.</div>
-<div class="req"><span class="id">W2-NG-10</span><span class="kw must">MUST</span>Do no float arithmetic in managed code when compiling: fold constants and compute spline tangents and bounds through the Burst interpreter, and widen every bound by the fixed margin (AD-30).</div>
+<div class="req"><span class="id">W2-NG-10</span><span class="kw must">MUST</span>Do no float arithmetic in managed code when compiling: fold constants and compute spline tangents and bounds through the Burst interpreter, and widen every bound by the bounds margin (AD-30, §3.4).</div>
 
 <!-- ============================================================ -->
 <h2 id="s4">4 · Parameters</h2>
@@ -439,7 +450,7 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 </tbody>
 </table>
 <p class="small">The wavelengths are the shipped v1 asset's values divided by its climate frequency scale 0.85 (T 4000, F 3200, C 3200, E 1600, W 1000).</p>
-<p><strong>C curve.</strong> v1 passes C through a seven-key curve. Measured offline, the raw noise puts 26.9 % of the area in the ocean bands (C below −0.19) and v1's curve 47.2 %. v2 passes C through a <code>spline</code> node that the sweep tunes to about 30 % (DEC-148). The band edges of §4.3 and the massif footprint edge C ≥ 0.18 apply to the curved C and are re-derived in V3.</p>
+<p><strong>C curve.</strong> v1 passes C through a seven-key curve. Measured offline, the raw noise puts 26.9 % of the area in the ocean bands (C below −0.19) and v1's curve 47.2 %. v2 passes C through a <code>spline</code> node that the sweep tunes to about 30 % (DEC-148). The band edges of §4.3 and the massif footprint edge C ≥ 0.18 apply to the curved C and are re-derived in V3. Until the sweep has run, the start graph's C curve is the identity (a linear spline from (−1, −1) to (1, 1)): the start graph uses the warped noise as it is.</p>
 
 <h3 id="s4-2">4.2 Range and independence</h3>
 <ul>
@@ -991,6 +1002,7 @@ w = w_snow for snow, w_ice for ice (own noises, as in v1)</code></pre>
   <li>Tests: each node against a scalar reference; compiled equals uncompiled bit for bit; random graphs (fuzzing): compiled equals direct evaluation and every bound is sound; the marker's interpolation against a direct trilinear reference; noise seeds by name; equal values at shared corners of neighbouring chunks; a hash of the 2D outputs over fixed columns (W2-ID-05); the validator rejects cycles, unknown names and graphs over the limits.</li>
   <li>Measurements (§3.7): (a) nanoseconds per simplex sample in the lane kernel against v1's scalar call; (b) the terrain-plus-caves test program against hand-written Burst code; (c) the dispatch overhead on an arithmetic-heavy graph.</li>
   <li>Gate: overhead in (b) ≤ +15 %, otherwise generated code for the shipped graph, bit for bit equal to the interpreter (§3.7).</li>
+  <li>Result: interpreter +14 to +22 % in (b), so the shipped graph runs as generated code, within ±1 % of hand-written (§3.7). V1 builds no pass of the chunk, so the running budget is still the estimate of §2.4.</li>
 </ul>
 </div>
 
@@ -1227,7 +1239,7 @@ w = w_snow for snow, w_ice for ice (own noises, as in v1)</code></pre>
 <tr><td>AD-27</td><td>Per column, Δup = 64 · A / K and Δdown = min(32, Δup), from the bound A of the N3 term and the factor K. Start values: A = 0.25 and K from 1 (rugged) to 8 (flat), so Δup is 16 to 2 blocks; N3 with 3 octaves at wavelength 64 across and 32 up.</td><td>The real surface lies within [<code>preliminary_surface</code> − Δdown, <code>preliminary_surface</code> + Δup]; a window per column keeps the skipping tight on flat land, where one global value would not. The look prototype (DEC-159) and the V2 tour set the final values.</td><td>§5.1, §5.4</td></tr>
 <tr><td>AD-28</td><td>DistanceBlend computes its kernel at stride 2, as v1, and keeps the 4 largest weights per column; v1 holds 16 dense weights (<code>BlendWeights.Capacity</code>).</td><td>255 biomes (DEC-144) need sparse weights; stride 4 is the next lever (§2.5).</td><td>§2.2, §12</td></tr>
 <tr><td>AD-29</td><td>Every rule has a name, unique in its list; a mod inserts a rule before or after a named rule, appends it, or replaces a rule by name.</td><td>A first-match list needs defined places for the rules that several mods add.</td><td>§7.1, §14</td></tr>
-<tr><td>AD-30</td><td>The compiler does no float arithmetic in managed code: constant folding, spline tangents and interval bounds run through the Burst interpreter, and every bound is widened by a margin of 1e-4, as v1's <code>SkipMargin</code>.</td><td>Managed code and Burst may round differently; folding in Burst gives the Editor and a player the same bits.</td><td>§3.4, §15</td></tr>
+<tr><td>AD-30</td><td>The compiler does no float arithmetic in managed code: constant folding, spline tangents and interval bounds run through the Burst interpreter, and every bound except a constant's is widened by a margin of 1e-4 · max(1, m), m the larger magnitude of its ends (relative since V1, §3.4), as v1's <code>SkipMargin</code>.</td><td>Managed code and Burst may round differently; folding in Burst gives the Editor and a player the same bits.</td><td>§3.4, §15</td></tr>
 </tbody>
 </table>
 
@@ -1474,7 +1486,7 @@ w = w_snow for snow, w_ice for ice (own noises, as in v1)</code></pre>
 <table>
 <thead><tr><th>Risk</th><th>Effect</th><th>Answer</th><th>Phase</th></tr></thead>
 <tbody>
-<tr><td>Interpreter cost</td><td>The graph interpreter is slower than hand-written code.</td><td>Gate ≤ +15 %; otherwise generated C# from the shipped graph (§3.7).</td><td>V1</td></tr>
+<tr><td>Interpreter cost</td><td>The graph interpreter is slower than hand-written code.</td><td>Gate ≤ +15 %; otherwise generated C# from the shipped graph (§3.7). V1: +14 to +22 %, generated code built.</td><td>V1</td></tr>
 <tr><td>3D cost</td><td>The 3D terrain and the caves exceed their rows of §2.4 (0.6–1.4 and 0.5–1.0 ms).</td><td>Corner-column ranges, uniform cells, octave counts, cell size (§2.5); the running budget of every phase (W2-PERF-04); the 8 ms gate in V6b (DEC-147).</td><td>V2, V6a, V6b</td></tr>
 <tr><td>Thin tunnels</td><td>Interpolating max(|a|, |b|) breaks tunnels of radius 2.5 into beads, on cells 8 high and, less often, on cells 4 high (§10.3).</td><td>Three options: radius about 4 on cells 4 × 8 × 4, an own cave lattice with cells 4 high, or a and b interpolated separately with <code>abs</code> and <code>max</code> per voxel (DEC-151); V6a measures them, and the owner picks (DEC-143).</td><td>V6a</td></tr>
 <tr><td>Water walls</td><td>Caves next to lakes and the sea leave walls of standing water (DEC-78).</td><td>Counted in the world report and judged in the V6a tour (DEC-140); <code>CaveWaterMargin</code> as the lever.</td><td>V6a</td></tr>
