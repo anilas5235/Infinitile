@@ -123,6 +123,7 @@ namespace Engine.Scripts.WorldGen.Graph{
                 if (octavesFinite) CheckBounds(foldedBounds);
 
                 List<GraphOutputInfo> outputs = Stage(foldedBounds);
+                CheckTerrain(outputs);
                 int instructions = _code.Count;
                 if (instructions > GraphLimits.MaxInstructions)
                     Error(null, $"The graph compiles to {instructions} instructions; the limit is {GraphLimits.MaxInstructions}.");
@@ -268,7 +269,7 @@ namespace Engine.Scripts.WorldGen.Graph{
                             }
 
                             n.Aux = _splines.Count;
-                            _splines.Add(new SplineInfo{ PointStart = start, PointCount = s.PointCount, Linear = s.Linear });
+                            _splines.Add(new SplineInfo{ PointStart = start, PointCount = s.PointCount, Mode = s.Mode });
                         }
 
                         if (n.Op is GraphOp.Add or GraphOp.Mul && n.A > n.B) (n.A, n.B) = (n.B, n.A);
@@ -341,9 +342,12 @@ namespace Engine.Scripts.WorldGen.Graph{
                     ResolvedOutput r = _ir.Outputs[o];
                     int f = _foldedOutputs[o];
                     GraphOutputInfo info = new(){
-                        Name = r.Name, Is3D = _dependsY[f], PerColumn = r.PerColumn, ReferenceNode = r.Node, Bounds = bounds[f]
+                        Name = r.Name, Is3D = _dependsY[f], PerColumn = r.PerColumn, BoundOnly = r.BoundOnly, ReferenceNode = r.Node, Bounds = bounds[f]
                     };
-                    if (info.Is3D){
+                    if (info.BoundOnly){
+                        // Only the bound is read; no program computes the values.
+                    }
+                    else if (info.Is3D){
                         if (r.PerColumn) Error(null, $"Output \"{r.Name}\" depends on y; only 2D outputs can be evaluated per column.");
                         info.VoxelOutput = voxelRoots.Count;
                         voxelRoots.Add((f, info.VoxelOutput));
@@ -365,6 +369,11 @@ namespace Engine.Scripts.WorldGen.Graph{
                         return Is2D(f) ? (true, GraphSlotSource.Lattice, LatticeSlot(f)) : (false, GraphSlotSource.Lattice, -1);
                     });
 
+                // An output that is a marker itself names its marker slot (assigned while the voxel program was built).
+                for (int o = 0; o < outputs.Count; o++)
+                    if (!outputs[o].BoundOnly && _markerIndex.TryGetValue(_foldedOutputs[o], out int marker))
+                        outputs[o].Marker = marker;
+
                 foreach (int cellHeight in new[]{ 4, 8 }){
                     List<(int node, int slot)> roots = new();
                     for (int m = 0; m < _markerNodes.Count; m++)
@@ -379,6 +388,42 @@ namespace Engine.Scripts.WorldGen.Graph{
                     BuildProgram(GraphStage.Lattice, 0, _latticeNodes.Select((n, i) => (n, i)).ToList(), _ => (false, GraphSlotSource.Lattice, -1));
                 if (columnRoots.Count > 0) BuildProgram(GraphStage.Column, 0, columnRoots, _ => (false, GraphSlotSource.Lattice, -1));
                 return outputs;
+            }
+
+            /// <summary>
+            ///     The terrain outputs come as a set (§5.1): terrain_density an interpolated marker itself (so its corner
+            ///     signs decide uniform cells), preliminary_surface and factor 2D, factor above 0, preliminary_surface
+            ///     at most y 255, terrain_noise and top_slide_start bound-only and the slide start a constant in the world.
+            /// </summary>
+            private void CheckTerrain(List<GraphOutputInfo> outputs){
+                GraphOutputInfo Find(string name) => outputs.FirstOrDefault(o => o.Name == name);
+                GraphOutputInfo density = Find(GraphOutputs.TerrainDensity);
+                // terrain_density alone is an ordinary 3D output (the V1 test graphs); any of the other four makes the
+                // graph a terrain graph, which needs all five.
+                bool any = GraphOutputs.Terrain.Any(n => n != GraphOutputs.TerrainDensity && Find(n) != null);
+                if (!any) return;
+                foreach (string name in GraphOutputs.Terrain)
+                    if (Find(name) == null)
+                        Error(null, $"The terrain output \"{name}\" is missing; the terrain outputs {string.Join(", ", GraphOutputs.Terrain)} come together.");
+                if (density != null && (!density.Is3D || density.Marker < 0))
+                    Error(null, $"Output \"{GraphOutputs.TerrainDensity}\" must be an interpolated node itself.");
+                foreach (string name in new[]{ GraphOutputs.PreliminarySurface, GraphOutputs.Factor }){
+                    GraphOutputInfo o = Find(name);
+                    if (o != null && (o.Is3D || o.BoundOnly)) Error(null, $"Output \"{name}\" must be a 2D output.");
+                }
+
+                GraphOutputInfo factor = Find(GraphOutputs.Factor);
+                if (factor != null && !(factor.Bounds.Min > 0f))
+                    Error(null, $"Output \"{GraphOutputs.Factor}\" must stay above 0; its bound is {factor.Bounds}.");
+                GraphOutputInfo surface = Find(GraphOutputs.PreliminarySurface);
+                if (surface != null && !(surface.Bounds.Max <= GraphOutputs.PreliminarySurfaceLimit))
+                    Error(null, $"Output \"{GraphOutputs.PreliminarySurface}\" reaches {surface.Bounds.Max:0.###}; it must stay at or below y {GraphLimits.WorldHeight - 1}.");
+                GraphOutputInfo noise = Find(GraphOutputs.TerrainNoise);
+                if (noise != null && !noise.BoundOnly) Error(null, $"Output \"{GraphOutputs.TerrainNoise}\" must be bound-only.");
+                GraphOutputInfo slide = Find(GraphOutputs.TopSlideStart);
+                if (slide != null && (!slide.BoundOnly || slide.Bounds.Min != slide.Bounds.Max || !(slide.Bounds.Min >= 0f) ||
+                                      !(slide.Bounds.Max <= GraphLimits.WorldHeight)))
+                    Error(null, $"Output \"{GraphOutputs.TopSlideStart}\" must be a bound-only constant between 0 and {GraphLimits.WorldHeight}.");
             }
 
             private int LatticeSlot(int f){
@@ -613,7 +658,7 @@ namespace Engine.Scripts.WorldGen.Graph{
                         ins.A = Reg(n.A);
                         ins.Aux = _programPoints.Count;
                         ins.B = (short)s.PointCount;
-                        ins.C = (short)s.Linear;
+                        ins.C = (short)s.Mode;
                         for (int k = 0; k < s.PointCount; k++){
                             SplinePoint p = _points[s.PointStart + k];
                             if (p.Value >= 0 && IsConst(p.Value)){

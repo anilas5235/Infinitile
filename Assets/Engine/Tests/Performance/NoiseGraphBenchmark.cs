@@ -243,10 +243,18 @@ namespace Engine.Tests.Performance{
         public void GeneratedCode_IsUpToDate(){
             const string path = "Assets/Engine/Tests/Performance/NoiseGraphBenchmarkCode.cs";
             using CompiledNoiseGraph caves = CompileOrFail(TerrainCaves()), chain = CompileOrFail(ArithmeticChain());
+            using CompiledNoiseGraph fixture = CompileJsonOrFail(System.IO.File.ReadAllText(DensityFixture.GraphPath));
+            using CompiledNoiseGraph fixture4 = CompileJsonOrFail(DensityChunkBenchmark.Cell4Json());
             string expected = NoiseGraphCodeGenerator.Generate("Engine.Tests.Performance", "the noise graph benchmark", ("TerrainCavesBenchmarkCode", caves),
-                ("ArithmeticChainBenchmarkCode", chain));
+                ("ArithmeticChainBenchmarkCode", chain), ("DensityFixtureCode", fixture), ("DensityFixtureCell4Code", fixture4));
             if (!NoiseGraphCodeGenerator.IsUpToDate(path, expected, out string fresh))
                 Assert.Fail($"{path} is out of date: replace it with the generated text in {fresh}.");
+        }
+
+        private static CompiledNoiseGraph CompileJsonOrFail(string json){
+            GraphCompileResult r = GraphCompiler.Compile(json, DensityFixture.GraphPath);
+            if (!r.Succeeded) Assert.Fail("Compile failed: " + string.Join("; ", r.Messages));
+            return r.Graph;
         }
 
         private static CompiledNoiseGraph CompileOrFail(NoiseGraph graph){
@@ -419,7 +427,7 @@ namespace Engine.Tests.Performance{
                     values[0] = sp[7].Constant;
                     values[1] = sp[8].Constant;
                     values[2] = sp[9].Constant;
-                    float4 factor = GraphKernels.Spline(e, sp + 7, values, 3, true);
+                    float4 factor = GraphKernels.Spline(e, sp + 7, values, 3, 1);
                     for (int k = 0; k < 4 && x0 + k < LatticeWidth; k++){
                         int at = lz * LatticeWidth + x0 + k;
                         lattice[at] = c[k];
@@ -522,12 +530,12 @@ namespace Engine.Tests.Performance{
                 values[0] = sp[4].Constant;
                 values[1] = sp[5].Constant;
                 values[2] = sp[6].Constant;
-                float4 inner = GraphKernels.Spline(e, sp + 4, values, 3, false);
+                float4 inner = GraphKernels.Spline(e, sp + 4, values, 3, 0);
                 values[0] = sp[0].Constant;
                 values[1] = sp[1].Constant;
                 values[2] = inner;
                 values[3] = sp[3].Constant;
-                float4 offset = GraphKernels.Spline(c, sp, values, 4, false);
+                float4 offset = GraphKernels.Spline(c, sp, values, 4, 0);
                 return 64f + offset * 96f;
             }
         }

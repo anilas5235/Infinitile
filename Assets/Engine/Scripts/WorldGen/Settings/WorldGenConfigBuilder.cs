@@ -68,6 +68,8 @@ namespace Engine.Scripts.WorldGen.Settings{
             WorldGenConfig cfg = new(){
                 Seed = (uint)seed,
                 Architecture = settings.Architecture,
+                Generator = settings.Generator,
+                DensityStoneVoxel = Id(settings.DensityStoneVoxel, voxelId),
                 MaterialMethod = settings.MaterialMethod,
                 MaterialBlendWidth = settings.MaterialBlendWidth,
                 MaterialBorderWavelength = settings.MaterialBorderWavelength,
@@ -148,6 +150,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                     Biome biome = active[b];
                     cfg.Biomes[b] = voxelId != null ? biome.ToStruct(voxelId) : biome.ToStruct();
                     if (cfg.Biomes[b].beachHeight != 0) cfg.HasBeaches = true;
+                    if (b == 0 && cfg.DensityStoneVoxel == 0) cfg.DensityStoneVoxel = cfg.Biomes[0].stoneBlock;
                     for (int i = 0; i < octaveCount; i++){
                         // a_{b,i} = HeightAmplitude_b × OctaveWeights_{b,i}; missing weights count as 0.
                         float w = biome.OctaveWeights != null && i < biome.OctaveWeights.Length ? biome.OctaveWeights[i] : 0f;

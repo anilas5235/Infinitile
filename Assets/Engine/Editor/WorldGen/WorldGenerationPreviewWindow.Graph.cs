@@ -85,7 +85,7 @@ namespace Engine.Editor.WorldGen{
             _graphScroll = EditorGUILayout.BeginScrollView(_graphScroll);
             {
                 const int columns = 4;
-                List<GraphOutputView> flat = _graphViews.Where(v => !v.Output.Is3D).ToList();
+                List<GraphOutputView> flat = _graphViews.Where(v => !v.Output.Is3D && !v.Output.BoundOnly).ToList();
                 for (int row = 0; row * columns < flat.Count; row++){
                     EditorGUILayout.BeginHorizontal();
                     for (int col = 0; col < columns; col++){
@@ -98,7 +98,7 @@ namespace Engine.Editor.WorldGen{
                     EditorGUILayout.EndHorizontal();
                 }
 
-                foreach (GraphOutputView view in _graphViews.Where(v => v.Output.Is3D)){
+                foreach (GraphOutputView view in _graphViews.Where(v => v.Output.Is3D && !v.Output.BoundOnly)){
                     EditorGUILayout.LabelField(GraphViewTitle(view) + $" · x–y slice at z {_worldOffset.y}", EditorStyles.boldLabel);
                     if (!view.Texture) continue;
                     float width = Mathf.Min(position.width - 40f, view.Texture.width * 2f);
@@ -176,21 +176,21 @@ namespace Engine.Editor.WorldGen{
                 _graphCounters.Add(latticeCounters);
             }
 
-            foreach (GraphOutputInfo output in graph.Outputs.Where(o => !o.Is3D)){
+            foreach (GraphOutputInfo output in graph.Outputs.Where(o => !o.Is3D && !o.BoundOnly)){
                 GraphOutputView view = new(){ Output = output };
                 view.Texture = Paint(size, size, output.Bounds, k => lattice[output.LatticeValue * points.Length + k], view);
                 _graphViews.Add(view);
             }
 
             // 3D outputs: an x–y slice through the centre of the view, one sample per block.
-            if (graph.Outputs.Any(o => o.Is3D)){
+            if (graph.Outputs.Any(o => o.Is3D && !o.BoundOnly)){
                 int width = Mathf.Min(extent, ViewResolution) & ~3;
                 int startX = (origin.x + (extent - width) / 2) & ~3;
                 int z = _worldOffset.y;
                 int regionZ = z & ~3;
                 using GraphRegionResult region = GraphEvaluator.EvaluateRegion(graph, seed, new int2(startX, regionZ), new int2(width, 4), true);
                 _graphCounters.Add(region.Counters);
-                foreach (GraphOutputInfo output in graph.Outputs.Where(o => o.Is3D)){
+                foreach (GraphOutputInfo output in graph.Outputs.Where(o => o.Is3D && !o.BoundOnly)){
                     GraphOutputView view = new(){ Output = output };
                     view.Texture = Paint(width, GraphLimits.WorldHeight, output.Bounds,
                         k => region.Voxel(output.VoxelOutput, k % width, k / width, z - regionZ), view);

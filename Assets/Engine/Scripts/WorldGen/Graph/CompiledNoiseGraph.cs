@@ -25,6 +25,12 @@ namespace Engine.Scripts.WorldGen.Graph{
         /// <summary>Index among the column outputs (per-column 2D outputs), else −1.</summary>
         public int ColumnOutput = -1;
 
+        /// <summary>The marker slot when the output is an interpolated marker itself, else −1.</summary>
+        public int Marker = -1;
+
+        /// <summary>Only the bound is known: no program computes the values (LatticeValue and VoxelOutput are −1).</summary>
+        public bool BoundOnly;
+
         /// <summary>The output's node in the uncompiled node list (for the direct evaluation).</summary>
         public int ReferenceNode;
 

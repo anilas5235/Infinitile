@@ -54,8 +54,8 @@ namespace Engine.Tests.EditMode{
         ///     interpolation gives the corner values), and every value inside its bound.
         /// </summary>
         private static void CheckAgainstDirect(CompiledNoiseGraph graph, uint seed, int2 origin, int2 size, float2[] points, string label){
-            List<GraphOutputInfo> flat = graph.Outputs.Where(o => !o.Is3D).ToList();
-            List<GraphOutputInfo> volume = graph.Outputs.Where(o => o.Is3D).ToList();
+            List<GraphOutputInfo> flat = graph.Outputs.Where(o => !o.Is3D && !o.BoundOnly).ToList();
+            List<GraphOutputInfo> volume = graph.Outputs.Where(o => o.Is3D && !o.BoundOnly).ToList();
 
             if (flat.Count > 0){
                 float[] compiled = GraphEvaluator.SampleLattice(graph, seed, points, out _);

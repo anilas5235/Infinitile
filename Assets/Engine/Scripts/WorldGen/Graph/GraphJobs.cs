@@ -43,7 +43,7 @@ namespace Engine.Scripts.WorldGen.Graph{
             NoiseEntry* entries = (NoiseEntry*)Entries.GetUnsafeReadOnlyPtr();
             NoiseOctave* octaves = (NoiseOctave*)Octaves.GetUnsafePtr();
             float4* values = (float4*)UnsafeUtility.Malloc(sizeof(float4) * math.max(1, Nodes.Length), 16, Allocator.Temp);
-            float4* splineValues = stackalloc float4[GraphLimits.MaxSplinePoints];
+            float4* splineValues = stackalloc float4[GraphKernels.SplineScratch];
 
             for (int i = 0; i < Nodes.Length; i++){
                 ref GraphNode n = ref nodes[i];
@@ -111,7 +111,7 @@ namespace Engine.Scripts.WorldGen.Graph{
                 }
             }
 
-            if (s.Linear != 0 || n < 2) return;
+            if (s.Mode != SplineMode.Cubic || n < 2) return;
             for (int k = 0; k < n; k++){
                 if (p[k].HasDerivative != 0) return;
                 if (p[k].Value >= 0 && Constant[p[k].Value] == 0) return;
@@ -174,7 +174,7 @@ namespace Engine.Scripts.WorldGen.Graph{
             NoiseEntry* entries = (NoiseEntry*)Entries.GetUnsafeReadOnlyPtr();
             NoiseOctave* octaves = (NoiseOctave*)Octaves.GetUnsafeReadOnlyPtr();
             float4* values = (float4*)UnsafeUtility.Malloc(sizeof(float4) * math.max(1, Nodes.Length), 16, Allocator.Temp);
-            float4* splineValues = stackalloc float4[GraphLimits.MaxSplinePoints];
+            float4* splineValues = stackalloc float4[GraphKernels.SplineScratch];
             int count = Positions.Length;
             int select = Select.Length;
 
@@ -365,7 +365,7 @@ namespace Engine.Scripts.WorldGen.Graph{
                 if (c.Max < p0.Location || c.Min >= p1.Location) continue;
                 GraphBounds v0 = ValueBounds(p0), v1 = ValueBounds(p1);
                 float segLo = math.min(v0.Min, v1.Min), segHi = math.max(v0.Max, v1.Max);
-                if (s.Linear == 0){
+                if (s.Mode == SplineMode.Cubic){
                     float o = 4f / 27f * p0.Span;
                     float a = o * p0.Derivative, b = -o * p1.Derivative;
                     segLo += math.min(0f, a) + math.min(0f, b);

@@ -2,12 +2,15 @@
 //     Made by NoiseGraphCodeGenerator from Resources/WorldGen/NoiseGraph.json. Do not edit; regenerate it when the graph changes.
 // </auto-generated>
 
+using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.WorldGen.Graph;
 using Engine.Scripts.WorldGen.Noise;
 using Unity.Jobs;
 using Unity.Mathematics;
 
 [assembly: RegisterGenericJobType(typeof(GeneratedRegionJob<Engine.Scripts.WorldGen.Graph.ShippedNoiseGraphCode>))]
+[assembly: RegisterGenericJobType(typeof(DensityChunkJob<Engine.Scripts.WorldGen.Graph.ShippedNoiseGraphCode>))]
+[assembly: RegisterGenericJobType(typeof(DensityProbeJob<Engine.Scripts.WorldGen.Graph.ShippedNoiseGraphCode>))]
 
 namespace Engine.Scripts.WorldGen.Graph{
     /// <summary>Generated programs of one noise graph; see <see cref="IGraphPrograms" />.</summary>
@@ -65,7 +68,7 @@ namespace Engine.Scripts.WorldGen.Graph{
                 }
                 sv[0] = math.asfloat(0xBF800000u);
                 sv[1] = math.asfloat(0x3F800000u);
-                r4 = GraphKernels.Spline(r3, points + 0, sv, 2, true);
+                r4 = GraphKernels.Spline(r3, points + 0, sv, 2, 1);
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;

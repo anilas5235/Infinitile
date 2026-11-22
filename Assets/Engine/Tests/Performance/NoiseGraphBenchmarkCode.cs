@@ -166,16 +166,16 @@ namespace Engine.Tests.Performance{
                 sv[0] = math.asfloat(0x40C00000u);
                 sv[1] = math.asfloat(0x40400000u);
                 sv[2] = math.asfloat(0x3FC00000u);
-                r5 = GraphKernels.Spline(r4, points + 0, sv, 3, true);
+                r5 = GraphKernels.Spline(r4, points + 0, sv, 3, 1);
                 sv[0] = math.asfloat(0x3F19999Au);
                 sv[1] = math.asfloat(0x3E800000u);
                 sv[2] = math.asfloat(0x3D4CCCCDu);
-                r6 = GraphKernels.Spline(r4, points + 3, sv, 3, false);
+                r6 = GraphKernels.Spline(r4, points + 3, sv, 3, 0);
                 sv[0] = math.asfloat(0xBF19999Au);
                 sv[1] = math.asfloat(0xBDCCCCCDu);
                 sv[2] = r6;
                 sv[3] = math.asfloat(0x3F666666u);
-                r4 = GraphKernels.Spline(r3, points + 6, sv, 4, false);
+                r4 = GraphKernels.Spline(r3, points + 6, sv, 4, 0);
                 r6 = r4 * math.asfloat(0x42C00000u);
                 r4 = r6 + math.asfloat(0x42800000u);
                 r6 = math.clamp(r3, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
@@ -221,12 +221,12 @@ namespace Engine.Tests.Performance{
                 sv[0] = math.asfloat(0x3F19999Au);
                 sv[1] = math.asfloat(0x3E800000u);
                 sv[2] = math.asfloat(0x3D4CCCCDu);
-                r5 = GraphKernels.Spline(r4, points + 10, sv, 3, false);
+                r5 = GraphKernels.Spline(r4, points + 10, sv, 3, 0);
                 sv[0] = math.asfloat(0xBF19999Au);
                 sv[1] = math.asfloat(0xBDCCCCCDu);
                 sv[2] = r5;
                 sv[3] = math.asfloat(0x3F666666u);
-                r4 = GraphKernels.Spline(r3, points + 13, sv, 4, false);
+                r4 = GraphKernels.Spline(r3, points + 13, sv, 4, 0);
                 r3 = r4 * math.asfloat(0x42C00000u);
                 r4 = r3 + math.asfloat(0x42800000u);
                 ((float4*)(r + 512))[q] = r4;
@@ -324,6 +324,28 @@ namespace Engine.Tests.Performance{
                 }
                 ((float4*)(r + 384))[q] = r3;
             }
+        }
+    }
+}
+
+namespace Engine.Tests.Performance{
+    // Placeholders until the Editor regenerates this file (NoiseGraphBenchmark.GeneratedCode_IsUpToDate): they fit no
+    // graph, so the density benchmark rows fail with "out of date" instead of running stale code.
+    internal unsafe struct DensityFixtureCode : IGraphPrograms{
+        public ulong CodeHash => 1;
+        public GraphTableSizes Sizes => default;
+
+        public void Run(int program, in GraphCode code, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters){
+            code.Run(code.Programs[program], registers, scratch, lanes, seed, ref counters);
+        }
+    }
+
+    internal unsafe struct DensityFixtureCell4Code : IGraphPrograms{
+        public ulong CodeHash => 1;
+        public GraphTableSizes Sizes => default;
+
+        public void Run(int program, in GraphCode code, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters){
+            code.Run(code.Programs[program], registers, scratch, lanes, seed, ref counters);
         }
     }
 }

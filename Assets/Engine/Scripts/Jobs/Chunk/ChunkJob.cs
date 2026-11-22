@@ -114,7 +114,7 @@ namespace Engine.Scripts.Jobs.Chunk{
         ///     The runs go into a Temp list first and are then copied into a list of their exact size: a fixed
         ///     reservation would hold hundreds of KiB per loaded chunk, far more than the runs of a generated chunk.
         /// </summary>
-        private void WriteToChunkData(NativeArray<ushort> vox, out ChunkVoxelData data){
+        internal static void WriteToChunkData(NativeArray<ushort> vox, out ChunkVoxelData data){
             UnsafeIntervalList<ushort> runs = new(TempRunCapacity, Allocator.Temp);
             ushort last = 0;
             int run = 0;
