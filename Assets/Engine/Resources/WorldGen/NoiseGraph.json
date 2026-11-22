@@ -90,7 +90,7 @@
       "op": "sub"
     },
     "preliminary_surface": {
-      "in": {
+      "coordinate": {
         "a": {
           "a": 124,
           "b": "terrain_offset",
@@ -103,9 +103,30 @@
         },
         "op": "add"
       },
-      "max": 250,
-      "min": -64,
-      "op": "clamp"
+      "interpolation": "monotone",
+      "op": "spline",
+      "points": [
+        {
+          "location": -64,
+          "value": -64
+        },
+        {
+          "location": 190,
+          "value": 190
+        },
+        {
+          "location": 206,
+          "value": 206
+        },
+        {
+          "location": 260.4,
+          "value": 231.5
+        },
+        {
+          "location": 320,
+          "value": 240
+        }
+      ]
     },
     "terrain_density": {
       "cellHeight": 8,
