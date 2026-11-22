@@ -21,7 +21,7 @@ namespace Engine.Tests.Performance{
     ///     The noise graph interpreter against hand-written Burst code, every pair timed in A, B, B, A order on one
     ///     worker:
     ///     <list type="bullet">
-    ///         <item>ns per simplex sample: the lane kernel against v1's scalar SeededSimplex call;</item>
+    ///         <item>ns per simplex sample: the lane kernel against the scalar SeededSimplex call;</item>
     ///         <item>
     ///             ms per 32 × 32 chunk of a terrain-plus-caves graph (lattice, column, two corner programs and the
     ///             voxel program with three markers): the interpreter against straight-line code for the same graph,

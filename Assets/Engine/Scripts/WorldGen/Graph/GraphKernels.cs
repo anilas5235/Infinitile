@@ -116,7 +116,7 @@ namespace Engine.Scripts.WorldGen.Graph{
         }
 
         /// <summary>
-        ///     A noise entry on four positions through v1's scalar SeededSimplex: the reference the lane kernel must
+        ///     A noise entry on four positions through the scalar SeededSimplex: the reference the lane kernel must
         ///     match bit for bit. Octaves accumulate as acc + n · amp (ridged: acc + (1 − |n|) · amp), from 0.
         /// </summary>
         public static float4 NoiseReference(in NoiseEntry entry, NoiseOctave* octaves, float4 x, float4 y, float4 z, uint seed){

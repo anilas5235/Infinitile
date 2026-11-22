@@ -95,7 +95,7 @@ namespace Engine.Scripts.WorldGen.Graph{
 
         /// <summary>
         ///     Segment spans and, when no point gives a derivative and every value is constant, Fritsch–Carlson
-        ///     tangents from the constant values (v1's monotone splines); otherwise a missing derivative is 0.
+        ///     tangents from the constant values (as NestedSpline's MonotoneCubic); otherwise a missing derivative is 0.
         /// </summary>
         private void PrepareSpline(SplineInfo s, SplinePoint* all, float4* values){
             SplinePoint* p = all + s.PointStart;
@@ -148,7 +148,7 @@ namespace Engine.Scripts.WorldGen.Graph{
 
     /// <summary>
     ///     Direct, uncompiled evaluation of a node list at a list of positions: every node in order, markers as the
-    ///     identity, noise through v1's scalar simplex. The reference the compiled programs are tested against.
+    ///     identity, noise through the scalar SeededSimplex. The reference the compiled programs are tested against.
     /// </summary>
     [BurstCompile(FloatMode = FloatMode.Strict, CompileSynchronously = true)]
     internal unsafe struct GraphDirectJob : IJob{

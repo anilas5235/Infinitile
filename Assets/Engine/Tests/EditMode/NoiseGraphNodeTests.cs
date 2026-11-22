@@ -213,7 +213,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void SplineWithoutDerivatives_InterpolatesThePointsMonotonically(){
-            // Constant values and no derivatives: tangents from the monotone (Fritsch–Carlson) rule, as v1's splines.
+            // Constant values and no derivatives: tangents from the monotone (Fritsch–Carlson) rule, as NestedSpline's MonotoneCubic.
             double[] l ={ -1, -0.2, 0.1, 0.6, 1 };
             double[] v ={ -0.5, -0.1, 0.4, 0.45, 1.2 };
             Dictionary<string, object>[] points = new Dictionary<string, object>[l.Length];
