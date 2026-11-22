@@ -54,8 +54,8 @@ namespace Engine.Tests.EditMode{
         ///     interpolation gives the corner values), and every value inside its bound.
         /// </summary>
         private static void CheckAgainstDirect(CompiledNoiseGraph graph, uint seed, int2 origin, int2 size, float2[] points, string label){
-            List<GraphOutputInfo> flat = graph.Outputs.Where(o => !o.Is3D).ToList();
-            List<GraphOutputInfo> volume = graph.Outputs.Where(o => o.Is3D).ToList();
+            List<GraphOutputInfo> flat = graph.Outputs.Where(o => !o.Is3D && !o.BoundOnly).ToList();
+            List<GraphOutputInfo> volume = graph.Outputs.Where(o => o.Is3D && !o.BoundOnly).ToList();
 
             if (flat.Count > 0){
                 float[] compiled = GraphEvaluator.SampleLattice(graph, seed, points, out _);
@@ -519,6 +519,7 @@ namespace Engine.Tests.EditMode{
                         }
 
                         double? derivative = random.Next(2) == 0 ? Constant(random, 2) : null;
+                        if (linear) derivative = null; // drawn all the same, so the random stream stays as before
                         list.Add(Point(location, value, derivative));
                         location += 0.05 + Math.Round(random.NextDouble() * 1.5, 3);
                     }

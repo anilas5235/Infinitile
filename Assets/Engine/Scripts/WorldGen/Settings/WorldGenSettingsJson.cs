@@ -88,6 +88,12 @@ namespace Engine.Scripts.WorldGen.Settings{
                 ["Biomes"] = BiomeSetTree(s.Biomes),
                 ["Splines"] = s.Splines ? s.Splines.ToTree() : null
             };
+            // The v2 keys are written only off their defaults, so the manifests of v1 runs keep their hash.
+            if (s.Generator != WorldGenerator.HeightField){
+                tree["Generator"] = s.Generator;
+                tree["DensityStoneVoxel"] = VoxelName(s.DensityStoneVoxel);
+            }
+
             if (seed.HasValue) tree["Seed"] = seed.Value;
             return tree;
         }

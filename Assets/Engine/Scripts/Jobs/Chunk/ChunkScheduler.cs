@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Core;
@@ -6,6 +6,8 @@ using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.World;
+using Engine.Scripts.WorldGen.Density;
+using Engine.Scripts.WorldGen.Graph;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -22,6 +24,12 @@ namespace Engine.Scripts.Jobs.Chunk{
         private readonly ChunkManager _chunkManager;
         private readonly GeneratorConfig _config;
         private readonly VoxelWorld _world;
+
+        // The density generator (WorldGen v2): the shipped noise graph, compiled once per scheduler, and whether the
+        // generated code fits it (else the interpreter runs it)
+        private readonly CompiledNoiseGraph _graph;
+        private readonly DensityTerrainGraph _terrain;
+        private readonly bool _generatedCode;
 
         /// <summary>
         ///     Indicates whether the scheduler is ready to start a new chunk generation batch.
@@ -72,6 +80,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             _chunkManager = chunkManager;
             _config = config;
             _world = world;
+            if (config.WorldGen.Generator == WorldGenerator.Density) _graph = CompileDensityGraph(out _terrain, out _generatedCode);
             _jobs = new NativeList<int2>(Allocator.Domain);
             _results = new NativeParallelHashMap<int2, ChunkVoxelData>(
                 settings.Chunk.LoadDistance.SquareSize(),
@@ -79,6 +88,21 @@ namespace Engine.Scripts.Jobs.Chunk{
             );
         }
 
+
+        /// <summary>The shipped noise graph with its terrain outputs; throws when it has errors or no terrain.</summary>
+        private static CompiledNoiseGraph CompileDensityGraph(out DensityTerrainGraph terrain, out bool generatedCode){
+            GraphCompileResult result = ShippedNoiseGraph.Compile();
+            if (!result.Succeeded)
+                throw new InvalidOperationException("The noise graph has errors: " + string.Join("; ", result.Errors));
+            CompiledNoiseGraph graph = result.Graph;
+            if (!DensityTerrainGraph.TryCreate(graph, out terrain, out string error)){
+                graph.Dispose();
+                throw new InvalidOperationException(error);
+            }
+
+            generatedCode = GraphEvaluator.HasGeneratedCode(graph);
+            return graph;
+        }
 
         /// <summary>The world-generation config the chunk jobs read; released with this scheduler.</summary>
         internal WorldGenConfig WorldGen => _config.WorldGen;
@@ -98,6 +122,11 @@ namespace Engine.Scripts.Jobs.Chunk{
             IsReady = false;
             foreach (int2 j in jobs) _jobs.Add(j);
 
+            if (_graph != null){
+                _handle = _generatedCode ? ScheduleDensity<ShippedNoiseGraphCode>() : ScheduleDensity<InterpretedPrograms>();
+                return;
+            }
+
             ChunkJob job = new(){
                 Jobs = _jobs,
                 Results = _results.AsParallelWriter(),
@@ -105,6 +134,16 @@ namespace Engine.Scripts.Jobs.Chunk{
             };
 
             _handle = job.Schedule(_jobs.Length, 1);
+        }
+
+        private JobHandle ScheduleDensity<TPrograms>() where TPrograms : struct, IGraphPrograms{
+            DensityChunkJob<TPrograms> job = new(){
+                Jobs = _jobs,
+                Results = _results.AsParallelWriter(),
+                Config = _config,
+                Terrain = _terrain
+            };
+            return job.Schedule(_jobs.Length, 1);
         }
 
         /// <summary>
@@ -229,6 +268,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             _jobs.Dispose();
             _results.Dispose();
             _config.Dispose(); // Releases the noise parameters created for this scheduler's config
+            _graph?.Dispose();
         }
     }
 }

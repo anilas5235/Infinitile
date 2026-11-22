@@ -10,6 +10,9 @@ namespace Engine.Scripts.WorldGen.Graph{
         public string Name;
         public int Node;
         public bool PerColumn;
+
+        /// <summary>Only the output's bound is wanted: no program computes its values.</summary>
+        public bool BoundOnly;
     }
 
     /// <summary>A graph as a node list in topological order, with its splines and noise entries (no float math done yet).</summary>
@@ -158,11 +161,11 @@ namespace Engine.Scripts.WorldGen.Graph{
 
             foreach (KeyValuePair<string, object> output in _graph.Outputs){
                 object reference = output.Value;
-                bool perColumn = false;
+                bool perColumn = false, boundOnly = false;
                 if (reference is Dictionary<string, object> o && !o.ContainsKey("op")){
                     foreach (string key in o.Keys)
-                        if (key != "node" && key != "perColumn")
-                            Error(null, $"Output \"{output.Key}\": unknown field \"{key}\" (allowed: node, perColumn).");
+                        if (key != "node" && key != "perColumn" && key != "boundOnly")
+                            Error(null, $"Output \"{output.Key}\": unknown field \"{key}\" (allowed: node, perColumn, boundOnly).");
                     if (!o.TryGetValue("node", out reference)){
                         Error(null, $"Output \"{output.Key}\" has no \"node\".");
                         continue;
@@ -172,6 +175,14 @@ namespace Engine.Scripts.WorldGen.Graph{
                         if (flag is bool b) perColumn = b;
                         else Error(null, $"Output \"{output.Key}\": \"perColumn\" must be true or false.");
                     }
+
+                    if (o.TryGetValue("boundOnly", out object only)){
+                        if (only is bool b) boundOnly = b;
+                        else Error(null, $"Output \"{output.Key}\": \"boundOnly\" must be true or false.");
+                    }
+
+                    if (boundOnly && (perColumn || GraphOutputs.IsClimate(output.Key)))
+                        Error(null, $"Output \"{output.Key}\": a bound-only output cannot be a climate output or evaluated per column.");
                 }
 
                 int node = Reference(reference, $"output {output.Key}");
@@ -187,7 +198,7 @@ namespace Engine.Scripts.WorldGen.Graph{
                     }
                 }
 
-                _ir.Outputs.Add(new ResolvedOutput{ Name = output.Key, Node = node, PerColumn = perColumn });
+                _ir.Outputs.Add(new ResolvedOutput{ Name = output.Key, Node = node, PerColumn = perColumn, BoundOnly = boundOnly });
             }
 
             CheckStructure();
@@ -559,15 +570,18 @@ namespace Engine.Scripts.WorldGen.Graph{
 
         private int SplineNode(Dictionary<string, object> fields, string name){
             int coordinate = Reference(fields["coordinate"], $"{name}.coordinate");
-            bool linear = false;
+            int mode = SplineMode.Cubic;
             if (fields.TryGetValue("interpolation", out object interpolation)){
                 switch (interpolation as string){
                     case "cubic": break;
                     case "linear":
-                        linear = true;
+                        mode = SplineMode.Linear;
+                        break;
+                    case "monotone":
+                        mode = SplineMode.Monotone;
                         break;
                     default:
-                        Error(Owner(name), $"{name}: \"interpolation\" must be \"cubic\" or \"linear\".");
+                        Error(Owner(name), $"{name}: \"interpolation\" must be \"cubic\", \"linear\" or \"monotone\".");
                         return -1;
                 }
             }
@@ -607,6 +621,11 @@ namespace Engine.Scripts.WorldGen.Graph{
                 SplinePoint point = new(){ Location = location, Value = Reference(value, $"{at}.value") };
                 if (point.Value < 0) ok = false;
                 if (p.ContainsKey("derivative")){
+                    if (mode != SplineMode.Cubic){
+                        Error(Owner(name), $"{at}: a derivative is only allowed on a cubic spline.");
+                        ok = false;
+                    }
+
                     if (!Number(p, "derivative", at, out float derivative)) ok = false;
                     point.Derivative = derivative;
                     point.HasDerivative = 1;
@@ -623,7 +642,7 @@ namespace Engine.Scripts.WorldGen.Graph{
             if (!ok) return -1;
             GraphNode n = GraphNode.Make(GraphOp.Spline, coordinate);
             n.Aux = _ir.Splines.Count;
-            _ir.Splines.Add(new SplineInfo{ PointStart = _ir.Points.Count, PointCount = points.Count, Linear = linear ? 1 : 0 });
+            _ir.Splines.Add(new SplineInfo{ PointStart = _ir.Points.Count, PointCount = points.Count, Mode = mode });
             _ir.Points.AddRange(points);
             return _ir.Add(n, name);
         }

@@ -27,6 +27,12 @@ namespace Engine.Scripts.WorldGen.Settings{
 
         public GenArchitecture Architecture;
 
+        /// <summary>The generator that fills the chunks (<see cref="WorldGenerator" />).</summary>
+        public WorldGenerator Generator;
+
+        /// <summary>Stone of the density generator's placeholder fill; the first biome's stone block when not set.</summary>
+        public ushort DensityStoneVoxel;
+
         // --- Blending -----------------------------------------------------------------------------------------------
         public BlendMethod MaterialMethod;
 

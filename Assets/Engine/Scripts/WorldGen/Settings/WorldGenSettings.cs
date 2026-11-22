@@ -22,6 +22,12 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Tooltip("Terrain-first (spline height, 6D classification) or Biome-first (5D classification, per-biome height).")]
         public GenArchitecture Architecture = GenArchitecture.BiomeFirst;
 
+        [Tooltip("Height field (v1, the default until WorldGen v2 is complete) or the v2 density generator (WorldGen v2 §5).")]
+        public WorldGenerator Generator = WorldGenerator.HeightField;
+
+        [Tooltip("Stone of the density generator's placeholder fill (WorldGen v2 V2); empty takes the first biome's stone block.")]
+        public VoxelConfig.Data.Voxel.Voxel DensityStoneVoxel;
+
         [Header("Blending")]
         public BlendMethod MaterialMethod = BlendMethod.None;
 

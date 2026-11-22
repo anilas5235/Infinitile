@@ -12,7 +12,8 @@ namespace Engine.Editor.WorldGen{
     ///     validator messages, the program sizes and the work counters, and draws every output. 2D outputs are top
     ///     views of the framed region (exact values at every sample); 3D outputs are a vertical x–y slice through the
     ///     centre of the view at one sample per block. Colours run from blue (negative) through grey to red
-    ///     (positive), scaled by the output's bound; magenta marks a value outside its bound.
+    ///     (positive), scaled by the output's bound; magenta marks a value outside its bound. A graph with the terrain
+    ///     outputs also gets the density cross-section (WorldGenerationPreviewWindow.Density.cs).
     /// </summary>
     public partial class WorldGenerationPreviewWindow{
         private const double GraphRebuildDelaySeconds = 0.15;
@@ -85,7 +86,7 @@ namespace Engine.Editor.WorldGen{
             _graphScroll = EditorGUILayout.BeginScrollView(_graphScroll);
             {
                 const int columns = 4;
-                List<GraphOutputView> flat = _graphViews.Where(v => !v.Output.Is3D).ToList();
+                List<GraphOutputView> flat = _graphViews.Where(v => !v.Output.Is3D && !v.Output.BoundOnly).ToList();
                 for (int row = 0; row * columns < flat.Count; row++){
                     EditorGUILayout.BeginHorizontal();
                     for (int col = 0; col < columns; col++){
@@ -98,7 +99,7 @@ namespace Engine.Editor.WorldGen{
                     EditorGUILayout.EndHorizontal();
                 }
 
-                foreach (GraphOutputView view in _graphViews.Where(v => v.Output.Is3D)){
+                foreach (GraphOutputView view in _graphViews.Where(v => v.Output.Is3D && !v.Output.BoundOnly)){
                     EditorGUILayout.LabelField(GraphViewTitle(view) + $" · x–y slice at z {_worldOffset.y}", EditorStyles.boldLabel);
                     if (!view.Texture) continue;
                     float width = Mathf.Min(position.width - 40f, view.Texture.width * 2f);
@@ -106,6 +107,8 @@ namespace Engine.Editor.WorldGen{
                     EditorGUI.DrawRect(rect, new Color(0.1f, 0.1f, 0.1f, 1f));
                     GUI.DrawTexture(rect, view.Texture, ScaleMode.StretchToFill, false);
                 }
+
+                DrawDensityView();
             }
             EditorGUILayout.EndScrollView();
         }
@@ -176,21 +179,21 @@ namespace Engine.Editor.WorldGen{
                 _graphCounters.Add(latticeCounters);
             }
 
-            foreach (GraphOutputInfo output in graph.Outputs.Where(o => !o.Is3D)){
+            foreach (GraphOutputInfo output in graph.Outputs.Where(o => !o.Is3D && !o.BoundOnly)){
                 GraphOutputView view = new(){ Output = output };
                 view.Texture = Paint(size, size, output.Bounds, k => lattice[output.LatticeValue * points.Length + k], view);
                 _graphViews.Add(view);
             }
 
             // 3D outputs: an x–y slice through the centre of the view, one sample per block.
-            if (graph.Outputs.Any(o => o.Is3D)){
+            if (graph.Outputs.Any(o => o.Is3D && !o.BoundOnly)){
                 int width = Mathf.Min(extent, ViewResolution) & ~3;
                 int startX = (origin.x + (extent - width) / 2) & ~3;
                 int z = _worldOffset.y;
                 int regionZ = z & ~3;
                 using GraphRegionResult region = GraphEvaluator.EvaluateRegion(graph, seed, new int2(startX, regionZ), new int2(width, 4), true);
                 _graphCounters.Add(region.Counters);
-                foreach (GraphOutputInfo output in graph.Outputs.Where(o => o.Is3D)){
+                foreach (GraphOutputInfo output in graph.Outputs.Where(o => o.Is3D && !o.BoundOnly)){
                     GraphOutputView view = new(){ Output = output };
                     view.Texture = Paint(width, GraphLimits.WorldHeight, output.Bounds,
                         k => region.Voxel(output.VoxelOutput, k % width, k / width, z - regionZ), view);
@@ -198,6 +201,7 @@ namespace Engine.Editor.WorldGen{
                 }
             }
 
+            BuildDensityView(graph, seed, origin, extent);
             _graphMilliseconds = watch.Elapsed.TotalMilliseconds;
         }
 
@@ -239,6 +243,7 @@ namespace Engine.Editor.WorldGen{
                 if (view.Texture)
                     DestroyImmediate(view.Texture);
             _graphViews.Clear();
+            DestroyDensityTexture();
         }
 
         private void DisposeGraphCompile(){

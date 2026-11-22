@@ -88,12 +88,22 @@ namespace Engine.Scripts.WorldGen.Graph{
         }
 
         /// <summary>
-        ///     A spline at coordinate <paramref name="c" />: the first value below the first location, the last value
-        ///     at or above the last one, and in between the cubic segment with fixed derivatives
-        ///     v = lerp(v0, v1, t) + t (1 − t) lerp(g, h, t) with g = d0·span − Δ and h = Δ − d1·span (linear: the
-        ///     plain lerp). <paramref name="values" /> holds each point's value on the four lanes.
+        ///     Float4 rows a spline evaluation needs at <c>values</c>: the point values, then for a monotone spline
+        ///     the secants and the tangents.
         /// </summary>
-        public static float4 Spline(float4 c, SplinePoint* points, float4* values, int count, bool linear){
+        public const int SplineScratch = 3 * GraphLimits.MaxSplinePoints;
+
+        /// <summary>
+        ///     A spline at coordinate <paramref name="c" />: the first value below the first location, the last value
+        ///     at or above the last one, and in between the cubic segment
+        ///     v = lerp(v0, v1, t) + t (1 − t) lerp(g, h, t) with g = d0·span − Δ and h = Δ − d1·span (linear: the
+        ///     plain lerp). The derivatives d are the points' fixed ones, or for <see cref="SplineMode.Monotone" />
+        ///     the Fritsch–Carlson tangents of each lane's values. <paramref name="values" /> holds each point's value
+        ///     on the four lanes and has <see cref="SplineScratch" /> rows.
+        /// </summary>
+        public static float4 Spline(float4 c, SplinePoint* points, float4* values, int count, int mode){
+            float4* tangents = values + 2 * GraphLimits.MaxSplinePoints;
+            if (mode == SplineMode.Monotone && count > 1) MonotoneTangents(points, values, count, values + GraphLimits.MaxSplinePoints, tangents);
             float4 result = values[0];
             for (int k = 0; k < count - 1; k++){
                 bool4 at = c >= points[k].Location;
@@ -103,9 +113,11 @@ namespace Engine.Scripts.WorldGen.Graph{
                 float4 dv = values[k + 1] - v0;
                 float4 t = (c - p0.Location) * p0.InverseSpan;
                 float4 segment = v0 + t * dv;
-                if (!linear){
-                    float4 g = p0.Derivative * p0.Span - dv;
-                    float4 h = dv - points[k + 1].Derivative * p0.Span;
+                if (mode != SplineMode.Linear){
+                    float4 d0 = mode == SplineMode.Monotone ? tangents[k] : p0.Derivative;
+                    float4 d1 = mode == SplineMode.Monotone ? tangents[k + 1] : points[k + 1].Derivative;
+                    float4 g = d0 * p0.Span - dv;
+                    float4 h = dv - d1 * p0.Span;
                     segment += t * (1f - t) * (g + t * (h - g));
                 }
 
@@ -113,6 +125,30 @@ namespace Engine.Scripts.WorldGen.Graph{
             }
 
             return math.select(result, values[count - 1], c >= points[count - 1].Location);
+        }
+
+        /// <summary>
+        ///     Fritsch–Carlson tangents per lane, the same steps as NestedSpline (v1) and the compile-time derivation
+        ///     for constant values: secants, averaged where they agree in sign, then the limiter over every segment in
+        ///     order (limiting segment k changes the tangent segment k + 1 starts with).
+        /// </summary>
+        private static void MonotoneTangents(SplinePoint* points, float4* values, int count, float4* secants, float4* m){
+            for (int k = 0; k < count - 1; k++) secants[k] = (values[k + 1] - values[k]) / points[k].Span;
+            m[0] = secants[0];
+            for (int k = 1; k < count - 1; k++)
+                m[k] = math.select(float4.zero, 0.5f * (secants[k - 1] + secants[k]), secants[k - 1] * secants[k] > 0f);
+            m[count - 1] = secants[count - 2];
+            for (int k = 0; k < count - 1; k++){
+                float4 d = secants[k];
+                bool4 flat = d == 0f;
+                float4 alpha = m[k] / d;
+                float4 beta = m[k + 1] / d;
+                float4 r2 = alpha * alpha + beta * beta;
+                bool4 limit = !flat & r2 > 9f;
+                float4 tau = 3f / math.sqrt(r2);
+                m[k] = math.select(math.select(m[k], tau * alpha * d, limit), float4.zero, flat);
+                m[k + 1] = math.select(math.select(m[k + 1], tau * beta * d, limit), float4.zero, flat);
+            }
         }
 
         /// <summary>
@@ -172,7 +208,7 @@ namespace Engine.Scripts.WorldGen.Graph{
                         splineValues[k] = p.Value >= 0 ? values[p.Value] : p.Constant;
                     }
 
-                    return Spline(values[n.A], points + s.PointStart, splineValues, s.PointCount, s.Linear != 0);
+                    return Spline(values[n.A], points + s.PointStart, splineValues, s.PointCount, s.Mode);
                 }
                 default:
                     return Apply(n.Op, n.A >= 0 ? values[n.A] : float4.zero, n.B >= 0 ? values[n.B] : float4.zero,

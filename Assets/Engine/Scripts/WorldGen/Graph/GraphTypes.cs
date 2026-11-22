@@ -126,10 +126,25 @@ namespace Engine.Scripts.WorldGen.Graph{
         public uint Salt;
     }
 
-    /// <summary>A spline: its point range and whether segments are linear instead of cubic.</summary>
+    /// <summary>A spline: its point range and how its segments interpolate (a <see cref="SplineMode" /> value).</summary>
     public struct SplineInfo{
         public int PointStart, PointCount;
-        public int Linear;
+        public int Mode;
+    }
+
+    /// <summary>How a spline interpolates between its points.</summary>
+    public static class SplineMode{
+        /// <summary>Cubic Hermite with fixed derivatives: given ones, or Fritsch–Carlson ones from constant values.</summary>
+        public const int Cubic = 0;
+
+        /// <summary>Piecewise linear.</summary>
+        public const int Linear = 1;
+
+        /// <summary>
+        ///     Monotone cubic Hermite with Fritsch–Carlson tangents from the values at each position (v1's
+        ///     NestedSpline MonotoneCubic): values that are splines themselves give their tangents per lane.
+        /// </summary>
+        public const int Monotone = 2;
     }
 
     /// <summary>
@@ -276,6 +291,30 @@ namespace Engine.Scripts.WorldGen.Graph{
         public static bool IsClimate(string name){
             return Array.IndexOf(Climate, name) >= 0;
         }
+
+        /// <summary>The terrain density (§5.1): an interpolated marker, terrain where above 0.</summary>
+        public const string TerrainDensity = "terrain_density";
+
+        /// <summary>S + J · P, 2D: the smooth surface the 3D noise moves the real surface around.</summary>
+        public const string PreliminarySurface = "preliminary_surface";
+
+        /// <summary>K, 2D and above 0: the density's slope per block is K / 64.</summary>
+        public const string Factor = "factor";
+
+        /// <summary>The 3D noise term N3, bound-only: its bound is A, the most it adds to the density.</summary>
+        public const string TerrainNoise = "terrain_noise";
+
+        /// <summary>The y where the top slide starts, a bound-only constant: below it the slide leaves the density as it is.</summary>
+        public const string TopSlideStart = "top_slide_start";
+
+        /// <summary>Outputs that come together when a graph has terrain.</summary>
+        public static readonly string[] Terrain ={ TerrainDensity, PreliminarySurface, Factor, TerrainNoise, TopSlideStart };
+
+        /// <summary>
+        ///     Highest bound preliminary_surface may have: y 255 plus half a block for the interval rules' margins
+        ///     (their sum over a chain of additions reaches a few hundredths at this size).
+        /// </summary>
+        public const float PreliminarySurfaceLimit = GraphLimits.WorldHeight - 0.5f;
     }
 
     /// <summary>Work done by an evaluation, summed over runs: lanes per program, noise samples, instructions.</summary>

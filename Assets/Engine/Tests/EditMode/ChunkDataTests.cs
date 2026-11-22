@@ -1,4 +1,3 @@
-﻿using System.Reflection;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.Utils.Extensions;
@@ -25,15 +24,10 @@ namespace Engine.Tests.EditMode{
             _hasVoxelData = _hasLightData = false;
         }
 
-        /// <summary>Runs the real (private) ChunkJob.WriteToChunkData on a voxel buffer.</summary>
+        /// <summary>Runs the real ChunkJob.WriteToChunkData on a voxel buffer.</summary>
         internal static ChunkVoxelData WriteToChunkData(NativeArray<ushort> vox){
-            MethodInfo method = typeof(ChunkJob).GetMethod("WriteToChunkData",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-            Assert.IsNotNull(method, "ChunkJob.WriteToChunkData not found");
-            object job = new ChunkJob();
-            object[] args ={ vox, null };
-            method.Invoke(job, args);
-            return (ChunkVoxelData)args[1];
+            ChunkJob.WriteToChunkData(vox, out ChunkVoxelData data);
+            return data;
         }
 
         [Test]

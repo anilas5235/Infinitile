@@ -26,7 +26,7 @@ namespace Engine.Scripts.WorldGen.Graph{
             SplinePoint* points, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters){
             int padded = SimplexLanes.Padded(lanes);
             int quads = padded >> 2;
-            float4* splineValues = stackalloc float4[GraphLimits.MaxSplinePoints];
+            float4* splineValues = stackalloc float4[GraphKernels.SplineScratch];
             GraphInstruction* code = instructions + program.InstructionStart;
             long noise2 = 0, noise3 = 0;
 
@@ -157,14 +157,14 @@ namespace Engine.Scripts.WorldGen.Graph{
                         for (int q = 0; q < quads; q++) d[q] = GraphKernels.ClampedMap(a[q], k, ins.P1, ins.P2, ins.P3);
                         break;
                     case GraphOp.Spline:{
-                        // Aux: first point in the program's point table; B: point count; C: 1 for linear segments.
+                        // Aux: first point in the program's point table; B: point count; C: the SplineMode.
                         SplinePoint* p = points + ins.Aux;
                         int count = ins.B;
-                        bool linear = ins.C != 0;
+                        int mode = ins.C;
                         for (int q = 0; q < quads; q++){
                             for (int j = 0; j < count; j++)
                                 splineValues[j] = p[j].Value >= 0 ? ((float4*)(registers + p[j].Value * Lanes))[q] : p[j].Constant;
-                            d[q] = GraphKernels.Spline(a[q], p, splineValues, count, linear);
+                            d[q] = GraphKernels.Spline(a[q], p, splineValues, count, mode);
                         }
 
                         break;
