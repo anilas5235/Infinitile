@@ -21,6 +21,8 @@ namespace Engine.Tests.EditMode{
     ///     sampler's decision for that world column, independent of the chunk it lies in, so chunk borders carry
     ///     no seam; the blocks come from the surface-source biome and the ice override follows the climate switch.
     /// </summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class ChunkJobTerrainFirstTests{
         private const ushort TopA = TestFixtures.Grass;
         private const ushort UnderA = TestFixtures.Dirt;

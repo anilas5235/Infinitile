@@ -11,6 +11,8 @@ using Object = UnityEngine.Object;
 
 namespace Engine.Tests.EditMode{
     /// <summary>Nested spline evaluation, JSON import/export and continuity.</summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class NestedSplineTests{
         private readonly List<Object> _created = new();
         private readonly List<IDisposable> _native = new();

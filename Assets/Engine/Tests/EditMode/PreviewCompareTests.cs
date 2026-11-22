@@ -10,6 +10,8 @@ namespace Engine.Tests.EditMode{
     ///     Configuration B is layered on the asset without touching it, A's knobs round-trip through the
     ///     asset, and the difference views report what differs.
     /// </summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class PreviewCompareTests{
         private WorldGenSettings _settings;
         private BiomeSet _set;

@@ -18,6 +18,8 @@ using Object = UnityEngine.Object;
 
 namespace Engine.Tests.EditMode{
     /// <summary>Sampler skeleton, classifier, blend weights and the region API.</summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class WorldSamplerTests{
         private readonly List<Object> _created = new();
         private readonly List<IDisposable> _native = new();

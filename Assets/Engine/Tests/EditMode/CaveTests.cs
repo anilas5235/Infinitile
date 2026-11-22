@@ -25,6 +25,8 @@ namespace Engine.Tests.EditMode{
     ///     rules next to water, at the floor, at the surface, for lava and for ores, and flora on carved ground. Blocks run
     ///     through the chunk job's voxel pipeline in a Burst job.
     /// </summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class CaveTests{
         private const string ShippedSettingsPath = "Assets/EngineSettings/WorldGenSettings.asset";
         private const int Columns = ChunkWidth * ChunkDepth;

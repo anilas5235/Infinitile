@@ -9,6 +9,8 @@ namespace Engine.Tests.EditMode{
     ///     and needs a dry column and a snow block, ice needs a biome whose water freezes, the freeze noise makes the ice
     ///     edge ragged, and the strata bands wrap below zero.
     /// </summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class SurfaceCoverTests{
         private const int WaterLevel = 124;
 

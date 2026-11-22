@@ -57,9 +57,9 @@ namespace Engine.Tests.PlayMode{
                 int[] original = ColumnHashes(world, centre, out int[] originalHeights);
 
                 WorldGenSettings variant = Object.Instantiate(world.Settings.WorldGen);
-                variant.Architecture = variant.Architecture == GenArchitecture.BiomeFirst
-                    ? GenArchitecture.TerrainFirst
-                    : GenArchitecture.BiomeFirst;
+                variant.Generator = variant.Generator == WorldGenerator.Density
+                    ? WorldGenerator.HeightField
+                    : WorldGenerator.Density;
                 int evicted = 0;
                 Action<int2> countEvictions = _ => evicted++;
                 world.ChunkEvicted += countEvictions;
@@ -79,7 +79,7 @@ namespace Engine.Tests.PlayMode{
 
                 yield return WaitForChunk(world, buffers, centre);
                 int[] regenerated = ColumnHashes(world, centre, out _);
-                Assert.AreNotEqual(original, regenerated, "the other architecture must change the terrain");
+                Assert.AreNotEqual(original, regenerated, "the other generator must change the terrain");
 
                 world.Regenerate();
                 yield return WaitForChunk(world, buffers, centre);

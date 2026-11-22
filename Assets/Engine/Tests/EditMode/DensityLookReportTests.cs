@@ -37,6 +37,12 @@ namespace Engine.Tests.EditMode{
         private const int Batch = 256;
         private const int Seed = 1337;
 
+        /// <summary>The z rows (array index, 0 = z −2048) whose vertical slices the candidate dump keeps.</summary>
+        /// <summary>The window's center in columns (the candidate report only; the shipped report stays at the origin).</summary>
+        private static int2 _center;
+
+        private static readonly int[] SliceRows = Enumerable.Range(0, 16).Select(i => i * 256 + 128).ToArray();
+
         [BurstCompile]
         private struct ChunkStatsJob : IJob{
             [ReadOnly] public NativeArray<byte> Solid;
@@ -130,15 +136,58 @@ namespace Engine.Tests.EditMode{
         ///     the test reports nothing.
         /// </summary>
         [Test]
+        [Timeout(3600000)]
         public void DensityLook_ReportCandidates(){
             string dir = Path.Combine(Directory.GetCurrentDirectory(), "Temp", "density-candidates");
             if (!Directory.Exists(dir)) Assert.Ignore($"No candidate folder at {dir}");
-            foreach (string file in Directory.GetFiles(dir, "*.json").OrderBy(f => f, StringComparer.Ordinal)){
-                GraphCompileResult compile = GraphCompiler.Compile(File.ReadAllText(file), Path.GetFileName(file));
-                Assert.IsTrue(compile.Succeeded, file + ": " + string.Join("; ", compile.Messages));
-                using CompiledNoiseGraph graph = compile.Graph;
-                Report<InterpretedPrograms>(graph, Path.GetFileNameWithoutExtension(file));
+            // An optional center.txt ("x z", rounded down to whole chunks) moves the window off the origin.
+            string center = Path.Combine(dir, "center.txt");
+            _center = int2.zero;
+            if (File.Exists(center)){
+                string[] xz = File.ReadAllText(center).Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+                _center = new int2(int.Parse(xz[0], CultureInfo.InvariantCulture), int.Parse(xz[1], CultureInfo.InvariantCulture)) / 32 * 32;
             }
+
+            try{
+                DumpClimate();
+                foreach (string file in Directory.GetFiles(dir, "*.json").OrderBy(f => f, StringComparer.Ordinal)){
+                    GraphCompileResult compile = GraphCompiler.Compile(File.ReadAllText(file), Path.GetFileName(file));
+                    Assert.IsTrue(compile.Succeeded, file + ": " + string.Join("; ", compile.Messages));
+                    using CompiledNoiseGraph graph = compile.Graph;
+                    Report<InterpretedPrograms>(graph, Path.GetFileNameWithoutExtension(file));
+                }
+            }
+            finally{
+                _center = int2.zero;
+            }
+        }
+
+        /// <summary>
+        ///     C, E, PV and W of the shipped graph every <see cref="Stride" /> columns
+        ///     (floats, row-major from z −2048) into <c>Temp/density-dump/climate.bin</c>, for the candidate pictures.
+        /// </summary>
+        private static void DumpClimate(){
+            GraphCompileResult compile = ShippedNoiseGraph.Compile();
+            Assert.IsTrue(compile.Succeeded, string.Join("\n", compile.Messages));
+            using CompiledNoiseGraph graph = compile.Graph;
+            int side = Columns / Stride;
+            float2[] p = new float2[side * side];
+            for (int j = 0; j < side; j++)
+            for (int i = 0; i < side; i++)
+                p[j * side + i] = new float2(i * Stride - Columns / 2 + _center.x, j * Stride - Columns / 2 + _center.y);
+            float[] values = GraphEvaluator.SampleLattice(graph, Seed, p, out _);
+            string[] names ={ "continentalness", "erosion", "pv", "weirdness" };
+            float[] outv = new float[names.Length * p.Length];
+            for (int o = 0; o < names.Length; o++){
+                GraphOutputInfo info = graph.Outputs.First(x => x.Name == names[o]);
+                Array.Copy(values, info.LatticeValue * p.Length, outv, o * p.Length, p.Length);
+            }
+
+            byte[] b = new byte[outv.Length * 4];
+            Buffer.BlockCopy(outv, 0, b, 0, b.Length);
+            string d = Path.Combine(Directory.GetCurrentDirectory(), "Temp", "density-dump");
+            Directory.CreateDirectory(d);
+            File.WriteAllBytes(Path.Combine(d, "climate.bin"), b);
         }
 
         private static void Report<TPrograms>(CompiledNoiseGraph graph, string name) where TPrograms : struct, IGraphPrograms{
@@ -146,6 +195,10 @@ namespace Engine.Tests.EditMode{
             WorldGenConfig config = settings.ToConfig(Seed, null, Allocator.Persistent);
             int water = config.WaterLevel;
             short[] height = new short[Columns * Columns];
+            bool dump = name != "shipped";
+            byte[] gaps = dump ? new byte[Columns * Columns] : null;
+            const int wh = DensityLayout.Height;
+            byte[] slices = dump ? new byte[SliceRows.Length * Columns * wh] : null;
             long overhangColumns = 0, overhangVoxels = 0, floatingVoxels = 0, floatingPieces = 0, land = 0;
             DateTime start = DateTime.Now;
             try{
@@ -161,7 +214,7 @@ namespace Engine.Tests.EditMode{
                     NativeArray<JobHandle> handles = new(count, Allocator.Temp);
                     try{
                         for (int k = 0; k < count; k++){
-                            int2 origin = (all[b + k] - Chunks / 2) * 32;
+                            int2 origin = (all[b + k] - Chunks / 2) * 32 + _center;
                             DensityProbeJob<TPrograms> job =
                                 DensityProbe.Create<TPrograms>(graph, config, origin, DensityChunk.PassTerrain, out results[k]);
                             counters[k] = job.Counters;
@@ -180,6 +233,14 @@ namespace Engine.Tests.EditMode{
                                 short top = map[x * 32 + z];
                                 height[(c.y * 32 + z) * Columns + c.x * 32 + x] = top;
                                 if (top >= water) land++;
+                                if (!dump) continue;
+                                int gap = 0, col = (x * 32 + z) * wh;
+                                for (int y = math.max(water, 0); y < top; y++)
+                                    if (results[k].Solid[col + y] == 0) gap++;
+                                gaps[(c.y * 32 + z) * Columns + c.x * 32 + x] = (byte)math.min(gap, 255);
+                                int row = Array.IndexOf(SliceRows, c.y * 32 + z);
+                                if (row < 0) continue;
+                                for (int y = 0; y < wh; y++) slices[(row * wh + y) * Columns + c.x * 32 + x] = results[k].Solid[col + y];
                             }
 
                             int4 s = stats[k][0];
@@ -206,7 +267,7 @@ namespace Engine.Tests.EditMode{
 
             double seconds = (DateTime.Now - start).TotalSeconds;
             StringBuilder sb = new();
-            sb.AppendLine($"Density look · {name} · seed {Seed} · {Columns}² columns around the origin · water level {water} · {seconds:F1} s");
+            sb.AppendLine($"Density look · {name} · seed {Seed} · {Columns}² columns around {_center} · water level {water} · {seconds:F1} s");
             sb.AppendLine("top height " + Percentiles(height.Select(v => (float)v)));
             sb.AppendLine($"under water {100.0 * (height.Length - land) / height.Length:F1} % of the columns · highest {height.Max()} · lowest {height.Min()}");
 
@@ -242,6 +303,17 @@ namespace Engine.Tests.EditMode{
             }
 
             Debug.Log(sb.ToString());
+            if (dump){
+                string d = Path.Combine(Directory.GetCurrentDirectory(), "Temp", "density-dump", name);
+                Directory.CreateDirectory(d);
+                byte[] hb = new byte[height.Length * 2];
+                Buffer.BlockCopy(height, 0, hb, 0, hb.Length);
+                File.WriteAllBytes(Path.Combine(d, "height.bin"), hb);
+                File.WriteAllBytes(Path.Combine(d, "gaps.bin"), gaps);
+                File.WriteAllBytes(Path.Combine(d, "slices.bin"), slices);
+                File.WriteAllText(Path.Combine(d, "report.txt"), sb.ToString());
+            }
+
             WriteHeightMap(sampled, side, water, name == "shipped" ? "density-height.png" : $"density-height-{name}.png");
         }
 
@@ -283,6 +355,65 @@ namespace Engine.Tests.EditMode{
                       $"shipped curve: C < −0.19 on {100.0 * curved.Count(v => v < -0.19f) / curved.Count:F1} %, C < −0.11 on {100.0 * curved.Count(v => v < -0.11f) / curved.Count:F1} % · preliminary surface world-wide: < 124 on " +
                       $"{100.0 * surface.Count(v => v < 124f) / surface.Count:F1} %, ≥ 180 on {100.0 * surface.Count(v => v >= 180f) / surface.Count:F2} %, " +
                       $"≥ 210 on {100.0 * surface.Count(v => v >= 210f) / surface.Count:F2} %");
+        }
+
+        /// <summary>
+        ///     The world-wide area share of a massif box C ≥ c0 and E &lt; e0 (curved C, erosion) for a grid of edges,
+        ///     over five seeds and 200 k points each spread over ±60 000 blocks: sizes the Mountain zone (Mountain plus
+        ///     Badlands is the whole box).
+        /// </summary>
+        [Test]
+        public void MassifShare_Report(){
+            GraphCompileResult compile = ShippedNoiseGraph.Compile();
+            Assert.IsTrue(compile.Succeeded, string.Join("\n", compile.Messages));
+            using CompiledNoiseGraph graph = compile.Graph;
+            GraphOutputInfo cOut = graph.Outputs.First(o => o.Name == "continentalness"), eOut = graph.Outputs.First(o => o.Name == "erosion");
+            List<float2> ce = new();
+            System.Random random = new(12);
+            const int points = 200_000;
+            foreach (uint seed in new uint[]{ 1337, 1, 2, 3, 4 }){
+                float2[] p = new float2[points];
+                for (int i = 0; i < points; i++) p[i] = new float2((float)(random.NextDouble() * 120_000 - 60_000), (float)(random.NextDouble() * 120_000 - 60_000));
+                float[] values = GraphEvaluator.SampleLattice(graph, seed, p, out _);
+                for (int i = 0; i < points; i++) ce.Add(new float2(values[cOut.LatticeValue * points + i], values[eOut.LatticeValue * points + i]));
+            }
+
+            float[] cs ={ 0.03f, 0.08f, 0.12f, 0.15f, 0.18f, 0.2f, 0.22f, 0.25f, 0.28f, 0.3f, 0.35f };
+            float[] es ={ -0.05f, -0.1f, -0.15f, -0.2f, -0.25f, -0.3f, -0.35f, -0.38f, -0.45f };
+            StringBuilder sb = new();
+            sb.AppendLine("massif box share of the area (%), rows C ≥ c0, columns E < e0");
+            sb.AppendLine("c0 / e0 " + string.Join(" ", es.Select(e => e.ToString("F2", CultureInfo.InvariantCulture).PadLeft(6))));
+            foreach (float c0 in cs)
+                sb.AppendLine(c0.ToString("F2", CultureInfo.InvariantCulture).PadLeft(8) + " " +
+                              string.Join(" ", es.Select(e0 => (100.0 * ce.Count(v => v.x >= c0 && v.y < e0) / ce.Count).ToString("F2", CultureInfo.InvariantCulture).PadLeft(6))));
+            // The 4096² windows (centers every 1024 within ±16 384) of seed 1337 with the most area in the box C ≥ 0.2, E < −0.27.
+            const int step = 64, reach = 16384 + 2048;
+            int grid = 2 * reach / step;
+            float2[] q = new float2[grid * grid];
+            for (int j = 0; j < grid; j++)
+            for (int i = 0; i < grid; i++)
+                q[j * grid + i] = new float2(i * step - reach, j * step - reach);
+            float[] qv = GraphEvaluator.SampleLattice(graph, 1337, q, out _);
+            List<(float share, int x, int z)> windows = new();
+            for (int cz = -16384; cz <= 16384; cz += 1024)
+            for (int cx = -16384; cx <= 16384; cx += 1024){
+                int inBox = 0, count = 0;
+                for (int z = cz - 2048; z < cz + 2048; z += step)
+                for (int x = cx - 2048; x < cx + 2048; x += step){
+                    int k = (z + reach) / step * grid + (x + reach) / step;
+                    count++;
+                    if (qv[cOut.LatticeValue * q.Length + k] >= 0.2f && qv[eOut.LatticeValue * q.Length + k] < -0.27f) inBox++;
+                }
+
+                windows.Add((100f * inBox / count, cx, cz));
+            }
+
+            sb.AppendLine("seed 1337 windows with the most box area (C ≥ 0.2, E < −0.27): " +
+                          string.Join(" · ", windows.OrderByDescending(w => w.share).Take(8).Select(w => FormattableString.Invariant($"({w.x}, {w.z}) {w.share:F1} %"))));
+            Debug.Log(sb.ToString());
+            string d = Path.Combine(Directory.GetCurrentDirectory(), "Temp", "density-dump");
+            Directory.CreateDirectory(d);
+            File.WriteAllText(Path.Combine(d, "massif-share.txt"), sb.ToString());
         }
 
         private static string Percentiles(IEnumerable<float> values){

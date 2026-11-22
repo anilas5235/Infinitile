@@ -311,7 +311,7 @@ namespace Engine.Tests.EditMode{
         /// </summary>
         [Test]
         public void ShippedGraph_OutputsOnFixedColumnsMatchTheGoldenHash(){
-            const uint expected = 0x07CA4D37u; // V3: blend_border, T/F wavelengths ×1.4 (DEC-161) (V2: the terrain outputs, the massif re-tune and the soft knee)
+            const uint expected = 0xAE31465Cu; // V3 re-tune: ranges on the W zero line, Badlands K (DEC-163…165); V3: blend_border, T/F wavelengths ×1.4 (DEC-161) (V2: the terrain outputs, the massif re-tune and the soft knee)
             using CompiledNoiseGraph graph = ShippedNoiseGraph.Compile().Graph;
             float2[] columns = GoldenColumns();
             float[] lattice = GraphEvaluator.SampleLattice(graph, Seed, columns, out _);
@@ -330,8 +330,8 @@ namespace Engine.Tests.EditMode{
             using CompiledNoiseGraph graph = ShippedNoiseGraph.Compile().Graph;
             float2[] points = GoldenColumns();
             GraphEvaluator.SampleLattice(graph, Seed, points, out GraphWorkCounters counters);
-            // Octaves: continentalness 5 + warp 2 × 2 + erosion 4 + humidity 3 + temperature 3 + weirdness 3 + peak 1 + blend border 1 + 1.
-            const int samplesPerPoint = 25;
+            // Octaves: continentalness 5 + warp 2 × 2 + erosion 4 + humidity 3 + temperature 3 + weirdness 3 + peak 3 (re-tune 2026-11-22) + blend border 1 + 1.
+            const int samplesPerPoint = 27;
             Assert.AreEqual(points.Length, counters.LatticePoints);
             Assert.AreEqual((long)samplesPerPoint * points.Length, counters.NoiseSamples2D);
             Assert.AreEqual(0, counters.NoiseSamples3D);

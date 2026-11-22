@@ -16,6 +16,8 @@ using Engine.Scripts.VoxelConfig;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Biomes;
 using Engine.Scripts.WorldGen.Core;
+using Engine.Scripts.WorldGen.Graph;
+using Engine.Scripts.WorldGen.Noise;
 using Engine.Scripts.WorldGen.Settings;
 using Unity.Mathematics;
 using UnityEngine;
@@ -397,7 +399,39 @@ namespace Engine.Scripts.World{
             if (_isShuttingDown || _chunkScheduler == null) return false;
             WorldGenConfig cfg = _chunkScheduler.WorldGen;
             if (!cfg.IsCreated) return false;
+            if (cfg.Generator == WorldGenerator.Density) return TrySampleDensityColumn(x, z, cfg, out sample);
             WorldSampler.SampleColumn(x, z, cfg, out sample);
+            return true;
+        }
+
+        private CompiledNoiseGraph _densitySampleGraph;
+        private int2 _densitySampleColumn;
+        private ColumnSample _densitySample;
+
+        /// <summary>
+        ///     The density generator's column (WorldGen v2): hard biome, top terrain voxel and the five climate values
+        ///     (in [−1, 1]) from <see cref="BiomeColumnSampler" />, cached per column. The surface source is the hard
+        ///     biome; the blend's pick is not sampled.
+        /// </summary>
+        private bool TrySampleDensityColumn(int x, int z, in WorldGenConfig cfg, out ColumnSample sample){
+            sample = default;
+            CompiledNoiseGraph graph = _chunkScheduler.Graph;
+            if (graph == null || !cfg.Layout.HasBoxes) return false;
+            int2 column = new(x, z);
+            if (ReferenceEquals(graph, _densitySampleGraph) && column.Equals(_densitySampleColumn)){
+                sample = _densitySample;
+                return true;
+            }
+
+            using BiomeColumns c = BiomeColumnSampler.Sample(graph, cfg.Layout, cfg.Seed, new[]{ new float2(x, z) }, true, true);
+            int biome = c.Biome[0] == byte.MaxValue ? -1 : c.Biome[0];
+            sample.HardBiome = sample.SurfaceSource = sample.DominantMaterialBiome = biome;
+            sample.ColumnHeight = c.Top[0];
+            sample.Height = c.Top[0];
+            sample.Fields = new WorldFields{ T = c.Climate[0], F = c.Climate[1], C = c.Climate[2], E = c.Climate[3], W = c.Climate[4] };
+            _densitySampleGraph = graph;
+            _densitySampleColumn = column;
+            _densitySample = sample;
             return true;
         }
 

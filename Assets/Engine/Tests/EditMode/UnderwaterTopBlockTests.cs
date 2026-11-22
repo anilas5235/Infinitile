@@ -19,6 +19,8 @@ namespace Engine.Tests.EditMode{
     ///     and sea floors carry no grass. A top block at <c>WaterLevel - 1</c> touches the water surface and stays dry.
     ///     The chunk job agrees with the pure region API in both architectures.
     /// </summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class UnderwaterTopBlockTests{
         private const ushort TopA = TestFixtures.Grass;
         private const ushort UnderA = TestFixtures.Dirt;

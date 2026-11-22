@@ -1,6 +1,65 @@
 {
   "formatVersion": 1,
   "nodes": {
+    "badlands_factor": {
+      "coordinate": "continentalness_curve",
+      "interpolation": "monotone",
+      "op": "spline",
+      "points": [
+        {
+          "location": -0.19,
+          "value": 2.8284
+        },
+        {
+          "location": -0.15,
+          "value": 8
+        },
+        {
+          "location": -0.11,
+          "value": {
+            "coordinate": "erosion_value",
+            "interpolation": "monotone",
+            "op": "spline",
+            "points": [
+              {
+                "location": -0.38,
+                "value": 2.0705
+              },
+              {
+                "location": 0.4,
+                "value": 8
+              }
+            ]
+          }
+        },
+        {
+          "location": 0.03,
+          "value": {
+            "coordinate": "erosion_value",
+            "interpolation": "monotone",
+            "op": "spline",
+            "points": [
+              {
+                "location": -0.6,
+                "value": 1
+              },
+              {
+                "location": -0.38,
+                "value": 1
+              },
+              {
+                "location": -0.1,
+                "value": 2.8284
+              },
+              {
+                "location": 0.4,
+                "value": 8
+              }
+            ]
+          }
+        }
+      ]
+    },
     "continentalness_curve": {
       "coordinate": "continentalness_warped",
       "interpolation": "cubic",
@@ -63,6 +122,29 @@
       "noise": "erosion",
       "op": "fbm"
     },
+    "hot_dry": {
+      "a": {
+        "from": 0.28,
+        "in": "temperature_value",
+        "op": "smoothstep",
+        "to": 0.34
+      },
+      "b": {
+        "from": 0.087,
+        "in": {
+          "a": 0,
+          "b": "humidity_value",
+          "op": "sub"
+        },
+        "op": "smoothstep",
+        "to": 0.147
+      },
+      "op": "mul"
+    },
+    "humidity_value": {
+      "noise": "humidity",
+      "op": "fbm"
+    },
     "peaks": {
       "in": {
         "noise": "peaks",
@@ -73,19 +155,17 @@
     "peaks_valleys": {
       "a": 1,
       "b": {
-        "in": {
-          "a": {
-            "a": 3,
-            "b": {
-              "in": "weirdness_value",
-              "op": "abs"
-            },
-            "op": "mul"
+        "a": 2,
+        "b": {
+          "in": {
+            "in": "weirdness_value",
+            "op": "abs"
           },
-          "b": 2,
-          "op": "sub"
+          "max": 1,
+          "min": 0,
+          "op": "clamp"
         },
-        "op": "abs"
+        "op": "mul"
       },
       "op": "sub"
     },
@@ -128,44 +208,21 @@
         }
       ]
     },
-    "terrain_density": {
-      "cellHeight": 8,
-      "in": "terrain_slid_density",
-      "op": "interpolated"
-    },
-    "terrain_factor": {
+    "ranges_factor": {
       "coordinate": "continentalness_curve",
       "interpolation": "monotone",
       "op": "spline",
       "points": [
         {
           "location": -0.19,
-          "value": 2.8284
-        },
-        {
-          "location": -0.15,
           "value": 8
         },
         {
-          "location": -0.11,
-          "value": {
-            "coordinate": "erosion_value",
-            "interpolation": "monotone",
-            "op": "spline",
-            "points": [
-              {
-                "location": -0.38,
-                "value": 2.0705
-              },
-              {
-                "location": 0.4,
-                "value": 8
-              }
-            ]
-          }
+          "location": 0.03,
+          "value": 8
         },
         {
-          "location": 0.03,
+          "location": 0.12,
           "value": {
             "coordinate": "erosion_value",
             "interpolation": "monotone",
@@ -173,24 +230,71 @@
             "points": [
               {
                 "location": -0.6,
-                "value": 1
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": 0.5,
+                      "value": 6
+                    },
+                    {
+                      "location": 0.7,
+                      "value": 2
+                    },
+                    {
+                      "location": 1,
+                      "value": 1.4142
+                    }
+                  ]
+                }
               },
               {
-                "location": -0.38,
-                "value": 1
+                "location": -0.25,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": 0.5,
+                      "value": 7.1999999999999993
+                    },
+                    {
+                      "location": 0.7,
+                      "value": 2.4
+                    },
+                    {
+                      "location": 1,
+                      "value": 1.6970399999999999
+                    }
+                  ]
+                }
               },
               {
-                "location": -0.1,
-                "value": 2.8284
-              },
-              {
-                "location": 0.4,
+                "location": -0.05,
                 "value": 8
               }
             ]
           }
         }
       ]
+    },
+    "temperature_value": {
+      "noise": "temperature",
+      "op": "fbm"
+    },
+    "terrain_density": {
+      "cellHeight": 8,
+      "in": "terrain_slid_density",
+      "op": "interpolated"
+    },
+    "terrain_factor": {
+      "a": "ranges_factor",
+      "b": "badlands_factor",
+      "op": "lerp",
+      "t": "hot_dry"
     },
     "terrain_jaggedness": {
       "a": {
@@ -245,12 +349,12 @@
                     "op": "spline",
                     "points": [
                       {
-                        "location": -1,
-                        "value": 16
+                        "location": 0.5,
+                        "value": 0
                       },
                       {
                         "location": 1,
-                        "value": 50
+                        "value": 26
                       }
                     ]
                   }
@@ -263,12 +367,12 @@
                     "op": "spline",
                     "points": [
                       {
-                        "location": -1,
-                        "value": 10
+                        "location": 0.5,
+                        "value": 0
                       },
                       {
                         "location": 1,
-                        "value": 40
+                        "value": 22.099999999999998
                       }
                     ]
                   }
@@ -281,12 +385,12 @@
                     "op": "spline",
                     "points": [
                       {
-                        "location": 0.2,
+                        "location": 0.5,
                         "value": 0
                       },
                       {
                         "location": 1,
-                        "value": 8
+                        "value": 10
                       }
                     ]
                   }
@@ -313,12 +417,12 @@
                     "op": "spline",
                     "points": [
                       {
-                        "location": -1,
-                        "value": 20
+                        "location": 0.5,
+                        "value": 0
                       },
                       {
                         "location": 1,
-                        "value": 65
+                        "value": 31.2
                       }
                     ]
                   }
@@ -331,12 +435,12 @@
                     "op": "spline",
                     "points": [
                       {
-                        "location": -1,
-                        "value": 14
+                        "location": 0.5,
+                        "value": 0
                       },
                       {
                         "location": 1,
-                        "value": 50
+                        "value": 26.519999999999996
                       }
                     ]
                   }
@@ -349,7 +453,7 @@
                     "op": "spline",
                     "points": [
                       {
-                        "location": 0,
+                        "location": 0.5,
                         "value": 0
                       },
                       {
@@ -622,23 +726,27 @@
                   "points": [
                     {
                       "location": -1,
-                      "value": 40
-                    },
-                    {
-                      "location": -0.85,
-                      "value": 46
+                      "value": 22
                     },
                     {
                       "location": -0.5,
-                      "value": 64
+                      "value": 28
                     },
                     {
                       "location": 0,
-                      "value": 76
+                      "value": 38
+                    },
+                    {
+                      "location": 0.3,
+                      "value": 52
+                    },
+                    {
+                      "location": 0.6,
+                      "value": 74
                     },
                     {
                       "location": 1,
-                      "value": 84
+                      "value": 104
                     }
                   ]
                 }
@@ -652,23 +760,27 @@
                   "points": [
                     {
                       "location": -1,
-                      "value": 34
-                    },
-                    {
-                      "location": -0.85,
-                      "value": 40
+                      "value": 20.240000000000002
                     },
                     {
                       "location": -0.5,
-                      "value": 54
+                      "value": 25.76
                     },
                     {
                       "location": 0,
-                      "value": 64
+                      "value": 34.96
+                    },
+                    {
+                      "location": 0.3,
+                      "value": 47.84
+                    },
+                    {
+                      "location": 0.6,
+                      "value": 68.08
                     },
                     {
                       "location": 1,
-                      "value": 72
+                      "value": 95.68
                     }
                   ]
                 }
@@ -685,20 +797,20 @@
                       "value": 13
                     },
                     {
-                      "location": -0.85,
-                      "value": 18
-                    },
-                    {
-                      "location": -0.5,
-                      "value": 37.6
-                    },
-                    {
                       "location": 0,
-                      "value": 52
+                      "value": 28
+                    },
+                    {
+                      "location": 0.3,
+                      "value": 38
+                    },
+                    {
+                      "location": 0.6,
+                      "value": 50
                     },
                     {
                       "location": 1,
-                      "value": 70
+                      "value": 66
                     }
                   ]
                 }
@@ -782,23 +894,27 @@
                   "points": [
                     {
                       "location": -1,
-                      "value": 46
-                    },
-                    {
-                      "location": -0.85,
-                      "value": 52
+                      "value": 28
                     },
                     {
                       "location": -0.5,
-                      "value": 70
+                      "value": 34
                     },
                     {
                       "location": 0,
-                      "value": 82
+                      "value": 44
+                    },
+                    {
+                      "location": 0.3,
+                      "value": 58
+                    },
+                    {
+                      "location": 0.6,
+                      "value": 80
                     },
                     {
                       "location": 1,
-                      "value": 90
+                      "value": 110
                     }
                   ]
                 }
@@ -812,23 +928,27 @@
                   "points": [
                     {
                       "location": -1,
-                      "value": 40
-                    },
-                    {
-                      "location": -0.85,
-                      "value": 46
+                      "value": 26.240000000000002
                     },
                     {
                       "location": -0.5,
-                      "value": 60
+                      "value": 31.76
                     },
                     {
                       "location": 0,
-                      "value": 70
+                      "value": 40.96
+                    },
+                    {
+                      "location": 0.3,
+                      "value": 53.84
+                    },
+                    {
+                      "location": 0.6,
+                      "value": 74.08
                     },
                     {
                       "location": 1,
-                      "value": 78
+                      "value": 101.68
                     }
                   ]
                 }
@@ -845,20 +965,20 @@
                       "value": 13
                     },
                     {
-                      "location": -0.85,
-                      "value": 18
-                    },
-                    {
-                      "location": -0.5,
-                      "value": 37.6
-                    },
-                    {
                       "location": 0,
-                      "value": 52
+                      "value": 28
+                    },
+                    {
+                      "location": 0.3,
+                      "value": 38
+                    },
+                    {
+                      "location": 0.6,
+                      "value": 50
                     },
                     {
                       "location": 1,
-                      "value": 70
+                      "value": 66
                     }
                   ]
                 }
@@ -1037,8 +1157,8 @@
       "gain": 0.5,
       "kind": "simplex2",
       "lacunarity": 2,
-      "octaves": 1,
-      "wavelength": 192
+      "octaves": 3,
+      "wavelength": 256
     },
     "temperature": {
       "amplitude": 1,
@@ -1090,16 +1210,10 @@
     "continentalness": "continentalness_curve",
     "erosion": "erosion_value",
     "factor": "terrain_factor",
-    "humidity": {
-      "noise": "humidity",
-      "op": "fbm"
-    },
+    "humidity": "humidity_value",
     "preliminary_surface": "preliminary_surface",
     "pv": "peaks_valleys",
-    "temperature": {
-      "noise": "temperature",
-      "op": "fbm"
-    },
+    "temperature": "temperature_value",
     "terrain_density": "terrain_density",
     "terrain_noise": {
       "boundOnly": true,

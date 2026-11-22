@@ -17,6 +17,8 @@ namespace Engine.Tests.EditMode{
     ///     HeightAmplitude_b from the detail residual of the Terrain-first reference, writes nothing and restores the
     ///     settings.
     /// </summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class BiomeFirstCalibrationTests{
         private const int Seed = 1234;
         private static readonly int2 Origin = new(-4000, 2500);

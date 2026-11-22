@@ -41,10 +41,13 @@ namespace Engine.Editor.WorldGen{
         private const float Inner = 0.087f, Outer = 0.28f;
 
         /// <summary>
-        ///     The massif footprint's edges and the Swamp edge in the shipped layout (DEC-161: the terrain's jagged zone),
-        ///     and the footprint of the V3 start layout (§6.4).
+        ///     The massif footprint's edges and the Swamp edge in the shipped layout (DEC-161, moved to C 0.09 by DEC-166:
+        ///     the terrain's ranges climb from there), the footprint of the V3 start layout (§6.4), and the edge of the
+        ///     Mountain ridge band |W| &lt; 0.2 (DEC-163, DEC-166: Mountain only on the ridges of the ranges, the highland
+        ///     valleys between them go to the lowland biomes).
         /// </summary>
-        private const float MassifC = 0.12f, MassifE = -0.05f, SwampE = 0.4f, StartMassifC = 0.18f, StartMassifE = -0.38f;
+        private const float MassifC = 0.09f, MassifE = -0.05f, SwampE = 0.4f, StartMassifC = 0.18f, StartMassifE = -0.38f,
+            RidgeW = 0.2f;
 
         /// <summary>
         ///     The candidates, each one change from the shipped graph and layout. The V3 sweep that DEC-161 picked from
@@ -63,6 +66,8 @@ namespace Engine.Editor.WorldGen{
                 new(){ Name = "I T/F edges ±0.06 / ±0.24", Layout = l => BandEdges(l, 0.06f, 0.24f) },
                 new(){ Name = "J T/F edges ±0.12 / ±0.33", Layout = l => BandEdges(l, 0.12f, 0.33f) },
                 new(){ Name = "K Swamp from E ≥ 0.30", Layout = l => MoveEdge(l, 3, SwampE, 0.30f) },
+                new(){ Name = "L Mountain band |W| < 0.15", Layout = l => RidgeBand(l, 0.15f) },
+                new(){ Name = "M Mountain band |W| < 0.25", Layout = l => RidgeBand(l, 0.25f) },
                 new(){ Name = "S V3 start layout and wavelengths", Graph = g => Wavelength(g, 1f / 1.4f), Layout = l => {
                     MoveEdge(l, 2, MassifC, StartMassifC);
                     MoveEdge(l, 3, MassifE, StartMassifE);
@@ -95,6 +100,12 @@ namespace Engine.Editor.WorldGen{
                 if (Math.Abs(b.Min[d] - from) < 1e-4f) b.Min[d] = to;
                 if (Math.Abs(b.Max[d] - from) < 1e-4f) b.Max[d] = to;
             }
+        }
+
+        /// <summary>Moves the edges ±<see cref="RidgeW" /> of the Mountain ridge band to ±<paramref name="w" />.</summary>
+        public static void RidgeBand(BiomeLayout l, float w){
+            MoveEdge(l, 4, RidgeW, w);
+            MoveEdge(l, 4, -RidgeW, -w);
         }
 
         /// <summary>Moves the T and F band edges ±<see cref="Inner" /> and ±<see cref="Outer" />.</summary>

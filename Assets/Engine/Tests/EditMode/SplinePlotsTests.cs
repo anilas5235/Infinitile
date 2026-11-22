@@ -9,6 +9,8 @@ using UnityEngine;
 
 namespace Engine.Tests.EditMode{
     /// <summary>1D plots of every spline level evaluate the flattened subtree of each node.</summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class SplinePlotsTests{
         private TerrainSplineSet _set;
 

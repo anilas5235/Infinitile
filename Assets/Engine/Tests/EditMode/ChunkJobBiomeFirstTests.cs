@@ -19,6 +19,8 @@ namespace Engine.Tests.EditMode{
     ///     blocks come from the surface-source biome; without blending a height step at a biome boundary is expected
     ///     and must be the same step the sampler produces.
     /// </summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class ChunkJobBiomeFirstTests{
         private const ushort TopA = TestFixtures.Grass;
         private const ushort UnderA = TestFixtures.Dirt;

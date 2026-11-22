@@ -13,10 +13,12 @@ namespace Engine.Scripts.Diagnostics{
     /// </summary>
     internal static class GoalRunRig{
         /// <summary>
-        ///     Height of every flight: above the terrain along the path (highest block y 123 to 139 near the spawn)
-        ///     and under the world's top at 256.
+        ///     Height of every flight: above the terrain along the path and under the world's top at 256. It was 200
+        ///     with the v1 generator (highest block y 123 to 139 near the spawn); the v2 ranges reach y 206 to 216 on
+        ///     the path and about 240 at most, so since v2 became the shipped setting (DEC-167) the rig flies at 245
+        ///     (owner 2026-11-22). Goal-run timings before and after the change are not comparable.
         /// </summary>
-        internal const float FlightHeight = 200f;
+        internal const float FlightHeight = 245f;
 
         /// <summary>Degrees the camera of a flight looks down, so the picture holds terrain and not only sky.</summary>
         internal const float FlightPitch = 20f;

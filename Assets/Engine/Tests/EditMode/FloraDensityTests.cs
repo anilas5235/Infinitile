@@ -14,6 +14,8 @@ namespace Engine.Tests.EditMode{
     ///     its plants, the switch on the settings gives exactly the even placement, column probabilities above 1 are
     ///     scaled down, and the multi-block pre-filter stays a necessary condition.
     /// </summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class FloraDensityTests{
         private FloraFixture _fixture;
         private WorldGenConfig _cfg;
