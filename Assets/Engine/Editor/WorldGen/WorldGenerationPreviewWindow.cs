@@ -101,6 +101,7 @@ namespace Engine.Editor.WorldGen{
             _builder = null;
             DisposeDiff();
             DisposeGallery();
+            DisposeGraphView();
         }
 
         private void DestroyEditors(){
@@ -488,8 +489,11 @@ namespace Engine.Editor.WorldGen{
                     EditorGUIUtility.labelWidth = 0f;
 
                     GUILayout.Space(20f);
-                    DrawCrossSectionToggle();
-                    if (!_crossSection) DrawCompareToggle();
+                    DrawGraphToggle();
+                    if (!_graphView){
+                        DrawCrossSectionToggle();
+                        if (!_crossSection) DrawCompareToggle();
+                    }
 
                     GUILayout.FlexibleSpace();
                 }
@@ -500,8 +504,9 @@ namespace Engine.Editor.WorldGen{
                     $"A: {PassA?.Description} · drag a view to pan · 1 sample per block up to 512, then every {stride}th column",
                     EditorStyles.miniLabel);
 
-                if (!_crossSection) wantsMouseMove = false;
-                if (_crossSection) DrawCrossSectionViews();
+                if (!_crossSection || _graphView) wantsMouseMove = false;
+                if (_graphView) DrawGraphViews();
+                else if (_crossSection) DrawCrossSectionViews();
                 else if (_compare) DrawCompareViews();
                 else DrawGrid();
             }
