@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Engine.Editor.WorldGen;
 using Engine.Scripts.WorldGen.Core;
 using Engine.Scripts.WorldGen.Graph;
 using Engine.Scripts.WorldGen.Noise;
@@ -31,8 +32,9 @@ namespace Engine.Tests.Performance{
     ///             is 37 arithmetic instructions and the difference is the interpreter's dispatch.
     ///         </item>
     ///     </list>
-    ///     Both sides of each chunk pair give the same bits; the test checks that before it times anything. Each test
-    ///     logs one summary line starting with "Noise graph benchmark".
+    ///     The chunk tests also time the generated code of each graph against the hand-written code. All sides give
+    ///     the same bits; the tests check that before they time anything. Each timed pair logs one summary line
+    ///     starting with "Noise graph benchmark".
     /// </summary>
     [TestFixture]
     internal unsafe class NoiseGraphBenchmark{
@@ -96,6 +98,29 @@ namespace Engine.Tests.Performance{
                 float x = interpreter[interpreterStart + i], y = hand[handStart + i];
                 if (!SameValue(x, y)) Assert.Fail($"{what} differs at {i}: interpreter {x:R}, hand-written {y:R}");
             }
+        }
+
+        /// <summary>Every buffer of two evaluations of one region, bit for bit.</summary>
+        private static void AssertSameRegion(GraphRegionResult interpreted, GraphRegionResult generated){
+            (string, NativeArray<float>, NativeArray<float>)[] buffers ={
+                ("lattice", interpreted.Lattice, generated.Lattice), ("columns", interpreted.Columns, generated.Columns),
+                ("corners", interpreted.Corners, generated.Corners), ("voxels", interpreted.Voxels, generated.Voxels)
+            };
+            foreach ((string what, NativeArray<float> x, NativeArray<float> y) in buffers)
+                for (int i = 0; i < x.Length; i++)
+                    if (BitConverter.SingleToInt32Bits(x[i]) != BitConverter.SingleToInt32Bits(y[i]))
+                        Assert.Fail($"{what} differs at {i}: interpreter {x[i]:R}, generated {y[i]:R}");
+        }
+
+        /// <summary>A region job for <paramref name="graph" /> with its own buffers, run by the generated code.</summary>
+        private static GraphRegionResult Generated<TPrograms>(CompiledNoiseGraph graph, out GeneratedRegionJob<TPrograms> job)
+            where TPrograms : struct, IGraphPrograms{
+            Assert.AreEqual(graph.CodeHash, default(TPrograms).CodeHash, $"{typeof(TPrograms).Name} is out of date; see GeneratedCode_IsUpToDate.");
+            GraphRegionResult region = GraphEvaluator.Allocate(graph, Origins[0], new int2(Width, Width), true, false, out GraphRegionJob regionJob,
+                Allocator.Persistent);
+            regionJob.Seed = Seed;
+            job = new GeneratedRegionJob<TPrograms>{ Region = regionJob };
+            return region;
         }
 
         #endregion
@@ -212,6 +237,16 @@ namespace Engine.Tests.Performance{
             AddNode(g, "t31", Op("soft_clamp", ("in", "t30")));
             g.Outputs["value"] = Op("add", ("a", "t31"), ("b", "t16"));
             return g;
+        }
+
+        [Test]
+        public void GeneratedCode_IsUpToDate(){
+            const string path = "Assets/Engine/Tests/Performance/NoiseGraphBenchmarkCode.cs";
+            using CompiledNoiseGraph caves = CompileOrFail(TerrainCaves()), chain = CompileOrFail(ArithmeticChain());
+            string expected = NoiseGraphCodeGenerator.Generate("Engine.Tests.Performance", "the noise graph benchmark", ("TerrainCavesBenchmarkCode", caves),
+                ("ArithmeticChainBenchmarkCode", chain));
+            if (!NoiseGraphCodeGenerator.IsUpToDate(path, expected, out string fresh))
+                Assert.Fail($"{path} is out of date: replace it with the generated text in {fresh}.");
         }
 
         private static CompiledNoiseGraph CompileOrFail(NoiseGraph graph){
@@ -429,11 +464,10 @@ namespace Engine.Tests.Performance{
                     }
                 }
 
-                // Voxels.
+                // Voxels, fused: each row of four voxels is interpolated (the same operations as
+                // GraphInterpolation.Trilinear) and finished in registers, without staging the markers.
                 float* surfaceColumns = stackalloc float[16];
-                float* tm = stackalloc float[GraphLimits.MaxLanes];
-                float* cm = stackalloc float[GraphLimits.MaxLanes];
-                float* tn = stackalloc float[GraphLimits.MaxLanes];
+                float4 tx = new(0f, 0.25f, 0.5f, 0.75f);
                 for (int cz = 0; cz < Width / 4; cz++)
                 for (int cx = 0; cx < Width / 4; cx++){
                     int at = cz * LatticeWidth + cx;
@@ -443,25 +477,38 @@ namespace Engine.Tests.Performance{
                     float* c0 = corners + (LatticePoints + at) * Stride;
                     float* n0 = corners + (2 * LatticePoints + at) * Stride;
                     const int row = LatticeWidth * Stride;
-                    for (int cy = 0; cy < Height / GraphLimits.CellBlockHeight; cy++){
-                        int baseY = cy * GraphLimits.CellBlockHeight;
-                        GraphInterpolation.Trilinear(t0, t0 + Stride, t0 + row, t0 + row + Stride, 8, baseY, tm);
-                        GraphInterpolation.Trilinear(c0, c0 + Stride, c0 + row, c0 + row + Stride, 4, baseY, cm);
-                        GraphInterpolation.Trilinear(n0, n0 + Stride, n0 + row, n0 + row + Stride, 4, baseY, tn);
-                        for (int q = 0; q < GraphLimits.MaxLanes / 4; q++){
-                            float y = baseY + (q >> 2);
-                            float4 surface = *(float4*)(surfaceColumns + (q & 3) * 4);
-                            float4 terrain = GraphKernels.SoftClamp(((float4*)tm)[q]);
-                            float4 cave = math.min(((float4*)cm)[q], math.max(((float4*)tn)[q], (y - surface) * -0.05f));
-                            int z = cz * 4 + (q & 3), yy = baseY + (q >> 2);
+                    for (int y = 0; y < Height; y++){
+                        int t8 = y >> 3, t4 = y >> 2;
+                        float ty8 = (y - t8 * 8) * 0.125f, ty4 = (y - t4 * 4) * 0.25f;
+                        float4 ta = Lerp(t0[t8], t0[t8 + Stride], tx), tb = Lerp(t0[t8 + row], t0[t8 + row + Stride], tx);
+                        float4 tc = Lerp(t0[t8 + 1], t0[t8 + 1 + Stride], tx), td = Lerp(t0[t8 + 1 + row], t0[t8 + 1 + row + Stride], tx);
+                        float4 ca = Lerp(c0[t4], c0[t4 + Stride], tx), cb = Lerp(c0[t4 + row], c0[t4 + row + Stride], tx);
+                        float4 cc = Lerp(c0[t4 + 1], c0[t4 + 1 + Stride], tx), cd = Lerp(c0[t4 + 1 + row], c0[t4 + 1 + row + Stride], tx);
+                        float4 na = Lerp(n0[t4], n0[t4 + Stride], tx), nb = Lerp(n0[t4 + row], n0[t4 + row + Stride], tx);
+                        float4 nc = Lerp(n0[t4 + 1], n0[t4 + 1 + Stride], tx), nd = Lerp(n0[t4 + 1 + row], n0[t4 + 1 + row + Stride], tx);
+                        float fy = y;
+                        for (int lz = 0; lz < 4; lz++){
+                            float tz = lz * 0.25f;
+                            float4 tm = Lerp(Lerp(ta, tb, tz), Lerp(tc, td, tz), ty8);
+                            float4 cm = Lerp(Lerp(ca, cb, tz), Lerp(cc, cd, tz), ty4);
+                            float4 tn = Lerp(Lerp(na, nb, tz), Lerp(nc, nd, tz), ty4);
+                            float4 surface = *(float4*)(surfaceColumns + lz * 4);
+                            float4 terrain = GraphKernels.SoftClamp(tm);
+                            float4 cave = math.min(cm, math.max(tn, (fy - surface) * -0.05f));
+                            int z = cz * 4 + lz;
                             for (int k = 0; k < 4; k++){
-                                int index = (z * Width + cx * 4 + k) * Height + yy;
+                                int index = (z * Width + cx * 4 + k) * Height + y;
                                 voxels[index] = terrain[k];
                                 voxels[Width * Width * Height + index] = cave[k];
                             }
                         }
                     }
                 }
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private static float4 Lerp(float4 a, float4 b, float4 t){
+                return GraphInterpolation.Lerp(a, b, t);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -675,11 +722,25 @@ namespace Engine.Tests.Performance{
             AssertSame("terrain density", region.Voxels, terrain.VoxelOutput * Width * Width * Height, voxels, 0, Width * Width * Height);
             AssertSame("cave density", region.Voxels, cave.VoxelOutput * Width * Width * Height, voxels, Width * Width * Height, Width * Width * Height);
             GraphWorkCounters counters = region.Counters;
+            using GraphRegionResult generatedRegion = Generated(graph, out GeneratedRegionJob<TerrainCavesBenchmarkCode> generated);
+            generated.Run();
+            AssertSameRegion(region, generatedRegion);
 
             Abba("(b) terrain plus caves", "interpreter", "hand-written", () => {
                 foreach (int2 origin in Origins){
                     interpreter.Origin = origin;
                     interpreter.Run();
+                }
+            }, () => {
+                foreach (int2 origin in Origins){
+                    hand.Origin = origin;
+                    hand.Run();
+                }
+            }, 1.0 / Origins.Length, SampleUnit.Millisecond, "ms/chunk");
+            Abba("(b) terrain plus caves, generated code", "generated", "hand-written", () => {
+                foreach (int2 origin in Origins){
+                    generated.Region.Origin = origin;
+                    generated.Run();
                 }
             }, () => {
                 foreach (int2 origin in Origins){
@@ -708,11 +769,25 @@ namespace Engine.Tests.Performance{
             hand.Run();
             AssertSame("value", region.Voxels, graph.Output("value").VoxelOutput * Width * Width * Height, voxels, 0, Width * Width * Height);
             GraphWorkCounters counters = region.Counters;
+            using GraphRegionResult generatedRegion = Generated(graph, out GeneratedRegionJob<ArithmeticChainBenchmarkCode> generated);
+            generated.Run();
+            AssertSameRegion(region, generatedRegion);
 
             Abba("(c) arithmetic chain", "interpreter", "hand-written", () => {
                 foreach (int2 origin in Origins){
                     interpreter.Origin = origin;
                     interpreter.Run();
+                }
+            }, () => {
+                foreach (int2 origin in Origins){
+                    hand.Origin = origin;
+                    hand.Run();
+                }
+            }, 1.0 / Origins.Length, SampleUnit.Millisecond, "ms/chunk");
+            Abba("(c) arithmetic chain, generated code", "generated", "hand-written", () => {
+                foreach (int2 origin in Origins){
+                    generated.Region.Origin = origin;
+                    generated.Run();
                 }
             }, () => {
                 foreach (int2 origin in Origins){

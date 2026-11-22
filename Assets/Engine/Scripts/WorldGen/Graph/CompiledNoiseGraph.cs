@@ -61,6 +61,77 @@ namespace Engine.Scripts.WorldGen.Graph{
         public int LatticeValueCount, ColumnOutputCount, MarkerCount, VoxelOutputCount;
     }
 
+    /// <summary>64-bit FNV-1a over the fields of a graph's tables (float fields by their bits), in table order.</summary>
+    internal static class GraphCodeHash{
+        private const ulong Offset = 14695981039346656037UL;
+        private const ulong Prime = 1099511628211UL;
+
+        public static ulong Of(in GraphData d){
+            ulong h = Offset;
+            Mix(ref h, d.LatticeProgram, d.ColumnProgram, d.CornerProgram4, d.CornerProgram8, d.VoxelProgram);
+            Mix(ref h, d.LatticeValueCount, d.ColumnOutputCount, d.MarkerCount, d.VoxelOutputCount);
+            Mix(ref h, Length(d.Instructions));
+            for (int k = 0; k < Length(d.Instructions); k++){
+                GraphInstruction i = d.Instructions[k];
+                Mix(ref h, (int)i.Op, i.Dst, i.A, i.B, i.C, i.Aux);
+                MixFloats(ref h, i.P0, i.P1, i.P2, i.P3);
+            }
+
+            Mix(ref h, Length(d.Programs));
+            for (int k = 0; k < Length(d.Programs); k++){
+                GraphProgram p = d.Programs[k];
+                Mix(ref h, (int)p.Stage, p.CellHeight, p.InstructionStart, p.InstructionCount, p.RegisterCount);
+                Mix(ref h, p.InputStart, p.InputCount, p.OutputStart, p.OutputCount);
+            }
+
+            Mix(ref h, Length(d.Slots));
+            for (int k = 0; k < Length(d.Slots); k++){
+                GraphSlot s = d.Slots[k];
+                Mix(ref h, s.Register, (int)s.Source, s.Slot);
+            }
+
+            Mix(ref h, Length(d.Entries));
+            for (int k = 0; k < Length(d.Entries); k++){
+                NoiseEntry e = d.Entries[k];
+                Mix(ref h, e.Dimensions, (int)e.Mode, e.OctaveStart, e.OctaveCount, e.Definition);
+            }
+
+            Mix(ref h, Length(d.Octaves));
+            for (int k = 0; k < Length(d.Octaves); k++){
+                NoiseOctave o = d.Octaves[k];
+                MixFloats(ref h, o.FrequencyXZ, o.FrequencyY, o.Amplitude);
+                Mix(ref h, unchecked((int)o.Salt));
+            }
+
+            Mix(ref h, Length(d.Points));
+            for (int k = 0; k < Length(d.Points); k++){
+                SplinePoint p = d.Points[k];
+                MixFloats(ref h, p.Location, p.Derivative, p.Constant, p.Span);
+                MixFloats(ref h, p.InverseSpan);
+                Mix(ref h, p.Value, p.HasDerivative);
+            }
+
+            Mix(ref h, Length(d.MarkerCellHeights));
+            for (int k = 0; k < Length(d.MarkerCellHeights); k++) Mix(ref h, d.MarkerCellHeights[k]);
+            return h;
+        }
+
+        private static int Length<T>(NativeArray<T> array) where T : struct{
+            return array.IsCreated ? array.Length : 0;
+        }
+
+        private static void Mix(ref ulong h, params int[] values){
+            foreach (int v in values){
+                uint u = unchecked((uint)v);
+                for (int b = 0; b < 4; b++) h = unchecked((h ^ ((u >> (8 * b)) & 0xFF)) * Prime);
+            }
+        }
+
+        private static void MixFloats(ref ulong h, params float[] values){
+            foreach (float v in values) Mix(ref h, unchecked((int)math.asuint(v)));
+        }
+    }
+
     /// <summary>
     ///     A compiled noise graph: the 2D (lattice and column), corner and voxel programs with their tables, the
     ///     outputs and bounds, and the uncompiled node list for the direct evaluation. Independent of the world
@@ -87,6 +158,19 @@ namespace Engine.Scripts.WorldGen.Graph{
         public int NoiseCount{ get; internal set; }
 
         public int ReferenceNodeCount => ReferenceNodes.Length;
+
+        private ulong _codeHash;
+
+        /// <summary>
+        ///     Hash over every field of the program tables. Generated code carries the hash of the graph it was made
+        ///     from and only runs a graph with the same hash.
+        /// </summary>
+        public ulong CodeHash{
+            get{
+                if (_codeHash == 0) _codeHash = GraphCodeHash.Of(Data);
+                return _codeHash;
+            }
+        }
 
         public GraphData Tables => Data;
 

@@ -78,6 +78,7 @@ namespace Engine.Editor.WorldGen{
 
             EditorGUILayout.LabelField(
                 $"{graph.Outputs.Count} outputs · {graph.NoiseCount} noises · {graph.InstructionCount} of {GraphLimits.MaxInstructions} instructions · " +
+                (GraphEvaluator.HasGeneratedCode(graph) ? "generated code · " : "interpreter · ") +
                 string.Join(" · ", graph.Programs.Select(p => p.ToString())), EditorStyles.miniLabel);
             EditorGUILayout.LabelField($"Last evaluation {_graphMilliseconds:0.0} ms · {_graphCounters}", EditorStyles.miniLabel);
 

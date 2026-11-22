@@ -20,9 +20,16 @@ namespace Engine.Scripts.WorldGen.Graph{
             return a + t * (b - a);
         }
 
+        /// <summary><see cref="Lerp(float, float, float)" /> lane by lane, with the same operations per lane.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float4 Lerp(float4 a, float4 b, float4 t){
+            return a + t * (b - a);
+        }
+
         /// <summary>
         ///     The 16 column values of a 4 × 4 column cell from its four lattice corners (column index lz · 4 + lx).
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Bilinear(float v00, float v10, float v01, float v11, float* columns){
             for (int lz = 0; lz < 4; lz++){
                 float tz = lz * 0.25f;
@@ -37,22 +44,23 @@ namespace Engine.Scripts.WorldGen.Graph{
         ///     Trilinear marker values for the 128 voxels of a cell (lane = ly · 16 + lz · 4 + lx, y = baseY + ly) from
         ///     the corner columns c00, c10, c01, c11 (x then z), each <see cref="CornerStride" /> long.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Trilinear(float* c00, float* c10, float* c01, float* c11, int cellHeight, int baseY, float* lanes){
+            // Four lanes along x at a time; the corner values are read once per row, since the stores into lanes may
+            // alias the corner columns for all the compiler knows.
             float inverse = cellHeight == 4 ? 0.25f : 0.125f;
+            float4 tx = new(0f, 0.25f, 0.5f, 0.75f);
             for (int ly = 0; ly < GraphLimits.CellBlockHeight; ly++){
                 int y = baseY + ly;
                 int cy = y / cellHeight;
                 float ty = (y - cy * cellHeight) * inverse;
+                float4 v00 = Lerp(c00[cy], c10[cy], tx);
+                float4 v10 = Lerp(c01[cy], c11[cy], tx);
+                float4 v01 = Lerp(c00[cy + 1], c10[cy + 1], tx);
+                float4 v11 = Lerp(c01[cy + 1], c11[cy + 1], tx);
                 for (int lz = 0; lz < 4; lz++){
                     float tz = lz * 0.25f;
-                    for (int lx = 0; lx < 4; lx++){
-                        float tx = lx * 0.25f;
-                        float v00 = Lerp(c00[cy], c10[cy], tx);
-                        float v10 = Lerp(c01[cy], c11[cy], tx);
-                        float v01 = Lerp(c00[cy + 1], c10[cy + 1], tx);
-                        float v11 = Lerp(c01[cy + 1], c11[cy + 1], tx);
-                        lanes[ly * 16 + lz * 4 + lx] = Lerp(Lerp(v00, v10, tz), Lerp(v01, v11, tz), ty);
-                    }
+                    *(float4*)(lanes + ly * 16 + lz * 4) = Lerp(Lerp(v00, v10, tz), Lerp(v01, v11, tz), ty);
                 }
             }
         }
@@ -100,19 +108,27 @@ namespace Engine.Scripts.WorldGen.Graph{
         private const int Lanes = GraphLimits.MaxLanes;
 
         public void Execute(){
+            Evaluate(new InterpretedPrograms());
+        }
+
+        /// <summary>The evaluation with the programs run by <typeparamref name="TPrograms" /> (interpreted or generated).</summary>
+        internal void Evaluate<TPrograms>(TPrograms programs) where TPrograms : struct, IGraphPrograms{
             GraphWorkCounters counters = default;
             float* registers = (float*)UnsafeUtility.Malloc(GraphInterpreter.RegisterFloats * sizeof(float), 64, Allocator.Temp);
             float* scratch = (float*)UnsafeUtility.Malloc(GraphInterpreter.ScratchFloats * sizeof(float), 64, Allocator.Temp);
             UnsafeUtility.MemClear(registers, GraphInterpreter.RegisterFloats * sizeof(float));
             int lx = Size.x / 4 + 1, lz = Size.y / 4 + 1;
+            GraphCode code = GraphCode.Of(Graph);
+            float* lattice = (float*)Lattice.GetUnsafePtr();
 
-            if (Graph.LatticeProgram >= 0) RunLattice(registers, scratch, lx, lz, ref counters);
-            if (Graph.ColumnProgram >= 0) RunColumns(registers, scratch, ref counters);
-            if (InterpolateColumns != 0) InterpolateLattice(lx, lz);
+            if (Graph.LatticeProgram >= 0) RunLattice(programs, code, lattice, registers, scratch, lx, lz, ref counters);
+            if (Graph.ColumnProgram >= 0) RunColumns(programs, code, registers, scratch, ref counters);
+            if (InterpolateColumns != 0) InterpolateLattice(lattice, lx, lz);
             if (Evaluate3D != 0){
-                if (Graph.CornerProgram4 >= 0) RunCorners(Graph.CornerProgram4, 4, registers, scratch, lx, lz, ref counters);
-                if (Graph.CornerProgram8 >= 0) RunCorners(Graph.CornerProgram8, 8, registers, scratch, lx, lz, ref counters);
-                if (Graph.VoxelProgram >= 0) RunVoxels(registers, scratch, lx, lz, ref counters);
+                float* corners = (float*)Corners.GetUnsafePtr();
+                if (Graph.CornerProgram4 >= 0) RunCorners(programs, code, Graph.CornerProgram4, 4, lattice, corners, registers, scratch, lx, lz, ref counters);
+                if (Graph.CornerProgram8 >= 0) RunCorners(programs, code, Graph.CornerProgram8, 8, lattice, corners, registers, scratch, lx, lz, ref counters);
+                if (Graph.VoxelProgram >= 0) RunVoxels(programs, code, lattice, corners, registers, scratch, lx, lz, ref counters);
             }
 
             Counters[0] = counters;
@@ -120,19 +136,13 @@ namespace Engine.Scripts.WorldGen.Graph{
             UnsafeUtility.Free(scratch, Allocator.Temp);
         }
 
-        private void Run(int programIndex, float* registers, float* scratch, int lanes, ref GraphWorkCounters counters){
-            GraphProgram program = Graph.Programs[programIndex];
-            GraphInterpreter.Run(program, (GraphInstruction*)Graph.Instructions.GetUnsafeReadOnlyPtr(), (NoiseEntry*)Graph.Entries.GetUnsafeReadOnlyPtr(),
-                (NoiseOctave*)Graph.Octaves.GetUnsafeReadOnlyPtr(), (SplinePoint*)Graph.Points.GetUnsafeReadOnlyPtr(), registers, scratch, lanes, Seed,
-                ref counters);
-        }
-
         private static void Fill(float* row, float value, int padded){
             for (int i = 0; i < padded; i++) row[i] = value;
         }
 
-        private void RunLattice(float* registers, float* scratch, int lx, int lz, ref GraphWorkCounters counters){
-            GraphProgram program = Graph.Programs[Graph.LatticeProgram];
+        private void RunLattice<TPrograms>(TPrograms programs, in GraphCode code, float* lattice, float* registers, float* scratch, int lx, int lz,
+            ref GraphWorkCounters counters) where TPrograms : struct, IGraphPrograms{
+            GraphProgram program = code.Programs[Graph.LatticeProgram];
             for (int z = 0; z < lz; z++)
             for (int x0 = 0; x0 < lx; x0 += Lanes){
                 int n = math.min(Lanes, lx - x0);
@@ -140,19 +150,22 @@ namespace Engine.Scripts.WorldGen.Graph{
                 for (int i = 0; i < padded; i++) registers[i] = Origin.x + 4 * (x0 + math.min(i, n - 1));
                 Fill(registers + Lanes, 0f, padded);
                 Fill(registers + 2 * Lanes, Origin.y + 4 * z, padded);
-                Run(Graph.LatticeProgram, registers, scratch, n, ref counters);
+                programs.Run(Graph.LatticeProgram, code, registers, scratch, n, Seed, ref counters);
                 for (int o = 0; o < program.OutputCount; o++){
-                    GraphSlot s = Graph.Slots[program.OutputStart + o];
+                    GraphSlot s = code.Slots[program.OutputStart + o];
                     float* row = registers + s.Register * Lanes;
-                    for (int i = 0; i < n; i++) Lattice[(s.Slot * lz + z) * lx + x0 + i] = row[i];
+                    float* to = lattice + (s.Slot * lz + z) * lx + x0;
+                    for (int i = 0; i < n; i++) to[i] = row[i];
                 }
 
                 counters.LatticePoints += n;
             }
         }
 
-        private void RunColumns(float* registers, float* scratch, ref GraphWorkCounters counters){
-            GraphProgram program = Graph.Programs[Graph.ColumnProgram];
+        private void RunColumns<TPrograms>(TPrograms programs, in GraphCode code, float* registers, float* scratch, ref GraphWorkCounters counters)
+            where TPrograms : struct, IGraphPrograms{
+            GraphProgram program = code.Programs[Graph.ColumnProgram];
+            float* columns = (float*)Columns.GetUnsafePtr();
             for (int z = 0; z < Size.y; z++)
             for (int x0 = 0; x0 < Size.x; x0 += Lanes){
                 int n = math.min(Lanes, Size.x - x0);
@@ -160,33 +173,36 @@ namespace Engine.Scripts.WorldGen.Graph{
                 for (int i = 0; i < padded; i++) registers[i] = Origin.x + x0 + math.min(i, n - 1);
                 Fill(registers + Lanes, 0f, padded);
                 Fill(registers + 2 * Lanes, Origin.y + z, padded);
-                Run(Graph.ColumnProgram, registers, scratch, n, ref counters);
+                programs.Run(Graph.ColumnProgram, code, registers, scratch, n, Seed, ref counters);
                 for (int o = 0; o < program.OutputCount; o++){
-                    GraphSlot s = Graph.Slots[program.OutputStart + o];
+                    GraphSlot s = code.Slots[program.OutputStart + o];
                     float* row = registers + s.Register * Lanes;
-                    for (int i = 0; i < n; i++) Columns[(s.Slot * Size.y + z) * Size.x + x0 + i] = row[i];
+                    float* to = columns + (s.Slot * Size.y + z) * Size.x + x0;
+                    for (int i = 0; i < n; i++) to[i] = row[i];
                 }
 
                 counters.ColumnPoints += n;
             }
         }
 
-        private void InterpolateLattice(int lx, int lz){
+        private void InterpolateLattice(float* lattice, int lx, int lz){
             float* columns = stackalloc float[16];
+            float* to = (float*)Columns2D.GetUnsafePtr();
             for (int v = 0; v < Graph.LatticeValueCount; v++)
             for (int cz = 0; cz < Size.y / 4; cz++)
             for (int cx = 0; cx < Size.x / 4; cx++){
-                GraphInterpolation.Bilinear(Lattice[(v * lz + cz) * lx + cx], Lattice[(v * lz + cz) * lx + cx + 1],
-                    Lattice[(v * lz + cz + 1) * lx + cx], Lattice[(v * lz + cz + 1) * lx + cx + 1], columns);
+                float* l = lattice + (v * lz + cz) * lx + cx;
+                GraphInterpolation.Bilinear(l[0], l[1], l[lx], l[lx + 1], columns);
                 for (int i = 0; i < 16; i++){
                     int x = cx * 4 + (i & 3), z = cz * 4 + (i >> 2);
-                    Columns2D[(v * Size.y + z) * Size.x + x] = columns[i];
+                    to[(v * Size.y + z) * Size.x + x] = columns[i];
                 }
             }
         }
 
-        private void RunCorners(int programIndex, int cellHeight, float* registers, float* scratch, int lx, int lz, ref GraphWorkCounters counters){
-            GraphProgram program = Graph.Programs[programIndex];
+        private void RunCorners<TPrograms>(TPrograms programs, in GraphCode code, int programIndex, int cellHeight, float* lattice, float* corners, float* registers, float* scratch,
+            int lx, int lz, ref GraphWorkCounters counters) where TPrograms : struct, IGraphPrograms{
+            GraphProgram program = code.Programs[programIndex];
             int lanes = GraphLimits.WorldHeight / cellHeight + 1;
             int padded = (lanes + 3) & ~3;
             for (int i = 0; i < padded; i++) registers[Lanes + i] = math.min(i, lanes - 1) * cellHeight;
@@ -195,39 +211,43 @@ namespace Engine.Scripts.WorldGen.Graph{
                 Fill(registers, Origin.x + 4 * x, padded);
                 Fill(registers + 2 * Lanes, Origin.y + 4 * z, padded);
                 for (int i = 0; i < program.InputCount; i++){
-                    GraphSlot s = Graph.Slots[program.InputStart + i];
-                    Fill(registers + s.Register * Lanes, Lattice[(s.Slot * lz + z) * lx + x], padded);
+                    GraphSlot s = code.Slots[program.InputStart + i];
+                    Fill(registers + s.Register * Lanes, lattice[(s.Slot * lz + z) * lx + x], padded);
                 }
 
-                Run(programIndex, registers, scratch, lanes, ref counters);
+                programs.Run(programIndex, code, registers, scratch, lanes, Seed, ref counters);
                 for (int o = 0; o < program.OutputCount; o++){
-                    GraphSlot s = Graph.Slots[program.OutputStart + o];
+                    GraphSlot s = code.Slots[program.OutputStart + o];
                     float* row = registers + s.Register * Lanes;
-                    int at = ((s.Slot * lz + z) * lx + x) * GraphInterpolation.CornerStride;
-                    for (int i = 0; i < lanes; i++) Corners[at + i] = row[i];
+                    float* to = corners + ((s.Slot * lz + z) * lx + x) * GraphInterpolation.CornerStride;
+                    for (int i = 0; i < lanes; i++) to[i] = row[i];
                 }
 
                 counters.Corners += lanes;
             }
         }
 
-        private void RunVoxels(float* registers, float* scratch, int lx, int lz, ref GraphWorkCounters counters){
-            GraphProgram program = Graph.Programs[Graph.VoxelProgram];
+        private void RunVoxels<TPrograms>(TPrograms programs, in GraphCode code, float* lattice, float* corners, float* registers, float* scratch, int lx, int lz,
+            ref GraphWorkCounters counters) where TPrograms : struct, IGraphPrograms{
+            GraphProgram program = code.Programs[Graph.VoxelProgram];
+            GraphSlot* inputs = code.Slots + program.InputStart;
+            GraphSlot* outputs = code.Slots + program.OutputStart;
+            int* cellHeights = (int*)Graph.MarkerCellHeights.GetUnsafeReadOnlyPtr();
+            float* voxels = (float*)Voxels.GetUnsafePtr();
             float* columns = (float*)UnsafeUtility.Malloc(math.max(1, program.InputCount) * 16 * sizeof(float), 16, Allocator.Temp);
-            float* corners = (float*)Corners.GetUnsafeReadOnlyPtr();
             const int stride = GraphInterpolation.CornerStride;
+            const int height = GraphLimits.WorldHeight;
             int markers = 0;
             for (int i = 0; i < program.InputCount; i++)
-                if (Graph.Slots[program.InputStart + i].Source == GraphSlotSource.Marker)
+                if (inputs[i].Source == GraphSlotSource.Marker)
                     markers++;
 
             for (int cz = 0; cz < Size.y / 4; cz++)
             for (int cx = 0; cx < Size.x / 4; cx++){
                 for (int i = 0; i < program.InputCount; i++){
-                    GraphSlot s = Graph.Slots[program.InputStart + i];
-                    if (s.Source != GraphSlotSource.Lattice) continue;
-                    int at = (s.Slot * lz + cz) * lx + cx;
-                    GraphInterpolation.Bilinear(Lattice[at], Lattice[at + 1], Lattice[at + lx], Lattice[at + lx + 1], columns + i * 16);
+                    if (inputs[i].Source != GraphSlotSource.Lattice) continue;
+                    float* l = lattice + (inputs[i].Slot * lz + cz) * lx + cx;
+                    GraphInterpolation.Bilinear(l[0], l[1], l[lx], l[lx + 1], columns + i * 16);
                 }
 
                 for (int lane = 0; lane < Lanes; lane++){
@@ -235,30 +255,33 @@ namespace Engine.Scripts.WorldGen.Graph{
                     registers[2 * Lanes + lane] = Origin.y + cz * 4 + ((lane >> 2) & 3);
                 }
 
-                for (int cy = 0; cy < GraphLimits.WorldHeight / GraphLimits.CellBlockHeight; cy++){
+                for (int cy = 0; cy < height / GraphLimits.CellBlockHeight; cy++){
                     int baseY = cy * GraphLimits.CellBlockHeight;
                     for (int lane = 0; lane < Lanes; lane++) registers[Lanes + lane] = baseY + (lane >> 4);
                     for (int i = 0; i < program.InputCount; i++){
-                        GraphSlot s = Graph.Slots[program.InputStart + i];
+                        GraphSlot s = inputs[i];
                         float* row = registers + s.Register * Lanes;
                         if (s.Source == GraphSlotSource.Lattice){
-                            float* c = columns + i * 16;
-                            for (int lane = 0; lane < Lanes; lane++) row[lane] = c[lane & 15];
+                            float4* c = (float4*)(columns + i * 16);
+                            for (int q = 0; q < Lanes / 4; q++) ((float4*)row)[q] = c[q & 3];
                         }
                         else{
                             float* m = corners + (s.Slot * lz + cz) * lx * stride;
-                            GraphInterpolation.Trilinear(m + cx * stride, m + (cx + 1) * stride, m + (lx + cx) * stride, m + (lx + cx + 1) * stride,
-                                Graph.MarkerCellHeights[s.Slot], baseY, row);
+                            float* c00 = m + cx * stride, c10 = m + (cx + 1) * stride, c01 = m + (lx + cx) * stride, c11 = m + (lx + cx + 1) * stride;
+                            // A constant cell height lets Burst turn the division by it into a shift.
+                            if (cellHeights[s.Slot] == 4) GraphInterpolation.Trilinear(c00, c10, c01, c11, 4, baseY, row);
+                            else GraphInterpolation.Trilinear(c00, c10, c01, c11, 8, baseY, row);
                         }
                     }
 
-                    Run(Graph.VoxelProgram, registers, scratch, Lanes, ref counters);
+                    programs.Run(Graph.VoxelProgram, code, registers, scratch, Lanes, Seed, ref counters);
                     for (int o = 0; o < program.OutputCount; o++){
-                        GraphSlot s = Graph.Slots[program.OutputStart + o];
-                        float* row = registers + s.Register * Lanes;
-                        for (int lane = 0; lane < Lanes; lane++){
-                            int x = cx * 4 + (lane & 3), z = cz * 4 + ((lane >> 2) & 3), y = baseY + (lane >> 4);
-                            Voxels[((s.Slot * Size.y + z) * Size.x + x) * GraphLimits.WorldHeight + y] = row[lane];
+                        float* row = registers + outputs[o].Register * Lanes;
+                        float* to = voxels + ((outputs[o].Slot * Size.y + cz * 4) * Size.x + cx * 4) * height + baseY;
+                        for (int vz = 0; vz < 4; vz++)
+                        for (int vx = 0; vx < 4; vx++){
+                            float* column = to + (vz * Size.x + vx) * height;
+                            for (int vy = 0; vy < GraphLimits.CellBlockHeight; vy++) column[vy] = row[vy * 16 + vz * 4 + vx];
                         }
                     }
 
@@ -269,6 +292,64 @@ namespace Engine.Scripts.WorldGen.Graph{
             }
 
             UnsafeUtility.Free(columns, Allocator.Temp);
+        }
+    }
+
+    /// <summary>Raw pointers to a compiled graph's tables, taken once per job instead of per array access.</summary>
+    internal unsafe struct GraphCode{
+        public GraphInstruction* Instructions;
+        public GraphProgram* Programs;
+        public GraphSlot* Slots;
+        public NoiseEntry* Entries;
+        public NoiseOctave* Octaves;
+        public SplinePoint* Points;
+
+        public static GraphCode Of(in GraphData graph){
+            return new GraphCode{
+                Instructions = (GraphInstruction*)graph.Instructions.GetUnsafeReadOnlyPtr(),
+                Programs = (GraphProgram*)graph.Programs.GetUnsafeReadOnlyPtr(),
+                Slots = (GraphSlot*)graph.Slots.GetUnsafeReadOnlyPtr(),
+                Entries = (NoiseEntry*)graph.Entries.GetUnsafeReadOnlyPtr(),
+                Octaves = (NoiseOctave*)graph.Octaves.GetUnsafeReadOnlyPtr(),
+                Points = (SplinePoint*)graph.Points.GetUnsafeReadOnlyPtr()
+            };
+        }
+
+        public void Run(in GraphProgram program, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters){
+            GraphInterpreter.Run(program, Instructions, Entries, Octaves, Points, registers, scratch, lanes, seed, ref counters);
+        }
+    }
+
+    /// <summary>
+    ///     Runs the programs of a compiled graph on the register file: the interpreter, or code generated for one
+    ///     graph. Either reads the input rows and leaves the outputs in their rows, with the same values bit for bit.
+    /// </summary>
+    internal unsafe interface IGraphPrograms{
+        /// <summary>Code hash of the graph the programs belong to (<see cref="CompiledNoiseGraph.CodeHash" />); 0 for any graph.</summary>
+        ulong CodeHash{ get; }
+
+        void Run(int program, in GraphCode code, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters);
+    }
+
+    /// <summary>The interpreter, for any graph.</summary>
+    internal unsafe struct InterpretedPrograms : IGraphPrograms{
+        public ulong CodeHash => 0;
+
+        public void Run(int program, in GraphCode code, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters){
+            code.Run(code.Programs[program], registers, scratch, lanes, seed, ref counters);
+        }
+    }
+
+    /// <summary>
+    ///     <see cref="GraphRegionJob" /> with the programs of generated code. Each generated type registers its job
+    ///     instance with <see cref="RegisterGenericJobTypeAttribute" />.
+    /// </summary>
+    [BurstCompile(FloatMode = FloatMode.Strict, CompileSynchronously = true)]
+    internal struct GeneratedRegionJob<TPrograms> : IJob where TPrograms : struct, IGraphPrograms{
+        public GraphRegionJob Region;
+
+        public void Execute(){
+            Region.Evaluate(default(TPrograms));
         }
     }
 
@@ -405,12 +486,38 @@ namespace Engine.Scripts.WorldGen.Graph{
             return r;
         }
 
-        /// <summary>Evaluates a region synchronously (see <see cref="GraphRegionJob" />).</summary>
+        /// <summary>
+        ///     True when <paramref name="graph" /> is the graph the shipped generated code was made from (same code
+        ///     hash); any other graph, a mod's or an edited one, runs in the interpreter.
+        /// </summary>
+        public static bool HasGeneratedCode(CompiledNoiseGraph graph){
+            return graph.CodeHash == default(ShippedNoiseGraphCode).CodeHash;
+        }
+
+        /// <summary>
+        ///     Evaluates a region synchronously (see <see cref="GraphRegionJob" />): with the generated code where
+        ///     <see cref="HasGeneratedCode" />, else (or with <paramref name="interpreterOnly" />) in the interpreter.
+        /// </summary>
         public static GraphRegionResult EvaluateRegion(CompiledNoiseGraph graph, uint seed, int2 origin, int2 size, bool evaluate3D,
-            bool interpolateColumns = false){
+            bool interpolateColumns = false, bool interpreterOnly = false){
             GraphRegionResult r = Allocate(graph, origin, size, evaluate3D, interpolateColumns, out GraphRegionJob job);
             job.Seed = seed;
-            job.Run();
+            if (!interpreterOnly && HasGeneratedCode(graph)) new GeneratedRegionJob<ShippedNoiseGraphCode>{ Region = job }.Run();
+            else job.Run();
+            return r;
+        }
+
+        /// <summary>
+        ///     Evaluates a region with the generated code <typeparamref name="TPrograms" />, which must have been made
+        ///     from <paramref name="graph" />.
+        /// </summary>
+        internal static GraphRegionResult EvaluateRegion<TPrograms>(CompiledNoiseGraph graph, uint seed, int2 origin, int2 size, bool evaluate3D,
+            bool interpolateColumns = false) where TPrograms : struct, IGraphPrograms{
+            if (default(TPrograms).CodeHash != graph.CodeHash)
+                throw new ArgumentException($"{typeof(TPrograms).Name} was generated from another graph; regenerate it.");
+            GraphRegionResult r = Allocate(graph, origin, size, evaluate3D, interpolateColumns, out GraphRegionJob job);
+            job.Seed = seed;
+            new GeneratedRegionJob<TPrograms>{ Region = job }.Run();
             return r;
         }
 

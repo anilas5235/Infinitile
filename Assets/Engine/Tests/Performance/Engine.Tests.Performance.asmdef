@@ -3,6 +3,7 @@
     "rootNamespace": "Engine.Tests.Performance",
     "references": [
         "Engine.Runtime",
+        "Engine.Editor",
         "Unity.PerformanceTesting",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
