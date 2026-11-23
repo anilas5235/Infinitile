@@ -87,8 +87,11 @@ namespace Engine.Scripts.Jobs.Chunk{
                 _graph = CompileDensityGraph(out _terrain, out _generatedCode);
                 try{
                     CheckLayout(settings.WorldGen, config.WorldGen, _graph);
-                    if (config.WorldGen.Layout.HasBoxes && settings.WorldGen != null)
-                        _config.WorldGen.SurfaceRules = CompileSurfaceRules(settings.WorldGen, config.WorldGen, _graph);
+                    if (config.WorldGen.Layout.HasBoxes && settings.WorldGen != null){
+                        SurfaceRules rules = CompileSurfaceRules(settings.WorldGen, config.WorldGen, _graph);
+                        _config.WorldGen.SurfaceRules.Dispose(); // the builder's empty set; this scheduler owns the config
+                        _config.WorldGen.SurfaceRules = rules;
+                    }
                 }
                 catch{
                     _graph.Dispose();

@@ -142,7 +142,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                 for (int c = 0; c < DensityLayout.Columns; c++) Border[c] = border ? b.Border[c] : float.NaN;
             }
 
-            if (Passes >= DensityChunk.PassFill && WorldGen.Layout.HasBoxes && WorldGen.SurfaceRules.IsCreated)
+            if (Passes >= DensityChunk.PassFill && WorldGen.Layout.HasBoxes && WorldGen.SurfaceRules.HasRules)
                 for (int x = 0; x < DensityLayout.ChunkSize; x++)
                 for (int z = 0; z < DensityLayout.ChunkSize; z++){
                     int c = x * DensityLayout.ChunkSize + z;
@@ -198,7 +198,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             }
 
             if (passes < PassFill) return;
-            if (layout && worldGen.SurfaceRules.IsCreated) SurfacePass.Run(worldGen.SurfaceRules, worldGen, origin, ref b, voxels, ref counters.Surface);
+            if (layout && worldGen.SurfaceRules.HasRules) SurfacePass.Run(worldGen.SurfaceRules, worldGen, origin, ref b, voxels, ref counters.Surface);
             else Fill(b.Solid, voxels, worldGen);
             ChunkJob.ApplyBottomLayer(voxels, new int3(origin.x, 0, origin.y), worldGen);
             if (biomes.IsCreated) WriteBiomes(b, biomes, layout);

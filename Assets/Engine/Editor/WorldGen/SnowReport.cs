@@ -1,0 +1,225 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+using Engine.Scripts.WorldGen.Biomes;
+using Engine.Scripts.WorldGen.Density;
+using Engine.Scripts.WorldGen.Graph;
+using Engine.Scripts.WorldGen.Surface;
+using Unity.Collections;
+using Unity.Mathematics;
+
+namespace Engine.Editor.WorldGen{
+    /// <summary>The snow, ice and tree line measures of one seed (WorldGen v2 §8, phase V4).</summary>
+    public sealed class SnowReportSeed{
+        public uint Seed;
+        public string[] Names;
+
+        /// <summary>T of every dry Mountain sample (the calibration pools them over the seeds, DEC-175).</summary>
+        public float[] MountainT = Array.Empty<float>();
+
+        public float MedianMountainT = float.NaN;
+
+        /// <summary>The snow line (lowest snowy y) at the median Mountain T without wobble.</summary>
+        public int SnowLineAtMedian = -1;
+
+        /// <summary>Mountain ground at y 200 and above, in five T bands of equal count: the band's T range and snow share.</summary>
+        public readonly List<(float From, float To, int Samples, double Snow)> MountainBands = new();
+
+        /// <summary>Per biome: dry samples, their snow share, and (never-snow biomes) the share above their snow line.</summary>
+        public long[] Dry;
+
+        public double[] SnowShare, WouldSnowShare;
+
+        /// <summary>Neighbour pairs where snow stops at a never-snow biome above its snow line, and all snow edges.</summary>
+        public long HardEdges, SnowEdges;
+
+        /// <summary>Share of the open water samples (top below y 123) that freeze.</summary>
+        public double IceShare;
+
+        public readonly List<TourSpot> Tour = new();
+    }
+
+    /// <summary>
+    ///     The snow measures of the world report (§13.4, phase V4) on a grid of columns with the column sampler: T, the
+    ///     snow and tree line per column from the compiled rules' climate, and the hard biome as the surface biome (the
+    ///     blend can move it a few blocks at borders). Snow lies on a dry top at or above the column's snow line in a
+    ///     biome that may snow, as the snow rule puts it.
+    /// </summary>
+    public static class SnowReport{
+        public const int Extent = 4096, Stride = 8;
+
+        public static SnowReportSeed Run(CompiledNoiseGraph graph, BiomeLayout layout, in BiomeLayoutData data, in SurfaceRules rules, SurfaceClimate climate, uint seed,
+            int extent = Extent, int stride = Stride){
+            int nb = layout.Biomes.Count;
+            SnowReportSeed r = new(){
+                Seed = seed, Names = layout.Biomes.Select(b => b.Name).ToArray(), Dry = new long[nb], SnowShare = new double[nb], WouldSnowShare = new double[nb]
+            };
+            int side = extent / stride, n = side * side, origin = -extent / 2;
+            float2[] grid = new float2[n];
+            for (int z = 0; z < side; z++)
+            for (int x = 0; x < side; x++)
+                grid[z * side + x] = new float2(origin + x * stride, origin + z * stride);
+
+            using NativeArray<float2> points = new(grid, Allocator.TempJob);
+            using BiomeColumns c = BiomeColumnSampler.Sample(graph, data, seed, points, true);
+            float[] lattice = GraphEvaluator.SampleLattice(graph, seed, grid, out _);
+            float Value(int slot, int i){
+                return slot >= 0 ? lattice[slot * n + i] : 0f;
+            }
+
+            int Slot(string output){
+                GraphOutputInfo o = output != null ? graph.Output(output) : null;
+                return o != null ? o.LatticeValue : -1;
+            }
+
+            int tSlot = rules.TemperatureSlot, snowSlot = Slot(climate.SnowWobble), treeSlot = Slot(climate.TreeLineWobble), iceSlot = Slot(climate.IceWobble);
+            const int surfaceY = DensityLayout.WetnessY;
+            int mountain = Array.IndexOf(r.Names, "Mountain");
+
+            bool[] snow = new bool[n], dry = new bool[n], never = new bool[n], above = new bool[n];
+            int[] snowLine = new int[n], treeLine = new int[n];
+            long[] snowy = new long[nb], would = new long[nb];
+            long water = 0, ice = 0;
+            List<float> mountainT = new();
+            List<(float T, bool Snow)> high = new();
+            for (int i = 0; i < n; i++){
+                int b = c.Biome[i];
+                short top = c.Top[i];
+                float t = Value(tSlot, i);
+                snowLine[i] = rules.ColdThreshold(t, Value(snowSlot, i), rules.SnowTemperature);
+                treeLine[i] = rules.TreeLine(t, Value(treeSlot, i));
+                dry[i] = top >= surfaceY;
+                never[i] = b < nb && data.Defs[b].neverSnows != 0;
+                above[i] = dry[i] && top >= snowLine[i];
+                snow[i] = above[i] && !never[i];
+                if (!dry[i]){
+                    water++;
+                    if (!never[i] && rules.ColdAt(surfaceY, t, Value(iceSlot, i), rules.IceTemperature)){
+                        ice++;
+                        if (r.Tour.All(s => !s.What.StartsWith("sea ice", StringComparison.Ordinal)))
+                            r.Tour.Add(new TourSpot{ What = $"sea ice ({r.Names[b]}, T {F(t)})", X = (int)grid[i].x, Z = (int)grid[i].y, Y = surfaceY + 12 });
+                    }
+
+                    continue;
+                }
+
+                if (b >= nb) continue;
+                r.Dry[b]++;
+                if (snow[i]) snowy[b]++;
+                if (above[i] && never[i]) would[b]++;
+                if (b == mountain){
+                    mountainT.Add(t);
+                    if (top >= 200) high.Add((t, snow[i]));
+                }
+            }
+
+            for (int b = 0; b < nb; b++){
+                r.SnowShare[b] = r.Dry[b] > 0 ? (double)snowy[b] / r.Dry[b] : double.NaN;
+                r.WouldSnowShare[b] = r.Dry[b] > 0 ? (double)would[b] / r.Dry[b] : double.NaN;
+            }
+
+            r.IceShare = water > 0 ? (double)ice / water : 0;
+            r.MountainT = mountainT.ToArray();
+            if (mountainT.Count > 0){
+                mountainT.Sort();
+                r.MedianMountainT = mountainT[mountainT.Count / 2];
+                r.SnowLineAtMedian = rules.ColdThreshold(r.MedianMountainT, 0f, rules.SnowTemperature);
+            }
+
+            high.Sort((a, b) => a.T.CompareTo(b.T));
+            for (int k = 0; k < 5 && high.Count >= 5; k++){
+                int from = high.Count * k / 5, to = high.Count * (k + 1) / 5;
+                int count = to - from, snowCount = 0;
+                for (int i = from; i < to; i++)
+                    if (high[i].Snow)
+                        snowCount++;
+                r.MountainBands.Add((high[from].T, high[to - 1].T, count, count > 0 ? (double)snowCount / count : double.NaN));
+            }
+
+            // Edges: snow next to no snow. Hard where the snowless side is a never-snow biome above its snow line.
+            int hardSpots = 0;
+            for (int z = 0; z < side; z++)
+            for (int x = 0; x < side; x++){
+                int i = z * side + x;
+                for (int k = 0; k < 2; k++){
+                    int j = k == 0 ? (x + 1 < side ? i + 1 : -1) : (z + 1 < side ? i + side : -1);
+                    if (j < 0 || snow[i] == snow[j]) continue;
+                    r.SnowEdges++;
+                    int bare = snow[i] ? j : i;
+                    if (!(above[bare] && never[bare])) continue;
+                    r.HardEdges++;
+                    if (hardSpots++ < 2)
+                        r.Tour.Add(new TourSpot{
+                            What = $"hard snow edge {r.Names[c.Biome[i]]} | {r.Names[c.Biome[j]]}", X = (int)grid[i].x, Z = (int)grid[i].y, Y = math.max(c.Top[i], c.Top[j]) + 6
+                        });
+                }
+            }
+
+            // Tour: the snow line at the median Mountain T, an alpine band below it, the highest snowy Mountain ground.
+            if (mountain >= 0 && !float.IsNaN(r.MedianMountainT)){
+                int best = -1, alpine = -1, peak = -1;
+                float bestScore = float.MaxValue;
+                for (int i = 0; i < n; i++){
+                    if (c.Biome[i] != mountain || !dry[i]) continue;
+                    float t = Value(tSlot, i);
+                    float score = math.abs(t - r.MedianMountainT) * 100f + math.abs(c.Top[i] - snowLine[i]);
+                    if (math.abs(c.Top[i] - snowLine[i]) <= 2 && score < bestScore){
+                        bestScore = score;
+                        best = i;
+                    }
+
+                    if (alpine < 0 && c.Top[i] >= treeLine[i] && c.Top[i] < snowLine[i] - 4) alpine = i;
+                    if (snow[i] && (peak < 0 || c.Top[i] > c.Top[peak])) peak = i;
+                }
+
+                if (best >= 0)
+                    r.Tour.Add(new TourSpot{ What = $"snow line at the median Mountain T (y {snowLine[best]})", X = (int)grid[best].x, Z = (int)grid[best].y, Y = c.Top[best] + 8 });
+                if (alpine >= 0)
+                    r.Tour.Add(new TourSpot{ What = $"alpine band (tree line {treeLine[alpine]}, snow line {snowLine[alpine]})", X = (int)grid[alpine].x, Z = (int)grid[alpine].y, Y = c.Top[alpine] + 8 });
+                if (peak >= 0)
+                    r.Tour.Add(new TourSpot{ What = "highest snowy Mountain ground", X = (int)grid[peak].x, Z = (int)grid[peak].y, Y = c.Top[peak] + 8 });
+            }
+
+            return r;
+        }
+
+        /// <summary>T_snow that puts the snow line at y 210 at the median Mountain T (DEC-175): T_med − (210 − lapseFrom) · L = T_med − 86 L.</summary>
+        public static float CalibratedSnowTemperature(float medianMountainT, in SurfaceRules rules, int snowLine = 210){
+            return medianMountainT - (snowLine - rules.LapseFrom) * rules.Lapse;
+        }
+
+        public static float Median(IEnumerable<float> values){
+            List<float> list = values.ToList();
+            if (list.Count == 0) return float.NaN;
+            list.Sort();
+            return list[list.Count / 2];
+        }
+
+        public static string Text(SnowReportSeed r, in SurfaceRules rules){
+            StringBuilder sb = new();
+            sb.AppendLine($"=== Snow report · seed {r.Seed} ===");
+            sb.AppendLine($"median Mountain T {F(r.MedianMountainT)} → snow line y {r.SnowLineAtMedian} (target 210 ± 2: {(math.abs(r.SnowLineAtMedian - 210) <= 2 ? "pass" : "FAIL")}) · " +
+                          $"T_snow {F(rules.SnowTemperature)}, L {F(rules.Lapse, "0.0000")} · sea ice {BiomeWorldReport.P(r.IceShare, "0.00")} of the open water");
+            sb.AppendLine("Mountain ground at y 200 and above, snow share per T band (equal counts):");
+            foreach ((float from, float to, int samples, double share) in r.MountainBands)
+                sb.AppendLine($"  T {F(from),6} … {F(to),6}: {BiomeWorldReport.P(share),6} of {samples}");
+            sb.AppendLine("biome        dry      snow   above its snow line but never snows");
+            for (int b = 0; b < r.Names.Length; b++){
+                if (r.Dry[b] == 0) continue;
+                sb.AppendLine($"{r.Names[b],-11} {r.Dry[b],7} {BiomeWorldReport.P(r.SnowShare[b]),7}   {BiomeWorldReport.P(r.WouldSnowShare[b], "0.00")}");
+            }
+
+            sb.AppendLine($"hard snow edges (snow next to a never-snow biome above its snow line): {r.HardEdges} of {r.SnowEdges} snow edges " +
+                          $"({BiomeWorldReport.P(r.SnowEdges > 0 ? (double)r.HardEdges / r.SnowEdges : 0, "0.00")})");
+            sb.AppendLine("tour list:");
+            foreach (TourSpot s in r.Tour) sb.AppendLine("  " + s);
+            return sb.ToString();
+        }
+
+        private static string F(float v, string format = "0.000"){
+            return float.IsNaN(v) ? "-" : v.ToString(format, CultureInfo.InvariantCulture);
+        }
+    }
+}

@@ -187,6 +187,21 @@ namespace Engine.Scripts.WorldGen.Surface{
 
         public readonly bool IsCreated => Biomes.IsCreated;
 
+        /// <summary>Whether rules are attached: the fill runs them only then (an <see cref="Empty" /> set has none).</summary>
+        public readonly bool HasRules => Biomes.IsCreated && Biomes.Length > 0;
+
+        /// <summary>
+        ///     A set without rules: every container is created (zero length), so the jobs that carry a config without
+        ///     rules see valid containers; <see cref="HasRules" /> is false.
+        /// </summary>
+        public static SurfaceRules Empty(Allocator allocator){
+            return new SurfaceRules{
+                Biomes = new NativeArray<BiomeRules>(0, allocator), Nodes = new NativeArray<RuleNode>(0, allocator), Actions = new NativeArray<SurfaceAction>(0, allocator),
+                Flags = new NativeArray<ColumnFlagDef>(0, allocator), Ints = new NativeArray<ColumnIntDef>(0, allocator), Outputs = new NativeArray<RuleOutput>(0, allocator),
+                Thresholds = new NativeArray<int>(0, allocator), TemperatureSlot = -1, PreliminarySurfaceSlot = -1, IceWobble = -1, SnowWobble = -1, TreeLineWobble = -1
+            };
+        }
+
         public readonly bool HasRulesFor(int biome){
             return Biomes.IsCreated && biome >= 0 && biome < Biomes.Length && Biomes[biome].HasRules != 0;
         }
