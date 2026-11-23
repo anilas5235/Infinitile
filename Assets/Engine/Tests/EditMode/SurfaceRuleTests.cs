@@ -86,7 +86,7 @@ namespace Engine.Tests.EditMode{
 
         /// <summary>
         ///     Up to four chunks per kind, nearest to the origin first, from T and the preliminary surface at the centres
-        ///     of a grid of chunks: snow (surface ≥ 215), alpine (surface 180 … 205), ice (T &lt; −0.68, surface &lt; 112), coast (surface within 2 of
+        ///     of a grid of chunks: snow (surface 8 above the centre's snow line), alpine (between its tree line + 4 and snow line − 6), ice (T &lt; −0.68, surface &lt; 112), coast (surface within 2 of
         ///     the water), lowland (surface 135 … 165) and hot (T &gt; 0.45, dry).
         /// </summary>
         private IEnumerable<(string Kind, int2 Chunk)> SampleChunks(){
@@ -106,8 +106,10 @@ namespace Engine.Tests.EditMode{
             for (int i = 0; i < chunks.Count; i++){
                 float t = values[tSlot * points.Length + i], s = values[sSlot * points.Length + i];
                 if (s < 112f) _coldestWater = math.min(_coldestWater, t);
-                string kind = s >= 215f ? "snow"
-                    : s >= 180f && s < 205f ? "alpine"
+                // Snow and alpine from the chunk centre's own lines, so a climate refit keeps the samples.
+                int snowLine = Rules.ColdThreshold(t, 0f, Rules.SnowTemperature), treeLine = Rules.TreeLine(t, 0f);
+                string kind = s >= snowLine + 8f && s >= 160f ? "snow"
+                    : s >= treeLine + 4f && s < snowLine - 6f ? "alpine"
                     : t < -0.68f && s < 112f ? "ice"
                     : math.abs(s - _waterLevel) < 2f ? "coast"
                     : s >= 135f && s <= 165f && t <= 0.45f ? "lowland"
@@ -224,12 +226,13 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void Validator_ReportsIceThatCanBeWarmerThanSnow(){
+        public void Validator_WarnsAboutIceThatCanBeWarmerThanSnow(){
+            // A warning since DEC-176: frozen water may meet a snowless shore.
             SurfaceRuleSet set = Parse("{ 'formatVersion': 1, " + Climate.Replace("'iceTemperature': -0.6", "'iceTemperature': -0.45") +
                                        ", 'default': [{ 'name': 'top', 'if': 'floor', 'then': { 'block': '@top' } }] }");
             using SurfaceRuleCompileResult r = Compile(set);
-            AssertError(r, "climate");
-            StringAssert.Contains("W2-CLM-05", Errors(r));
+            Assert.IsTrue(r.Succeeded, r.ErrorText());
+            Assert.IsTrue(r.Messages.Any(m => m.Severity == LayoutSeverity.Warning && m.Kind == "climate" && m.Text.Contains("W2-CLM-05")), Errors(r));
         }
 
         [Test]
@@ -320,6 +323,8 @@ namespace Engine.Tests.EditMode{
             for (float t = -1.2f; t <= 1.2f; t += 0.0137f){
                 int tree = rules.TreeLine(t, 0f);
                 Assert.GreaterOrEqual(tree, (int)rules.TreeLineFloor);
+                // The floor holds with the wobble too (W2-CLM-04).
+                Assert.GreaterOrEqual(rules.TreeLine(t, -8f), (int)rules.TreeLineFloor, $"T {t}, wobble -8");
                 float free = rules.LapseFrom + (t - rules.TreeTemperature) / rules.Lapse;
                 if (free <= rules.TreeLineFloor + 1f || free >= 240f) continue;
                 int snow = rules.ColdThreshold(t, 0f, rules.SnowTemperature);
@@ -538,7 +543,8 @@ namespace Engine.Tests.EditMode{
                             underRule = "beach under snow";
                             under = def.beachBlock;
                         }
-                        else if (dry && !beachTop && (steep || alpine) && def.rockBlock != 0 && d <= 4){
+                        // below_tree_line is a per-voxel test: the rock under an alpine top stops at the tree line.
+                        else if (dry && !beachTop && (steep || y >= r.TreeLine[c]) && def.rockBlock != 0 && d <= 4){
                             underRule = steep ? "steep" : "alpine";
                             under = def.rockBlock;
                         }

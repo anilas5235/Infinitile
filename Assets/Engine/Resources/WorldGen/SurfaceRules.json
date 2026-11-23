@@ -3,7 +3,7 @@
   "climate": {
     "lapse": 0.0055,
     "lapseFrom": 124,
-    "snowTemperature": -0.473,
+    "snowTemperature": -0.638,
     "snowWobble": "snow_wobble",
     "iceTemperature": -0.6,
     "iceWobble": "ice_wobble",

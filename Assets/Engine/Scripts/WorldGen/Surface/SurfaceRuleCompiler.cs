@@ -53,8 +53,9 @@ namespace Engine.Scripts.WorldGen.Surface{
     ///         </item>
     ///         <item>
     ///             Errors: unknown biomes, blocks, slots and graph outputs, duplicate rule names, stone depth bounds
-    ///             above <see cref="SurfaceRules.MaxDepthBound" />, ice warmer than snow (W2-CLM-05). Warnings: a rule
-    ///             after an unconditional rule, a never-snow biome whose box reaches snow temperatures.
+    ///             above <see cref="SurfaceRules.MaxDepthBound" />, Warnings: a rule after an
+    ///             unconditional rule, a never-snow biome whose box reaches snow temperatures, ice warmer than snow
+    ///             (W2-CLM-05, DEC-176).
     ///         </item>
     ///     </list>
     /// </summary>
@@ -164,8 +165,9 @@ namespace Engine.Scripts.WorldGen.Surface{
                 Output(climate.IceWobble);
                 float iceWobble = WobbleBound(climate.IceWobble), snowWobble = WobbleBound(climate.SnowWobble);
                 if (climate.IceTemperature + iceWobble > climate.SnowTemperature - snowWobble)
-                    Error(null, $"W2-CLM-05: ice ({SurfaceRuleSet.Format(climate.IceTemperature)} ± {SurfaceRuleSet.Format(iceWobble)}) can be warmer than snow " +
-                                $"({SurfaceRuleSet.Format(climate.SnowTemperature)} ± {SurfaceRuleSet.Format(snowWobble)}): water would freeze where the ground has no snow.",
+                    // A warning since V4 (DEC-176): the snow refit (DEC-175) would otherwise push the ice into rarity.
+                    Warning("W2-CLM-05", $"W2-CLM-05: ice ({SurfaceRuleSet.Format(climate.IceTemperature)} ± {SurfaceRuleSet.Format(iceWobble)}) can be warmer than snow " +
+                                  $"({SurfaceRuleSet.Format(climate.SnowTemperature)} ± {SurfaceRuleSet.Format(snowWobble)}): water may freeze where the shore has no snow.",
                         "climate");
                 if (_needsTemperature && TemperatureSlot() < 0)
                     Error(null, $"The rules read the temperature, but the graph has no lattice output \"{GraphOutputs.Temperature}\".", "output");

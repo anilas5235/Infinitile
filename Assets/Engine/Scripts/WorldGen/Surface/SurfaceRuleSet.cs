@@ -237,7 +237,7 @@ namespace Engine.Scripts.WorldGen.Surface{
         public float Lapse = 0.0055f;
 
         public float LapseFrom = 124f;
-        public float SnowTemperature = -0.473f;
+        public float SnowTemperature = -0.638f;
         public string SnowWobble;
         public float IceTemperature = -0.6f;
         public string IceWobble;

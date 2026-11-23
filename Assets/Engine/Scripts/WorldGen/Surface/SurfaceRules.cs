@@ -226,10 +226,13 @@ namespace Engine.Scripts.WorldGen.Surface{
             return y;
         }
 
-        /// <summary>The tree line: voxels at y ≥ this lie above it (§8.3).</summary>
+        /// <summary>
+        ///     The tree line: voxels at y ≥ this lie above it (§8.5). The floor applies after the wobble, so the line
+        ///     never lies below it (W2-CLM-04, DEC-139).
+        /// </summary>
         public readonly int TreeLine(float temperature, float wobble){
             float y = Lapse > 0f ? LapseFrom + (temperature - TreeTemperature) / Lapse : TreeLineFloor;
-            return (int)math.ceil(math.max(TreeLineFloor, y) + wobble);
+            return (int)math.ceil(math.max(TreeLineFloor, y + wobble));
         }
 
         public void Dispose(){

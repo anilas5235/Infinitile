@@ -200,7 +200,7 @@ namespace Engine.Editor.WorldGen{
         public static string Text(SnowReportSeed r, in SurfaceRules rules){
             StringBuilder sb = new();
             sb.AppendLine($"=== Snow report · seed {r.Seed} ===");
-            sb.AppendLine($"median Mountain T {F(r.MedianMountainT)} → snow line y {r.SnowLineAtMedian} (target 210 ± 2: {(math.abs(r.SnowLineAtMedian - 210) <= 2 ? "pass" : "FAIL")}) · " +
+            sb.AppendLine($"median Mountain T {F(r.MedianMountainT)} → snow line y {r.SnowLineAtMedian} (the calibration pools the five seeds: y 210 at their joint median) · " +
                           $"T_snow {F(rules.SnowTemperature)}, L {F(rules.Lapse, "0.0000")} · sea ice {BiomeWorldReport.P(r.IceShare, "0.00")} of the open water");
             sb.AppendLine("Mountain ground at y 200 and above, snow share per T band (equal counts):");
             foreach ((float from, float to, int samples, double share) in r.MountainBands)
