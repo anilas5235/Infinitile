@@ -80,8 +80,9 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                  + "neighbour with a higher target cannot win its summits by height alone.")]
         [SerializeField] public bool TargetHeightIsFloor;
 
-        [Tooltip("Only columns under water may take this biome (Terrain-first only): a column whose top block is "
-                 + "dry never classifies to it, the next nearest biome takes it. On for Ocean.")]
+        [Tooltip("Water biome: only columns under water may take this biome. v1 (Terrain-first): a dry column never "
+                 + "classifies to it, the next nearest biome takes it. v2 (density): the dry-column rule gives a dry column "
+                 + "of this biome the nearest land box (§6.5). On for Ocean.")]
         [SerializeField] [UnityEngine.Serialization.FormerlySerializedAs("SubmergedOnly")]
         public bool IsUnderwaterBiome;
 
@@ -98,6 +99,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
         [Tooltip("Jaggedness J_b: amplitude of the peak noise in blocks.")]
         [SerializeField] public float Jaggedness;
+
+        // --- WorldGen v2 layout ---------------------------------------------------------------------------------------
+
+        [Tooltip("WorldGen v2: the parameter boxes that place this biome (§6.1). Boxes of one data source must not " +
+                 "overlap; a point in no box takes the nearest box. v1 ignores them.")]
+        [SerializeField] public List<Engine.Scripts.WorldGen.Biomes.BiomeBox> Boxes = new();
 
         // --- Flora ----------------------------------------------------------------------------------------------------
 

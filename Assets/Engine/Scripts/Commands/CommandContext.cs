@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Engine.Scripts.Commands{
@@ -14,6 +15,21 @@ namespace Engine.Scripts.Commands{
 
         /// <summary>Sets one voxel the way block placing does (light and meshes follow); false when it could not.</summary>
         bool SetVoxel(ushort id, Vector3Int position);
+    }
+
+    /// <summary>
+    ///     Finding places in the generated world without generating chunks (WorldGen v2 §13.6): implemented by
+    ///     worlds that can (the density generator); <see cref="LocateCommand" /> looks for it on the world.
+    /// </summary>
+    public interface ICommandLocator{
+        /// <summary>What can be found: the world's biome names, and "peak".</summary>
+        IReadOnlyList<string> LocateTargets{ get; }
+
+        /// <summary>
+        ///     The nearest place of <paramref name="target" /> to <paramref name="from" />: x and z of the column, y one
+        ///     block above its top terrain voxel. False with <paramref name="error" /> when there is none.
+        /// </summary>
+        bool Locate(string target, Vector3 from, out Vector3Int position, out string error);
     }
 
     /// <summary>The player as commands see it.</summary>

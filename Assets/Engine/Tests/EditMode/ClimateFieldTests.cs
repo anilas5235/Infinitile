@@ -8,6 +8,8 @@ using UnityEngine;
 
 namespace Engine.Tests.EditMode{
     /// <summary>Field sanity and periodicity of the detail octaves, P and the climate fields.</summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class ClimateFieldTests{
         private const uint Seed = 1337u;
         private ClimateParams _climate;

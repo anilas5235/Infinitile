@@ -2,9 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Engine.Scripts.WorldGen.Biomes;
+using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Density;
 using Engine.Scripts.WorldGen.Graph;
+using Engine.Scripts.WorldGen.Settings;
+using Unity.Collections;
 using Unity.Mathematics;
+using UnityEditor;
 
 namespace Engine.Editor.WorldGen{
     /// <summary>Chunk classes of the benchmark fixture (§17.5); the cavern and lava mask classes come in V6a.</summary>
@@ -24,6 +29,23 @@ namespace Engine.Editor.WorldGen{
     public static class DensityFixture{
         public const string GraphPath = "Assets/Engine/Tests/Fixtures/DensityFixture/NoiseGraph.json";
         public const uint Seed = 1337u;
+
+        /// <summary>The shipped biome set and the shipped DistanceBlend width (WorldGenSettings.MaterialBlendWidth).</summary>
+        public const string BiomeSetPath = "Assets/EngineSettings/BiomeSet_Default.asset";
+
+        public const float BlendWidth = 32f;
+
+        /// <summary>
+        ///     Gives <paramref name="cfg" /> the shipped biome layout and the DistanceBlend material kernel, so the biome
+        ///     and blend passes (P2, P3) run as in the game; disposes what it replaces.
+        /// </summary>
+        public static void UseShippedBiomes(ref WorldGenConfig cfg, Allocator allocator = Allocator.Persistent){
+            if (cfg.Layout.IsCreated) cfg.Layout.Dispose();
+            cfg.Layout = BiomeLayoutData.Create(BiomeLayout.FromBiomeSet(AssetDatabase.LoadAssetAtPath<BiomeSet>(BiomeSetPath)), null, allocator);
+            if (cfg.MaterialTaps.IsCreated) cfg.MaterialTaps.Dispose();
+            cfg.MaterialMethod = BlendMethod.DistanceBlend;
+            cfg.MaterialKernel = KernelSet.Build(BlendWidth, allocator, out cfg.MaterialTaps);
+        }
 
         public static readonly DensityChunkClass[] Classes = (DensityChunkClass[])Enum.GetValues(typeof(DensityChunkClass));
 

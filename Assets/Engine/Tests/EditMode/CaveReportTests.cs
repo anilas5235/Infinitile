@@ -25,6 +25,7 @@ namespace Engine.Tests.EditMode{
     /// </summary>
     [Category(TestTiers.Report)]
     [Explicit(TestTiers.ReportReason)]
+    [Category(TestTiers.LegacyV1)]
     public class CaveReportTests{
         private const string ShippedSettingsPath = "Assets/EngineSettings/WorldGenSettings.asset";
         private const int Size = 4096;

@@ -21,13 +21,14 @@ namespace Engine.Scripts.Commands{
         /// <summary>The commands sorted by name.</summary>
         public IReadOnlyList<ConsoleCommand> Commands => _commands;
 
-        /// <summary>A registry with help, clear, teleport and setvoxel.</summary>
+        /// <summary>A registry with help, clear, teleport, setvoxel and locate.</summary>
         public static CommandRegistry CreateWithBuiltins(){
             CommandRegistry registry = new();
             registry.Register(new HelpCommand());
             registry.Register(new ClearCommand());
             registry.Register(new TeleportCommand());
             registry.Register(new SetVoxelCommand());
+            registry.Register(new LocateCommand());
             return registry;
         }
 

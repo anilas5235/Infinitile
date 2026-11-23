@@ -7,6 +7,8 @@ namespace Engine.Tests.EditMode{
     ///     The soft height limit (2026-11-10): H above HeightMax − band bends towards HeightMax instead of being cut
     ///     flat there; band 0 is the hard clamp.
     /// </summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class HeightLimitTests{
         private static WorldGenConfig Cfg(float band){
             return new WorldGenConfig{ HeightMin = 50f, HeightMax = 250f, HeightSoftBand = band };

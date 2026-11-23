@@ -38,6 +38,27 @@ namespace Engine.Scripts.WorldGen.Density{
 
         public const int Voxels = ChunkSize * Height * ChunkSize;
         public const int Columns = ChunkSize * ChunkSize;
+
+        /// <summary>
+        ///     Columns the biome passes reach before the chunk on x and z (P2, §6): the blend kernel's radius (R = 16,
+        ///     §12), so P3 reads the hard biome of every tap. V6b's flora ring widens it.
+        /// </summary>
+        public const int BiomePadding = 16;
+
+        /// <summary>Columns along x and z of the padded biome map: 64.</summary>
+        public const int BiomeSpan = ChunkSize + 2 * BiomePadding;
+
+        /// <summary>Lattice points along x and z of the padded biome map: 17.</summary>
+        public const int BiomeLattice = BiomeSpan / CellXZ + 1;
+
+        /// <summary>Lattice index of the biome map's first corner column.</summary>
+        public const int BiomeLatticeOffset = (Padding - BiomePadding) / CellXZ;
+
+        /// <summary>Cells along x and z of the padded biome map: 16.</summary>
+        public const int BiomeCells = BiomeSpan / CellXZ;
+
+        /// <summary>The y of the wetness test (AD-08): the top water layer.</summary>
+        public const int WetnessY = 123;
     }
 
     /// <summary>
@@ -70,6 +91,34 @@ namespace Engine.Scripts.WorldGen.Density{
         /// <summary>128 interpolated values of one block.</summary>
         public float* Block;
 
+        /// <summary>[z][x] over the padded biome map (64²): the hard biome (after the dry-column rule) and the wet flag.</summary>
+        public byte* Hard, Wet;
+
+        /// <summary>[lz][lx] over the biome lattice (17²): 0 surely dry, 1 surely wet, 2 undecided; 3 when its layers are computed.</summary>
+        public byte* PointState;
+
+        /// <summary>[lz][lx][2]: the terrain marker at the two corner layers around the wetness y.</summary>
+        public float* WetLayers;
+
+        /// <summary>Per chunk column (x · 32 + z): the surface-source biome (§12, AD-25).</summary>
+        public byte* Surface;
+
+        /// <summary>Per chunk column: the 4 largest blend weights' biomes (255 unused, by id) and weights (Σ 1).</summary>
+        public int4* BlendBiomes;
+
+        public float4* BlendWeights;
+
+        /// <summary>The blend's per-biome sums (256) and the ids it touched.</summary>
+        public float* BlendSums;
+
+        public byte* Touched;
+
+        /// <summary>Summed-area tables of the biome map's x and z edges, 65², for the uniform-window test.</summary>
+        public int* EdgesX, EdgesZ;
+
+        /// <summary>Per chunk column (z · 32 + x): the border threshold of the surface pick.</summary>
+        public float* Border;
+
         private Allocator _allocator;
 
         public static DensityChunkBuffers Allocate(int latticeValues, Allocator allocator){
@@ -92,8 +141,21 @@ namespace Engine.Scripts.WorldGen.Density{
                 LastOpen = Ints(cellColumns, allocator),
                 Solid = (byte*)UnsafeUtility.Malloc(DensityLayout.Voxels, 64, allocator),
                 Heightmap = (short*)UnsafeUtility.Malloc(DensityLayout.Columns * sizeof(short), 64, allocator),
-                Block = Floats(GraphLimits.MaxLanes, allocator)
+                Block = Floats(GraphLimits.MaxLanes, allocator),
+                Hard = (byte*)UnsafeUtility.Malloc(DensityLayout.BiomeSpan * DensityLayout.BiomeSpan, 64, allocator),
+                Wet = (byte*)UnsafeUtility.Malloc(DensityLayout.BiomeSpan * DensityLayout.BiomeSpan, 64, allocator),
+                PointState = (byte*)UnsafeUtility.Malloc(DensityLayout.BiomeLattice * DensityLayout.BiomeLattice, 64, allocator),
+                WetLayers = Floats(DensityLayout.BiomeLattice * DensityLayout.BiomeLattice * 2, allocator),
+                Surface = (byte*)UnsafeUtility.Malloc(DensityLayout.Columns, 64, allocator),
+                BlendBiomes = (int4*)UnsafeUtility.Malloc(DensityLayout.Columns * sizeof(int4), 64, allocator),
+                BlendWeights = (float4*)UnsafeUtility.Malloc(DensityLayout.Columns * sizeof(float4), 64, allocator),
+                BlendSums = Floats(256, allocator),
+                Touched = (byte*)UnsafeUtility.Malloc(256, 64, allocator),
+                EdgesX = Ints((DensityLayout.BiomeSpan + 1) * (DensityLayout.BiomeSpan + 1), allocator),
+                EdgesZ = Ints((DensityLayout.BiomeSpan + 1) * (DensityLayout.BiomeSpan + 1), allocator),
+                Border = Floats(DensityLayout.Columns, allocator)
             };
+            UnsafeUtility.MemClear(b.BlendSums, 256 * sizeof(float));
             // Lanes past a program's count are read (padded to four) but never used; clear them once.
             UnsafeUtility.MemClear(b.Registers, GraphInterpreter.RegisterFloats * sizeof(float));
             return b;
@@ -123,6 +185,18 @@ namespace Engine.Scripts.WorldGen.Density{
             UnsafeUtility.Free(Solid, _allocator);
             UnsafeUtility.Free(Heightmap, _allocator);
             UnsafeUtility.Free(Block, _allocator);
+            UnsafeUtility.Free(Hard, _allocator);
+            UnsafeUtility.Free(Wet, _allocator);
+            UnsafeUtility.Free(PointState, _allocator);
+            UnsafeUtility.Free(WetLayers, _allocator);
+            UnsafeUtility.Free(Surface, _allocator);
+            UnsafeUtility.Free(BlendBiomes, _allocator);
+            UnsafeUtility.Free(BlendWeights, _allocator);
+            UnsafeUtility.Free(BlendSums, _allocator);
+            UnsafeUtility.Free(Touched, _allocator);
+            UnsafeUtility.Free(EdgesX, _allocator);
+            UnsafeUtility.Free(EdgesZ, _allocator);
+            UnsafeUtility.Free(Border, _allocator);
         }
     }
 

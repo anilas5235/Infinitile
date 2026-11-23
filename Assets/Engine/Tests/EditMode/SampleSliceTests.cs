@@ -18,6 +18,8 @@ namespace Engine.Tests.EditMode{
     ///     Slices and the cave volume of the region API against the chunk job, on the shipped settings with caves on
     ///     and a local voxel id table.
     /// </summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class SampleSliceTests{
         private const string ShippedSettingsPath = "Assets/EngineSettings/WorldGenSettings.asset";
 

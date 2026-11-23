@@ -1,0 +1,9 @@
+{
+  "formatVersion": 1,
+  "noises": {
+    "testmod_wobble": { "kind": "simplex2", "octaves": 2, "wavelength": 96, "amplitude": 1 }
+  },
+  "outputs": {
+    "testmod_wobble": { "op": "fbm", "noise": "testmod_wobble" }
+  }
+}

@@ -62,5 +62,15 @@ namespace Engine.Scripts.WorldGen.Graph{
         ///     "node" and an optional "perColumn" flag.
         /// </summary>
         public readonly SortedDictionary<string, object> Outputs = new(System.StringComparer.Ordinal);
+
+        /// <summary>
+        ///     Merges a later data source's graph by name (WorldGen v2 §14): its noises, nodes and outputs are added, and
+        ///     replace those of the same name. The merged graph goes through the validator as a whole.
+        /// </summary>
+        public void MergeFrom(NoiseGraph later){
+            foreach (KeyValuePair<string, NoiseDefinition> pair in later.Noises) Noises[pair.Key] = pair.Value;
+            foreach (KeyValuePair<string, GraphNodeDefinition> pair in later.Nodes) Nodes[pair.Key] = pair.Value;
+            foreach (KeyValuePair<string, object> pair in later.Outputs) Outputs[pair.Key] = pair.Value;
+        }
     }
 }

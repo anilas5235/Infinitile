@@ -23,6 +23,8 @@ namespace Engine.Tests.EditMode{
     ///     of shore have no beach, and a beach needs water nearby. Beach-ground plants grow only there, other plants
     ///     never; the chunk job agrees with the pure region API in both architectures.
     /// </summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class BeachTests{
         private FloraFixture _fixture;
         private GeneratorConfig _config;

@@ -12,6 +12,15 @@ namespace Engine.Scripts.WorldGen.Graph{
     ///     hand-written comparison code. lerp(a, b, t) is a + t (b − a); x first, then z, then y.
     /// </summary>
     public static unsafe class GraphInterpolation{
+        /// <summary>
+        ///     1 / cell height. Cell heights are 4 or 8: the compiler builds one corner program for each, so a constant
+        ///     replaces the division and every caller gets the same bits.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float InverseCellHeight(int cellHeight){
+            return cellHeight == 4 ? 0.25f : 0.125f;
+        }
+
         /// <summary>Corner slots per corner column and marker: y 0 to the world height at cell height 4.</summary>
         public const int CornerStride = GraphLimits.WorldHeight / 4 + 1;
 
@@ -48,7 +57,7 @@ namespace Engine.Scripts.WorldGen.Graph{
         public static void Trilinear(float* c00, float* c10, float* c01, float* c11, int cellHeight, int baseY, float* lanes){
             // Four lanes along x at a time; the corner values are read once per row, since the stores into lanes may
             // alias the corner columns for all the compiler knows.
-            float inverse = cellHeight == 4 ? 0.25f : 0.125f;
+            float inverse = InverseCellHeight(cellHeight);
             float4 tx = new(0f, 0.25f, 0.5f, 0.75f);
             for (int ly = 0; ly < GraphLimits.CellBlockHeight; ly++){
                 int y = baseY + ly;

@@ -22,6 +22,8 @@ namespace Engine.Tests.EditMode{
     ///     strata and ice agree as well, and the same input gives the same output in any chunk order. The fixture turns
     ///     the caves off; the cave tests cover flora on carved ground.
     /// </summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class FloraChunkTests{
         private FloraFixture _fixture;
         private GeneratorConfig _config;

@@ -72,7 +72,7 @@ namespace Engine.Tests.EditMode{
             Assert.IsTrue(registry.TryGet("Teleport", out ConsoleCommand teleport));
             Assert.AreSame(tp, teleport);
             Assert.IsFalse(registry.TryGet("fly", out _));
-            CollectionAssert.AreEqual(new[]{ "clear", "help", "setvoxel", "teleport" },
+            CollectionAssert.AreEqual(new[]{ "clear", "help", "locate", "setvoxel", "teleport" },
                 registry.Commands.Select(c => c.Name).ToArray());
         }
 
@@ -208,7 +208,7 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void Complete_CommandNamesThenAliases(){
             CommandConsole console = NewConsole();
-            CollectionAssert.AreEqual(new[]{ "clear", "help", "setvoxel", "teleport" }, Items(console, ""));
+            CollectionAssert.AreEqual(new[]{ "clear", "help", "locate", "setvoxel", "teleport" }, Items(console, ""));
             CollectionAssert.AreEqual(new[]{ "teleport", "tp" }, Items(console, "/t"));
             CollectionAssert.AreEqual(new[]{ "help" }, Items(console, "HE"));
             Assert.AreEqual(0, Items(console, "fly").Length);
@@ -338,8 +338,9 @@ namespace Engine.Tests.EditMode{
             CommandConsole console = NewConsole();
             console.Submit("help");
             string[] lines = console.Lines.Skip(1).Select(l => l.Text).ToArray();
-            Assert.AreEqual(4, lines.Length);
-            Assert.AreEqual("teleport <x> <y> <z>  ·  Moves the player to x y z.", lines[3]);
+            Assert.AreEqual(5, lines.Length);
+            Assert.AreEqual("teleport <x> <y> <z>  ·  Moves the player to x y z.", lines[4]);
+            Assert.AreEqual("locate <target>  ·  Finds the nearest biome, or the highest peak nearby.", lines[2]);
             Assert.AreEqual("help [command]  ·  Lists the commands, or shows how to use one.", lines[1]);
 
             console.Clear();
@@ -415,6 +416,39 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual("There is no world with voxels.", LastLine(console));
         }
 
+        // ── Locate ───────────────────────────────────────────────────────────
+
+        [Test]
+        public void Locate_PrintsTheNearestPlace_CaseIgnored(){
+            CommandConsole console = NewConsole();
+            console.World = new FakeLocatorWorld();
+            Assert.IsTrue(console.Submit("locate desert"));
+            Assert.AreEqual("Desert at 310 71 -4 (300 blocks away).", LastLine(console));
+            Assert.IsTrue(console.Submit("/locate peak"));
+            StringAssert.StartsWith("peak at 10 190 997", LastLine(console));
+        }
+
+        [Test]
+        public void Locate_RefusesUnknownTargetsMissingPlacesAndWorldsWithoutLocator(){
+            CommandConsole console = NewConsole();
+            console.World = new FakeLocatorWorld();
+            Assert.IsFalse(console.Submit("locate Volcano"));
+            Assert.AreEqual("Unknown target 'Volcano'. Known: Desert, Ocean, peak.", LastLine(console));
+            Assert.IsFalse(console.Submit("locate Ocean"));
+            Assert.AreEqual("No Ocean within 20000 blocks.", LastLine(console));
+            console.World = _world;
+            Assert.IsFalse(console.Submit("locate Desert"));
+            Assert.AreEqual("This world cannot locate places.", LastLine(console));
+        }
+
+        [Test]
+        public void Locate_CompletesTargets(){
+            CommandConsole console = NewConsole();
+            console.World = new FakeLocatorWorld();
+            CollectionAssert.AreEqual(new[]{ "Desert", "Ocean", "peak" }, Items(console, "locate "));
+            CollectionAssert.AreEqual(new[]{ "Ocean" }, Items(console, "locate o"));
+        }
+
         // ── Fakes ────────────────────────────────────────────────────────────
 
         /// <summary>A world whose chunks with x ≥ 0 are loaded.</summary>
@@ -432,6 +466,37 @@ namespace Engine.Tests.EditMode{
                 if (Refuse) return false;
                 Set[position] = id;
                 return true;
+            }
+        }
+
+        /// <summary>A world with Desert 300 blocks east of the player, no Ocean, and a peak.</summary>
+        private sealed class FakeLocatorWorld : ICommandWorld, ICommandLocator{
+            public VoxelNameIndex Voxels{ get; } = new(CommandConsoleTests.Voxels);
+            public int Height => 256;
+            public IReadOnlyList<string> LocateTargets{ get; } = new[]{ "Desert", "Ocean", "peak" };
+
+            public bool IsLoaded(Vector3Int position){
+                return true;
+            }
+
+            public bool SetVoxel(ushort id, Vector3Int position){
+                return false;
+            }
+
+            public bool Locate(string target, Vector3 from, out Vector3Int position, out string error){
+                error = null;
+                position = default;
+                switch (target){
+                    case "Desert":
+                        position = new Vector3Int(Mathf.RoundToInt(from.x) + 300, 71, Mathf.RoundToInt(from.z));
+                        return true;
+                    case "peak":
+                        position = new Vector3Int(10, 190, 997);
+                        return true;
+                    default:
+                        error = $"No {target} within 20000 blocks.";
+                        return false;
+                }
             }
         }
 

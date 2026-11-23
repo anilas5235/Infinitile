@@ -17,6 +17,8 @@ namespace Engine.Tests.EditMode{
     ///     The per-column flora decision on the pure sampler and the region API, the structure expansion and the
     ///     config tables the chunk job stamps from.
     /// </summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class FloraPlacementTests{
         private const int WaterLevel = 124;
 

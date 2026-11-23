@@ -6,6 +6,8 @@ using Engine.Scripts.Settings;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.World;
+using Engine.Scripts.WorldGen.Biomes;
+using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Density;
 using Engine.Scripts.WorldGen.Graph;
 using Engine.Scripts.WorldGen.Settings;
@@ -80,7 +82,16 @@ namespace Engine.Scripts.Jobs.Chunk{
             _chunkManager = chunkManager;
             _config = config;
             _world = world;
-            if (config.WorldGen.Generator == WorldGenerator.Density) _graph = CompileDensityGraph(out _terrain, out _generatedCode);
+            if (config.WorldGen.Generator == WorldGenerator.Density){
+                _graph = CompileDensityGraph(out _terrain, out _generatedCode);
+                try{
+                    CheckLayout(settings.WorldGen, config.WorldGen, _graph);
+                }
+                catch{
+                    _graph.Dispose();
+                    throw;
+                }
+            }
             _jobs = new NativeList<int2>(Allocator.Domain);
             _results = new NativeParallelHashMap<int2, ChunkVoxelData>(
                 settings.Chunk.LoadDistance.SquareSize(),
@@ -104,8 +115,34 @@ namespace Engine.Scripts.Jobs.Chunk{
             return graph;
         }
 
+        /// <summary>
+        ///     The checks of WorldGen v2 §6.6 and §12 before the first chunk: the merged biome layout must have no
+        ///     validator errors (with ε and the parameter range from the graph), and the blend kernel must fit in the
+        ///     biome padding. Throws with every error.
+        /// </summary>
+        private static void CheckLayout(WorldGenSettings settings, in WorldGenConfig worldGen, CompiledNoiseGraph graph){
+            if (!worldGen.Layout.HasBoxes || settings == null) return;
+            LayoutValidation validation = BiomeLayoutValidator.Validate(BiomeLayout.FromBiomeSet(settings.Biomes), graph);
+            if (validation.HasErrors) throw new InvalidOperationException("The biome layout has errors:\n" + validation.ErrorText());
+            string blendError = BlendWidthError(worldGen.MaterialMethod, worldGen.MaterialKernel.Reach, settings.MaterialBlendWidth);
+            if (blendError != null) throw new InvalidOperationException(blendError);
+        }
+
+        /// <summary>
+        ///     The refusal of a blend kernel that reaches past the biome padding; null when the kernel fits or the
+        ///     method has no kernel.
+        /// </summary>
+        internal static string BlendWidthError(BlendMethod method, int reach, float width){
+            if (method != BlendMethod.DistanceBlend || reach <= DensityLayout.BiomePadding - 1) return null;
+            return $"MaterialBlendWidth {width} reaches {reach} columns; the biome padding allows " +
+                   $"{DensityLayout.BiomePadding - 1} (a width of at most 32).";
+        }
+
         /// <summary>The world-generation config the chunk jobs read; released with this scheduler.</summary>
         internal WorldGenConfig WorldGen => _config.WorldGen;
+
+        /// <summary>The compiled noise graph of the density generator; null for the other generators.</summary>
+        internal CompiledNoiseGraph Graph => _graph;
 
         /// <summary>
         ///     Gets a value indicating whether the scheduled job has completed.

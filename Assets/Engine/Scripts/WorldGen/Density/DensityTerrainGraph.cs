@@ -25,6 +25,22 @@ namespace Engine.Scripts.WorldGen.Density{
         /// <summary>Below this y the top slide leaves the density unchanged.</summary>
         public float SlideStart;
 
+        /// <summary>
+        ///     Lattice slots of the five climate parameters the biome boxes bound (T, F, C, E, W in
+        ///     <see cref="Engine.Scripts.WorldGen.Biomes.BiomeBox" /> order), −1 for a parameter the graph lacks (it reads 0).
+        /// </summary>
+        public int4 ClimateA;
+
+        public int ClimateW;
+
+        /// <summary>The column output of the blend's border noise (§12, <see cref="GraphOutputs.BlendBorder" />), −1 without it.</summary>
+        public int BorderColumn;
+
+        /// <summary>Lattice slot of climate parameter <paramref name="p" /> (0…4), −1 when the graph lacks it.</summary>
+        public readonly int ClimateSlot(int p){
+            return p < 4 ? ClimateA[p] : ClimateW;
+        }
+
         /// <summary>Corner layers per corner column: y 0 to the world height in steps of the cell height.</summary>
         public int Layers => GraphLimits.WorldHeight / CellHeight + 1;
 
@@ -59,16 +75,28 @@ namespace Engine.Scripts.WorldGen.Density{
                 CellHeight = cellHeight,
                 CornerProgram = cellHeight == 4 ? d.CornerProgram4 : d.CornerProgram8,
                 NoiseBound = math.max(math.abs(noise.Bounds.Min), math.abs(noise.Bounds.Max)),
-                SlideStart = slide.Bounds.Min
+                SlideStart = slide.Bounds.Min,
+                ClimateA = new int4(Slot(graph, GraphOutputs.Temperature), Slot(graph, GraphOutputs.Humidity), Slot(graph, GraphOutputs.Continentalness),
+                    Slot(graph, GraphOutputs.Erosion)),
+                ClimateW = Slot(graph, GraphOutputs.Weirdness),
+                BorderColumn = graph.Output(GraphOutputs.BlendBorder) is{ PerColumn: true, ColumnOutput: >= 0 } border ? border.ColumnOutput : -1
             };
             error = null;
             return true;
+        }
+
+        private static int Slot(CompiledNoiseGraph graph, string name){
+            GraphOutputInfo o = graph.Output(name);
+            return o is{ BoundOnly: false, LatticeValue: >= 0 } ? o.LatticeValue : -1;
         }
     }
 
     /// <summary>Work of the density passes, summed over chunks (W2-TST-05): the graph's own counters and the cell counts.</summary>
     public struct DensityWorkCounters{
         public GraphWorkCounters Graph;
+
+        /// <summary>The biome passes' own counts (P2, P3).</summary>
+        public BiomeWorkCounters Biomes;
 
         public long Chunks;
 
@@ -89,6 +117,7 @@ namespace Engine.Scripts.WorldGen.Density{
 
         public void Add(in DensityWorkCounters o){
             Graph.Add(o.Graph);
+            Biomes.Add(o.Biomes);
             Chunks += o.Chunks;
             CornerColumns += o.CornerColumns;
             Corners += o.Corners;
@@ -101,7 +130,7 @@ namespace Engine.Scripts.WorldGen.Density{
 
         public override string ToString(){
             return $"{Chunks} chunks: corner columns {CornerColumns}, corners {Corners}, blocks by range {BlocksByRange} / by sign {BlocksBySign} / mixed {BlocksMixed}, " +
-                   $"interpolated {InterpolatedVoxels}, solid {SolidVoxels}; graph: {Graph}";
+                   $"interpolated {InterpolatedVoxels}, solid {SolidVoxels}; {(Biomes.Columns > 0 ? Biomes + "; " : "")}graph: {Graph}";
         }
     }
 }

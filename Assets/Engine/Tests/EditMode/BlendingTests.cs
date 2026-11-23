@@ -24,6 +24,8 @@ namespace Engine.Tests.EditMode{
     ///     method-independence of the Terrain-first height, Biome-first linearity, method 4 in the hard limit,
     ///     argmax = hard class, weight normalisation and the dithered surface pick.
     /// </summary>
+    [Category(TestTiers.LegacyV1)]
+    [Explicit(TestTiers.LegacyV1Reason)]
     public class BlendingTests{
         private static readonly BlendMethod[] Methods ={
             BlendMethod.None, BlendMethod.DistanceBlend, BlendMethod.DistortedBoundary, BlendMethod.ParameterSpaceWeighting

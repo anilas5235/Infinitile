@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: WorldGenSettings
   m_EditorClassIdentifier: 
   Architecture: 0
+  Generator: 1
   MaterialMethod: 1
   MaterialBlendWidth: 32
   MaterialSigma: 0.04

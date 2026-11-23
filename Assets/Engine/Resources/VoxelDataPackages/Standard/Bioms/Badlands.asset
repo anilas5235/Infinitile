@@ -43,6 +43,13 @@ MonoBehaviour:
   - 0.15
   - 0.08
   Jaggedness: 0
+  Boxes:
+  - TemperatureRange: {x: 0.28, y: 1}
+    HumidityRange: {x: -1, y: -0.087}
+    ContinentalnessRange: {x: 0.09, y: 1}
+    ErosionRange: {x: -1, y: -0.05}
+    WeirdnessRange: {x: -1, y: 1}
+    DepthRange: {x: 0, y: 0}
   FloraRules:
   - SpeciesVoxel: {fileID: 11400000, guid: 7d70a9befae6460eb69514c9661cc35f, type: 2}
     SpeciesStructure: {fileID: 0}

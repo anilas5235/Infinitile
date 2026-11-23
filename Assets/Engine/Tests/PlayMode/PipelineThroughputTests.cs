@@ -43,10 +43,12 @@ namespace Engine.Tests.PlayMode{
         ///     the GPU build slots limit the mesh stage now. Without the partitions that hold no voxel (48 % of the
         ///     draw window, no mesh job and no GPU build) it needs 701 to 703. Under the main-thread budget of 2 ms
         ///     per frame it needed 799 to 820 while the budget left the spare time of a frame of the 60 frames cap
-        ///     unused; with half of it (shipped share 0.5) or all of it it needs 703 again (Editor, 2026-11-15). The limit
-        ///     leaves 8 % of slack and fails when the spare time is lost.
+        ///     unused; with half of it (shipped share 0.5) or all of it it needs 703 again (Editor, 2026-11-15). Since the
+        ///     v2 density generator is the shipped setting (DEC-167) the world needs 798 frames (13.3 s, the same in a
+        ///     focused and an unfocused run, 2026-11-22), because its chunk job is heavier (about 0.9 ms per chunk). The limit
+        ///     leaves 8 % of slack over the v2 count and fails when the spare time is lost.
         /// </summary>
-        private const int FreshBuildFrameBudget = 760;
+        private const int FreshBuildFrameBudget = 860;
 
         private int _savedTargetFrameRate;
         private int _savedVSync;
