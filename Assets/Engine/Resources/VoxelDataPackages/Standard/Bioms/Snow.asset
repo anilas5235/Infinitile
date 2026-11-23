@@ -21,6 +21,8 @@ MonoBehaviour:
   StrataBlock: {fileID: 11400000, guid: 2a1844411e45fba40a1da565a805687e, type: 2}
   BeachBlock: {fileID: 0}
   BeachHeight: 3
+  RockBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
+  NeverSnows: 0
   TargetHumidity: 0.3
   TargetTemperature: 0.12
   TargetContinental: 0.55

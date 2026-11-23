@@ -45,6 +45,12 @@ namespace Engine.Scripts.WorldGen.Density{
         /// <summary>[z · 32 + x]: the blend's border threshold (from <see cref="DensityChunk.PassBlend" />); NaN where the border did not run.</summary>
         public NativeArray<float> Border;
 
+        /// <summary>[x · 32 + z], with surface rules (from <see cref="DensityChunk.PassFill" />): T, snow line, tree line, rise, ice flag.</summary>
+        public NativeArray<float> ColumnTemperature;
+
+        public NativeArray<short> SnowLine, TreeLine;
+        public NativeArray<byte> Rise, IceCold;
+
         public DensityWorkCounters Counters;
 
         /// <summary>The hard biome of padded column (<paramref name="x" />, <paramref name="z" />) relative to the chunk origin (−16 … 47).</summary>
@@ -72,6 +78,11 @@ namespace Engine.Scripts.WorldGen.Density{
             if (BlendBiomes.IsCreated) BlendBiomes.Dispose();
             if (BlendWeights.IsCreated) BlendWeights.Dispose();
             if (Border.IsCreated) Border.Dispose();
+            if (ColumnTemperature.IsCreated) ColumnTemperature.Dispose();
+            if (SnowLine.IsCreated) SnowLine.Dispose();
+            if (TreeLine.IsCreated) TreeLine.Dispose();
+            if (Rise.IsCreated) Rise.Dispose();
+            if (IceCold.IsCreated) IceCold.Dispose();
         }
     }
 
@@ -134,7 +145,12 @@ namespace Engine.Scripts.WorldGen.Density{
                 BiomeClimate = new NativeArray<float>(5 * DensityLayout.BiomeLattice * DensityLayout.BiomeLattice, Allocator.TempJob),
                 BlendBiomes = new NativeArray<int4>(DensityLayout.Columns, Allocator.TempJob),
                 BlendWeights = new NativeArray<float4>(DensityLayout.Columns, Allocator.TempJob),
-                Border = new NativeArray<float>(DensityLayout.Columns, Allocator.TempJob)
+                Border = new NativeArray<float>(DensityLayout.Columns, Allocator.TempJob),
+                ColumnTemperature = new NativeArray<float>(DensityLayout.Columns, Allocator.TempJob),
+                SnowLine = new NativeArray<short>(DensityLayout.Columns, Allocator.TempJob),
+                TreeLine = new NativeArray<short>(DensityLayout.Columns, Allocator.TempJob),
+                Rise = new NativeArray<byte>(DensityLayout.Columns, Allocator.TempJob),
+                IceCold = new NativeArray<byte>(DensityLayout.Columns, Allocator.TempJob)
             };
             return new DensityProbeJob<TPrograms>{
                 Terrain = terrain,
@@ -153,6 +169,11 @@ namespace Engine.Scripts.WorldGen.Density{
                 BlendBiomes = result.BlendBiomes,
                 BlendWeights = result.BlendWeights,
                 Border = result.Border,
+                ColumnTemperature = result.ColumnTemperature,
+                SnowLine = result.SnowLine,
+                TreeLine = result.TreeLine,
+                Rise = result.Rise,
+                IceCold = result.IceCold,
                 Counters = new NativeArray<DensityWorkCounters>(1, Allocator.TempJob)
             };
         }

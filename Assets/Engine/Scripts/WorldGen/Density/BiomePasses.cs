@@ -288,7 +288,11 @@ namespace Engine.Scripts.WorldGen.Density{
             }
 
             BuildEdgeTables(ref b);
-            if (terrain.BorderColumn >= 0) RunBorder(programs, terrain, code, seed, chunk, ref b, ref counters);
+            if (terrain.BorderColumn >= 0){
+                // The column program ran before the blend (DensityPasses.ColumnOutputs); the border is one of its outputs.
+                UnsafeUtility.MemCpy(b.Border, b.ColumnValues + terrain.BorderColumn * DensityLayout.Columns, DensityLayout.Columns * sizeof(float));
+                counters.Biomes.BorderColumns += n * n;
+            }
 
             int reach = kernel.Reach;
             if (reach > pad){
@@ -419,36 +423,6 @@ namespace Engine.Scripts.WorldGen.Density{
         private static int Sum(int* table, int x0, int z0, int x1, int z1){
             const int w = DensityLayout.BiomeSpan + 1;
             return table[(z1 + 1) * w + x1 + 1] - table[z0 * w + x1 + 1] - table[(z1 + 1) * w + x0] + table[z0 * w + x0];
-        }
-
-        /// <summary>The graph's column program on the chunk's columns, four rows per run, for the border threshold.</summary>
-        private static void RunBorder<TPrograms>(TPrograms programs, in DensityTerrainGraph terrain, in GraphCode code, uint seed, int2 chunk,
-            ref DensityChunkBuffers b, ref DensityWorkCounters counters) where TPrograms : struct, IGraphPrograms{
-            const int n = DensityLayout.ChunkSize;
-            GraphData graph = terrain.Graph;
-            GraphProgram program = code.Programs[graph.ColumnProgram];
-            int register = -1;
-            for (int o = 0; o < program.OutputCount; o++){
-                GraphSlot s = code.Slots[program.OutputStart + o];
-                if (s.Slot == terrain.BorderColumn) register = s.Register;
-            }
-
-            float* registers = b.Registers;
-            const int rows = Lanes / n;
-            for (int z0 = 0; z0 < n; z0 += rows){
-                for (int i = 0; i < Lanes; i++){
-                    registers[i] = chunk.x + i % n;
-                    registers[Lanes + i] = 0f;
-                    registers[2 * Lanes + i] = chunk.y + z0 + i / n;
-                }
-
-                programs.Run(graph.ColumnProgram, code, registers, b.Scratch, Lanes, seed, ref counters.Graph);
-                float* from = registers + register * Lanes;
-                for (int i = 0; i < Lanes; i++) b.Border[z0 * n + i] = from[i];
-                counters.Graph.ColumnPoints += Lanes;
-            }
-
-            counters.Biomes.BorderColumns += n * n;
         }
     }
 }

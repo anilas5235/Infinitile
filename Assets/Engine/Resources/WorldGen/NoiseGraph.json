@@ -1096,6 +1096,14 @@
     }
   },
   "noises": {
+    "beach": {
+      "amplitude": 1,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 1,
+      "wavelength": 128
+    },
     "blend_border": {
       "amplitude": 0.2,
       "gain": 0.5,
@@ -1144,6 +1152,14 @@
       "octaves": 3,
       "wavelength": 5271
     },
+    "ice_wobble": {
+      "amplitude": 0.08,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 1,
+      "wavelength": 24
+    },
     "peaks": {
       "amplitude": 1,
       "gain": 0.5,
@@ -1151,6 +1167,22 @@
       "lacunarity": 2,
       "octaves": 3,
       "wavelength": 256
+    },
+    "snow_wobble": {
+      "amplitude": 0.033,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 1,
+      "wavelength": 48
+    },
+    "strata_shift": {
+      "amplitude": 4,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 1,
+      "wavelength": 64
     },
     "temperature": {
       "amplitude": 1,
@@ -1169,6 +1201,14 @@
       "wavelength": 128,
       "wavelengthY": 48
     },
+    "tree_line_wobble": {
+      "amplitude": 8,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 1,
+      "wavelength": 64
+    },
     "weirdness": {
       "amplitude": 1,
       "gain": 0.5,
@@ -1179,6 +1219,26 @@
     }
   },
   "outputs": {
+    "beach_shape": {
+      "node": {
+        "from": 0.45,
+        "in": {
+          "a": 0.5,
+          "b": {
+            "a": 0.5,
+            "b": {
+              "noise": "beach",
+              "op": "fbm"
+            },
+            "op": "mul"
+          },
+          "op": "add"
+        },
+        "op": "smoothstep",
+        "to": 0.6
+      },
+      "perColumn": true
+    },
     "blend_border": {
       "node": {
         "in": {
@@ -1199,8 +1259,29 @@
     "erosion": "erosion_value",
     "factor": "terrain_factor",
     "humidity": "humidity_value",
+    "ice_wobble": {
+      "node": {
+        "noise": "ice_wobble",
+        "op": "fbm"
+      },
+      "perColumn": true
+    },
     "preliminary_surface": "preliminary_surface",
     "pv": "peaks_valleys",
+    "snow_wobble": {
+      "node": {
+        "noise": "snow_wobble",
+        "op": "fbm"
+      },
+      "perColumn": true
+    },
+    "strata_shift": {
+      "node": {
+        "noise": "strata_shift",
+        "op": "fbm"
+      },
+      "perColumn": true
+    },
     "temperature": "temperature_value",
     "terrain_density": "terrain_density",
     "terrain_noise": {
@@ -1210,6 +1291,13 @@
     "top_slide_start": {
       "boundOnly": true,
       "node": 235
+    },
+    "tree_line_wobble": {
+      "node": {
+        "noise": "tree_line_wobble",
+        "op": "fbm"
+      },
+      "perColumn": true
     },
     "weirdness": "weirdness_value"
   }

@@ -57,6 +57,14 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                  + "above the water surface, minus one; the beach noise scales it down per column.")]
         [Min(0)] [SerializeField] public int BeachHeight = 3;
 
+        [Tooltip("WorldGen v2: bare rock of steep slopes and of dry ground above the tree line (the surface rule slot "
+                 + "@rock). Empty: those rules skip the biome.")]
+        [SerializeField] public Voxel.Voxel RockBlock;
+
+        [Tooltip("WorldGen v2: the biome never takes snow or ice, whatever its temperature (hot biomes). Snow and ice "
+                 + "read the surface biome, so both stop at the same border.")]
+        [SerializeField] public bool NeverSnows;
+
         // --- Classification target ------------------------------------------------------------------------------------
 
         [Range(0f, 1f)] [SerializeField] public float TargetHumidity = 0.5f;
@@ -172,6 +180,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                 }
 
             def.beachBlock = BeachBlock ? voxelId(BeachBlock) : (ushort)0;
+            def.rockBlock = RockBlock ? voxelId(RockBlock) : (ushort)0;
             return def;
         }
 
@@ -197,6 +206,7 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
                 soilGround = TopBlock && TopBlock != StoneBlock ? (byte)1 : (byte)0,
                 meadowGround = MeadowBlock ? (byte)1 : (byte)0,
                 freezesWater = FreezesWater ? (byte)1 : (byte)0,
+                neverSnows = NeverSnows ? (byte)1 : (byte)0,
                 forestFloorDensity = ForestFloorDensity,
                 beachHeight = BeachBlock ? (byte)Mathf.Clamp(BeachHeight, 0, 255) : (byte)0,
                 beachFloraGround = BeachBlock && BeachBlock.meshLayer == Mesh.MeshLayer.Solid ? (byte)1 : (byte)0
@@ -254,6 +264,12 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
 
             /// <summary>1 when the beach block is solid ground that carries plants.</summary>
             public byte beachFloraGround;
+
+            /// <summary>WorldGen v2: bare rock of steep and high ground (surface rule slot @rock); 0 = none.</summary>
+            public ushort rockBlock;
+
+            /// <summary>WorldGen v2: 1 when the biome never takes snow or ice.</summary>
+            public byte neverSnows;
 
             public float targetHumidity;
             public float targetTemperature;

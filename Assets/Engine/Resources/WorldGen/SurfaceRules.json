@@ -1,0 +1,92 @@
+{
+  "formatVersion": 1,
+  "climate": {
+    "lapse": 0.0055,
+    "lapseFrom": 124,
+    "snowTemperature": -0.473,
+    "snowWobble": "snow_wobble",
+    "iceTemperature": -0.6,
+    "iceWobble": "ice_wobble",
+    "treeLineBelowSnow": 15,
+    "treeLineFloor": 170,
+    "treeLineWobble": "tree_line_wobble",
+    "nearWaterDistance": 16,
+    "beachShape": "beach_shape"
+  },
+  "strata": {
+    "period": 7,
+    "thickness": 2,
+    "shift": "strata_shift"
+  },
+  "blocks": {
+    "snow": "std:StoneSnowy"
+  },
+  "globalBefore": [
+    {
+      "name": "snow",
+      "if": { "all": ["floor", "dry", "sky_open", { "temperature": "snow" }, { "not": "never_snows" }] },
+      "then": { "block": "@snow" }
+    }
+  ],
+  "default": [
+    {
+      "name": "surface",
+      "if": { "above_preliminary_surface": "delta_down" },
+      "then": {
+        "sequence": [
+          {
+            "name": "shallow_floor",
+            "if": { "all": ["floor", { "water_depth": [1, 3] }] },
+            "then": { "block": "@beach" }
+          },
+          {
+            "name": "underwater_top",
+            "if": { "all": ["floor", { "water_depth": [1, 255] }] },
+            "then": { "block": "@underwater_top" }
+          },
+          {
+            "name": "beach",
+            "if": { "all": [{ "stone_depth_above": 2 }, "dry", "beach_band", "near_water"] },
+            "then": { "block": "@beach" }
+          },
+          {
+            "name": "steep",
+            "if": { "all": [{ "stone_depth_above": 4 }, "dry", "steep"] },
+            "then": { "block": "@rock" }
+          },
+          {
+            "name": "alpine",
+            "if": { "all": [{ "stone_depth_above": 4 }, "dry", { "not": "below_tree_line" }] },
+            "then": { "block": "@rock" }
+          },
+          {
+            "name": "forest_floor",
+            "if": { "all": ["floor", "dry", "dense_forest"] },
+            "then": { "block": "@forest_floor" }
+          },
+          {
+            "name": "meadow",
+            "if": { "all": ["floor", "dry", "below_tree_line"] },
+            "then": { "block": "@meadow" }
+          },
+          {
+            "name": "top",
+            "if": "floor",
+            "then": { "block": "@top" }
+          },
+          {
+            "name": "under",
+            "if": { "stone_depth_above": 4 },
+            "then": { "block": "@under" }
+          }
+        ]
+      }
+    },
+    {
+      "name": "stone",
+      "then": { "block": "@stone" }
+    }
+  ],
+  "biomes": {},
+  "globalAfter": []
+}

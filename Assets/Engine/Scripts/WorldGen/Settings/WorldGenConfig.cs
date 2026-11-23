@@ -183,6 +183,13 @@ namespace Engine.Scripts.WorldGen.Settings{
         public Engine.Scripts.WorldGen.Biomes.BiomeLayoutData Layout;
 
         /// <summary>
+        ///     WorldGen v2: the compiled surface rules (§7, §8), attached by the chunk scheduler (or a test) once the noise
+        ///     graph is compiled (<see cref="Engine.Scripts.WorldGen.Surface.SurfaceRuleCompiler" />). Owned; not created
+        ///     for v1 or before attaching, and then P5 fills stone and water only.
+        /// </summary>
+        public Engine.Scripts.WorldGen.Surface.SurfaceRules SurfaceRules;
+
+        /// <summary>
         ///     Effective Biome-first octave coefficients a_{b,i} = HeightAmplitude_b × OctaveWeights_{b,i},
         ///     flattened as [b × K + i]. Owned.
         /// </summary>
@@ -300,6 +307,7 @@ namespace Engine.Scripts.WorldGen.Settings{
             if (VoxelClasses.IsCreated) VoxelClasses.Dispose();
             Caves.Dispose();
             Layout.Dispose();
+            SurfaceRules.Dispose();
         }
     }
 }
