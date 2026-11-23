@@ -94,6 +94,9 @@ namespace Engine.Scripts.Jobs.Chunk{
 
         public NativeArray<float4> BlendWeights;
 
+        /// <summary>[z · 32 + x]: the blend's border threshold per column; NaN where the border did not run.</summary>
+        public NativeArray<float> Border;
+
         public NativeArray<DensityWorkCounters> Counters;
 
         public unsafe void Execute(){
@@ -126,6 +129,8 @@ namespace Engine.Scripts.Jobs.Chunk{
                 UnsafeUtility.MemCpy(Surface.GetUnsafePtr(), b.Surface, DensityLayout.Columns);
                 UnsafeUtility.MemCpy(BlendBiomes.GetUnsafePtr(), b.BlendBiomes, DensityLayout.Columns * sizeof(int4));
                 UnsafeUtility.MemCpy(BlendWeights.GetUnsafePtr(), b.BlendWeights, DensityLayout.Columns * sizeof(float4));
+                bool border = counters.Biomes.BorderColumns > 0;
+                for (int c = 0; c < DensityLayout.Columns; c++) Border[c] = border ? b.Border[c] : float.NaN;
             }
 
             b.Dispose();

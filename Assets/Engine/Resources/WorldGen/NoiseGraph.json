@@ -1188,24 +1188,27 @@
   },
   "outputs": {
     "blend_border": {
-      "in": {
-        "a": 0.5,
-        "b": {
-          "a": {
-            "noise": "blend_border",
-            "op": "fbm"
-          },
+      "node": {
+        "in": {
+          "a": 0.5,
           "b": {
-            "noise": "blend_border_detail",
-            "op": "fbm"
+            "a": {
+              "noise": "blend_border",
+              "op": "fbm"
+            },
+            "b": {
+              "noise": "blend_border_detail",
+              "op": "fbm"
+            },
+            "op": "add"
           },
           "op": "add"
         },
-        "op": "add"
+        "max": 0.96,
+        "min": 0.04,
+        "op": "clamp"
       },
-      "max": 0.96,
-      "min": 0.04,
-      "op": "clamp"
+      "perColumn": true
     },
     "continentalness": "continentalness_curve",
     "erosion": "erosion_value",

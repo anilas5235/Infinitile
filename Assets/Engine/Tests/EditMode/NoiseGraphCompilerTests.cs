@@ -338,7 +338,9 @@ namespace Engine.Tests.EditMode{
 
             using GraphRegionResult region = GraphEvaluator.EvaluateRegion(graph, Seed, new int2(-64, 32), new int2(32, 32), true);
             Assert.AreEqual(9 * 9, region.Counters.LatticePoints, "a chunk's lattice is 9 × 9 points");
-            Assert.AreEqual(samplesPerPoint * 81, region.Counters.NoiseSamples2D);
+            // The per-column output blend_border adds its 2 noise samples on each of the chunk's 32 × 32 columns.
+            const int columnSamples = 2;
+            Assert.AreEqual(samplesPerPoint * 81 + columnSamples * 32 * 32, region.Counters.NoiseSamples2D);
             Assert.Greater(region.Counters.NoiseSamples3D, 0, "the terrain density is 3D (N3)");
         }
 

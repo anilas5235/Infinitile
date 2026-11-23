@@ -249,7 +249,7 @@ namespace Engine.Scripts.WorldGen.Biomes{
             }
 
             int errors = CountErrors();
-            List<(LayoutBiome biome, bool isNew, List<BiomeBox> boxes, object water)> parsed = new();
+            List<(LayoutBiome biome, bool isNew, Biome baseAsset, List<BiomeBox> boxes, object water)> parsed = new();
             if (root.TryGetValue("biomes", out object biomesValue)){
                 if (biomesValue is not List<object> list){
                     Error(source, file, null, "\"biomes\" must be a list.", "file");
@@ -264,6 +264,7 @@ namespace Engine.Scripts.WorldGen.Biomes{
 
                     int existing = IdOf(name);
                     LayoutBiome biome;
+                    Biome baseAsset = null;
                     bool isNew = existing < 0;
                     if (isNew){
                         if (!o.TryGetValue("base", out object baseValue) || baseValue is not string baseName || IdOf(baseName) < 0){
@@ -271,10 +272,10 @@ namespace Engine.Scripts.WorldGen.Biomes{
                             continue;
                         }
 
+                        // The base asset is copied only once the whole file is accepted, so a file with errors leaves no copy behind.
                         LayoutBiome b = Biomes[IdOf(baseName)];
-                        Biome asset = b.Asset ? UnityEngine.Object.Instantiate(b.Asset) : null;
-                        if (asset) asset.name = name;
-                        biome = new LayoutBiome{ Name = name, IsWater = b.IsWater, Source = source, File = file, Asset = asset };
+                        baseAsset = b.Asset;
+                        biome = new LayoutBiome{ Name = name, IsWater = b.IsWater, Source = source, File = file };
                     }
                     else biome = Biomes[existing];
 
@@ -293,7 +294,7 @@ namespace Engine.Scripts.WorldGen.Biomes{
                         }
                     }
 
-                    parsed.Add((biome, isNew, boxes, water));
+                    parsed.Add((biome, isNew, baseAsset, boxes, water));
                 }
             }
 
@@ -312,8 +313,13 @@ namespace Engine.Scripts.WorldGen.Biomes{
 
             if (CountErrors() > errors) return;
 
-            foreach ((LayoutBiome biome, bool isNew, List<BiomeBox> boxes, object water) in parsed){
+            foreach ((LayoutBiome biome, bool isNew, Biome baseAsset, List<BiomeBox> boxes, object water) in parsed){
                 if (isNew){
+                    if (baseAsset){
+                        biome.Asset = UnityEngine.Object.Instantiate(baseAsset);
+                        biome.Asset.name = biome.Name;
+                    }
+
                     biome.Id = Biomes.Count;
                     Biomes.Add(biome);
                 }

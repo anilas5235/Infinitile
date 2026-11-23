@@ -254,7 +254,7 @@ namespace Engine.Tests.EditMode{
         // --- Validator ------------------------------------------------------------------------------------------------
 
         [Test]
-        public void Validator_ShippedLayout_HasNoErrors(){
+        public void Validator_ShippedLayout_HasNoErrorsOrWarnings(){
             LayoutValidation v = BiomeLayoutValidator.Validate(Shipped());
             Assert.IsFalse(v.HasErrors, Messages(v));
             GraphCompileResult r = ShippedNoiseGraph.Compile();
@@ -262,6 +262,7 @@ namespace Engine.Tests.EditMode{
             using CompiledNoiseGraph graph = r.Graph;
             v = BiomeLayoutValidator.Validate(Shipped(), graph);
             Assert.IsFalse(v.HasErrors, Messages(v));
+            Assert.IsFalse(v.Messages.Any(m => m.Severity == LayoutSeverity.Warning), "the shipped layout has no warnings either\n" + Messages(v));
             Debug.Log($"[BiomeLayout] shipped layout: {v.Cells} cells, ε = {string.Join(", ", v.Epsilon.Select(e => e.ToString("0.#####")))}, " +
                       $"range {string.Join(", ", v.RangeMin.Zip(v.RangeMax, (a, b) => $"{a:0.###}…{b:0.###}"))}\n{Messages(v)}");
         }

@@ -36,7 +36,7 @@ namespace Engine.Scripts.WorldGen.Biomes{
         [Tooltip("Weirdness interval (W).")]
         public Vector2 WeirdnessRange = Full;
 
-        [Tooltip("Depth interval, reserved for cave biomes (V8): v2.0 evaluates depth 0 only, so a box whose depth interval " +
+        [Tooltip("Depth interval, reserved for cave biomes: only depth 0 is evaluated, so a box whose depth interval " +
                  "does not hold 0 never places its biome.")]
         public Vector2 DepthRange = Vector2.zero;
 

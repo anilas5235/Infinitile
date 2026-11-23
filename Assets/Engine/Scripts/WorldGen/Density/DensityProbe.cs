@@ -42,6 +42,9 @@ namespace Engine.Scripts.WorldGen.Density{
 
         public NativeArray<float4> BlendWeights;
 
+        /// <summary>[z · 32 + x]: the blend's border threshold (from <see cref="DensityChunk.PassBlend" />); NaN where the border did not run.</summary>
+        public NativeArray<float> Border;
+
         public DensityWorkCounters Counters;
 
         /// <summary>The hard biome of padded column (<paramref name="x" />, <paramref name="z" />) relative to the chunk origin (−16 … 47).</summary>
@@ -68,6 +71,7 @@ namespace Engine.Scripts.WorldGen.Density{
             if (BiomeClimate.IsCreated) BiomeClimate.Dispose();
             if (BlendBiomes.IsCreated) BlendBiomes.Dispose();
             if (BlendWeights.IsCreated) BlendWeights.Dispose();
+            if (Border.IsCreated) Border.Dispose();
         }
     }
 
@@ -129,7 +133,8 @@ namespace Engine.Scripts.WorldGen.Density{
                 PaddedWet = new NativeArray<byte>(DensityLayout.BiomeSpan * DensityLayout.BiomeSpan, Allocator.TempJob),
                 BiomeClimate = new NativeArray<float>(5 * DensityLayout.BiomeLattice * DensityLayout.BiomeLattice, Allocator.TempJob),
                 BlendBiomes = new NativeArray<int4>(DensityLayout.Columns, Allocator.TempJob),
-                BlendWeights = new NativeArray<float4>(DensityLayout.Columns, Allocator.TempJob)
+                BlendWeights = new NativeArray<float4>(DensityLayout.Columns, Allocator.TempJob),
+                Border = new NativeArray<float>(DensityLayout.Columns, Allocator.TempJob)
             };
             return new DensityProbeJob<TPrograms>{
                 Terrain = terrain,
@@ -147,6 +152,7 @@ namespace Engine.Scripts.WorldGen.Density{
                 BiomeClimate = result.BiomeClimate,
                 BlendBiomes = result.BlendBiomes,
                 BlendWeights = result.BlendWeights,
+                Border = result.Border,
                 Counters = new NativeArray<DensityWorkCounters>(1, Allocator.TempJob)
             };
         }

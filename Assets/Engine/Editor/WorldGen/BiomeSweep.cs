@@ -51,7 +51,8 @@ namespace Engine.Editor.WorldGen{
 
         /// <summary>
         ///     The candidates, each one change from the shipped graph and layout. The V3 sweep that DEC-161 picked from
-        ///     ran on the start layout (massif C ≥ 0.18, E ≤ −0.38, T/F wavelengths 4706 / 3765); row S is that layout.
+        ///     ran on the start layout (massif C ≥ 0.18, E ≤ −0.38, T/F wavelengths 4706 / 3765); row S moves the massif
+        ///     edges and the wavelengths back there but keeps the Mountain ridge band and its companion boxes.
         /// </summary>
         public static List<SweepCandidate> Candidates(){
             return new List<SweepCandidate>{
@@ -68,7 +69,7 @@ namespace Engine.Editor.WorldGen{
                 new(){ Name = "K Swamp from E ≥ 0.30", Layout = l => MoveEdge(l, 3, SwampE, 0.30f) },
                 new(){ Name = "L Mountain band |W| < 0.15", Layout = l => RidgeBand(l, 0.15f) },
                 new(){ Name = "M Mountain band |W| < 0.25", Layout = l => RidgeBand(l, 0.25f) },
-                new(){ Name = "S V3 start layout and wavelengths", Graph = g => Wavelength(g, 1f / 1.4f), Layout = l => {
+                new(){ Name = "S start massif edges and wavelengths (ridge band kept)", Graph = g => Wavelength(g, 1f / 1.4f), Layout = l => {
                     MoveEdge(l, 2, MassifC, StartMassifC);
                     MoveEdge(l, 3, MassifE, StartMassifE);
                 } }

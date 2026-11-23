@@ -200,7 +200,8 @@ namespace Engine.Tests.EditMode{
         ///     map, the 4 largest kept (ties: the lower id), by id, normalised; the surface is the patchy pick at the
         ///     border threshold (0.5 without the graph output).
         /// </summary>
-        private static void ReferenceBlend(in DensityProbeResult probe, in WorldGenConfig worldGen, int x, int z, out int4 ids, out float4 weights, out byte surface){
+        private static void ReferenceBlend(in DensityProbeResult probe, in WorldGenConfig worldGen, int x, int z, out int4 ids, out float4 weights, out byte surface,
+            float threshold01 = 0.5f){
             KernelSet kernel = worldGen.MaterialKernel;
             int phase = kernel.Phase(probe.Origin.x + x, probe.Origin.y + z);
             Dictionary<int, float> sums = new();
@@ -233,7 +234,7 @@ namespace Engine.Tests.EditMode{
 
             float sum = 0f;
             for (int k = 0; k < kept.Count; k++) sum += weights[k];
-            float threshold = 0.5f * sum, cumulative = 0f;
+            float threshold = threshold01 * sum, cumulative = 0f;
             surface = (byte)kept[^1];
             for (int k = 0; k < kept.Count; k++){
                 cumulative += weights[k];
@@ -262,6 +263,46 @@ namespace Engine.Tests.EditMode{
             }
 
             Assert.Greater(blended, 0, "some columns lie in a blend zone");
+        }
+
+        /// <summary>
+        ///     The shipped graph's border noise is a per-column output, so the blend picks each column's surface at its
+        ///     own threshold: the pick equals the reference at the probe's threshold, and some columns differ from the
+        ///     straight cut at 0.5 (the patchy, wavy border of DEC-87).
+        /// </summary>
+        [Test]
+        public void DistanceBlend_ShippedBorder_IsPerColumnAndPatchy(){
+            GraphCompileResult r = ShippedNoiseGraph.Compile();
+            Assert.IsTrue(r.Succeeded, string.Join("\n", r.Messages));
+            using CompiledNoiseGraph shipped = r.Graph;
+            Assert.IsTrue(DensityTerrainGraph.TryCreate(shipped, out DensityTerrainGraph terrain, out string error), error);
+            Assert.GreaterOrEqual(terrain.BorderColumn, 0, "blend_border must be a per-column output (\"perColumn\": true)");
+
+            int mixed = 0, blended = 0, patchy = 0;
+            for (int i = 0; i < 64 && mixed < 6; i++){
+                int2 chunk = new(i * 7 - 224, i * 5 - 160);
+                using DensityProbeResult probe = DensityProbe.Run(shipped, _config.WorldGen, chunk * Size, DensityChunk.PassBlend);
+                if (probe.Counters.Biomes.BlendKernelColumns == 0) continue;
+                mixed++;
+                Assert.Greater(probe.Counters.Biomes.BorderColumns, 0, $"the border ran, chunk {chunk}");
+                for (int x = 0; x < Size; x++)
+                for (int z = 0; z < Size; z++){
+                    float threshold = probe.Border[z * Size + x];
+                    Assert.IsTrue(threshold >= 0.04f && threshold <= 0.96f, $"threshold {threshold}, chunk {chunk} column ({x}, {z})");
+                    ReferenceBlend(probe, _config.WorldGen, x, z, out int4 ids, out _, out byte surface, threshold);
+                    int c = x * Size + z;
+                    Assert.AreEqual(surface, probe.Surface[c], $"surface, chunk {chunk} column ({x}, {z}), threshold {threshold}");
+                    if (ids.y == 255) continue;
+                    blended++;
+                    ReferenceBlend(probe, _config.WorldGen, x, z, out _, out _, out byte straight);
+                    if (straight != surface) patchy++;
+                }
+            }
+
+            Assert.Greater(mixed, 0, "some chunks hold a biome border");
+            Assert.Greater(blended, 0);
+            Assert.Greater(patchy, 0, "the border noise moves the pick away from the straight cut");
+            UnityEngine.Debug.Log($"[BiomePasses] shipped border: {mixed} chunks, {blended} blended columns, {patchy} off the straight cut");
         }
 
         [Test]
@@ -304,9 +345,12 @@ namespace Engine.Tests.EditMode{
             KernelSet wide = KernelSet.Build(40f, Allocator.Temp, out NativeArray<KernelTap> taps);
             taps.Dispose();
             Assert.Greater(wide.Reach, Pad - 1, "a width of 40 does not fit the padding");
+            StringAssert.Contains("biome padding allows", ChunkScheduler.BlendWidthError(BlendMethod.DistanceBlend, wide.Reach, 40f));
+            Assert.IsNull(ChunkScheduler.BlendWidthError(BlendMethod.None, wide.Reach, 40f), "None has no kernel");
             KernelSet shipped = KernelSet.Build(32f, Allocator.Temp, out taps);
             taps.Dispose();
             Assert.LessOrEqual(shipped.Reach, Pad - 1, "the shipped width 32 fits");
+            Assert.IsNull(ChunkScheduler.BlendWidthError(BlendMethod.DistanceBlend, shipped.Reach, 32f));
         }
 
         // --- Test mod -------------------------------------------------------------------------------------------------

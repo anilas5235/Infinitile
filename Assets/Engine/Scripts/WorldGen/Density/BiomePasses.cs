@@ -170,7 +170,7 @@ namespace Engine.Scripts.WorldGen.Density{
             const int cells = DensityLayout.BiomeCells;
             const int span = DensityLayout.BiomeSpan;
             int h = terrain.CellHeight;
-            float ty = (DensityLayout.WetnessY - DensityLayout.WetnessY / h * h) * (h == 4 ? 0.25f : 0.125f);
+            float ty = (DensityLayout.WetnessY - DensityLayout.WetnessY / h * h) * GraphInterpolation.InverseCellHeight(h);
 
             int* slots = stackalloc int[P];
             for (int p = 0; p < P; p++) slots[p] = terrain.ClimateSlot(p);

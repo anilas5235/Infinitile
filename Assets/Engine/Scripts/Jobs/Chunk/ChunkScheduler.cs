@@ -124,10 +124,18 @@ namespace Engine.Scripts.Jobs.Chunk{
             if (!worldGen.Layout.HasBoxes || settings == null) return;
             LayoutValidation validation = BiomeLayoutValidator.Validate(BiomeLayout.FromBiomeSet(settings.Biomes), graph);
             if (validation.HasErrors) throw new InvalidOperationException("The biome layout has errors:\n" + validation.ErrorText());
-            if (worldGen.MaterialMethod == BlendMethod.DistanceBlend && worldGen.MaterialKernel.Reach > DensityLayout.BiomePadding - 1)
-                throw new InvalidOperationException(
-                    $"MaterialBlendWidth {settings.MaterialBlendWidth} reaches {worldGen.MaterialKernel.Reach} columns; the biome padding allows " +
-                    $"{DensityLayout.BiomePadding - 1} (a width of at most 32).");
+            string blendError = BlendWidthError(worldGen.MaterialMethod, worldGen.MaterialKernel.Reach, settings.MaterialBlendWidth);
+            if (blendError != null) throw new InvalidOperationException(blendError);
+        }
+
+        /// <summary>
+        ///     The refusal of a blend kernel that reaches past the biome padding; null when the kernel fits or the
+        ///     method has no kernel.
+        /// </summary>
+        internal static string BlendWidthError(BlendMethod method, int reach, float width){
+            if (method != BlendMethod.DistanceBlend || reach <= DensityLayout.BiomePadding - 1) return null;
+            return $"MaterialBlendWidth {width} reaches {reach} columns; the biome padding allows " +
+                   $"{DensityLayout.BiomePadding - 1} (a width of at most 32).";
         }
 
         /// <summary>The world-generation config the chunk jobs read; released with this scheduler.</summary>

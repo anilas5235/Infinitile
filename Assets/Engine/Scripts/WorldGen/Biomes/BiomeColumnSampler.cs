@@ -159,7 +159,7 @@ namespace Engine.Scripts.WorldGen.Biomes{
                 int h = Terrain.CellHeight;
                 int cy = DensityLayout.WetnessY / h;
                 float yLo = cy * h, yHi = (cy + 1) * h;
-                float inverse = h == 4 ? 0.25f : 0.125f;
+                float inverse = GraphInterpolation.InverseCellHeight(h);
                 float ty = (DensityLayout.WetnessY - cy * h) * inverse;
                 float scale = 64f * Terrain.NoiseBound;
                 int maxLayer = GraphLimits.WorldHeight / h;
