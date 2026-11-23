@@ -1097,20 +1097,12 @@
   },
   "noises": {
     "blend_border": {
-      "amplitude": 0.56,
+      "amplitude": 0.2,
       "gain": 0.5,
       "kind": "simplex2",
       "lacunarity": 2,
       "octaves": 1,
-      "wavelength": 28
-    },
-    "blend_border_detail": {
-      "amplitude": 0.24,
-      "gain": 0.5,
-      "kind": "simplex2",
-      "lacunarity": 2,
-      "octaves": 1,
-      "wavelength": 9.3333
+      "wavelength": 48
     },
     "continentalness": {
       "amplitude": 1,
@@ -1192,15 +1184,8 @@
         "in": {
           "a": 0.5,
           "b": {
-            "a": {
-              "noise": "blend_border",
-              "op": "fbm"
-            },
-            "b": {
-              "noise": "blend_border_detail",
-              "op": "fbm"
-            },
-            "op": "add"
+            "noise": "blend_border",
+            "op": "fbm"
           },
           "op": "add"
         },

@@ -311,7 +311,7 @@ namespace Engine.Tests.EditMode{
         /// </summary>
         [Test]
         public void ShippedGraph_OutputsOnFixedColumnsMatchTheGoldenHash(){
-            const uint expected = 0x95D290CEu; // V3 deeper valleys: massif rows d2 (DEC-168); V3 re-tune: ranges on the W zero line, Badlands K (DEC-163…165); V3: blend_border, T/F wavelengths ×1.4 (DEC-161) (V2: the terrain outputs, the massif re-tune and the soft knee)
+            const uint expected = 0x78167522u; // V3 calmer border (DEC-171); V3 deeper valleys: massif rows d2 (DEC-168); V3 re-tune: ranges on the W zero line, Badlands K (DEC-163…165); V3: blend_border, T/F wavelengths ×1.4 (DEC-161) (V2: the terrain outputs, the massif re-tune and the soft knee)
             using CompiledNoiseGraph graph = ShippedNoiseGraph.Compile().Graph;
             float2[] columns = GoldenColumns();
             float[] lattice = GraphEvaluator.SampleLattice(graph, Seed, columns, out _);
@@ -330,16 +330,16 @@ namespace Engine.Tests.EditMode{
             using CompiledNoiseGraph graph = ShippedNoiseGraph.Compile().Graph;
             float2[] points = GoldenColumns();
             GraphEvaluator.SampleLattice(graph, Seed, points, out GraphWorkCounters counters);
-            // Octaves: continentalness 5 + warp 2 × 2 + erosion 4 + humidity 3 + temperature 3 + weirdness 3 + peak 3 (re-tune 2026-11-22) + blend border 1 + 1.
-            const int samplesPerPoint = 27;
+            // Octaves: continentalness 5 + warp 2 × 2 + erosion 4 + humidity 3 + temperature 3 + weirdness 3 + peak 3 (re-tune 2026-11-22) + blend border 1 (the detail noise went with DEC-171).
+            const int samplesPerPoint = 26;
             Assert.AreEqual(points.Length, counters.LatticePoints);
             Assert.AreEqual((long)samplesPerPoint * points.Length, counters.NoiseSamples2D);
             Assert.AreEqual(0, counters.NoiseSamples3D);
 
             using GraphRegionResult region = GraphEvaluator.EvaluateRegion(graph, Seed, new int2(-64, 32), new int2(32, 32), true);
             Assert.AreEqual(9 * 9, region.Counters.LatticePoints, "a chunk's lattice is 9 × 9 points");
-            // The per-column output blend_border adds its 2 noise samples on each of the chunk's 32 × 32 columns.
-            const int columnSamples = 2;
+            // The per-column output blend_border adds its noise sample on each of the chunk's 32 × 32 columns.
+            const int columnSamples = 1;
             Assert.AreEqual(samplesPerPoint * 81 + columnSamples * 32 * 32, region.Counters.NoiseSamples2D);
             Assert.Greater(region.Counters.NoiseSamples3D, 0, "the terrain density is 3D (N3)");
         }

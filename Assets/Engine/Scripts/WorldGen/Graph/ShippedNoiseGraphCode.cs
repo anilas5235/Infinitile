@@ -15,8 +15,8 @@ using Unity.Mathematics;
 namespace Engine.Scripts.WorldGen.Graph{
     /// <summary>Generated programs of one noise graph; see <see cref="IGraphPrograms" />.</summary>
     internal unsafe struct ShippedNoiseGraphCode : IGraphPrograms{
-        public ulong CodeHash => 0x709F6EE0032EE882UL;
-        public GraphTableSizes Sizes => new(93, 4, 15, 11, 31, 169, 1);
+        public ulong CodeHash => 0x32C9F45774C6848EUL;
+        public GraphTableSizes Sizes => new(89, 4, 15, 10, 30, 169, 1);
 
         public void Run(int program, in GraphCode code, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters){
             switch (program){
@@ -33,15 +33,15 @@ namespace Engine.Scripts.WorldGen.Graph{
                     break;
                 case 2:
                     Lattice(registers, code.Points, lanes, seed);
-                    counters.Instructions += 77;
-                    counters.InstructionLanes += 77L * lanes;
-                    counters.NoiseSamples2D += 27L * lanes;
+                    counters.Instructions += 75;
+                    counters.InstructionLanes += 75L * lanes;
+                    counters.NoiseSamples2D += 26L * lanes;
                     break;
                 case 3:
                     Column(registers, code.Points, lanes, seed);
-                    counters.Instructions += 5;
-                    counters.InstructionLanes += 5L * lanes;
-                    counters.NoiseSamples2D += 2L * lanes;
+                    counters.Instructions += 3;
+                    counters.InstructionLanes += 3L * lanes;
+                    counters.NoiseSamples2D += 1L * lanes;
                     break;
                 default:
                     code.Run(code.Programs[program], registers, scratch, lanes, seed, ref counters);
@@ -91,7 +91,7 @@ namespace Engine.Scripts.WorldGen.Graph{
             }
         }
 
-        /// <summary>Lattice program: 77 instructions, 21 registers.</summary>
+        /// <summary>Lattice program: 75 instructions, 21 registers.</summary>
         private static void Lattice(float* r, SplinePoint* points, int lanes, uint seed){
             int quads = (lanes + 3) >> 2;
             float4* sv = stackalloc float4[48];
@@ -395,25 +395,18 @@ namespace Engine.Scripts.WorldGen.Graph{
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D124925u), nz * math.asfloat(0x3D124925u), seed, 0xBFF24553u) * math.asfloat(0x3F0F5C29u);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3CAAAAABu), nz * math.asfloat(0x3CAAAAABu), seed, 0xBFF24553u) * math.asfloat(0x3E4CCCCDu);
                     r7 = n;
                 }
-                {
-                    float4 nx = r0, nz = r2;
-                    float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3DDB6DEBu), nz * math.asfloat(0x3DDB6DEBu), seed, 0x6C046216u) * math.asfloat(0x3E75C28Fu);
-                    r9 = n;
-                }
-                r10 = r7 + r9;
-                r7 = r10 + math.asfloat(0x3F000000u);
-                r9 = math.clamp(r7, math.asfloat(0x3D23D70Au), math.asfloat(0x3F75C28Fu));
-                r7 = math.clamp(r4, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
+                r9 = r7 + math.asfloat(0x3F000000u);
+                r7 = math.clamp(r9, math.asfloat(0x3D23D70Au), math.asfloat(0x3F75C28Fu));
+                r9 = math.clamp(r4, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
                 r4 = math.clamp(r3, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
                 r3 = math.clamp(r6, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
                 r6 = math.clamp(r12, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
                 r10 = math.clamp(r5, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
-                ((float4*)(r + 1152))[q] = r9;
                 ((float4*)(r + 896))[q] = r7;
+                ((float4*)(r + 1152))[q] = r9;
                 ((float4*)(r + 512))[q] = r4;
                 ((float4*)(r + 1664))[q] = r13;
                 ((float4*)(r + 384))[q] = r3;
@@ -424,29 +417,22 @@ namespace Engine.Scripts.WorldGen.Graph{
             }
         }
 
-        /// <summary>Column program: 5 instructions, 6 registers.</summary>
+        /// <summary>Column program: 3 instructions, 5 registers.</summary>
         private static void Column(float* r, SplinePoint* points, int lanes, uint seed){
             int quads = (lanes + 3) >> 2;
             for (int q = 0; q < quads; q++){
                 float4 r0 = ((float4*)r)[q];
                 float4 r2 = ((float4*)(r + 256))[q];
-                float4 r3, r4, r5;
+                float4 r3, r4;
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D124925u), nz * math.asfloat(0x3D124925u), seed, 0xBFF24553u) * math.asfloat(0x3F0F5C29u);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3CAAAAABu), nz * math.asfloat(0x3CAAAAABu), seed, 0xBFF24553u) * math.asfloat(0x3E4CCCCDu);
                     r3 = n;
                 }
-                {
-                    float4 nx = r0, nz = r2;
-                    float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3DDB6DEBu), nz * math.asfloat(0x3DDB6DEBu), seed, 0x6C046216u) * math.asfloat(0x3E75C28Fu);
-                    r4 = n;
-                }
-                r5 = r3 + r4;
-                r3 = r5 + math.asfloat(0x3F000000u);
-                r4 = math.clamp(r3, math.asfloat(0x3D23D70Au), math.asfloat(0x3F75C28Fu));
-                ((float4*)(r + 512))[q] = r4;
+                r4 = r3 + math.asfloat(0x3F000000u);
+                r3 = math.clamp(r4, math.asfloat(0x3D23D70Au), math.asfloat(0x3F75C28Fu));
+                ((float4*)(r + 384))[q] = r3;
             }
         }
     }
