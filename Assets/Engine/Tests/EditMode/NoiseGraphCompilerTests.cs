@@ -311,7 +311,7 @@ namespace Engine.Tests.EditMode{
         /// </summary>
         [Test]
         public void ShippedGraph_OutputsOnFixedColumnsMatchTheGoldenHash(){
-            const uint expected = 0xAE31465Cu; // V3 re-tune: ranges on the W zero line, Badlands K (DEC-163…165); V3: blend_border, T/F wavelengths ×1.4 (DEC-161) (V2: the terrain outputs, the massif re-tune and the soft knee)
+            const uint expected = 0x95D290CEu; // V3 deeper valleys: massif rows d2 (DEC-168); V3 re-tune: ranges on the W zero line, Badlands K (DEC-163…165); V3: blend_border, T/F wavelengths ×1.4 (DEC-161) (V2: the terrain outputs, the massif re-tune and the soft knee)
             using CompiledNoiseGraph graph = ShippedNoiseGraph.Compile().Graph;
             float2[] columns = GoldenColumns();
             float[] lattice = GraphEvaluator.SampleLattice(graph, Seed, columns, out _);

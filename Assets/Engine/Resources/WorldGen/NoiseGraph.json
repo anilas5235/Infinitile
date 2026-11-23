@@ -726,23 +726,23 @@
                   "points": [
                     {
                       "location": -1,
-                      "value": 22
+                      "value": 8
                     },
                     {
                       "location": -0.5,
-                      "value": 28
+                      "value": 10
                     },
                     {
                       "location": 0,
-                      "value": 38
+                      "value": 16
                     },
                     {
                       "location": 0.3,
-                      "value": 52
+                      "value": 28
                     },
                     {
                       "location": 0.6,
-                      "value": 74
+                      "value": 64
                     },
                     {
                       "location": 1,
@@ -760,23 +760,23 @@
                   "points": [
                     {
                       "location": -1,
-                      "value": 20.240000000000002
+                      "value": 7.36
                     },
                     {
                       "location": -0.5,
-                      "value": 25.76
+                      "value": 9.2
                     },
                     {
                       "location": 0,
-                      "value": 34.96
+                      "value": 14.72
                     },
                     {
                       "location": 0.3,
-                      "value": 47.84
+                      "value": 25.76
                     },
                     {
                       "location": 0.6,
-                      "value": 68.08
+                      "value": 58.88
                     },
                     {
                       "location": 1,
@@ -794,19 +794,19 @@
                   "points": [
                     {
                       "location": -1,
-                      "value": 13
+                      "value": 8
                     },
                     {
                       "location": 0,
-                      "value": 28
+                      "value": 18
                     },
                     {
                       "location": 0.3,
-                      "value": 38
+                      "value": 30
                     },
                     {
                       "location": 0.6,
-                      "value": 50
+                      "value": 46
                     },
                     {
                       "location": 1,
@@ -894,23 +894,23 @@
                   "points": [
                     {
                       "location": -1,
-                      "value": 28
+                      "value": 14
                     },
                     {
                       "location": -0.5,
-                      "value": 34
+                      "value": 16
                     },
                     {
                       "location": 0,
-                      "value": 44
+                      "value": 22
                     },
                     {
                       "location": 0.3,
-                      "value": 58
+                      "value": 34
                     },
                     {
                       "location": 0.6,
-                      "value": 80
+                      "value": 70
                     },
                     {
                       "location": 1,
@@ -928,23 +928,23 @@
                   "points": [
                     {
                       "location": -1,
-                      "value": 26.240000000000002
+                      "value": 13.36
                     },
                     {
                       "location": -0.5,
-                      "value": 31.76
+                      "value": 15.2
                     },
                     {
                       "location": 0,
-                      "value": 40.96
+                      "value": 20.72
                     },
                     {
                       "location": 0.3,
-                      "value": 53.84
+                      "value": 31.76
                     },
                     {
                       "location": 0.6,
-                      "value": 74.08
+                      "value": 64.88
                     },
                     {
                       "location": 1,
@@ -962,19 +962,19 @@
                   "points": [
                     {
                       "location": -1,
-                      "value": 13
+                      "value": 8
                     },
                     {
                       "location": 0,
-                      "value": 28
+                      "value": 18
                     },
                     {
                       "location": 0.3,
-                      "value": 38
+                      "value": 30
                     },
                     {
                       "location": 0.6,
-                      "value": 50
+                      "value": 46
                     },
                     {
                       "location": 1,
