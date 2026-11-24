@@ -119,9 +119,12 @@ namespace Engine.Scripts.WorldGen.Density{
         /// <summary>Per chunk column (z · 32 + x): the border threshold of the surface pick.</summary>
         public float* Border;
 
+        /// <summary>[column output][z · 32 + x]: the graph's per-column outputs on the chunk's columns (<see cref="DensityPasses.ColumnOutputs{TPrograms}" />).</summary>
+        public float* ColumnValues;
+
         private Allocator _allocator;
 
-        public static DensityChunkBuffers Allocate(int latticeValues, Allocator allocator){
+        public static DensityChunkBuffers Allocate(int latticeValues, int columnOutputs, Allocator allocator){
             const int points = DensityLayout.LatticeSize * DensityLayout.LatticeSize;
             const int cornerColumns = DensityLayout.CornerColumns * DensityLayout.CornerColumns;
             const int cellColumns = DensityLayout.CellColumns * DensityLayout.CellColumns;
@@ -153,7 +156,8 @@ namespace Engine.Scripts.WorldGen.Density{
                 Touched = (byte*)UnsafeUtility.Malloc(256, 64, allocator),
                 EdgesX = Ints((DensityLayout.BiomeSpan + 1) * (DensityLayout.BiomeSpan + 1), allocator),
                 EdgesZ = Ints((DensityLayout.BiomeSpan + 1) * (DensityLayout.BiomeSpan + 1), allocator),
-                Border = Floats(DensityLayout.Columns, allocator)
+                Border = Floats(DensityLayout.Columns, allocator),
+                ColumnValues = Floats(math.max(1, columnOutputs) * DensityLayout.Columns, allocator)
             };
             UnsafeUtility.MemClear(b.BlendSums, 256 * sizeof(float));
             // Lanes past a program's count are read (padded to four) but never used; clear them once.
@@ -197,6 +201,7 @@ namespace Engine.Scripts.WorldGen.Density{
             UnsafeUtility.Free(EdgesX, _allocator);
             UnsafeUtility.Free(EdgesZ, _allocator);
             UnsafeUtility.Free(Border, _allocator);
+            UnsafeUtility.Free(ColumnValues, _allocator);
         }
     }
 
@@ -246,6 +251,38 @@ namespace Engine.Scripts.WorldGen.Density{
                 float up = scale / factor[i];
                 b.DeltaUp[i] = up;
                 b.DeltaDown[i] = math.min(32f, up);
+            }
+        }
+
+        /// <summary>
+        ///     The graph's column program on the chunk's 1024 columns, four rows of 32 per run, into
+        ///     <see cref="DensityChunkBuffers.ColumnValues" /> (every per-column output: the blend's border, the surface
+        ///     rules' wobbles and shapes).
+        /// </summary>
+        internal static void ColumnOutputs<TPrograms>(TPrograms programs, in DensityTerrainGraph terrain, in GraphCode code, uint seed, int2 chunk,
+            ref DensityChunkBuffers b, ref GraphWorkCounters counters) where TPrograms : struct, IGraphPrograms{
+            const int n = DensityLayout.ChunkSize;
+            GraphData graph = terrain.Graph;
+            if (graph.ColumnOutputCount == 0) return;
+            GraphProgram program = code.Programs[graph.ColumnProgram];
+            float* registers = b.Registers;
+            const int rows = Lanes / n;
+            for (int z0 = 0; z0 < n; z0 += rows){
+                for (int i = 0; i < Lanes; i++){
+                    registers[i] = chunk.x + i % n;
+                    registers[Lanes + i] = 0f;
+                    registers[2 * Lanes + i] = chunk.y + z0 + i / n;
+                }
+
+                programs.Run(graph.ColumnProgram, code, registers, b.Scratch, Lanes, seed, ref counters);
+                for (int o = 0; o < program.OutputCount; o++){
+                    GraphSlot s = code.Slots[program.OutputStart + o];
+                    float* from = registers + s.Register * Lanes;
+                    float* to = b.ColumnValues + s.Slot * DensityLayout.Columns + z0 * n;
+                    for (int i = 0; i < Lanes; i++) to[i] = from[i];
+                }
+
+                counters.ColumnPoints += Lanes;
             }
         }
 

@@ -7,6 +7,8 @@ using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Density;
 using Engine.Scripts.WorldGen.Graph;
 using Engine.Scripts.WorldGen.Settings;
+using Engine.Scripts.WorldGen.Surface;
+using Engine.Scripts.VoxelConfig.Data.Voxel;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEditor;
@@ -45,6 +47,27 @@ namespace Engine.Editor.WorldGen{
             if (cfg.MaterialTaps.IsCreated) cfg.MaterialTaps.Dispose();
             cfg.MaterialMethod = BlendMethod.DistanceBlend;
             cfg.MaterialKernel = KernelSet.Build(BlendWidth, allocator, out cfg.MaterialTaps);
+        }
+
+        /// <summary>
+        ///     Gives <paramref name="cfg" /> the shipped biome layout with real voxel ids (<see cref="FixtureVoxelIds" />),
+        ///     the DistanceBlend kernel and the shipped surface rules compiled against <paramref name="graph" />, so the
+        ///     fill runs as in the game (WorldGen v2 §7). Water, ice and the generator's stone take their ids too.
+        /// </summary>
+        public static FixtureVoxelIds UseShippedSurface(ref WorldGenConfig cfg, CompiledNoiseGraph graph, Allocator allocator = Allocator.Persistent){
+            FixtureVoxelIds ids = new();
+            BiomeLayout layout = BiomeLayout.FromBiomeSet(AssetDatabase.LoadAssetAtPath<BiomeSet>(BiomeSetPath));
+            UseShippedBiomes(ref cfg, allocator);
+            cfg.Layout.Dispose();
+            cfg.Layout = BiomeLayoutData.Create(layout, ids.Id, allocator);
+            cfg.WaterVoxel = (ushort)ids.ByName("std:Water");
+            cfg.IceVoxel = (ushort)ids.ByName("std:Ice");
+            cfg.DensityStoneVoxel = (ushort)ids.ByName("std:Stone");
+            if (cfg.SurfaceRules.IsCreated) cfg.SurfaceRules.Dispose();
+            using SurfaceRuleCompileResult rules = SurfaceRuleCompiler.CompileShipped(layout, cfg.Layout.Defs.ToArray(), graph, ids.ByName, allocator);
+            if (!rules.Succeeded) throw new InvalidOperationException("The shipped surface rules do not compile:\n" + rules.ErrorText());
+            cfg.SurfaceRules = rules.TakeRules();
+            return ids;
         }
 
         public static readonly DensityChunkClass[] Classes = (DensityChunkClass[])Enum.GetValues(typeof(DensityChunkClass));
@@ -126,6 +149,59 @@ namespace Engine.Editor.WorldGen{
             }
 
             return found;
+        }
+    }
+
+    /// <summary>
+    ///     Voxel ids for tests and benchmarks without the importer: every Voxel asset of the project gets an id from 1
+    ///     on, in asset-path order, and is found by its full name ("std:Stone"). Air is 0.
+    /// </summary>
+    public sealed class FixtureVoxelIds{
+        private readonly Dictionary<Voxel, ushort> _ids = new();
+        private readonly Dictionary<string, ushort> _byName = new();
+        private readonly List<Voxel> _voxels = new(){ null };
+
+        private readonly Dictionary<Voxel, string> _fullNames = new();
+
+        public FixtureVoxelIds(){
+            // Full names from the data packages (a voxel's package field is only set when its package validates).
+            foreach (string path in AssetDatabase.FindAssets("t:VoxelDataPackage").Select(AssetDatabase.GUIDToAssetPath).OrderBy(p => p, StringComparer.Ordinal)){
+                VoxelDataPackage package = AssetDatabase.LoadAssetAtPath<VoxelDataPackage>(path);
+                if (!package || package.voxel == null) continue;
+                foreach (Voxel v in package.voxel)
+                    if (v)
+                        _fullNames.TryAdd(v, package.packagePrefix + ":" + v.name);
+            }
+
+            foreach (string path in AssetDatabase.FindAssets("t:Voxel").Select(AssetDatabase.GUIDToAssetPath).Distinct().OrderBy(p => p, StringComparer.Ordinal)){
+                Voxel v = AssetDatabase.LoadAssetAtPath<Voxel>(path);
+                if (!v || _ids.ContainsKey(v)) continue;
+                ushort id = (ushort)_voxels.Count;
+                _voxels.Add(v);
+                _ids.Add(v, id);
+                _byName.TryAdd(FullName(v), id);
+            }
+        }
+
+        public int Count => _voxels.Count;
+
+        public ushort Id(Voxel v){
+            return v && _ids.TryGetValue(v, out ushort id) ? id : (ushort)0;
+        }
+
+        /// <summary>The id of a full name, −1 when no voxel has it.</summary>
+        public int ByName(string name){
+            return name != null && _byName.TryGetValue(name, out ushort id) ? id : -1;
+        }
+
+        /// <summary>The full name of an id ("air" for 0).</summary>
+        public string Name(int id){
+            if (id <= 0 || id >= _voxels.Count) return "air";
+            return FullName(_voxels[id]);
+        }
+
+        private string FullName(Voxel v){
+            return _fullNames.TryGetValue(v, out string name) ? name : v.package ? v.package.packagePrefix + ":" + v.name : v.name;
         }
     }
 }

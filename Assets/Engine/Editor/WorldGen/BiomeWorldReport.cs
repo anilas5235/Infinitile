@@ -421,7 +421,7 @@ namespace Engine.Editor.WorldGen{
             sb.AppendLine("targets:");
             foreach (TargetResult t in r.Targets)
                 sb.AppendLine($"  [{(t.Pass ? "pass" : "FAIL")}] {t.Name}: {t.Value} (target {t.Bound}){(t.Pass || t.Worst == null ? "" : " · worst: " + t.Worst)}");
-            sb.AppendLine("  [ open ] Snow in never-snow biomes, snow line at the median Mountain temperature (once snow is built) · carved voxels connected (once caves are built)");
+            sb.AppendLine("  [ open ] Carved voxels connected (once caves are built) · snow, ice and the snow line: see snow.txt (SnowReport_FiveSeeds)");
             sb.AppendLine("tour list:");
             foreach (TourSpot s in r.Tour) sb.AppendLine("  " + s);
             foreach (TargetResult t in r.Targets.Where(t => !t.Pass && t.Worst != null)) sb.AppendLine("  worst place · " + t.Worst);

@@ -11,6 +11,7 @@ using Engine.Scripts.WorldGen.Blending;
 using Engine.Scripts.WorldGen.Density;
 using Engine.Scripts.WorldGen.Graph;
 using Engine.Scripts.WorldGen.Settings;
+using Engine.Scripts.WorldGen.Surface;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
@@ -86,6 +87,11 @@ namespace Engine.Scripts.Jobs.Chunk{
                 _graph = CompileDensityGraph(out _terrain, out _generatedCode);
                 try{
                     CheckLayout(settings.WorldGen, config.WorldGen, _graph);
+                    if (config.WorldGen.Layout.HasBoxes && settings.WorldGen != null){
+                        SurfaceRules rules = CompileSurfaceRules(settings.WorldGen, config.WorldGen, _graph);
+                        _config.WorldGen.SurfaceRules.Dispose(); // the builder's empty set; this scheduler owns the config
+                        _config.WorldGen.SurfaceRules = rules;
+                    }
                 }
                 catch{
                     _graph.Dispose();
@@ -126,6 +132,19 @@ namespace Engine.Scripts.Jobs.Chunk{
             if (validation.HasErrors) throw new InvalidOperationException("The biome layout has errors:\n" + validation.ErrorText());
             string blendError = BlendWidthError(worldGen.MaterialMethod, worldGen.MaterialKernel.Reach, settings.MaterialBlendWidth);
             if (blendError != null) throw new InvalidOperationException(blendError);
+        }
+
+        /// <summary>
+        ///     The shipped surface rules (§7) for the BiomeSet's biomes, with block ids from the voxel registry (none in
+        ///     tests without one: named blocks then drop their rules). Throws with every validator error.
+        /// </summary>
+        private static SurfaceRules CompileSurfaceRules(WorldGenSettings settings, in WorldGenConfig worldGen, CompiledNoiseGraph graph){
+            VoxelConfig.Registry.VoxelRegistry registry = VoxelConfig.DataImporter.Instance != null ? VoxelConfig.DataImporter.Instance.VoxelRegistry : null;
+            Func<string, int> blockByName = registry == null ? null : name => name.Length <= FixedString32Bytes.UTF8MaxLengthInBytes && registry.TryGetId(new FixedString32Bytes(name), out ushort id) ? id : -1;
+            using SurfaceRuleCompileResult result = SurfaceRuleCompiler.CompileShipped(BiomeLayout.FromBiomeSet(settings.Biomes), worldGen.Layout.Defs.ToArray(), graph,
+                blockByName, Allocator.Persistent);
+            if (!result.Succeeded) throw new InvalidOperationException("The surface rules have errors:\n" + result.ErrorText());
+            return result.TakeRules();
         }
 
         /// <summary>

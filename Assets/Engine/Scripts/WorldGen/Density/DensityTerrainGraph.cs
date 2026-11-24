@@ -98,6 +98,9 @@ namespace Engine.Scripts.WorldGen.Density{
         /// <summary>The biome passes' own counts (P2, P3).</summary>
         public BiomeWorkCounters Biomes;
 
+        /// <summary>The surface pass's own counts (P5).</summary>
+        public SurfaceWorkCounters Surface;
+
         public long Chunks;
 
         /// <summary>Corner columns the corner program ran on, and the corners it computed.</summary>
@@ -118,6 +121,7 @@ namespace Engine.Scripts.WorldGen.Density{
         public void Add(in DensityWorkCounters o){
             Graph.Add(o.Graph);
             Biomes.Add(o.Biomes);
+            Surface.Add(o.Surface);
             Chunks += o.Chunks;
             CornerColumns += o.CornerColumns;
             Corners += o.Corners;
@@ -130,7 +134,7 @@ namespace Engine.Scripts.WorldGen.Density{
 
         public override string ToString(){
             return $"{Chunks} chunks: corner columns {CornerColumns}, corners {Corners}, blocks by range {BlocksByRange} / by sign {BlocksBySign} / mixed {BlocksMixed}, " +
-                   $"interpolated {InterpolatedVoxels}, solid {SolidVoxels}; {(Biomes.Columns > 0 ? Biomes + "; " : "")}graph: {Graph}";
+                   $"interpolated {InterpolatedVoxels}, solid {SolidVoxels}; {(Biomes.Columns > 0 ? Biomes + "; " : "")}{(Surface.Columns > 0 ? Surface + "; " : "")}graph: {Graph}";
         }
     }
 }

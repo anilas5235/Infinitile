@@ -20,7 +20,7 @@ namespace Engine.Scripts.Jobs.Chunk{
     /// <summary>
     ///     The chunk job of the v2 density generator (WorldGen v2 §2), beside <see cref="ChunkJob" />: P1 and P4's terrain
     ///     from the noise graph (<see cref="DensityPasses" />), the biomes and the blend (<see cref="BiomePasses" />, V3),
-    ///     then the placeholder fill until the rule lists of V4; the bottom layer as in v1. The chunk keeps its hard
+    ///     then the fluids, ice and surface rules (<see cref="SurfacePass" />, V4); the bottom layer as in v1. The chunk keeps its hard
     ///     biome per column (§6.8).
     /// </summary>
     [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Strict)]
@@ -97,11 +97,20 @@ namespace Engine.Scripts.Jobs.Chunk{
         /// <summary>[z · 32 + x]: the blend's border threshold per column; NaN where the border did not run.</summary>
         public NativeArray<float> Border;
 
+        /// <summary>
+        ///     [x · 32 + z], with surface rules and <see cref="DensityChunk.PassFill" />: the column's T, snow line, tree
+        ///     line, heightmap rise and ice flag as the rules see them (<see cref="SurfacePass.ColumnClimate" />).
+        /// </summary>
+        public NativeArray<float> ColumnTemperature;
+
+        public NativeArray<short> SnowLine, TreeLine;
+        public NativeArray<byte> Rise, IceCold;
+
         public NativeArray<DensityWorkCounters> Counters;
 
         public unsafe void Execute(){
             DensityWorkCounters counters = default;
-            DensityChunkBuffers b = DensityChunkBuffers.Allocate(Terrain.Graph.LatticeValueCount, Allocator.Temp);
+            DensityChunkBuffers b = DensityChunkBuffers.Allocate(Terrain.Graph.LatticeValueCount, Terrain.Graph.ColumnOutputCount, Allocator.Temp);
             for (int r = 0; r < math.max(1, Repeat); r++){
                 counters = default;
                 DensityChunk.Run(default(TPrograms), Terrain, WorldGen, Origin, Passes, Voxels, Biomes, ref b, ref counters);
@@ -133,6 +142,18 @@ namespace Engine.Scripts.Jobs.Chunk{
                 for (int c = 0; c < DensityLayout.Columns; c++) Border[c] = border ? b.Border[c] : float.NaN;
             }
 
+            if (Passes >= DensityChunk.PassFill && WorldGen.Layout.HasBoxes && WorldGen.SurfaceRules.HasRules)
+                for (int x = 0; x < DensityLayout.ChunkSize; x++)
+                for (int z = 0; z < DensityLayout.ChunkSize; z++){
+                    int c = x * DensityLayout.ChunkSize + z;
+                    SurfacePass.ColumnClimate(WorldGen.SurfaceRules, ref b, x, z, out float t, out int snow, out int tree, out int rise, out bool ice);
+                    ColumnTemperature[c] = t;
+                    SnowLine[c] = (short)snow;
+                    TreeLine[c] = (short)tree;
+                    Rise[c] = (byte)math.min(255, rise);
+                    IceCold[c] = ice ? (byte)1 : (byte)0;
+                }
+
             b.Dispose();
             Counters[0] = counters;
         }
@@ -149,7 +170,7 @@ namespace Engine.Scripts.Jobs.Chunk{
         /// </summary>
         public static void Generate<TPrograms>(TPrograms programs, in DensityTerrainGraph terrain, in WorldGenConfig worldGen, int2 origin,
             NativeArray<ushort> voxels, NativeArray<byte> biomes, ref DensityWorkCounters counters) where TPrograms : struct, IGraphPrograms{
-            DensityChunkBuffers buffers = DensityChunkBuffers.Allocate(terrain.Graph.LatticeValueCount, Allocator.Temp);
+            DensityChunkBuffers buffers = DensityChunkBuffers.Allocate(terrain.Graph.LatticeValueCount, terrain.Graph.ColumnOutputCount, Allocator.Temp);
             Run(programs, terrain, worldGen, origin, PassFill, voxels, biomes, ref buffers, ref counters);
             buffers.Dispose();
         }
@@ -170,11 +191,14 @@ namespace Engine.Scripts.Jobs.Chunk{
             if (passes < PassBiomes) return;
             if (layout) BiomePasses.Biomes(programs, terrain, code, worldGen.Seed, origin, worldGen.Layout, ref b, ref counters);
             if (passes < PassBlend) return;
-            if (layout)
+            if (layout){
+                DensityPasses.ColumnOutputs(programs, terrain, code, worldGen.Seed, origin, ref b, ref counters.Graph);
                 BiomePasses.Blend(programs, terrain, code, worldGen.Seed, origin, worldGen.MaterialMethod == BlendMethod.DistanceBlend, worldGen.MaterialKernel,
                     worldGen.MaterialTaps, ref b, ref counters);
+            }
+
             if (passes < PassFill) return;
-            if (layout) FillBiomes(b, voxels, worldGen);
+            if (layout && worldGen.SurfaceRules.HasRules) SurfacePass.Run(worldGen.SurfaceRules, worldGen, origin, ref b, voxels, ref counters.Surface);
             else Fill(b.Solid, voxels, worldGen);
             ChunkJob.ApplyBottomLayer(voxels, new int3(origin.x, 0, origin.y), worldGen);
             if (biomes.IsCreated) WriteBiomes(b, biomes, layout);
@@ -191,7 +215,7 @@ namespace Engine.Scripts.Jobs.Chunk{
         }
 
         /// <summary>
-        ///     The placeholder fill of V2: terrain is <see cref="WorldGenConfig.DensityStoneVoxel" />, an open voxel below
+        ///     The fill without a layout or surface rules (V2): terrain is <see cref="WorldGenConfig.DensityStoneVoxel" />, an open voxel below
         ///     the water level is water, the rest air. Same [x][z][y] layout as the voxel buffer.
         /// </summary>
         private static void Fill(byte* solid, NativeArray<ushort> voxels, in WorldGenConfig worldGen){
@@ -203,49 +227,6 @@ namespace Engine.Scripts.Jobs.Chunk{
                 ushort* column = to + c * ChunkHeight;
                 for (int y = 0; y < waterLevel; y++) column[y] = from[y] != 0 ? stone : water;
                 for (int y = waterLevel; y < ChunkHeight; y++) column[y] = from[y] != 0 ? stone : (ushort)0;
-            }
-        }
-
-        /// <summary>Voxels under a surface voxel that take the under block.</summary>
-        private const int UnderDepth = 3;
-
-        /// <summary>
-        ///     The placeholder fill of V3, until the rule lists of V4: the surface-source biome's blocks (§12, AD-25). A
-        ///     terrain voxel with an open voxel above takes the top block (the underwater top block under water), the
-        ///     <see cref="UnderDepth" /> voxels below it the under block, the rest the stone block; open voxels below the
-        ///     water level are water. A biome without a block keeps the V2 stone.
-        /// </summary>
-        private static void FillBiomes(in DensityChunkBuffers b, NativeArray<ushort> voxels, in WorldGenConfig worldGen){
-            ushort fallback = worldGen.DensityStoneVoxel, water = worldGen.WaterVoxel;
-            int waterLevel = math.clamp(worldGen.WaterLevel, 0, ChunkHeight);
-            ushort* to = (ushort*)voxels.GetUnsafePtr();
-            NativeArray<Biome.BiomeDef> defs = worldGen.Layout.Defs;
-            int biomeCount = worldGen.Layout.BiomeCount;
-            for (int c = 0; c < DensityLayout.Columns; c++){
-                byte* from = b.Solid + c * ChunkHeight;
-                ushort* column = to + c * ChunkHeight;
-                int id = b.Surface[c];
-                ushort top = fallback, wetTop = fallback, under = fallback, stone = fallback;
-                if (id < biomeCount){
-                    Biome.BiomeDef def = defs[id];
-                    stone = def.stoneBlock != 0 ? def.stoneBlock : fallback;
-                    under = def.underBlock != 0 ? def.underBlock : stone;
-                    top = def.topBlock != 0 ? def.topBlock : under;
-                    wetTop = def.underwaterTopBlock != 0 ? def.underwaterTopBlock : top;
-                }
-
-                int depth = UnderDepth + 1; // voxels below the last surface voxel; past UnderDepth is stone
-                for (int y = ChunkHeight - 1; y >= 0; y--){
-                    if (from[y] == 0){
-                        column[y] = y < waterLevel ? water : (ushort)0;
-                        depth = -1;
-                        continue;
-                    }
-
-                    depth++;
-                    if (depth == 0) column[y] = y + 1 < waterLevel ? wetTop : top;
-                    else column[y] = depth <= UnderDepth ? under : stone;
-                }
             }
         }
     }

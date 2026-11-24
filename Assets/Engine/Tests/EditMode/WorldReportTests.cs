@@ -10,6 +10,7 @@ using Engine.Scripts.WorldGen.Biomes;
 using Engine.Scripts.WorldGen.Density;
 using Engine.Scripts.WorldGen.Graph;
 using Engine.Scripts.WorldGen.Settings;
+using Engine.Scripts.WorldGen.Surface;
 using NUnit.Framework;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -55,6 +56,45 @@ namespace Engine.Tests.EditMode{
 
             all.AppendLine(System.FormattableString.Invariant($"({watch.Elapsed.TotalSeconds:0.0} s)"));
             File.WriteAllText(Path.Combine(Dir, "report.txt"), all.ToString());
+        }
+
+        /// <summary>
+        ///     The snow measures (§8, phase V4) on the five seeds: the snow line at the median Mountain T, the snow share
+        ///     of Mountain ground above y 200 per T band, snow per biome, hard snow edges, sea ice, tour spots, and the
+        ///     T_snow calibration over the pooled Mountain T (DEC-175). Writes <c>snow.txt</c>.
+        /// </summary>
+        [Test]
+        [Category(TestTiers.Report)]
+        [Explicit(TestTiers.ReportReason)]
+        [Timeout(3600000)]
+        public void SnowReport_FiveSeeds(){
+            GraphCompileResult compile = ShippedNoiseGraph.Compile();
+            Assert.IsTrue(compile.Succeeded, string.Join("\n", compile.Messages));
+            using CompiledNoiseGraph graph = compile.Graph;
+            BiomeLayout layout = BiomeLayout.FromBiomeSet(Set);
+            using BiomeLayoutDataScope data = new(layout);
+            SurfaceRuleSet set = SurfaceRuleSet.Shipped();
+            using SurfaceRuleCompileResult rules = SurfaceRuleCompiler.CompileShipped(layout, data.Data.Defs.ToArray(), graph, null, Allocator.Persistent);
+            Assert.IsTrue(rules.Succeeded, rules.ErrorText());
+            StringBuilder all = new();
+            List<float> mountainT = new();
+            Stopwatch watch = Stopwatch.StartNew();
+            foreach (uint seed in BiomeWorldReport.Seeds){
+                SnowReportSeed r = SnowReport.Run(graph, layout, data.Data, rules.Rules, set.Climate, seed);
+                mountainT.AddRange(r.MountainT);
+                string text = SnowReport.Text(r, rules.Rules);
+                Debug.Log(text);
+                all.AppendLine(text);
+            }
+
+            float median = SnowReport.Median(mountainT);
+            float calibrated = SnowReport.CalibratedSnowTemperature(median, rules.Rules);
+            all.AppendLine(System.FormattableString.Invariant(
+                $"calibration (DEC-175): median Mountain T over the five seeds {median:0.0000} ({mountainT.Count} samples) → T_snow = T_med − 86 L = {calibrated:0.0000} (rule file: {rules.Rules.SnowTemperature:0.0000}); ") +
+                System.FormattableString.Invariant($"snow line at that median with the file's T_snow: y {rules.Rules.ColdThreshold(median, 0f, rules.Rules.SnowTemperature)}"));
+            all.AppendLine(System.FormattableString.Invariant($"({watch.Elapsed.TotalSeconds:0.0} s)"));
+            Debug.Log(all.ToString());
+            File.WriteAllText(Path.Combine(Dir, "snow.txt"), all.ToString());
         }
 
         [Test]

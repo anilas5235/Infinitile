@@ -168,6 +168,9 @@ namespace Engine.Scripts.WorldGen.Settings{
                 cfg.Layout = settings.Generator == WorldGenerator.Density
                     ? Engine.Scripts.WorldGen.Biomes.BiomeLayoutData.Create(Engine.Scripts.WorldGen.Biomes.BiomeLayout.FromBiomeSet(settings.Biomes), voxelId, allocator)
                     : Engine.Scripts.WorldGen.Biomes.BiomeLayoutData.Empty(allocator);
+
+                // The surface rules need the compiled noise graph: the chunk scheduler (or a test) replaces this empty set.
+                cfg.SurfaceRules = Engine.Scripts.WorldGen.Surface.SurfaceRules.Empty(allocator);
             }
             catch{
                 cfg.Dispose();

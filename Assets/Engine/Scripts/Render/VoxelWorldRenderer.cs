@@ -23,6 +23,9 @@ namespace Engine.Scripts.Render{
     /// </summary>
     [RequireComponent(typeof(VoxelWorld))]
     public class VoxelWorldRenderer : Singleton<VoxelWorldRenderer>{
+        /// <summary>Solid render buffers made at start (V4: one fills at the baseline draw distance).</summary>
+        internal const int SolidInitialBuffers = 2;
+
         /// <summary>
         ///     Reference to the VoxelWorld instance.
         /// </summary>
@@ -207,7 +210,9 @@ namespace Engine.Scripts.Render{
             _buildRequests = new PartitionBuildRequest[_maxInFlight];
             for (int i = 0; i < _maxInFlight; i++) _buildRequests[i] = new PartitionBuildRequest(default);
 
-            _solidBufferManager = new RenderBufferManager(rSettings.solidMaterial);
+            // Two solid buffers from the start: the varied surfaces of WorldGen v2 (V4) fill one at the baseline draw
+            // distance 6, and a buffer made mid-flight allocates; the shipped draw distance makes more anyway.
+            _solidBufferManager = new RenderBufferManager(rSettings.solidMaterial, SolidInitialBuffers);
             // the transparent layer's buffer holds the cut-out blocks (leaves) too, drawn with the opaque blocks
             _transparentBufferManager =
                 RenderBufferManager.WithCutoutPass(rSettings.transparentMaterial, rSettings.cutoutMaterial);

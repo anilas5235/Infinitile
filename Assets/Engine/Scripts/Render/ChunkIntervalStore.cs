@@ -2,6 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using Engine.Scripts.Utils.Collections;
 using Engine.Scripts.Utils.Logger;
+using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 using static Engine.Scripts.Utils.VoxelRenderConstants;
@@ -20,7 +21,8 @@ namespace Engine.Scripts.Render{
         private readonly ComputeShader _copyShader;
         private readonly int _copyKernel;
         private readonly IntervalPages _pages;
-        private uint2[] _staging = Array.Empty<uint2>(); // reused upload staging
+        // Reused upload staging; native, so growing it for a longer list than any before allocates no managed memory.
+        private NativeArray<uint2> _staging;
 
         /// <summary>Creates the store with every page free.</summary>
         /// <param name="pageCount">Initial pages (<see cref="IntervalPages.PageSize" /> elements each).</param>
@@ -45,6 +47,7 @@ namespace Engine.Scripts.Render{
         internal long GpuBytes => Render.GpuBytes.Of(Buffer);
 
         public void Dispose(){
+            if (_staging.IsCreated) _staging.Dispose();
             Buffer?.Dispose();
             Buffer = null;
         }
@@ -57,8 +60,13 @@ namespace Engine.Scripts.Render{
             int intervalCount = data.CompressedLength;
             int length = intervalCount + 1;
 
-            if (_staging.Length < length) _staging = new uint2[math.max(length, _staging.Length * 2)];
-            uint2[] staging = _staging;
+            if (!_staging.IsCreated || _staging.Length < length){
+                int capacity = math.max(length, _staging.IsCreated ? _staging.Length * 2 : 0);
+                if (_staging.IsCreated) _staging.Dispose();
+                _staging = new NativeArray<uint2>(capacity, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+            }
+
+            NativeArray<uint2> staging = _staging;
             int i = 1;
             foreach (UnsafeIntervalList<ushort>.Node n in data.Internal)
                 staging[i++] = new uint2(n.Value, (uint)n.Count);

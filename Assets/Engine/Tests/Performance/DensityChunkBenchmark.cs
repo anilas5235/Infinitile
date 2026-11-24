@@ -36,6 +36,9 @@ namespace Engine.Tests.Performance{
         private CompiledNoiseGraph _graph, _graph4, _shipped;
         private GeneratorConfig _config;
 
+        /// <summary>The shipped biomes with real voxel ids and the shipped surface rules (V4), for the rows of the game's job.</summary>
+        private GeneratorConfig _rules;
+
         private static readonly DensityChunkClass[] Classes = DensityFixture.Classes;
 
         [OneTimeSetUp]
@@ -49,6 +52,9 @@ namespace Engine.Tests.Performance{
             _config.WorldGen.Seed = DensityFixture.Seed;
             _config.WorldGen.DensityStoneVoxel = BenchmarkFixtures.Stone;
             DensityFixture.UseShippedBiomes(ref _config.WorldGen);
+            _rules = BenchmarkFixtures.CreateGeneratorConfig(Allocator.Persistent);
+            _rules.WorldGen.Seed = DensityFixture.Seed;
+            DensityFixture.UseShippedSurface(ref _rules.WorldGen, _shipped);
         }
 
         [OneTimeTearDown]
@@ -57,6 +63,7 @@ namespace Engine.Tests.Performance{
             _graph4?.Dispose();
             _shipped?.Dispose();
             BenchmarkFixtures.DisposeGeneratorConfig(ref _config);
+            BenchmarkFixtures.DisposeGeneratorConfig(ref _rules);
         }
 
         /// <summary>The fixture graph with the terrain marker at cell height 4 (W2-DEN-06).</summary>
@@ -142,17 +149,31 @@ namespace Engine.Tests.Performance{
         [Test]
         [Performance]
         public void DensityChunkJob_Run_Shipped_MsPerChunk([ValueSource(nameof(Classes))] DensityChunkClass c){
-            MeasureJob<ShippedNoiseGraphCode>(_shipped, c, $"DensityChunkJob.Run shipped graph {c} ms/chunk");
+            MeasureJob<ShippedNoiseGraphCode>(_shipped, c, $"DensityChunkJob.Run shipped graph {c} ms/chunk", _rules);
         }
 
-        private void MeasureJob<TPrograms>(CompiledNoiseGraph graph, DensityChunkClass c, string sampleGroup) where TPrograms : struct, IGraphPrograms{
+        /// <summary>The shipped job without surface rules (V3's placeholder fill): the rule cost is the difference to the row above.</summary>
+        [Test]
+        [Performance]
+        public void DensityChunkJob_Run_Shipped_NoRules_MsPerChunk([ValueSource(nameof(Classes))] DensityChunkClass c){
+            MeasureJob<ShippedNoiseGraphCode>(_shipped, c, $"DensityChunkJob.Run shipped graph without rules {c} ms/chunk");
+        }
+
+        /// <summary>P1 … P3 and the surface rules (V4): the rule pass is the difference to the blend row.</summary>
+        [Test]
+        [Performance]
+        public void DensityChunk_Shipped_Rules_MsPerChunk([ValueSource(nameof(Classes))] DensityChunkClass c){
+            MeasureProbe<ShippedNoiseGraphCode>(_shipped, c, DensityChunk.PassFill, $"Shipped graph P1+P4+P2+P3 blend + surface rules {c} ms/chunk", _rules);
+        }
+
+        private void MeasureJob<TPrograms>(CompiledNoiseGraph graph, DensityChunkClass c, string sampleGroup, GeneratorConfig? config = null) where TPrograms : struct, IGraphPrograms{
             AssertFits<TPrograms>(graph);
             DensityTerrainGraph.TryCreate(graph, out DensityTerrainGraph terrain, out _);
             NativeList<int2> jobs = new(8, Allocator.Persistent);
             NativeParallelHashMap<int2, ChunkVoxelData> results = new(8, Allocator.Persistent);
             try{
                 foreach (int2 chunk in DensityFixture.Chunks(c)) jobs.Add(chunk);
-                DensityChunkJob<TPrograms> job = new(){ Jobs = jobs, Results = results.AsParallelWriter(), Config = _config, Terrain = terrain };
+                DensityChunkJob<TPrograms> job = new(){ Jobs = jobs, Results = results.AsParallelWriter(), Config = config ?? _config, Terrain = terrain };
                 SampleGroup group = new(sampleGroup, SampleUnit.Millisecond);
                 for (int i = 0; i < WarmupCount + MeasurementCount; i++){
                     Stopwatch watch = Stopwatch.StartNew();
@@ -169,12 +190,12 @@ namespace Engine.Tests.Performance{
             }
         }
 
-        private void MeasureProbe<TPrograms>(CompiledNoiseGraph graph, DensityChunkClass c, int passes, string sampleGroup)
+        private void MeasureProbe<TPrograms>(CompiledNoiseGraph graph, DensityChunkClass c, int passes, string sampleGroup, GeneratorConfig? config = null)
             where TPrograms : struct, IGraphPrograms{
             AssertFits<TPrograms>(graph);
             IReadOnlyList<int2> chunks = DensityFixture.Chunks(c);
             Assert.Greater(chunks.Count, 0, "the fixture lists no chunks of this class");
-            DensityProbeJob<TPrograms> job = DensityProbe.Create<TPrograms>(graph, _config.WorldGen, int2.zero, passes, out DensityProbeResult result);
+            DensityProbeJob<TPrograms> job = DensityProbe.Create<TPrograms>(graph, (config ?? _config).WorldGen, int2.zero, passes, out DensityProbeResult result);
             try{
                 SampleGroup group = new(sampleGroup, SampleUnit.Millisecond);
                 for (int i = 0; i < WarmupCount + MeasurementCount; i++){
