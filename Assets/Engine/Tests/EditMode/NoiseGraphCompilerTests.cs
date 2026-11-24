@@ -311,7 +311,7 @@ namespace Engine.Tests.EditMode{
         /// </summary>
         [Test]
         public void ShippedGraph_OutputsOnFixedColumnsMatchTheGoldenHash(){
-            const uint expected = 0x52B61DCBu; // V4 rule outputs (beach_shape and the snow, ice, tree line and strata wobbles); V3 calmer border (DEC-171); V3 deeper valleys: massif rows d2 (DEC-168); V3 re-tune: ranges on the W zero line, Badlands K (DEC-163…165); V3: blend_border, T/F wavelengths ×1.4 (DEC-161) (V2: the terrain outputs, the massif re-tune and the soft knee)
+            const uint expected = 0x9E8DAC55u; // V4 tour 6: rock_kind output (DEC-190); V4 tour 5: ground_mix output (DEC-187); V4 tour 4: rock_mix wavelength 12 (DEC-184); V4 tour 3: rock_mix output (DEC-182); V4 tour: beach noise 64, beach_shape ramp 0.20…0.35 (DEC-179); V4 rule outputs (beach_shape and the snow, ice, tree line and strata wobbles); V3 calmer border (DEC-171); V3 deeper valleys: massif rows d2 (DEC-168); V3 re-tune: ranges on the W zero line, Badlands K (DEC-163…165); V3: blend_border, T/F wavelengths ×1.4 (DEC-161) (V2: the terrain outputs, the massif re-tune and the soft knee)
             using CompiledNoiseGraph graph = ShippedNoiseGraph.Compile().Graph;
             float2[] columns = GoldenColumns();
             float[] lattice = GraphEvaluator.SampleLattice(graph, Seed, columns, out _);
@@ -331,16 +331,16 @@ namespace Engine.Tests.EditMode{
             float2[] points = GoldenColumns();
             GraphEvaluator.SampleLattice(graph, Seed, points, out GraphWorkCounters counters);
             // Octaves: continentalness 5 + warp 2 × 2 + erosion 4 + humidity 3 + temperature 3 + weirdness 3 + peak 3 (re-tune 2026-11-22) + blend border 1 (the detail noise went with DEC-171)
-            // + the V4 rule outputs beach_shape, ice_wobble, snow_wobble, strata_shift and tree_line_wobble 1 each.
-            const int samplesPerPoint = 31;
+            // + the V4 rule outputs beach_shape, ice_wobble, snow_wobble, strata_shift and tree_line_wobble 1 each, rock_mix 2 (DEC-182), ground_mix 2 (DEC-187), rock_kind 2 (DEC-190).
+            const int samplesPerPoint = 37;
             Assert.AreEqual(points.Length, counters.LatticePoints);
             Assert.AreEqual((long)samplesPerPoint * points.Length, counters.NoiseSamples2D);
             Assert.AreEqual(0, counters.NoiseSamples3D);
 
             using GraphRegionResult region = GraphEvaluator.EvaluateRegion(graph, Seed, new int2(-64, 32), new int2(32, 32), true);
             Assert.AreEqual(9 * 9, region.Counters.LatticePoints, "a chunk's lattice is 9 × 9 points");
-            // The per-column outputs (blend_border and the five V4 rule outputs) add their noise sample on each of the chunk's 32 × 32 columns.
-            const int columnSamples = 6;
+            // The per-column outputs (blend_border and the five V4 rule outputs, rock_mix, ground_mix and rock_kind with two octaves each) add their noise samples on each of the chunk's 32 × 32 columns.
+            const int columnSamples = 12;
             Assert.AreEqual(samplesPerPoint * 81 + columnSamples * 32 * 32, region.Counters.NoiseSamples2D);
             Assert.Greater(region.Counters.NoiseSamples3D, 0, "the terrain density is 3D (N3)");
         }

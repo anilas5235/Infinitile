@@ -20,7 +20,7 @@ MonoBehaviour:
   FreezesWater: 0
   StrataBlock: {fileID: 0}
   BeachBlock: {fileID: 11400000, guid: b5df436b2cc46cf419e666fccd2d96b3, type: 2}
-  BeachHeight: 3
+  BeachHeight: 4
   RockBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   NeverSnows: 0
   TargetHumidity: 0.42

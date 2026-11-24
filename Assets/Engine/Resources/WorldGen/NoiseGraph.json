@@ -1102,7 +1102,7 @@
       "kind": "simplex2",
       "lacunarity": 2,
       "octaves": 1,
-      "wavelength": 128
+      "wavelength": 64
     },
     "blend_border": {
       "amplitude": 0.2,
@@ -1144,6 +1144,14 @@
       "octaves": 4,
       "wavelength": 1882
     },
+    "ground_mix": {
+      "amplitude": 1,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 2,
+      "wavelength": 14
+    },
     "humidity": {
       "amplitude": 1,
       "gain": 0.5,
@@ -1167,6 +1175,22 @@
       "lacunarity": 2,
       "octaves": 3,
       "wavelength": 256
+    },
+    "rock_kind": {
+      "amplitude": 1,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 2,
+      "wavelength": 64
+    },
+    "rock_mix": {
+      "amplitude": 1,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 2,
+      "wavelength": 12
     },
     "snow_wobble": {
       "amplitude": 0.033,
@@ -1221,7 +1245,7 @@
   "outputs": {
     "beach_shape": {
       "node": {
-        "from": 0.45,
+        "from": 0.2,
         "in": {
           "a": 0.5,
           "b": {
@@ -1235,7 +1259,7 @@
           "op": "add"
         },
         "op": "smoothstep",
-        "to": 0.6
+        "to": 0.35
       },
       "perColumn": true
     },
@@ -1258,6 +1282,13 @@
     "continentalness": "continentalness_curve",
     "erosion": "erosion_value",
     "factor": "terrain_factor",
+    "ground_mix": {
+      "node": {
+        "noise": "ground_mix",
+        "op": "fbm"
+      },
+      "perColumn": true
+    },
     "humidity": "humidity_value",
     "ice_wobble": {
       "node": {
@@ -1268,6 +1299,20 @@
     },
     "preliminary_surface": "preliminary_surface",
     "pv": "peaks_valleys",
+    "rock_kind": {
+      "node": {
+        "noise": "rock_kind",
+        "op": "fbm"
+      },
+      "perColumn": true
+    },
+    "rock_mix": {
+      "node": {
+        "noise": "rock_mix",
+        "op": "fbm"
+      },
+      "perColumn": true
+    },
     "snow_wobble": {
       "node": {
         "noise": "snow_wobble",

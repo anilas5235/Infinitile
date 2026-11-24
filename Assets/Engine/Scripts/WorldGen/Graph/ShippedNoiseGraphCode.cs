@@ -15,8 +15,8 @@ using Unity.Mathematics;
 namespace Engine.Scripts.WorldGen.Graph{
     /// <summary>Generated programs of one noise graph; see <see cref="IGraphPrograms" />.</summary>
     internal unsafe struct ShippedNoiseGraphCode : IGraphPrograms{
-        public ulong CodeHash => 0xF59CF43E266FC49EUL;
-        public GraphTableSizes Sizes => new(105, 4, 25, 15, 35, 169, 1);
+        public ulong CodeHash => 0xB6FF1DFC6654F34FUL;
+        public GraphTableSizes Sizes => new(111, 4, 31, 18, 41, 169, 1);
 
         public void Run(int program, in GraphCode code, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters){
             switch (program){
@@ -33,15 +33,15 @@ namespace Engine.Scripts.WorldGen.Graph{
                     break;
                 case 2:
                     Lattice(registers, code.Points, lanes, seed);
-                    counters.Instructions += 83;
-                    counters.InstructionLanes += 83L * lanes;
-                    counters.NoiseSamples2D += 31L * lanes;
+                    counters.Instructions += 86;
+                    counters.InstructionLanes += 86L * lanes;
+                    counters.NoiseSamples2D += 37L * lanes;
                     break;
                 case 3:
                     Column(registers, code.Points, lanes, seed);
-                    counters.Instructions += 11;
-                    counters.InstructionLanes += 11L * lanes;
-                    counters.NoiseSamples2D += 6L * lanes;
+                    counters.Instructions += 14;
+                    counters.InstructionLanes += 14L * lanes;
+                    counters.NoiseSamples2D += 12L * lanes;
                     break;
                 default:
                     code.Run(code.Programs[program], registers, scratch, lanes, seed, ref counters);
@@ -91,7 +91,7 @@ namespace Engine.Scripts.WorldGen.Graph{
             }
         }
 
-        /// <summary>Lattice program: 83 instructions, 21 registers.</summary>
+        /// <summary>Lattice program: 86 instructions, 21 registers.</summary>
         private static void Lattice(float* r, SplinePoint* points, int lanes, uint seed){
             int quads = (lanes + 3) >> 2;
             float4* sv = stackalloc float4[48];
@@ -395,12 +395,12 @@ namespace Engine.Scripts.WorldGen.Graph{
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C000000u), nz * math.asfloat(0x3C000000u), seed, 0x9DFC6BE5u) * math.asfloat(0x3F800000u);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0x9DFC6BE5u) * math.asfloat(0x3F800000u);
                     r7 = n;
                 }
                 r9 = r7 * math.asfloat(0x3F000000u);
                 r7 = r9 + math.asfloat(0x3F000000u);
-                r9 = GraphKernels.Smoothstep(r7, math.asfloat(0x3EE66666u), math.asfloat(0x40D55552u));
+                r9 = GraphKernels.Smoothstep(r7, math.asfloat(0x3E4CCCCDu), math.asfloat(0x40D55556u));
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
@@ -411,27 +411,48 @@ namespace Engine.Scripts.WorldGen.Graph{
                 r7 = math.clamp(r10, math.asfloat(0x3D23D70Au), math.asfloat(0x3F75C28Fu));
                 r10 = math.clamp(r4, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
                 r4 = math.clamp(r3, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
-                r3 = math.clamp(r6, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
+                {
+                    float4 nx = r0, nz = r2;
+                    float4 n = float4.zero;
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D924925u), nz * math.asfloat(0x3D924925u), seed, 0xA4F5A288u) * math.asfloat(0x3F2AAAABu);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3E124925u), nz * math.asfloat(0x3E124925u), seed, 0x917A6AE6u) * math.asfloat(0x3EAAAAABu);
+                    r3 = n;
+                }
+                r14 = math.clamp(r6, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D2AAAABu), nz * math.asfloat(0x3D2AAAABu), seed, 0x0628FB72u) * math.asfloat(0x3DA3D70Au);
                     r6 = n;
                 }
-                r14 = math.clamp(r12, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
+                r15 = math.clamp(r12, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3CAAAAABu), nz * math.asfloat(0x3CAAAAABu), seed, 0xA6EEF686u) * math.asfloat(0x3D072B02u);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0xA6370C99u) * math.asfloat(0x3F2AAAABu);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D000000u), nz * math.asfloat(0x3D000000u), seed, 0xD8978A24u) * math.asfloat(0x3EAAAAABu);
                     r12 = n;
                 }
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0x62813496u) * math.asfloat(0x40800000u);
-                    r15 = n;
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3DAAAAABu), nz * math.asfloat(0x3DAAAAABu), seed, 0xC6853C8Cu) * math.asfloat(0x3F2AAAABu);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3E2AAAABu), nz * math.asfloat(0x3E2AAAABu), seed, 0xF427C45Cu) * math.asfloat(0x3EAAAAABu);
+                    r16 = n;
                 }
-                r16 = math.clamp(r5, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
+                {
+                    float4 nx = r0, nz = r2;
+                    float4 n = float4.zero;
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3CAAAAABu), nz * math.asfloat(0x3CAAAAABu), seed, 0xA6EEF686u) * math.asfloat(0x3D072B02u);
+                    r17 = n;
+                }
+                {
+                    float4 nx = r0, nz = r2;
+                    float4 n = float4.zero;
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0x62813496u) * math.asfloat(0x40800000u);
+                    r18 = n;
+                }
+                r19 = math.clamp(r5, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
@@ -444,33 +465,36 @@ namespace Engine.Scripts.WorldGen.Graph{
                 ((float4*)(r + 512))[q] = r4;
                 ((float4*)(r + 1664))[q] = r13;
                 ((float4*)(r + 384))[q] = r3;
+                ((float4*)(r + 1792))[q] = r14;
                 ((float4*)(r + 768))[q] = r6;
                 ((float4*)(r + 1408))[q] = r11;
-                ((float4*)(r + 1792))[q] = r14;
-                ((float4*)(r + 1536))[q] = r12;
                 ((float4*)(r + 1920))[q] = r15;
+                ((float4*)(r + 1536))[q] = r12;
                 ((float4*)(r + 2048))[q] = r16;
+                ((float4*)(r + 2176))[q] = r17;
+                ((float4*)(r + 2304))[q] = r18;
+                ((float4*)(r + 2432))[q] = r19;
                 ((float4*)(r + 640))[q] = r5;
                 ((float4*)(r + 1024))[q] = r8;
             }
         }
 
-        /// <summary>Column program: 11 instructions, 9 registers.</summary>
+        /// <summary>Column program: 14 instructions, 12 registers.</summary>
         private static void Column(float* r, SplinePoint* points, int lanes, uint seed){
             int quads = (lanes + 3) >> 2;
             for (int q = 0; q < quads; q++){
                 float4 r0 = ((float4*)r)[q];
                 float4 r2 = ((float4*)(r + 256))[q];
-                float4 r3, r4, r5, r6, r7, r8;
+                float4 r3, r4, r5, r6, r7, r8, r9, r10, r11;
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C000000u), nz * math.asfloat(0x3C000000u), seed, 0x9DFC6BE5u) * math.asfloat(0x3F800000u);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0x9DFC6BE5u) * math.asfloat(0x3F800000u);
                     r3 = n;
                 }
                 r4 = r3 * math.asfloat(0x3F000000u);
                 r3 = r4 + math.asfloat(0x3F000000u);
-                r4 = GraphKernels.Smoothstep(r3, math.asfloat(0x3EE66666u), math.asfloat(0x40D55552u));
+                r4 = GraphKernels.Smoothstep(r3, math.asfloat(0x3E4CCCCDu), math.asfloat(0x40D55556u));
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
@@ -482,26 +506,47 @@ namespace Engine.Scripts.WorldGen.Graph{
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D2AAAABu), nz * math.asfloat(0x3D2AAAABu), seed, 0x0628FB72u) * math.asfloat(0x3DA3D70Au);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D924925u), nz * math.asfloat(0x3D924925u), seed, 0xA4F5A288u) * math.asfloat(0x3F2AAAABu);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3E124925u), nz * math.asfloat(0x3E124925u), seed, 0x917A6AE6u) * math.asfloat(0x3EAAAAABu);
                     r5 = n;
                 }
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3CAAAAABu), nz * math.asfloat(0x3CAAAAABu), seed, 0xA6EEF686u) * math.asfloat(0x3D072B02u);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D2AAAABu), nz * math.asfloat(0x3D2AAAABu), seed, 0x0628FB72u) * math.asfloat(0x3DA3D70Au);
                     r6 = n;
                 }
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0x62813496u) * math.asfloat(0x40800000u);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0xA6370C99u) * math.asfloat(0x3F2AAAABu);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D000000u), nz * math.asfloat(0x3D000000u), seed, 0xD8978A24u) * math.asfloat(0x3EAAAAABu);
                     r7 = n;
                 }
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0xCA4EF3D0u) * math.asfloat(0x41000000u);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3DAAAAABu), nz * math.asfloat(0x3DAAAAABu), seed, 0xC6853C8Cu) * math.asfloat(0x3F2AAAABu);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3E2AAAABu), nz * math.asfloat(0x3E2AAAABu), seed, 0xF427C45Cu) * math.asfloat(0x3EAAAAABu);
                     r8 = n;
+                }
+                {
+                    float4 nx = r0, nz = r2;
+                    float4 n = float4.zero;
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3CAAAAABu), nz * math.asfloat(0x3CAAAAABu), seed, 0xA6EEF686u) * math.asfloat(0x3D072B02u);
+                    r9 = n;
+                }
+                {
+                    float4 nx = r0, nz = r2;
+                    float4 n = float4.zero;
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0x62813496u) * math.asfloat(0x40800000u);
+                    r10 = n;
+                }
+                {
+                    float4 nx = r0, nz = r2;
+                    float4 n = float4.zero;
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0xCA4EF3D0u) * math.asfloat(0x41000000u);
+                    r11 = n;
                 }
                 ((float4*)(r + 512))[q] = r4;
                 ((float4*)(r + 384))[q] = r3;
@@ -509,6 +554,9 @@ namespace Engine.Scripts.WorldGen.Graph{
                 ((float4*)(r + 768))[q] = r6;
                 ((float4*)(r + 896))[q] = r7;
                 ((float4*)(r + 1024))[q] = r8;
+                ((float4*)(r + 1152))[q] = r9;
+                ((float4*)(r + 1280))[q] = r10;
+                ((float4*)(r + 1408))[q] = r11;
             }
         }
     }

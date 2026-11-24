@@ -288,6 +288,12 @@ namespace Engine.Scripts.WorldGen.Surface{
                     case BlockAction b: {
                         ushort id = Block(b.Block, rule.Name);
                         if (id == 0) return -1;
+                        if (b.Cover != null){
+                            ushort cover = Block(b.Cover, rule.Name);
+                            if (cover == 0) return -1;
+                            return AddAction(new SurfaceAction{ Kind = RuleActionKind.Block, Block = id, Cover = cover });
+                        }
+
                         // Strata replace the biome's stone block wherever a rule puts it (v1 did so on every stone voxel).
                         if (id == _def.stoneBlock && _def.strataBlock != 0)
                             return AddAction(new SurfaceAction{
@@ -347,8 +353,12 @@ namespace Engine.Scripts.WorldGen.Surface{
                         case "@snow":
                             if (_def.snowTopBlock != 0) return _def.snowTopBlock;
                             return _set.Blocks.TryGetValue("snow", out string snow) ? Named(snow, rule) : (ushort)0;
+                        case "@snow_layer":
+                            return _set.Blocks.TryGetValue("snow_layer", out string layer) ? Named(layer, rule) : (ushort)0;
                         default:
-                            Error(rule, $"Rule \"{rule}\": unknown block slot \"{block}\" (@top, @under, @stone, @underwater_top, @beach, @meadow, @forest_floor, @rock, @snow, @strata).",
+                            // Any other slot names a voxel in the rule file's "blocks" table (shipped: @dark_rock).
+                            if (_set.Blocks.TryGetValue(block.Substring(1), out string named)) return Named(named, rule);
+                            Error(rule, $"Rule \"{rule}\": unknown block slot \"{block}\" (@top, @under, @stone, @underwater_top, @beach, @meadow, @forest_floor, @rock, @snow, @snow_layer, @strata, or a name from \"blocks\").",
                                 "block");
                             return 0;
                     }

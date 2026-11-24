@@ -183,12 +183,15 @@ namespace Engine.Scripts.WorldGen.Surface{
         public abstract RuleAction Clone();
     }
 
-    /// <summary>A block: a biome slot ("@top", …) or a voxel's full name ("std:Stone").</summary>
+    /// <summary>
+    ///     A block: a biome slot ("@top", …) or a voxel's full name ("std:Stone"). <see cref="Cover" /> (optional) goes
+    ///     on the air voxel above a run's top, e.g. a snow layer on the ground (DEC-178).
+    /// </summary>
     public sealed class BlockAction : RuleAction{
-        public string Block;
+        public string Block, Cover;
 
         public override RuleAction Clone(){
-            return new BlockAction{ Block = Block };
+            return new BlockAction{ Block = Block, Cover = Cover };
         }
     }
 
@@ -643,8 +646,15 @@ namespace Engine.Scripts.WorldGen.Surface{
         }
 
         private RuleAction ReadAction(object value, string source, string file, string biome, string rule){
+            // A block may carry a cover: {"block": …, "cover": …}.
+            if (value is Dictionary<string, object>{ Count: 2 } bc && bc.TryGetValue("block", out object bb) && bc.TryGetValue("cover", out object cv)){
+                if (bb is string blockName && cv is string coverName) return new BlockAction{ Block = blockName, Cover = coverName };
+                Error(source, file, biome, $"Rule \"{rule}\": \"block\" and \"cover\" are block names.", "file");
+                return null;
+            }
+
             if (value is not Dictionary<string, object>{ Count: 1 } o){
-                Error(source, file, biome, $"Rule \"{rule}\": \"then\" is one of {{\"block\": …}}, {{\"bands\": …}}, {{\"sequence\": […]}}.", "file");
+                Error(source, file, biome, $"Rule \"{rule}\": \"then\" is one of {{\"block\": …}} (with an optional \"cover\"), {{\"bands\": …}}, {{\"sequence\": […]}}.", "file");
                 return null;
             }
 

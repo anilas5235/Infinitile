@@ -151,8 +151,16 @@ namespace Engine.Scripts.WorldGen.Density{
             int top, int bottom, ushort* column, ushort keep, int waterLevel, ref SurfaceWorkCounters counters){
             int fullTop = rules.FullEvaluation ? bottom : math.max(bottom, top - br.RAbove);
             int fullBottom = rules.FullEvaluation ? bottom - 1 : math.min(fullTop - 1, bottom + br.RBelow);
-            for (int y = top; y >= fullTop; y--) column[y] = Full(rules, worldGen, br.Root, ref col, ref b, v, y, top, bottom, keep, waterLevel, ref counters);
-            for (int y = bottom; y <= fullBottom; y++) column[y] = Full(rules, worldGen, br.Root, ref col, ref b, v, y, top, bottom, keep, waterLevel, ref counters);
+            for (int y = top; y >= fullTop; y--){
+                SurfaceAction a = rules.Actions[Full(rules, worldGen, br.Root, ref col, ref b, v, y, top, bottom, waterLevel, ref counters)];
+                column[y] = Emit(rules, a, ref col, ref b, y, keep);
+                // The top's cover (a snow layer) goes on the open voxel above it when that is air.
+                if (y == top && a.Cover != 0 && top + 1 < H && column[top + 1] == 0) column[top + 1] = a.Cover;
+            }
+
+            for (int y = bottom; y <= fullBottom; y++)
+                column[y] = Emit(rules, rules.Actions[Full(rules, worldGen, br.Root, ref col, ref b, v, y, top, bottom, waterLevel, ref counters)], ref col, ref b, y,
+                    keep);
 
             int lo = fullBottom + 1, hi = fullTop - 1;
             if (lo > hi) return;
@@ -202,14 +210,14 @@ namespace Engine.Scripts.WorldGen.Density{
             for (int i = 0; i <= count; i++) col.RangeAction[i] = -1;
         }
 
-        private static ushort Full(in SurfaceRules rules, in WorldGenConfig worldGen, int root, ref Column col, ref DensityChunkBuffers b, Voxel v, int y, int top,
-            int bottom, ushort keep, int waterLevel, ref SurfaceWorkCounters counters){
+        /// <summary>The action of voxel <paramref name="y" /> of the run from the full graph.</summary>
+        private static int Full(in SurfaceRules rules, in WorldGenConfig worldGen, int root, ref Column col, ref DensityChunkBuffers b, Voxel v, int y, int top,
+            int bottom, int waterLevel, ref SurfaceWorkCounters counters){
             v.Y = y;
             v.DepthAbove = top - y;
             v.DepthBelow = y - bottom;
             counters.FullVoxels++;
-            int action = Walk(rules, worldGen, root, ref col, ref b, v, waterLevel, ref counters);
-            return Emit(rules, rules.Actions[action], ref col, ref b, y, keep);
+            return Walk(rules, worldGen, root, ref col, ref b, v, waterLevel, ref counters);
         }
 
         private static ushort Emit(in SurfaceRules rules, in SurfaceAction a, ref Column col, ref DensityChunkBuffers b, int y, ushort keep){
@@ -377,15 +385,20 @@ namespace Engine.Scripts.WorldGen.Density{
         }
 
         /// <summary>
-        ///     The heightmap's rise across the column: the larger of |h(x + 1) − h(x − 1)| and |h(z + 1) − h(z − 1)|, at the
-        ///     chunk edge twice the one-sided difference. A column without terrain is never steep.
+        ///     The heightmap's rise across the column, per two columns: the larger of |h(x + 2) − h(x − 2)| / 2 and
+        ///     |h(z + 2) − h(z − 2)| / 2, rounded; at the chunk edge the footprint shrinks and the difference is scaled to two
+        ///     columns. The four-column footprint lets neighbouring columns agree, so steep faces do not flip between rules from
+        ///     column to column (DEC-181). A column without terrain is never steep.
         /// </summary>
         internal static int Rise(ref DensityChunkBuffers b, int x, int z){
             short* h = b.Heightmap;
             int self = h[x * N + z];
             if (self < 0) return 0;
-            return math.max(Across(h, x, z, 1, 0), Across(h, x, z, 0, 1));
+            return math.max(Across(h, x, z, RiseReach, 0), Across(h, x, z, 0, RiseReach));
         }
+
+        /// <summary>Half the footprint of <see cref="Rise" />, in columns.</summary>
+        private const int RiseReach = 2;
 
         private static int Across(short* h, int x, int z, int dx, int dz){
             int x0 = math.max(0, x - dx), z0 = math.max(0, z - dz), x1 = math.min(N - 1, x + dx), z1 = math.min(N - 1, z + dz);
@@ -393,7 +406,7 @@ namespace Engine.Scripts.WorldGen.Density{
             if (a < 0 || c < 0) return 0;
             int span = (x1 - x0) + (z1 - z0);
             int rise = math.abs(c - a);
-            return span == 2 ? rise : rise * 2;
+            return (rise * 4 + span) / (2 * span);
         }
 
         /// <summary>

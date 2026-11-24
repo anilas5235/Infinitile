@@ -59,6 +59,9 @@ namespace Engine.Scripts.WorldGen.Surface{
         /// <summary>The block (bands: the block between the bands).</summary>
         public ushort Block;
 
+        /// <summary>Block actions: the voxel placed on the open voxel above a run's top (a snow layer), 0 for none.</summary>
+        public ushort Cover;
+
         public int Period, Thickness;
 
         /// <summary>Column int of the band shift, −1 for none.</summary>

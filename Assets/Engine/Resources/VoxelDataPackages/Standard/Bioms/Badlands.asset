@@ -24,7 +24,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d47e3da2e55678e694c98341f4038760, type: 2}
   - {fileID: 11400000, guid: eeed6c09b1b96c04faeab22d816e1b62, type: 2}
   BeachBlock: {fileID: 11400000, guid: 9cf114b1c56383b448012d6a5b9d8b72, type: 2}
-  BeachHeight: 3
+  BeachHeight: 4
   RockBlock: {fileID: 11400000, guid: 4b68ebaffc51483a003d9dd66e7c1219, type: 2}
   NeverSnows: 1
   TargetHumidity: 0.03

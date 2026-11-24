@@ -30,6 +30,18 @@ namespace Engine.Tests.EditMode{
         private CompiledNoiseGraph _graph;
         private GeneratorConfig _config;
         private FixtureVoxelIds _ids;
+
+        /// <summary>The dark rock the rules mix into rock by the rock_mix noise (DEC-182); the oracle cannot see the noise.</summary>
+        private static ushort _darkRock;
+
+        /// <summary>
+        ///     The rock variety the rules mix into steep and alpine rock by the ground_mix and rock_kind noises (DEC-187, DEC-190):
+        ///     mossy and lichen rock, granite, diorite, andesite and marble; the oracle cannot see the noises.
+        /// </summary>
+        private static readonly HashSet<ushort> RockVariety = new();
+
+        /// <summary>The ground-variety tops the rules mix into dry floors below the tree line and into floors 4+ under water by the ground_mix noise (DEC-187, DEC-190).</summary>
+        private static readonly HashSet<ushort> GroundVariety = new();
         private BiomeLayout _layout;
         private string[] _names;
         private Biome.BiomeDef[] _defs;
@@ -51,6 +63,16 @@ namespace Engine.Tests.EditMode{
             _config = TestFixtures.CreateGeneratorConfig(Allocator.Persistent);
             _config.WorldGen.Seed = DensityFixture.Seed;
             _ids = DensityFixture.UseShippedSurface(ref _config.WorldGen, _graph);
+            _darkRock = (ushort)_ids.ByName("std:StoneGrey");
+            RockVariety.Clear();
+            foreach (string name in new[]{ "std:StoneMossy", "std:StoneGreyMossy", "std:StoneGreyLichen", "std:Granite", "std:Diorite", "std:Andesite", "std:Marble" })
+                RockVariety.Add((ushort)_ids.ByName(name));
+            GroundVariety.Clear();
+            foreach (string name in new[]{
+                         "std:StoneGrassy", "std:DirtSandy", "std:Litter", "std:LitterLeaves", "std:DirtCoarse", "std:Mud", "std:Peat", "std:Moss",
+                         "std:Cobblestone", "std:StoneGravel", "std:Clay"
+                     })
+                GroundVariety.Add((ushort)_ids.ByName(name));
             _layout = BiomeLayoutTests.Shipped();
             _names = _layout.Palette();
             _defs = _config.WorldGen.Layout.Defs.ToArray();
@@ -138,7 +160,25 @@ namespace Engine.Tests.EditMode{
         }
 
         private ushort SnowBlock(in Biome.BiomeDef def){
-            return def.snowTopBlock != 0 ? def.snowTopBlock : (ushort)_ids.ByName("std:StoneSnowy");
+            return def.snowTopBlock != 0 ? def.snowTopBlock : (ushort)_ids.ByName("std:Snow");
+        }
+
+        private ushort SnowLayer => (ushort)_ids.ByName("std:SnowLayer");
+
+        /// <summary>
+        ///     The ground under snow (DEC-178, DEC-180, DEC-181): bare rock on steep faces (rise ≥ 4), rock under a snow layer on
+        ///     ledges (rise 2–3), a snow block above the tree line and on steps (rise 1), else the under block under a snow layer.
+        /// </summary>
+        private ushort SnowGround(in Biome.BiomeDef def, int y, int treeLine, int rise){
+            if (rise >= 2 && def.rockBlock != 0) return def.rockBlock;
+            return y >= treeLine || rise >= 1 ? SnowBlock(def) : Under(def);
+        }
+
+        /// <summary>Whether the snow ground carries a snow layer (see <see cref="SnowGround" />).</summary>
+        private static bool SnowLayerOn(in Biome.BiomeDef def, int y, int treeLine, int rise){
+            if (rise >= 4 && def.rockBlock != 0) return false;
+            if (rise >= 2 && def.rockBlock != 0) return true;
+            return y < treeLine && rise < 1;
         }
 
         /// <summary>Whether <paramref name="block" /> is one of the biome's own surface blocks (then it may lie there without snow).</summary>
@@ -193,6 +233,16 @@ namespace Engine.Tests.EditMode{
                 AssertError(r, "block");
             using (SurfaceRuleCompileResult r = Compile(WithDefault("{ 'name': 'a', 'if': 'floor', 'then': { 'block': 'std:NoSuchVoxel' } }")))
                 AssertError(r, "block");
+            // A cover is a block name too (DEC-178).
+            using (SurfaceRuleCompileResult r = Compile(WithDefault("{ 'name': 'a', 'if': 'floor', 'then': { 'block': '@top', 'cover': 'std:NoSuchVoxel' } }")))
+                AssertError(r, "block");
+            using (SurfaceRuleCompileResult r = Compile(WithDefault("{ 'name': 'a', 'if': 'floor', 'then': { 'block': '@top', 'cover': 'std:SnowLayer' } }"))){
+                Assert.IsTrue(r.Succeeded, Errors(r));
+                Assert.IsTrue(r.Rules.Actions.Any(a => a.Cover == (ushort)_ids.ByName("std:SnowLayer")), "the cover reaches the compiled action");
+            }
+
+            Assert.IsTrue(WithDefault("{ 'name': 'a', 'then': { 'block': '@top', 'cover': 3 } }").Messages.Any(m => m.Severity == LayoutSeverity.Error),
+                "a cover that is not a block name");
             using (SurfaceRuleCompileResult r = Compile(WithDefault(
                        "{ 'name': 'a', 'if': { 'noise_threshold': { 'name': 'no_such_output', 'min': 0 } }, 'then': { 'block': '@top' } }")))
                 AssertError(r, "output");
@@ -365,17 +415,26 @@ namespace Engine.Tests.EditMode{
                     int c = x * Size + z, h = r.Heightmap[c];
                     if (h < 0 || h >= Height - 1) continue;
                     Biome.BiomeDef def = _defs[r.Surface[c]];
-                    ushort block = SnowBlock(def), top = VoxelAt(r, x, h, z);
+                    ushort block = SnowBlock(def), top = VoxelAt(r, x, h, z), above = VoxelAt(r, x, h + 1, z);
                     bool dry = h + 1 >= _waterLevel;
                     bool expected = dry && h >= r.SnowLine[c] && def.neverSnows == 0 && block != 0;
                     if (dry && h >= r.SnowLine[c]) aboveLine++;
-                    string where = $"chunk {r.Origin} column ({x}, {z}) y {h} {_names[r.Surface[c]]}, snow line {r.SnowLine[c]}";
+                    string where = $"chunk {r.Origin} column ({x}, {z}) y {h} {_names[r.Surface[c]]}, snow line {r.SnowLine[c]}, tree line {r.TreeLine[c]}";
                     if (expected){
-                        Assert.AreEqual(block, top, $"{where}: {Name(top)} instead of snow");
+                        // Rock under a layer on steep slopes, a snow block above the tree line and on steps, else the under block
+                        // with a snow layer on top (DEC-178, DEC-180).
+                        ushort ground = SnowGround(def, h, r.TreeLine[c], r.Rise[c]);
+                        Assert.IsTrue(Writes(def, ground, top), $"{where}, rise {r.Rise[c]}: {Name(top)} instead of {Name(ground)}");
+                        if (SnowLayerOn(def, h, r.TreeLine[c], r.Rise[c]))
+                            Assert.AreEqual(SnowLayer, above, $"{where}, rise {r.Rise[c]}: {Name(above)} instead of a snow layer");
+                        else Assert.AreNotEqual(SnowLayer, above, $"{where}, rise {r.Rise[c]}: a snow layer on a snow block");
+
                         snow++;
                     }
-                    else if (!IsOwnBlock(def, block))
-                        Assert.AreNotEqual(block, top, $"{where}: snow below the snow line or in a never-snow biome");
+                    else{
+                        if (!IsOwnBlock(def, block)) Assert.AreNotEqual(block, top, $"{where}: snow below the snow line or in a never-snow biome");
+                        Assert.AreNotEqual(SnowLayer, above, $"{where}: a snow layer below the snow line or in a never-snow biome");
+                    }
                 }
 
             TestContext.WriteLine($"{snow} snow tops, {aboveLine} dry tops above the snow line");
@@ -420,6 +479,7 @@ namespace Engine.Tests.EditMode{
                     columns++;
                     ushort block = SnowBlock(def);
                     if (!IsOwnBlock(def, block)) Assert.AreNotEqual(block, VoxelAt(r, x, h, z), $"snow in {_names[r.Surface[c]]} at chunk {r.Origin} ({x}, {z})");
+                    if (h + 1 < Height) Assert.AreNotEqual(SnowLayer, VoxelAt(r, x, h + 1, z), $"a snow layer in {_names[r.Surface[c]]} at chunk {r.Origin} ({x}, {z})");
                     Assert.AreNotEqual(iceId, VoxelAt(r, x, DensityLayout.WetnessY, z), $"ice in {_names[r.Surface[c]]} at chunk {r.Origin} ({x}, {z})");
                 }
 
@@ -431,6 +491,7 @@ namespace Engine.Tests.EditMode{
         /// <summary>A block a rule may write: the block itself, or any band block when it is the biome's banded stone.</summary>
         private static bool Writes(in Biome.BiomeDef def, ushort expected, ushort actual){
             if (expected == actual) return true;
+            if (expected == def.rockBlock && (actual == _darkRock || RockVariety.Contains(actual))) return true;
             if (expected != def.stoneBlock || def.strataCount == 0) return false;
             return actual == def.stoneBlock || actual == def.strataBlock || actual == def.strataBlock1 || actual == def.strataBlock2 || actual == def.strataBlock3;
         }
@@ -490,7 +551,9 @@ namespace Engine.Tests.EditMode{
                     bool beachTop = false;
                     if (dry && h >= r.SnowLine[c] && def.neverSnows == 0){
                         rule = "snow";
-                        expected = SnowBlock(def);
+                        expected = SnowGround(def, h, r.TreeLine[c], r.Rise[c]);
+                        if (SnowLayerOn(def, h, r.TreeLine[c], r.Rise[c]))
+                            Assert.AreEqual(SnowLayer, VoxelAt(r, x, h + 1, z), $"{where}: no snow layer over the snow ground");
                     }
                     else if (depth >= 1 && depth <= 3 && def.beachBlock != 0){
                         rule = "shallow_floor";
@@ -500,15 +563,17 @@ namespace Engine.Tests.EditMode{
                         rule = "underwater_top";
                         expected = def.underwaterTopBlock != 0 ? def.underwaterTopBlock : Top(def);
                     }
+                    else if (dry && r.Rise[c] >= 3 && h - DensityLayout.WetnessY < 4 && def.rockBlock != 0 && WetWithin(r, x, z, 20) &&
+                             Writes(def, def.rockBlock, top)){
+                        rule = "shore_cliff";
+                        expected = def.rockBlock;
+                    }
                     else if (beachPossible && top == def.beachBlock){
                         rule = "beach";
                         expected = def.beachBlock;
                         beachTop = true;
                     }
-                    else if (steep && def.rockBlock != 0){
-                        rule = "steep";
-                        expected = def.rockBlock;
-                    }
+                    // Steep slopes keep their top (DEC-177): only the layers under it turn to rock.
                     else if (alpine && def.rockBlock != 0){
                         rule = "alpine";
                         expected = def.rockBlock;
@@ -526,8 +591,15 @@ namespace Engine.Tests.EditMode{
                         expected = Top(def);
                     }
 
-                    Assert.IsTrue(Writes(def, expected, top), $"{where}: rule {rule} wants {Name(expected)}, found {Name(top)}");
-                    Count(rule);
+                    // Ground variety (DEC-187, DEC-190) may replace the top, meadow or forest floor of a dry floor below the tree line,
+                    // and the floor 4 or more blocks under water.
+                    if (top != expected && GroundVariety.Contains(top) &&
+                        (dry && !alpine && rule is "top" or "meadow" or "forest_floor" || rule == "underwater_top" && depth >= 4))
+                        Count(dry ? "ground" : "underwater mix");
+                    else{
+                        Assert.IsTrue(Writes(def, expected, top), $"{where}: rule {rule} wants {Name(expected)}, found {Name(top)}");
+                        Count(rule);
+                    }
 
                     // The four voxels under the floor, while the run goes on.
                     for (int d = 1; d <= 5; d++){
@@ -535,7 +607,15 @@ namespace Engine.Tests.EditMode{
                         if (!r.IsSolid(x, y, z)) break;
                         ushort under;
                         string underRule;
-                        if (dry && beachTop && d <= 2){
+                        if (dry && r.Rise[c] >= 2 && y >= r.SnowLine[c] && def.neverSnows == 0 && def.rockBlock != 0 && d <= 4){
+                            underRule = "snow rock";
+                            under = def.rockBlock;
+                        }
+                        else if (rule == "shore_cliff" && d <= 4){
+                            underRule = "shore_cliff";
+                            under = def.rockBlock;
+                        }
+                        else if (dry && beachTop && d <= 2){
                             underRule = "beach";
                             under = def.beachBlock;
                         }
@@ -559,11 +639,12 @@ namespace Engine.Tests.EditMode{
 
                         ushort actual = VoxelAt(r, x, y, z);
                         Assert.IsTrue(Writes(def, under, actual), $"{where}, depth {d}: rule {underRule} wants {Name(under)}, found {Name(actual)}");
+                        if (d == 1 && underRule == "steep") Count("steep (under)");
                     }
                 }
 
             TestContext.WriteLine(string.Join(", ", seen.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key} {kv.Value}")));
-            foreach (string rule in new[]{ "snow", "shallow_floor", "underwater_top", "beach", "steep", "alpine", "meadow", "top" })
+            foreach (string rule in new[]{ "snow", "shallow_floor", "underwater_top", "beach", "steep (under)", "alpine", "meadow", "top", "ground" })
                 Assert.IsTrue(seen.ContainsKey(rule), $"no column took the {rule} rule in the sample chunks");
             Kind("coast");
             Kind("lowland");
