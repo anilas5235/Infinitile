@@ -1357,6 +1357,30 @@
       "octaves": 1,
       "wavelength": 24
     },
+    "patch_mix": {
+      "amplitude": 1,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 1,
+      "wavelength": 32
+    },
+    "patch_warp_x": {
+      "amplitude": 1,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 2,
+      "wavelength": 20
+    },
+    "patch_warp_z": {
+      "amplitude": 1,
+      "gain": 0.5,
+      "kind": "simplex2",
+      "lacunarity": 2,
+      "octaves": 2,
+      "wavelength": 20
+    },
     "peaks": {
       "amplitude": 1,
       "gain": 0.5,
@@ -1483,6 +1507,32 @@
       "node": {
         "noise": "ice_wobble",
         "op": "fbm"
+      },
+      "perColumn": true
+    },
+    "patch_mix": {
+      "node": {
+        "in": {
+          "noise": "patch_mix",
+          "op": "fbm"
+        },
+        "op": "shift",
+        "x": {
+          "a": {
+            "noise": "patch_warp_x",
+            "op": "fbm"
+          },
+          "b": 8,
+          "op": "mul"
+        },
+        "z": {
+          "a": {
+            "noise": "patch_warp_z",
+            "op": "fbm"
+          },
+          "b": 8,
+          "op": "mul"
+        }
       },
       "perColumn": true
     },

@@ -143,11 +143,17 @@ namespace Engine.Scripts.VoxelConfig.Data.Generation{
         [Tooltip("Mean colour of the biome-tinted plants (grass tufts, tall grass, ferns, reeds) in this biome; blended like the grass.")]
         [SerializeField] public Color FoliageColor = DefaultFoliageColor;
 
+        [Tooltip("Mean colour of the biome-tinted leaf litter (std:LitterLeaves) in this biome; blended like the grass (DEC-206).")]
+        [SerializeField] public Color LitterColor = DefaultLitterColor;
+
         /// <summary>Grass colour of a new biome, and of a missing one (Plains, #7cc24a).</summary>
         public static readonly Color DefaultGrassColor = new(0x7c / 255f, 0xc2 / 255f, 0x4a / 255f);
 
         /// <summary>Plant colour of a new biome, and of a missing one (Plains, #6aae3a).</summary>
         public static readonly Color DefaultFoliageColor = new(0x6a / 255f, 0xae / 255f, 0x3a / 255f);
+
+        /// <summary>Leaf litter colour of a new biome, and of a missing one: the brown broadleaf litter of DEC-201.</summary>
+        public static readonly Color DefaultLitterColor = new(0.595f, 0.409f, 0.294f);
 
         public BiomeDef ToStruct(VoxelRegistry voxelRegistry){
             return ToStruct(v => voxelRegistry.GetIdOrThrow(v.GetFullName()));

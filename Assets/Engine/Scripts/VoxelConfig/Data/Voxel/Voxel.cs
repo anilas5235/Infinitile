@@ -235,9 +235,11 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         ///     (as the shader does: linear colour / <see cref="BiomeTintGreyMean" />), gamma-encoded for UI tints.
         /// </summary>
         public static Color BiomeTintFactor(VoxelBiomeTint tint){
-            Color color = tint == VoxelBiomeTint.Foliage
-                ? Generation.Biome.DefaultFoliageColor
-                : Generation.Biome.DefaultGrassColor;
+            Color color = tint switch{
+                VoxelBiomeTint.Foliage => Generation.Biome.DefaultFoliageColor,
+                VoxelBiomeTint.Litter => Generation.Biome.DefaultLitterColor,
+                _ => Generation.Biome.DefaultGrassColor
+            };
             Color linear = color.linear / BiomeTintGreyMean;
             linear.a = 1f;
             return linear.gamma;
@@ -381,7 +383,10 @@ namespace Engine.Scripts.VoxelConfig.Data.Voxel{
         Grass = 1,
 
         /// <summary>The biome's plant colour (grass tufts, tall grass, ferns, reeds).</summary>
-        Foliage = 2
+        Foliage = 2,
+
+        /// <summary>The biome's leaf litter colour (DEC-206).</summary>
+        Litter = 3
     }
 
     /// <summary>Value range of the voxel light properties.</summary>

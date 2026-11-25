@@ -19,7 +19,7 @@ MonoBehaviour:
   SnowTopBlock: {fileID: 11400000, guid: 718e517cfa2f0b945a8f3566abd28090, type: 2}
   FreezesWater: 1
   StrataBlock: {fileID: 11400000, guid: 2a1844411e45fba40a1da565a805687e, type: 2}
-  MeadowBlock: {fileID: 11400000, guid: 2e8eca1efe0447d4b845f277ce2ada8f, type: 2}
+  MeadowBlock: {fileID: 0}
   BeachBlock: {fileID: 0}
   BeachHeight: 3
   RockBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
@@ -66,16 +66,6 @@ MonoBehaviour:
     WeirdnessRange: {x: 0.45, y: 0.85}
     DepthRange: {x: 0, y: 0}
   FloraRules:
-  - SpeciesVoxel: {fileID: 11400000, guid: 970fe84b79e76ed42a636f8d60feca7d, type: 2}
-    SpeciesStructure: {fileID: 0}
-    SpeciesTree: {fileID: 0}
-    Probability: 0.05
-    RequiresSurfaceFromSameBiome: 0
-    MinHeightAboveWater: 1
-    DensityNoise: 1
-    DensityInfluence: 1
-    MinStackHeight: 1
-    MaxStackHeight: 1
   - SpeciesVoxel: {fileID: 11400000, guid: 10218f21e1d9ac948ac6846e1469b188, type: 2}
     SpeciesStructure: {fileID: 0}
     SpeciesTree: {fileID: 0}
@@ -93,18 +83,6 @@ MonoBehaviour:
     RequiresSurfaceFromSameBiome: 0
     MinHeightAboveWater: 1
     DensityNoise: 3
-    DensityInfluence: 1
-    MinStackHeight: 1
-    MaxStackHeight: 1
-  - SpeciesVoxel: {fileID: 0}
-    SpeciesStructure: {fileID: 0}
-    SpeciesTree: {fileID: 11400000, guid: 848dca3f23de4e129f80781ec35e85fe, type: 2}
-    Probability: 0.01
-    RequiresSurfaceFromSameBiome: 0
-    MinHeightAboveWater: 1
-    StopsAtTreeLine: 1
-    RequiresSoil: 1
-    DensityNoise: 0
     DensityInfluence: 1
     MinStackHeight: 1
     MaxStackHeight: 1

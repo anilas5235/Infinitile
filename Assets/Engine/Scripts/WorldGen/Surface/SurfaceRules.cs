@@ -95,6 +95,9 @@ namespace Engine.Scripts.WorldGen.Surface{
 
         /// <summary>A ≤ flora density factor [Output] &lt; B.</summary>
         public const byte Density = 3;
+
+        /// <summary>A direct neighbour column inside the chunk lies at least A higher (the foot of a step).</summary>
+        public const byte StepFoot = 4;
     }
 
     public struct ColumnFlagDef{
@@ -182,6 +185,11 @@ namespace Engine.Scripts.WorldGen.Surface{
         /// <summary>Rule outputs of the ice, snow and tree line wobbles (−1 none).</summary>
         public int IceWobble, SnowWobble, TreeLineWobble;
 
+        /// <summary>Frozen rivers (DEC-207): the rule output of the river weight (−1: rivers freeze like the sea), its minimum and T limit.</summary>
+        public int RiverIce;
+
+        public float RiverIceMin, RiverIceTemperature;
+
         /// <summary>1: ice forms where it is cold enough (some biome may snow).</summary>
         public byte Ice;
 
@@ -201,7 +209,7 @@ namespace Engine.Scripts.WorldGen.Surface{
             return new SurfaceRules{
                 Biomes = new NativeArray<BiomeRules>(0, allocator), Nodes = new NativeArray<RuleNode>(0, allocator), Actions = new NativeArray<SurfaceAction>(0, allocator),
                 Flags = new NativeArray<ColumnFlagDef>(0, allocator), Ints = new NativeArray<ColumnIntDef>(0, allocator), Outputs = new NativeArray<RuleOutput>(0, allocator),
-                Thresholds = new NativeArray<int>(0, allocator), TemperatureSlot = -1, PreliminarySurfaceSlot = -1, IceWobble = -1, SnowWobble = -1, TreeLineWobble = -1
+                Thresholds = new NativeArray<int>(0, allocator), TemperatureSlot = -1, PreliminarySurfaceSlot = -1, IceWobble = -1, SnowWobble = -1, TreeLineWobble = -1, RiverIce = -1
             };
         }
 

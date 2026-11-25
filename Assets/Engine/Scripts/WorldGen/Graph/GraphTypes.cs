@@ -317,6 +317,12 @@ namespace Engine.Scripts.WorldGen.Graph{
         public const string BlendBorder = "blend_border";
 
         /// <summary>
+        ///     The river weight (§9.2): 1 on a river's centre line, 0 outside the valleys slice. Read by the river(min)
+        ///     rule condition and by <c>locate river</c>; optional.
+        /// </summary>
+        public const string River = "river";
+
+        /// <summary>
         ///     Highest bound preliminary_surface may have: y 255 plus half a block for the interval rules' margins
         ///     (their sum over a chain of additions reaches a few hundredths at this size).
         /// </summary>

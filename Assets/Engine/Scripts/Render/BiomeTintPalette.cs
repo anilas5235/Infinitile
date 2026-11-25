@@ -7,20 +7,21 @@ namespace Engine.Scripts.Render{
     /// <summary>
     ///     The biome colours of the <see cref="BiomeTintMap" /> layers by biome index (the column biomes of
     ///     <see cref="Data.ChunkVoxelData.Biomes" />), kept in linear light for averaging: layer 0 the water colour
-    ///     (<see cref="Biome.WaterColor" />), 1 the grass colour, 2 the plant colour (the values of
+    ///     (<see cref="Biome.WaterColor" />), 1 the grass colour, 2 the plant colour, 3 the leaf litter colour (the values of
     ///     <see cref="VoxelConfig.Data.Voxel.VoxelBiomeTint" />). A missing biome takes the layer's default.
     ///     Replaced, not changed, when the world's biomes change; <see cref="Version" /> tells the map to rewrite.
     /// </summary>
     internal sealed class BiomeTintPalette{
-        /// <summary>Layers of the tint map: water, grass, plants.</summary>
-        public const int LayerCount = 3;
+        /// <summary>Layers of the tint map: water, grass, plants, leaf litter.</summary>
+        public const int LayerCount = 4;
 
         public const int WaterLayer = 0;
         public const int GrassLayer = 1;
         public const int FoliageLayer = 2;
+        public const int LitterLayer = 3;
 
         private static readonly Color[] Defaults ={
-            Biome.DefaultWaterColor, Biome.DefaultGrassColor, Biome.DefaultFoliageColor
+            Biome.DefaultWaterColor, Biome.DefaultGrassColor, Biome.DefaultFoliageColor, Biome.DefaultLitterColor
         };
 
         private readonly float3[][] _linear = new float3[LayerCount][];
@@ -52,15 +53,16 @@ namespace Engine.Scripts.Render{
         /// <summary>The palette of <paramref name="biomes" /> in config order; a null biome takes the defaults.</summary>
         public static BiomeTintPalette FromBiomes(IReadOnlyList<Biome> biomes, int version){
             int count = biomes?.Count ?? 0;
-            Color[] water = new Color[count], grass = new Color[count], foliage = new Color[count];
+            Color[] water = new Color[count], grass = new Color[count], foliage = new Color[count], litter = new Color[count];
             for (int i = 0; i < count; i++){
                 Biome biome = biomes[i];
                 water[i] = biome ? biome.WaterColor : Biome.DefaultWaterColor;
                 grass[i] = biome ? biome.GrassColor : Biome.DefaultGrassColor;
                 foliage[i] = biome ? biome.FoliageColor : Biome.DefaultFoliageColor;
+                litter[i] = biome ? biome.LitterColor : Biome.DefaultLitterColor;
             }
 
-            return new BiomeTintPalette(new IReadOnlyList<Color>[]{ water, grass, foliage }, version);
+            return new BiomeTintPalette(new IReadOnlyList<Color>[]{ water, grass, foliage, litter }, version);
         }
 
         /// <summary>The default colour (sRGB) of <paramref name="layer" />, where no chunk has written yet.</summary>

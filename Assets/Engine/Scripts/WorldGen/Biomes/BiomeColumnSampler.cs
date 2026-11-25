@@ -31,6 +31,9 @@ namespace Engine.Scripts.WorldGen.Biomes{
         /// <summary>1 where the dry-column rule replaced a water biome.</summary>
         public NativeArray<byte> Substituted;
 
+        /// <summary>The graph's <c>river</c> output (§9.2), 0 when the graph has none.</summary>
+        public NativeArray<float> River;
+
         public void Dispose(){
             if (Biome.IsCreated) Biome.Dispose();
             if (Wet.IsCreated) Wet.Dispose();
@@ -38,6 +41,7 @@ namespace Engine.Scripts.WorldGen.Biomes{
             if (Top.IsCreated) Top.Dispose();
             if (Climate.IsCreated) Climate.Dispose();
             if (Substituted.IsCreated) Substituted.Dispose();
+            if (River.IsCreated) River.Dispose();
         }
     }
 
@@ -71,7 +75,8 @@ namespace Engine.Scripts.WorldGen.Biomes{
                 Surface = new NativeArray<float>(math.max(1, n), allocator),
                 Top = new NativeArray<short>(heights ? math.max(1, n) : 1, allocator),
                 Climate = new NativeArray<float>(climate ? math.max(1, n * BiomeBox.Parameters) : 1, allocator),
-                Substituted = new NativeArray<byte>(math.max(1, n), allocator)
+                Substituted = new NativeArray<byte>(math.max(1, n), allocator),
+                River = new NativeArray<float>(math.max(1, n), allocator)
             };
             if (n == 0) return r;
             BiomeColumnJob job = new(){
@@ -86,7 +91,9 @@ namespace Engine.Scripts.WorldGen.Biomes{
                 Surface = r.Surface,
                 Top = r.Top,
                 Climate = r.Climate,
-                Substituted = r.Substituted
+                Substituted = r.Substituted,
+                River = r.River,
+                RiverSlot = graph.Output(GraphOutputs.River) is{ BoundOnly: false, LatticeValue: >= 0 } river ? river.LatticeValue : -1
             };
             int batches = (n + Batch - 1) / Batch;
             SlicedParallelFor.Schedule(job, batches, BatchesPerSlice).Complete();
@@ -105,10 +112,11 @@ namespace Engine.Scripts.WorldGen.Biomes{
             public BiomeLayoutData Layout;
             public uint Seed;
             public bool Heights, WithClimate;
+            public int RiverSlot;
             [ReadOnly] public NativeArray<float2> Points;
 
             [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<byte> Biome, Wet, Substituted;
-            [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<float> Surface, Climate;
+            [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<float> Surface, Climate, River;
             [NativeDisableParallelForRestriction] [WriteOnly] public NativeArray<short> Top;
 
             public int Offset{ get; set; }
@@ -216,6 +224,7 @@ namespace Engine.Scripts.WorldGen.Biomes{
                     byte wet = state == 2 ? GraphInterpolation.Lerp(d[cy], d[cy + 1], ty) > 0f ? (byte)0 : (byte)1 : state;
                     Wet[start + i] = wet;
                     Surface[start + i] = surface;
+                    River[start + i] = RiverSlot < 0 ? 0f : lattice[RiverSlot * Batch + i];
 
                     if (Heights){
                         // The top voxel: down from the window's top layer, as P4 interpolates between layers; above the

@@ -226,6 +226,41 @@ def inside(rnd, n, radii, pad=5, tries=300):
     return best
 
 
+def _lin(c):
+    c /= 255
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def _srgb(l):
+    l = max(0.0, min(1.0, l))
+    return round(255 * (12.92 * l if l <= 0.0031308 else 1.055 * l ** (1 / 2.4) - 0.055))
+
+
+def tint_grey(im, grey_mean=0.70):
+    """The tile in grey for a biome tint: relative luminance kept, linear mean scaled to grey_mean (TINT_GREY_MEAN,
+    as Docs/Tools/make_tint_tiles.py does), so the shader's biome colour is the mean colour the tile shows."""
+    px = im.load(); w, h = im.size
+    lum = lambda r, g, b: 0.2126 * _lin(r) + 0.7152 * _lin(g) + 0.0722 * _lin(b)
+    lums = [lum(*px[x, y][:3]) for y in range(h) for x in range(w)]
+    # the scale that gives grey_mean after the bright texels clip at 1 (a plain mean / grey_mean scale ends low)
+    lo, hi = 0.0, 4.0 * grey_mean / (sum(lums) / len(lums))
+    for _ in range(40):
+        k = (lo + hi) / 2
+        if sum(min(1.0, l * k) for l in lums) / len(lums) < grey_mean: lo = k
+        else: hi = k
+    out = im.copy(); opx = out.load()
+    for y in range(h):
+        for x in range(w):
+            v = _srgb(lums[x + y * w] * k); opx[x, y] = (v, v, v, px[x, y][3])
+    return out
+
+
+def mean_colour(im):
+    """The linear-light mean colour of a tile, as sRGB 0..1 (for a biome tint colour)."""
+    px = im.load(); w, h = im.size; n = w * h
+    return tuple(round(_srgb(sum(_lin(px[x, y][i]) for y in range(h) for x in range(w)) / n) / 255, 3) for i in range(3))
+
+
 def inner_shapes(base, seed, count, rmin, rmax, colours, sides, jitter=(.8, 1.0)):
     """A few flat polygons of radius rmin..rmax, kept inside the tile edges (inside())."""
     rnd = random.Random(seed); radii = [rnd.uniform(rmin, rmax) for _ in range(count)]; shapes = []
@@ -247,12 +282,16 @@ tiles['coarse_dirt'] = inner_shapes(recolour(load('dirt'), ALL, None, .97, .96),
 tiles['moss_top'] = inner_shapes(recolour(load('leaves'), ALL, 74, .66, .78), 37, 5, 11, 15,
                                  [(146, 166, 72, 255), (100, 120, 52, 255)], (6, 8))
 tiles['dirt_moss'] = recolour(load('dirt_grass'), GREEN, 74, .66, .66)
-# Leaf litter: the Kenney autumn leaves (leaves_orange) browned, darker and redder than the orange Kenney dirt, with a
-# few fallen leaves of pebble size in orange, ochre and dark brown; its dirt side with a fringe in the same brown
-# (Litter is the Taiga needle litter).
-tiles['leaf_litter_top'] = inner_shapes(recolour(load('leaves_orange'), ALL, 22, .72, .66), 41, 5, 11, 15,
-                                        [(178, 104, 52, 255), (166, 132, 64, 255), (122, 68, 42, 255)], (3, 5), (.75, 1.0))
-tiles['dirt_leaf_litter'] = recolour(load('dirt_grass'), GREEN, 22, .65, .75)
+# Leaf litter (DEC-206): tinted per biome like grass (Biome.LitterColor, tint layer 3). The tile is the Kenney leaves in
+# the Jungle look picked by the owner (L1: dark green with olive, dark and ochre fallen leaves of pebble size), turned grey
+# with a linear mean of TINT_GREY_MEAN, so the biome colour is its mean; the side is a copy of the grass side tint tile
+# (a texture carries one tint word, so Grass and LitterLeaves cannot share it) with the grass overlay as its mask, so
+# the fringe takes the litter colour (Litter is the Taiga needle litter, untinted).
+_leaf_litter = inner_shapes(recolour(load('leaves'), ALL, 100, .62, .52), 43, 5, 11, 15,
+                            [(118, 140, 52, 255), (88, 104, 40, 255), (140, 128, 60, 255)], (3, 5), (.75, 1.0))
+tiles['leaf_litter_top_tint'] = tint_grey(_leaf_litter)
+tiles['dirt_litter_tint'] = Image.open(os.path.join(ROOT, 'Assets/Engine/Resources/Artwork/KenneyDerived/dirt_grass_tint.png')).convert('RGBA')
+print('Jungle LitterColor (mean of the L1 tile):', mean_colour(_leaf_litter))
 # Rock types: granite pale pink-grey (tour round 7: a saturated red read as Badlands terracotta), diorite light grey,
 # andesite mid grey, each with Kenney-size squares in clear lighter and darker tones (the ±12 % round was too plain);
 # marble see below. Round 9 (owner 2026-11-25: they must work together with std:Stone):

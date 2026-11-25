@@ -203,11 +203,11 @@ namespace Engine.Tests.EditMode{
         }
 
         /// <summary>
-        ///     The locator on the shipped world: the found column has the biome, no ring point nearer than it has
-        ///     the biome, and the peak is at least as high as every column on a coarse grid around the start.
+        ///     The locator on the shipped world: the found column has the biome (or is river water), no ring point nearer than
+        ///     it has the biome, and the peak is at least as high as every column on a coarse grid around the start.
         /// </summary>
         [Test]
-        public void Locator_FindsTheNearestBiomeAndTheHighestPeak(){
+        public void Locator_FindsTheNearestBiomeRiverAndTheHighestPeak(){
             GraphCompileResult compile = ShippedNoiseGraph.Compile();
             Assert.IsTrue(compile.Succeeded, string.Join("\n", compile.Messages));
             using CompiledNoiseGraph graph = compile.Graph;
@@ -230,6 +230,30 @@ namespace Engine.Tests.EditMode{
                 using BiomeColumns n = BiomeColumnSampler.Sample(graph, data.Data, seed, nearer.ToArray());
                 for (int i = 0; i < nearer.Count; i++) Assert.AreNotEqual(biome, n.Biome[i], $"{name} at {nearer[i]} is nearer than {at}");
             }
+
+            // locate river (§13.6): a wet column at the river bed's weight, and no point of the coarse grid clearly nearer is one
+            Assert.IsTrue(BiomeLocator.FindRiver(graph, data.Data, seed, from, out int2 river, out int riverTop, out bool riverWet), "river");
+            Assert.IsTrue(riverWet, $"river at {river} is wet");
+            using (BiomeColumns r = BiomeColumnSampler.Sample(graph, data.Data, seed, new[]{ (float2)river }, true)){
+                Assert.GreaterOrEqual(r.River[0], BiomeLocator.RiverMin, $"river weight at {river}");
+                Assert.AreEqual(1, r.Wet[0], $"river at {river} is wet");
+                Assert.AreEqual(r.Top[0], riverTop);
+            }
+
+            float riverDistance = math.distance(river, from);
+            Assert.Less(riverDistance, 4000f, "rivers are common in the lowland");
+            int2 origin = (int2)math.floor((float2)from / BiomeLocator.Step) * BiomeLocator.Step;
+            List<float2> closer = new();
+            int reach = (int)riverDistance / BiomeLocator.Step + 1;
+            for (int z = -reach; z <= reach; z++)
+            for (int x = -reach; x <= reach; x++){
+                float2 p = origin + new float2(x, z) * BiomeLocator.Step;
+                if (math.distance(p, from) < riverDistance - 24) closer.Add(p);
+            }
+
+            using (BiomeColumns n = BiomeColumnSampler.Sample(graph, data.Data, seed, closer.ToArray()))
+                for (int i = 0; i < closer.Count; i++)
+                    Assert.IsFalse(n.River[i] >= BiomeLocator.RiverMin && n.Wet[i] != 0, $"river at {closer[i]} is nearer than {river}");
 
             Assert.IsTrue(BiomeLocator.FindPeak(graph, data.Data, seed, from, out int2 peak, out int peakTop));
             Assert.LessOrEqual(math.distance(peak, from), BiomeLocator.PeakRadius + 2 * BiomeLocator.Step);

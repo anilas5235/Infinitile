@@ -7,6 +7,8 @@
     "snowWobble": "snow_wobble",
     "iceTemperature": -0.6,
     "iceWobble": "ice_wobble",
+    "riverIceTemperature": -0.45,
+    "riverIceMin": 0.01,
     "treeLineBelowSnow": 15,
     "treeLineFloor": 170,
     "treeLineWobble": "tree_line_wobble",
@@ -21,13 +23,13 @@
   "blocks": {
     "snow": "std:Snow",
     "snow_layer": "std:SnowLayer",
+    "snow_half": "std:SnowLayerHalf",
     "dark_rock": "std:StoneGrey",
     "litter": "std:Litter",
     "coarse_dirt": "std:DirtCoarse",
     "mud": "std:Mud",
     "moss": "std:Moss",
     "leaf_litter": "std:LitterLeaves",
-    "needle_litter": "std:Litter",
     "peat": "std:Peat",
     "clay": "std:Clay",
     "gravel": "std:StoneGravel",
@@ -64,14 +66,19 @@
             }
           },
           {
+            "name": "snow_foot",
+            "if": "step_foot",
+            "then": { "block": "@snow", "cover": "@snow_half" }
+          },
+          {
             "name": "snow_peak",
             "if": { "not": "below_tree_line" },
-            "then": { "block": "@snow" }
+            "then": { "block": "@snow", "cover": "@snow_layer" }
           },
           {
             "name": "snow_step",
             "if": { "steep": 1 },
-            "then": { "block": "@snow" }
+            "then": { "block": "@snow", "cover": "@snow_layer" }
           },
           {
             "name": "snow_ground",
@@ -178,13 +185,13 @@
             "if": { "all": ["floor", "dry", "below_tree_line"] },
             "then": {
               "sequence": [
+                { "name": "ground_steep_rock", "if": { "all": ["steep", { "biome": ["Forest", "Jungle", "Plains", "Savanna", "Swamp", "Taiga"] }, { "noise_threshold": { "name": "ground_mix", "min": -0.1 } }] }, "then": { "block": "@rock" } },
                 { "name": "ground_scree", "if": { "all": [{ "biome": "Mountain" }, { "steep": 2 }, { "noise_threshold": { "name": "ground_mix", "min": 0.35 } }] }, "then": { "block": "@cobble" } },
-                { "name": "ground_moss", "if": { "all": [{ "biome": ["Forest", "Jungle", "Swamp", "Taiga"] }, { "noise_threshold": { "name": "rock_mix", "max": -0.55 } }] }, "then": { "block": "@moss" } },
-                { "name": "ground_leaves", "if": { "all": [{ "biome": ["Forest", "Jungle"] }, { "noise_threshold": { "name": "ground_mix", "min": 0.3 } }] }, "then": { "block": "@leaf_litter" } },
-                { "name": "ground_needles", "if": { "all": [{ "biome": "Taiga" }, { "noise_threshold": { "name": "ground_mix", "min": 0.45 } }] }, "then": { "block": "@needle_litter" } },
-                { "name": "ground_coarse", "if": { "all": [{ "biome": "Savanna" }, { "noise_threshold": { "name": "ground_mix", "min": 0.25 } }] }, "then": { "block": "@coarse_dirt" } },
-                { "name": "ground_coarse_taiga", "if": { "all": [{ "biome": "Taiga" }, { "noise_threshold": { "name": "ground_mix", "max": -0.4 } }] }, "then": { "block": "@coarse_dirt" } },
-                { "name": "ground_bare", "if": { "all": [{ "biome": "Plains" }, { "noise_threshold": { "name": "ground_mix", "min": 0.5 } }] }, "then": { "block": "@coarse_dirt" } },
+                { "name": "ground_moss_jungle", "if": { "all": [{ "biome": "Jungle" }, { "noise_threshold": { "name": "patch_mix", "max": -0.72 } }] }, "then": { "block": "@moss" } },
+                { "name": "ground_moss", "if": { "all": [{ "biome": "Swamp" }, { "noise_threshold": { "name": "rock_mix", "max": -0.55 } }] }, "then": { "block": "@moss" } },
+                { "name": "ground_leaves", "if": { "all": [{ "biome": "Jungle" }, { "noise_threshold": { "name": "patch_mix", "min": 0.44 } }] }, "then": { "block": "@leaf_litter" } },
+                { "name": "ground_coarse", "if": { "all": [{ "biome": "Savanna" }, { "noise_threshold": { "name": "patch_mix", "min": 0.37 } }] }, "then": { "block": "@coarse_dirt" } },
+                { "name": "ground_dry", "if": { "all": [{ "biome": "Savanna" }, { "noise_threshold": { "name": "patch_mix", "max": -0.71 } }] }, "then": { "block": "@coarse_dirt" } },
                 { "name": "ground_mud", "if": { "all": [{ "biome": "Swamp" }, { "noise_threshold": { "name": "ground_mix", "min": 0.4 } }] }, "then": { "block": "@mud" } },
                 { "name": "ground_peat", "if": { "all": [{ "biome": "Swamp" }, { "noise_threshold": { "name": "ground_mix", "max": -0.45 } }] }, "then": { "block": "@peat" } }
               ]

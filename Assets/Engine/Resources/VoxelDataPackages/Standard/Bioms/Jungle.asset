@@ -198,3 +198,4 @@ MonoBehaviour:
   WaterFogColor: {r: 0.02, g: 0.33, b: 0.93, a: 1}
   GrassColor: {r: 0.2470588, g: 0.7294118, b: 0.172549, a: 1}
   FoliageColor: {r: 0.1803922, g: 0.6470588, b: 0.1411765, a: 1}
+  LitterColor: {r: 0.259, g: 0.361, b: 0.184, a: 1}

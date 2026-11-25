@@ -35,11 +35,12 @@ namespace Engine.Tests.EditMode{
         private RegistryTestFixtures _fixtures;
         private ChunkVoxelData _data;
 
-        // sRGB colours per layer (water, grass, plants) and biome; the water layer lacks biome 2
+        // sRGB colours per layer (water, grass, plants, litter) and biome; the water layer lacks biome 2
         private static readonly Color32[][] Colors ={
             new Color32[]{ new(200, 40, 40, 255), new(40, 200, 40, 255) },
             new Color32[]{ new(120, 194, 74, 255), new(184, 176, 78, 255), new(63, 186, 44, 255) },
-            new Color32[]{ new(106, 174, 58, 255), new(168, 156, 60, 255), new(46, 165, 36, 255) }
+            new Color32[]{ new(106, 174, 58, 255), new(168, 156, 60, 255), new(46, 165, 36, 255) },
+            new Color32[]{ new(152, 104, 75, 255), new(140, 110, 70, 255), new(66, 92, 47, 255) }
         };
 
         [SetUp]
@@ -122,6 +123,7 @@ namespace Engine.Tests.EditMode{
             savanna.WaterColor = new Color32(30, 90, 160, 255);
             savanna.GrassColor = new Color32(184, 176, 78, 255);
             savanna.FoliageColor = new Color32(168, 156, 60, 255);
+            savanna.LitterColor = new Color32(120, 90, 50, 255);
 
             BiomeTintPalette palette = BiomeTintPalette.FromBiomes(new[]{ null, savanna }, 2);
 
@@ -130,6 +132,8 @@ namespace Engine.Tests.EditMode{
             AssertColor(savanna.WaterColor, Expected(palette, BiomeTintPalette.WaterLayer, 1), 1, "water");
             AssertColor(savanna.GrassColor, Expected(palette, BiomeTintPalette.GrassLayer, 1), 1, "grass");
             AssertColor(savanna.FoliageColor, Expected(palette, BiomeTintPalette.FoliageLayer, 1), 1, "plants");
+            AssertColor(savanna.LitterColor, Expected(palette, BiomeTintPalette.LitterLayer, 1), 1, "leaf litter");
+            AssertColor(Biome.DefaultLitterColor, Expected(palette, BiomeTintPalette.LitterLayer, 0), 1, "null biome litter");
         }
 
         #endregion
@@ -491,7 +495,7 @@ namespace Engine.Tests.EditMode{
 
         private static readonly string[] Tinted ={
             "Solid/Grass", "Foliage/GrassF", "Foliage/GrassFDry", "Foliage/GrassFSwamp",
-            "Foliage/GrassFTall", "Foliage/Fern", "Foliage/Reeds"
+            "Foliage/GrassFTall", "Foliage/Fern", "Foliage/Reeds", "Solid/LitterLeaves"
         };
 
         [Test]
@@ -500,6 +504,10 @@ namespace Engine.Tests.EditMode{
             Assert.IsNotNull(LoadVoxel("Solid/Grass").biomeTintMask, "the grass side keeps its dirt untinted");
             foreach (string path in Tinted.Where(p => p.StartsWith("Foliage/")))
                 Assert.AreEqual(VoxelBiomeTint.Foliage, LoadVoxel(path).biomeTint, path);
+            // DEC-206: the broadleaf litter takes the biome's litter colour; its side is a copy of the grass side (a texture
+            // carries one tint word, the registry logs an error otherwise) and shares the grass side's overlay
+            Assert.AreEqual(VoxelBiomeTint.Litter, LoadVoxel("Solid/LitterLeaves").biomeTint);
+            Assert.AreEqual(LoadVoxel("Solid/Grass").biomeTintMask, LoadVoxel("Solid/LitterLeaves").biomeTintMask);
 
             HashSet<string> tinted = new(Tinted.Select(p => p.Substring(p.IndexOf('/') + 1)));
             foreach (Voxel voxel in LoadAll<Voxel>(Standard).Where(v => !tinted.Contains(v.name)))
@@ -552,7 +560,7 @@ namespace Engine.Tests.EditMode{
                 }
             }
 
-            Assert.GreaterOrEqual(checkedTiles.Count, 7, "grass top, grass side overlay and five plant tiles");
+            Assert.GreaterOrEqual(checkedTiles.Count, 8, "grass top, grass side overlay, five plant tiles and the leaf litter top");
         }
 
         [Test]
