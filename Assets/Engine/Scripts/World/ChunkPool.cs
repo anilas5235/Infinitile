@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Engine.Scripts.Behaviour;
 using Engine.Scripts.Settings;
-using Engine.Scripts.ThirdParty.Priority_Queue;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
 using Unity.Mathematics;
@@ -16,16 +15,16 @@ using Object = UnityEngine.Object;
 namespace Engine.Scripts.World{
     /// <summary>
     ///     Pool for <see cref="ChunkBehaviour" /> instances (render + collider). Handles activation & reclamation.
-    ///     Uses a priority queue ordered by distance to focus for eviction.
+    ///     Evicts the farthest from the focus first (<see cref="EvictionQueue" />).
     /// </summary>
     internal class ChunkPool{
         private readonly Dictionary<int2, ChunkBehaviour> _chunkMap;
         private readonly int _chunkPoolSize;
-        private readonly SimpleFastPriorityQueue<int2, float> _chunkQueue;
+        private readonly EvictionQueue _chunkQueue;
         private readonly HashSet<int3> _colliderSet;
         private readonly Dictionary<int3, ChunkPartition> _meshMap;
         private readonly int _partitionPoolSize;
-        private readonly SimpleFastPriorityQueue<int3, float> _partitionQueue;
+        private readonly EvictionQueue _partitionQueue;
         private readonly ObjectPool<ChunkBehaviour> _pool;
         internal Action<int2> OnChunkEvicted;
         internal Action<int3> OnPartitionEvicted;
@@ -52,11 +51,9 @@ namespace Engine.Scripts.World{
             // An entry per active partition (cleared on reclaim), so the set never rehashes during flight
             _colliderSet = new HashSet<int3>(_partitionPoolSize);
 
-            _chunkQueue = new SimpleFastPriorityQueue<int2, float>();
-            _partitionQueue = new SimpleFastPriorityQueue<int3, float>();
             // The queues hold at most one entry over the pool size before a reclaim
-            _chunkQueue.Reserve(_chunkPoolSize + 1);
-            _partitionQueue.Reserve(_partitionPoolSize + 1);
+            _chunkQueue = new EvictionQueue(_chunkPoolSize + 1, true);
+            _partitionQueue = new EvictionQueue(_partitionPoolSize + 1, false);
 
             _pool = new ObjectPool<ChunkBehaviour>(
                 () => {
@@ -106,19 +103,13 @@ namespace Engine.Scripts.World{
         /// </summary>
         internal void FocusUpdateChunks(Focus focus){
             _focus = focus;
-            // Static lambdas with explicit state (instance method groups allocate a delegate per call);
-            // reclaim by plain distance
-            _chunkQueue.UpdateAllPriorities(focus, static (f, pos) => EvictionPriority(ref pos, ref f));
+            _chunkQueue.UpdateFocus(focus);
         }
 
         /// <summary>The second half of <see cref="FocusUpdate" />: reprioritises the partition queue.</summary>
         internal void FocusUpdatePartitions(Focus focus){
             _focus = focus;
-            _partitionQueue.UpdateAllPriorities(focus, static (f, pos) => EvictionPriority(ref pos, ref f));
-        }
-
-        private float PriorityCalc(int2 position){
-            return EvictionPriority(ref position, ref _focus);
+            _partitionQueue.UpdateFocus(focus);
         }
 
         private float PriorityCalc(int3 position){
@@ -146,7 +137,7 @@ namespace Engine.Scripts.World{
             if (_chunkMap.ContainsKey(position))
                 throw new InvalidOperationException($"Chunk ({position}) already active");
             if (_chunkQueue.Count >= _chunkPoolSize){
-                int2 reclaim = _chunkQueue.Dequeue();
+                int2 reclaim = _chunkQueue.DequeueColumn();
                 ReclaimChunk(reclaim);
             }
 
@@ -159,7 +150,7 @@ namespace Engine.Scripts.World{
             }
 
             _chunkMap.Add(position, behaviour);
-            _chunkQueue.Enqueue(position, PriorityCalc(position));
+            _chunkQueue.Enqueue(position);
             return behaviour;
         }
 
@@ -190,7 +181,7 @@ namespace Engine.Scripts.World{
             partition.Clear();
             _meshMap.Add(position, partition);
             behaviour.ActivePartitions |= 1u << position.y;
-            _partitionQueue.Enqueue(position, PriorityCalc(position));
+            _partitionQueue.Enqueue(position);
 
             if (_partitionQueue.Count <= _partitionPoolSize) return partition;
 
@@ -206,7 +197,7 @@ namespace Engine.Scripts.World{
         /// <returns>True if the chunk was active.</returns>
         internal bool TryReclaimChunk(int2 position){
             if (!IsChunkActive(position)) return false;
-            if (_chunkQueue.Contains(position)) _chunkQueue.Remove(position);
+            _chunkQueue.TryRemove(position);
             ReclaimChunk(position);
             return true;
         }
@@ -234,7 +225,7 @@ namespace Engine.Scripts.World{
                 _meshMap.Remove(partitionPos);
             }
 
-            if (_partitionQueue.Contains(partitionPos)) _partitionQueue.Remove(partitionPos);
+            _partitionQueue.TryRemove(partitionPos);
             _colliderSet.Remove(partitionPos);
             // A reclaimed chunk is out of the map already; its masks are reset when it is claimed again
             if (_chunkMap.TryGetValue(partitionPos.xz, out ChunkBehaviour behaviour)){
