@@ -1,6 +1,10 @@
 {
   "formatVersion": 1,
   "nodes": {
+    "abs_weirdness": {
+      "in": "weirdness_value",
+      "op": "abs"
+    },
     "badlands_factor": {
       "coordinate": "continentalness_curve",
       "interpolation": "monotone",
@@ -122,6 +126,20 @@
       "noise": "erosion",
       "op": "fbm"
     },
+    "gorge_carve": {
+      "a": {
+        "from": 0.2,
+        "in": "river_raw",
+        "op": "smoothstep",
+        "to": 0.7
+      },
+      "b": {
+        "a": 1,
+        "b": "river_fade",
+        "op": "sub"
+      },
+      "op": "mul"
+    },
     "hot_dry": {
       "a": {
         "from": 0.28,
@@ -145,6 +163,57 @@
       "noise": "humidity",
       "op": "fbm"
     },
+    "lowland_pv": {
+      "coordinate": "abs_weirdness",
+      "interpolation": "monotone",
+      "op": "spline",
+      "points": [
+        {
+          "location": 0,
+          "value": -1
+        },
+        {
+          "location": 0.04,
+          "value": -0.85
+        },
+        {
+          "location": 0.075,
+          "value": -0.557
+        },
+        {
+          "location": 0.1,
+          "value": -0.445
+        },
+        {
+          "location": 0.15,
+          "value": -0.263
+        },
+        {
+          "location": 0.25,
+          "value": 0.019
+        },
+        {
+          "location": 0.35,
+          "value": 0.241
+        },
+        {
+          "location": 0.5,
+          "value": 0.515
+        },
+        {
+          "location": 0.7,
+          "value": 0.778
+        },
+        {
+          "location": 0.9,
+          "value": 0.928
+        },
+        {
+          "location": 1,
+          "value": 1
+        }
+      ]
+    },
     "peaks": {
       "in": {
         "noise": "peaks",
@@ -155,17 +224,16 @@
     "peaks_valleys": {
       "a": 1,
       "b": {
-        "a": 2,
-        "b": {
-          "in": {
-            "in": "weirdness_value",
-            "op": "abs"
+        "in": {
+          "a": {
+            "a": 3,
+            "b": "abs_weirdness",
+            "op": "mul"
           },
-          "max": 1,
-          "min": 0,
-          "op": "clamp"
+          "b": 2,
+          "op": "sub"
         },
-        "op": "mul"
+        "op": "abs"
       },
       "op": "sub"
     },
@@ -281,6 +349,78 @@
         }
       ]
     },
+    "river_carve": {
+      "a": {
+        "from": 0,
+        "in": "river_raw",
+        "op": "smoothstep",
+        "to": 0.5
+      },
+      "b": "river_fade",
+      "op": "mul"
+    },
+    "river_fade": {
+      "from": 0.4,
+      "in": "river_weight",
+      "op": "smoothstep",
+      "to": 0.8
+    },
+    "river_raw": {
+      "in": {
+        "a": 1,
+        "b": {
+          "a": "abs_weirdness",
+          "b": 25,
+          "op": "mul"
+        },
+        "op": "sub"
+      },
+      "max": 1,
+      "min": 0,
+      "op": "clamp"
+    },
+    "river_value": {
+      "a": "river_raw",
+      "b": "river_weight",
+      "op": "mul"
+    },
+    "river_weight": {
+      "coordinate": "continentalness_curve",
+      "interpolation": "monotone",
+      "op": "spline",
+      "points": [
+        {
+          "location": -0.19,
+          "value": 0
+        },
+        {
+          "location": -0.11,
+          "value": 1
+        },
+        {
+          "location": 0.03,
+          "value": 1
+        },
+        {
+          "location": 0.12,
+          "value": {
+            "coordinate": "erosion_value",
+            "interpolation": "monotone",
+            "op": "spline",
+            "points": [
+              {
+                "location": -0.05,
+                "value": 0
+              },
+              {
+                "location": 0,
+                "value": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
     "temperature_value": {
       "noise": "temperature",
       "op": "fbm"
@@ -297,6 +437,15 @@
       "t": "hot_dry"
     },
     "terrain_jaggedness": {
+      "a": "terrain_jaggedness_base",
+      "b": {
+        "a": 1,
+        "b": "valley_carve",
+        "op": "sub"
+      },
+      "op": "mul"
+    },
+    "terrain_jaggedness_base": {
       "a": {
         "coordinate": "continentalness_curve",
         "interpolation": "monotone",
@@ -312,7 +461,7 @@
                 {
                   "location": -0.6,
                   "value": {
-                    "coordinate": "peaks_valleys",
+                    "coordinate": "lowland_pv",
                     "interpolation": "monotone",
                     "op": "spline",
                     "points": [
@@ -490,6 +639,41 @@
       "to": -16
     },
     "terrain_offset": {
+      "a": "terrain_offset_base",
+      "b": {
+        "a": {
+          "a": "river_carve",
+          "b": {
+            "in": {
+              "a": "terrain_offset_base",
+              "b": 4,
+              "op": "add"
+            },
+            "max": 40,
+            "min": 0,
+            "op": "clamp"
+          },
+          "op": "mul"
+        },
+        "b": {
+          "a": "gorge_carve",
+          "b": {
+            "in": {
+              "a": "terrain_offset_base",
+              "b": 6,
+              "op": "sub"
+            },
+            "max": 36,
+            "min": 0,
+            "op": "clamp"
+          },
+          "op": "mul"
+        },
+        "op": "add"
+      },
+      "op": "sub"
+    },
+    "terrain_offset_base": {
       "coordinate": "continentalness_curve",
       "interpolation": "monotone",
       "op": "spline",
@@ -520,7 +704,7 @@
               {
                 "location": -0.6,
                 "value": {
-                  "coordinate": "peaks_valleys",
+                  "coordinate": "lowland_pv",
                   "interpolation": "monotone",
                   "op": "spline",
                   "points": [
@@ -550,7 +734,7 @@
               {
                 "location": 0,
                 "value": {
-                  "coordinate": "peaks_valleys",
+                  "coordinate": "lowland_pv",
                   "interpolation": "monotone",
                   "op": "spline",
                   "points": [
@@ -580,7 +764,7 @@
               {
                 "location": 0.4,
                 "value": {
-                  "coordinate": "peaks_valleys",
+                  "coordinate": "lowland_pv",
                   "interpolation": "monotone",
                   "op": "spline",
                   "points": [
@@ -620,7 +804,7 @@
               {
                 "location": -0.6,
                 "value": {
-                  "coordinate": "peaks_valleys",
+                  "coordinate": "lowland_pv",
                   "interpolation": "monotone",
                   "op": "spline",
                   "points": [
@@ -650,7 +834,7 @@
               {
                 "location": 0,
                 "value": {
-                  "coordinate": "peaks_valleys",
+                  "coordinate": "lowland_pv",
                   "interpolation": "monotone",
                   "op": "spline",
                   "points": [
@@ -680,7 +864,7 @@
               {
                 "location": 0.4,
                 "value": {
-                  "coordinate": "peaks_valleys",
+                  "coordinate": "lowland_pv",
                   "interpolation": "monotone",
                   "op": "spline",
                   "points": [
@@ -818,7 +1002,7 @@
               {
                 "location": 0,
                 "value": {
-                  "coordinate": "peaks_valleys",
+                  "coordinate": "lowland_pv",
                   "interpolation": "monotone",
                   "op": "spline",
                   "points": [
@@ -848,7 +1032,7 @@
               {
                 "location": 0.4,
                 "value": {
-                  "coordinate": "peaks_valleys",
+                  "coordinate": "lowland_pv",
                   "interpolation": "monotone",
                   "op": "spline",
                   "points": [
@@ -986,7 +1170,7 @@
               {
                 "location": 0,
                 "value": {
-                  "coordinate": "peaks_valleys",
+                  "coordinate": "lowland_pv",
                   "interpolation": "monotone",
                   "op": "spline",
                   "points": [
@@ -1016,7 +1200,7 @@
               {
                 "location": 0.4,
                 "value": {
-                  "coordinate": "peaks_valleys",
+                  "coordinate": "lowland_pv",
                   "interpolation": "monotone",
                   "op": "spline",
                   "points": [
@@ -1080,6 +1264,11 @@
         "op": "smoothstep",
         "to": 255
       }
+    },
+    "valley_carve": {
+      "a": "river_carve",
+      "b": "gorge_carve",
+      "op": "add"
     },
     "weirdness_value": {
       "in": {
@@ -1299,6 +1488,7 @@
     },
     "preliminary_surface": "preliminary_surface",
     "pv": "peaks_valleys",
+    "river": "river_value",
     "rock_kind": {
       "node": {
         "noise": "rock_kind",

@@ -248,6 +248,22 @@ namespace Engine.Tests.EditMode{
                 AssertError(r, "output");
         }
 
+        /// <summary>river(min) (§7.2, §9.2) is noise_threshold on the graph's river output, and a non-number is an error.</summary>
+        [Test]
+        public void RiverCondition_IsANoiseThresholdOnTheRiverOutput(){
+            SurfaceRuleSet set = WithDefault("{ 'name': 'a', 'if': { 'river': 0.3 }, 'then': { 'block': '@top' } }");
+            Assert.IsFalse(set.Messages.Any(m => m.Severity == LayoutSeverity.Error), string.Join("\n", set.Messages));
+            NoiseCondition c = set.Default[0].Condition as NoiseCondition;
+            Assert.IsNotNull(c, "river parses into a noise threshold");
+            Assert.AreEqual(SurfaceRuleSet.RiverOutput, c.Name);
+            Assert.AreEqual(0.3f, c.Min);
+            Assert.AreEqual(float.PositiveInfinity, c.Max);
+            using (SurfaceRuleCompileResult r = Compile(set))
+                Assert.IsTrue(r.Succeeded, "the shipped graph has a river output:\n" + Errors(r));
+            Assert.IsTrue(WithDefault("{ 'name': 'a', 'if': { 'river': 'x' }, 'then': { 'block': '@top' } }").Messages.Any(m => m.Severity == LayoutSeverity.Error),
+                "river takes a number");
+        }
+
         [Test]
         public void Validator_ReportsDuplicateNamesAndUnknownBiomes(){
             // Twice in one list: the merge refuses the second; the same name in globalBefore and a biome list: the compiler.
@@ -516,6 +532,29 @@ namespace Engine.Tests.EditMode{
             return false;
         }
 
+        /// <summary>The river_bed rule's threshold on the river output (SurfaceRules.json).</summary>
+        internal const float RiverBedMin = 0.3f;
+
+        /// <summary>The blocks the river_bed rule writes in a biome (DEC-195): sand (the beach block), clay, gravel, mud in a swamp.</summary>
+        private HashSet<ushort> RiverBed(in Biome.BiomeDef def){
+            HashSet<ushort> set = new(){ (ushort)_ids.ByName("std:StoneGravel"), (ushort)_ids.ByName("std:Clay"), (ushort)_ids.ByName("std:Mud") };
+            if (def.beachBlock != 0) set.Add(def.beachBlock);
+            return set;
+        }
+
+        /// <summary>The graph's river output at each column of <paramref name="r" />, [x · 32 + z], sampled at the column.</summary>
+        private float[] RiverAt(DensityProbeResult r){
+            float2[] points = new float2[Size * Size];
+            for (int x = 0; x < Size; x++)
+            for (int z = 0; z < Size; z++)
+                points[x * Size + z] = new float2(r.Origin.x + x, r.Origin.y + z);
+            float[] values = GraphEvaluator.SampleLattice(_graph, _config.WorldGen.Seed, points, out _);
+            int slot = _graph.Outputs.First(o => o.Name == SurfaceRuleSet.RiverOutput).LatticeValue;
+            float[] river = new float[points.Length];
+            Array.Copy(values, slot * points.Length, river, 0, points.Length);
+            return river;
+        }
+
         /// <summary>
         ///     The shipped rule order on a column's top run, written out (§7.4, the v1 surfaces as rules): what the top
         ///     voxel and the four under it must be. Beach band and dense forest depend on noise the test does not see,
@@ -529,7 +568,8 @@ namespace Engine.Tests.EditMode{
                 seen[what] = n + 1;
             }
 
-            foreach (DensityProbeResult r in _chunks)
+            foreach (DensityProbeResult r in _chunks){
+                float[] river = RiverAt(r);
                 for (int x = 0; x < Size; x++)
                 for (int z = 0; z < Size; z++){
                     int c = x * Size + z, h = r.Heightmap[c];
@@ -554,6 +594,17 @@ namespace Engine.Tests.EditMode{
                         expected = SnowGround(def, h, r.TreeLine[c], r.Rise[c]);
                         if (SnowLayerOn(def, h, r.TreeLine[c], r.Rise[c]))
                             Assert.AreEqual(SnowLayer, VoxelAt(r, x, h + 1, z), $"{where}: no snow layer over the snow ground");
+                    }
+                    // The river bed (DEC-195): mud in a swamp, else sand, clay or gravel by ground_mix. The rule reads the
+                    // river output bilinearly from the lattice; the test samples it at the column, so it accepts a bed block
+                    // a little either side of the threshold.
+                    else if (depth >= 1 && river[c] >= RiverBedMin - 0.1f && RiverBed(def).Contains(top)){
+                        rule = "river_bed";
+                        expected = top;
+                    }
+                    else if (depth >= 1 && river[c] >= RiverBedMin + 0.1f){
+                        Assert.Fail($"{where}: river {river[c]:0.00}, the river_bed rule wants a bed block, found {Name(top)}");
+                        return;
                     }
                     else if (depth >= 1 && depth <= 3 && def.beachBlock != 0){
                         rule = "shallow_floor";
@@ -642,6 +693,7 @@ namespace Engine.Tests.EditMode{
                         if (d == 1 && underRule == "steep") Count("steep (under)");
                     }
                 }
+            }
 
             TestContext.WriteLine(string.Join(", ", seen.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key} {kv.Value}")));
             foreach (string rule in new[]{ "snow", "shallow_floor", "underwater_top", "beach", "steep (under)", "alpine", "meadow", "top", "ground" })

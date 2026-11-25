@@ -55,6 +55,7 @@ namespace Engine.Tests.EditMode{
             _disposables.Clear();
             _fixtures.DestroyAll();
             if (_data.Biomes.IsCreated) _data.Biomes.Dispose();
+            if (_data.SurfaceBiomes.IsCreated) _data.SurfaceBiomes.Dispose();
             _data = default;
         }
 
@@ -210,6 +211,32 @@ namespace Engine.Tests.EditMode{
 
             for (int layer = 0; layer < BiomeTintPalette.LayerCount; layer++)
                 AssertColor(palette.DefaultColor(layer), pixels[3 + (5 + layer * t) * t], 1, $"layer {layer}");
+        }
+
+        /// <summary>
+        ///     DEC-194 (AD-25): the grass and plant layers read the surface-source biome, so their colour follows the wavy
+        ///     material border; the water layer keeps the hard biome.
+        /// </summary>
+        [Test]
+        public void TintMap_FillPixels_GrassAndPlantsReadTheSurfaceBiome_WaterTheHardBiome(){
+            WriteHalves(); // hard: 0 west, 1 east
+            _data.CreateSurfaceBiomes();
+            for (int x = 0; x < ChunkWidth; x++)
+            for (int z = 0; z < ChunkDepth; z++)
+                _data.SurfaceBiomes[z + x * ChunkDepth] = (byte)(x < ChunkWidth / 2 ? 1 : 0); // surface: the other way round
+            BiomeTintPalette palette = Palette(1);
+            const int t = BiomeTintMap.ChunkTexels;
+            Color32[] pixels = new Color32[t * t * BiomeTintPalette.LayerCount];
+
+            BiomeTintMap.FillPixels(_data, palette, pixels);
+
+            for (int layer = 0; layer < BiomeTintPalette.LayerCount; layer++)
+            for (int tx = 0; tx < t; tx++)
+            for (int tz = 0; tz < t; tz++){
+                bool west = tx < t / 2;
+                int biome = layer == BiomeTintPalette.WaterLayer ? west ? 0 : 1 : west ? 1 : 0;
+                AssertColor(Expected(palette, layer, biome), pixels[tx + (tz + layer * t) * t], 1, $"layer {layer}, texel ({tx}, {tz})");
+            }
         }
 
         [Test]

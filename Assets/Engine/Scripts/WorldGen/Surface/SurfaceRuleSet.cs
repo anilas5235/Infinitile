@@ -276,6 +276,9 @@ namespace Engine.Scripts.WorldGen.Surface{
         public const string ResourcePath = "WorldGen/SurfaceRules";
         public const string FileName = "Resources/WorldGen/SurfaceRules.json";
 
+        /// <summary>The graph output the river(min) condition reads (§9.2): 1 on a river's centre line, 0 outside the valleys slice.</summary>
+        public const string RiverOutput = "river";
+
         public readonly List<string> Sources = new();
         public SurfaceClimate Climate = new();
         public SurfaceStrata Strata = new();
@@ -838,6 +841,11 @@ namespace Engine.Scripts.WorldGen.Surface{
                         }
 
                         return c;
+                    }
+                    case "river": {
+                        // river(min) (§7.2, §9.2): the graph's river output is at least min; sugar for noise_threshold.
+                        if (v is double min) return new NoiseCondition{ Name = RiverOutput, Min = (float)min };
+                        break;
                     }
                     case "top_above_water": {
                         if (v is List<object>{ Count: 2 } r && r[0] is double min && r[1] is double max)

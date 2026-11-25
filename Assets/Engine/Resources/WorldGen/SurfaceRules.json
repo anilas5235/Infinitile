@@ -103,6 +103,18 @@
       "then": {
         "sequence": [
           {
+            "name": "river_bed",
+            "if": { "all": ["floor", { "water_depth": [1, 255] }, { "river": 0.3 }] },
+            "then": {
+              "sequence": [
+                { "name": "river_bed_mud", "if": { "biome": "Swamp" }, "then": { "block": "@mud" } },
+                { "name": "river_bed_sand", "if": { "noise_threshold": { "name": "ground_mix", "min": 0.35 } }, "then": { "block": "@beach" } },
+                { "name": "river_bed_clay", "if": { "noise_threshold": { "name": "ground_mix", "max": -0.35 } }, "then": { "block": "@clay" } },
+                { "name": "river_bed_gravel", "then": { "block": "@gravel" } }
+              ]
+            }
+          },
+          {
             "name": "shallow_floor",
             "if": { "all": ["floor", { "water_depth": [1, 3] }] },
             "then": { "block": "@beach" }

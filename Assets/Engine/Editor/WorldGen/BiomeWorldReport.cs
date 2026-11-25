@@ -388,7 +388,7 @@ namespace Engine.Editor.WorldGen{
             }
 
             if (badlands >= 0) Add("Badlands share of the land (%)", "< 7", r.LandShare[badlands] * 100, "0.0", r.LandShare[badlands] < 0.07);
-            if (jungle >= 0) Add("Jungle columns under water (%)", "< 20", r.WetShare[jungle] * 100, "0.0", !(r.WetShare[jungle] >= 0.20));
+            if (jungle >= 0) Add("Jungle columns under water (%)", "< 25", r.WetShare[jungle] * 100, "0.0", !(r.WetShare[jungle] >= 0.25)); // DEC-199 (was 20)
             if (plains >= 0) Add("Plains columns under water (%)", "< 28", r.WetShare[plains] * 100, "0.0", !(r.WetShare[plains] >= 0.28));
             if (savanna >= 0) Add("Savanna columns under water (%)", "< 32", r.WetShare[savanna] * 100, "0.0", !(r.WetShare[savanna] >= 0.32));
             Add("Land in single-biome patches smaller than 64 × 64 (%)", "< 2", r.SmallPatchLandShare * 100, "0.00", r.SmallPatchLandShare < 0.02);

@@ -97,6 +97,38 @@ namespace Engine.Tests.EditMode{
             File.WriteAllText(Path.Combine(Dir, "snow.txt"), all.ToString());
         }
 
+        /// <summary>
+        ///     The river measures (§9.2, phase V5) on the five seeds: spacing along lines, the width of the valleys slice and
+        ///     of the water across the river (p10, median, p90, p99), the shares of the slice and of the river columns, dry and
+        ///     open-water crossings, tour spots. Writes <c>rivers.txt</c>.
+        /// </summary>
+        [Test]
+        [Category(TestTiers.Report)]
+        [Explicit(TestTiers.ReportReason)]
+        [Timeout(3600000)]
+        public void RiverReport_FiveSeeds(){
+            GraphCompileResult compile = ShippedNoiseGraph.Compile();
+            Assert.IsTrue(compile.Succeeded, string.Join("\n", compile.Messages));
+            using CompiledNoiseGraph graph = compile.Graph;
+            BiomeLayout layout = BiomeLayout.FromBiomeSet(Set);
+            using BiomeLayoutDataScope data = new(layout);
+            StringBuilder all = new();
+            List<RiverReportSeed> seeds = new();
+            Stopwatch watch = Stopwatch.StartNew();
+            foreach (uint seed in BiomeWorldReport.Seeds){
+                RiverReportSeed r = RiverReport.Run(graph, data.Data, seed);
+                seeds.Add(r);
+                string text = RiverReport.Text(r);
+                Debug.Log(text);
+                all.AppendLine(text);
+            }
+
+            all.AppendLine(RiverReport.Pooled(seeds));
+            all.AppendLine(System.FormattableString.Invariant($"({watch.Elapsed.TotalSeconds:0.0} s)"));
+            Debug.Log(all.ToString());
+            File.WriteAllText(Path.Combine(Dir, "rivers.txt"), all.ToString());
+        }
+
         [Test]
         [Category(TestTiers.Report)]
         [Explicit(TestTiers.ReportReason)]

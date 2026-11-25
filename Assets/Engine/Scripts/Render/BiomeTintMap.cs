@@ -133,8 +133,9 @@ namespace Engine.Scripts.Render{
 
         /// <summary>
         ///     The colours of one chunk's texels: layer <c>l</c>, texel (x, z) is pixel x + (z + l × 8) × 8, the
-        ///     linear-light mean of the colours of its 4 × 4 columns, sRGB-encoded. A column without a biome, or with
-        ///     one the palette lacks, takes the layer's default colour.
+        ///     linear-light mean of the colours of its 4 × 4 columns, sRGB-encoded. The water layer reads the hard biome,
+        ///     the grass and plant layers the surface-source biome (DEC-194), so their colour follows the wavy material
+        ///     border. A column without a biome, or with one the palette lacks, takes the layer's default colour.
         /// </summary>
         internal static void FillPixels(in ChunkVoxelData data, BiomeTintPalette palette, Color32[] pixels){
             bool hasBiomes = data.HasBiomes;
@@ -145,7 +146,8 @@ namespace Engine.Scripts.Render{
                 float3 sum = float3.zero;
                 for (int dx = 0; dx < BlendColumns; dx++)
                 for (int dz = 0; dz < BlendColumns; dz++){
-                    int biome = hasBiomes ? data.GetBiome(tx * BlendColumns + dx, tz * BlendColumns + dz) : -1;
+                    int x = tx * BlendColumns + dx, z = tz * BlendColumns + dz;
+                    int biome = !hasBiomes ? -1 : layer == BiomeTintPalette.WaterLayer ? data.GetBiome(x, z) : data.GetSurfaceBiome(x, z);
                     sum += palette.Linear(layer, biome);
                 }
 
