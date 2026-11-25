@@ -1117,8 +1117,8 @@ leaves are not tinted (spec idea 16.8 stays open); flowers, mushrooms, rocks, wh
 - **Grey tiles** (`Docs/Tools/make_tint_tiles.py`, from the Kenney tiles). Every tinted pixel is turned grey with
   its relative luminance kept and the mean scaled to a linear 0.70, so a biome colour is the mean the tinted part
   shows before light. A grass side has its grass band greyed and an overlay with alpha 255 on that band and 0 on the
-  dirt (DXT5); the solid tiles are saved without alpha (DXT1). Tiles: `grass_top_tint` (Grass and StoneGrassy tops),
-  `dirt_grass_tint` + overlay, `stone_grass_tint` + overlay, `grass1_tint` (GrassFSwamp), `grass2_tint` (Fern),
+  dirt (DXT5); the solid tiles are saved without alpha (DXT1). Tiles: `grass_top_tint` (Grass tops),
+  `dirt_grass_tint` + overlay, `grass1_tint` (GrassFSwamp), `grass2_tint` (Fern),
   `grass3_tint` (GrassFTall), `grass4_tint` (GrassF, Reeds), `grass_tan_tint` (GrassFDry).
 - **Folded blocks.** With the colour from the biome, the per-biome grass blocks were the same block: GrassDry,
   GrassJungle, GrassSwamp and GrassTaiga are now Grass; StoneGrassyTaiga is StoneGrassy (now tinted too);

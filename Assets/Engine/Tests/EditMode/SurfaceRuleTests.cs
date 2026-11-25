@@ -69,7 +69,7 @@ namespace Engine.Tests.EditMode{
                 RockVariety.Add((ushort)_ids.ByName(name));
             GroundVariety.Clear();
             foreach (string name in new[]{
-                         "std:StoneGrassy", "std:DirtSandy", "std:Litter", "std:LitterLeaves", "std:DirtCoarse", "std:Mud", "std:Peat", "std:Moss",
+                         "std:Litter", "std:LitterLeaves", "std:DirtCoarse", "std:Mud", "std:Peat", "std:Moss",
                          "std:Cobblestone", "std:StoneGravel", "std:Clay"
                      })
                 GroundVariety.Add((ushort)_ids.ByName(name));

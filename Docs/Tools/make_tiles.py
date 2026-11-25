@@ -146,13 +146,17 @@ def shade(img, m, f):
     return Image.fromarray(a.astype(np.uint8), 'RGBA')
 
 
-def speckle(base, seed, count, colours, rmin, rmax, sides=(4, 6)):
-    """Base tile with small flat polygons (pebbles, grains) in the given colours; seamless (patches wrap)."""
+def speckle(base, seed, count, colours, rmin, rmax, sides=(4, 6), even=False):
+    """Base tile with small flat polygons (pebbles, grains) in the given colours; seamless (patches wrap). With `even`
+    the centres come from spread(), so the flecks do not line up in rows when the tile repeats."""
     n = base.width; ss = 4
     layer = Image.new('RGBA', (n * ss, n * ss), (0, 0, 0, 0)); d = ImageDraw.Draw(layer)
     rnd = random.Random(seed)
+    radii = [rnd.uniform(rmin, rmax) for _ in range(count)] if even else None
+    centres = spread(rnd, n, radii) if even else None
     for i in range(count):
-        cx, cy = rnd.uniform(0, n), rnd.uniform(0, n); r = rnd.uniform(rmin, rmax)
+        if even: (cx, cy), r = centres[i], radii[i]
+        else: cx, cy = rnd.uniform(0, n), rnd.uniform(0, n); r = rnd.uniform(rmin, rmax)
         k = rnd.randint(*sides); a0 = rnd.uniform(0, math.tau)
         pts = [(cx + r * rnd.uniform(.75, 1.1) * math.cos(a0 + j * math.tau / k),
                 cy + r * rnd.uniform(.75, 1.1) * math.sin(a0 + j * math.tau / k)) for j in range(k)]
@@ -251,16 +255,23 @@ tiles['leaf_litter_top'] = inner_shapes(recolour(load('leaves_orange'), ALL, 22,
 tiles['dirt_leaf_litter'] = recolour(load('dirt_grass'), GREEN, 22, .65, .75)
 # Rock types: granite pale pink-grey (tour round 7: a saturated red read as Badlands terracotta), diorite light grey,
 # andesite mid grey, each with Kenney-size squares in clear lighter and darker tones (the ±12 % round was too plain);
-# marble white with soft wavy bands (Kenney snow).
-_granite = recolour(load('stone'), ALL, 14, sat_abs=.16, val=1.02)
-tiles['granite'] = speckle(_granite, 47, 22, [tone(_granite, .72), tone(_granite, 1.22), (176, 128, 118, 255)], 4.5, 9, (4, 4))
-_diorite = recolour(load('stone'), ALL, 40, sat_abs=.04, val=1.22)
-tiles['diorite'] = speckle(_diorite, 53, 22, [tone(_diorite, .62), tone(_diorite, .80)], 4.5, 9, (4, 4))
-_andesite = recolour(load('stone'), ALL, 30, sat_abs=.05, val=.80)
-tiles['andesite'] = speckle(_andesite, 59, 22, [tone(_andesite, 1.34), tone(_andesite, .78)], 4.5, 9, (4, 4))
-# Kenney's snow bands differ from the white by saturation only, so they are darkened before the tile goes grey.
-tiles['marble'] = recolour(recolour(load('snow'), lambda h, s, v: s > .04, 40, sat_abs=.035, val=.88),
-                           lambda h, s, v: s < .03, 40, sat_abs=.02, val=.95)
+# marble see below. Round 9 (owner 2026-11-25: they must work together with std:Stone):
+# all four are the Kenney stone tile - faintly warm (granite, with pink flecks), and in its own cool hue lighter
+# (diorite) or darker (andesite) - with about a dozen evenly spread flecks instead of 22 random ones (those lined up in rows).
+_granite = recolour(load('stone'), ALL, 16, sat_abs=.07, val=1.0)
+tiles['granite'] = speckle(_granite, 44, 12, [(196, 138, 124, 255), tone(_granite, .74), tone(_granite, 1.18)], 4.5, 9, (4, 4), True)
+_diorite = recolour(load('stone'), ALL, None, .40, 1.15)
+tiles['diorite'] = speckle(_diorite, 53, 12, [tone(_diorite, .72), tone(_diorite, .86)], 4.5, 9, (4, 4), True)
+_andesite = recolour(load('stone'), ALL, None, .60, .84)
+tiles['andesite'] = speckle(_andesite, 59, 12, [tone(_andesite, 1.26), tone(_andesite, .80)], 4.5, 9, (4, 4), True)
+# Marble (round 9, owner: the wavy snow bands read as sand, veins rejected): the Kenney stone tile nearly white in the
+# stone's own hue, with six soft grey patches a few percent darker so it is a little more than plain white stone.
+# Fewer flecks than the stone (owner): the stone's lighter squares take the base colour, its darker ones keep about
+# half their contrast.
+_marble = recolour(recolour(recolour(load('stone'), lambda h, s, v: v > .665, 184, sat_abs=.035, val=1.306),
+                            lambda h, s, v: v < .63, 184, sat_abs=.035, val=1.415),
+                   lambda h, s, v: .63 <= v <= .665, 184, sat_abs=.035, val=1.36)
+tiles['marble'] = speckle(_marble, 71, 6, [tone(_marble, .93), tone(_marble, .95)], 12, 18, (5, 7), True)
 
 # Clay: soft blue-grey clay for swamp, lake and sea floors (the Clay* colours are the Badlands terracottas).
 tiles['clay_grey'] = recolour(load('dirt'), ALL, 208, sat_abs=.14, val=1.02)

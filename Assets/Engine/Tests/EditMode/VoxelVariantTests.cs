@@ -105,12 +105,11 @@ namespace Engine.Tests.EditMode{
         /// <summary>Name → id of every Standard voxel, read from the package before turned variants existed.</summary>
         private static readonly string[] StandardOrder = {
             "Stone", "Dirt", "Grass", "Water", "GrassF", "CottonBlue", "CottonGreen", "CottonRed", "CottonTan",
-            "DirtGravel", "DirtSandy", "DirtSnowy", "BrickGrey", "BrickRed", "Cactus", "Glass", "GrassFDead",
-            "GrassFDry", "GreystoneRubyOre", "Ice", "Lava", "Leaves", "LeavesOrange", "LogBirch", "LogOak",
-            "MushroomBrown", "MushroomRed", "MushroomTan", "Oven", "Planks", "PlanksRed", "Rock", "RockMossy", "Sand",
-            "SandGrey", "SandRed", "SandStoneRed", "SandStoneRedEmeraldOre", "SandStoneRedSandy", "StoneCoalOre",
-            "StoneDiamondOre", "StoneGoldOre", "StoneGrassy", "StoneGravel", "StoneGrey", "StoneGreySandy",
-            "StoneIronBrownOre", "StoneIronGreenOre", "StoneSandy", "StoneSilverOre", "StoneSnowy", "WheatStage1",
+            "DirtGravel", "BrickGrey", "BrickRed", "Cactus", "Glass", "GrassFDead", "GrassFDry", "GreystoneRubyOre",
+            "Ice", "Lava", "Leaves", "LeavesOrange", "LogBirch", "LogOak", "MushroomBrown", "MushroomRed",
+            "MushroomTan", "Oven", "Planks", "PlanksRed", "Rock", "RockMossy", "Sand", "SandGrey", "SandRed",
+            "SandStoneRed", "SandStoneRedEmeraldOre", "StoneCoalOre", "StoneDiamondOre", "StoneGoldOre",
+            "StoneGravel", "StoneGrey", "StoneIronBrownOre", "StoneIronGreenOre", "StoneSilverOre", "WheatStage1",
             "WheatStage2", "WheatStage3", "WheatStage4", "Workbench", "Flowers", "Snow", "StoneSlab",
             "LeavesSpruce", "LogSpruce", "DeadBush"
         };
@@ -124,6 +123,17 @@ namespace Engine.Tests.EditMode{
             // Voxels appended to the package later take the next base ids, before every variant
             Assert.AreEqual(voxels.Length + 1, registry.BaseCount);
             AssertLookupsRoundTrip(registry);
+        }
+
+        [Test]
+        public void StandardPackage_HasNoCombinedVoxels(){
+            // DEC-203: no voxel with one material's top on another's side (the gravels are one texture all round and stay)
+            List<Voxel> voxels = Resources.Load<VoxelDataPackage>("VoxelDataPackages/Standard/Standard").voxel;
+            Assert.IsTrue(voxels.All(v => v), "no missing voxel in the package list");
+            foreach (string name in new[]{
+                         "DirtSandy", "StoneSandy", "StoneGreySandy", "SandStoneRedSandy", "StoneGrassy", "DirtSnowy", "StoneSnowy"
+                     })
+                Assert.IsFalse(voxels.Any(v => v.name == name), name);
         }
 
         private VoxelRegistry StandardRegistry(out Voxel[] voxels){

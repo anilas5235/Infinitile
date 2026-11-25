@@ -57,9 +57,8 @@ def tiles(root):
     k = os.path.join(root, 'Assets/Engine/Resources/Artwork/kenney_voxel-pack/PNG/Tiles')
     load = lambda n: Image.open(os.path.join(k, n + '.png')).convert('RGBA')
     t = {}
-    t['grass_top_tint'], _ = grey(load('grass_top'), ANY)  # Grass and StoneGrassy tops
+    t['grass_top_tint'], _ = grey(load('grass_top'), ANY)  # Grass tops
     t['dirt_grass_tint'], t['dirt_grass_tint_overlay'] = grey(load('dirt_grass'), GREEN)  # Grass sides
-    t['stone_grass_tint'], t['stone_grass_tint_overlay'] = grey(load('stone_grass'), GREEN)  # StoneGrassy sides
     t['grass1_tint'], _ = grey(load('grass1'), ANY)  # GrassFSwamp
     t['grass2_tint'], _ = grey(load('grass2'), ANY)  # Fern
     t['grass3_tint'], _ = grey(load('grass3'), ANY)  # GrassFTall

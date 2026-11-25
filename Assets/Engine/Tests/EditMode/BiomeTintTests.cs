@@ -490,16 +490,14 @@ namespace Engine.Tests.EditMode{
         }
 
         private static readonly string[] Tinted ={
-            "Solid/Grass", "Solid/StoneGrassy", "Foliage/GrassF", "Foliage/GrassFDry", "Foliage/GrassFSwamp",
+            "Solid/Grass", "Foliage/GrassF", "Foliage/GrassFDry", "Foliage/GrassFSwamp",
             "Foliage/GrassFTall", "Foliage/Fern", "Foliage/Reeds"
         };
 
         [Test]
         public void Assets_TintTheGreenGrassAndPlantsOnly(){
             Assert.AreEqual(VoxelBiomeTint.Grass, LoadVoxel("Solid/Grass").biomeTint);
-            Assert.AreEqual(VoxelBiomeTint.Grass, LoadVoxel("Solid/StoneGrassy").biomeTint);
             Assert.IsNotNull(LoadVoxel("Solid/Grass").biomeTintMask, "the grass side keeps its dirt untinted");
-            Assert.IsNotNull(LoadVoxel("Solid/StoneGrassy").biomeTintMask);
             foreach (string path in Tinted.Where(p => p.StartsWith("Foliage/")))
                 Assert.AreEqual(VoxelBiomeTint.Foliage, LoadVoxel(path).biomeTint, path);
 
@@ -511,7 +509,7 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void Assets_FoldedGrassVariantsAreGone(){
             string[] folded ={
-                "GrassDry", "GrassJungle", "GrassSwamp", "GrassTaiga", "StoneGrassyTaiga", "GrassFTallDry",
+                "GrassDry", "GrassJungle", "GrassSwamp", "GrassTaiga", "StoneGrassyTaiga", "StoneGrassy", "GrassFTallDry",
                 "GrassFTallJungle"
             };
             HashSet<string> names = new(LoadAll<Voxel>(Standard).Select(v => v.name));
@@ -554,12 +552,12 @@ namespace Engine.Tests.EditMode{
                 }
             }
 
-            Assert.GreaterOrEqual(checkedTiles.Count, 8);
+            Assert.GreaterOrEqual(checkedTiles.Count, 7, "grass top, grass side overlay and five plant tiles");
         }
 
         [Test]
         public void Assets_OverlayAlphaIsOnOrOff(){
-            foreach (string path in new[]{ "Solid/Grass", "Solid/StoneGrassy" }){
+            foreach (string path in new[]{ "Solid/Grass" }){
                 Texture2D overlay = LoadVoxel(path).biomeTintMask;
                 Color32[] pixels = SourcePixels(overlay);
                 Assert.That(pixels.All(p => p.a is 0 or 255), overlay.name + ": the shader tints or does not");
