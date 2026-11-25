@@ -570,7 +570,8 @@ namespace Engine.Scripts.WorldGen.Caves{
         /// </summary>
         public static int MaxSteps(in CaveConfig c){
             int main = c.Cover + (int)math.ceil(c.WormMaxRadius) + 1 + c.WormLength.y;
-            float flat = (1f + TargetReach) * c.WormReach, climb = ChunkHeight / Climb(c);
+            // v1 keeps its 256-high world for the climb (AD-39), so its worms and hashes stay unchanged.
+            float flat = (1f + TargetReach) * c.WormReach, climb = LegacyChunkHeight / Climb(c);
             int connector = (int)math.ceil(TargetStepsPerBlock * math.max(flat, climb)) + TargetSlack;
             return math.max(main + main / 2, connector);
         }

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using Engine.Scripts.WorldGen.Biomes;
 using Engine.Scripts.WorldGen.Graph;
+using Engine.Scripts.WorldGen.Settings;
 using Unity.Collections;
 using Unity.Mathematics;
 
@@ -21,6 +22,9 @@ namespace Engine.Editor.WorldGen{
         public int WindowExtent = 32768, WindowStride = 32;
 
         public const int WindowSize = 8000, WindowStep = 2000;
+
+        /// <summary>The world's water level: the wetness test runs one block below it, as in the chunks (AD-40).</summary>
+        public int WaterLevel = WorldGenSettings.DefaultWaterLevel;
 
         /// <summary>The sweep's cheaper maps: heights at stride 8.</summary>
         public static WorldReportOptions Sweep => new(){ HeightStride = 8 };
@@ -54,7 +58,7 @@ namespace Engine.Editor.WorldGen{
         /// <summary>Per biome: share of all columns, share of the dry columns, share of its columns under water.</summary>
         public double[] AreaShare, LandShare, WetShare;
 
-        /// <summary>Water (air at y 123), the ocean bands (a water biome before the dry-column rule), the dry-column rule's columns.</summary>
+        /// <summary>Water (air one block below the water level), the ocean bands (a water biome before the dry-column rule), the dry-column rule's columns.</summary>
         public double WaterShare, OceanBandShare, SubstituteShare;
 
         public long OceanOnDry;
@@ -132,7 +136,7 @@ namespace Engine.Editor.WorldGen{
         private static void ShareMap(CompiledNoiseGraph graph, BiomeLayout layout, in BiomeLayoutData data, uint seed, WorldReportOptions o, WorldReportSeed r){
             int nb = r.Names.Length;
             using NativeArray<float2> points = Grid(o.Extent, o.Stride, out int side);
-            using BiomeColumns c = BiomeColumnSampler.Sample(graph, data, seed, points);
+            using BiomeColumns c = BiomeColumnSampler.Sample(graph, data, seed, points, waterLevel: o.WaterLevel);
             int n = side * side;
             long[] count = new long[nb], wet = new long[nb];
             long water = 0, dry = 0, band = 0, substituted = 0;
@@ -205,7 +209,7 @@ namespace Engine.Editor.WorldGen{
         private static void HeightMap(CompiledNoiseGraph graph, BiomeLayout layout, in BiomeLayoutData data, uint seed, WorldReportOptions o, WorldReportSeed r){
             int nb = r.Names.Length;
             using NativeArray<float2> points = Grid(o.HeightExtent, o.HeightStride, out int side);
-            using BiomeColumns c = BiomeColumnSampler.Sample(graph, data, seed, points, true);
+            using BiomeColumns c = BiomeColumnSampler.Sample(graph, data, seed, points, true, waterLevel: o.WaterLevel);
             int n = side * side;
             int origin = -o.HeightExtent / 2;
             List<short>[] heights = new List<short>[nb];
@@ -281,7 +285,7 @@ namespace Engine.Editor.WorldGen{
         private static void WindowMap(CompiledNoiseGraph graph, in BiomeLayoutData data, uint seed, WorldReportOptions o, WorldReportSeed r){
             int nb = r.Names.Length;
             using NativeArray<float2> points = Grid(o.WindowExtent, o.WindowStride, out int side);
-            using BiomeColumns c = BiomeColumnSampler.Sample(graph, data, seed, points);
+            using BiomeColumns c = BiomeColumnSampler.Sample(graph, data, seed, points, waterLevel: o.WaterLevel);
             int size = WorldReportOptions.WindowSize / o.WindowStride, step = WorldReportOptions.WindowStep / o.WindowStride;
             int[] present = new int[nb];
             int windows = 0;

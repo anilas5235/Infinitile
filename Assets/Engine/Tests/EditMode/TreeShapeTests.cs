@@ -479,7 +479,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void FitsBelowWorldTop_TreeStructureStack_NeverCutAtTheWorldTop(){
-            // An anchor carries its plant only when the highest voxel stays below ChunkHeight; one block higher it
+            // An anchor carries its plant only when the highest voxel stays below v1's top, LegacyChunkHeight (AD-39); one block higher it
             // carries nothing (2026-11-10: no trees cut off at the world top).
             Biome b = _fixture.MakeBiome("B", .5f, 150f, 8f, _fixture.GrassSo, FloraFixture.Rule(_fixture.Grove, .2f),
                 FloraFixture.Rule(_fixture.Tree, .2f), FloraFixture.Rule(_fixture.CactusSo, .2f, 1, 4));
@@ -516,15 +516,15 @@ namespace Engine.Tests.EditMode{
 
                         // The highest column height that still fits: its plant lies wholly below the world top.
                         int highest = -1;
-                        for (int h = VoxelConstants.ChunkHeight - 1; h >= VoxelConstants.ChunkHeight - 64; h--)
+                        for (int h = VoxelConstants.LegacyChunkHeight - 1; h >= VoxelConstants.LegacyChunkHeight - 64; h--)
                             if (FloraPlacement.FitsBelowWorldTop(x, z, rule, h, _cfg)){
                                 highest = h;
                                 break;
                             }
 
                         Assert.GreaterOrEqual(highest, 0, $"rule {rule} at ({x},{z}): fits nowhere in the top 64 blocks");
-                        Assert.Less(highest + 1 + top, VoxelConstants.ChunkHeight, $"rule {rule} at ({x},{z}): cut at the top");
-                        Assert.LessOrEqual(VoxelConstants.ChunkHeight - 1 - (highest + 1 + top), 3,
+                        Assert.Less(highest + 1 + top, VoxelConstants.LegacyChunkHeight, $"rule {rule} at ({x},{z}): cut at the top");
+                        Assert.LessOrEqual(VoxelConstants.LegacyChunkHeight - 1 - (highest + 1 + top), 3,
                             $"rule {rule} at ({x},{z}): refused far below the top");
                     }
                 }

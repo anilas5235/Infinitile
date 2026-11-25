@@ -8,8 +8,20 @@ namespace Engine.Scripts.Utils{
     /// </summary>
     public static class VoxelConstants{
         public const int ChunkWidth = 32;
-        public const int ChunkHeight = 256;
+
+        /// <summary>
+        ///     The build height (DEC-210, §5.7): 512 keeps the flat index in powers of two (shifts 14 and 9) and gives
+        ///     16 partitions of 32. Every engine bound derives from it (W2-HGT-01).
+        /// </summary>
+        public const int ChunkHeight = 512;
+
         public const int ChunkDepth = 32;
+
+        /// <summary>
+        ///     The build height the v1 generator was made for (AD-39): its height clamps, worm climb, ore range and
+        ///     flora top keep it, so v1 stays byte-identical until it is deleted in V7 (W2-MIG-01).
+        /// </summary>
+        internal const int LegacyChunkHeight = 256;
 
         internal const int MinChunkPosXYZ = 0;
         internal const int MaxXChunkPos = ChunkWidth - 1;
@@ -21,8 +33,8 @@ namespace Engine.Scripts.Utils{
         /// <summary>Lowest Y level terrain height can be generated at (bedrock floor for surface terrain).</summary>
         internal const int MinTerrainHeight = 100;
 
-        /// <summary>Highest Y level terrain height can be generated at.</summary>
-        internal const int MaxTerrainHeight = ChunkHeight - 1;
+        /// <summary>Highest Y level the v1 generator's terrain height can be generated at (AD-39: the legacy height).</summary>
+        internal const int MaxTerrainHeight = LegacyChunkHeight - 1;
 
         /// <summary>Usable vertical span for terrain height generation.</summary>
         internal const int TerrainHeightRange = MaxTerrainHeight - MinTerrainHeight;
@@ -38,6 +50,12 @@ namespace Engine.Scripts.Utils{
 
         internal const int VoxelsPerPartition = PartitionWidth * PartitionHeight * PartitionDepth;
         internal const int PartitionsPerChunk = ChunkHeight / PartitionHeight;
+
+        // Compile-time checks: a constant 256 does not convert to byte, so a false condition fails the build. The
+        // occupancy mask of a chunk is a uint with one bit per partition; the light region and the flat index mask y
+        // with ChunkHeight - 1, which needs a power of two.
+        private const byte AssertPartitionsFitOccupancyMask = PartitionsPerChunk <= 31 ? 0 : 256;
+        private const byte AssertChunkHeightIsPowerOfTwo = (ChunkHeight & (ChunkHeight - 1)) == 0 ? 0 : 256;
 
         internal const MeshUpdateFlags MeshFlags = MeshUpdateFlags.DontRecalculateBounds |
                                                    MeshUpdateFlags.DontValidateIndices |

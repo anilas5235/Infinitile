@@ -6,6 +6,7 @@ using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Biomes;
 using Engine.Scripts.WorldGen.Density;
 using Engine.Scripts.WorldGen.Graph;
+using Engine.Scripts.WorldGen.Settings;
 using Engine.Scripts.WorldGen.Surface;
 using NUnit.Framework;
 using Unity.Collections;
@@ -36,6 +37,7 @@ namespace Engine.Tests.EditMode{
         private FixtureVoxelIds _ids;
         private Biome.BiomeDef[] _defs;
         private int _waterLevel;
+        private int WetY => DensityLayout.WetnessY(_waterLevel);
         private string[] _names;
 
         /// <summary>Chunks whose centre lies on a river's centre line in the plain lowland, nearest to the origin first.</summary>
@@ -55,7 +57,7 @@ namespace Engine.Tests.EditMode{
             _defs = _config.WorldGen.Layout.Defs.ToArray();
             _names = BiomeLayoutTests.Shipped().Palette();
             _waterLevel = _config.WorldGen.WaterLevel;
-            Assert.AreEqual(DensityLayout.WetnessY + 1, _waterLevel, "the tests assume the water level 124");
+            Assert.AreEqual(WorldGenSettings.DefaultWaterLevel, _waterLevel, "the tests assume the shipped water level");
 
             _chunks = new List<DensityProbeResult>();
             _river = new List<float[]>();
@@ -230,7 +232,7 @@ namespace Engine.Tests.EditMode{
                 for (int c = 0; c < Size * Size; c++){
                     if (_river[i][c] < 0.9f || _c[i][c] < LowlandCMin || _c[i][c] > LowlandCMax) continue;
                     columns++;
-                    if (r.Heightmap[c] < DensityLayout.WetnessY) wet++;
+                    if (r.Heightmap[c] < WetY) wet++;
                 }
             }
 
@@ -258,7 +260,7 @@ namespace Engine.Tests.EditMode{
                     Biome.BiomeDef def = _defs[r.Surface[c]];
                     ushort top = r.Voxels[c * Height + h];
                     string where = $"chunk {r.Origin} column ({x}, {z}) y {h} (river {_river[i][c]:0.00}, rise {r.Rise[c]})";
-                    if (h < DensityLayout.WetnessY && _river[i][c] >= SurfaceRuleTests.RiverBedMin + 0.1f){
+                    if (h < WetY && _river[i][c] >= SurfaceRuleTests.RiverBedMin + 0.1f){
                         string kind = top == gravel ? "gravel" : top == clay ? "clay" : top == mud ? "mud" : def.beachBlock != 0 && top == def.beachBlock ? "sand" : null;
                         Assert.IsNotNull(kind, $"{where}: the river bed is {_ids.Name(top)}");
                         if (kind == "mud") Assert.AreEqual("Swamp", _names[r.Surface[c]], where + ": mud only in a swamp");
@@ -268,13 +270,13 @@ namespace Engine.Tests.EditMode{
                     }
 
                     // A gentle dry bank next to a river column.
-                    if (h < DensityLayout.WetnessY || h > DensityLayout.WetnessY + 2 || r.Rise[c] >= 3 || h >= r.SnowLine[c] || def.beachBlock == 0) continue;
+                    if (h < WetY || h > WetY + 2 || r.Rise[c] >= 3 || h >= r.SnowLine[c] || def.beachBlock == 0) continue;
                     bool besideRiver = false;
                     for (int d = 0; d < 4 && !besideRiver; d++){
                         int nx = x + (d == 0 ? 1 : d == 1 ? -1 : 0), nz = z + (d == 2 ? 1 : d == 3 ? -1 : 0);
                         if (nx < 0 || nz < 0 || nx >= Size || nz >= Size) continue;
                         int nc = nx * Size + nz;
-                        besideRiver = r.Heightmap[nc] < DensityLayout.WetnessY && _river[i][nc] > 0f;
+                        besideRiver = r.Heightmap[nc] < WetY && _river[i][nc] > 0f;
                     }
 
                     if (!besideRiver) continue;

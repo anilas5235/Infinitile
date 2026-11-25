@@ -221,7 +221,8 @@ namespace Engine.Scripts.Jobs.Chunk{
             for (int r = 0; r < c.Ores.Length; r++){
                 OreRuleDef def = c.Ores[r];
                 int3 lo = new(origin.x, math.max(def.MinY, CaveColumns.Floor + 1), origin.z);
-                int3 hi = new(origin.x + ChunkWidth - 1, math.min(def.MaxY, ChunkHeight - 1), origin.z + ChunkDepth - 1);
+                // The ore range keeps v1's 256-high world (AD-39).
+                int3 hi = new(origin.x + ChunkWidth - 1, math.min(def.MaxY, LegacyChunkHeight - 1), origin.z + ChunkDepth - 1);
                 if (lo.y > hi.y) continue;
                 int reach = def.VeinSize.y - 1;
                 int3 first = OreVeins.Cell(lo - reach), last = OreVeins.Cell(hi + reach);

@@ -5,7 +5,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 
 namespace Engine.Scripts.WorldGen.Density{
-    /// <summary>Sizes of the density passes for one chunk of 32 × 256 × 32.</summary>
+    /// <summary>Sizes of the density passes for one chunk of 32 × <see cref="GraphLimits.WorldHeight" /> × 32 (32 × 512 × 32).</summary>
     public static class DensityLayout{
         public const int ChunkSize = 32;
         public const int Height = GraphLimits.WorldHeight;
@@ -57,8 +57,13 @@ namespace Engine.Scripts.WorldGen.Density{
         /// <summary>Cells along x and z of the padded biome map: 16.</summary>
         public const int BiomeCells = BiomeSpan / CellXZ;
 
-        /// <summary>The y of the wetness test (AD-08): the top water layer.</summary>
-        public const int WetnessY = 123;
+        /// <summary>
+        ///     The y of the wetness test and of the ice test (AD-08, AD-40): the top water layer, one under the water
+        ///     level (water fills y &lt; <paramref name="waterLevel" />).
+        /// </summary>
+        public static int WetnessY(int waterLevel){
+            return waterLevel - 1;
+        }
     }
 
     /// <summary>
@@ -302,10 +307,13 @@ namespace Engine.Scripts.WorldGen.Density{
             int layers = terrain.Layers;
             int perBlock = DensityLayout.BlockHeight / h;
             float* surface = b.Lattice + terrain.PreliminarySurface * size * size;
+            // The generation top (top_slide_end, AD-45): blocks that start above it stay air by range, so the world above
+            // it costs no corners (with the top at 255 the open blocks are exactly those of the 256-high world).
+            int topBlock = math.min(DensityLayout.BlocksPerColumn - 1, (int)math.floor(terrain.SlideEnd / DensityLayout.BlockHeight));
 
             // Own ranges (§5.4): corners are computed from preliminary_surface − Δdown to preliminary_surface + Δup and
             // one layer beyond; below the corner is solid, above it is air. In the top slide the density can turn
-            // negative over solid rock (flat ground near y 255 has a small Δdown), so a range that reaches the slide
+            // negative over solid rock (flat ground near the slide's end has a small Δdown), so a range that reaches the slide
             // starts at the slide at the latest.
             for (int cz = 0; cz < corners; cz++)
             for (int cx = 0; cx < corners; cx++){
@@ -330,7 +338,7 @@ namespace Engine.Scripts.WorldGen.Density{
                 // Block k spans layers k · perBlock to (k + 1) · perBlock: open when its top layer reaches minLow and its
                 // bottom layer is at most maxHigh.
                 int first = math.max(0, CeilDiv(minLow - perBlock, perBlock));
-                int last = math.min(DensityLayout.BlocksPerColumn - 1, FloorDiv(maxHigh, perBlock));
+                int last = math.min(topBlock, FloorDiv(maxHigh, perBlock));
                 int cell = bz * cells + bx;
                 b.FirstOpen[cell] = first;
                 b.LastOpen[cell] = last;
@@ -351,15 +359,14 @@ namespace Engine.Scripts.WorldGen.Density{
             b.NeedHigh[c] = math.max(b.NeedHigh[c], hi);
         }
 
-        /// <summary>The corner program on the needed layers of each corner column, lanes = layers from the lowest.</summary>
+        /// <summary>
+        ///     The corner program on the needed layers of each corner column, lanes = layers from the lowest, in slices of
+        ///     at most <see cref="GraphLimits.MaxLanes" /> layers (AD-44).
+        /// </summary>
         private static void RunCorners<TPrograms>(TPrograms programs, in DensityTerrainGraph terrain, in GraphCode code, uint seed, int2 chunk,
             ref DensityChunkBuffers b, ref DensityWorkCounters counters) where TPrograms : struct, IGraphPrograms{
             const int corners = DensityLayout.CornerColumns;
-            const int size = DensityLayout.LatticeSize;
-            const int offset = DensityLayout.ChunkLatticeOffset;
             GraphProgram program = code.Programs[terrain.CornerProgram];
-            float* registers = b.Registers;
-            int h = terrain.CellHeight;
             int markerRegister = -1;
             for (int o = 0; o < program.OutputCount; o++){
                 GraphSlot s = code.Slots[program.OutputStart + o];
@@ -369,33 +376,46 @@ namespace Engine.Scripts.WorldGen.Density{
             for (int cz = 0; cz < corners; cz++)
             for (int cx = 0; cx < corners; cx++){
                 int c = cz * corners + cx;
-                int lo = b.NeedLow[c], hi = b.NeedHigh[c];
-                if (hi < lo) continue;
-                int n = hi - lo + 1;
-                int padded = (n + 3) & ~3;
-                float wx = chunk.x + 4 * cx, wz = chunk.y + 4 * cz;
-                int l = (offset + cz) * size + offset + cx;
-                for (int i = 0; i < padded; i++){
-                    registers[i] = wx;
-                    registers[Lanes + i] = (lo + math.min(i, n - 1)) * h;
-                    registers[2 * Lanes + i] = wz;
-                }
-
-                for (int i = 0; i < program.InputCount; i++){
-                    GraphSlot s = code.Slots[program.InputStart + i];
-                    float v = b.Lattice[s.Slot * size * size + l];
-                    float* row = registers + s.Register * Lanes;
-                    for (int k = 0; k < padded; k++) row[k] = v;
-                }
-
-                programs.Run(terrain.CornerProgram, code, registers, b.Scratch, n, seed, ref counters.Graph);
-                float* from = registers + markerRegister * Lanes;
-                float* to = b.Corners + c * DensityLayout.MaxLayers + lo;
-                for (int i = 0; i < n; i++) to[i] = from[i];
-                counters.Graph.Corners += n;
-                counters.Corners += n;
+                int need = b.NeedHigh[c];
+                if (need < b.NeedLow[c]) continue;
+                for (int lo = b.NeedLow[c]; lo <= need; lo += Lanes)
+                    RunCornerSlice(programs, terrain, code, seed, chunk, ref b, ref counters, cx, cz, lo, math.min(need - lo + 1, Lanes), markerRegister);
                 counters.CornerColumns++;
             }
+        }
+
+        /// <summary>The corner program on <paramref name="n" /> (at most Lanes) layers of one corner column from layer <paramref name="lo" />.</summary>
+        private static void RunCornerSlice<TPrograms>(TPrograms programs, in DensityTerrainGraph terrain, in GraphCode code, uint seed, int2 chunk,
+            ref DensityChunkBuffers b, ref DensityWorkCounters counters, int cx, int cz, int lo, int n, int markerRegister) where TPrograms : struct, IGraphPrograms{
+            const int corners = DensityLayout.CornerColumns;
+            const int size = DensityLayout.LatticeSize;
+            const int offset = DensityLayout.ChunkLatticeOffset;
+            GraphProgram program = code.Programs[terrain.CornerProgram];
+            float* registers = b.Registers;
+            int h = terrain.CellHeight;
+            int c = cz * corners + cx;
+            int padded = (n + 3) & ~3;
+            float wx = chunk.x + 4 * cx, wz = chunk.y + 4 * cz;
+            int l = (offset + cz) * size + offset + cx;
+            for (int i = 0; i < padded; i++){
+                registers[i] = wx;
+                registers[Lanes + i] = (lo + math.min(i, n - 1)) * h;
+                registers[2 * Lanes + i] = wz;
+            }
+
+            for (int i = 0; i < program.InputCount; i++){
+                GraphSlot s = code.Slots[program.InputStart + i];
+                float v = b.Lattice[s.Slot * size * size + l];
+                float* row = registers + s.Register * Lanes;
+                for (int k = 0; k < padded; k++) row[k] = v;
+            }
+
+            programs.Run(terrain.CornerProgram, code, registers, b.Scratch, n, seed, ref counters.Graph);
+            float* from = registers + markerRegister * Lanes;
+            float* to = b.Corners + c * DensityLayout.MaxLayers + lo;
+            for (int i = 0; i < n; i++) to[i] = from[i];
+            counters.Graph.Corners += n;
+            counters.Corners += n;
         }
 
         /// <summary>

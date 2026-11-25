@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Engine.Scripts.Commands;
+using Engine.Scripts.Utils;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -369,6 +370,8 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual("Teleported to 5.5 70 -3.5.", LastLine(console));
             Assert.IsTrue(console.Submit("teleport ~ ~10 ~1.25"));
             Assert.AreEqual(new Vector3(5.5f, 80f, -2.25f), _player.Teleported);
+            Assert.IsTrue(console.Submit("tp 0 511 0"), "the world's top block since H1");
+            Assert.AreEqual(new Vector3(0.5f, 511f, 0.5f), _player.Teleported);
         }
 
         [Test]
@@ -393,13 +396,16 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual("Set std:Stone at 1 2 3.", LastLine(console));
             Assert.IsTrue(console.Submit("setvoxel ~ ~-1 ~ std:air"));
             Assert.AreEqual((ushort)0, _world.Set[new Vector3Int(10, 63, -4)]);
+            Assert.IsTrue(console.Submit("setvoxel 1 0 3 std:stone"), "the bottom block");
+            Assert.IsTrue(console.Submit("setvoxel 1 511 3 std:stone"), "the top block since H1 (512 high)");
+            Assert.AreEqual((ushort)1, _world.Set[new Vector3Int(1, 511, 3)]);
         }
 
         [Test]
         public void SetVoxel_RefusesOutsideWorldUnloadedAndUnknown(){
             CommandConsole console = NewConsole();
-            Assert.IsFalse(console.Submit("setvoxel 1 256 3 std:Stone"));
-            Assert.AreEqual("y 256 is outside the world (0 to 255).", LastLine(console));
+            Assert.IsFalse(console.Submit("setvoxel 1 512 3 std:Stone"));
+            Assert.AreEqual("y 512 is outside the world (0 to 511).", LastLine(console));
             Assert.IsFalse(console.Submit("setvoxel 1 -1 3 std:Stone"));
             Assert.IsFalse(console.Submit("setvoxel -1 2 3 std:Stone"));
             Assert.AreEqual("The chunk at -1 2 3 is not loaded.", LastLine(console));
@@ -426,7 +432,7 @@ namespace Engine.Tests.EditMode{
             Assert.IsTrue(console.Submit("locate desert"));
             Assert.AreEqual("Desert at 310 71 -4 (300 blocks away).", LastLine(console));
             Assert.IsTrue(console.Submit("/locate peak"));
-            StringAssert.StartsWith("peak at 10 190 997", LastLine(console));
+            StringAssert.StartsWith("peak at 10 450 997", LastLine(console));
         }
 
         [Test]
@@ -455,8 +461,8 @@ namespace Engine.Tests.EditMode{
             CommandConsole console = NewConsole();
             console.World = new FakeLocatorWorld();
             Assert.IsTrue(console.Submit("goto peak"));
-            Assert.AreEqual(new Vector3(10.5f, 190f, 997.5f), _player.Teleported);
-            StringAssert.StartsWith("Teleported to peak at 10 190 997 (", LastLine(console));
+            Assert.AreEqual(new Vector3(10.5f, 450f, 997.5f), _player.Teleported, "a place above the old top at 256 (H1)");
+            StringAssert.StartsWith("Teleported to peak at 10 450 997 (", LastLine(console));
             CollectionAssert.AreEqual(new[]{ "Desert", "Ocean", "peak" }, Items(console, "goto "));
         }
 
@@ -479,7 +485,7 @@ namespace Engine.Tests.EditMode{
             public readonly Dictionary<Vector3Int, ushort> Set = new();
             public bool Refuse;
             public VoxelNameIndex Voxels{ get; } = new(CommandConsoleTests.Voxels);
-            public int Height => 256;
+            public int Height => VoxelConstants.ChunkHeight;
 
             public bool IsLoaded(Vector3Int position){
                 return position.x >= 0;
@@ -495,7 +501,7 @@ namespace Engine.Tests.EditMode{
         /// <summary>A world with Desert 300 blocks east of the player, no Ocean, and a peak.</summary>
         private sealed class FakeLocatorWorld : ICommandWorld, ICommandLocator{
             public VoxelNameIndex Voxels{ get; } = new(CommandConsoleTests.Voxels);
-            public int Height => 256;
+            public int Height => VoxelConstants.ChunkHeight;
             public IReadOnlyList<string> LocateTargets{ get; } = new[]{ "Desert", "Ocean", "peak" };
 
             public bool IsLoaded(Vector3Int position){
@@ -514,7 +520,7 @@ namespace Engine.Tests.EditMode{
                         position = new Vector3Int(Mathf.RoundToInt(from.x) + 300, 71, Mathf.RoundToInt(from.z));
                         return true;
                     case "peak":
-                        position = new Vector3Int(10, 190, 997);
+                        position = new Vector3Int(10, 450, 997);
                         return true;
                     default:
                         error = $"No {target} within 20000 blocks.";

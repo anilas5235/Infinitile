@@ -153,6 +153,18 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
+        public void VoxelAtTheWorldTop_Y511_ProducesSixQuads(){
+            // H1: the top partition (15) of a 512-high chunk; the face above the world's top stays (nothing lies above).
+            AddAirNeighbours(int2.zero);
+            int3 top = new(5, ChunkHeight - 1, 5);
+            AddChunk(int2.zero, Voxels(top));
+            RunJob(new int3(0, PartitionsPerChunk - 1, 0));
+            Assert.AreEqual((24, 36), Counts());
+            foreach (CVertex vertex in _meshData[0].GetVertexData<CVertex>())
+                Assert.That((float)vertex.Position.y, Is.InRange((float)(PartitionHeight - 1), (float)PartitionHeight), "partition-local y of the top voxel");
+        }
+
+        [Test]
         public void EmptyPartition_ProducesNoGeometry(){
             AddAirNeighbours(int2.zero);
             RunJob(new int3(0, 0, 0));
@@ -231,6 +243,13 @@ namespace Engine.Tests.EditMode{
             int vertexTotal = 0;
             for (int i = 0; i < partitions.Length; i++){
                 Mesh.MeshData mesh = _meshData[i];
+                // The terrain keeps the 256-high world of the recording (H1): the partitions above it stay empty and
+                // the hash runs over the old 8 per chunk, so it still equals the recorded one.
+                if (partitions[i].y >= LegacyHeight / PartitionHeight){
+                    Assert.AreEqual(0, mesh.vertexCount, $"partition {partitions[i]} above y 256");
+                    continue;
+                }
+
                 vertexTotal += mesh.vertexCount;
                 hash = Fnv(hash, mesh.vertexCount);
                 foreach (CVertex vertex in mesh.GetVertexData<CVertex>()){
@@ -251,9 +270,14 @@ namespace Engine.Tests.EditMode{
 
         private const int RecordedVertexTotal = 311332;
         private const ulong RecordedHash = 17997073674349874371UL;
+        private const int LegacyHeight = 256;
 
-        /// <summary>Stepped plateaus with caves, water up to 124, ice spots and floating dirt up to the world top.</summary>
+        /// <summary>
+        ///     Stepped plateaus with caves, water up to 124, ice spots and floating dirt up to y 255, the top of the
+        ///     256-high world the meshes were recorded in; air above.
+        /// </summary>
         private static ushort MixedTerrain(int2 world, int y){
+            if (y >= LegacyHeight) return TestFixtures.Air;
             uint column = Hash((uint)world.x, 0, (uint)world.y);
             int height = 30 + (int)(Hash((uint)(world.x >> 2), 1, (uint)(world.y >> 2)) % 200) + (int)(column % 3);
             uint r = Hash((uint)world.x, (uint)y + 2, (uint)world.y);

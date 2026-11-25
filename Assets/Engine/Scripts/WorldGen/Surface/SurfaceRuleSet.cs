@@ -139,7 +139,7 @@ namespace Engine.Scripts.WorldGen.Surface{
         }
     }
 
-    /// <summary>near_water: a water probe (columns at multiples of 4, wet at y 123) lies within the climate's distance.</summary>
+    /// <summary>near_water: a water probe (columns at multiples of 4, wet one block below the water level) lies within the climate's distance.</summary>
     public sealed class NearWaterCondition : RuleCondition{
         public override RuleCondition Clone(){
             return new NearWaterCondition();

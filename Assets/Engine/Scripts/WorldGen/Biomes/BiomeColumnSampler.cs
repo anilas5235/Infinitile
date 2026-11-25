@@ -2,6 +2,7 @@ using System;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.WorldGen.Density;
 using Engine.Scripts.WorldGen.Graph;
+using Engine.Scripts.WorldGen.Settings;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -16,7 +17,7 @@ namespace Engine.Scripts.WorldGen.Biomes{
         /// <summary>The hard biome after the dry-column rule (255: the layout has no box).</summary>
         public NativeArray<byte> Biome;
 
-        /// <summary>1 when the terrain is air at y 123 (§6.5).</summary>
+        /// <summary>1 when the terrain is air one block below the water level (§6.5, AD-40).</summary>
         public NativeArray<byte> Wet;
 
         /// <summary>The preliminary surface (graph output).</summary>
@@ -48,7 +49,7 @@ namespace Engine.Scripts.WorldGen.Biomes{
     /// <summary>
     ///     The biome facts of single columns without generating chunks, for the world report, the sweep and
     ///     <c>locate</c> (§13.4, §13.6): the 2D program at each point, the wetness test with the chunk's early-out and
-    ///     the corner program on the two layers around y 123, the lookup and the dry-column rule, and optionally the top
+    ///     the corner program on the two layers around the wetness y, the lookup and the dry-column rule, and optionally the top
     ///     terrain voxel from the corner program inside the column's Δ window (§5.4). On a point of the 4-block lattice
     ///     (x and z multiples of 4) every value equals the chunk's, which reads that point's lattice values without
     ///     interpolation; elsewhere the point is evaluated exactly where a chunk interpolates.
@@ -62,10 +63,10 @@ namespace Engine.Scripts.WorldGen.Biomes{
 
         /// <summary>
         ///     Samples <paramref name="points" />. The caller disposes the result. <paramref name="graph" /> must have
-        ///     the terrain outputs.
+        ///     the terrain outputs. The wetness test runs one block below <paramref name="waterLevel" /> (AD-40).
         /// </summary>
         public static BiomeColumns Sample(CompiledNoiseGraph graph, in BiomeLayoutData layout, uint seed, NativeArray<float2> points, bool heights = false,
-            bool climate = false, Allocator allocator = Allocator.TempJob){
+            bool climate = false, Allocator allocator = Allocator.TempJob, int waterLevel = WorldGenSettings.DefaultWaterLevel){
             if (!DensityTerrainGraph.TryCreate(graph, out DensityTerrainGraph terrain, out string error)) throw new ArgumentException(error);
             int n = points.Length;
             BiomeColumns r = new(){
@@ -83,6 +84,7 @@ namespace Engine.Scripts.WorldGen.Biomes{
                 Terrain = terrain,
                 Layout = layout,
                 Seed = seed,
+                WetnessY = DensityLayout.WetnessY(waterLevel),
                 Points = points,
                 Heights = heights,
                 WithClimate = climate,
@@ -100,10 +102,11 @@ namespace Engine.Scripts.WorldGen.Biomes{
             return r;
         }
 
-        /// <summary><see cref="Sample(CompiledNoiseGraph, in BiomeLayoutData, uint, NativeArray{float2}, bool, bool, Allocator)" /> for managed points.</summary>
-        public static BiomeColumns Sample(CompiledNoiseGraph graph, in BiomeLayoutData layout, uint seed, float2[] points, bool heights = false, bool climate = false){
+        /// <summary><see cref="Sample(CompiledNoiseGraph, in BiomeLayoutData, uint, NativeArray{float2}, bool, bool, Allocator, int)" /> for managed points.</summary>
+        public static BiomeColumns Sample(CompiledNoiseGraph graph, in BiomeLayoutData layout, uint seed, float2[] points, bool heights = false, bool climate = false,
+            int waterLevel = WorldGenSettings.DefaultWaterLevel){
             using NativeArray<float2> p = new(points, Allocator.TempJob);
-            return Sample(graph, layout, seed, p, heights, climate);
+            return Sample(graph, layout, seed, p, heights, climate, Allocator.TempJob, waterLevel);
         }
 
         [BurstCompile(FloatMode = FloatMode.Strict, CompileSynchronously = true)]
@@ -111,6 +114,7 @@ namespace Engine.Scripts.WorldGen.Biomes{
             public DensityTerrainGraph Terrain;
             public BiomeLayoutData Layout;
             public uint Seed;
+            public int WetnessY;
             public bool Heights, WithClimate;
             public int RiverSlot;
             [ReadOnly] public NativeArray<float2> Points;
@@ -165,14 +169,14 @@ namespace Engine.Scripts.WorldGen.Biomes{
                 }
 
                 int h = Terrain.CellHeight;
-                int cy = DensityLayout.WetnessY / h;
+                int cy = WetnessY / h;
                 float yLo = cy * h, yHi = (cy + 1) * h;
                 float inverse = GraphInterpolation.InverseCellHeight(h);
-                float ty = (DensityLayout.WetnessY - cy * h) * inverse;
+                float ty = (WetnessY - cy * h) * inverse;
                 float scale = 64f * Terrain.NoiseBound;
                 int maxLayer = GraphLimits.WorldHeight / h;
 
-                // Per point the layers to compute: the two around y 123 when the early-out cannot decide, and with
+                // Per point the layers to compute: the two around the wetness y when the early-out cannot decide, and with
                 // heights every layer of the Δ window. Lanes fill across points; a full set of lanes runs at once.
                 byte* states = stackalloc byte[Batch];
                 int* firstLayer = stackalloc int[Batch];

@@ -53,13 +53,23 @@ namespace Engine.Scripts.Jobs.Core{
         protected override void EnqueueRow(PriorityUtil.Focus focus, int x){
             int update = Settings.Chunk.UpdateDistance;
 
-            for (int z = -update; z <= update; z++)
-            for (int y = 0; y < VoxelConstants.PartitionsPerChunk; y++){
-                int3 pos = new(x + focus.Pos.x, y, z + focus.Pos.z);
-                // Only meshed partitions: the layers outside the vertical draw window are never meshed, and queueing
-                // them would keep the handler awake re-queueing what JobUpdateStep drops. Meshing wakes the handler.
-                if (!Queue.Contains(pos) && CanBakeColliderForChunk(pos) && ShouldScheduleForBaking(pos))
-                    Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
+            for (int z = -update; z <= update; z++){
+                int2 column = focus.Pos.xz + new int2(x, z);
+                // Only meshed (active) partitions: the layers outside the vertical draw window are never meshed, and
+                // queueing them would keep the handler awake re-queueing what JobUpdateStep drops. Meshing wakes the
+                // handler. A column whose active partitions are all collidable and hold no rebuild flag has nothing
+                // to queue: one test for the column instead of one per partition (DEC-232).
+                uint active = ChunkPool.ActivePartitionMask(column);
+                if (active == 0) continue;
+                if ((active & ~ChunkPool.CollidablePartitionMask(column)) == 0 && !ChunkManager.ColumnHasReCollide(column))
+                    continue;
+
+                for (int y = 0; y < VoxelConstants.PartitionsPerChunk; y++){
+                    if ((active & (1u << y)) == 0) continue; // CanBakeColliderForChunk
+                    int3 pos = new(column.x, y, column.y);
+                    if (!Queue.Contains(pos) && ShouldScheduleForBaking(pos))
+                        Queue.Enqueue(pos, PriorityUtil.DistPriority(ref pos, ref focus));
+                }
             }
         }
 

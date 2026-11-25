@@ -38,8 +38,8 @@ namespace Engine.Scripts.Jobs.Chunk{
             DensityWorkCounters counters = default;
             // Hard biomes, then the surface-source biomes (the tint follows the material border, DEC-194).
             NativeArray<byte> biomes = new(2 * DensityLayout.Columns, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-            DensityChunk.Generate(default(TPrograms), Terrain, Config.WorldGen, position * ChunkWidth, voxels, biomes, ref counters);
-            ChunkJob.WriteToChunkData(voxels, out ChunkVoxelData data);
+            int airFrom = DensityChunk.Generate(default(TPrograms), Terrain, Config.WorldGen, position * ChunkWidth, voxels, biomes, ref counters);
+            ChunkJob.WriteToChunkData(voxels, out ChunkVoxelData data, airFrom);
             if (Config.WorldGen.Layout.HasBoxes){
                 data.CreateBiomes();
                 data.CreateSurfaceBiomes();
@@ -151,7 +151,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                 for (int x = 0; x < DensityLayout.ChunkSize; x++)
                 for (int z = 0; z < DensityLayout.ChunkSize; z++){
                     int c = x * DensityLayout.ChunkSize + z;
-                    SurfacePass.ColumnClimate(WorldGen.SurfaceRules, ref b, x, z, out float t, out int snow, out int tree, out int rise, out bool ice);
+                    SurfacePass.ColumnClimate(WorldGen.SurfaceRules, ref b, x, z, WorldGen.WaterLevel, out float t, out int snow, out int tree, out int rise, out bool ice);
                     ColumnTemperature[c] = t;
                     SnowLine[c] = (short)snow;
                     TreeLine[c] = (short)tree;
@@ -173,11 +173,13 @@ namespace Engine.Scripts.Jobs.Chunk{
         ///     All passes for the chunk whose first column is <paramref name="origin" />, into <paramref name="voxels" />
         ///     and the hard biomes into <paramref name="biomes" /> ([x · 32 + z]).
         /// </summary>
-        public static void Generate<TPrograms>(TPrograms programs, in DensityTerrainGraph terrain, in WorldGenConfig worldGen, int2 origin,
+        /// <returns>The layer from which on every voxel of the chunk is air (see <see cref="Run" />).</returns>
+        public static int Generate<TPrograms>(TPrograms programs, in DensityTerrainGraph terrain, in WorldGenConfig worldGen, int2 origin,
             NativeArray<ushort> voxels, NativeArray<byte> biomes, ref DensityWorkCounters counters) where TPrograms : struct, IGraphPrograms{
             DensityChunkBuffers buffers = DensityChunkBuffers.Allocate(terrain.Graph.LatticeValueCount, terrain.Graph.ColumnOutputCount, Allocator.Temp);
-            Run(programs, terrain, worldGen, origin, PassFill, voxels, biomes, ref buffers, ref counters);
+            int airFrom = Run(programs, terrain, worldGen, origin, PassFill, voxels, biomes, ref buffers, ref counters);
             buffers.Dispose();
+            return airFrom;
         }
 
         /// <summary>
@@ -185,28 +187,37 @@ namespace Engine.Scripts.Jobs.Chunk{
         ///     biomes (they only share P1's lattice), so the terrain rows of the benchmark keep their meaning. Without a
         ///     layout (v1 settings, tests of the terrain alone) the biome passes are skipped and the fill is V2's.
         /// </summary>
-        public static void Run<TPrograms>(TPrograms programs, in DensityTerrainGraph terrain, in WorldGenConfig worldGen, int2 origin, int passes,
+        /// <returns>
+        ///     After the fill, the layer from which on every voxel of the chunk is air: the highest
+        ///     <see cref="SurfacePass.AirFrom" /> of its columns (DEC-232). The chunk height when the fill did not run.
+        /// </returns>
+        public static int Run<TPrograms>(TPrograms programs, in DensityTerrainGraph terrain, in WorldGenConfig worldGen, int2 origin, int passes,
             NativeArray<ushort> voxels, NativeArray<byte> biomes, ref DensityChunkBuffers b, ref DensityWorkCounters counters)
             where TPrograms : struct, IGraphPrograms{
             GraphCode code = GraphCode.Of(terrain.Graph);
             DensityPasses.Columns(programs, terrain, code, worldGen.Seed, origin - DensityLayout.Padding, DensityLayout.LatticeSize, ref b, ref counters.Graph);
-            if (passes < PassTerrain) return;
+            if (passes < PassTerrain) return ChunkHeight;
             DensityPasses.Terrain(programs, terrain, code, worldGen.Seed, origin, ref b, ref counters);
             bool layout = worldGen.Layout.HasBoxes;
-            if (passes < PassBiomes) return;
-            if (layout) BiomePasses.Biomes(programs, terrain, code, worldGen.Seed, origin, worldGen.Layout, ref b, ref counters);
-            if (passes < PassBlend) return;
+            if (passes < PassBiomes) return ChunkHeight;
+            if (layout) BiomePasses.Biomes(programs, terrain, code, worldGen.Seed, origin, worldGen.Layout, worldGen.WaterLevel, ref b, ref counters);
+            if (passes < PassBlend) return ChunkHeight;
             if (layout){
                 DensityPasses.ColumnOutputs(programs, terrain, code, worldGen.Seed, origin, ref b, ref counters.Graph);
                 BiomePasses.Blend(programs, terrain, code, worldGen.Seed, origin, worldGen.MaterialMethod == BlendMethod.DistanceBlend, worldGen.MaterialKernel,
                     worldGen.MaterialTaps, ref b, ref counters);
             }
 
-            if (passes < PassFill) return;
+            if (passes < PassFill) return ChunkHeight;
             if (layout && worldGen.SurfaceRules.HasRules) SurfacePass.Run(worldGen.SurfaceRules, worldGen, origin, ref b, voxels, ref counters.Surface);
             else Fill(b.Solid, voxels, worldGen);
             ChunkJob.ApplyBottomLayer(voxels, new int3(origin.x, 0, origin.y), worldGen);
             if (biomes.IsCreated) WriteBiomes(b, biomes, layout);
+
+            int waterLevel = math.clamp(worldGen.WaterLevel, 0, ChunkHeight);
+            int airFrom = 0;
+            for (int c = 0; c < DensityLayout.Columns; c++) airFrom = math.max(airFrom, SurfacePass.AirFrom(b, c, waterLevel));
+            return airFrom;
         }
 
         /// <summary>

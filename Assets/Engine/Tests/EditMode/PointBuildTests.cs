@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using Engine.Scripts.Data;
 using Engine.Scripts.Render;
 using Engine.Scripts.Render.Post;
 using Engine.Scripts.Utils.Collections;
@@ -59,7 +60,8 @@ namespace Engine.Tests.EditMode{
         [TestCase(0, 2953, 0, 0, 1102910112564121940UL)] // cave pockets on the world bottom
         // Partition 3 re-recorded 2026-11-25: DEC-203 removed seven of the first 63 base voxels, so others fill the set
         [TestCase(3, 12170, 1254, 398, 11706040180931564079UL)] // surface, water and every voxel type (Water alpha 0.6, DEC-119)
-        [TestCase(7, 5737, 0, 0, 16801187266041425973UL)] // floating blocks under the world top
+        [TestCase(7, 5737, 0, 0, 16801187266041425973UL)] // floating blocks under the 256-high world's top
+        [TestCase(PartitionsPerChunk - 1, 6115, 0, 0, 3237186216782477692UL)] // floating blocks under the world top (y 506 … 511, H1)
         public void BuildPoints_MatchesRecordedPoints(int partitionY, int solid, int transparent, int foliage,
             ulong hash){
             ComputeShader shader = AssetDatabase.LoadAssetAtPath<ComputeShader>(
@@ -290,13 +292,15 @@ namespace Engine.Tests.EditMode{
 
         /// <summary>
         ///     Surface near y = 100 with water up to 104 and scattered blocks of every voxel type above it, cave
-        ///     pockets at the world bottom and floating blocks at its top (so the y = 0 and y = 255 borders matter).
+        ///     pockets at the world bottom and floating blocks at its top (so the y = 0 and the top border matter). The
+        ///     floating blocks of y 250 … 255 stay from the 256-high world, so partition 7 keeps its recorded points.
         /// </summary>
         private static ushort Voxel(int x, int y, int z, ushort[] solids, ushort[] liquids, ushort[] all){
             int height = 96 + (int)(Hash(x, 0, z) % 12);
             uint h = Hash(x, y, z);
             if (y < 3) return h % 7 == 0 ? (ushort)0 : solids[0];
-            if (y >= 250) return h % 5 == 0 ? solids[2] : (ushort)0;
+            if (y >= 250 && y < 256 || y >= ChunkHeight - 6) return h % 5 == 0 ? solids[2] : (ushort)0;
+            if (y >= 256) return 0;
             if (y < height - 3) return solids[0];
             if (y < height) return solids[1];
             if (y == height) return solids[2];
@@ -305,8 +309,13 @@ namespace Engine.Tests.EditMode{
             return 0;
         }
 
-        /// <summary>Light in runs of 4 voxels along y: every channel varies, so the smooth light sees each one.</summary>
+        /// <summary>
+        ///     Light in runs of 4 voxels along y: every channel varies, so the smooth light sees each one. From y 256 up
+        ///     to the floating blocks it is full sky, what the shader read above the 256-high world (partition 7 keeps
+        ///     its recorded points).
+        /// </summary>
         private static ushort Light(int x, int y, int z){
+            if (y >= 256 && y < ChunkHeight - 8) return VoxelLight.FullSky;
             return (ushort)Hash(x, y >> 2, z);
         }
 

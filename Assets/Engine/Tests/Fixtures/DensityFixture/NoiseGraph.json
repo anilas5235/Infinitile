@@ -1043,6 +1043,10 @@
       "boundOnly": true,
       "node": "terrain_noise"
     },
+    "top_slide_end": {
+      "boundOnly": true,
+      "node": 255
+    },
     "top_slide_start": {
       "boundOnly": true,
       "node": 235

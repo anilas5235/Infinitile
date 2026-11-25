@@ -335,15 +335,21 @@ namespace Engine.Tests.PlayMode{
             // reclaim a partition 3 behind (weighted 45) before one 6 in front (weighted 36).
             VoxelEngineSettings settings = PlayModeFixtures.CreateSettings(0, VoxelWorld.Instance.Settings.Chunk.ChunkPrefab);
             GameObject root = new("SchedulerEvictionTests.PoolRig");
-            ChunkPool pool = new(root.transform, settings); // partition pool = 1 chunk x PartitionsPerChunk = 8
+            ChunkPool pool = new(root.transform, settings); // partition pool = 1 chunk x PartitionsPerChunk
             try{
                 pool.FocusUpdate(new PriorityUtil.Focus(int3.zero, new float3(1, 0, 0)));
                 int3 behind = new(-3, 0, 0);
                 int3 front = new(6, 0, 0);
                 pool.GetOrClaimPartition(behind);
                 pool.GetOrClaimPartition(front);
-                int3[] fillers = { new(1, 0, 0), new(2, 0, 0), new(1, 1, 0), new(2, 1, 0), new(1, 0, 1), new(2, 0, 1) };
-                foreach (int3 filler in fillers) pool.GetOrClaimPartition(filler); // 8 claimed = pool size
+                // Fillers closer than both, up to the pool size (claimed = PartitionsPerChunk).
+                List<int3> fillers = new();
+                for (int y = 0; y <= 2; y++)
+                for (int x = 1; x <= 2; x++)
+                for (int z = -1; z <= 1; z++)
+                    if (fillers.Count < PartitionsPerChunk - 2 && math.length(new float3(x, y, z)) < 3f) fillers.Add(new int3(x, y, z));
+                Assert.AreEqual(PartitionsPerChunk - 2, fillers.Count, "fillers closer than the partition behind");
+                foreach (int3 filler in fillers) pool.GetOrClaimPartition(filler);
                 Assert.IsTrue(pool.IsPartitionActive(behind));
                 Assert.IsTrue(pool.IsPartitionActive(front));
                 yield return null;

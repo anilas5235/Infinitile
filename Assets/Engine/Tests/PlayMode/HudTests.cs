@@ -421,7 +421,7 @@ namespace Engine.Tests.PlayMode{
                 Assert.AreEqual(DisplayStyle.Flex, bar.resolvedStyle.display, "an error keeps the console open");
                 Assert.AreEqual("setvoxel 0 999 0 std:Stone", field.value, "the line stays to be fixed");
                 Label error = LastShownLine(hud);
-                Assert.AreEqual("y 999 is outside the world (0 to 255).", error.text);
+                Assert.AreEqual("y 999 is outside the world (0 to 511).", error.text);
                 Assert.IsTrue(error.ClassListContains("con__line--error"), "the error line is marked");
             }
             finally{
@@ -434,7 +434,7 @@ namespace Engine.Tests.PlayMode{
             Assert.AreEqual(DisplayStyle.None, bar.resolvedStyle.display, "the console closes");
             Assert.AreEqual(DisplayStyle.None, suggest.resolvedStyle.display, "suggestions hidden");
             Assert.AreEqual(DisplayStyle.Flex, hud.Q("crosshair").resolvedStyle.display, "crosshair back");
-            Assert.AreEqual("y 999 is outside the world (0 to 255).", LastShownLine(hud).text,
+            Assert.AreEqual("y 999 is outside the world (0 to 511).", LastShownLine(hud).text,
                 "the newest lines stay a while after closing");
             Assert.IsEmpty(_problems, "warnings or errors while the console ran");
         }

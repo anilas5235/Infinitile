@@ -278,7 +278,7 @@ namespace Engine.Scripts.WorldGen.Flora{
 
         /// <summary>
         ///     True when the multi-block plant of rule <paramref name="rule" /> anchored on the column with top block
-        ///     <paramref name="columnHeight" /> stays below the world top (y &lt; <see cref="VoxelConstants.ChunkHeight" />):
+        ///     <paramref name="columnHeight" /> stays below v1's world top (y &lt; <see cref="VoxelConstants.LegacyChunkHeight" />, AD-39):
         ///     a tree up to <see cref="TreeShape.TopOffset" />, a structure up to its highest voxel, a stack up to its
         ///     rolled height. Otherwise the anchor carries nothing rather than a plant cut off at the top.
         /// </summary>
@@ -300,7 +300,7 @@ namespace Engine.Scripts.WorldGen.Flora{
             else top = StackHeight(x, z, cfg, d) - 1;
 
             // Offsets count from the block above the top block.
-            return columnHeight + 1 + top < VoxelConstants.ChunkHeight;
+            return columnHeight + 1 + top < VoxelConstants.LegacyChunkHeight;
         }
 
         /// <summary>False for an anchor whose lying trunk fits nowhere (<see cref="LyingFit" /> 0); other trees always fit.</summary>

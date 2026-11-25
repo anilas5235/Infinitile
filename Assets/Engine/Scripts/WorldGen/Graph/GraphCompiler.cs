@@ -392,8 +392,10 @@ namespace Engine.Scripts.WorldGen.Graph{
 
             /// <summary>
             ///     The terrain outputs come as a set (§5.1): terrain_density an interpolated marker itself (so its corner
-            ///     signs decide uniform cells), preliminary_surface and factor 2D, factor above 0, preliminary_surface
-            ///     at most y 255, terrain_noise and top_slide_start bound-only and the slide start a constant in the world.
+            ///     signs decide uniform cells), preliminary_surface and factor 2D, factor above 0, terrain_noise,
+            ///     top_slide_start and top_slide_end bound-only, the slide's start and end constants with
+            ///     0 ≤ start ≤ end ≤ the world top, and preliminary_surface at most the slide's end, the graph's
+            ///     generation top (AD-45).
             /// </summary>
             private void CheckTerrain(List<GraphOutputInfo> outputs){
                 GraphOutputInfo Find(string name) => outputs.FirstOrDefault(o => o.Name == name);
@@ -415,15 +417,23 @@ namespace Engine.Scripts.WorldGen.Graph{
                 GraphOutputInfo factor = Find(GraphOutputs.Factor);
                 if (factor != null && !(factor.Bounds.Min > 0f))
                     Error(null, $"Output \"{GraphOutputs.Factor}\" must stay above 0; its bound is {factor.Bounds}.");
-                GraphOutputInfo surface = Find(GraphOutputs.PreliminarySurface);
-                if (surface != null && !(surface.Bounds.Max <= GraphOutputs.PreliminarySurfaceLimit))
-                    Error(null, $"Output \"{GraphOutputs.PreliminarySurface}\" reaches {surface.Bounds.Max:0.###}; it must stay at or below y {GraphLimits.WorldHeight - 1}.");
                 GraphOutputInfo noise = Find(GraphOutputs.TerrainNoise);
                 if (noise != null && !noise.BoundOnly) Error(null, $"Output \"{GraphOutputs.TerrainNoise}\" must be bound-only.");
                 GraphOutputInfo slide = Find(GraphOutputs.TopSlideStart);
                 if (slide != null && (!slide.BoundOnly || slide.Bounds.Min != slide.Bounds.Max || !(slide.Bounds.Min >= 0f) ||
                                       !(slide.Bounds.Max <= GraphLimits.WorldHeight)))
                     Error(null, $"Output \"{GraphOutputs.TopSlideStart}\" must be a bound-only constant between 0 and {GraphLimits.WorldHeight}.");
+                // The generation top (AD-45): the slide's end, under the world's top voxel, and preliminary_surface
+                // under it, so the ranges' solid-below shortcut never reaches past the top (W2-DEN-04).
+                GraphOutputInfo end = Find(GraphOutputs.TopSlideEnd);
+                bool endValid = end != null && end.BoundOnly && end.Bounds.Min == end.Bounds.Max && end.Bounds.Max <= GraphLimits.WorldHeight - 1 &&
+                                (slide == null || end.Bounds.Min >= slide.Bounds.Max);
+                if (end != null && !endValid)
+                    Error(null, $"Output \"{GraphOutputs.TopSlideEnd}\" must be a bound-only constant between \"{GraphOutputs.TopSlideStart}\" and {GraphLimits.WorldHeight - 1}.");
+                GraphOutputInfo surface = Find(GraphOutputs.PreliminarySurface);
+                if (surface != null && endValid && !(surface.Bounds.Max <= end.Bounds.Max + GraphOutputs.PreliminarySurfaceMargin))
+                    Error(null, $"Output \"{GraphOutputs.PreliminarySurface}\" reaches {surface.Bounds.Max:0.###}; it must stay at or below the generation top, " +
+                                $"y {end.Bounds.Max:0.###} (\"{GraphOutputs.TopSlideEnd}\").");
             }
 
             private int LatticeSlot(int f){

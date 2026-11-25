@@ -235,10 +235,13 @@ namespace Engine.Editor.WorldGen{
             GraphCompileResult compile = _graphCompile ?? ShippedNoiseGraph.Compile();
             if (compile.Graph == null || _layout == null || !_layoutData.IsCreated) return "The graph or the layout does not compile.";
             List<string> parts = new();
+            WorldReportOptions options = new(){
+                WaterLevel = WorldGenSettings ? WorldGenSettings.WaterLevel : global::Engine.Scripts.WorldGen.Settings.WorldGenSettings.DefaultWaterLevel
+            };
             try{
                 foreach (uint seed in BiomeWorldReport.Seeds){
                     if (EditorUtility.DisplayCancelableProgressBar("World report", $"seed {seed}", parts.Count / (float)BiomeWorldReport.Seeds.Length)) break;
-                    parts.Add(BiomeWorldReport.Text(BiomeWorldReport.Run(compile.Graph, _layout, _layoutData, seed), "preview"));
+                    parts.Add(BiomeWorldReport.Text(BiomeWorldReport.Run(compile.Graph, _layout, _layoutData, seed, options), "preview"));
                 }
             }
             finally{

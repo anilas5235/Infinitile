@@ -75,9 +75,9 @@ namespace Engine.Tests.EditMode{
         public void AddVoxels_ARunOverTheTopOfAColumn_MarksTheTopAndTheBottom(){
             ChunkVoxelData data = new(8);
             try{
-                data.AddVoxels(TestFixtures.Air, 250);
-                data.AddVoxels(TestFixtures.Stone, 20); // y 250 to 255 of column 0, then y 0 to 13 of column 1
-                Assert.AreEqual(0b1000_0001u, data.OccupiedPartitions);
+                data.AddVoxels(TestFixtures.Air, ChunkHeight - 6);
+                data.AddVoxels(TestFixtures.Stone, 20); // the top 6 voxels of column 0, then y 0 to 13 of column 1
+                Assert.AreEqual(1u << (PartitionsPerChunk - 1) | 1u, data.OccupiedPartitions);
             }
             finally{
                 data.Dispose();

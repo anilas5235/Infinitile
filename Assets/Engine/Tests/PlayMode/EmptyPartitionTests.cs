@@ -182,6 +182,54 @@ namespace Engine.Tests.PlayMode{
         }
 
         /// <summary>
+        ///     DEC-232: the pool's column masks, which let the scans skip a finished column in one test, agree with
+        ///     the per-partition state: a set active bit is an active partition, a set collidable bit a collidable one,
+        ///     through claims, bakes, a moved window and a reclaimed chunk.
+        /// </summary>
+        [UnityTest]
+        [Timeout(120000)]
+        public IEnumerator ColumnMasks_FollowThePartitions(){
+            using MeshRig rig = new(PartitionHeight);
+            PriorityUtil.Focus focus = rig.FocusAt(1);
+            yield return rig.MeshUntilAsleep(focus);
+            AssertMasks(rig, "after meshing");
+            yield return rig.BakeUntilAsleep(focus);
+            AssertMasks(rig, "after the bake");
+            Assert.AreEqual(0b1111u, rig.Pool.ActivePartitionMask(int2.zero), "the window's four layers");
+            Assert.AreEqual(0b1111u, rig.Pool.CollidablePartitionMask(int2.zero), "all four collidable");
+
+            focus = rig.FocusAt(PartitionsPerChunk - 2);
+            yield return rig.MeshUntilAsleep(focus);
+            AssertMasks(rig, "after the window moved up");
+
+            Assert.IsTrue(rig.Pool.TryReclaimChunk(int2.zero));
+            Assert.AreEqual(0u, rig.Pool.ActivePartitionMask(int2.zero), "a reclaimed chunk has no active partition");
+            AssertMasks(rig, "after a reclaim");
+
+            focus = rig.FocusAt(1);
+            yield return rig.MeshUntilAsleep(focus);
+            yield return rig.BakeUntilAsleep(focus);
+            AssertMasks(rig, "after meshing the reclaimed chunk again");
+            Assert.AreEqual(0b1111u, rig.Pool.ActivePartitionMask(int2.zero) & 0b1111u, "the reclaimed column is active again");
+        }
+
+        private static void AssertMasks(MeshRig rig, string when){
+            for (int x = -Grid; x <= Grid; x++)
+            for (int z = -Grid; z <= Grid; z++){
+                uint active = rig.Pool.ActivePartitionMask(new int2(x, z));
+                uint collidable = rig.Pool.CollidablePartitionMask(new int2(x, z));
+                Assert.AreEqual(0u, collidable & ~active, $"{when}: ({x}, {z}) collidable bits only on active partitions");
+                for (int y = 0; y < PartitionsPerChunk; y++){
+                    int3 pos = new(x, y, z);
+                    Assert.AreEqual(rig.Pool.IsPartitionActive(pos), (active & (1u << y)) != 0, $"{when}: {pos} active bit");
+                    if ((collidable & (1u << y)) != 0) Assert.IsTrue(rig.Pool.IsCollidable(pos), $"{when}: {pos} collidable bit");
+                    else if (rig.Pool.IsPartitionActive(pos))
+                        Assert.IsFalse(rig.Pool.IsCollidable(pos), $"{when}: {pos} is collidable without its bit");
+                }
+            }
+        }
+
+        /// <summary>
         ///     A budget of <paramref name="items" /> items of work per frame: its clock counts the items it is asked
         ///     for instead of the time, so a test with it does not depend on the machine.
         /// </summary>
@@ -239,7 +287,7 @@ namespace Engine.Tests.PlayMode{
             Assert.Greater(waiting.Count, 1, "the cut dispatch holds more partitions without a voxel");
             int3[] left = waiting.GetRange(1, waiting.Count - 1).ToArray();
 
-            focus = rig.FocusAt(6); // the window holds the partitions 4 to 7 now, all of them air
+            focus = rig.FocusAt(PartitionsPerChunk - 2); // the window holds the top four partitions now, all of them air
             yield return rig.MeshUntilAsleep(focus, budget);
 
             foreach (int3 pos in left) Assert.IsFalse(rig.Pool.IsPartitionActive(pos), $"{pos} left the draw window");

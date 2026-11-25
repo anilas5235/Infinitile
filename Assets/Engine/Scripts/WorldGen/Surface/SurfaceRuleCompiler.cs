@@ -555,7 +555,7 @@ namespace Engine.Scripts.WorldGen.Surface{
                 GraphOutputInfo surface = _graph?.Output(GraphOutputs.PreliminarySurface);
                 GraphOutputInfo temperature = _graph?.Output(GraphOutputs.Temperature);
                 if (surface == null || temperature == null) return;
-                int top = (int)math.min(255f, math.floor(surface.Bounds.Max));
+                int top = (int)math.min(GraphLimits.WorldHeight - 1, math.floor(surface.Bounds.Max));
                 SurfaceRules probe = Climate();
                 foreach (LayoutBiome b in layout.Biomes){
                     if (b.Asset == null || !b.Asset.NeverSnows) continue;

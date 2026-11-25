@@ -6,6 +6,7 @@ using System.Text;
 using Engine.Scripts.WorldGen.Biomes;
 using Engine.Scripts.WorldGen.Density;
 using Engine.Scripts.WorldGen.Graph;
+using Engine.Scripts.WorldGen.Settings;
 using Engine.Scripts.WorldGen.Surface;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -14,6 +15,9 @@ namespace Engine.Editor.WorldGen{
     /// <summary>The river measures of one seed (§9.2, phase V5).</summary>
     public sealed class RiverReportSeed{
         public uint Seed;
+
+        /// <summary>The water level the wetness test and the tour heights read (AD-40).</summary>
+        public int WaterLevel = WorldGenSettings.DefaultWaterLevel;
 
         /// <summary>Along-line distances between neighbouring river crossings (blocks), as the offline 553 was measured.</summary>
         public readonly List<float> Spacing = new();
@@ -67,8 +71,8 @@ namespace Engine.Editor.WorldGen{
         /// <summary>A wet run longer than this is open water (sea or a lake), not the river's own width.</summary>
         public const int OpenWater = 512;
 
-        public static RiverReportSeed Run(CompiledNoiseGraph graph, in BiomeLayoutData data, uint seed){
-            RiverReportSeed r = new(){ Seed = seed };
+        public static RiverReportSeed Run(CompiledNoiseGraph graph, in BiomeLayoutData data, uint seed, int waterLevel = WorldGenSettings.DefaultWaterLevel){
+            RiverReportSeed r = new(){ Seed = seed, WaterLevel = waterLevel };
             int riverSlot = graph.Output(SurfaceRuleSet.RiverOutput).LatticeValue, wSlot = graph.Output("weirdness").LatticeValue,
                 cSlot = graph.Output("continentalness").LatticeValue, sSlot = graph.Output("preliminary_surface").LatticeValue;
             float2[] points = new float2[2 * Length];
@@ -96,7 +100,7 @@ namespace Engine.Editor.WorldGen{
                     surface[i] = lattice[sSlot * n + i];
                 }
 
-                using (BiomeColumns columns = BiomeColumnSampler.Sample(graph, data, seed, main))
+                using (BiomeColumns columns = BiomeColumnSampler.Sample(graph, data, seed, main, waterLevel: waterLevel))
                     for (int i = 0; i < Length; i++)
                         wet[i] = columns.Wet[i];
                 Line(r, main, w, w1, river, c, surface, wet);
@@ -144,7 +148,7 @@ namespace Engine.Editor.WorldGen{
 
                         r.GorgeDepth.Add(math.max(0f, math.min(left, right) - surface[k]));
                         if (r.Tour.Count(t => t.What.StartsWith("dry gorge", StringComparison.Ordinal)) < 3)
-                            r.Tour.Add(Spot(Invariant($"dry gorge (river {river[k]:0.00}, surface {surface[k]:0})"), p[k], surface[k]));
+                            r.Tour.Add(Spot(r.WaterLevel, Invariant($"dry gorge (river {river[k]:0.00}, surface {surface[k]:0})"), p[k], surface[k]));
                     }
 
                     continue;
@@ -175,7 +179,7 @@ namespace Engine.Editor.WorldGen{
                 if (m < 0){
                     r.DryCrossings++;
                     if (r.Tour.Count(t => t.What.StartsWith("dry river", StringComparison.Ordinal)) < 3)
-                        r.Tour.Add(Spot("dry river crossing (gorge or end)", p[k], surface[k]));
+                        r.Tour.Add(Spot(r.WaterLevel, "dry river crossing (gorge or end)", p[k], surface[k]));
                     continue;
                 }
 
@@ -187,23 +191,23 @@ namespace Engine.Editor.WorldGen{
                 if (a == 0 || b + 1 == n || run > OpenWater){
                     r.OpenWaterCrossings++;
                     if (r.Tour.Count(t => t.What.StartsWith("river joins", StringComparison.Ordinal)) < 2)
-                        r.Tour.Add(Spot("river joins open water", p[k], surface[k]));
+                        r.Tour.Add(Spot(r.WaterLevel, "river joins open water", p[k], surface[k]));
                     continue;
                 }
 
                 float width = run * factor;
                 r.WetWidth.Add(width);
                 if (width >= 60f && r.Tour.Count(t => t.What.StartsWith("wide river", StringComparison.Ordinal)) < 3)
-                    r.Tour.Add(Spot(Invariant($"wide river ({width:0} blocks)"), p[k], surface[k]));
+                    r.Tour.Add(Spot(r.WaterLevel, Invariant($"wide river ({width:0} blocks)"), p[k], surface[k]));
                 else if (width >= 15f && width <= 25f && r.Tour.Count(t => t.What.StartsWith("typical river", StringComparison.Ordinal)) < 3)
-                    r.Tour.Add(Spot(Invariant($"typical river ({width:0} blocks)"), p[k], surface[k]));
+                    r.Tour.Add(Spot(r.WaterLevel, Invariant($"typical river ({width:0} blocks)"), p[k], surface[k]));
                 else if (width <= 8f && r.Tour.Count(t => t.What.StartsWith("narrow river", StringComparison.Ordinal)) < 2)
-                    r.Tour.Add(Spot(Invariant($"narrow river ({width:0} blocks)"), p[k], surface[k]));
+                    r.Tour.Add(Spot(r.WaterLevel, Invariant($"narrow river ({width:0} blocks)"), p[k], surface[k]));
             }
         }
 
-        private static TourSpot Spot(string what, float2 p, float surface){
-            return new TourSpot{ What = what, X = (int)p.x, Z = (int)p.y, Y = (int)math.max(DensityLayout.WetnessY + 1, surface) + 24 };
+        private static TourSpot Spot(int waterLevel, string what, float2 p, float surface){
+            return new TourSpot{ What = what, X = (int)p.x, Z = (int)p.y, Y = (int)math.max(waterLevel, surface) + 24 };
         }
 
         private static string Invariant(FormattableString s){

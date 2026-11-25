@@ -114,23 +114,41 @@ namespace Engine.Scripts.Jobs.Chunk{
         ///     The runs go into a Temp list first and are then copied into a list of their exact size: a fixed
         ///     reservation would hold hundreds of KiB per loaded chunk, far more than the runs of a generated chunk.
         /// </summary>
-        internal static void WriteToChunkData(NativeArray<ushort> vox, out ChunkVoxelData data){
+        /// <param name="airFrom">
+        ///     The layer from which on every voxel of <paramref name="vox" /> is air: those layers are added as runs of
+        ///     air without reading them (DEC-232; the density generator's chunks end below the build height).
+        /// </param>
+        internal static void WriteToChunkData(NativeArray<ushort> vox, out ChunkVoxelData data, int airFrom = ChunkHeight){
             UnsafeIntervalList<ushort> runs = new(TempRunCapacity, Allocator.Temp);
             ushort last = 0;
             int run = 0;
             bool hasLast = false;
+            int read = math.clamp(airFrom, 0, ChunkSize.y);
+            int air = ChunkSize.y - read;
             for (int x = 0; x < ChunkSize.x; x++)
-            for (int z = 0; z < ChunkSize.z; z++)
-            for (int y = 0; y < ChunkSize.y; y++){
-                ushort voxelId = vox[ChunkSize.Flatten(x, y, z)];
-                if (hasLast && voxelId == last)
-                    run++;
-                else{
-                    if (hasLast) runs.AddInterval(last, run);
-                    last = voxelId;
-                    run = 1;
-                    hasLast = true;
+            for (int z = 0; z < ChunkSize.z; z++){
+                for (int y = 0; y < read; y++){
+                    ushort voxelId = vox[ChunkSize.Flatten(x, y, z)];
+                    if (hasLast && voxelId == last)
+                        run++;
+                    else{
+                        if (hasLast) runs.AddInterval(last, run);
+                        last = voxelId;
+                        run = 1;
+                        hasLast = true;
+                    }
                 }
+
+                if (air == 0) continue;
+                if (hasLast && last == 0){
+                    run += air;
+                    continue;
+                }
+
+                if (hasLast) runs.AddInterval(last, run);
+                last = 0;
+                run = air;
+                hasLast = true;
             }
 
             if (hasLast && run > 0) runs.AddInterval(last, run);

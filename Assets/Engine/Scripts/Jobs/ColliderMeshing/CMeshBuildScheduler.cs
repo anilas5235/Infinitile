@@ -316,7 +316,8 @@ namespace Engine.Scripts.Jobs.ColliderMeshing{
         private void MarkCollidableWithoutCollider(int3 pos, ChunkPartition partition){
             _chunkPool.ColliderBaked(pos);
             _chunkManager.ReCollidedPartition(pos);
-            partition.ApplyColliderMesh(); // an empty mesh removes the collider
+            // An empty mesh removes the collider; a clear partition has none to remove (DEC-232)
+            if (!partition.IsClear) partition.ApplyColliderMesh();
         }
 
         /// <summary>

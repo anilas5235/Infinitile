@@ -212,11 +212,14 @@ namespace Engine.Scripts.WorldGen.Graph{
         private void RunCorners<TPrograms>(TPrograms programs, in GraphCode code, int programIndex, int cellHeight, float* lattice, float* corners, float* registers, float* scratch,
             int lx, int lz, ref GraphWorkCounters counters) where TPrograms : struct, IGraphPrograms{
             GraphProgram program = code.Programs[programIndex];
-            int lanes = GraphLimits.WorldHeight / cellHeight + 1;
-            int padded = (lanes + 3) & ~3;
-            for (int i = 0; i < padded; i++) registers[Lanes + i] = math.min(i, lanes - 1) * cellHeight;
+            int layers = GraphLimits.WorldHeight / cellHeight + 1;
             for (int z = 0; z < lz; z++)
-            for (int x = 0; x < lx; x++){
+            for (int x = 0; x < lx; x++)
+                // Slices of at most Lanes layers (AD-44): a cell-4 marker over the full height has more layers than lanes.
+            for (int first = 0; first < layers; first += Lanes){
+                int lanes = math.min(Lanes, layers - first);
+                int padded = (lanes + 3) & ~3;
+                for (int i = 0; i < padded; i++) registers[Lanes + i] = (first + math.min(i, lanes - 1)) * cellHeight;
                 Fill(registers, Origin.x + 4 * x, padded);
                 Fill(registers + 2 * Lanes, Origin.y + 4 * z, padded);
                 for (int i = 0; i < program.InputCount; i++){
@@ -228,7 +231,7 @@ namespace Engine.Scripts.WorldGen.Graph{
                 for (int o = 0; o < program.OutputCount; o++){
                     GraphSlot s = code.Slots[program.OutputStart + o];
                     float* row = registers + s.Register * Lanes;
-                    float* to = corners + ((s.Slot * lz + z) * lx + x) * GraphInterpolation.CornerStride;
+                    float* to = corners + ((s.Slot * lz + z) * lx + x) * GraphInterpolation.CornerStride + first;
                     for (int i = 0; i < lanes; i++) to[i] = row[i];
                 }
 

@@ -25,6 +25,9 @@ namespace Engine.Scripts.WorldGen.Density{
         /// <summary>Below this y the top slide leaves the density unchanged.</summary>
         public float SlideStart;
 
+        /// <summary>The generation top (top_slide_end, AD-45): above it every voxel is air.</summary>
+        public float SlideEnd;
+
         /// <summary>
         ///     Lattice slots of the five climate parameters the biome boxes bound (T, F, C, E, W in
         ///     <see cref="Engine.Scripts.WorldGen.Biomes.BiomeBox" /> order), −1 for a parameter the graph lacks (it reads 0).
@@ -55,7 +58,8 @@ namespace Engine.Scripts.WorldGen.Density{
             GraphOutputInfo factor = graph.Output(GraphOutputs.Factor);
             GraphOutputInfo noise = graph.Output(GraphOutputs.TerrainNoise);
             GraphOutputInfo slide = graph.Output(GraphOutputs.TopSlideStart);
-            if (density == null || surface == null || factor == null || noise == null || slide == null){
+            GraphOutputInfo end = graph.Output(GraphOutputs.TopSlideEnd);
+            if (density == null || surface == null || factor == null || noise == null || slide == null || end == null){
                 error = $"The graph has no terrain: it needs the outputs {string.Join(", ", GraphOutputs.Terrain)}.";
                 return false;
             }
@@ -76,6 +80,7 @@ namespace Engine.Scripts.WorldGen.Density{
                 CornerProgram = cellHeight == 4 ? d.CornerProgram4 : d.CornerProgram8,
                 NoiseBound = math.max(math.abs(noise.Bounds.Min), math.abs(noise.Bounds.Max)),
                 SlideStart = slide.Bounds.Min,
+                SlideEnd = end.Bounds.Max,
                 ClimateA = new int4(Slot(graph, GraphOutputs.Temperature), Slot(graph, GraphOutputs.Humidity), Slot(graph, GraphOutputs.Continentalness),
                     Slot(graph, GraphOutputs.Erosion)),
                 ClimateW = Slot(graph, GraphOutputs.Weirdness),

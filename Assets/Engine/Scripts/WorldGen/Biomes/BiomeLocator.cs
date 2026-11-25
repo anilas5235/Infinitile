@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Engine.Scripts.WorldGen.Graph;
+using Engine.Scripts.WorldGen.Settings;
 using Unity.Collections;
 using Unity.Mathematics;
 
@@ -9,7 +10,8 @@ namespace Engine.Scripts.WorldGen.Biomes{
     /// <summary>
     ///     Finds places from the 2D program and the biome lookup without generating chunks (§13.6, DEC-160): the nearest
     ///     column of a biome, the nearest river water, and the highest peak nearby. Searches square rings on a 16-block grid outwards, then
-    ///     refines on the 4-block lattice, where <see cref="BiomeColumnSampler" /> gives the chunk's own values.
+    ///     refines on the 4-block lattice, where <see cref="BiomeColumnSampler" /> gives the chunk's own values. Pass the
+    ///     world's water level so the wetness test runs where the chunks run it (AD-40).
     /// </summary>
     public static class BiomeLocator{
         /// <summary>The coarse search grid, and how far the biome search goes.</summary>
@@ -32,15 +34,16 @@ namespace Engine.Scripts.WorldGen.Biomes{
         ///     <see cref="MaxBiomeRadius" />, with its top terrain voxel; false when none is found.
         /// </summary>
         public static bool FindBiome(CompiledNoiseGraph graph, in BiomeLayoutData layout, uint seed, int2 from, byte biome, out int2 at, out int top,
-            out bool wet){
-            return FindNearest(graph, layout, seed, from, (c, i) => c.Biome[i] == biome, out at, out top, out wet);
+            out bool wet, int waterLevel = WorldGenSettings.DefaultWaterLevel){
+            return FindNearest(graph, layout, seed, from, (c, i) => c.Biome[i] == biome, out at, out top, out wet, waterLevel);
         }
 
         /// <summary>
         ///     The nearest wet column with a river weight of at least <see cref="RiverMin" /> (§9.2) within
         ///     <see cref="MaxBiomeRadius" />; false when none is found or the graph has no river output.
         /// </summary>
-        public static bool FindRiver(CompiledNoiseGraph graph, in BiomeLayoutData layout, uint seed, int2 from, out int2 at, out int top, out bool wet){
+        public static bool FindRiver(CompiledNoiseGraph graph, in BiomeLayoutData layout, uint seed, int2 from, out int2 at, out int top, out bool wet,
+            int waterLevel = WorldGenSettings.DefaultWaterLevel){
             if (graph.Output(GraphOutputs.River) is not{ BoundOnly: false, LatticeValue: >= 0 }){
                 at = default;
                 top = -1;
@@ -48,12 +51,12 @@ namespace Engine.Scripts.WorldGen.Biomes{
                 return false;
             }
 
-            return FindNearest(graph, layout, seed, from, (c, i) => c.River[i] >= RiverMin && c.Wet[i] != 0, out at, out top, out wet);
+            return FindNearest(graph, layout, seed, from, (c, i) => c.River[i] >= RiverMin && c.Wet[i] != 0, out at, out top, out wet, waterLevel);
         }
 
         /// <summary>The column nearest to <paramref name="from" /> that <paramref name="match" /> accepts.</summary>
         private static bool FindNearest(CompiledNoiseGraph graph, in BiomeLayoutData layout, uint seed, int2 from, Func<BiomeColumns, int, bool> match,
-            out int2 at, out int top, out bool wet){
+            out int2 at, out int top, out bool wet, int waterLevel){
             at = default;
             top = -1;
             wet = false;
@@ -67,7 +70,7 @@ namespace Engine.Scripts.WorldGen.Biomes{
                 if (found && first * Step > bestDistance + Step) break;
                 List<float2> points = new();
                 for (int k = first; k < first + RingsPerRound && k <= rings; k++) Ring(origin, k, points);
-                using BiomeColumns c = BiomeColumnSampler.Sample(graph, layout, seed, points.ToArray());
+                using BiomeColumns c = BiomeColumnSampler.Sample(graph, layout, seed, points.ToArray(), waterLevel: waterLevel);
                 for (int i = 0; i < points.Count; i++){
                     if (!match(c, i)) continue;
                     float d = math.distance(points[i], from);
@@ -85,7 +88,7 @@ namespace Engine.Scripts.WorldGen.Biomes{
             for (int dz = -Step; dz <= Step; dz += 4)
             for (int dx = -Step; dx <= Step; dx += 4)
                 fine.Add(best + new int2(dx, dz));
-            using BiomeColumns f = BiomeColumnSampler.Sample(graph, layout, seed, fine.ToArray());
+            using BiomeColumns f = BiomeColumnSampler.Sample(graph, layout, seed, fine.ToArray(), waterLevel: waterLevel);
             float fineDistance = float.MaxValue;
             int pick = -1;
             for (int i = 0; i < fine.Count; i++){
@@ -98,19 +101,20 @@ namespace Engine.Scripts.WorldGen.Biomes{
             }
 
             at = pick >= 0 ? (int2)fine[pick] : best;
-            Top(graph, layout, seed, at, out top, out wet);
+            Top(graph, layout, seed, at, out top, out wet, waterLevel);
             return true;
         }
 
         /// <summary>The highest top terrain voxel within <see cref="PeakRadius" /> of <paramref name="from" />.</summary>
-        public static bool FindPeak(CompiledNoiseGraph graph, in BiomeLayoutData layout, uint seed, int2 from, out int2 at, out int top){
+        public static bool FindPeak(CompiledNoiseGraph graph, in BiomeLayoutData layout, uint seed, int2 from, out int2 at, out int top,
+            int waterLevel = WorldGenSettings.DefaultWaterLevel){
             int2 origin = (int2)math.floor((float2)from / Step) * Step;
             List<float2> points = new();
             for (int dz = -PeakRadius; dz <= PeakRadius; dz += Step)
             for (int dx = -PeakRadius; dx <= PeakRadius; dx += Step)
                 if (dx * dx + dz * dz <= PeakRadius * PeakRadius)
                     points.Add(origin + new int2(dx, dz));
-            using BiomeColumns c = BiomeColumnSampler.Sample(graph, layout, seed, points.ToArray());
+            using BiomeColumns c = BiomeColumnSampler.Sample(graph, layout, seed, points.ToArray(), waterLevel: waterLevel);
 
             // The preliminary surface picks the candidates, the terrain program decides among them on the lattice.
             List<int> candidates = Enumerable.Range(0, points.Count).OrderByDescending(i => c.Surface[i]).Take(24).ToList();
@@ -119,7 +123,7 @@ namespace Engine.Scripts.WorldGen.Biomes{
                 for (int dz = -Step; dz <= Step; dz += 4)
                 for (int dx = -Step; dx <= Step; dx += 4)
                     fine.Add(points[i] + new float2(dx, dz));
-            using BiomeColumns f = BiomeColumnSampler.Sample(graph, layout, seed, fine.ToArray(), true);
+            using BiomeColumns f = BiomeColumnSampler.Sample(graph, layout, seed, fine.ToArray(), true, waterLevel: waterLevel);
             int pick = 0;
             for (int i = 1; i < fine.Count; i++)
                 if (f.Top[i] > f.Top[pick])
@@ -130,8 +134,9 @@ namespace Engine.Scripts.WorldGen.Biomes{
         }
 
         /// <summary>The top terrain voxel and the wet flag of one column.</summary>
-        public static void Top(CompiledNoiseGraph graph, in BiomeLayoutData layout, uint seed, int2 at, out int top, out bool wet){
-            using BiomeColumns c = BiomeColumnSampler.Sample(graph, layout, seed, new[]{ (float2)at }, true);
+        public static void Top(CompiledNoiseGraph graph, in BiomeLayoutData layout, uint seed, int2 at, out int top, out bool wet,
+            int waterLevel = WorldGenSettings.DefaultWaterLevel){
+            using BiomeColumns c = BiomeColumnSampler.Sample(graph, layout, seed, new[]{ (float2)at }, true, waterLevel: waterLevel);
             top = c.Top[0];
             wet = c.Wet[0] != 0;
         }

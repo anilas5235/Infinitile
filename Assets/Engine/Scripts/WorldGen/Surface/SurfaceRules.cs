@@ -121,7 +121,7 @@ namespace Engine.Scripts.WorldGen.Surface{
         /// </summary>
         public const byte AbovePreliminary = 3;
 
-        /// <summary>The lowest y where T − L · max(0, y − lapseFrom) + output[Output] &lt; A (256 for none).</summary>
+        /// <summary>The lowest y where T − L · max(0, y − lapseFrom) + output[Output] &lt; A (the chunk height for none).</summary>
         public const byte Cold = 4;
 
         /// <summary>ceil(max(treeLineFloor, lapseFrom + (T − T_tree) / L) + output[Output]).</summary>
@@ -225,15 +225,19 @@ namespace Engine.Scripts.WorldGen.Surface{
             return temperature - Lapse * math.max(0f, y - LapseFrom) + wobble < limit;
         }
 
-        /// <summary>The lowest y in 0 … 256 that is cold (<see cref="ColdAt" />); 256 when none is.</summary>
+        /// <summary>
+        ///     The lowest y in 0 … <see cref="Utils.VoxelConstants.ChunkHeight" /> that is cold (<see cref="ColdAt" />);
+        ///     the chunk height when none is (W2-HGT-01).
+        /// </summary>
         public readonly int ColdThreshold(float temperature, float wobble, float limit){
+            const int none = Utils.VoxelConstants.ChunkHeight;
             if (ColdAt(0, temperature, wobble, limit)) return 0;
-            if (!(Lapse > 0f)) return 256;
+            if (!(Lapse > 0f)) return none;
             float guess = LapseFrom + (temperature + wobble - limit) / Lapse;
-            int y = (int)math.clamp(math.floor(guess) + 1f, 0f, 256f);
+            int y = (int)math.clamp(math.floor(guess) + 1f, 0f, none);
             // The formula is exact up to rounding; step to the first cold y with the test itself.
             while (y > 0 && ColdAt(y - 1, temperature, wobble, limit)) y--;
-            while (y < 256 && !ColdAt(y, temperature, wobble, limit)) y++;
+            while (y < none && !ColdAt(y, temperature, wobble, limit)) y++;
             return y;
         }
 

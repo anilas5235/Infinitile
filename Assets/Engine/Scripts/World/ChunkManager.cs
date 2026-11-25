@@ -23,9 +23,9 @@ namespace Engine.Scripts.World{
     public class ChunkManager{
         private readonly int _chunkStoreSize;
         private readonly Dictionary<int2, Chunk> _chunks;
-        private readonly HashSet<int3> _reCollidePartitions;
+        private readonly PartitionSet _reCollidePartitions;
 
-        private readonly HashSet<int3> _reMeshPartitions;
+        private readonly PartitionSet _reMeshPartitions;
         private readonly SimpleFastPriorityQueue<int2, float> _unloadingQueue;
         private readonly Stack<Chunk> _chunkObjectPool; // unloaded chunk objects are reused
         internal Action<Chunk> OnChunkChange;
@@ -69,8 +69,8 @@ namespace Engine.Scripts.World{
 
             // Sized for every loaded chunk; re-lit chunks flag partitions up to the load ring
             int reMeshCapacity = _chunkStoreSize * PartitionsPerChunk;
-            _reMeshPartitions = new HashSet<int3>(reMeshCapacity);
-            _reCollidePartitions = new HashSet<int3>(reMeshCapacity);
+            _reMeshPartitions = new PartitionSet(reMeshCapacity, _chunkStoreSize);
+            _reCollidePartitions = new PartitionSet(reMeshCapacity, _chunkStoreSize);
 
             _chunks = new Dictionary<int2, Chunk>(_chunkStoreSize);
             _unloadingQueue = new SimpleFastPriorityQueue<int2, float>();
@@ -103,6 +103,16 @@ namespace Engine.Scripts.World{
         /// </summary>
         internal bool ShouldReCollide(int3 position){
             return _reCollidePartitions.Contains(position);
+        }
+
+        /// <summary>Whether a partition of the chunk column is flagged for remeshing (one lookup, DEC-232).</summary>
+        internal bool ColumnHasReMesh(int2 column){
+            return _reMeshPartitions.AnyInColumn(column);
+        }
+
+        /// <summary>Whether a partition of the chunk column needs a collider rebuild (one lookup, DEC-232).</summary>
+        internal bool ColumnHasReCollide(int2 column){
+            return _reCollidePartitions.AnyInColumn(column);
         }
 
         /// <summary>
@@ -366,7 +376,6 @@ namespace Engine.Scripts.World{
         ///     Callback after collider bake completes: remove flag.
         /// </summary>
         internal void ReCollidedPartition(int3 position){
-            if (!_reCollidePartitions.Contains(position)) return;
             _reCollidePartitions.Remove(position);
         }
 
