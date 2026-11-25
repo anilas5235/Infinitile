@@ -213,6 +213,7 @@ td > a:only-child{white-space:nowrap}
 <tr><td><a href="#GAME-33">GAME-33</a></td><td>Torch placement sound and particles</td><td>Feel</td><td>normal</td><td><span class="nw">GAME-50</span></td><td>later</td></tr>
 <tr><td><a href="#GAME-34">GAME-34</a></td><td>Wind sway for grass and leaves</td><td>Feel</td><td>normal</td><td>leaf rendering fix (in focus)</td><td>later</td></tr>
 <tr><td><a href="#GAME-35">GAME-35</a></td><td>Inventory slot hover animation (optional)</td><td>Feel</td><td>normal</td><td>—</td><td>later</td></tr>
+<tr><td><a href="#GAME-36">GAME-36</a></td><td>Texture variants for blocks</td><td>Feel</td><td>normal</td><td>—</td><td>later</td></tr>
 <tr><td><a href="#GAME-40">GAME-40</a></td><td>UI dark/light mode</td><td>UI</td><td>normal</td><td>—</td><td>later</td></tr>
 <tr><td><a href="#GAME-41">GAME-41</a></td><td>Version number in the menus</td><td>UI</td><td>normal</td><td>—</td><td>later</td></tr>
 <tr><td><a href="#GAME-42">GAME-42</a></td><td>Controls page in settings</td><td>UI</td><td>normal</td><td><span class="nw">GAME-60</span></td><td>later</td></tr>
@@ -890,6 +891,17 @@ Autosave / quit / region leaves cache ──► snapshot dirty loaded kept chunk
 <dt>Depends on</dt><dd>— (gamepad focus should animate the same as mouse hover, GAME-60).</dd>
 <dt>Open picks</dt><dd>Which animation; hotbar too or not.</dd>
 <dt>Cost</dt><dd>Animate transforms (scale, translate), not layout properties, so no relayout per frame.</dd>
+</dl>
+</div>
+
+<div class="item" id="GAME-36">
+<h3><span class="id">GAME-36</span>Texture variants for blocks <span class="st">LATER</span></h3>
+<dl class="f">
+<dt>What</dt><dd>A block face can show one of several textures instead of always the same tile, so large areas of one block (grass, dirt, sand, stone, moss, litter, snow) do not show a repeating grid. Each block lists a few variant tiles, optionally with weights. A hash of the block's world position picks the variant (the same block always looks the same and the world stays deterministic). Two cheap forms come first, then real variants: <ul class="tight"><li>rotate or mirror the one tile per block (no new art; not for tiles with a direction, such as grass sides or logs),</li><li>separate variant tiles: the variants sit as neighbouring layers of the texture array, so the shader adds the picked offset to the base layer.</li></ul>Variants are a look only; the voxel id does not change, so saves, the registry and the surface rules are not affected.</dd>
+<dt>Origin</dt><dd><q>wirte up vareinte textures for later</q> — owner, 2026-11-25, while the ground tiles (coarse dirt, moss, litter) were redrawn in WorldGen v2 V5 (PR #88).</dd>
+<dt>Depends on</dt><dd>— (new tiles are drawn with <code>Docs/Tools/make_tiles.py</code> in the existing style).</dd>
+<dt>Open picks</dt><dd><ul class="tight"><li>Which blocks get variants first, and how many per block (2–4).</li><li>Rotation/mirror only, separate tiles, or both.</li><li>Per face or per block (top and sides the same variant or not).</li><li>Together with a slight per-block brightness change, which the owner left open on 2026-11-18 (“not sure”, maybe later).</li><li>Data: a variant list on the voxel definition; mods can add variants to their own blocks (GAME-MOD-01).</li></ul></dd>
+<dt>Cost</dt><dd>GPU only: one hash of the block position and an add to the layer index per pixel or per face in <code>SolidVoxel</code>, <code>CutoutVoxel</code> and <code>TransparentVoxel</code>; no CPU or meshing cost, and faces stay as they are. The texture array grows by the extra tiles (128 × 128 each, about 85 kB with mipmaps at 32 bits). Biome tint, AO and the light must read the same block as today. The item icons keep the base tile.</dd>
 </dl>
 </div>
 
