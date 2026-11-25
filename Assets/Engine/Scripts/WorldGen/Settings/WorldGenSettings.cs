@@ -96,8 +96,11 @@ namespace Engine.Scripts.WorldGen.Settings{
         [Min(0f)]
         public float HeightSoftBand;
 
+        /// <summary>The shipped water level; also the default of the column samplers' wetness test (AD-40).</summary>
+        public const int DefaultWaterLevel = 124;
+
         [Tooltip("Water surface level in world Y. Water fills every column up to this level.")]
-        public int WaterLevel = 124;
+        public int WaterLevel = DefaultWaterLevel;
 
         [Tooltip("Voxel that fills every column up to the water level.")]
         public VoxelConfig.Data.Voxel.Voxel WaterVoxel;

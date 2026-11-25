@@ -100,7 +100,7 @@ namespace Engine.Tests.EditMode{
         [TestCase(SliceAxis.Z, -40, 70, 1, 13, 60, 180)]
         [TestCase(SliceAxis.X, -50, 32, 3, -30, 0, 255)]
         [TestCase(SliceAxis.Z, -60, 12, 7, 2, 0, 140)]
-        [TestCase(SliceAxis.X, 195, 55, 1, 430, 0, 255)]
+        [TestCase(SliceAxis.X, 195, 55, 1, 430, 0, ChunkHeight - 1)]
         public void SampleSlice_EqualsChunkJob(SliceAxis axis, int start, int width, int stride, int coordinate, int yMin, int yMax){
             ushort[] slice = Slice(axis, start, width, stride, coordinate, yMin, yMax, true);
             int solid = 0;

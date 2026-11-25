@@ -381,7 +381,7 @@ namespace Engine.Tests.EditMode{
             List<Item> items = new(){
                 new Item{ Reference = Op("mul", ("a", "x"), ("b", 0.01)), Magnitude = GraphLimits.CoordinateLimit * 0.01 },
                 new Item{ Reference = Op("mul", ("a", "z"), ("b", 0.013)), Magnitude = GraphLimits.CoordinateLimit * 0.013 },
-                new Item{ Reference = Op("mul", ("a", "y"), ("b", 0.02)), Magnitude = 256 * 0.02, Is3D = true }
+                new Item{ Reference = Op("mul", ("a", "y"), ("b", 0.02)), Magnitude = GraphLimits.WorldHeight * 0.02, Is3D = true }
             };
 
             int count = random.Next(8, 36);

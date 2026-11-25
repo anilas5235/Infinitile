@@ -20,11 +20,18 @@ namespace Engine.Scripts.Utils{
 
         #region Mirrored in Shaders/Urp/VoxelGpuConstants.hlsl (GpuConstantsTests compares them)
 
-        /// <summary>Flat chunk index x * ChunkDepth * ChunkHeight + z * ChunkHeight + y, as shifts.</summary>
-        internal const int ChunkIndexShiftX = 13;
+        /// <summary>
+        ///     Flat chunk index x * ChunkDepth * ChunkHeight + z * ChunkHeight + y, as shifts (32 × 512 × 32: 14 and 9,
+        ///     the largest index 524,287).
+        /// </summary>
+        internal const int ChunkIndexShiftX = 14;
 
         /// <inheritdoc cref="ChunkIndexShiftX" />
-        internal const int ChunkIndexShiftZ = 8;
+        internal const int ChunkIndexShiftZ = 9;
+
+        // Compile-time check: the shifts must match the chunk size (a constant 256 does not convert to byte).
+        private const byte AssertShiftsMatchChunkSize =
+            1 << ChunkIndexShiftZ == ChunkHeight && 1 << ChunkIndexShiftX == ChunkDepth * ChunkHeight ? 0 : 256;
 
         /// <summary>Elements per interval store page as a shift (<see cref="Render.IntervalPages.PageSize" />).</summary>
         internal const int CompPageShift = 9;

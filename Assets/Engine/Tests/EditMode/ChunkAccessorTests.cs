@@ -64,8 +64,8 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void OutsideY_ReturnsAir(){
             Assert.AreEqual(0, Get(new int3(0, 0, 0), new int3(0, -1, 0)));
-            Assert.AreEqual(0, Get(new int3(0, 7, 0), new int3(0, 32, 0)));
-            Assert.AreEqual(0, Get(new int3(0, 0, 0), new int3(0, 256, 0)));
+            Assert.AreEqual(0, Get(new int3(0, PartitionsPerChunk - 1, 0), new int3(0, PartitionHeight, 0)));
+            Assert.AreEqual(0, Get(new int3(0, 0, 0), new int3(0, ChunkHeight, 0)));
         }
 
         [Test]
@@ -110,11 +110,11 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void InChunkBounds(){
             Assert.IsTrue(ChunkAccessor.InChunkBounds(new int3(0, 0, 0)));
-            Assert.IsTrue(ChunkAccessor.InChunkBounds(new int3(31, 255, 31)));
+            Assert.IsTrue(ChunkAccessor.InChunkBounds(new int3(31, ChunkHeight - 1, 31)));
             Assert.IsFalse(ChunkAccessor.InChunkBounds(new int3(-1, 0, 0)));
             Assert.IsFalse(ChunkAccessor.InChunkBounds(new int3(32, 0, 0)));
             Assert.IsFalse(ChunkAccessor.InChunkBounds(new int3(0, -1, 0)));
-            Assert.IsFalse(ChunkAccessor.InChunkBounds(new int3(0, 256, 0)));
+            Assert.IsFalse(ChunkAccessor.InChunkBounds(new int3(0, ChunkHeight, 0)));
             Assert.IsFalse(ChunkAccessor.InChunkBounds(new int3(0, 0, -1)));
             Assert.IsFalse(ChunkAccessor.InChunkBounds(new int3(0, 0, 32)));
         }

@@ -273,15 +273,15 @@ namespace Engine.Tests.Performance{
             }
         }
 
-        /// <summary>Collider meshes of every partition of the class's chunks, ms per chunk (all eight partitions).</summary>
+        /// <summary>Collider meshes of every partition of the class's chunks, ms per chunk (all partitions).</summary>
         [Test]
         [Performance]
         public void CMeshBuildJob_Run_Density_MsPerChunk([ValueSource(nameof(Classes))] DensityChunkClass c){
             NativeParallelHashMap<int2, ChunkVoxelData> chunks = GenerateWithRings(c);
             NativeArray<UnityEngine.Rendering.VertexAttributeDescriptor> vertexParams = CVertex.CreateLayout(Allocator.Persistent);
             VoxelEngineRenderGenData renderGenData = BenchmarkFixtures.CreateRenderGenData(Allocator.Persistent);
-            NativeList<int3> jobs = new(64, Allocator.Persistent);
-            NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult> results = new(64, Allocator.Persistent);
+            NativeList<int3> jobs = new(8 * PartitionsPerChunk, Allocator.Persistent);
+            NativeParallelHashMap<int3, CMeshBuildJob.PartitionJobResult> results = new(8 * PartitionsPerChunk, Allocator.Persistent);
             try{
                 IReadOnlyList<int2> centers = DensityFixture.Chunks(c);
                 foreach (int2 chunk in centers)

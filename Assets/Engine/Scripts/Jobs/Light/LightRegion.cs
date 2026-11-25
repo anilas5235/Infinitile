@@ -10,8 +10,9 @@ using static Engine.Scripts.Utils.VoxelConstants;
 namespace Engine.Scripts.Jobs.Light{
     /// <summary>
     ///     A full-height box of voxels for light propagation, decompressed from the chunks' interval
-    ///     lists. Column (x, z) of the box starts at <c>x · StrideX + z · 256</c>, y is innermost (the chunk
-    ///     Flatten order), so a step in y is ±1 and a y bound check is <c>index &amp; 255</c>. The outermost ring
+    ///     lists. Column (x, z) of the box starts at <c>x · StrideX + z · ChunkHeight</c>, y is innermost (the chunk
+    ///     Flatten order), so a step in y is ±1 and a y bound check is <c>index &amp; (ChunkHeight − 1)</c> (the
+    ///     height is a power of two, checked in <see cref="Engine.Scripts.Utils.VoxelConstants" />). The outermost ring
     ///     of columns is a sentinel with attenuation 15: the BFS never enters it and needs no x/z bound checks.
     ///     Used by <see cref="LightJob" /> (chunk ± 14) and <see cref="LightEditJob" /> (edit ± 16).
     /// </summary>

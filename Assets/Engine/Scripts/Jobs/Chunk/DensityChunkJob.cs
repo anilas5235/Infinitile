@@ -151,7 +151,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                 for (int x = 0; x < DensityLayout.ChunkSize; x++)
                 for (int z = 0; z < DensityLayout.ChunkSize; z++){
                     int c = x * DensityLayout.ChunkSize + z;
-                    SurfacePass.ColumnClimate(WorldGen.SurfaceRules, ref b, x, z, out float t, out int snow, out int tree, out int rise, out bool ice);
+                    SurfacePass.ColumnClimate(WorldGen.SurfaceRules, ref b, x, z, WorldGen.WaterLevel, out float t, out int snow, out int tree, out int rise, out bool ice);
                     ColumnTemperature[c] = t;
                     SnowLine[c] = (short)snow;
                     TreeLine[c] = (short)tree;
@@ -194,7 +194,7 @@ namespace Engine.Scripts.Jobs.Chunk{
             DensityPasses.Terrain(programs, terrain, code, worldGen.Seed, origin, ref b, ref counters);
             bool layout = worldGen.Layout.HasBoxes;
             if (passes < PassBiomes) return;
-            if (layout) BiomePasses.Biomes(programs, terrain, code, worldGen.Seed, origin, worldGen.Layout, ref b, ref counters);
+            if (layout) BiomePasses.Biomes(programs, terrain, code, worldGen.Seed, origin, worldGen.Layout, worldGen.WaterLevel, ref b, ref counters);
             if (passes < PassBlend) return;
             if (layout){
                 DensityPasses.ColumnOutputs(programs, terrain, code, worldGen.Seed, origin, ref b, ref counters.Graph);

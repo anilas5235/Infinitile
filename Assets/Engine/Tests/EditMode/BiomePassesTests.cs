@@ -149,7 +149,7 @@ namespace Engine.Tests.EditMode{
                 for (int x = 0; x < Size; x++)
                 for (int z = 0; z < Size; z++){
                     bool isWet = probe.PaddedWetAt(x, z);
-                    Assert.AreEqual(!probe.IsSolid(x, DensityLayout.WetnessY, z), isWet, $"chunk {chunk} column ({x}, {z})");
+                    Assert.AreEqual(!probe.IsSolid(x, DensityLayout.WetnessY(_config.WorldGen.WaterLevel), z), isWet, $"chunk {chunk} column ({x}, {z})");
                     if (isWet) wet++;
                     else dry++;
                 }

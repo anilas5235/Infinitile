@@ -380,7 +380,7 @@ namespace Engine.Tests.Performance{
 
         /// <summary>
         ///     Straight-line code for <see cref="TerrainCaves" /> on a 32 × 32 chunk, with the interpreter's lanes and
-        ///     buffer layouts: lattice rows of 9, column rows of 32, corner columns of 33 and 65 lanes and 4 × 8 × 4
+        ///     buffer layouts: lattice rows of 9, column rows of 32, corner columns of Height / 8 + 1 and Height / 4 + 1 layers and 4 × 8 × 4
         ///     voxel cells. Octaves: continents 0–3, warp 4–5, erosion 6–8, terrain 9–11, cheese 12–13, tunnel 14.
         ///     Spline points: offset 0–3, its erosion spline 4–6, factor 7–9.
         /// </summary>
@@ -453,7 +453,7 @@ namespace Engine.Tests.Performance{
                     float factor = lattice[LatticePoints + at], surface = lattice[2 * LatticePoints + at];
                     float4 x = Origin.x + 4 * lx, z = Origin.y + 4 * lz;
                     float* terrain = corners + at * Stride;
-                    for (int q = 0; q < 9; q++){
+                    for (int q = 0; q * 4 <= Height / 8; q++){
                         float4 y = math.min(q * 4 + step, Height / 8) * 8;
                         float4 t = factor * ((surface - y) * 0.0078125f) + Fbm3(x, y, z, o + 9, 3, Seed) * 0.5f;
                         for (int k = 0; k < 4 && q * 4 + k <= Height / 8; k++) terrain[q * 4 + k] = t[k];
@@ -461,7 +461,7 @@ namespace Engine.Tests.Performance{
 
                     float* cheese = corners + (LatticePoints + at) * Stride;
                     float* tunnel = corners + (2 * LatticePoints + at) * Stride;
-                    for (int q = 0; q < 17; q++){
+                    for (int q = 0; q * 4 <= Height / 4; q++){
                         float4 y = math.min(q * 4 + step, Height / 4) * 4;
                         float4 ch = Fbm3(x, y, z, o + 12, 2, Seed) + GraphKernels.ClampedMap(y, 0f, GradientInverseSpan, -0.3f, GradientValueSpan);
                         float4 tu = math.abs(Fbm3(x, y, z, o + 14, 1, Seed)) - 0.08f;
@@ -563,7 +563,7 @@ namespace Engine.Tests.Performance{
                 for (int lx = 0; lx < LatticeWidth; lx++){
                     float4 x = Origin.x + 4 * lx, z = Origin.y + 4 * lz;
                     float* column = corners + (lz * LatticeWidth + lx) * Stride;
-                    for (int q = 0; q < 17; q++){
+                    for (int q = 0; q * 4 <= Height / 4; q++){
                         float4 y = math.min(q * 4 + step, Height / 4) * 4;
                         float4 n = Fbm3(x, y, z, o, 1, Seed);
                         for (int k = 0; k < 4 && q * 4 + k <= Height / 4; k++) column[q * 4 + k] = n[k];

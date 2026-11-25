@@ -158,7 +158,7 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(VoxelsPerChunk, _lightData.GetData().Length);
             Assert.AreEqual(1, _lightData.GetData().CompressedLength);
             Assert.AreEqual(0, _lightData.GetLight(new int3(0, 0, 0)));
-            Assert.AreEqual(0, _lightData.GetLight(new int3(31, 255, 31)));
+            Assert.AreEqual(0, _lightData.GetLight(new int3(31, ChunkHeight - 1, 31)));
             Assert.IsFalse(default(ChunkLightData).IsCreated);
         }
 
@@ -178,13 +178,13 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void ChunkLightData_UsesVoxelFlattenOrder(){
-            // Same layout as the voxel data, so a column (x, z) is one contiguous run of 256 values.
+            // Same layout as the voxel data, so a column (x, z) is one contiguous run of ChunkHeight values.
             _lightData = ChunkLightData.CreateEmpty(16);
             _hasLightData = true;
             _lightData.AddLights(VoxelLight.FullSky, ChunkHeight); // column (0, 0)
             _lightData.AddLights(0, VoxelsPerChunk - ChunkHeight);
             Assert.AreEqual(VoxelLight.FullSky, _lightData.GetLight(new int3(0, 0, 0)));
-            Assert.AreEqual(VoxelLight.FullSky, _lightData.GetLight(new int3(0, 255, 0)));
+            Assert.AreEqual(VoxelLight.FullSky, _lightData.GetLight(new int3(0, ChunkHeight - 1, 0)));
             Assert.AreEqual(0, _lightData.GetLight(new int3(0, 0, 1)));
             Assert.AreEqual(0, _lightData.GetLight(new int3(1, 0, 0)));
         }

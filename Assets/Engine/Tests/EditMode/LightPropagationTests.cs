@@ -158,8 +158,8 @@ namespace Engine.Tests.EditMode{
         public void TopOfWorld_NonClearVoxel_SeesSkyAboveTheWorld(){
             using LightTestWorld world = new(1, p => p.y == ChunkHeight - 1 ? Leaves : p.y <= 200 ? Stone : Air);
             ChunkLightData light = world.LightChunk(Origin);
-            Assert.AreEqual(13, VoxelLight.GetSky(LightAt(light, new int3(16, 255, 16))));
-            Assert.AreEqual(12, VoxelLight.GetSky(LightAt(light, new int3(16, 254, 16))));
+            Assert.AreEqual(13, VoxelLight.GetSky(LightAt(light, new int3(16, ChunkHeight - 1, 16))));
+            Assert.AreEqual(12, VoxelLight.GetSky(LightAt(light, new int3(16, ChunkHeight - 2, 16))));
             light.Dispose();
         }
 

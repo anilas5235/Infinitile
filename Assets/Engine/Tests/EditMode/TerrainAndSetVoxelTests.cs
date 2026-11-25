@@ -125,7 +125,7 @@ namespace Engine.Tests.EditMode{
         [TestCase(ChunkHeight)]
         [TestCase(-1)]
         public void SetVoxel_OutsideChunkHeight_IsRejected(int y){
-            // Without a Y check, y = 256 would wrap into the next column and y = -1 into the previous one.
+            // Without a Y check, y = ChunkHeight would wrap into the next column and y = -1 into the previous one.
             CreateManagerWithStoneChunk();
             bool result = true;
             Assert.DoesNotThrow(() => result = _manager.SetVoxel(TestFixtures.Grass, new int3(5, y, 5)));

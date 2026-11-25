@@ -43,7 +43,7 @@ namespace Engine.Scripts.WorldGen.Density{
 
     /// <summary>
     ///     The biome passes of one chunk (§6, §12): P2 gives every column of the padded biome map (chunk ± 16) its hard
-    ///     biome from the interpolated climate (W2-BIO-01, -06), with the wetness test at y 123 and the dry-column rule;
+    ///     biome from the interpolated climate (W2-BIO-01, -06), with the wetness test one block below the water level (AD-40) and the dry-column rule;
     ///     P3 blends the hard biomes with DistanceBlend into the surface-source biome and the 4 largest weights per chunk
     ///     column. Burst only (FloatMode.Strict).
     /// </summary>
@@ -57,20 +57,21 @@ namespace Engine.Scripts.WorldGen.Density{
         ///     chunk − 16.
         /// </summary>
         internal static void Biomes<TPrograms>(TPrograms programs, in DensityTerrainGraph terrain, in GraphCode code, uint seed, int2 chunk,
-            in BiomeLayoutData layout, ref DensityChunkBuffers b, ref DensityWorkCounters counters) where TPrograms : struct, IGraphPrograms{
-            Wetness(programs, terrain, code, seed, chunk, ref b, ref counters);
-            Lookup(terrain, layout, ref b, ref counters.Biomes);
+            in BiomeLayoutData layout, int waterLevel, ref DensityChunkBuffers b, ref DensityWorkCounters counters) where TPrograms : struct, IGraphPrograms{
+            int wetnessY = DensityLayout.WetnessY(waterLevel);
+            Wetness(programs, terrain, code, seed, chunk, wetnessY, ref b, ref counters);
+            Lookup(terrain, layout, wetnessY, ref b, ref counters.Biomes);
         }
 
         /// <summary>The wetness test's early-out per lattice point, then the two layers of every corner of an undecided cell.</summary>
-        private static void Wetness<TPrograms>(TPrograms programs, in DensityTerrainGraph terrain, in GraphCode code, uint seed, int2 chunk,
+        private static void Wetness<TPrograms>(TPrograms programs, in DensityTerrainGraph terrain, in GraphCode code, uint seed, int2 chunk, int wetnessY,
             ref DensityChunkBuffers b, ref DensityWorkCounters counters) where TPrograms : struct, IGraphPrograms{
             const int size = DensityLayout.LatticeSize;
             const int lattice = DensityLayout.BiomeLattice;
             const int offset = DensityLayout.BiomeLatticeOffset;
             const int cells = DensityLayout.BiomeCells;
             int h = terrain.CellHeight;
-            int cy = DensityLayout.WetnessY / h;
+            int cy = wetnessY / h;
             float yLo = cy * h, yHi = (cy + 1) * h;
             float* surface = b.Lattice + terrain.PreliminarySurface * size * size;
 
@@ -163,14 +164,14 @@ namespace Engine.Scripts.WorldGen.Density{
         ///     Per cell of the biome map: the wet flags of its columns, then the hard biome, from one box when the cell is
         ///     uniform (§6.3) and from the lookup otherwise, and the dry-column rule.
         /// </summary>
-        private static void Lookup(in DensityTerrainGraph terrain, in BiomeLayoutData layout, ref DensityChunkBuffers b, ref BiomeWorkCounters counters){
+        private static void Lookup(in DensityTerrainGraph terrain, in BiomeLayoutData layout, int wetnessY, ref DensityChunkBuffers b, ref BiomeWorkCounters counters){
             const int size = DensityLayout.LatticeSize;
             const int lattice = DensityLayout.BiomeLattice;
             const int offset = DensityLayout.BiomeLatticeOffset;
             const int cells = DensityLayout.BiomeCells;
             const int span = DensityLayout.BiomeSpan;
             int h = terrain.CellHeight;
-            float ty = (DensityLayout.WetnessY - DensityLayout.WetnessY / h * h) * GraphInterpolation.InverseCellHeight(h);
+            float ty = (wetnessY - wetnessY / h * h) * GraphInterpolation.InverseCellHeight(h);
 
             int* slots = stackalloc int[P];
             for (int p = 0; p < P; p++) slots[p] = terrain.ClimateSlot(p);

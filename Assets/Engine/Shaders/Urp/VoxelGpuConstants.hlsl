@@ -10,9 +10,9 @@
 // Points per render page (PointsPerPage)
 #define POINTS_PER_PAGE 256u
 
-// Flat chunk index x * 32 * 256 + z * 256 + y (ChunkIndexShiftX, ChunkIndexShiftZ)
-#define CHUNK_INDEX_SHIFT_X 13
-#define CHUNK_INDEX_SHIFT_Z 8
+// Flat chunk index x * 32 * 512 + z * 512 + y (ChunkIndexShiftX, ChunkIndexShiftZ)
+#define CHUNK_INDEX_SHIFT_X 14
+#define CHUNK_INDEX_SHIFT_Z 9
 
 // Interval store pages of 512 elements (CompPageShift, CompPageMask)
 #define COMP_PAGE_SHIFT 9

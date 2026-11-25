@@ -423,7 +423,7 @@ namespace Engine.Scripts.World{
                 return true;
             }
 
-            using BiomeColumns c = BiomeColumnSampler.Sample(graph, cfg.Layout, cfg.Seed, new[]{ new float2(x, z) }, true, true);
+            using BiomeColumns c = BiomeColumnSampler.Sample(graph, cfg.Layout, cfg.Seed, new[]{ new float2(x, z) }, true, true, cfg.WaterLevel);
             int biome = c.Biome[0] == byte.MaxValue ? -1 : c.Biome[0];
             sample.HardBiome = sample.SurfaceSource = sample.DominantMaterialBiome = biome;
             sample.ColumnHeight = c.Top[0];

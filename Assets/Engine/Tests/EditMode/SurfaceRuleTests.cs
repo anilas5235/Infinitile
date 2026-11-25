@@ -7,6 +7,7 @@ using Engine.Scripts.Jobs.Chunk;
 using Engine.Scripts.VoxelConfig.Data.Generation;
 using Engine.Scripts.WorldGen.Biomes;
 using Engine.Scripts.WorldGen.Density;
+using Engine.Scripts.Utils;
 using Engine.Scripts.WorldGen.Graph;
 using Engine.Scripts.WorldGen.Settings;
 using Engine.Scripts.WorldGen.Surface;
@@ -46,6 +47,7 @@ namespace Engine.Tests.EditMode{
         private string[] _names;
         private Biome.BiomeDef[] _defs;
         private int _waterLevel;
+        private int WetY => DensityLayout.WetnessY(_waterLevel);
 
         /// <summary>Sample chunks by kind (snow, ice, coast, lowland, hot), found from the climate at chunk centres.</summary>
         private Dictionary<string, List<DensityProbeResult>> _kinds;
@@ -77,7 +79,7 @@ namespace Engine.Tests.EditMode{
             _names = _layout.Palette();
             _defs = _config.WorldGen.Layout.Defs.ToArray();
             _waterLevel = _config.WorldGen.WaterLevel;
-            Assert.AreEqual(DensityLayout.WetnessY + 1, _waterLevel, "the tests assume the water level 124");
+            Assert.AreEqual(WorldGenSettings.DefaultWaterLevel, _waterLevel, "the tests assume the shipped water level");
 
             _kinds = new Dictionary<string, List<DensityProbeResult>>();
             HashSet<int2> done = new();
@@ -400,10 +402,11 @@ namespace Engine.Tests.EditMode{
             for (float t = -1.2f; t <= 1.2f; t += 0.0137f)
                 foreach (float w in wobbles){
                     int y = rules.ColdThreshold(t, w, rules.SnowTemperature);
-                    Assert.That(y, Is.InRange(0, 256));
-                    if (y < 256) Assert.IsTrue(rules.ColdAt(y, t, w, rules.SnowTemperature), $"T {t} w {w}: y {y} is not cold");
+                    const int none = VoxelConstants.ChunkHeight;
+                    Assert.That(y, Is.InRange(0, none));
+                    if (y < none) Assert.IsTrue(rules.ColdAt(y, t, w, rules.SnowTemperature), $"T {t} w {w}: y {y} is not cold");
                     if (y > 0) Assert.IsFalse(rules.ColdAt(y - 1, t, w, rules.SnowTemperature), $"T {t} w {w}: y {y - 1} is cold already");
-                    if (y > 0 && y < 256){
+                    if (y > 0 && y < none){
                         float formula = rules.LapseFrom + (t + w - rules.SnowTemperature) / rules.Lapse;
                         Assert.That(y, Is.InRange((int)math.floor(formula), (int)math.ceil(formula) + 1), $"T {t} w {w}");
                     }
@@ -524,11 +527,11 @@ namespace Engine.Tests.EditMode{
                 for (int z = 0; z < Size; z++){
                     int c = x * Size + z, h = r.Heightmap[c];
                     for (int y = 0; y < Height; y++)
-                        if (y != DensityLayout.WetnessY && VoxelAt(r, x, y, z) == iceId)
+                        if (y != WetY && VoxelAt(r, x, y, z) == iceId)
                             Assert.Fail($"chunk {r.Origin} column ({x}, {z}): ice at y {y}");
                     Biome.BiomeDef def = _defs[r.Surface[c]];
-                    bool expected = h < DensityLayout.WetnessY && r.IceCold[c] != 0 && def.neverSnows == 0;
-                    bool found = VoxelAt(r, x, DensityLayout.WetnessY, z) == iceId;
+                    bool expected = h < WetY && r.IceCold[c] != 0 && def.neverSnows == 0;
+                    bool found = VoxelAt(r, x, WetY, z) == iceId;
                     Assert.AreEqual(expected, found, $"chunk {r.Origin} column ({x}, {z}) {_names[r.Surface[c]]}, top {h}, T {r.ColumnTemperature[c]}");
                     if (found) ice++;
                 }
@@ -552,7 +555,7 @@ namespace Engine.Tests.EditMode{
                     ushort block = SnowBlock(def);
                     if (!IsOwnBlock(def, block)) Assert.AreNotEqual(block, VoxelAt(r, x, h, z), $"snow in {_names[r.Surface[c]]} at chunk {r.Origin} ({x}, {z})");
                     if (h + 1 < Height) Assert.IsTrue(VoxelAt(r, x, h + 1, z) != SnowLayer && VoxelAt(r, x, h + 1, z) != SnowHalf, $"a snow layer in {_names[r.Surface[c]]} at chunk {r.Origin} ({x}, {z})");
-                    Assert.AreNotEqual(iceId, VoxelAt(r, x, DensityLayout.WetnessY, z), $"ice in {_names[r.Surface[c]]} at chunk {r.Origin} ({x}, {z})");
+                    Assert.AreNotEqual(iceId, VoxelAt(r, x, WetY, z), $"ice in {_names[r.Surface[c]]} at chunk {r.Origin} ({x}, {z})");
                 }
 
             TestContext.WriteLine($"{columns} never-snow columns");
@@ -639,7 +642,7 @@ namespace Engine.Tests.EditMode{
                     string where = $"chunk {r.Origin} column ({x}, {z}) y {h} {_names[id]} (water {depth}, rise {r.Rise[c]}, tree line {r.TreeLine[c]}, snow line {r.SnowLine[c]})";
 
                     // The beach rule could fire here (its band noise is not visible to the test).
-                    bool beachPossible = dry && def.beachBlock != 0 && h - DensityLayout.WetnessY < math.max(1, (int)def.beachHeight) && WetWithin(r, x, z, 20);
+                    bool beachPossible = dry && def.beachBlock != 0 && h - WetY < math.max(1, (int)def.beachHeight) && WetWithin(r, x, z, 20);
 
                     // The floor.
                     string rule;
@@ -671,7 +674,7 @@ namespace Engine.Tests.EditMode{
                         rule = "underwater_top";
                         expected = def.underwaterTopBlock != 0 ? def.underwaterTopBlock : Top(def);
                     }
-                    else if (dry && r.Rise[c] >= 3 && h - DensityLayout.WetnessY < 4 && def.rockBlock != 0 && WetWithin(r, x, z, 20) &&
+                    else if (dry && r.Rise[c] >= 3 && h - WetY < 4 && def.rockBlock != 0 && WetWithin(r, x, z, 20) &&
                              Writes(def, def.rockBlock, top)){
                         rule = "shore_cliff";
                         expected = def.rockBlock;

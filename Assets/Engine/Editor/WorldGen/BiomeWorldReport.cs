@@ -54,7 +54,7 @@ namespace Engine.Editor.WorldGen{
         /// <summary>Per biome: share of all columns, share of the dry columns, share of its columns under water.</summary>
         public double[] AreaShare, LandShare, WetShare;
 
-        /// <summary>Water (air at y 123), the ocean bands (a water biome before the dry-column rule), the dry-column rule's columns.</summary>
+        /// <summary>Water (air one block below the water level), the ocean bands (a water biome before the dry-column rule), the dry-column rule's columns.</summary>
         public double WaterShare, OceanBandShare, SubstituteShare;
 
         public long OceanOnDry;

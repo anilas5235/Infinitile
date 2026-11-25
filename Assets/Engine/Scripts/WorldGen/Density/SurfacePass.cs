@@ -361,11 +361,13 @@ namespace Engine.Scripts.WorldGen.Density{
 
         /// <summary>
         ///     The climate of chunk column (x, z) as the rules see it, for tests and reports: T, the snow line (the lowest
-        ///     y where the snow test holds, 256 for none), the tree line (y at and above it is above the tree line), the
-        ///     heightmap's rise and whether the water surface is cold enough to freeze.
+        ///     y where the snow test holds, the chunk height for none), the tree line (y at and above it is above the tree
+        ///     line), the heightmap's rise and whether the water surface (y <paramref name="waterLevel" /> − 1) is cold
+        ///     enough to freeze.
         /// </summary>
-        internal static void ColumnClimate(in SurfaceRules rules, ref DensityChunkBuffers b, int x, int z, out float temperature, out int snowLine,
-            out int treeLine, out int rise, out bool iceCold){
+        internal static void ColumnClimate(in SurfaceRules rules, ref DensityChunkBuffers b, int x, int z, int waterLevel, out float temperature,
+            out int snowLine, out int treeLine, out int rise, out bool iceCold){
+            int surface = DensityLayout.WetnessY(waterLevel);
             temperature = rules.TemperatureSlot >= 0 ? Lattice(b.Lattice, rules.TemperatureSlot, x, z) : 0f;
             float snow = WobbleAt(rules, ref b, rules.SnowWobble, x, z);
             float tree = WobbleAt(rules, ref b, rules.TreeLineWobble, x, z);
@@ -373,9 +375,9 @@ namespace Engine.Scripts.WorldGen.Density{
             snowLine = rules.ColdThreshold(temperature, snow, rules.SnowTemperature);
             treeLine = rules.TreeLine(temperature, tree);
             rise = Rise(ref b, x, z);
-            iceCold = rules.ColdAt(DensityLayout.WetnessY, temperature, ice, rules.IceTemperature) ||
+            iceCold = rules.ColdAt(surface, temperature, ice, rules.IceTemperature) ||
                       rules.RiverIce >= 0 && WobbleAt(rules, ref b, rules.RiverIce, x, z) >= rules.RiverIceMin &&
-                      rules.ColdAt(DensityLayout.WetnessY, temperature, 0f, rules.RiverIceTemperature);
+                      rules.ColdAt(surface, temperature, 0f, rules.RiverIceTemperature);
         }
 
         private static float WobbleAt(in SurfaceRules rules, ref DensityChunkBuffers b, int output, int x, int z){

@@ -71,9 +71,18 @@ namespace Engine.Tests.EditMode{
             Assert.AreEqual(ChunkHeight, 1 << ChunkIndexShiftZ);
             Assert.AreEqual(ChunkDepth * ChunkHeight, 1 << ChunkIndexShiftX);
 
-            int3 pos = new(ChunkWidth - 1, 77, 5);
-            int shifted = (pos.x << ChunkIndexShiftX) + (pos.z << ChunkIndexShiftZ) + pos.y;
-            Assert.AreEqual(ChunkSize.Flatten(pos), shifted, "the kernels index like Chunk.GetIndex");
+            foreach (int3 pos in new[]{ new int3(ChunkWidth - 1, 77, 5), new int3(ChunkWidth - 1, ChunkHeight - 1, ChunkDepth - 1), new int3(3, 300, 17) }){
+                int shifted = (pos.x << ChunkIndexShiftX) + (pos.z << ChunkIndexShiftZ) + pos.y;
+                Assert.AreEqual(ChunkSize.Flatten(pos), shifted, $"the kernels index like Chunk.GetIndex at {pos}");
+            }
+        }
+
+        /// <summary>H1: chunks 512 high, x · 32 · 512 + z · 512 + y (the HLSL values are checked against these above).</summary>
+        [Test]
+        public void ChunkIndexShifts_Are14And9(){
+            Assert.AreEqual(512, ChunkHeight);
+            Assert.AreEqual(14, ChunkIndexShiftX);
+            Assert.AreEqual(9, ChunkIndexShiftZ);
         }
 
         [Test]

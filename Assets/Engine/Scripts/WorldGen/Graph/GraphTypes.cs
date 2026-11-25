@@ -257,7 +257,10 @@ namespace Engine.Scripts.WorldGen.Graph{
         /// <summary>Deepest nesting of objects and arrays a graph file may have (inline nodes, spline points).</summary>
         public const int MaxJsonNesting = 64;
 
-        /// <summary>Lanes of the interpreter's registers: one 4 × 8 × 4 voxel cell.</summary>
+        /// <summary>
+        ///     Lanes of the interpreter's registers: one 4 × 8 × 4 voxel cell. Corner programs run in slices of at most
+        ///     this many layers (AD-44): a cell-4 marker over the 512-block world has 129.
+        /// </summary>
         public const int MaxLanes = 128;
 
         /// <summary>Stride of the 2D lattice and horizontal size of a cell, in blocks.</summary>
@@ -266,8 +269,11 @@ namespace Engine.Scripts.WorldGen.Graph{
         /// <summary>Height of a voxel cell (the voxel program's lanes are 4 × CellBlockHeight × 4).</summary>
         public const int CellBlockHeight = 8;
 
-        /// <summary>The y range of the world: 0 to WorldHeight − 1.</summary>
-        public const int WorldHeight = 256;
+        /// <summary>
+        ///     The y range of the world: 0 to WorldHeight − 1, the build height (AD-38). A graph names its own
+        ///     generation top with <see cref="GraphOutputs.TopSlideEnd" /> (AD-45).
+        /// </summary>
+        public const int WorldHeight = Utils.VoxelConstants.ChunkHeight;
 
         /// <summary>Bounds of the x and z inputs the interval rules assume.</summary>
         public const float CoordinateLimit = 16777216f;
@@ -307,8 +313,15 @@ namespace Engine.Scripts.WorldGen.Graph{
         /// <summary>The y where the top slide starts, a bound-only constant: below it the slide leaves the density as it is.</summary>
         public const string TopSlideStart = "top_slide_start";
 
+        /// <summary>
+        ///     The graph's generation top (AD-45): the y where its top slide ends, a bound-only constant between
+        ///     <see cref="TopSlideStart" /> and the world top. preliminary_surface must stay at or below it, so the
+        ///     solid-below shortcut never puts rock above the top (W2-DEN-04).
+        /// </summary>
+        public const string TopSlideEnd = "top_slide_end";
+
         /// <summary>Outputs that come together when a graph has terrain.</summary>
-        public static readonly string[] Terrain ={ TerrainDensity, PreliminarySurface, Factor, TerrainNoise, TopSlideStart };
+        public static readonly string[] Terrain ={ TerrainDensity, PreliminarySurface, Factor, TerrainNoise, TopSlideStart, TopSlideEnd };
 
         /// <summary>
         ///     The threshold of DistanceBlend's surface pick in 0…1 (§12, DEC-87), a per-column output: the patchy, wavy
@@ -323,10 +336,11 @@ namespace Engine.Scripts.WorldGen.Graph{
         public const string River = "river";
 
         /// <summary>
-        ///     Highest bound preliminary_surface may have: y 255 plus half a block for the interval rules' margins
-        ///     (their sum over a chain of additions reaches a few hundredths at this size).
+        ///     How far preliminary_surface's bound may pass the graph's generation top (<see cref="TopSlideEnd" />):
+        ///     half a block for the interval rules' margins (their sum over a chain of additions reaches a few
+        ///     hundredths at this size).
         /// </summary>
-        public const float PreliminarySurfaceLimit = GraphLimits.WorldHeight - 0.5f;
+        public const float PreliminarySurfaceMargin = 0.5f;
     }
 
     /// <summary>Work done by an evaluation, summed over runs: lanes per program, noise samples, instructions.</summary>

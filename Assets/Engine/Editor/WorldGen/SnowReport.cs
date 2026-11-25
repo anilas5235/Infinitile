@@ -6,6 +6,7 @@ using System.Text;
 using Engine.Scripts.WorldGen.Biomes;
 using Engine.Scripts.WorldGen.Density;
 using Engine.Scripts.WorldGen.Graph;
+using Engine.Scripts.WorldGen.Settings;
 using Engine.Scripts.WorldGen.Surface;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -35,7 +36,7 @@ namespace Engine.Editor.WorldGen{
         /// <summary>Neighbour pairs where snow stops at a never-snow biome above its snow line, and all snow edges.</summary>
         public long HardEdges, SnowEdges;
 
-        /// <summary>Share of the open water samples (top below y 123) that freeze.</summary>
+        /// <summary>Share of the open water samples (top below the water level − 1) that freeze.</summary>
         public double IceShare;
 
         /// <summary>
@@ -59,7 +60,7 @@ namespace Engine.Editor.WorldGen{
         public const int Extent = 4096, Stride = 8;
 
         public static SnowReportSeed Run(CompiledNoiseGraph graph, BiomeLayout layout, in BiomeLayoutData data, in SurfaceRules rules, SurfaceClimate climate, uint seed,
-            int extent = Extent, int stride = Stride){
+            int extent = Extent, int stride = Stride, int waterLevel = WorldGenSettings.DefaultWaterLevel){
             int nb = layout.Biomes.Count;
             SnowReportSeed r = new(){
                 Seed = seed, Names = layout.Biomes.Select(b => b.Name).ToArray(), Dry = new long[nb], SnowShare = new double[nb], WouldSnowShare = new double[nb]
@@ -71,7 +72,7 @@ namespace Engine.Editor.WorldGen{
                 grid[z * side + x] = new float2(origin + x * stride, origin + z * stride);
 
             using NativeArray<float2> points = new(grid, Allocator.TempJob);
-            using BiomeColumns c = BiomeColumnSampler.Sample(graph, data, seed, points, true);
+            using BiomeColumns c = BiomeColumnSampler.Sample(graph, data, seed, points, true, waterLevel: waterLevel);
             float[] lattice = GraphEvaluator.SampleLattice(graph, seed, grid, out _);
             float Value(int slot, int i){
                 return slot >= 0 ? lattice[slot * n + i] : 0f;
@@ -83,7 +84,7 @@ namespace Engine.Editor.WorldGen{
             }
 
             int tSlot = rules.TemperatureSlot, snowSlot = Slot(climate.SnowWobble), treeSlot = Slot(climate.TreeLineWobble), iceSlot = Slot(climate.IceWobble);
-            const int surfaceY = DensityLayout.WetnessY;
+            int surfaceY = DensityLayout.WetnessY(waterLevel);
             int mountain = Array.IndexOf(r.Names, "Mountain");
 
             bool[] snow = new bool[n], dry = new bool[n], never = new bool[n], above = new bool[n];

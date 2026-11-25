@@ -1,11 +1,18 @@
 ﻿using UnityEngine;
+using static Engine.Scripts.Utils.VoxelConstants;
 
 namespace Engine.Scripts.Behaviour{
     /// <summary>
     ///     MonoBehaviour representation of a chunk with a dedicated render mesh and collider mesh.
     /// </summary>
     public class ChunkBehaviour : MonoBehaviour{
-        [SerializeField] private ChunkPartition[] chunkPartitions;
+        /// <summary>
+        ///     The partition object; <see cref="Init" /> builds <see cref="PartitionsPerChunk" /> of them under the chunk
+        ///     (AD-37), so a change of the build height cannot leave the prefab behind.
+        /// </summary>
+        [SerializeField] private ChunkPartition partitionPrefab;
+
+        private ChunkPartition[] chunkPartitions;
 
         /// <summary>
         ///     Cached at pool creation; the first <c>transform</c> access on an instance allocates the managed
@@ -15,7 +22,13 @@ namespace Engine.Scripts.Behaviour{
 
         public void Init(){
             Transform = transform;
-            for (int pId = 0; pId < chunkPartitions.Length; pId++) chunkPartitions[pId].Init(pId);
+            chunkPartitions = new ChunkPartition[PartitionsPerChunk];
+            for (int pId = 0; pId < PartitionsPerChunk; pId++){
+                ChunkPartition partition = Instantiate(partitionPrefab, Transform);
+                partition.name = "ChunkPartition";
+                partition.Init(pId);
+                chunkPartitions[pId] = partition;
+            }
         }
 
         public void ClearData(){
