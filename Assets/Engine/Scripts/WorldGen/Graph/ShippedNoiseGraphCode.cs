@@ -15,8 +15,8 @@ using Unity.Mathematics;
 namespace Engine.Scripts.WorldGen.Graph{
     /// <summary>Generated programs of one noise graph; see <see cref="IGraphPrograms" />.</summary>
     internal unsafe struct ShippedNoiseGraphCode : IGraphPrograms{
-        public ulong CodeHash => 0xB6FF1DFC6654F34FUL;
-        public GraphTableSizes Sizes => new(111, 4, 31, 18, 41, 169, 1);
+        public ulong CodeHash => 0xC99983312D5D43C2UL;
+        public GraphTableSizes Sizes => new(146, 4, 34, 21, 46, 186, 1);
 
         public void Run(int program, in GraphCode code, float* registers, float* scratch, int lanes, uint seed, ref GraphWorkCounters counters){
             switch (program){
@@ -33,15 +33,15 @@ namespace Engine.Scripts.WorldGen.Graph{
                     break;
                 case 2:
                     Lattice(registers, code.Points, lanes, seed);
-                    counters.Instructions += 86;
-                    counters.InstructionLanes += 86L * lanes;
-                    counters.NoiseSamples2D += 37L * lanes;
+                    counters.Instructions += 116;
+                    counters.InstructionLanes += 116L * lanes;
+                    counters.NoiseSamples2D += 42L * lanes;
                     break;
                 case 3:
                     Column(registers, code.Points, lanes, seed);
-                    counters.Instructions += 14;
-                    counters.InstructionLanes += 14L * lanes;
-                    counters.NoiseSamples2D += 12L * lanes;
+                    counters.Instructions += 19;
+                    counters.InstructionLanes += 19L * lanes;
+                    counters.NoiseSamples2D += 17L * lanes;
                     break;
                 default:
                     code.Run(code.Programs[program], registers, scratch, lanes, seed, ref counters);
@@ -91,39 +91,50 @@ namespace Engine.Scripts.WorldGen.Graph{
             }
         }
 
-        /// <summary>Lattice program: 86 instructions, 21 registers.</summary>
+        /// <summary>Lattice program: 116 instructions, 26 registers.</summary>
         private static void Lattice(float* r, SplinePoint* points, int lanes, uint seed){
             int quads = (lanes + 3) >> 2;
             float4* sv = stackalloc float4[48];
             for (int q = 0; q < quads; q++){
                 float4 r0 = ((float4*)r)[q];
                 float4 r2 = ((float4*)(r + 256))[q];
-                float4 r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20;
+                float4 r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25;
+                {
+                    float4 nx = r0, nz = r2;
+                    float4 n = float4.zero;
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3A5EE95Cu), nz * math.asfloat(0x3A5EE95Cu), seed, 0xF92CB539u) * math.asfloat(0x3F124925u);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3ADEE95Cu), nz * math.asfloat(0x3ADEE95Cu), seed, 0xC42335A5u) * math.asfloat(0x3E924925u);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3B5EE95Cu), nz * math.asfloat(0x3B5EE95Cu), seed, 0x20D0C658u) * math.asfloat(0x3E124925u);
+                    r3 = n;
+                }
+                r4 = r3 * math.asfloat(0x3FCCCCCDu);
+                r3 = math.clamp(r4, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
+                r4 = math.abs(r3);
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3A11A2B4u), nz * math.asfloat(0x3A11A2B4u), seed, 0x1D345415u) * math.asfloat(0x3F2AAAABu);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3A91A2B4u), nz * math.asfloat(0x3A91A2B4u), seed, 0xE583A3ABu) * math.asfloat(0x3EAAAAABu);
-                    r3 = n;
+                    r5 = n;
                 }
-                r4 = r3 * math.asfloat(0x43C80000u);
+                r6 = r5 * math.asfloat(0x43C80000u);
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3A11A2B4u), nz * math.asfloat(0x3A11A2B4u), seed, 0x76D780ABu) * math.asfloat(0x3F2AAAABu);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3A91A2B4u), nz * math.asfloat(0x3A91A2B4u), seed, 0xFA12C7A4u) * math.asfloat(0x3EAAAAABu);
-                    r3 = n;
+                    r5 = n;
                 }
-                r5 = r3 * math.asfloat(0x43C80000u);
+                r7 = r5 * math.asfloat(0x43C80000u);
                 {
-                    float4 nx = r0 + r4, nz = r2 + r5;
+                    float4 nx = r0 + r6, nz = r2 + r7;
                     float4 n = float4.zero;
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x398B40CDu), nz * math.asfloat(0x398B40CDu), seed, 0xC2855251u) * math.asfloat(0x3F042108u);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3A0B40CDu), nz * math.asfloat(0x3A0B40CDu), seed, 0x0980506Bu) * math.asfloat(0x3E842108u);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3A8B40CDu), nz * math.asfloat(0x3A8B40CDu), seed, 0x0B8F58E2u) * math.asfloat(0x3E042108u);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3B0B40CDu), nz * math.asfloat(0x3B0B40CDu), seed, 0xD355DA56u) * math.asfloat(0x3D842108u);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3B8B40CDu), nz * math.asfloat(0x3B8B40CDu), seed, 0xEE8AC32Eu) * math.asfloat(0x3D042108u);
-                    r3 = n;
+                    r5 = n;
                 }
                 sv[0] = math.asfloat(0xBF800000u);
                 sv[1] = math.asfloat(0xBEE8F5C3u);
@@ -132,7 +143,7 @@ namespace Engine.Scripts.WorldGen.Graph{
                 sv[4] = math.asfloat(0x3CF5C28Fu);
                 sv[5] = math.asfloat(0x3E99999Au);
                 sv[6] = math.asfloat(0x3F800000u);
-                r4 = GraphKernels.Spline(r3, points + 0, sv, 7, 0);
+                r6 = GraphKernels.Spline(r5, points + 0, sv, 7, 0);
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
@@ -140,28 +151,43 @@ namespace Engine.Scripts.WorldGen.Graph{
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3A8B4A45u), nz * math.asfloat(0x3A8B4A45u), seed, 0x6D667EC2u) * math.asfloat(0x3E888889u);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3B0B4A45u), nz * math.asfloat(0x3B0B4A45u), seed, 0xFC797B41u) * math.asfloat(0x3E088889u);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3B8B4A45u), nz * math.asfloat(0x3B8B4A45u), seed, 0xCB84F6DFu) * math.asfloat(0x3D888889u);
-                    r3 = n;
+                    r5 = n;
                 }
                 sv[0] = math.asfloat(0x40048312u);
                 sv[1] = math.asfloat(0x41000000u);
-                r5 = GraphKernels.Spline(r3, points + 7, sv, 2, 2);
+                r7 = GraphKernels.Spline(r5, points + 7, sv, 2, 2);
                 sv[0] = math.asfloat(0x3F800000u);
                 sv[1] = math.asfloat(0x3F800000u);
                 sv[2] = math.asfloat(0x40350481u);
                 sv[3] = math.asfloat(0x41000000u);
-                r6 = GraphKernels.Spline(r3, points + 9, sv, 4, 2);
+                r8 = GraphKernels.Spline(r5, points + 9, sv, 4, 2);
                 sv[0] = math.asfloat(0x40350481u);
                 sv[1] = math.asfloat(0x41000000u);
-                sv[2] = r5;
-                sv[3] = r6;
-                r7 = GraphKernels.Spline(r4, points + 13, sv, 4, 2);
+                sv[2] = r7;
+                sv[3] = r8;
+                r9 = GraphKernels.Spline(r6, points + 13, sv, 4, 2);
+                r7 = r4 * math.asfloat(0x41C80000u);
+                r8 = math.asfloat(0x3F800000u) - r7;
+                r7 = math.clamp(r8, math.asfloat(0x00000000u), math.asfloat(0x3F800000u));
+                sv[0] = math.asfloat(0x00000000u);
+                sv[1] = math.asfloat(0x3F800000u);
+                r8 = GraphKernels.Spline(r5, points + 17, sv, 2, 2);
+                sv[0] = math.asfloat(0x00000000u);
+                sv[1] = math.asfloat(0x3F800000u);
+                sv[2] = math.asfloat(0x3F800000u);
+                sv[3] = r8;
+                r10 = GraphKernels.Spline(r6, points + 19, sv, 4, 2);
+                r8 = GraphKernels.Smoothstep(r10, math.asfloat(0x3ECCCCCDu), math.asfloat(0x40200000u));
+                r11 = GraphKernels.Smoothstep(r7, math.asfloat(0x3E4CCCCDu), math.asfloat(0x40000000u));
+                r12 = math.asfloat(0x3F800000u) - r8;
+                r13 = r11 * r12;
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x391F27A6u), nz * math.asfloat(0x391F27A6u), seed, 0x25EE7622u) * math.asfloat(0x3F124925u);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x399F27A6u), nz * math.asfloat(0x399F27A6u), seed, 0xCA8E0882u) * math.asfloat(0x3E924925u);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3A1F27A6u), nz * math.asfloat(0x3A1F27A6u), seed, 0x01C34032u) * math.asfloat(0x3E124925u);
-                    r5 = n;
+                    r11 = n;
                 }
                 {
                     float4 nx = r0, nz = r2;
@@ -169,323 +195,363 @@ namespace Engine.Scripts.WorldGen.Graph{
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3946EEDBu), nz * math.asfloat(0x3946EEDBu), seed, 0x01DC74C7u) * math.asfloat(0x3F124925u);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x39C6EEDBu), nz * math.asfloat(0x39C6EEDBu), seed, 0xB4E99848u) * math.asfloat(0x3E924925u);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3A46EEDBu), nz * math.asfloat(0x3A46EEDBu), seed, 0x77D2DAB2u) * math.asfloat(0x3E124925u);
-                    r6 = n;
+                    r12 = n;
                 }
-                r8 = GraphKernels.Smoothstep(r5, math.asfloat(0x3E8F5C29u), math.asfloat(0x41855555u));
-                r9 = math.asfloat(0x00000000u) - r6;
-                r10 = GraphKernels.Smoothstep(r9, math.asfloat(0x3DB22D0Eu), math.asfloat(0x41855555u));
-                r9 = r8 * r10;
+                r14 = GraphKernels.Smoothstep(r11, math.asfloat(0x3E8F5C29u), math.asfloat(0x41855555u));
+                r15 = math.asfloat(0x00000000u) - r12;
+                r16 = GraphKernels.Smoothstep(r15, math.asfloat(0x3DB22D0Eu), math.asfloat(0x41855555u));
+                r15 = r14 * r16;
+                sv[0] = math.asfloat(0xBF800000u);
+                sv[1] = math.asfloat(0xBF59999Au);
+                sv[2] = math.asfloat(0xBF0E978Du);
+                sv[3] = math.asfloat(0xBEE3D70Au);
+                sv[4] = math.asfloat(0xBE86A7F0u);
+                sv[5] = math.asfloat(0x3C9BA5E3u);
+                sv[6] = math.asfloat(0x3E76C8B4u);
+                sv[7] = math.asfloat(0x3F03D70Au);
+                sv[8] = math.asfloat(0x3F472B02u);
+                sv[9] = math.asfloat(0x3F6D9168u);
+                sv[10] = math.asfloat(0x3F800000u);
+                r14 = GraphKernels.Spline(r4, points + 23, sv, 11, 2);
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
                     n = n + (1f - math.abs(SimplexLanes.Noise2(nx * math.asfloat(0x3B800000u), nz * math.asfloat(0x3B800000u), seed, 0x5DBECED4u))) * math.asfloat(0x3F124925u);
                     n = n + (1f - math.abs(SimplexLanes.Noise2(nx * math.asfloat(0x3C000000u), nz * math.asfloat(0x3C000000u), seed, 0xABAE4F2Fu))) * math.asfloat(0x3E924925u);
                     n = n + (1f - math.abs(SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0x79352EEFu))) * math.asfloat(0x3E124925u);
-                    r8 = n;
+                    r16 = n;
                 }
-                r10 = r8 * r8;
-                {
-                    float4 nx = r0, nz = r2;
-                    float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3A5EE95Cu), nz * math.asfloat(0x3A5EE95Cu), seed, 0xF92CB539u) * math.asfloat(0x3F124925u);
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3ADEE95Cu), nz * math.asfloat(0x3ADEE95Cu), seed, 0xC42335A5u) * math.asfloat(0x3E924925u);
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3B5EE95Cu), nz * math.asfloat(0x3B5EE95Cu), seed, 0x20D0C658u) * math.asfloat(0x3E124925u);
-                    r8 = n;
-                }
-                r11 = r8 * math.asfloat(0x3FCCCCCDu);
-                r8 = math.clamp(r11, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
-                r11 = math.abs(r8);
-                r12 = math.clamp(r11, math.asfloat(0x00000000u), math.asfloat(0x3F800000u));
-                r11 = r12 * math.asfloat(0x40000000u);
-                r12 = math.asfloat(0x3F800000u) - r11;
+                r17 = r16 * r16;
+                r16 = r4 * math.asfloat(0x40400000u);
+                r4 = r16 - math.asfloat(0x40000000u);
+                r16 = math.abs(r4);
+                r4 = math.asfloat(0x3F800000u) - r16;
                 sv[0] = math.asfloat(0xC0800000u);
                 sv[1] = math.asfloat(0xBF800000u);
                 sv[2] = math.asfloat(0x40ACCCCDu);
                 sv[3] = math.asfloat(0x412CCCCDu);
                 sv[4] = math.asfloat(0x41ACCCCDu);
-                r11 = GraphKernels.Spline(r12, points + 17, sv, 5, 2);
+                r16 = GraphKernels.Spline(r14, points + 34, sv, 5, 2);
                 sv[0] = math.asfloat(0xC0800000u);
                 sv[1] = math.asfloat(0xBF800000u);
                 sv[2] = math.asfloat(0x40666666u);
                 sv[3] = math.asfloat(0x40E66666u);
                 sv[4] = math.asfloat(0x41666666u);
-                r13 = GraphKernels.Spline(r12, points + 22, sv, 5, 2);
+                r18 = GraphKernels.Spline(r14, points + 39, sv, 5, 2);
                 sv[0] = math.asfloat(0xC0800000u);
                 sv[1] = math.asfloat(0xBF800000u);
                 sv[2] = math.asfloat(0x402CCCCDu);
                 sv[3] = math.asfloat(0x40ACCCCDu);
                 sv[4] = math.asfloat(0x40E66666u);
-                r14 = GraphKernels.Spline(r12, points + 27, sv, 5, 2);
-                sv[0] = r11;
-                sv[1] = r13;
-                sv[2] = r14;
-                r15 = GraphKernels.Spline(r3, points + 32, sv, 3, 2);
+                r19 = GraphKernels.Spline(r14, points + 44, sv, 5, 2);
+                sv[0] = r16;
+                sv[1] = r18;
+                sv[2] = r19;
+                r20 = GraphKernels.Spline(r5, points + 49, sv, 3, 2);
                 sv[0] = math.asfloat(0xC0800000u);
                 sv[1] = math.asfloat(0x00000000u);
                 sv[2] = math.asfloat(0x41666666u);
                 sv[3] = math.asfloat(0x41C9999Au);
                 sv[4] = math.asfloat(0x422CCCCDu);
-                r11 = GraphKernels.Spline(r12, points + 35, sv, 5, 2);
+                r16 = GraphKernels.Spline(r14, points + 52, sv, 5, 2);
                 sv[0] = math.asfloat(0xC0800000u);
                 sv[1] = math.asfloat(0x00000000u);
                 sv[2] = math.asfloat(0x41100000u);
                 sv[3] = math.asfloat(0x4181999Au);
                 sv[4] = math.asfloat(0x41E66666u);
-                r13 = GraphKernels.Spline(r12, points + 40, sv, 5, 2);
+                r18 = GraphKernels.Spline(r14, points + 57, sv, 5, 2);
                 sv[0] = math.asfloat(0xC0800000u);
                 sv[1] = math.asfloat(0xBF000000u);
                 sv[2] = math.asfloat(0x40ACCCCDu);
                 sv[3] = math.asfloat(0x41100000u);
                 sv[4] = math.asfloat(0x4149999Au);
-                r14 = GraphKernels.Spline(r12, points + 45, sv, 5, 2);
-                sv[0] = r11;
-                sv[1] = r13;
-                sv[2] = r14;
-                r16 = GraphKernels.Spline(r3, points + 50, sv, 3, 2);
+                r19 = GraphKernels.Spline(r14, points + 62, sv, 5, 2);
+                sv[0] = r16;
+                sv[1] = r18;
+                sv[2] = r19;
+                r21 = GraphKernels.Spline(r5, points + 67, sv, 3, 2);
                 sv[0] = math.asfloat(0x41000000u);
                 sv[1] = math.asfloat(0x41200000u);
                 sv[2] = math.asfloat(0x41800000u);
                 sv[3] = math.asfloat(0x41E00000u);
                 sv[4] = math.asfloat(0x42800000u);
                 sv[5] = math.asfloat(0x42D00000u);
-                r11 = GraphKernels.Spline(r12, points + 53, sv, 6, 2);
+                r16 = GraphKernels.Spline(r4, points + 70, sv, 6, 2);
                 sv[0] = math.asfloat(0x40EB851Fu);
                 sv[1] = math.asfloat(0x41133333u);
                 sv[2] = math.asfloat(0x416B851Fu);
                 sv[3] = math.asfloat(0x41CE147Bu);
                 sv[4] = math.asfloat(0x426B851Fu);
                 sv[5] = math.asfloat(0x42BF5C29u);
-                r13 = GraphKernels.Spline(r12, points + 59, sv, 6, 2);
+                r18 = GraphKernels.Spline(r4, points + 76, sv, 6, 2);
                 sv[0] = math.asfloat(0x41000000u);
                 sv[1] = math.asfloat(0x41900000u);
                 sv[2] = math.asfloat(0x41F00000u);
                 sv[3] = math.asfloat(0x42380000u);
                 sv[4] = math.asfloat(0x42840000u);
-                r14 = GraphKernels.Spline(r12, points + 65, sv, 5, 2);
+                r19 = GraphKernels.Spline(r4, points + 82, sv, 5, 2);
                 sv[0] = math.asfloat(0xC0800000u);
                 sv[1] = math.asfloat(0x00000000u);
                 sv[2] = math.asfloat(0x412CCCCDu);
                 sv[3] = math.asfloat(0x419E6666u);
                 sv[4] = math.asfloat(0x4201999Au);
-                r17 = GraphKernels.Spline(r12, points + 70, sv, 5, 2);
+                r22 = GraphKernels.Spline(r14, points + 87, sv, 5, 2);
                 sv[0] = math.asfloat(0xC0800000u);
                 sv[1] = math.asfloat(0xBF000000u);
                 sv[2] = math.asfloat(0x40ACCCCDu);
                 sv[3] = math.asfloat(0x412CCCCDu);
                 sv[4] = math.asfloat(0x41666666u);
-                r18 = GraphKernels.Spline(r12, points + 75, sv, 5, 2);
-                sv[0] = r11;
-                sv[1] = r13;
-                sv[2] = r14;
-                sv[3] = r17;
-                sv[4] = r18;
-                r19 = GraphKernels.Spline(r3, points + 80, sv, 5, 2);
+                r23 = GraphKernels.Spline(r14, points + 92, sv, 5, 2);
+                sv[0] = r16;
+                sv[1] = r18;
+                sv[2] = r19;
+                sv[3] = r22;
+                sv[4] = r23;
+                r24 = GraphKernels.Spline(r5, points + 97, sv, 5, 2);
                 sv[0] = math.asfloat(0x41600000u);
                 sv[1] = math.asfloat(0x41800000u);
                 sv[2] = math.asfloat(0x41B00000u);
                 sv[3] = math.asfloat(0x42080000u);
                 sv[4] = math.asfloat(0x428C0000u);
                 sv[5] = math.asfloat(0x42DC0000u);
-                r11 = GraphKernels.Spline(r12, points + 85, sv, 6, 2);
+                r16 = GraphKernels.Spline(r4, points + 102, sv, 6, 2);
                 sv[0] = math.asfloat(0x4155C28Fu);
                 sv[1] = math.asfloat(0x41733333u);
                 sv[2] = math.asfloat(0x41A5C28Fu);
                 sv[3] = math.asfloat(0x41FE147Bu);
                 sv[4] = math.asfloat(0x4281C28Fu);
                 sv[5] = math.asfloat(0x42CB5C29u);
-                r13 = GraphKernels.Spline(r12, points + 91, sv, 6, 2);
+                r18 = GraphKernels.Spline(r4, points + 108, sv, 6, 2);
                 sv[0] = math.asfloat(0x41000000u);
                 sv[1] = math.asfloat(0x41900000u);
                 sv[2] = math.asfloat(0x41F00000u);
                 sv[3] = math.asfloat(0x42380000u);
                 sv[4] = math.asfloat(0x42840000u);
-                r14 = GraphKernels.Spline(r12, points + 97, sv, 5, 2);
+                r19 = GraphKernels.Spline(r4, points + 114, sv, 5, 2);
                 sv[0] = math.asfloat(0xC0800000u);
                 sv[1] = math.asfloat(0x00000000u);
                 sv[2] = math.asfloat(0x412CCCCDu);
                 sv[3] = math.asfloat(0x419E6666u);
                 sv[4] = math.asfloat(0x4201999Au);
-                r17 = GraphKernels.Spline(r12, points + 102, sv, 5, 2);
+                r22 = GraphKernels.Spline(r14, points + 119, sv, 5, 2);
                 sv[0] = math.asfloat(0xC0800000u);
                 sv[1] = math.asfloat(0xBF000000u);
                 sv[2] = math.asfloat(0x40ACCCCDu);
                 sv[3] = math.asfloat(0x412CCCCDu);
                 sv[4] = math.asfloat(0x41666666u);
-                r18 = GraphKernels.Spline(r12, points + 107, sv, 5, 2);
-                sv[0] = r11;
-                sv[1] = r13;
-                sv[2] = r14;
-                sv[3] = r17;
-                sv[4] = r18;
-                r20 = GraphKernels.Spline(r3, points + 112, sv, 5, 2);
+                r23 = GraphKernels.Spline(r14, points + 124, sv, 5, 2);
+                sv[0] = r16;
+                sv[1] = r18;
+                sv[2] = r19;
+                sv[3] = r22;
+                sv[4] = r23;
+                r25 = GraphKernels.Spline(r5, points + 129, sv, 5, 2);
                 sv[0] = math.asfloat(0xC2680000u);
                 sv[1] = math.asfloat(0xC2080000u);
                 sv[2] = math.asfloat(0xC1400000u);
                 sv[3] = math.asfloat(0xC0800000u);
-                sv[4] = r15;
-                sv[5] = r16;
-                sv[6] = r19;
-                sv[7] = r20;
-                r11 = GraphKernels.Spline(r4, points + 117, sv, 8, 2);
+                sv[4] = r20;
+                sv[5] = r21;
+                sv[6] = r24;
+                sv[7] = r25;
+                r16 = GraphKernels.Spline(r6, points + 134, sv, 8, 2);
+                r18 = GraphKernels.Smoothstep(r7, math.asfloat(0x00000000u), math.asfloat(0x40000000u));
+                r19 = r8 * r18;
+                r8 = r16 + math.asfloat(0x40800000u);
+                r18 = math.clamp(r8, math.asfloat(0x00000000u), math.asfloat(0x42200000u));
+                r8 = r19 * r18;
+                r18 = r16 - math.asfloat(0x40C00000u);
+                r20 = math.clamp(r18, math.asfloat(0x00000000u), math.asfloat(0x42100000u));
+                r18 = r13 * r20;
+                r20 = r8 + r18;
+                r8 = r16 - r20;
                 sv[0] = math.asfloat(0x00000000u);
                 sv[1] = math.asfloat(0x41600000u);
-                r13 = GraphKernels.Spline(r12, points + 125, sv, 2, 2);
-                sv[0] = r13;
+                r16 = GraphKernels.Spline(r14, points + 142, sv, 2, 2);
+                sv[0] = r16;
                 sv[1] = math.asfloat(0x00000000u);
-                r14 = GraphKernels.Spline(r3, points + 127, sv, 2, 2);
+                r14 = GraphKernels.Spline(r5, points + 144, sv, 2, 2);
                 sv[0] = math.asfloat(0x00000000u);
                 sv[1] = math.asfloat(0x41D00000u);
-                r13 = GraphKernels.Spline(r12, points + 129, sv, 2, 2);
+                r16 = GraphKernels.Spline(r4, points + 146, sv, 2, 2);
                 sv[0] = math.asfloat(0x00000000u);
                 sv[1] = math.asfloat(0x41B0CCCDu);
-                r15 = GraphKernels.Spline(r12, points + 131, sv, 2, 2);
+                r18 = GraphKernels.Spline(r4, points + 148, sv, 2, 2);
                 sv[0] = math.asfloat(0x00000000u);
                 sv[1] = math.asfloat(0x41200000u);
-                r16 = GraphKernels.Spline(r12, points + 133, sv, 2, 2);
-                sv[0] = r13;
-                sv[1] = r15;
-                sv[2] = r16;
+                r20 = GraphKernels.Spline(r4, points + 150, sv, 2, 2);
+                sv[0] = r16;
+                sv[1] = r18;
+                sv[2] = r20;
                 sv[3] = math.asfloat(0x00000000u);
-                r17 = GraphKernels.Spline(r3, points + 135, sv, 4, 2);
+                r21 = GraphKernels.Spline(r5, points + 152, sv, 4, 2);
                 sv[0] = math.asfloat(0x00000000u);
                 sv[1] = math.asfloat(0x41F9999Au);
-                r13 = GraphKernels.Spline(r12, points + 139, sv, 2, 2);
+                r16 = GraphKernels.Spline(r4, points + 156, sv, 2, 2);
                 sv[0] = math.asfloat(0x00000000u);
                 sv[1] = math.asfloat(0x41D428F6u);
-                r15 = GraphKernels.Spline(r12, points + 141, sv, 2, 2);
+                r18 = GraphKernels.Spline(r4, points + 158, sv, 2, 2);
                 sv[0] = math.asfloat(0x00000000u);
                 sv[1] = math.asfloat(0x41200000u);
-                r16 = GraphKernels.Spline(r12, points + 143, sv, 2, 2);
-                sv[0] = r13;
-                sv[1] = r15;
-                sv[2] = r16;
+                r20 = GraphKernels.Spline(r4, points + 160, sv, 2, 2);
+                sv[0] = r16;
+                sv[1] = r18;
+                sv[2] = r20;
                 sv[3] = math.asfloat(0x00000000u);
-                r18 = GraphKernels.Spline(r3, points + 145, sv, 4, 2);
+                r22 = GraphKernels.Spline(r5, points + 162, sv, 4, 2);
                 sv[0] = r14;
-                sv[1] = r17;
-                sv[2] = r18;
-                r13 = GraphKernels.Spline(r4, points + 149, sv, 3, 2);
-                r14 = math.max(r13, math.asfloat(0x00000000u));
-                r13 = r11 + math.asfloat(0x42F80000u);
-                r11 = r10 * r14;
-                r10 = r13 + r11;
+                sv[1] = r21;
+                sv[2] = r22;
+                r16 = GraphKernels.Spline(r6, points + 166, sv, 3, 2);
+                r14 = math.max(r16, math.asfloat(0x00000000u));
+                r16 = r13 + r19;
+                r13 = math.asfloat(0x3F800000u) - r16;
+                r16 = r14 * r13;
+                r13 = r8 + math.asfloat(0x42F80000u);
+                r8 = r17 * r16;
+                r14 = r13 + r8;
                 sv[0] = math.asfloat(0xC2800000u);
                 sv[1] = math.asfloat(0x433E0000u);
                 sv[2] = math.asfloat(0x434E0000u);
                 sv[3] = math.asfloat(0x43678000u);
                 sv[4] = math.asfloat(0x43700000u);
-                r11 = GraphKernels.Spline(r10, points + 152, sv, 5, 2);
+                r8 = GraphKernels.Spline(r14, points + 169, sv, 5, 2);
                 sv[0] = math.asfloat(0x40C00000u);
                 sv[1] = math.asfloat(0x40000000u);
                 sv[2] = math.asfloat(0x3FB50481u);
-                r10 = GraphKernels.Spline(r12, points + 157, sv, 3, 2);
+                r13 = GraphKernels.Spline(r4, points + 174, sv, 3, 2);
                 sv[0] = math.asfloat(0x40E66666u);
                 sv[1] = math.asfloat(0x4019999Au);
                 sv[2] = math.asfloat(0x3FD9389Bu);
-                r13 = GraphKernels.Spline(r12, points + 160, sv, 3, 2);
-                sv[0] = r10;
-                sv[1] = r13;
+                r14 = GraphKernels.Spline(r4, points + 177, sv, 3, 2);
+                sv[0] = r13;
+                sv[1] = r14;
                 sv[2] = math.asfloat(0x41000000u);
-                r14 = GraphKernels.Spline(r3, points + 163, sv, 3, 2);
+                r16 = GraphKernels.Spline(r5, points + 180, sv, 3, 2);
                 sv[0] = math.asfloat(0x41000000u);
                 sv[1] = math.asfloat(0x41000000u);
-                sv[2] = r14;
-                r10 = GraphKernels.Spline(r4, points + 166, sv, 3, 2);
-                r13 = GraphKernels.Lerp(r9, r10, r7);
+                sv[2] = r16;
+                r13 = GraphKernels.Spline(r6, points + 183, sv, 3, 2);
+                r14 = r7 * r10;
+                r7 = GraphKernels.Lerp(r15, r13, r9);
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0x9DFC6BE5u) * math.asfloat(0x3F800000u);
-                    r7 = n;
+                    r9 = n;
                 }
-                r9 = r7 * math.asfloat(0x3F000000u);
-                r7 = r9 + math.asfloat(0x3F000000u);
-                r9 = GraphKernels.Smoothstep(r7, math.asfloat(0x3E4CCCCDu), math.asfloat(0x40D55556u));
+                r10 = r9 * math.asfloat(0x3F000000u);
+                r9 = r10 + math.asfloat(0x3F000000u);
+                r10 = GraphKernels.Smoothstep(r9, math.asfloat(0x3E4CCCCDu), math.asfloat(0x40D55556u));
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3CAAAAABu), nz * math.asfloat(0x3CAAAAABu), seed, 0xBFF24553u) * math.asfloat(0x3E4CCCCDu);
-                    r7 = n;
+                    r9 = n;
                 }
-                r10 = r7 + math.asfloat(0x3F000000u);
-                r7 = math.clamp(r10, math.asfloat(0x3D23D70Au), math.asfloat(0x3F75C28Fu));
-                r10 = math.clamp(r4, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
-                r4 = math.clamp(r3, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
+                r13 = r9 + math.asfloat(0x3F000000u);
+                r9 = math.clamp(r13, math.asfloat(0x3D23D70Au), math.asfloat(0x3F75C28Fu));
+                r13 = math.clamp(r6, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
+                r6 = math.clamp(r5, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D924925u), nz * math.asfloat(0x3D924925u), seed, 0xA4F5A288u) * math.asfloat(0x3F2AAAABu);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3E124925u), nz * math.asfloat(0x3E124925u), seed, 0x917A6AE6u) * math.asfloat(0x3EAAAAABu);
-                    r3 = n;
-                }
-                r14 = math.clamp(r6, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
-                {
-                    float4 nx = r0, nz = r2;
-                    float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D2AAAABu), nz * math.asfloat(0x3D2AAAABu), seed, 0x0628FB72u) * math.asfloat(0x3DA3D70Au);
-                    r6 = n;
+                    r5 = n;
                 }
                 r15 = math.clamp(r12, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D2AAAABu), nz * math.asfloat(0x3D2AAAABu), seed, 0x0628FB72u) * math.asfloat(0x3DA3D70Au);
+                    r12 = n;
+                }
+                {
+                    float4 nx = r0, nz = r2;
+                    float4 n = float4.zero;
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D4CCCCDu), nz * math.asfloat(0x3D4CCCCDu), seed, 0xE67F4092u) * math.asfloat(0x3F2AAAABu);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3DCCCCCDu), nz * math.asfloat(0x3DCCCCCDu), seed, 0x790B945Du) * math.asfloat(0x3EAAAAABu);
+                    r16 = n;
+                }
+                r17 = r16 * math.asfloat(0x41000000u);
+                {
+                    float4 nx = r0, nz = r2;
+                    float4 n = float4.zero;
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D4CCCCDu), nz * math.asfloat(0x3D4CCCCDu), seed, 0x41E7E88Cu) * math.asfloat(0x3F2AAAABu);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3DCCCCCDu), nz * math.asfloat(0x3DCCCCCDu), seed, 0x376D40BCu) * math.asfloat(0x3EAAAAABu);
+                    r16 = n;
+                }
+                r18 = r16 * math.asfloat(0x41000000u);
+                {
+                    float4 nx = r0 + r17, nz = r2 + r18;
+                    float4 n = float4.zero;
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D000000u), nz * math.asfloat(0x3D000000u), seed, 0x98ED2501u) * math.asfloat(0x3F800000u);
+                    r16 = n;
+                }
+                r17 = math.clamp(r4, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
+                {
+                    float4 nx = r0, nz = r2;
+                    float4 n = float4.zero;
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0xA6370C99u) * math.asfloat(0x3F2AAAABu);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D000000u), nz * math.asfloat(0x3D000000u), seed, 0xD8978A24u) * math.asfloat(0x3EAAAAABu);
-                    r12 = n;
+                    r4 = n;
                 }
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3DAAAAABu), nz * math.asfloat(0x3DAAAAABu), seed, 0xC6853C8Cu) * math.asfloat(0x3F2AAAABu);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3E2AAAABu), nz * math.asfloat(0x3E2AAAABu), seed, 0xF427C45Cu) * math.asfloat(0x3EAAAAABu);
-                    r16 = n;
+                    r18 = n;
                 }
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3CAAAAABu), nz * math.asfloat(0x3CAAAAABu), seed, 0xA6EEF686u) * math.asfloat(0x3D072B02u);
-                    r17 = n;
+                    r19 = n;
                 }
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0x62813496u) * math.asfloat(0x40800000u);
-                    r18 = n;
+                    r20 = n;
                 }
-                r19 = math.clamp(r5, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
+                r21 = math.clamp(r11, math.asfloat(0xBF800000u), math.asfloat(0x3F800000u));
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0xCA4EF3D0u) * math.asfloat(0x41000000u);
-                    r5 = n;
+                    r11 = n;
                 }
-                ((float4*)(r + 1152))[q] = r9;
-                ((float4*)(r + 896))[q] = r7;
                 ((float4*)(r + 1280))[q] = r10;
-                ((float4*)(r + 512))[q] = r4;
+                ((float4*)(r + 1152))[q] = r9;
                 ((float4*)(r + 1664))[q] = r13;
-                ((float4*)(r + 384))[q] = r3;
-                ((float4*)(r + 1792))[q] = r14;
                 ((float4*)(r + 768))[q] = r6;
-                ((float4*)(r + 1408))[q] = r11;
+                ((float4*)(r + 896))[q] = r7;
+                ((float4*)(r + 640))[q] = r5;
                 ((float4*)(r + 1920))[q] = r15;
                 ((float4*)(r + 1536))[q] = r12;
                 ((float4*)(r + 2048))[q] = r16;
+                ((float4*)(r + 1024))[q] = r8;
                 ((float4*)(r + 2176))[q] = r17;
+                ((float4*)(r + 1792))[q] = r14;
+                ((float4*)(r + 512))[q] = r4;
                 ((float4*)(r + 2304))[q] = r18;
                 ((float4*)(r + 2432))[q] = r19;
-                ((float4*)(r + 640))[q] = r5;
-                ((float4*)(r + 1024))[q] = r8;
+                ((float4*)(r + 2560))[q] = r20;
+                ((float4*)(r + 2688))[q] = r21;
+                ((float4*)(r + 1408))[q] = r11;
+                ((float4*)(r + 384))[q] = r3;
             }
         }
 
-        /// <summary>Column program: 14 instructions, 12 registers.</summary>
+        /// <summary>Column program: 19 instructions, 13 registers.</summary>
         private static void Column(float* r, SplinePoint* points, int lanes, uint seed){
             int quads = (lanes + 3) >> 2;
             for (int q = 0; q < quads; q++){
                 float4 r0 = ((float4*)r)[q];
                 float4 r2 = ((float4*)(r + 256))[q];
-                float4 r3, r4, r5, r6, r7, r8, r9, r10, r11;
+                float4 r3, r4, r5, r6, r7, r8, r9, r10, r11, r12;
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
@@ -519,34 +585,56 @@ namespace Engine.Scripts.WorldGen.Graph{
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D4CCCCDu), nz * math.asfloat(0x3D4CCCCDu), seed, 0xE67F4092u) * math.asfloat(0x3F2AAAABu);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3DCCCCCDu), nz * math.asfloat(0x3DCCCCCDu), seed, 0x790B945Du) * math.asfloat(0x3EAAAAABu);
+                    r7 = n;
+                }
+                r8 = r7 * math.asfloat(0x41000000u);
+                {
+                    float4 nx = r0, nz = r2;
+                    float4 n = float4.zero;
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D4CCCCDu), nz * math.asfloat(0x3D4CCCCDu), seed, 0x41E7E88Cu) * math.asfloat(0x3F2AAAABu);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3DCCCCCDu), nz * math.asfloat(0x3DCCCCCDu), seed, 0x376D40BCu) * math.asfloat(0x3EAAAAABu);
+                    r7 = n;
+                }
+                r9 = r7 * math.asfloat(0x41000000u);
+                {
+                    float4 nx = r0 + r8, nz = r2 + r9;
+                    float4 n = float4.zero;
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D000000u), nz * math.asfloat(0x3D000000u), seed, 0x98ED2501u) * math.asfloat(0x3F800000u);
+                    r7 = n;
+                }
+                {
+                    float4 nx = r0, nz = r2;
+                    float4 n = float4.zero;
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0xA6370C99u) * math.asfloat(0x3F2AAAABu);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3D000000u), nz * math.asfloat(0x3D000000u), seed, 0xD8978A24u) * math.asfloat(0x3EAAAAABu);
-                    r7 = n;
+                    r8 = n;
                 }
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3DAAAAABu), nz * math.asfloat(0x3DAAAAABu), seed, 0xC6853C8Cu) * math.asfloat(0x3F2AAAABu);
                     n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3E2AAAABu), nz * math.asfloat(0x3E2AAAABu), seed, 0xF427C45Cu) * math.asfloat(0x3EAAAAABu);
-                    r8 = n;
-                }
-                {
-                    float4 nx = r0, nz = r2;
-                    float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3CAAAAABu), nz * math.asfloat(0x3CAAAAABu), seed, 0xA6EEF686u) * math.asfloat(0x3D072B02u);
                     r9 = n;
                 }
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0x62813496u) * math.asfloat(0x40800000u);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3CAAAAABu), nz * math.asfloat(0x3CAAAAABu), seed, 0xA6EEF686u) * math.asfloat(0x3D072B02u);
                     r10 = n;
                 }
                 {
                     float4 nx = r0, nz = r2;
                     float4 n = float4.zero;
-                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0xCA4EF3D0u) * math.asfloat(0x41000000u);
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0x62813496u) * math.asfloat(0x40800000u);
                     r11 = n;
+                }
+                {
+                    float4 nx = r0, nz = r2;
+                    float4 n = float4.zero;
+                    n = n + SimplexLanes.Noise2(nx * math.asfloat(0x3C800000u), nz * math.asfloat(0x3C800000u), seed, 0xCA4EF3D0u) * math.asfloat(0x41000000u);
+                    r12 = n;
                 }
                 ((float4*)(r + 512))[q] = r4;
                 ((float4*)(r + 384))[q] = r3;
@@ -557,6 +645,7 @@ namespace Engine.Scripts.WorldGen.Graph{
                 ((float4*)(r + 1152))[q] = r9;
                 ((float4*)(r + 1280))[q] = r10;
                 ((float4*)(r + 1408))[q] = r11;
+                ((float4*)(r + 1536))[q] = r12;
             }
         }
     }

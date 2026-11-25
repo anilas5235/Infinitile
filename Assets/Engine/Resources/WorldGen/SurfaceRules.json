@@ -7,6 +7,8 @@
     "snowWobble": "snow_wobble",
     "iceTemperature": -0.6,
     "iceWobble": "ice_wobble",
+    "riverIceTemperature": -0.45,
+    "riverIceMin": 0.01,
     "treeLineBelowSnow": 15,
     "treeLineFloor": 170,
     "treeLineWobble": "tree_line_wobble",
@@ -21,22 +23,17 @@
   "blocks": {
     "snow": "std:Snow",
     "snow_layer": "std:SnowLayer",
+    "snow_half": "std:SnowLayerHalf",
     "dark_rock": "std:StoneGrey",
-    "moss_rock": "std:StoneMossy",
-    "dark_moss_rock": "std:StoneGreyMossy",
-    "grassy_rock": "std:StoneGrassy",
     "litter": "std:Litter",
     "coarse_dirt": "std:DirtCoarse",
-    "sandy_dirt": "std:DirtSandy",
     "mud": "std:Mud",
     "moss": "std:Moss",
     "leaf_litter": "std:LitterLeaves",
-    "needle_litter": "std:Litter",
     "peat": "std:Peat",
     "clay": "std:Clay",
     "gravel": "std:StoneGravel",
     "cobble": "std:Cobblestone",
-    "lichen_rock": "std:StoneGreyLichen",
     "granite": "std:Granite",
     "diorite": "std:Diorite",
     "andesite": "std:Andesite",
@@ -53,7 +50,7 @@
             "if": "steep",
             "then": {
               "sequence": [
-                { "name": "snow_cliff_dark", "if": { "noise_threshold": { "name": "rock_mix", "min": -0.3 } }, "then": { "block": "@dark_rock" } },
+                { "name": "snow_cliff_dark", "if": { "all": [{ "biome": "Mountain" }, { "noise_threshold": { "name": "rock_mix", "min": -0.3 } }] }, "then": { "block": "@dark_rock" } },
                 { "name": "snow_cliff_rock", "then": { "block": "@rock" } }
               ]
             }
@@ -63,20 +60,25 @@
             "if": { "steep": 2 },
             "then": {
               "sequence": [
-                { "name": "snow_ledge_dark", "if": { "noise_threshold": { "name": "rock_mix", "min": -0.3 } }, "then": { "block": "@dark_rock", "cover": "@snow_layer" } },
+                { "name": "snow_ledge_dark", "if": { "all": [{ "biome": "Mountain" }, { "noise_threshold": { "name": "rock_mix", "min": -0.3 } }] }, "then": { "block": "@dark_rock", "cover": "@snow_layer" } },
                 { "name": "snow_ledge_rock", "then": { "block": "@rock", "cover": "@snow_layer" } }
               ]
             }
           },
           {
+            "name": "snow_foot",
+            "if": "step_foot",
+            "then": { "block": "@snow", "cover": "@snow_half" }
+          },
+          {
             "name": "snow_peak",
             "if": { "not": "below_tree_line" },
-            "then": { "block": "@snow" }
+            "then": { "block": "@snow", "cover": "@snow_layer" }
           },
           {
             "name": "snow_step",
             "if": { "steep": 1 },
-            "then": { "block": "@snow" }
+            "then": { "block": "@snow", "cover": "@snow_layer" }
           },
           {
             "name": "snow_ground",
@@ -90,7 +92,7 @@
       "if": { "all": [{ "stone_depth_above": 4 }, { "not": "floor" }, "dry", { "steep": 2 }, { "temperature": "snow" }, { "not": "never_snows" }] },
       "then": {
         "sequence": [
-          { "name": "snow_rock_under_dark", "if": { "noise_threshold": { "name": "rock_mix", "min": -0.3 } }, "then": { "block": "@dark_rock" } },
+          { "name": "snow_rock_under_dark", "if": { "all": [{ "biome": "Mountain" }, { "noise_threshold": { "name": "rock_mix", "min": -0.3 } }] }, "then": { "block": "@dark_rock" } },
           { "name": "snow_rock_under_rock", "then": { "block": "@rock" } }
         ]
       }
@@ -102,6 +104,18 @@
       "if": { "above_preliminary_surface": "delta_down" },
       "then": {
         "sequence": [
+          {
+            "name": "river_bed",
+            "if": { "all": ["floor", { "water_depth": [1, 255] }, { "river": 0.3 }] },
+            "then": {
+              "sequence": [
+                { "name": "river_bed_mud", "if": { "biome": "Swamp" }, "then": { "block": "@mud" } },
+                { "name": "river_bed_sand", "if": { "noise_threshold": { "name": "ground_mix", "min": 0.35 } }, "then": { "block": "@beach" } },
+                { "name": "river_bed_clay", "if": { "noise_threshold": { "name": "ground_mix", "max": -0.35 } }, "then": { "block": "@clay" } },
+                { "name": "river_bed_gravel", "then": { "block": "@gravel" } }
+              ]
+            }
+          },
           {
             "name": "shallow_floor",
             "if": { "all": ["floor", { "water_depth": [1, 3] }] },
@@ -143,14 +157,11 @@
             "if": { "all": [{ "stone_depth_above": 4 }, { "not": "floor" }, "dry", "steep"] },
             "then": {
               "sequence": [
-                { "name": "steep_lichen", "if": { "all": [{ "biome": ["Forest", "Mountain", "Taiga"] }, { "noise_threshold": { "name": "ground_mix", "max": -0.5 } }] }, "then": { "block": "@lichen_rock" } },
                 { "name": "steep_marble", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_kind", "max": -0.5 } }, { "noise_threshold": { "name": "ground_mix", "min": 0.3 } }] }, "then": { "block": "@marble" } },
                 { "name": "steep_diorite", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_kind", "max": -0.5 } }] }, "then": { "block": "@diorite" } },
                 { "name": "steep_granite", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_kind", "min": 0.5 } }] }, "then": { "block": "@granite" } },
-                { "name": "steep_moss_dark", "if": { "all": [{ "biome": ["Forest", "Jungle", "Swamp", "Taiga"] }, { "noise_threshold": { "name": "rock_mix", "min": -0.3 } }, { "noise_threshold": { "name": "ground_mix", "min": 0.25 } }] }, "then": { "block": "@dark_moss_rock" } },
                 { "name": "steep_andesite", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_mix", "min": -0.3 } }, { "noise_threshold": { "name": "ground_mix", "min": 0.4 } }] }, "then": { "block": "@andesite" } },
-                { "name": "steep_dark", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_mix", "min": -0.3 } }] }, "then": { "block": "@dark_rock" } },
-                { "name": "steep_moss", "if": { "all": [{ "biome": ["Forest", "Jungle", "Swamp", "Taiga"] }, { "noise_threshold": { "name": "ground_mix", "min": 0.25 } }] }, "then": { "block": "@moss_rock" } },
+                { "name": "steep_dark", "if": { "all": [{ "biome": "Mountain" }, { "noise_threshold": { "name": "rock_mix", "min": -0.3 } }] }, "then": { "block": "@dark_rock" } },
                 { "name": "steep_rock", "then": { "block": "@rock" } }
               ]
             }
@@ -160,12 +171,11 @@
             "if": { "all": [{ "stone_depth_above": 4 }, "dry", { "not": "below_tree_line" }] },
             "then": {
               "sequence": [
-                { "name": "alpine_lichen", "if": { "all": [{ "biome": ["Forest", "Mountain", "Taiga"] }, { "noise_threshold": { "name": "ground_mix", "max": -0.5 } }] }, "then": { "block": "@lichen_rock" } },
                 { "name": "alpine_marble", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_kind", "max": -0.5 } }, { "noise_threshold": { "name": "ground_mix", "min": 0.3 } }] }, "then": { "block": "@marble" } },
                 { "name": "alpine_diorite", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_kind", "max": -0.5 } }] }, "then": { "block": "@diorite" } },
                 { "name": "alpine_granite", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_kind", "min": 0.5 } }] }, "then": { "block": "@granite" } },
                 { "name": "alpine_andesite", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_mix", "min": -0.3 } }, { "noise_threshold": { "name": "ground_mix", "min": 0.4 } }] }, "then": { "block": "@andesite" } },
-                { "name": "alpine_dark", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_mix", "min": -0.3 } }] }, "then": { "block": "@dark_rock" } },
+                { "name": "alpine_dark", "if": { "all": [{ "biome": "Mountain" }, { "noise_threshold": { "name": "rock_mix", "min": -0.3 } }] }, "then": { "block": "@dark_rock" } },
                 { "name": "alpine_rock", "then": { "block": "@rock" } }
               ]
             }
@@ -175,18 +185,15 @@
             "if": { "all": ["floor", "dry", "below_tree_line"] },
             "then": {
               "sequence": [
-                { "name": "ground_steep_cap", "if": { "all": ["steep", { "biome": ["Forest", "Jungle", "Plains", "Savanna", "Swamp", "Taiga"] }, { "noise_threshold": { "name": "ground_mix", "min": -0.1 } }] }, "then": { "block": "@grassy_rock" } },
-                { "name": "ground_shore", "if": { "all": ["near_water", { "top_above_water": [2, 6] }, { "biome": ["Forest", "Jungle", "Plains", "Savanna", "Taiga"] }, { "noise_threshold": { "name": "ground_mix", "min": -0.2 } }] }, "then": { "block": "@sandy_dirt" } },
+                { "name": "ground_steep_rock", "if": { "all": ["steep", { "biome": ["Forest", "Jungle", "Plains", "Savanna", "Swamp", "Taiga"] }, { "noise_threshold": { "name": "ground_mix", "min": -0.1 } }] }, "then": { "block": "@rock" } },
                 { "name": "ground_scree", "if": { "all": [{ "biome": "Mountain" }, { "steep": 2 }, { "noise_threshold": { "name": "ground_mix", "min": 0.35 } }] }, "then": { "block": "@cobble" } },
-                { "name": "ground_moss", "if": { "all": [{ "biome": ["Forest", "Jungle", "Swamp", "Taiga"] }, { "noise_threshold": { "name": "rock_mix", "max": -0.55 } }] }, "then": { "block": "@moss" } },
-                { "name": "ground_leaves", "if": { "all": [{ "biome": ["Forest", "Jungle"] }, { "noise_threshold": { "name": "ground_mix", "min": 0.3 } }] }, "then": { "block": "@leaf_litter" } },
-                { "name": "ground_needles", "if": { "all": [{ "biome": "Taiga" }, { "noise_threshold": { "name": "ground_mix", "min": 0.45 } }] }, "then": { "block": "@needle_litter" } },
-                { "name": "ground_coarse", "if": { "all": [{ "biome": "Savanna" }, { "noise_threshold": { "name": "ground_mix", "min": 0.25 } }] }, "then": { "block": "@coarse_dirt" } },
-                { "name": "ground_coarse_taiga", "if": { "all": [{ "biome": "Taiga" }, { "noise_threshold": { "name": "ground_mix", "max": -0.4 } }] }, "then": { "block": "@coarse_dirt" } },
-                { "name": "ground_bare", "if": { "all": [{ "biome": "Plains" }, { "noise_threshold": { "name": "ground_mix", "min": 0.5 } }] }, "then": { "block": "@coarse_dirt" } },
+                { "name": "ground_moss_jungle", "if": { "all": [{ "biome": "Jungle" }, { "noise_threshold": { "name": "patch_mix", "max": -0.72 } }] }, "then": { "block": "@moss" } },
+                { "name": "ground_moss", "if": { "all": [{ "biome": "Swamp" }, { "noise_threshold": { "name": "rock_mix", "max": -0.55 } }] }, "then": { "block": "@moss" } },
+                { "name": "ground_leaves", "if": { "all": [{ "biome": "Jungle" }, { "noise_threshold": { "name": "patch_mix", "min": 0.44 } }] }, "then": { "block": "@leaf_litter" } },
+                { "name": "ground_coarse", "if": { "all": [{ "biome": "Savanna" }, { "noise_threshold": { "name": "patch_mix", "min": 0.37 } }] }, "then": { "block": "@coarse_dirt" } },
+                { "name": "ground_dry", "if": { "all": [{ "biome": "Savanna" }, { "noise_threshold": { "name": "patch_mix", "max": -0.71 } }] }, "then": { "block": "@coarse_dirt" } },
                 { "name": "ground_mud", "if": { "all": [{ "biome": "Swamp" }, { "noise_threshold": { "name": "ground_mix", "min": 0.4 } }] }, "then": { "block": "@mud" } },
-                { "name": "ground_peat", "if": { "all": [{ "biome": "Swamp" }, { "noise_threshold": { "name": "ground_mix", "max": -0.45 } }] }, "then": { "block": "@peat" } },
-                { "name": "ground_dry", "if": { "all": [{ "biome": "Savanna" }, { "noise_threshold": { "name": "ground_mix", "max": -0.55 } }] }, "then": { "block": "@sandy_dirt" } }
+                { "name": "ground_peat", "if": { "all": [{ "biome": "Swamp" }, { "noise_threshold": { "name": "ground_mix", "max": -0.45 } }] }, "then": { "block": "@peat" } }
               ]
             }
           },

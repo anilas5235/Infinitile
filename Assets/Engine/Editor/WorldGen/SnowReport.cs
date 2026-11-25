@@ -38,6 +38,14 @@ namespace Engine.Editor.WorldGen{
         /// <summary>Share of the open water samples (top below y 123) that freeze.</summary>
         public double IceShare;
 
+        /// <summary>
+        ///     River water (the river ice's weight, DEC-207): samples, the share that freezes, the share the sea rule alone
+        ///     would freeze, and of the frozen ones the share with a snowy dry neighbour sample (W2-CLM-05's order).
+        /// </summary>
+        public long RiverWater;
+
+        public double RiverIceShare, RiverSeaRuleShare, FrozenRiverSnowyBank;
+
         public readonly List<TourSpot> Tour = new();
     }
 
@@ -81,7 +89,9 @@ namespace Engine.Editor.WorldGen{
             bool[] snow = new bool[n], dry = new bool[n], never = new bool[n], above = new bool[n];
             int[] snowLine = new int[n], treeLine = new int[n];
             long[] snowy = new long[nb], would = new long[nb];
-            long water = 0, ice = 0;
+            long water = 0, ice = 0, riverIce = 0, riverSeaRule = 0;
+            float riverMin = rules.RiverIce >= 0 ? rules.RiverIceMin : 0.3f;
+            List<int> frozenRivers = new();
             List<float> mountainT = new();
             List<(float T, bool Snow)> high = new();
             for (int i = 0; i < n; i++){
@@ -96,9 +106,23 @@ namespace Engine.Editor.WorldGen{
                 snow[i] = above[i] && !never[i];
                 if (!dry[i]){
                     water++;
-                    if (!never[i] && rules.ColdAt(surfaceY, t, Value(iceSlot, i), rules.IceTemperature)){
+                    bool river = c.River[i] >= riverMin && riverMin > 0f;
+                    bool seaCold = rules.ColdAt(surfaceY, t, Value(iceSlot, i), rules.IceTemperature);
+                    bool riverCold = rules.RiverIce >= 0 && river && rules.ColdAt(surfaceY, t, 0f, rules.RiverIceTemperature);
+                    if (river){
+                        r.RiverWater++;
+                        if (!never[i] && seaCold) riverSeaRule++;
+                    }
+
+                    if (!never[i] && (seaCold || riverCold)){
                         ice++;
-                        if (r.Tour.All(s => !s.What.StartsWith("sea ice", StringComparison.Ordinal)))
+                        if (river){
+                            riverIce++;
+                            frozenRivers.Add(i);
+                            if (r.Tour.All(s => !s.What.StartsWith("frozen river", StringComparison.Ordinal)))
+                                r.Tour.Add(new TourSpot{ What = $"frozen river ({r.Names[b]}, T {F(t)})", X = (int)grid[i].x, Z = (int)grid[i].y, Y = surfaceY + 12 });
+                        }
+                        else if (r.Tour.All(s => !s.What.StartsWith("sea ice", StringComparison.Ordinal)))
                             r.Tour.Add(new TourSpot{ What = $"sea ice ({r.Names[b]}, T {F(t)})", X = (int)grid[i].x, Z = (int)grid[i].y, Y = surfaceY + 12 });
                     }
 
@@ -121,6 +145,27 @@ namespace Engine.Editor.WorldGen{
             }
 
             r.IceShare = water > 0 ? (double)ice / water : 0;
+            r.RiverIceShare = r.RiverWater > 0 ? (double)riverIce / r.RiverWater : 0;
+            r.RiverSeaRuleShare = r.RiverWater > 0 ? (double)riverSeaRule / r.RiverWater : 0;
+            int withBank = 0, snowyBank = 0;
+            foreach (int i in frozenRivers){
+                int x = i % side, z = i / side;
+                bool any = false, bankSnow = false;
+                for (int k = 0; k < 4; k++){
+                    int nx = x + (k == 0 ? 1 : k == 1 ? -1 : 0), nz = z + (k == 2 ? 1 : k == 3 ? -1 : 0);
+                    if (nx < 0 || nz < 0 || nx >= side || nz >= side) continue;
+                    int j = nz * side + nx;
+                    if (!dry[j]) continue;
+                    any = true;
+                    bankSnow |= snow[j];
+                }
+
+                if (!any) continue;
+                withBank++;
+                if (bankSnow) snowyBank++;
+            }
+
+            r.FrozenRiverSnowyBank = withBank > 0 ? (double)snowyBank / withBank : double.NaN;
             r.MountainT = mountainT.ToArray();
             if (mountainT.Count > 0){
                 mountainT.Sort();
@@ -202,6 +247,8 @@ namespace Engine.Editor.WorldGen{
             sb.AppendLine($"=== Snow report · seed {r.Seed} ===");
             sb.AppendLine($"median Mountain T {F(r.MedianMountainT)} → snow line y {r.SnowLineAtMedian} (the calibration pools the five seeds: y 210 at their joint median) · " +
                           $"T_snow {F(rules.SnowTemperature)}, L {F(rules.Lapse, "0.0000")} · sea ice {BiomeWorldReport.P(r.IceShare, "0.00")} of the open water");
+            sb.AppendLine($"river water {r.RiverWater} samples: frozen {BiomeWorldReport.P(r.RiverIceShare, "0.00")} (the sea rule alone {BiomeWorldReport.P(r.RiverSeaRuleShare, "0.00")}); " +
+                          $"frozen river samples with a dry neighbour that has snow: {BiomeWorldReport.P(r.FrozenRiverSnowyBank, "0.0")}");
             sb.AppendLine("Mountain ground at y 200 and above, snow share per T band (equal counts):");
             foreach ((float from, float to, int samples, double share) in r.MountainBands)
                 sb.AppendLine($"  T {F(from),6} … {F(to),6}: {BiomeWorldReport.P(share),6} of {samples}");

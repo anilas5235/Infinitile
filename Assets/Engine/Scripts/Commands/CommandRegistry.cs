@@ -29,6 +29,7 @@ namespace Engine.Scripts.Commands{
             registry.Register(new TeleportCommand());
             registry.Register(new SetVoxelCommand());
             registry.Register(new LocateCommand());
+            registry.Register(new GotoCommand());
             return registry;
         }
 

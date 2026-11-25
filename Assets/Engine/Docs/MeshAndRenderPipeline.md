@@ -1081,9 +1081,10 @@ of the scene behind, no depth fade to opaque, no Snell's window, no opaque colou
 The owner asked for the per-biome colour of the water on grass and plants as well (WorldGenSpec DEC-122,
 2026-11-20): grass tops and sides and the green plants take a biome colour, Minecraft style, from grey tiles. Tree
 leaves are not tinted (spec idea 16.8 stays open); flowers, mushrooms, rocks, wheat, the torch and the dead plants
-(GrassFDead, DeadBush) keep their colours. Version 1.13 extends the water tint of Version 1.12 to three layers.
+(GrassFDead, DeadBush) keep their colours. Version 1.13 extends the water tint of Version 1.12 to three layers; WorldGen v2 DEC-206 (2026-11-25) adds a
+fourth, litter: `std:LitterLeaves` is a grey tile coloured per biome (`Biome.LitterColor`, default the old brown).
 
-- **Palette** (`BiomeTintPalette`). Per layer (0 water, 1 grass, 2 plants, the values of `VoxelBiomeTint`) the
+- **Palette** (`BiomeTintPalette`). Per layer (0 water, 1 grass, 2 plants, 3 litter, the values of `VoxelBiomeTint`) the
   colour of every biome in config order, kept in linear light, and a default per layer (`Biome.DefaultWaterColor`,
   `DefaultGrassColor` #7cc24a, `DefaultFoliageColor` #6aae3a: the Plains colours) for columns without a biome or a
   biome the palette lacks. `Biome.GrassColor` and `Biome.FoliageColor` are new fields; every shipped biome has its
@@ -1091,10 +1092,10 @@ leaves are not tinted (spec idea 16.8 stays open); flowers, mushrooms, rocks, wh
   the biomes change.
 - **Tint map** (`BiomeTintMap`, was `WaterTintMap`). A repeating sRGB `Tex2DArray` render texture with one slice
   per layer and one texel per 4 × 4 block columns (8 × 8 texels a chunk, the mean of its 16 columns in linear
-  light), `2 × draw distance + 4` chunks a side: 224² texels × 3 slices, 0.6 MB at draw distance 12 (Version 1.12:
-  4.2 MB with mips), 3.6 MB at 32. No mips: the texels are what the old blend mip held, so `UpdateMips` and its
-  `LateUpdate` call are gone. A chunk's three blocks go into one 8 × 24 staging texture (`FillPixels`, pixel
-  `x + (z + layer × 8) × 8`) and from there with three `Graphics.CopyTexture` calls into its slot; the slices are
+  light), `2 × draw distance + 4` chunks a side: 224² texels × 4 slices (3 before DEC-206), 0.8 MB at draw distance 12 (Version 1.12:
+  4.2 MB with mips), 4.8 MB at 32. No mips: the texels are what the old blend mip held, so `UpdateMips` and its
+  `LateUpdate` call are gone. A chunk's blocks (one per layer) go into one 8 × 32 staging texture (`FillPixels`, pixel
+  `x + (z + layer × 8) × 8`) and from there with one `Graphics.CopyTexture` call per layer into its slot; the slices are
   cleared to the layer defaults. `VoxelWorldRenderer.EnsureBiomeTint` writes the chunk and its eight neighbours
   that are loaded before the chunk's first partition is built (marker `Voxel.GpuUpload.BiomeTint`), so a chunk
   border never blends with the default colour. Globals `_VoxelBiomeTint` (the array) and `_VoxelBiomeTintParams`
@@ -1117,8 +1118,8 @@ leaves are not tinted (spec idea 16.8 stays open); flowers, mushrooms, rocks, wh
 - **Grey tiles** (`Docs/Tools/make_tint_tiles.py`, from the Kenney tiles). Every tinted pixel is turned grey with
   its relative luminance kept and the mean scaled to a linear 0.70, so a biome colour is the mean the tinted part
   shows before light. A grass side has its grass band greyed and an overlay with alpha 255 on that band and 0 on the
-  dirt (DXT5); the solid tiles are saved without alpha (DXT1). Tiles: `grass_top_tint` (Grass and StoneGrassy tops),
-  `dirt_grass_tint` + overlay, `stone_grass_tint` + overlay, `grass1_tint` (GrassFSwamp), `grass2_tint` (Fern),
+  dirt (DXT5); the solid tiles are saved without alpha (DXT1). Tiles: `grass_top_tint` (Grass tops),
+  `dirt_grass_tint` + overlay, `grass1_tint` (GrassFSwamp), `grass2_tint` (Fern),
   `grass3_tint` (GrassFTall), `grass4_tint` (GrassF, Reeds), `grass_tan_tint` (GrassFDry).
 - **Folded blocks.** With the colour from the biome, the per-biome grass blocks were the same block: GrassDry,
   GrassJungle, GrassSwamp and GrassTaiga are now Grass; StoneGrassyTaiga is StoneGrassy (now tinted too);

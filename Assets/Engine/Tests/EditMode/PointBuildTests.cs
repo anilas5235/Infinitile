@@ -57,7 +57,8 @@ namespace Engine.Tests.EditMode{
         }
 
         [TestCase(0, 2953, 0, 0, 1102910112564121940UL)] // cave pockets on the world bottom
-        [TestCase(3, 12063, 1292, 438, 13256704702427581129UL)] // surface, water and every voxel type (Water alpha 0.6, DEC-119)
+        // Partition 3 re-recorded 2026-11-25: DEC-203 removed seven of the first 63 base voxels, so others fill the set
+        [TestCase(3, 12170, 1254, 398, 11706040180931564079UL)] // surface, water and every voxel type (Water alpha 0.6, DEC-119)
         [TestCase(7, 5737, 0, 0, 16801187266041425973UL)] // floating blocks under the world top
         public void BuildPoints_MatchesRecordedPoints(int partitionY, int solid, int transparent, int foliage,
             ulong hash){

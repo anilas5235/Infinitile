@@ -163,6 +163,7 @@ namespace Engine.Scripts.WorldGen.Surface{
                 // Ice is always on: its wobble must exist when named, and T is needed.
                 _needsTemperature = true;
                 Output(climate.IceWobble);
+                if (!float.IsNaN(climate.RiverIceTemperature)) Output(GraphOutputs.River);
                 float iceWobble = WobbleBound(climate.IceWobble), snowWobble = WobbleBound(climate.SnowWobble);
                 if (climate.IceTemperature + iceWobble > climate.SnowTemperature - snowWobble)
                     // A warning since V4 (DEC-176): the snow refit (DEC-175) would otherwise push the ice into rarity.
@@ -245,6 +246,8 @@ namespace Engine.Scripts.WorldGen.Surface{
                             f, t, rule);
                     case SteepCondition s:
                         return Leaf(RuleNodeKind.Flag, Flag(new ColumnFlagDef{ Kind = ColumnFlagKind.Steep, A = s.Rise }), 0, t, f, rule);
+                    case StepFootCondition s:
+                        return Leaf(RuleNodeKind.Flag, Flag(new ColumnFlagDef{ Kind = ColumnFlagKind.StepFoot, A = s.Rise }), 0, t, f, rule);
                     case NearWaterCondition:
                         return Leaf(RuleNodeKind.Flag, Flag(new ColumnFlagDef{ Kind = ColumnFlagKind.NearWater, A = _set.Climate.NearWaterDistance }), 0, t, f, rule);
                     case SkyOpenCondition:
@@ -609,6 +612,10 @@ namespace Engine.Scripts.WorldGen.Surface{
                 r.TemperatureSlot = TemperatureSlot();
                 r.PreliminarySurfaceSlot = PreliminarySlot();
                 r.IceWobble = Output(_set.Climate.IceWobble);
+                bool riverIce = !float.IsNaN(_set.Climate.RiverIceTemperature);
+                r.RiverIce = riverIce ? Output(GraphOutputs.River) : -1;
+                r.RiverIceMin = _set.Climate.RiverIceMin;
+                r.RiverIceTemperature = riverIce ? _set.Climate.RiverIceTemperature : 0f;
                 r.SnowWobble = Output(_set.Climate.SnowWobble);
                 r.TreeLineWobble = Output(_set.Climate.TreeLineWobble);
                 r.Ice = 1;

@@ -18,7 +18,7 @@ MonoBehaviour:
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   SnowTopBlock: {fileID: 0}
   FreezesWater: 0
-  StrataBlock: {fileID: 11400000, guid: afe093b663ba4bb0244bb56edb4319f2, type: 2}
+  StrataBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   BeachBlock: {fileID: 11400000, guid: b5df436b2cc46cf419e666fccd2d96b3, type: 2}
   BeachHeight: 4
   RockBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
@@ -56,13 +56,25 @@ MonoBehaviour:
     HumidityRange: {x: 0.087, y: 1}
     ContinentalnessRange: {x: 0.09, y: 1}
     ErosionRange: {x: -1, y: -0.05}
-    WeirdnessRange: {x: -1, y: -0.2}
+    WeirdnessRange: {x: -1, y: -0.85}
     DepthRange: {x: 0, y: 0}
   - TemperatureRange: {x: 0.28, y: 1}
     HumidityRange: {x: 0.087, y: 1}
     ContinentalnessRange: {x: 0.09, y: 1}
     ErosionRange: {x: -1, y: -0.05}
-    WeirdnessRange: {x: 0.2, y: 1}
+    WeirdnessRange: {x: -0.45, y: 0}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: 0.28, y: 1}
+    HumidityRange: {x: 0.087, y: 1}
+    ContinentalnessRange: {x: 0.09, y: 1}
+    ErosionRange: {x: -1, y: -0.05}
+    WeirdnessRange: {x: 0, y: 0.45}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: 0.28, y: 1}
+    HumidityRange: {x: 0.087, y: 1}
+    ContinentalnessRange: {x: 0.09, y: 1}
+    ErosionRange: {x: -1, y: -0.05}
+    WeirdnessRange: {x: 0.85, y: 1}
     DepthRange: {x: 0, y: 0}
   FloraRules:
   - SpeciesVoxel: {fileID: 0}
@@ -186,3 +198,4 @@ MonoBehaviour:
   WaterFogColor: {r: 0.02, g: 0.33, b: 0.93, a: 1}
   GrassColor: {r: 0.2470588, g: 0.7294118, b: 0.172549, a: 1}
   FoliageColor: {r: 0.1803922, g: 0.6470588, b: 0.1411765, a: 1}
+  LitterColor: {r: 0.259, g: 0.361, b: 0.184, a: 1}

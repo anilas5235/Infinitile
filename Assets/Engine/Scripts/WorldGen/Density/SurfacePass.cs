@@ -138,12 +138,18 @@ namespace Engine.Scripts.WorldGen.Density{
                 int surface = waterLevel - 1;
                 if (rules.Ice != 0 && ice != 0 && surface >= 0 && b.Heightmap[c] < surface && worldGen.Layout.Defs[biome].neverSnows == 0){
                     float wobble = rules.IceWobble >= 0 ? Output(rules, ref col, ref b, rules.IceWobble) : 0f;
-                    if (rules.ColdAt(surface, col.Temperature, wobble, rules.IceTemperature)){
+                    if (rules.ColdAt(surface, col.Temperature, wobble, rules.IceTemperature) || RiverIceCold(rules, ref col, ref b, surface)){
                         column[surface] = ice;
                         counters.IceVoxels++;
                     }
                 }
             }
+        }
+
+        /// <summary>Frozen rivers (§8.3, DEC-207): a river column freezes where T is below the river limit, without wobble.</summary>
+        private static bool RiverIceCold(in SurfaceRules rules, ref Column col, ref DensityChunkBuffers b, int surface){
+            return rules.RiverIce >= 0 && Output(rules, ref col, ref b, rules.RiverIce) >= rules.RiverIceMin &&
+                   rules.ColdAt(surface, col.Temperature, 0f, rules.RiverIceTemperature);
         }
 
         /// <summary>The voxels of one solid run: full graph near its top and bottom, the interior plan between.</summary>
@@ -287,6 +293,9 @@ namespace Engine.Scripts.WorldGen.Density{
                 case ColumnFlagKind.NearWater:
                     value = NearWater(ref b, col.X, col.Z, (int)d.A);
                     break;
+                case ColumnFlagKind.StepFoot:
+                    value = StepUp(ref b, col.X, col.Z) >= d.A;
+                    break;
                 case ColumnFlagKind.Noise: {
                     float o = d.Output >= 0 ? Output(rules, ref col, ref b, d.Output) : 0f;
                     value = o >= d.A && o < d.B;
@@ -364,7 +373,9 @@ namespace Engine.Scripts.WorldGen.Density{
             snowLine = rules.ColdThreshold(temperature, snow, rules.SnowTemperature);
             treeLine = rules.TreeLine(temperature, tree);
             rise = Rise(ref b, x, z);
-            iceCold = rules.ColdAt(DensityLayout.WetnessY, temperature, ice, rules.IceTemperature);
+            iceCold = rules.ColdAt(DensityLayout.WetnessY, temperature, ice, rules.IceTemperature) ||
+                      rules.RiverIce >= 0 && WobbleAt(rules, ref b, rules.RiverIce, x, z) >= rules.RiverIceMin &&
+                      rules.ColdAt(DensityLayout.WetnessY, temperature, 0f, rules.RiverIceTemperature);
         }
 
         private static float WobbleAt(in SurfaceRules rules, ref DensityChunkBuffers b, int output, int x, int z){
@@ -395,6 +406,22 @@ namespace Engine.Scripts.WorldGen.Density{
             int self = h[x * N + z];
             if (self < 0) return 0;
             return math.max(Across(h, x, z, RiseReach, 0), Across(h, x, z, 0, RiseReach));
+        }
+
+        /// <summary>
+        ///     How much higher the highest direct neighbour column (x ± 1, z ± 1) lies, 0 when none is higher. Only columns
+        ///     inside the chunk count, so a step across the chunk border is not seen (DEC-205). A column without terrain has 0.
+        /// </summary>
+        internal static int StepUp(ref DensityChunkBuffers b, int x, int z){
+            short* h = b.Heightmap;
+            int self = h[x * N + z];
+            if (self < 0) return 0;
+            int top = self;
+            if (x > 0) top = math.max(top, h[(x - 1) * N + z]);
+            if (x < N - 1) top = math.max(top, h[(x + 1) * N + z]);
+            if (z > 0) top = math.max(top, h[x * N + z - 1]);
+            if (z < N - 1) top = math.max(top, h[x * N + z + 1]);
+            return top - self;
         }
 
         /// <summary>Half the footprint of <see cref="Rise" />, in columns.</summary>

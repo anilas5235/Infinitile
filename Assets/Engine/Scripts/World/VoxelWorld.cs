@@ -443,8 +443,12 @@ namespace Engine.Scripts.World{
         /// <summary>The target of <see cref="TryLocate" /> that finds the highest peak nearby.</summary>
         public const string PeakTarget = "peak";
 
+        /// <summary>The target of <see cref="TryLocate" /> that finds the nearest river water (§9.2).</summary>
+        public const string RiverTarget = "river";
+
         /// <summary>
-        ///     What <see cref="TryLocate" /> finds: the biome names of the layout and <see cref="PeakTarget" />; empty
+        ///     What <see cref="TryLocate" /> finds: the biome names of the layout, <see cref="RiverTarget" /> when the
+        ///     graph has a river output, and <see cref="PeakTarget" />; empty
         ///     unless the density generator runs.
         /// </summary>
         public IReadOnlyList<string> LocateTargets{
@@ -454,13 +458,14 @@ namespace Engine.Scripts.World{
                 foreach (string name in _biomeNames)
                     if (!string.IsNullOrEmpty(name))
                         targets.Add(name);
+                if (_chunkScheduler.Graph.Output(GraphOutputs.River) is{ BoundOnly: false, LatticeValue: >= 0 }) targets.Add(RiverTarget);
                 targets.Add(PeakTarget);
                 return targets;
             }
         }
 
         /// <summary>
-        ///     The nearest column of a biome, or the highest peak within <see cref="BiomeLocator.PeakRadius" />, from
+        ///     The nearest column of a biome or of river water, or the highest peak within <see cref="BiomeLocator.PeakRadius" />, from
         ///     the density generator's 2D program and biome lookup without generating chunks (WorldGen v2 §13.6): x and
         ///     z of the column, y one block above its top terrain voxel (at least the water level for wet columns).
         /// </summary>
@@ -479,6 +484,12 @@ namespace Engine.Scripts.World{
             if (string.Equals(target, PeakTarget, StringComparison.OrdinalIgnoreCase)){
                 if (!BiomeLocator.FindPeak(_chunkScheduler.Graph, cfg.Layout, cfg.Seed, start, out at, out top)){
                     error = "No peak found.";
+                    return false;
+                }
+            }
+            else if (string.Equals(target, RiverTarget, StringComparison.OrdinalIgnoreCase)){
+                if (!BiomeLocator.FindRiver(_chunkScheduler.Graph, cfg.Layout, cfg.Seed, start, out at, out top, out wet)){
+                    error = $"No river within {BiomeLocator.MaxBiomeRadius} blocks.";
                     return false;
                 }
             }

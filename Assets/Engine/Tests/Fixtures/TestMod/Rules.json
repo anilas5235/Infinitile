@@ -7,7 +7,7 @@
         "rule": {
           "name": "heath_moss",
           "if": { "all": ["floor", "dry", { "noise_threshold": { "name": "testmod_wobble", "min": 0.3 } }] },
-          "then": { "block": "std:StoneMossy" }
+          "then": { "block": "std:Moss" }
         }
       }
     ]

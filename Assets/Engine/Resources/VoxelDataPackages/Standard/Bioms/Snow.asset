@@ -18,7 +18,7 @@ MonoBehaviour:
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   SnowTopBlock: {fileID: 0}
   FreezesWater: 1
-  StrataBlock: {fileID: 11400000, guid: 2a1844411e45fba40a1da565a805687e, type: 2}
+  StrataBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   BeachBlock: {fileID: 0}
   BeachHeight: 3
   RockBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}

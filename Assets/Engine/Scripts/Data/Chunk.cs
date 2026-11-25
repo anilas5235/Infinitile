@@ -172,6 +172,28 @@ namespace Engine.Scripts.Data{
             Biomes.Resize(ChunkWidth * ChunkDepth, NativeArrayOptions.ClearMemory);
         }
 
+        /// <summary>
+        ///     Surface-source biome of every column (DistanceBlend's pick, WorldGen v2 §12), same order as
+        ///     <see cref="Biomes" />: the grass and plant tints read it, so the colour changes on the same wavy line as the
+        ///     material (DEC-194). Only the density generator writes it; without it the tints read <see cref="Biomes" />.
+        /// </summary>
+        internal UnsafeList<byte> SurfaceBiomes;
+
+        /// <summary>True when <see cref="SurfaceBiomes" /> holds the column surface biomes.</summary>
+        public bool HasSurfaceBiomes => SurfaceBiomes.IsCreated && SurfaceBiomes.Length == ChunkWidth * ChunkDepth;
+
+        /// <summary>Surface-source biome of the chunk-local column, or its hard biome when the chunk has none.</summary>
+        public byte GetSurfaceBiome(int x, int z){
+            return HasSurfaceBiomes ? SurfaceBiomes[z + x * ChunkDepth] : GetBiome(x, z);
+        }
+
+        /// <summary>Allocates <see cref="SurfaceBiomes" /> (all 0); the chunk job fills it.</summary>
+        internal void CreateSurfaceBiomes(){
+            if (SurfaceBiomes.IsCreated) return;
+            SurfaceBiomes = new UnsafeList<byte>(ChunkWidth * ChunkDepth, ChunkLists.Allocator);
+            SurfaceBiomes.Resize(ChunkWidth * ChunkDepth, NativeArrayOptions.ClearMemory);
+        }
+
         /// <summary>True when partition <paramref name="partitionY" /> may hold a voxel that is not air.</summary>
         public bool PartitionHasVoxels(int partitionY){
             return (uint)partitionY < PartitionsPerChunk && (OccupiedPartitions & (1u << partitionY)) != 0;
@@ -185,6 +207,7 @@ namespace Engine.Scripts.Data{
             Data = new UnsafeIntervalList<ushort>(initCapacity, ChunkLists.Allocator);
             OccupiedPartitions = 0;
             Biomes = default;
+            SurfaceBiomes = default;
         }
 
         /// <summary>
@@ -237,6 +260,7 @@ namespace Engine.Scripts.Data{
         public void Dispose(){
             Data.Dispose();
             if (Biomes.IsCreated) Biomes.Dispose();
+            if (SurfaceBiomes.IsCreated) SurfaceBiomes.Dispose();
         }
 
         private static int GetIndex(in int3 pos){

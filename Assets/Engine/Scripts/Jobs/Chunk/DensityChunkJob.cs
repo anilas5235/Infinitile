@@ -36,12 +36,17 @@ namespace Engine.Scripts.Jobs.Chunk{
             int2 position = Jobs[Offset + index];
             NativeArray<ushort> voxels = new(VoxelsPerChunk, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
             DensityWorkCounters counters = default;
-            NativeArray<byte> biomes = new(DensityLayout.Columns, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+            // Hard biomes, then the surface-source biomes (the tint follows the material border, DEC-194).
+            NativeArray<byte> biomes = new(2 * DensityLayout.Columns, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
             DensityChunk.Generate(default(TPrograms), Terrain, Config.WorldGen, position * ChunkWidth, voxels, biomes, ref counters);
             ChunkJob.WriteToChunkData(voxels, out ChunkVoxelData data);
             if (Config.WorldGen.Layout.HasBoxes){
                 data.CreateBiomes();
-                for (int i = 0; i < DensityLayout.Columns; i++) data.Biomes[i] = biomes[i];
+                data.CreateSurfaceBiomes();
+                for (int i = 0; i < DensityLayout.Columns; i++){
+                    data.Biomes[i] = biomes[i];
+                    data.SurfaceBiomes[i] = biomes[DensityLayout.Columns + i];
+                }
             }
 
             Results.TryAdd(position, data);
@@ -204,13 +209,20 @@ namespace Engine.Scripts.Jobs.Chunk{
             if (biomes.IsCreated) WriteBiomes(b, biomes, layout);
         }
 
-        /// <summary>The hard biome of every chunk column ([x · 32 + z]); 255 (none) is stored as 0, without a layout all 0.</summary>
+        /// <summary>
+        ///     The hard biome of every chunk column ([x · 32 + z]); 255 (none) is stored as 0, without a layout all 0. When
+        ///     <paramref name="biomes" /> holds twice the columns, the second half takes the surface-source biomes (§12).
+        /// </summary>
         private static void WriteBiomes(in DensityChunkBuffers b, NativeArray<byte> biomes, bool layout){
             const int n = DensityLayout.ChunkSize;
+            bool surface = biomes.Length >= 2 * DensityLayout.Columns;
             for (int x = 0; x < n; x++)
             for (int z = 0; z < n; z++){
                 byte id = layout ? b.Hard[(z + DensityLayout.BiomePadding) * DensityLayout.BiomeSpan + x + DensityLayout.BiomePadding] : (byte)0;
                 biomes[x * n + z] = id == 255 ? (byte)0 : id;
+                if (!surface) continue;
+                byte s = layout ? b.Surface[x * n + z] : (byte)0;
+                biomes[DensityLayout.Columns + x * n + z] = s == 255 ? biomes[x * n + z] : s;
             }
         }
 

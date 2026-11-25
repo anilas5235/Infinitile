@@ -72,7 +72,7 @@ namespace Engine.Tests.EditMode{
             Assert.IsTrue(registry.TryGet("Teleport", out ConsoleCommand teleport));
             Assert.AreSame(tp, teleport);
             Assert.IsFalse(registry.TryGet("fly", out _));
-            CollectionAssert.AreEqual(new[]{ "clear", "help", "locate", "setvoxel", "teleport" },
+            CollectionAssert.AreEqual(new[]{ "clear", "goto", "help", "locate", "setvoxel", "teleport" },
                 registry.Commands.Select(c => c.Name).ToArray());
         }
 
@@ -208,7 +208,7 @@ namespace Engine.Tests.EditMode{
         [Test]
         public void Complete_CommandNamesThenAliases(){
             CommandConsole console = NewConsole();
-            CollectionAssert.AreEqual(new[]{ "clear", "help", "locate", "setvoxel", "teleport" }, Items(console, ""));
+            CollectionAssert.AreEqual(new[]{ "clear", "goto", "help", "locate", "setvoxel", "teleport" }, Items(console, ""));
             CollectionAssert.AreEqual(new[]{ "teleport", "tp" }, Items(console, "/t"));
             CollectionAssert.AreEqual(new[]{ "help" }, Items(console, "HE"));
             Assert.AreEqual(0, Items(console, "fly").Length);
@@ -338,10 +338,11 @@ namespace Engine.Tests.EditMode{
             CommandConsole console = NewConsole();
             console.Submit("help");
             string[] lines = console.Lines.Skip(1).Select(l => l.Text).ToArray();
-            Assert.AreEqual(5, lines.Length);
-            Assert.AreEqual("teleport <x> <y> <z>  ·  Moves the player to x y z.", lines[4]);
-            Assert.AreEqual("locate <target>  ·  Finds the nearest biome, or the highest peak nearby.", lines[2]);
-            Assert.AreEqual("help [command]  ·  Lists the commands, or shows how to use one.", lines[1]);
+            Assert.AreEqual(6, lines.Length);
+            Assert.AreEqual("teleport <x> <y> <z>  ·  Moves the player to x y z.", lines[5]);
+            Assert.AreEqual("locate <target>  ·  Finds the nearest biome or river, or the highest peak nearby.", lines[3]);
+            Assert.AreEqual("help [command]  ·  Lists the commands, or shows how to use one.", lines[2]);
+            Assert.AreEqual("goto <target>  ·  Teleports to the nearest biome or river, or the highest peak nearby.", lines[1]);
 
             console.Clear();
             console.Submit("help TP");
@@ -447,6 +448,28 @@ namespace Engine.Tests.EditMode{
             console.World = new FakeLocatorWorld();
             CollectionAssert.AreEqual(new[]{ "Desert", "Ocean", "peak" }, Items(console, "locate "));
             CollectionAssert.AreEqual(new[]{ "Ocean" }, Items(console, "locate o"));
+        }
+
+        [Test]
+        public void Goto_TeleportsToTheLocatedPlace(){
+            CommandConsole console = NewConsole();
+            console.World = new FakeLocatorWorld();
+            Assert.IsTrue(console.Submit("goto peak"));
+            Assert.AreEqual(new Vector3(10.5f, 190f, 997.5f), _player.Teleported);
+            StringAssert.StartsWith("Teleported to peak at 10 190 997 (", LastLine(console));
+            CollectionAssert.AreEqual(new[]{ "Desert", "Ocean", "peak" }, Items(console, "goto "));
+        }
+
+        [Test]
+        public void Goto_RefusesMissingPlacesAndWorldsWithoutLocator(){
+            CommandConsole console = NewConsole();
+            console.World = new FakeLocatorWorld();
+            Assert.IsFalse(console.Submit("goto Ocean"));
+            Assert.AreEqual("No Ocean within 20000 blocks.", LastLine(console));
+            Assert.IsNull(_player.Teleported);
+            console.World = _world;
+            Assert.IsFalse(console.Submit("goto Desert"));
+            Assert.AreEqual("This world cannot locate places.", LastLine(console));
         }
 
         // ── Fakes ────────────────────────────────────────────────────────────

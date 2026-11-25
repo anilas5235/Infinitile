@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Engine.Scripts.WorldGen.Graph;
@@ -7,7 +8,7 @@ using Unity.Mathematics;
 namespace Engine.Scripts.WorldGen.Biomes{
     /// <summary>
     ///     Finds places from the 2D program and the biome lookup without generating chunks (§13.6, DEC-160): the nearest
-    ///     column of a biome, and the highest peak nearby. Searches square rings on a 16-block grid outwards, then
+    ///     column of a biome, the nearest river water, and the highest peak nearby. Searches square rings on a 16-block grid outwards, then
     ///     refines on the 4-block lattice, where <see cref="BiomeColumnSampler" /> gives the chunk's own values.
     /// </summary>
     public static class BiomeLocator{
@@ -21,11 +22,38 @@ namespace Engine.Scripts.WorldGen.Biomes{
         private const int RingsPerRound = 32;
 
         /// <summary>
+        ///     The river weight a river column needs: the river bed rule's threshold (SurfaceRules.json
+        ///     <c>river_bed</c>), so the found column has the river's bed and water.
+        /// </summary>
+        public const float RiverMin = 0.3f;
+
+        /// <summary>
         ///     The column of biome <paramref name="biome" /> nearest to <paramref name="from" /> (x, z) within
         ///     <see cref="MaxBiomeRadius" />, with its top terrain voxel; false when none is found.
         /// </summary>
         public static bool FindBiome(CompiledNoiseGraph graph, in BiomeLayoutData layout, uint seed, int2 from, byte biome, out int2 at, out int top,
             out bool wet){
+            return FindNearest(graph, layout, seed, from, (c, i) => c.Biome[i] == biome, out at, out top, out wet);
+        }
+
+        /// <summary>
+        ///     The nearest wet column with a river weight of at least <see cref="RiverMin" /> (§9.2) within
+        ///     <see cref="MaxBiomeRadius" />; false when none is found or the graph has no river output.
+        /// </summary>
+        public static bool FindRiver(CompiledNoiseGraph graph, in BiomeLayoutData layout, uint seed, int2 from, out int2 at, out int top, out bool wet){
+            if (graph.Output(GraphOutputs.River) is not{ BoundOnly: false, LatticeValue: >= 0 }){
+                at = default;
+                top = -1;
+                wet = false;
+                return false;
+            }
+
+            return FindNearest(graph, layout, seed, from, (c, i) => c.River[i] >= RiverMin && c.Wet[i] != 0, out at, out top, out wet);
+        }
+
+        /// <summary>The column nearest to <paramref name="from" /> that <paramref name="match" /> accepts.</summary>
+        private static bool FindNearest(CompiledNoiseGraph graph, in BiomeLayoutData layout, uint seed, int2 from, Func<BiomeColumns, int, bool> match,
+            out int2 at, out int top, out bool wet){
             at = default;
             top = -1;
             wet = false;
@@ -41,7 +69,7 @@ namespace Engine.Scripts.WorldGen.Biomes{
                 for (int k = first; k < first + RingsPerRound && k <= rings; k++) Ring(origin, k, points);
                 using BiomeColumns c = BiomeColumnSampler.Sample(graph, layout, seed, points.ToArray());
                 for (int i = 0; i < points.Count; i++){
-                    if (c.Biome[i] != biome) continue;
+                    if (!match(c, i)) continue;
                     float d = math.distance(points[i], from);
                     if (d >= bestDistance) continue;
                     bestDistance = d;
@@ -61,7 +89,7 @@ namespace Engine.Scripts.WorldGen.Biomes{
             float fineDistance = float.MaxValue;
             int pick = -1;
             for (int i = 0; i < fine.Count; i++){
-                if (f.Biome[i] != biome) continue;
+                if (!match(f, i)) continue;
                 float d = math.distance(fine[i], from);
                 if (d < fineDistance){
                     fineDistance = d;

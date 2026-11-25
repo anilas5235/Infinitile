@@ -18,7 +18,7 @@ MonoBehaviour:
   StoneBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   SnowTopBlock: {fileID: 0}
   FreezesWater: 0
-  StrataBlock: {fileID: 11400000, guid: 2a1844411e45fba40a1da565a805687e, type: 2}
+  StrataBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
   ForestFloorBlock: {fileID: 11400000, guid: bbb451d8a64e696787d97450e75d860d, type: 2}
   ForestFloorDensity: 1.5
   BeachBlock: {fileID: 11400000, guid: b5df436b2cc46cf419e666fccd2d96b3, type: 2}
@@ -42,53 +42,149 @@ MonoBehaviour:
   - 0.03
   Jaggedness: 0
   Boxes:
-  - TemperatureRange: {x: -1, y: -0.28}
+  - TemperatureRange: {x: -1, y: -0.45}
     HumidityRange: {x: -0.28, y: 1}
     ContinentalnessRange: {x: -0.19, y: 0.09}
     ErosionRange: {x: -1, y: 1}
     WeirdnessRange: {x: -1, y: 1}
     DepthRange: {x: 0, y: 0}
-  - TemperatureRange: {x: -1, y: -0.28}
+  - TemperatureRange: {x: -0.45, y: -0.28}
+    HumidityRange: {x: -0.28, y: 1}
+    ContinentalnessRange: {x: -0.19, y: -0.11}
+    ErosionRange: {x: -1, y: 1}
+    WeirdnessRange: {x: -1, y: 1}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: -0.45, y: -0.28}
+    HumidityRange: {x: -0.28, y: 1}
+    ContinentalnessRange: {x: -0.11, y: 0.09}
+    ErosionRange: {x: -1, y: 0.55}
+    WeirdnessRange: {x: -1, y: 1}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: -0.45, y: -0.28}
+    HumidityRange: {x: -0.28, y: 1}
+    ContinentalnessRange: {x: -0.11, y: 0.09}
+    ErosionRange: {x: 0.55, y: 1}
+    WeirdnessRange: {x: -1, y: -0.04}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: -0.45, y: -0.28}
+    HumidityRange: {x: -0.28, y: 1}
+    ContinentalnessRange: {x: -0.11, y: 0.09}
+    ErosionRange: {x: 0.55, y: 1}
+    WeirdnessRange: {x: 0.04, y: 1}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: -1, y: -0.45}
     HumidityRange: {x: -0.28, y: 1}
     ContinentalnessRange: {x: 0.09, y: 1}
     ErosionRange: {x: -0.05, y: 1}
     WeirdnessRange: {x: -1, y: 1}
     DepthRange: {x: 0, y: 0}
-  - TemperatureRange: {x: -1, y: -0.28}
+  - TemperatureRange: {x: -0.45, y: -0.28}
     HumidityRange: {x: -0.28, y: 1}
     ContinentalnessRange: {x: 0.09, y: 1}
-    ErosionRange: {x: -1, y: -0.05}
-    WeirdnessRange: {x: -1, y: -0.2}
+    ErosionRange: {x: -0.05, y: 0.55}
+    WeirdnessRange: {x: -1, y: 1}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: -0.45, y: -0.28}
+    HumidityRange: {x: -0.28, y: 1}
+    ContinentalnessRange: {x: 0.09, y: 1}
+    ErosionRange: {x: 0.55, y: 1}
+    WeirdnessRange: {x: -1, y: -0.04}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: -0.45, y: -0.28}
+    HumidityRange: {x: -0.28, y: 1}
+    ContinentalnessRange: {x: 0.09, y: 1}
+    ErosionRange: {x: 0.55, y: 1}
+    WeirdnessRange: {x: 0.04, y: 1}
     DepthRange: {x: 0, y: 0}
   - TemperatureRange: {x: -1, y: -0.28}
     HumidityRange: {x: -0.28, y: 1}
     ContinentalnessRange: {x: 0.09, y: 1}
     ErosionRange: {x: -1, y: -0.05}
-    WeirdnessRange: {x: 0.2, y: 1}
+    WeirdnessRange: {x: -1, y: -0.85}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: -1, y: -0.28}
+    HumidityRange: {x: -0.28, y: 1}
+    ContinentalnessRange: {x: 0.09, y: 1}
+    ErosionRange: {x: -1, y: -0.05}
+    WeirdnessRange: {x: -0.45, y: 0}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: -1, y: -0.28}
+    HumidityRange: {x: -0.28, y: 1}
+    ContinentalnessRange: {x: 0.09, y: 1}
+    ErosionRange: {x: -1, y: -0.05}
+    WeirdnessRange: {x: 0, y: 0.45}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: -1, y: -0.28}
+    HumidityRange: {x: -0.28, y: 1}
+    ContinentalnessRange: {x: 0.09, y: 1}
+    ErosionRange: {x: -1, y: -0.05}
+    WeirdnessRange: {x: 0.85, y: 1}
     DepthRange: {x: 0, y: 0}
   - TemperatureRange: {x: -0.28, y: -0.087}
     HumidityRange: {x: 0.087, y: 1}
-    ContinentalnessRange: {x: -0.19, y: 0.09}
+    ContinentalnessRange: {x: -0.19, y: -0.11}
     ErosionRange: {x: -1, y: 1}
     WeirdnessRange: {x: -1, y: 1}
     DepthRange: {x: 0, y: 0}
   - TemperatureRange: {x: -0.28, y: -0.087}
     HumidityRange: {x: 0.087, y: 1}
+    ContinentalnessRange: {x: -0.11, y: 0.09}
+    ErosionRange: {x: -1, y: 0.55}
+    WeirdnessRange: {x: -1, y: 1}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: -0.28, y: -0.087}
+    HumidityRange: {x: 0.087, y: 1}
+    ContinentalnessRange: {x: -0.11, y: 0.09}
+    ErosionRange: {x: 0.55, y: 1}
+    WeirdnessRange: {x: -1, y: -0.04}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: -0.28, y: -0.087}
+    HumidityRange: {x: 0.087, y: 1}
+    ContinentalnessRange: {x: -0.11, y: 0.09}
+    ErosionRange: {x: 0.55, y: 1}
+    WeirdnessRange: {x: 0.04, y: 1}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: -0.28, y: -0.087}
+    HumidityRange: {x: 0.087, y: 1}
     ContinentalnessRange: {x: 0.09, y: 1}
-    ErosionRange: {x: -0.05, y: 1}
+    ErosionRange: {x: -0.05, y: 0.55}
     WeirdnessRange: {x: -1, y: 1}
     DepthRange: {x: 0, y: 0}
   - TemperatureRange: {x: -0.28, y: -0.087}
     HumidityRange: {x: 0.087, y: 1}
     ContinentalnessRange: {x: 0.09, y: 1}
-    ErosionRange: {x: -1, y: -0.05}
-    WeirdnessRange: {x: -1, y: -0.2}
+    ErosionRange: {x: 0.55, y: 1}
+    WeirdnessRange: {x: -1, y: -0.04}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: -0.28, y: -0.087}
+    HumidityRange: {x: 0.087, y: 1}
+    ContinentalnessRange: {x: 0.09, y: 1}
+    ErosionRange: {x: 0.55, y: 1}
+    WeirdnessRange: {x: 0.04, y: 1}
     DepthRange: {x: 0, y: 0}
   - TemperatureRange: {x: -0.28, y: -0.087}
     HumidityRange: {x: 0.087, y: 1}
     ContinentalnessRange: {x: 0.09, y: 1}
     ErosionRange: {x: -1, y: -0.05}
-    WeirdnessRange: {x: 0.2, y: 1}
+    WeirdnessRange: {x: -1, y: -0.85}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: -0.28, y: -0.087}
+    HumidityRange: {x: 0.087, y: 1}
+    ContinentalnessRange: {x: 0.09, y: 1}
+    ErosionRange: {x: -1, y: -0.05}
+    WeirdnessRange: {x: -0.45, y: 0}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: -0.28, y: -0.087}
+    HumidityRange: {x: 0.087, y: 1}
+    ContinentalnessRange: {x: 0.09, y: 1}
+    ErosionRange: {x: -1, y: -0.05}
+    WeirdnessRange: {x: 0, y: 0.45}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: -0.28, y: -0.087}
+    HumidityRange: {x: 0.087, y: 1}
+    ContinentalnessRange: {x: 0.09, y: 1}
+    ErosionRange: {x: -1, y: -0.05}
+    WeirdnessRange: {x: 0.85, y: 1}
     DepthRange: {x: 0, y: 0}
   FloraRules:
   - SpeciesVoxel: {fileID: 0}

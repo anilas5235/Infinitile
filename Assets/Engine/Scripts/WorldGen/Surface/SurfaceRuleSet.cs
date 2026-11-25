@@ -127,6 +127,18 @@ namespace Engine.Scripts.WorldGen.Surface{
         }
     }
 
+    /// <summary>
+    ///     step_foot(rise): a direct neighbour column (x ± 1 or z ± 1, inside the chunk) lies at least <see cref="Rise" />
+    ///     higher, so the column is the foot of a step (DEC-205: a thicker snow layer smooths the step).
+    /// </summary>
+    public sealed class StepFootCondition : RuleCondition{
+        public int Rise;
+
+        public override RuleCondition Clone(){
+            return (StepFootCondition)MemberwiseClone();
+        }
+    }
+
     /// <summary>near_water: a water probe (columns at multiples of 4, wet at y 123) lies within the climate's distance.</summary>
     public sealed class NearWaterCondition : RuleCondition{
         public override RuleCondition Clone(){
@@ -245,6 +257,15 @@ namespace Engine.Scripts.WorldGen.Surface{
         public float IceTemperature = -0.6f;
         public string IceWobble;
 
+        /// <summary>
+        ///     Frozen rivers (§8.3, DEC-207): water where the graph's <c>river</c> output is at least
+        ///     <see cref="RiverIceMin" /> freezes where T &lt; this, without the wobble (Minecraft's temperature level 0),
+        ///     so a cold river is one ice sheet. NaN (the default): rivers freeze like the sea.
+        /// </summary>
+        public float RiverIceTemperature = float.NaN;
+
+        public float RiverIceMin = 0.3f;
+
         /// <summary>T_tree = T_snow + this · L: the tree line lies this many blocks below the snow line.</summary>
         public float TreeLineBelowSnow = 15f;
 
@@ -275,6 +296,9 @@ namespace Engine.Scripts.WorldGen.Surface{
 
         public const string ResourcePath = "WorldGen/SurfaceRules";
         public const string FileName = "Resources/WorldGen/SurfaceRules.json";
+
+        /// <summary>The graph output the river(min) condition reads (§9.2): 1 on a river's centre line, 0 outside the valleys slice.</summary>
+        public const string RiverOutput = global::Engine.Scripts.WorldGen.Graph.GraphOutputs.River;
 
         public readonly List<string> Sources = new();
         public SurfaceClimate Climate = new();
@@ -547,6 +571,8 @@ namespace Engine.Scripts.WorldGen.Surface{
                     case "snowWobble": Climate.SnowWobble = Text(p, source, file); break;
                     case "iceTemperature": Climate.IceTemperature = Number(p, source, file); break;
                     case "iceWobble": Climate.IceWobble = Text(p, source, file); break;
+                    case "riverIceTemperature": Climate.RiverIceTemperature = Number(p, source, file); break;
+                    case "riverIceMin": Climate.RiverIceMin = Number(p, source, file); break;
                     case "treeLineBelowSnow": Climate.TreeLineBelowSnow = Number(p, source, file); break;
                     case "treeLineFloor": Climate.TreeLineFloor = Number(p, source, file); break;
                     case "treeLineWobble": Climate.TreeLineWobble = Text(p, source, file); break;
@@ -718,6 +744,7 @@ namespace Engine.Scripts.WorldGen.Surface{
                 "below_tree_line" => new TreeLineCondition(),
                 "never_snows" => new NeverSnowsCondition(),
                 "steep" => new SteepCondition{ Rise = 4 },
+                "step_foot" => new StepFootCondition{ Rise = 1 },
                 "beach_band" => new TopAboveWaterCondition{ BeachBand = true },
                 "dense_forest" => new DenseForestCondition(),
                 _ => null
@@ -824,6 +851,10 @@ namespace Engine.Scripts.WorldGen.Surface{
                         if (v is double rise && rise >= 1) return new SteepCondition{ Rise = (int)rise };
                         break;
                     }
+                    case "step_foot": {
+                        if (v is double rise && rise >= 1) return new StepFootCondition{ Rise = (int)rise };
+                        break;
+                    }
                     case "noise_threshold": {
                         if (v is not Dictionary<string, object> f || !f.TryGetValue("name", out object nv) || nv is not string name) break;
                         NoiseCondition c = new(){ Name = name };
@@ -838,6 +869,11 @@ namespace Engine.Scripts.WorldGen.Surface{
                         }
 
                         return c;
+                    }
+                    case "river": {
+                        // river(min) (§7.2, §9.2): the graph's river output is at least min; sugar for noise_threshold.
+                        if (v is double min) return new NoiseCondition{ Name = RiverOutput, Min = (float)min };
+                        break;
                     }
                     case "top_above_water": {
                         if (v is List<object>{ Count: 2 } r && r[0] is double min && r[1] is double max)
