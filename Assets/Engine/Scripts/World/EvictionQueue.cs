@@ -71,13 +71,19 @@ namespace Engine.Scripts.World{
         }
 
         /// <summary><see cref="First" /> of a planar queue as a column.</summary>
-        internal int2 FirstColumn => First.xz;
+        internal int2 FirstColumn{
+            get{
+                AssertPlanar();
+                return First.xz;
+            }
+        }
 
         internal bool Contains(int3 pos){
             return _slotOf.ContainsKey(Key(pos));
         }
 
         internal bool Contains(int2 column){
+            AssertPlanar();
             return _slotOf.ContainsKey(new int3(column.x, 0, column.y));
         }
 
@@ -94,6 +100,7 @@ namespace Engine.Scripts.World{
         }
 
         internal void Enqueue(int2 column){
+            AssertPlanar();
             Enqueue(new int3(column.x, 0, column.y));
         }
 
@@ -106,6 +113,7 @@ namespace Engine.Scripts.World{
 
         /// <summary><see cref="Dequeue" /> of a planar queue as a column.</summary>
         internal int2 DequeueColumn(){
+            AssertPlanar();
             return Dequeue().xz;
         }
 
@@ -117,6 +125,7 @@ namespace Engine.Scripts.World{
         }
 
         internal bool TryRemove(int2 column){
+            AssertPlanar();
             return TryRemove(new int3(column.x, 0, column.y));
         }
 
@@ -142,6 +151,12 @@ namespace Engine.Scripts.World{
                     EvictionHeap.Reprioritise(heap, heapIndexOfSlot, _count, ref focus, _planar ? 1 : 0);
                 }
             }
+        }
+
+        /// <summary>The column overloads key at y 0 and drop y: they belong to planar queues only.</summary>
+        [System.Diagnostics.Conditional("UNITY_ASSERTIONS")]
+        private void AssertPlanar(){
+            UnityEngine.Debug.Assert(_planar, "Column overload on a non-planar eviction queue");
         }
 
         private int3 Key(int3 pos){
@@ -230,7 +245,7 @@ namespace Engine.Scripts.World{
         ///     Recomputes the priority of the first <paramref name="count" /> entries for <paramref name="focus" />,
         ///     rebuilds the heap (Floyd) and the slot table. Burst direct call; runs managed when Burst is off.
         /// </summary>
-        [BurstCompile]
+        [BurstCompile(CompileSynchronously = true)] // so the warm-up call in the constructor gets the Burst code
         public static void Reprioritise(EvictionQueue.Entry* heap, int* heapIndexOfSlot, int count,
             ref PriorityUtil.Focus focus, int planar){
             if (planar != 0){
