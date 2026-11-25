@@ -315,12 +315,14 @@ namespace Engine.Tests.PlayMode{
             int over = 0;
             float focusMax = 0f;
             int focusOver = 0, focusFrames = 0;
+            List<float> focusItems = new();
             for (int i = from; i < to; i++){
                 float ms = _itemMs[i];
                 if (ms > ItemLimitMs) over++;
                 float focusMs = _focusItemMs[i];
                 if (focusMs > 0f){
                     focusFrames++;
+                    focusItems.Add(focusMs);
                     focusMax = math.max(focusMax, focusMs);
                     if (focusMs > ItemLimitMs) focusOver++;
                     // The frame's largest item was a part of the focus update, not the stage's
@@ -341,6 +343,10 @@ namespace Engine.Tests.PlayMode{
                 text.Append(string.Format(inv, " {0} {1:0.000} / {2};", StageNames[i], stageMax[i], stageOver[i]));
             text.Append(string.Format(inv, " focus update parts {0:0.000} / {1} (in {2} frames);", focusMax, focusOver,
                 focusFrames));
+            // The focus update's largest part per frame it ran in (DEC-116: each part an item under the budget)
+            if (focusItems.Count > 0)
+                text.Append(string.Format(inv, " focus update parts per frame it ran in ms {0};",
+                    Distribution(focusItems, 0, focusItems.Count)));
             text.AppendLine();
             return text.ToString();
         }

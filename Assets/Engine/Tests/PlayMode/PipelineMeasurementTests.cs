@@ -1,8 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
+using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.World;
 using NUnit.Framework;
 using UnityEngine;
@@ -604,6 +606,123 @@ namespace Engine.Tests.PlayMode{
                 _scheduler.partitionBuildBatchSize = buildSlots;
                 yield return PipelineThroughputTests.StandThenFly(0, $"mesh batch {meshBatch}, build slots {buildSlots}: ",
                     draw);
+            }
+        }
+
+        /// <summary>
+        ///     The world's memory and load of H1 (WorldGen v2 §5.7, build height 512): at the shipped draw distance
+        ///     the time a reload of the world takes (the pool's warm-up included), then the goal run with the
+        ///     memory sampled every frame (the loading peak, the standing world at rest, the peak of the whole run),
+        ///     then the pool's warm-up alone (a second pool built and disposed three times). Editor numbers: the
+        ///     player's goal run is a later phase.
+        /// </summary>
+        [UnityTest]
+        [Order(20)]
+        [Timeout(1200000)]
+        public IEnumerator WorldMemoryAndWarmUp_AreMeasured(){
+            int draw = PlayModeFixtures.ShippedDrawDistance;
+            CultureInfo inv = CultureInfo.InvariantCulture;
+            yield return PlayModeFixtures.LoadGameScene(drawDistance: draw);
+            yield return PipelineThroughputTests.WaitForBuiltWorld();
+            System.Diagnostics.Stopwatch watch = System.Diagnostics.Stopwatch.StartNew();
+            yield return PlayModeFixtures.ReloadWorldWithDrawDistance(draw);
+            Debug.Log(string.Format(inv, "[PipelineProbe] memory and warm-up, draw {0}: world reload {1:0} ms", draw,
+                watch.Elapsed.TotalMilliseconds));
+
+            MemorySampler sampler = MemorySampler.Begin();
+            yield return PipelineThroughputTests.StandThenFly(0);
+            Debug.Log(sampler.Report($"memory and warm-up, draw {draw}"));
+            UnityEngine.Object.Destroy(sampler.gameObject);
+
+            VoxelEngineSettings settings = PlayModeFixtures.CreateSettings(draw, VoxelWorld.Instance.Settings.Chunk.ChunkPrefab);
+            GameObject root = new("PipelineMeasurementTests.WarmUpPool");
+            try{
+                StringBuilder text = new();
+                text.Append(string.Format(inv, "[PipelineProbe] memory and warm-up, draw {0}: pool warm-up of {1} chunk " +
+                                               "objects ({2} partitions each), ms:", draw,
+                    (settings.Chunk.ActiveDrawDistance + 2).SquareSize(), Engine.Scripts.Utils.VoxelConstants.PartitionsPerChunk));
+                for (int i = 0; i < 3; i++){
+                    yield return null;
+                    watch.Restart();
+                    ChunkPool pool = new(root.transform, settings);
+                    double ms = watch.Elapsed.TotalMilliseconds;
+                    pool.Dispose();
+                    text.Append(string.Format(inv, " {0:0}", ms));
+                }
+
+                Debug.Log(text.ToString());
+            }
+            finally{
+                UnityEngine.Object.Destroy(root);
+                UnityEngine.Object.Destroy(settings);
+            }
+        }
+
+        /// <summary>
+        ///     Samples Unity's native memory (allocated and reserved), the managed heap in use and the process's working
+        ///     set once per frame (the working set every 30 frames) from its start, across scene and world reloads.
+        /// </summary>
+        private sealed class MemorySampler : MonoBehaviour{
+            /// <summary>The standing world counts as at rest from here to <see cref="RestEnd" /> (s after the start).</summary>
+            private const float RestBegin = 30f, RestEnd = 38f;
+
+            /// <summary>The loading peak is the peak of the standing phase (s after the start).</summary>
+            private const float StandEnd = 38f;
+
+            private readonly List<float> _time = new(1 << 16);
+            private readonly List<long> _allocated = new(1 << 16), _reserved = new(1 << 16), _managed = new(1 << 16);
+            private readonly List<long> _workingSet = new(1 << 12);
+            private readonly List<float> _workingSetTime = new(1 << 12);
+            private float _start;
+
+            internal static MemorySampler Begin(){
+                GameObject host = new("PipelineMeasurementTests.MemorySampler");
+                DontDestroyOnLoad(host);
+                MemorySampler sampler = host.AddComponent<MemorySampler>();
+                sampler._start = Time.realtimeSinceStartup;
+                return sampler;
+            }
+
+            private void Update(){
+                float t = Time.realtimeSinceStartup - _start;
+                _time.Add(t);
+                _allocated.Add(UnityEngine.Profiling.Profiler.GetTotalAllocatedMemoryLong());
+                _reserved.Add(UnityEngine.Profiling.Profiler.GetTotalReservedMemoryLong());
+                _managed.Add(UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong());
+                if (_time.Count % 30 != 1) return;
+                using System.Diagnostics.Process process = System.Diagnostics.Process.GetCurrentProcess();
+                _workingSet.Add(process.WorkingSet64);
+                _workingSetTime.Add(t);
+            }
+
+            internal string Report(string label){
+                CultureInfo inv = CultureInfo.InvariantCulture;
+                StringBuilder text = new();
+                text.Append(string.Format(inv, "[PipelineProbe] {0}: memory MiB over {1} frames (loading peak = peak of the " +
+                                               "first {2:0} s; at rest = median of {3:0} to {4:0} s; run peak = whole run)\n",
+                    label, _time.Count, StandEnd, RestBegin, RestEnd));
+                Row(text, label, "native allocated", _time, _allocated);
+                Row(text, label, "native reserved", _time, _reserved);
+                Row(text, label, "managed heap used", _time, _managed);
+                Row(text, label, "process working set", _workingSetTime, _workingSet);
+                return text.ToString();
+            }
+
+            private static void Row(StringBuilder text, string label, string name, List<float> time, List<long> bytes){
+                long loadPeak = 0, runPeak = 0;
+                List<long> rest = new();
+                for (int i = 0; i < bytes.Count; i++){
+                    runPeak = System.Math.Max(runPeak, bytes[i]);
+                    if (time[i] <= StandEnd) loadPeak = System.Math.Max(loadPeak, bytes[i]);
+                    if (time[i] >= RestBegin && time[i] <= RestEnd) rest.Add(bytes[i]);
+                }
+
+                rest.Sort();
+                long atRest = rest.Count > 0 ? rest[rest.Count / 2] : -1;
+                const double mib = 1024d * 1024d;
+                text.Append(string.Format(CultureInfo.InvariantCulture,
+                    "[PipelineProbe] {0}: {1}: loading peak {2:0.0}, at rest {3:0.0}, run peak {4:0.0}\n", label, name,
+                    loadPeak / mib, atRest / mib, runPeak / mib));
             }
         }
     }
