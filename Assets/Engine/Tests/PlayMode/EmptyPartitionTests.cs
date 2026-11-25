@@ -239,7 +239,7 @@ namespace Engine.Tests.PlayMode{
             Assert.Greater(waiting.Count, 1, "the cut dispatch holds more partitions without a voxel");
             int3[] left = waiting.GetRange(1, waiting.Count - 1).ToArray();
 
-            focus = rig.FocusAt(6); // the window holds the partitions 4 to 7 now, all of them air
+            focus = rig.FocusAt(PartitionsPerChunk - 2); // the window holds the top four partitions now, all of them air
             yield return rig.MeshUntilAsleep(focus, budget);
 
             foreach (int3 pos in left) Assert.IsFalse(rig.Pool.IsPartitionActive(pos), $"{pos} left the draw window");

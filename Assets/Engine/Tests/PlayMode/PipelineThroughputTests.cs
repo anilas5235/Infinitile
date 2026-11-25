@@ -173,15 +173,17 @@ namespace Engine.Tests.PlayMode{
             // The main-thread budget only spreads a stage's turn over more frames: a world built with four items
             // of work per frame (a claim in the pool, the upload of a chunk, a row of a queue scan, the start of
             // a batch) ends in the same state as one built without a limit. The budget's clock counts the items
-            // it is asked for instead of the time, so the test does not depend on the machine.
+            // it is asked for instead of the time, so the test does not depend on the machine. The focus is held
+            // still: the vertical draw window (9 of the 16 partitions at draw 4) must not depend on how far the
+            // player sank by the time each world is built.
             const int draw = 4;
             PipelineRun whole = new();
-            yield return BuildFreshWorld(0, whole, "no budget: ", draw, FrameBudget.Unlimited);
+            yield return BuildFreshWorld(0, whole, "no budget: ", draw, FrameBudget.Unlimited, true);
 
             long asked = 0;
             FrameBudget budget = new(4f, () => asked++, 1d);
             PipelineRun cut = new();
-            yield return BuildFreshWorld(0, cut, "four items per frame: ", draw, budget);
+            yield return BuildFreshWorld(0, cut, "four items per frame: ", draw, budget, true);
 
             Assert.Greater(budget.FramesCut, 0, "frames in which the budget stopped a turn");
             Assert.Greater(cut.BuildFrames, whole.BuildFrames, "the cut turns took more frames");
@@ -294,12 +296,15 @@ namespace Engine.Tests.PlayMode{
         /// <summary>
         ///     Loads a fresh world and samples it until it is built. <paramref name="variant" /> names the settings
         ///     in the log lines when they are not the shipped ones. <paramref name="budget" /> replaces the
-        ///     main-thread budget of the world's scheduler.
+        ///     main-thread budget of the world's scheduler. <paramref name="holdFocus" /> takes the focus out of the
+        ///     player and holds it at the flight height (<see cref="FlightBody" />), so the vertical draw window does
+        ///     not follow a player that sinks while the world builds.
         /// </summary>
         internal static IEnumerator BuildFreshWorld(int frameRate, PipelineRun run, string variant = "",
-            int drawDistance = 0, FrameBudget budget = null){
+            int drawDistance = 0, FrameBudget budget = null, bool holdFocus = false){
             yield return LoadFreshWorld(frameRate, drawDistance);
             VoxelWorld world = VoxelWorld.Instance;
+            if (holdFocus) FlightBody(PlayModeFixtures.GetPrivateField<Transform>(world, "focus"));
             if (budget != null)
                 PlayModeFixtures.GetPrivateField<VoxelEngineScheduler>(world, "_scheduler").Budget = budget;
             int draw = world.Settings.Chunk.DrawDistance;
