@@ -313,6 +313,41 @@ namespace Engine.Tests.EditMode{
             }
         }
 
+        /// <summary>
+        ///     DEC-232: the chunk job writes the layers from the chunk's highest <see cref="SurfacePass.AirFrom" /> on as
+        ///     air without reading them. Every voxel there is air, and the chunk data equals the one read in full.
+        /// </summary>
+        [Test]
+        public void ChunkData_FromTheAirLayer_EqualsTheFullRead(){
+            int water = math.clamp(_config.WorldGen.WaterLevel, 0, Height);
+            foreach (int2 chunk in AllFixtureChunks()){
+                using DensityProbeResult p = DensityProbe.Run(_fixture, _config.WorldGen, chunk * Size);
+                int airFrom = 0;
+                for (int column = 0; column < Size * Size; column++) airFrom = math.max(airFrom, math.min(Height, math.max(p.Heightmap[column] + 2, water)));
+                Assert.Less(airFrom, Height, $"chunk {chunk}: the air layer is in effect");
+                for (int column = 0; column < Size * Size; column++)
+                for (int y = airFrom; y < Height; y++)
+                    if (p.Voxels[column * Height + y] != 0)
+                        Assert.Fail($"chunk {chunk}: voxel {p.Voxels[column * Height + y]} at y {y} in column {column}, air from {airFrom}");
+
+                ChunkJob.WriteToChunkData(p.Voxels, out Engine.Scripts.Data.ChunkVoxelData full);
+                ChunkJob.WriteToChunkData(p.Voxels, out Engine.Scripts.Data.ChunkVoxelData cut, airFrom);
+                try{
+                    Assert.AreEqual(full.Data.CompressedLength, cut.Data.CompressedLength, $"chunk {chunk}: runs");
+                    for (int n = 0; n < full.Data.CompressedLength; n++){
+                        Assert.AreEqual(full.Data.NodeAt(n).Value, cut.Data.NodeAt(n).Value, $"chunk {chunk}: run {n} id");
+                        Assert.AreEqual(full.Data.NodeAt(n).Count, cut.Data.NodeAt(n).Count, $"chunk {chunk}: run {n} end");
+                    }
+
+                    Assert.AreEqual(full.OccupiedPartitions, cut.OccupiedPartitions, $"chunk {chunk}: occupied partitions");
+                }
+                finally{
+                    full.Dispose();
+                    cut.Dispose();
+                }
+            }
+        }
+
         private DensityWorkCounters Count(DensityChunkClass c){
             DensityWorkCounters sum = default;
             foreach (int2 chunk in DensityFixture.Chunks(c)){

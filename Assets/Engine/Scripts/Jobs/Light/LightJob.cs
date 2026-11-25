@@ -39,7 +39,18 @@ namespace Engine.Scripts.Jobs.Light{
         internal static ChunkLightData Compute(int2 chunkPos,
             in NativeParallelHashMap<int2, ChunkVoxelData>.ReadOnly chunks, in VoxelLightTable table){
             int2 chunkOrigin = chunkPos * ChunkSizeXZ;
-            LightRegion region = new(BoxSize, BoxSize, chunkOrigin - (Margin + 1), Allocator.Temp);
+            // Only the layers up to the neighbourhood's top need filling and lighting (DEC-232); a missing chunk is
+            // opaque over the full height
+            uint occupied = 0;
+            bool missing = false;
+            for (int dx = -1; dx <= 1; dx++)
+            for (int dz = -1; dz <= 1; dz++){
+                if (chunks.TryGetValue(chunkPos + new int2(dx, dz), out ChunkVoxelData data)) occupied |= data.OccupiedPartitions;
+                else missing = true;
+            }
+
+            int limit = missing ? ChunkHeight : LightRegion.LimitFor(occupied);
+            LightRegion region = new(BoxSize, BoxSize, chunkOrigin - (Margin + 1), Allocator.Temp, limit);
 
             for (int dx = -1; dx <= 1; dx++)
             for (int dz = -1; dz <= 1; dz++){

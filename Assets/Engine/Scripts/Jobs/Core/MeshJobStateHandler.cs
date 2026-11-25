@@ -158,13 +158,19 @@ namespace Engine.Scripts.Jobs.Core{
         protected override void EnqueueRow(PriorityUtil.Focus focus, int x){
             int draw = Settings.Chunk.ActiveDrawDistance;
             float prioThreshold = ChunkPool.GetPartitionPrioThreshold();
+            // Only the vertical draw window is queued, the same filter IsPartitionStillRelevant applies;
+            // queueing all layers would make JobUpdateStep drop and re-queue the others every cycle.
+            int minY = math.max(0, focus.Pos.y - draw);
+            int maxY = math.min(VoxelConstants.PartitionsPerChunk - 1, focus.Pos.y + draw);
+            uint window = minY > maxY ? 0u : (uint)(((1ul << (maxY + 1)) - 1) & ~((1ul << minY) - 1));
 
             for (int z = -draw; z <= draw; z++){
-                if (!CanGenerateMeshForChunk(focus.Pos.xz + new int2(x, z))) continue;
-                // Only the vertical draw window is queued, the same filter IsPartitionStillRelevant applies;
-                // queueing all layers would make JobUpdateStep drop and re-queue the others every cycle.
-                int minY = math.max(0, focus.Pos.y - draw);
-                int maxY = math.min(VoxelConstants.PartitionsPerChunk - 1, focus.Pos.y + draw);
+                int2 column = focus.Pos.xz + new int2(x, z);
+                if (!CanGenerateMeshForChunk(column)) continue;
+                // A column whose window is active and holds no remesh flag has nothing to queue: one test for the
+                // column instead of one per partition (DEC-232; the build height doubled the partitions)
+                if ((window & ~ChunkPool.ActivePartitionMask(column)) == 0 && !ChunkManager.ColumnHasReMesh(column)) continue;
+
                 for (int y = minY; y <= maxY; y++){
                     int3 pos = new(x + focus.Pos.x, y, z + focus.Pos.z);
                     if (Queue.Contains(pos) || !ShouldScheduleForMeshing(pos)) continue;

@@ -1,3 +1,4 @@
+using System;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Light;
 using NUnit.Framework;
@@ -209,6 +210,52 @@ namespace Engine.Tests.EditMode{
             region.Dispose();
             small.Dispose();
             large.Dispose();
+        }
+
+        /// <summary>
+        ///     DEC-232: the light job fills and lights only the layers up to the neighbourhood's highest occupied
+        ///     partition plus a margin; above it the light is full sky. Emitters at the very top of that partition (a
+        ///     clear one in open air, an opaque one on a pillar) and the random terrain give the same light as the
+        ///     full-height region.
+        /// </summary>
+        [Test]
+        public void LayerLimit_EqualsTheFullHeight([Values(6, 7)] int seed){
+            const int top = 5 * PartitionHeight - 1; // the top layer of partition 4
+            int3 crystal = new(10, top, 12), lamp = new(-5, top, 30);
+            Func<int3, ushort> terrain = RandomTerrain(seed);
+            using LightTestWorld world = new(1, p => {
+                if (p.Equals(crystal)) return BlueCrystal;
+                if (p.Equals(lamp)) return RedLamp;
+                if (p.x == lamp.x && p.z == lamp.z && p.y < lamp.y) return Stone;
+                return terrain(p);
+            });
+
+            uint occupied = 0;
+            for (int dx = -1; dx <= 1; dx++)
+            for (int dz = -1; dz <= 1; dz++)
+                occupied |= world.Chunks[new int2(dx, dz)].OccupiedPartitions;
+            Assert.AreEqual(5 * PartitionHeight + MaxLightLevel + 1, LightRegion.LimitFor(occupied), "the limit of this world");
+            Assert.Less(LightRegion.LimitFor(occupied), ChunkHeight, "the limit is in effect");
+
+            ChunkLightData limited = world.LightChunk(Origin);
+
+            LightRegion region = new(LightJob.BoxSize, LightJob.BoxSize, -(LightJob.Margin + 1), Allocator.Persistent);
+            Assert.AreEqual(ChunkHeight, region.Limit);
+            Fill(ref region, world, Origin, 1);
+            LightQueue queue = new(64, Allocator.Persistent);
+            region.SeedSky(ref queue);
+            region.SeedEmitters(ref queue);
+            region.Propagate(ref queue);
+            ChunkLightData full = ChunkLightData.CreateEmpty(1024);
+            region.WriteChunk(new int2(LightJob.Margin + 1), ref full);
+
+            AssertEqual(full, limited, "limited vs full height");
+            Assert.AreEqual(0, VoxelLight.GetBlue(LightAt(limited, crystal + new int3(0, 12, 0))), "the crystal's light ends 12 up");
+            Assert.AreEqual(12 - 3, VoxelLight.GetBlue(LightAt(limited, crystal + new int3(0, 3, 0))), "crystal light above the top");
+            queue.Dispose();
+            region.Dispose();
+            limited.Dispose();
+            full.Dispose();
         }
 
         internal static void Fill(ref LightRegion region, LightTestWorld world, int2 center, int radius){

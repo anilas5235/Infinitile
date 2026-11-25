@@ -32,6 +32,13 @@ namespace Engine.Scripts.Behaviour{
         /// </summary>
         public int MeshVersion{ get; private set; }
 
+        /// <summary>
+        ///     True while the collider mesh is empty and the collider has no mesh, as <see cref="Clear" /> leaves them:
+        ///     clearing again changes nothing, so the claim of a partition without a voxel (most of the world above
+        ///     the generation top) skips the Unity calls (DEC-232).
+        /// </summary>
+        public bool IsClear{ get; private set; }
+
         private void Awake(){
             ColliderMesh = new Mesh{ name = "PCollider" };
         }
@@ -69,15 +76,19 @@ namespace Engine.Scripts.Behaviour{
         }
 
         public void Clear(){
-            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.PartitionClear.Auto();
             MeshVersion++;
+            if (IsClear) return;
+
+            using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.PartitionClear.Auto();
             ColliderMesh.Clear();
             Collider.sharedMesh = null;
+            IsClear = true;
         }
 
         /// <summary>Called before new collider mesh data is applied to <see cref="ColliderMesh" />.</summary>
         public void MarkMeshChanged(){
             MeshVersion++;
+            IsClear = false;
         }
     }
 }

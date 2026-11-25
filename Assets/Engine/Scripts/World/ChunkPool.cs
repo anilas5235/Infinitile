@@ -153,6 +153,8 @@ namespace Engine.Scripts.World{
             ChunkBehaviour behaviour;
             using (VoxelProfilerMarkers.PoolActivateChunk.Auto()){
                 behaviour = _pool.Get();
+                behaviour.ActivePartitions = 0;
+                behaviour.CollidablePartitions = 0;
                 behaviour.Transform.position = new float3(position.x * ChunkWidth, 0, position.y * ChunkDepth);
             }
 
@@ -183,9 +185,11 @@ namespace Engine.Scripts.World{
             ChunkBehaviour behaviour = GetOrClaimChunk(position.xz);
             ChunkPartition partition = behaviour.GetPartition(position.y);
 
-            PartitionMeshWriting?.Invoke();
+            // A partition that is already clear is not written: a running bake need not finish first (DEC-232)
+            if (!partition.IsClear) PartitionMeshWriting?.Invoke();
             partition.Clear();
             _meshMap.Add(position, partition);
+            behaviour.ActivePartitions |= 1u << position.y;
             _partitionQueue.Enqueue(position, PriorityCalc(position));
 
             if (_partitionQueue.Count <= _partitionPoolSize) return partition;
@@ -225,13 +229,19 @@ namespace Engine.Scripts.World{
 
         private void ReclaimPartition(int3 partitionPos){
             if (_meshMap.TryGetValue(partitionPos, out ChunkPartition reclaimPartition)){
-                PartitionMeshWriting?.Invoke();
+                if (!reclaimPartition.IsClear) PartitionMeshWriting?.Invoke();
                 reclaimPartition.Clear();
                 _meshMap.Remove(partitionPos);
             }
 
             if (_partitionQueue.Contains(partitionPos)) _partitionQueue.Remove(partitionPos);
             _colliderSet.Remove(partitionPos);
+            // A reclaimed chunk is out of the map already; its masks are reset when it is claimed again
+            if (_chunkMap.TryGetValue(partitionPos.xz, out ChunkBehaviour behaviour)){
+                uint keep = ~(1u << partitionPos.y);
+                behaviour.ActivePartitions &= keep;
+                behaviour.CollidablePartitions &= keep;
+            }
 
             if (_emitEvictionEvents) OnPartitionEvicted?.Invoke(partitionPos);
         }
@@ -248,6 +258,26 @@ namespace Engine.Scripts.World{
         /// </summary>
         internal void ColliderBaked(int3 position){
             _colliderSet.Add(position);
+            // The mask holds only active partitions, a subset of the set: a set bit always means collidable
+            if (_chunkMap.TryGetValue(position.xz, out ChunkBehaviour behaviour) &&
+                (behaviour.ActivePartitions & (1u << position.y)) != 0)
+                behaviour.CollidablePartitions |= 1u << position.y;
+        }
+
+        /// <summary>
+        ///     Bit p: partition p of the column is active (<see cref="IsPartitionActive" />); 0 when the chunk is
+        ///     not claimed. One lookup for the whole column (DEC-232).
+        /// </summary>
+        internal uint ActivePartitionMask(int2 column){
+            return _chunkMap.TryGetValue(column, out ChunkBehaviour behaviour) ? behaviour.ActivePartitions : 0;
+        }
+
+        /// <summary>
+        ///     Bit p: partition p of the column is active and collidable (<see cref="IsCollidable" />); a clear bit
+        ///     may still be collidable. One lookup for the whole column (DEC-232).
+        /// </summary>
+        internal uint CollidablePartitionMask(int2 column){
+            return _chunkMap.TryGetValue(column, out ChunkBehaviour behaviour) ? behaviour.CollidablePartitions : 0;
         }
 
         /// <summary>

@@ -20,6 +20,13 @@ namespace Engine.Scripts.Behaviour{
         /// </summary>
         public Transform Transform{ get; private set; }
 
+        /// <summary>
+        ///     Bit p: partition p is active in the pool (<see cref="World.ChunkPool.IsPartitionActive" />), and its
+        ///     collider is ready (<see cref="World.ChunkPool.IsCollidable" />). Kept by the pool while the chunk is
+        ///     claimed, so the scans test a whole column at once (DEC-232).
+        /// </summary>
+        internal uint ActivePartitions, CollidablePartitions;
+
         public void Init(){
             Transform = transform;
             chunkPartitions = new ChunkPartition[PartitionsPerChunk];

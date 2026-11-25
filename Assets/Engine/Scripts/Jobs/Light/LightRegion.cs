@@ -27,6 +27,13 @@ namespace Engine.Scripts.Jobs.Light{
         /// <summary>World x/z of the box column (0, 0).</summary>
         public readonly int2 Origin;
 
+        /// <summary>
+        ///     Layers below it are filled and lit; at and above it every interior voxel is clear air with full sky and
+        ///     no other light, and nothing reads or writes there (<see cref="LimitFor" />, DEC-232). Height when the
+        ///     whole column is used.
+        /// </summary>
+        public readonly int Limit;
+
         public NativeArray<byte> Att;
         public NativeArray<ushort> Light;
 
@@ -35,23 +42,49 @@ namespace Engine.Scripts.Jobs.Light{
 
         public NativeList<int> Emitters;
 
-        public LightRegion(int sizeX, int sizeZ, int2 origin, Allocator allocator){
+        /// <param name="limit">
+        ///     <see cref="Limit" />: the layers the region fills and lights (<see cref="LimitFor" />); Height for all.
+        /// </param>
+        public LightRegion(int sizeX, int sizeZ, int2 origin, Allocator allocator, int limit = Height){
             SizeX = sizeX;
             SizeZ = sizeZ;
             StrideX = sizeZ * Height;
             Origin = origin;
+            Limit = math.clamp(limit, 0, Height);
             int volume = sizeX * sizeZ * Height;
             Att = new NativeArray<byte>(volume, allocator, NativeArrayOptions.UninitializedMemory);
-            Light = new NativeArray<ushort>(volume, allocator);
+            Light = new NativeArray<ushort>(volume, allocator,
+                Limit == Height ? NativeArrayOptions.ClearMemory : NativeArrayOptions.UninitializedMemory);
             Top = new NativeArray<short>(sizeX * sizeZ, allocator, NativeArrayOptions.UninitializedMemory);
             Emitters = new NativeList<int>(64, allocator);
 
             // Sentinel / missing chunks: opaque everywhere until a chunk fills its columns.
             unsafe{
-                UnsafeUtility.MemSet(Att.GetUnsafePtr(), Opaque, volume);
+                if (Limit == Height) UnsafeUtility.MemSet(Att.GetUnsafePtr(), Opaque, volume);
+                else{
+                    // Only the layers below the limit; the rest is never read (the stride stays the full height)
+                    byte* att = (byte*)Att.GetUnsafePtr();
+                    ushort* light = (ushort*)Light.GetUnsafePtr();
+                    for (int column = 0; column < sizeX * sizeZ; column++){
+                        UnsafeUtility.MemSet(att + column * Height, Opaque, Limit);
+                        UnsafeUtility.MemClear(light + column * Height, Limit * sizeof(ushort));
+                    }
+                }
             }
 
             for (int i = 0; i < Top.Length; i++) Top[i] = Height - 1;
+        }
+
+        /// <summary>
+        ///     The <see cref="Limit" /> for a box lit from chunks whose occupied partitions are
+        ///     <paramref name="occupied" /> (the union of <see cref="ChunkVoxelData.OccupiedPartitions" />): every voxel
+        ///     that is not air lies below the top of the highest occupied partition, so above it there is full sky, and
+        ///     the light of an emitter rises at most <see cref="MaxLightLevel" /> - 1 layers. The BFS reads one layer
+        ///     above the highest voxel it raises, so a margin of 16 layers keeps every read below the limit.
+        /// </summary>
+        public static int LimitFor(uint occupied){
+            int occupiedTop = (32 - math.lzcnt(occupied)) * PartitionHeight; // up to the top of the highest one
+            return math.min(Height, occupiedTop + MaxLightLevel + 1);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -73,6 +106,7 @@ namespace Engine.Scripts.Jobs.Light{
             in VoxelLightTable table){
             GetColumnRange(chunkWorldOrigin, out int2 min, out int2 max, out int2 offset);
             byte* attPtr = (byte*)Att.GetUnsafePtr();
+            int limit = Limit;
             int nextStart = -1;
             int lastNode = 0;
             int lastCount = 0;
@@ -93,15 +127,22 @@ namespace Engine.Scripts.Jobs.Light{
                     UnsafeIntervalList<ushort>.Node node = voxels.NodeAt(nodeIndex++);
                     lastCount = node.Count;
                     int end = math.min(node.Count - chunkStart, Height);
+                    // At and above the limit only air (DEC-232): the nodes are walked to the column's end, unwritten
+                    if (y >= limit){
+                        y = end;
+                        continue;
+                    }
+
                     ushort id = node.Value;
                     byte att = id < table.Count ? table.Attenuation[id] : (byte)Opaque;
                     ushort emission = id < table.Count ? table.Emission[id] : (ushort)0;
+                    int filled = math.min(end, limit);
 
                     // Raw memset: the checked indexer keeps Burst from vectorising
-                    UnsafeUtility.MemSet(attPtr + baseIndex + y, att, end - y);
-                    if (att != 0) top = end - 1;
+                    UnsafeUtility.MemSet(attPtr + baseIndex + y, att, filled - y);
+                    if (att != 0) top = filled - 1;
                     if (emission != 0)
-                        for (int i = y; i < end; i++){
+                        for (int i = y; i < filled; i++){
                             Light[baseIndex + i] = emission;
                             Emitters.Add(baseIndex + i);
                         }
@@ -160,7 +201,7 @@ namespace Engine.Scripts.Jobs.Light{
                 int baseIndex = column * Height;
                 int top = Top[column];
                 ushort* sky = lightPtr + baseIndex; // unchecked so Burst vectorises the fill
-                for (int y = top + 1; y < Height; y++) sky[y] |= VoxelLight.FullSky;
+                for (int y = top + 1; y < Limit; y++) sky[y] |= VoxelLight.FullSky;
 
                 if (top == Height - 1){
                     // The topmost voxel is not clear: it sees the sky above the world with one step of loss.
@@ -176,10 +217,11 @@ namespace Engine.Scripts.Jobs.Light{
 
                 if (top >= 0 && Att[baseIndex + top] < Opaque) queue.Enqueue(baseIndex + top + 1);
 
-                int maxNeighbourTop = math.max(
+                // The sentinel ring's top is the world's; no voxel at or above the limit is lightable (DEC-232)
+                int maxNeighbourTop = math.min(Limit - 1, math.max(
                     math.max(Top[column - SizeZ], Top[column + SizeZ]),
                     math.max(Top[column - 1], Top[column + 1])
-                );
+                ));
 
                 for (int y = top + 1; y <= maxNeighbourTop; y++){
                     if (IsLightableNeighbour(column - SizeZ, y) || IsLightableNeighbour(column + SizeZ, y) ||
@@ -316,7 +358,7 @@ namespace Engine.Scripts.Jobs.Light{
             for (int x = 0; x < ChunkWidth; x++)
             for (int z = 0; z < ChunkDepth; z++){
                 ushort* column = lightPtr + ColumnBase(boxMin.x + x, boxMin.y + z);
-                for (int y = 0; y < Height; y++){
+                for (int y = 0; y < Limit; y++){
                     ushort value = column[y];
                     if (value == run){
                         count++;
@@ -327,6 +369,18 @@ namespace Engine.Scripts.Jobs.Light{
                     run = value;
                     count = 1;
                 }
+
+                // At and above the limit: full sky (DEC-232)
+                int above = Height - Limit;
+                if (above == 0) continue;
+                if (run == VoxelLight.FullSky){
+                    count += above;
+                    continue;
+                }
+
+                output.AddLights(run, count);
+                run = VoxelLight.FullSky;
+                count = above;
             }
 
             output.AddLights(run, count);
