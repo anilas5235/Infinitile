@@ -99,7 +99,7 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 <div class="layout">
 <nav class="toc" aria-label="Contents">
   <div class="brand">WorldGen v2 Spec</div>
-  <div class="ver">v1.11 · 2026-11-25 · Generator budget raised from 8 to 10 ms per chunk on the benchmark fixture (DEC-235). v1.10: H1 built: build height 512 with no change in the look; the work above the generation top cut to meet the no-regression gate (DEC-232), the pool's eviction-queue peak accepted with a follow-up (DEC-233), memory and load time accepted (DEC-234). v1.9: Height phases planned (DEC-210…231), reviewed against the whole spec: H1 raises the build height to 512 with no change in the look, H2 moves the sea to 127 and the terrain to Minecraft-like heights (generation to y 383, peaks about 320–380, every row towards Minecraft, snow and tree line scaled with the relief, plateaus, coastal cliffs and fjords, glaciers of std:Ice; after the review: vanilla-like peaks about 320, Mountain share and factor rows follow Minecraft, coastal massifs are Mountain, a tall-massif fixture class, snow on frozen-river banks, H1 gated on no regression; Minecraft as the base of the look, every look re-judged in H2); river-side variants and cloud forest go to V6b.</div>
+  <div class="ver">v1.12 · 2026-11-25 · Follow-up of DEC-233 built: the pool and store eviction queues are a struct heap with a Burst re-sort, the item peak falls from 3.3–5.2 to 0.13–0.18 ms (DEC-236). v1.11: Generator budget raised from 8 to 10 ms per chunk on the benchmark fixture (DEC-235). v1.10: H1 built: build height 512 with no change in the look; the work above the generation top cut to meet the no-regression gate (DEC-232), the pool's eviction-queue peak accepted with a follow-up (DEC-233), memory and load time accepted (DEC-234). v1.9: Height phases planned (DEC-210…231), reviewed against the whole spec: H1 raises the build height to 512 with no change in the look, H2 moves the sea to 127 and the terrain to Minecraft-like heights (generation to y 383, peaks about 320–380, every row towards Minecraft, snow and tree line scaled with the relief, plateaus, coastal cliffs and fjords, glaciers of std:Ice; after the review: vanilla-like peaks about 320, Mountain share and factor rows follow Minecraft, coastal massifs are Mountain, a tall-massif fixture class, snow on frozen-river banks, H1 gated on no regression; Minecraft as the base of the look, every look re-judged in H2); river-side variants and cloud forest go to V6b.</div>
   <ol>
     <li><a href="#s0">0 · How to use this spec</a></li>
     <li class="toc-part">Part A · Design</li>
@@ -136,7 +136,7 @@ nav.toc li.toc-part{margin:14px 0 4px;padding:0 8px;font-size:11.5px;font-weight
 <div class="meta">
   <span class="chip">Unity · Burst · Jobs · C#</span>
   <span class="chip">Phases V1–V5 and H1 built; next: height phase H2 (§5.7)</span>
-  <span class="chip">Owner decisions 2026-11-21…25: DEC-125…235 (§18)</span>
+  <span class="chip">Owner decisions 2026-11-21…25: DEC-125…236 (§18)</span>
   <span class="chip">Budget 10 ms per chunk on the benchmark fixture (DEC-147, DEC-235)</span>
   <span class="chip">Replaces Terrain-first biome selection, Biome-first and worm caves at the switch (V7)</span>
 </div>
@@ -1294,7 +1294,7 @@ w = w_snow for snow, w_ice for ice (own noises, as in v1)</code></pre>
 <!-- ============================================================ -->
 <div class="part" id="partC"><span>Part C</span> Decisions</div>
 
-<h2 id="s18">18 · Owner decisions (DEC-125…235)</h2>
+<h2 id="s18">18 · Owner decisions (DEC-125…236)</h2>
 <h3 id="s18-1">18.1 Design picks (DEC-125…138)</h3>
 <p>The owner picked these on 2026-11-21 from option questions with the agent's recommendation first. They are binding for v2. Six picks differ from the recommendation: DEC-125, 126, 128, 129, 134 and 137. Costs are estimates per chunk on the benchmark row; §2.4 has the current plan.</p>
 <table>
@@ -1478,9 +1478,19 @@ w = w_snow for snow, w_ice for ice (own noises, as in v1)</code></pre>
 <thead><tr><th>DEC</th><th>Question</th><th>Options (recommendation first)</th><th>Owner's pick</th><th>Changes · where</th></tr></thead>
 <tbody>
 <tr><td>DEC-232</td><td>The first measurement missed the gate: in flight at 80 u/s p95 7.8–8.0 → 9.5–9.6 ms, the scheduler's main-thread share 0.67 → 1.06 ms, the light job +130–155 %, all from the always-air layers above the generation top</td><td>Optimise in H1 (recommended); accept the regression and optimise later</td><td><strong>Optimise in H1</strong></td><td>Column masks let the mesh and collider scans skip columns with nothing to claim; a clear partition clears for free; the light job stops at the highest occupied partition plus the light range; the chunk job writes the air above the surface as one run. Afterwards p95 and p99 within the noise of master · H1</td></tr>
-<tr><td>DEC-233</td><td>The pool's re-sort of the partition eviction queue (focus update, about 1 % of the frames) peaks at 2.9–3.1 ms, master 1.6–2.1 ms (already over 2 ms in two of four runs); the queue is twice as long with 16 partitions</td><td>Accept, with a follow-up task (recommended); fix in H1</td><td><strong>Accept, follow-up</strong></td><td>A follow-up replaces the pool's eviction queue with a cheaper one (it also fixes master's own peak over 2 ms); no frame over 16.7 ms comes from it · H1, §21</td></tr>
+<tr><td>DEC-233</td><td>The pool's re-sort of the partition eviction queue (focus update, about 1 % of the frames) peaks at 2.9–3.1 ms, master 1.6–2.1 ms (already over 2 ms in two of four runs); the queue is twice as long with 16 partitions</td><td>Accept, with a follow-up task (recommended); fix in H1</td><td><strong>Accept, follow-up</strong></td><td>A follow-up replaces the pool's eviction queue with a cheaper one (it also fixes master's own peak over 2 ms); no frame over 16.7 ms comes from it; built as DEC-236 · H1, §21</td></tr>
 <tr><td>DEC-234</td><td>Memory and load time of the 512-high world (Editor, draw distance 12)</td><td>Accept (recommended); create the upper partition objects lazily</td><td><strong>Accept</strong></td><td>Native allocated at rest +32 MiB, reserved +75 MiB, managed +18 MiB; pool warm-up 120 → 290 ms, world reload 2.1 → 2.4 s; the time to a built world unchanged · H1</td></tr>
 <tr><td>DEC-235</td><td>The generator's budget per chunk (DEC-147: 8 ms, the mean over the benchmark fixture's chunk classes with everything on)</td><td>Owner's request, no options asked</td><td><strong>10 ms</strong></td><td>Changes DEC-147 (and so DEC-129): every gate, running budget and requirement that named 8 ms binds 10 ms; the running budget after H1 is 3.8 ms of 10. Earlier phase reports keep their figures against 8 ms as history · §1.3, §2.4, W2-PERF-01, W2-PERF-04, V2–V6b, §21</td></tr>
+</tbody>
+</table>
+
+<h3 id="s18-11">18.11 Picks after H1 (DEC-236)</h3>
+<p>The follow-up of DEC-233, built on 2026-11-25 and measured against master in ABBA order (Editor, draw distance 12, the goal run with the main-thread attribution; A1 B1 B2 A2, then one more B run after the warm-up fix).</p>
+<table>
+<thead><tr><th>DEC</th><th>Question</th><th>Options (recommendation first)</th><th>Owner's pick</th><th>Changes · where</th></tr></thead>
+<tbody>
+<tr><td>DEC-236</td><td>Which structure replaces the generic heap (class nodes, delegate comparers) of the pool's chunk and partition eviction queues and the store's unloading queue, whose re-sort after a focus move is the item “focus pool queues” (DEC-233)</td><td>A struct heap with the re-sort in one Burst call, skipped when the focus only turns, also for the store queue (recommended); the same for the pool only; buckets by distance ring; a re-sort spread over frames</td><td><strong>Struct heap, pool and store</strong></td><td><code>EvictionQueue</code>: an indexed binary heap over a struct array, the re-sort (priorities + Floyd heapify) as a Burst direct call warmed up while the world is built. The eviction order is unchanged (priority, then insertion order; tests compare it step by step with the old queue); each queue keeps its own focus, so a partition claimed between the pool's two focus steps ranks by the old focus until the second. Item max in the flights: pool 3.3–5.2 → 0.13–0.18 ms, store 0.42–0.45 → 0.02 ms; frame p95/p99 within the noise of master (flight 80 u/s p95 A 7.42 / 8.05, B 7.67 / 7.35, B3 8.15 ms) · §21
+</td></tr>
 </tbody>
 </table>
 
@@ -1800,7 +1810,7 @@ w = w_snow for snow, w_ice for ice (own noises, as in v1)</code></pre>
 <tr><td>Determinism</td><td>Float results differ between machines, Burst versions, or the Editor's managed code and Burst.</td><td><code>FloatMode.Strict</code>, no transcendental functions (W2-ID-02), no float arithmetic in managed code (AD-30), a 2D hash from V1 and a voxel hash from V2 (W2-ID-05), golden hashes in V7.</td><td>V1, V2, V7</td></tr>
 <tr><td>Taller world</td><td>Build height 512 doubles the partitions, the Temp memory of chunk and light jobs and the full-column passes; loading to a full view may take longer.</td><td>H1 changes no look and is measured against master in ABBA (frame times, memory, warm-up); the corner ranges keep the graph cost; the per-frame budget bounds each frame.</td><td>H1</td></tr>
 <tr><td>Full re-tune</td><td>Moving every spline row (DEC-219), the factor rows (DEC-225) and the Mountain share (DEC-223) reopens looks signed off in V2–V5: rivers, wet shares, the Jungle height, the ocean bands, the overhangs, the massif shape. The owner re-judges all of it in H2, with Minecraft as the base (DEC-231); the earlier look note “keep our mountain scale and share” is replaced by that.</td><td>Candidates with the reports before the tour, the V5 values shown next to the new ones; the targets of §13.5 re-derived and confirmed by the owner; the V5 river inputs are on the H2 tour list.</td><td>H2</td></tr>
-<tr><td>Per-frame bookkeeping</td><td>Loops over partitions on the main thread (requests, queues, pools) double with 16 partitions and are not all budget items.</td><td>H1 reports the focus-update items' p99 and max and the frames over 16.7 ms; DEC-230 gates on no regression. Measured in H1: the scans skip empty columns (DEC-232); the eviction queue's re-sort peaks at about 3 ms and gets a follow-up (DEC-233).</td><td>H1, follow-up</td></tr>
+<tr><td>Per-frame bookkeeping</td><td>Loops over partitions on the main thread (requests, queues, pools) double with 16 partitions and are not all budget items.</td><td>H1 reports the focus-update items' p99 and max and the frames over 16.7 ms; DEC-230 gates on no regression. Measured in H1: the scans skip empty columns (DEC-232); the eviction queue's re-sort peaked at about 3 ms, and its follow-up brings it to 0.13–0.18 ms (DEC-233, DEC-236).</td><td>H1, follow-up</td></tr>
 <tr><td>Pop-in</td><td>With fog off, tall ranges appear at the draw edge (384 blocks).</td><td>Judged in the H2 tour; distant terrain (V8) as the answer (DEC-226).</td><td>H2</td></tr>
 <tr><td>Taller massif cost</td><td>Peaks at 320–380 give the massif columns more corner ranges, more runs and more mesh.</td><td>The fixture's tall-massif and coastal-cliff classes (DEC-227), the running budget and W2-PERF-03 in H2; the caves row checked on the tall class in V6a.</td><td>H2</td></tr>
 </tbody>

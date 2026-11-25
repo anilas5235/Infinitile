@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Engine.Scripts.Data;
 using Engine.Scripts.Jobs.Core;
 using Engine.Scripts.Settings;
-using Engine.Scripts.ThirdParty.Priority_Queue;
 using Engine.Scripts.Utils;
 using Engine.Scripts.Utils.Extensions;
 using Engine.Scripts.Utils.Logger;
@@ -26,7 +25,7 @@ namespace Engine.Scripts.World{
         private readonly PartitionSet _reCollidePartitions;
 
         private readonly PartitionSet _reMeshPartitions;
-        private readonly SimpleFastPriorityQueue<int2, float> _unloadingQueue;
+        private readonly EvictionQueue _unloadingQueue;
         private readonly Stack<Chunk> _chunkObjectPool; // unloaded chunk objects are reused
         internal Action<Chunk> OnChunkChange;
 
@@ -59,8 +58,6 @@ namespace Engine.Scripts.World{
         private NativeParallelHashMap<int2, ChunkVoxelData> _accessorMap;
         private NativeParallelHashMap<int2, ChunkVoxelData> _lightJobMap;
 
-        private PriorityUtil.Focus _focus;
-
         /// <summary>
         ///     Creates a new manager with capacities from <paramref name="settings" />.
         /// </summary>
@@ -73,8 +70,7 @@ namespace Engine.Scripts.World{
             _reCollidePartitions = new PartitionSet(reMeshCapacity, _chunkStoreSize);
 
             _chunks = new Dictionary<int2, Chunk>(_chunkStoreSize);
-            _unloadingQueue = new SimpleFastPriorityQueue<int2, float>();
-            _unloadingQueue.Reserve(_chunkStoreSize + 1); // queue nodes are pooled up front
+            _unloadingQueue = new EvictionQueue(_chunkStoreSize + 1, true); // sized up front, never grows
 
             // Every chunk object the store can hold exists from the start, so loading a chunk never
             // allocates a managed object, not even before the store is full for the first time.
@@ -128,9 +124,7 @@ namespace Engine.Scripts.World{
         ///     Updates focus (player) and priorities in eviction queue.
         /// </summary>
         internal void FocusUpdate(PriorityUtil.Focus focus){
-            _focus = focus;
-            // Static lambda with explicit state instead of a closure capturing the focus; evict by plain distance
-            _unloadingQueue.UpdateAllPriorities(focus, static (f, pos) => PriorityUtil.EvictionPriority(ref pos, ref f));
+            _unloadingQueue.UpdateFocus(focus); // evict by plain distance
         }
 
         /// <summary>
@@ -156,12 +150,12 @@ namespace Engine.Scripts.World{
         ///     its own; <see cref="UnloadChunk" /> still completes every reader itself.
         /// </summary>
         internal void CompleteReadersOfNextEviction(){
-            if (_unloadingQueue.Count > 0) CompleteReadersOf(_unloadingQueue.First);
+            if (_unloadingQueue.Count > 0) CompleteReadersOf(_unloadingQueue.FirstColumn);
         }
 
         /// <summary>The chunk <see cref="EvictNext" /> unloads; false when the store is empty.</summary>
         internal bool TryGetNextEviction(out int2 position){
-            position = _unloadingQueue.Count > 0 ? _unloadingQueue.First : default;
+            position = _unloadingQueue.Count > 0 ? _unloadingQueue.FirstColumn : default;
             return _unloadingQueue.Count > 0;
         }
 
@@ -177,7 +171,7 @@ namespace Engine.Scripts.World{
 
         /// <summary>Unloads the loaded chunk farthest from the focus (eviction); nothing when the store is empty.</summary>
         internal void EvictNext(){
-            if (_unloadingQueue.Count > 0) RemoveChunkData(_unloadingQueue.Dequeue());
+            if (_unloadingQueue.Count > 0) RemoveChunkData(_unloadingQueue.DequeueColumn());
         }
 
         /// <summary>
@@ -204,7 +198,7 @@ namespace Engine.Scripts.World{
 
             chunk.VoxelData = data;
             _chunks.Add(position, chunk);
-            _unloadingQueue.Enqueue(position, PriorityUtil.EvictionPriority(ref position, ref _focus));
+            _unloadingQueue.Enqueue(position);
             return true;
         }
 
@@ -220,7 +214,7 @@ namespace Engine.Scripts.World{
         /// </summary>
         /// <returns>True if the chunk was loaded and has been removed.</returns>
         internal bool UnloadChunk(int2 position){
-            if (_unloadingQueue.Contains(position)) _unloadingQueue.Remove(position);
+            _unloadingQueue.TryRemove(position);
             if (!_chunks.TryGetValue(position, out Chunk chunk)) return false;
 
             using ProfilerMarker.AutoScope _ = VoxelProfilerMarkers.ChunkUnload.Auto();
