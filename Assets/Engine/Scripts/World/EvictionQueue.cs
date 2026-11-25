@@ -50,6 +50,13 @@ namespace Engine.Scripts.World{
             for (int i = 0; i < capacity; i++) _freeSlots[i] = capacity - 1 - i; // slot 0 is handed out first
             _freeCount = capacity;
             _focus = default;
+
+            // The first direct call of a domain JITs the call stub and looks up the Burst code (1.3-1.7 ms in the
+            // first flight of the ABBA run): pay it here, while the world is built, not in the first focus move
+            unsafe{
+                PriorityUtil.Focus warmUp = default;
+                EvictionHeap.Reprioritise(null, null, 0, ref warmUp, 0);
+            }
         }
 
         /// <summary>Entries in the queue.</summary>
