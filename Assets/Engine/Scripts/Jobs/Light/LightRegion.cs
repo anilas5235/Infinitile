@@ -62,11 +62,16 @@ namespace Engine.Scripts.Jobs.Light{
             unsafe{
                 if (Limit == Height) UnsafeUtility.MemSet(Att.GetUnsafePtr(), Opaque, volume);
                 else{
-                    // Only the layers below the limit; the rest is never read (the stride stays the full height)
+                    // Only the layers below the limit; the rest is never read (the stride stays the full height).
+                    // The sentinel ring stays opaque over the full height, so the BFS, whose unchecked steps rely on
+                    // the ring, cannot leave the box even if a voxel above the limit were ever lit.
                     byte* att = (byte*)Att.GetUnsafePtr();
                     ushort* light = (ushort*)Light.GetUnsafePtr();
-                    for (int column = 0; column < sizeX * sizeZ; column++){
-                        UnsafeUtility.MemSet(att + column * Height, Opaque, Limit);
+                    for (int x = 0; x < sizeX; x++)
+                    for (int z = 0; z < sizeZ; z++){
+                        int column = x * sizeZ + z;
+                        bool ring = x == 0 || z == 0 || x == sizeX - 1 || z == sizeZ - 1;
+                        UnsafeUtility.MemSet(att + column * Height, Opaque, ring ? Height : Limit);
                         UnsafeUtility.MemClear(light + column * Height, Limit * sizeof(ushort));
                     }
                 }
