@@ -482,13 +482,13 @@ namespace Engine.Scripts.World{
             int top;
             bool wet = false;
             if (string.Equals(target, PeakTarget, StringComparison.OrdinalIgnoreCase)){
-                if (!BiomeLocator.FindPeak(_chunkScheduler.Graph, cfg.Layout, cfg.Seed, start, out at, out top)){
+                if (!BiomeLocator.FindPeak(_chunkScheduler.Graph, cfg.Layout, cfg.Seed, start, out at, out top, cfg.WaterLevel)){
                     error = "No peak found.";
                     return false;
                 }
             }
             else if (string.Equals(target, RiverTarget, StringComparison.OrdinalIgnoreCase)){
-                if (!BiomeLocator.FindRiver(_chunkScheduler.Graph, cfg.Layout, cfg.Seed, start, out at, out top, out wet)){
+                if (!BiomeLocator.FindRiver(_chunkScheduler.Graph, cfg.Layout, cfg.Seed, start, out at, out top, out wet, cfg.WaterLevel)){
                     error = $"No river within {BiomeLocator.MaxBiomeRadius} blocks.";
                     return false;
                 }
@@ -500,7 +500,7 @@ namespace Engine.Scripts.World{
                     return false;
                 }
 
-                if (!BiomeLocator.FindBiome(_chunkScheduler.Graph, cfg.Layout, cfg.Seed, start, (byte)biome, out at, out top, out wet)){
+                if (!BiomeLocator.FindBiome(_chunkScheduler.Graph, cfg.Layout, cfg.Seed, start, (byte)biome, out at, out top, out wet, cfg.WaterLevel)){
                     error = $"No {_biomeNames[biome]} within {BiomeLocator.MaxBiomeRadius} blocks.";
                     return false;
                 }
