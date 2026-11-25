@@ -469,7 +469,7 @@ The <code>id</code> is the package prefix: lower case, short, unique.</dd>
 <div class="box note">
 <p><strong>Origin.</strong> <q>replaced standard "made with unity" intro, make game menu with + multiple worlds, persistance of worlds, worlds settings like seed and so on.</q> Then: <q>add to TODO list: main menu with world selection</q> and <q>add to TODO list: save game and load game</q> (world edits, player position, inventory and hotbar). On the first draft, which saved only the changed voxels: <q>huge problem if we only save deltas a generator change will destroy the world.</q> Moving the concept here: <q>Move all</q>, then <q>persistence-concept results to the new spec than can be archived.</q> — owner, 2026-11-17.</p>
 </div>
-<p class="small">Word use: in this engine a <strong>chunk is a whole column</strong>, 32 × 256 × 32 voxels (8 partitions of 32³). A "world column" is one x/z column of 256 voxels. A <strong>kept chunk</strong> is a chunk saved whole and loaded from disk instead of being generated.</p>
+<p class="small">Word use: in this engine a <strong>chunk is a whole column</strong>, 32 × 256 × 32 voxels (8 partitions of 32³); from WorldGen v2's phase H1 it is 32 × 512 × 32 (16 partitions, WorldGenV2Spec §5.7). A "world column" is one x/z column of the chunk's height. A <strong>kept chunk</strong> is a chunk saved whole and loaded from disk instead of being generated.</p>
 
 <h3 id="s3-1">3.1 Persistence decisions (owner, 2026-11-17)</h3>
 <p>Asked as options; binding. The question numbers are those of the concept. The owner first picked deltas (Q1 A), regions 16 × 16 (Q2) and Deflate (Q3), then stopped at Q4 with the objection above. Q1 and Q4 were asked again as Q1′ and Q4′ (§3.7); Q2 and Q3 still hold.</p>
@@ -491,7 +491,7 @@ The <code>id</code> is the package prefix: lower case, short, unique.</dd>
 <p class="small">Facts read on master and <code>feature/hud-settings-menu</code>, 2026-11-17.</p>
 <table>
 <tr><th>Item</th><th>Today</th><th>Where</th></tr>
-<tr><td>Chunk</td><td>262 144 voxels, <code>ushort</code> ids, RLE interval list (<code>UnsafeIntervalList&lt;ushort&gt;</code>, node = value + cumulative end); 8 partitions, <code>OccupiedPartitions</code> bit mask</td><td><code>Data/Chunk.cs</code>, <code>VoxelConstants</code></td></tr>
+<tr><td>Chunk</td><td>262 144 voxels (524 288 from H1), <code>ushort</code> ids, RLE interval list (<code>UnsafeIntervalList&lt;ushort&gt;</code>, node = value + cumulative end); 8 partitions (16 from H1), <code>OccupiedPartitions</code> bit mask</td><td><code>Data/Chunk.cs</code>, <code>VoxelConstants</code></td></tr>
 <tr><td>Generation</td><td><code>ChunkJob</code> (Burst, <code>FloatMode.Strict</code>, <code>CompileSynchronously</code>): a pure function of seed + <code>WorldGenConfig</code> + chunk position; about 5–7 ms per chunk per worker (forest species, DistanceBlend, caves on)</td><td><code>Jobs/Chunk/ChunkJob.cs</code>; DEC-45, 71, 73</td></tr>
 <tr><td>Seed</td><td>One global value, <code>VoxelEngineSettings.Seed = 1337</code>, read in <code>VoxelEngineProvider.ChunkDataScheduler</code></td><td><code>Settings/VoxelEngineSettings.cs</code></td></tr>
 <tr><td>Generator settings</td><td><code>WorldGenSettings</code> asset; <code>ToCanonicalJson(seed)</code> gives a deterministic, hashable JSON snapshot</td><td><code>WorldGen/Settings</code></td></tr>
@@ -577,13 +577,14 @@ The <code>id</code> is the package prefix: lower case, short, unique.</dd>
 }</code></pre></div>
 </div>
 <h4>Region file <code>.ivr</code> (binary, little endian)</h4>
-<pre><code>Header   "IVRG" | u16 format | u8 regionSide (16) | u8 compression (0 none, 1 deflate) | i32 rx | i32 rz
+<pre><code>Header   "IVRG" | u16 format | u8 regionSide (16) | u8 compression (0 none, 1 deflate) | u16 chunkHeight | i32 rx | i32 rz
 Table    256 × { u32 offset | u32 length | u32 crc32 | u8 kind }   kind 0 = none, 1 = snapshot edited, 2 = snapshot ring
 Records  per chunk, each compressed on its own:
            u16 generatorVersion | u8[8] settingsHash prefix
            u16 paletteCount; palette: { u8 len, utf8 "package:Name", u8 orientation }
            u32 runCount;     runs:    { u16 palette index | varint length }</code></pre>
 <ul class="tight">
+  <li><strong>Chunk height:</strong> the header stamps the chunk height (512 from WorldGen v2's H1); a record's runs cover 32 · 32 · chunkHeight voxels. A file with another height is not loaded as is (no saves exist before H1, so there is nothing to convert).</li>
   <li><strong>Size:</strong> a kept chunk is 15–20 k runs, 60–80 KB raw, 15–25 KB deflated. A region with a build area holds 25–110 records, ≈ 0.5–2.5 MB. The cache keeps records compressed, so a save deflates only changed chunks, then writes the whole file (≈ 10–30 ms of IO-thread time for 2 MB).</li>
   <li><strong>Palette by name + orientation per record:</strong> new, removed and re-ordered voxels or packages don't break a save (ROT-02). A record is rewritten alone, without touching other chunks' palettes.</li>
   <li><strong>Unknown name</strong> on load (voxel deleted or renamed): a visible placeholder block; the original name is kept, so the next save writes it back unchanged. A <code>voxel-renames.json</code> table (old → new) handles deliberate renames.</li>
