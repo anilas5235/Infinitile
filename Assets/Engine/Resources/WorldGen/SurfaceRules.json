@@ -22,8 +22,6 @@
     "snow": "std:Snow",
     "snow_layer": "std:SnowLayer",
     "dark_rock": "std:StoneGrey",
-    "moss_rock": "std:StoneMossy",
-    "dark_moss_rock": "std:StoneGreyMossy",
     "grassy_rock": "std:StoneGrassy",
     "litter": "std:Litter",
     "coarse_dirt": "std:DirtCoarse",
@@ -36,7 +34,6 @@
     "clay": "std:Clay",
     "gravel": "std:StoneGravel",
     "cobble": "std:Cobblestone",
-    "lichen_rock": "std:StoneGreyLichen",
     "granite": "std:Granite",
     "diorite": "std:Diorite",
     "andesite": "std:Andesite",
@@ -155,14 +152,11 @@
             "if": { "all": [{ "stone_depth_above": 4 }, { "not": "floor" }, "dry", "steep"] },
             "then": {
               "sequence": [
-                { "name": "steep_lichen", "if": { "all": [{ "biome": ["Forest", "Mountain", "Taiga"] }, { "noise_threshold": { "name": "ground_mix", "max": -0.5 } }] }, "then": { "block": "@lichen_rock" } },
                 { "name": "steep_marble", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_kind", "max": -0.5 } }, { "noise_threshold": { "name": "ground_mix", "min": 0.3 } }] }, "then": { "block": "@marble" } },
                 { "name": "steep_diorite", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_kind", "max": -0.5 } }] }, "then": { "block": "@diorite" } },
                 { "name": "steep_granite", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_kind", "min": 0.5 } }] }, "then": { "block": "@granite" } },
-                { "name": "steep_moss_dark", "if": { "all": [{ "biome": ["Forest", "Jungle", "Swamp", "Taiga"] }, { "noise_threshold": { "name": "rock_mix", "min": -0.3 } }, { "noise_threshold": { "name": "ground_mix", "min": 0.25 } }] }, "then": { "block": "@dark_moss_rock" } },
                 { "name": "steep_andesite", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_mix", "min": -0.3 } }, { "noise_threshold": { "name": "ground_mix", "min": 0.4 } }] }, "then": { "block": "@andesite" } },
                 { "name": "steep_dark", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_mix", "min": -0.3 } }] }, "then": { "block": "@dark_rock" } },
-                { "name": "steep_moss", "if": { "all": [{ "biome": ["Forest", "Jungle", "Swamp", "Taiga"] }, { "noise_threshold": { "name": "ground_mix", "min": 0.25 } }] }, "then": { "block": "@moss_rock" } },
                 { "name": "steep_rock", "then": { "block": "@rock" } }
               ]
             }
@@ -172,7 +166,6 @@
             "if": { "all": [{ "stone_depth_above": 4 }, "dry", { "not": "below_tree_line" }] },
             "then": {
               "sequence": [
-                { "name": "alpine_lichen", "if": { "all": [{ "biome": ["Forest", "Mountain", "Taiga"] }, { "noise_threshold": { "name": "ground_mix", "max": -0.5 } }] }, "then": { "block": "@lichen_rock" } },
                 { "name": "alpine_marble", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_kind", "max": -0.5 } }, { "noise_threshold": { "name": "ground_mix", "min": 0.3 } }] }, "then": { "block": "@marble" } },
                 { "name": "alpine_diorite", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_kind", "max": -0.5 } }] }, "then": { "block": "@diorite" } },
                 { "name": "alpine_granite", "if": { "all": [{ "not": { "biome": ["Desert", "Badlands"] } }, { "noise_threshold": { "name": "rock_kind", "min": 0.5 } }] }, "then": { "block": "@granite" } },

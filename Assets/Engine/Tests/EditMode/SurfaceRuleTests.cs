@@ -36,7 +36,7 @@ namespace Engine.Tests.EditMode{
 
         /// <summary>
         ///     The rock variety the rules mix into steep and alpine rock by the ground_mix and rock_kind noises (DEC-187, DEC-190):
-        ///     mossy and lichen rock, granite, diorite, andesite and marble; the oracle cannot see the noises.
+        ///     granite, diorite, andesite and marble (lichen and mossy stone removed, DEC-201); the oracle cannot see the noises.
         /// </summary>
         private static readonly HashSet<ushort> RockVariety = new();
 
@@ -65,7 +65,7 @@ namespace Engine.Tests.EditMode{
             _ids = DensityFixture.UseShippedSurface(ref _config.WorldGen, _graph);
             _darkRock = (ushort)_ids.ByName("std:StoneGrey");
             RockVariety.Clear();
-            foreach (string name in new[]{ "std:StoneMossy", "std:StoneGreyMossy", "std:StoneGreyLichen", "std:Granite", "std:Diorite", "std:Andesite", "std:Marble" })
+            foreach (string name in new[]{ "std:Granite", "std:Diorite", "std:Andesite", "std:Marble" })
                 RockVariety.Add((ushort)_ids.ByName(name));
             GroundVariety.Clear();
             foreach (string name in new[]{
