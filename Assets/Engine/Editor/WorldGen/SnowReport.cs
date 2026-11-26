@@ -158,7 +158,8 @@ namespace Engine.Editor.WorldGen{
                     int j = nz * side + nx;
                     if (!dry[j]) continue;
                     any = true;
-                    bankSnow |= snow[j];
+                    // The snow line or the bank rule (DEC-229): a dry bank cold enough for river ice; its steep test is not applied here.
+                    bankSnow |= snow[j] || !never[j] && rules.RiverIce >= 0 && rules.ColdAt(surfaceY, Value(tSlot, j), 0f, rules.RiverIceTemperature);
                 }
 
                 if (!any) continue;
@@ -231,8 +232,11 @@ namespace Engine.Editor.WorldGen{
             return r;
         }
 
-        /// <summary>T_snow that puts the snow line at y 210 at the median Mountain T (DEC-175): T_med − (210 − lapseFrom) · L = T_med − 86 L.</summary>
-        public static float CalibratedSnowTemperature(float medianMountainT, in SurfaceRules rules, int snowLine = 210){
+        /// <summary>The snow line at the pooled median Mountain T: y 255, by the peaks (DEC-244; V4: 210).</summary>
+        public const int CalibrationSnowLine = 255;
+
+        /// <summary>T_snow that puts the snow line at <see cref="CalibrationSnowLine" /> at the median Mountain T (DEC-175, DEC-244): T_med − (255 − lapseFrom) · L = T_med − 128 L.</summary>
+        public static float CalibratedSnowTemperature(float medianMountainT, in SurfaceRules rules, int snowLine = CalibrationSnowLine){
             return medianMountainT - (snowLine - rules.LapseFrom) * rules.Lapse;
         }
 
@@ -246,10 +250,10 @@ namespace Engine.Editor.WorldGen{
         public static string Text(SnowReportSeed r, in SurfaceRules rules){
             StringBuilder sb = new();
             sb.AppendLine($"=== Snow report · seed {r.Seed} ===");
-            sb.AppendLine($"median Mountain T {F(r.MedianMountainT)} → snow line y {r.SnowLineAtMedian} (the calibration pools the five seeds: y 210 at their joint median) · " +
+            sb.AppendLine($"median Mountain T {F(r.MedianMountainT)} → snow line y {r.SnowLineAtMedian} (the calibration pools the five seeds: y {CalibrationSnowLine} at their joint median, DEC-244) · " +
                           $"T_snow {F(rules.SnowTemperature)}, L {F(rules.Lapse, "0.0000")} · sea ice {BiomeWorldReport.P(r.IceShare, "0.00")} of the open water");
             sb.AppendLine($"river water {r.RiverWater} samples: frozen {BiomeWorldReport.P(r.RiverIceShare, "0.00")} (the sea rule alone {BiomeWorldReport.P(r.RiverSeaRuleShare, "0.00")}); " +
-                          $"frozen river samples with a dry neighbour that has snow: {BiomeWorldReport.P(r.FrozenRiverSnowyBank, "0.0")}");
+                          $"frozen river samples with a dry neighbour that has snow (the snow line or the bank rule, without its steep test): {BiomeWorldReport.P(r.FrozenRiverSnowyBank, "0.0")}");
             sb.AppendLine("Mountain ground at y 200 and above, snow share per T band (equal counts):");
             foreach ((float from, float to, int samples, double share) in r.MountainBands)
                 sb.AppendLine($"  T {F(from),6} … {F(to),6}: {BiomeWorldReport.P(share),6} of {samples}");

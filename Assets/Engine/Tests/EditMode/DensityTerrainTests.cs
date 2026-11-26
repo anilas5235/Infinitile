@@ -31,6 +31,7 @@ namespace Engine.Tests.EditMode{
             _config = TestFixtures.CreateGeneratorConfig(Unity.Collections.Allocator.Persistent);
             _config.WorldGen.Seed = DensityFixture.Seed;
             _config.WorldGen.DensityStoneVoxel = TestFixtures.Stone;
+            DensityFixture.UseShippedSea(ref _config.WorldGen);
         }
 
         [OneTimeTearDown]
@@ -103,7 +104,7 @@ namespace Engine.Tests.EditMode{
             using CompiledNoiseGraph graph = r.Graph;
             Assert.IsTrue(DensityTerrainGraph.TryCreate(graph, out DensityTerrainGraph terrain, out string error), error);
             Assert.AreEqual(8, terrain.CellHeight, "DEC-159 starts with cells 4 × 8 × 4.");
-            Assert.AreEqual(235f, terrain.SlideStart);
+            Assert.AreEqual(352f, terrain.SlideStart, "H2: the top slide 352 → 383 lies above the peaks (DEC-238).");
             Assert.That(terrain.NoiseBound, Is.GreaterThan(0f).And.LessThanOrEqualTo(1f));
             Assert.IsTrue(GraphEvaluator.HasGeneratedCode(graph), "The shipped graph should run as generated code; run Infinitile > Generate Noise Graph Code.");
         }
@@ -211,9 +212,11 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void NoTerrainAbove255(){
-            // The generation top of the fixture and FlatGround is y 255 (top_slide_end); the chunk is 512 high since H1.
-            const int top = 255;
+        public void NoTerrainAboveTheGenerationTop(){
+            // The fixture's generation top is its top_slide_end (y 383 since H2, DEC-238); the chunk is 512 high since H1.
+            Assert.IsTrue(DensityTerrainGraph.TryCreate(_fixture, out DensityTerrainGraph terrain, out string error), error);
+            int top = (int)terrain.SlideEnd;
+            Assert.AreEqual(383, top);
             foreach (int2 chunk in AllFixtureChunks()){
                 using DensityProbeResult p = DensityProbe.Run(_fixture, _config.WorldGen, chunk * Size, DensityChunk.PassTerrain);
                 for (int x = 0; x < Size; x++)
@@ -223,10 +226,11 @@ namespace Engine.Tests.EditMode{
                         Assert.Fail($"terrain at y {y} in column ({chunk.x * Size + x}, {chunk.y * Size + z})");
             }
 
+            // FlatGround's own top slide ends at y 255.
             using CompiledNoiseGraph high = CompileOrFail(FlatGround(253, 8, 8).Graph);
             using DensityProbeResult flat = DensityProbe.Run(high, _config.WorldGen, int2.zero, DensityChunk.PassTerrain);
             for (int i = 0; i < DensityLayout.Columns; i++)
-                Assert.Less(flat.Heightmap[i], top, "flat ground at y 253 reaches y 255");
+                Assert.Less(flat.Heightmap[i], 255, "flat ground at y 253 reaches y 255");
         }
 
         [Test]
@@ -288,29 +292,9 @@ namespace Engine.Tests.EditMode{
         /// </summary>
         [Test]
         public void VoxelHash_OfTheFixtureChunks(){
-            const ulong expected = 0xD7DEE36334953991UL;
+            const ulong expected = 0x2C1E2D8B2D350AC2UL;
             ulong actual = VoxelHash();
             Assert.AreEqual(expected, actual, $"voxel hash 0x{actual:X16}");
-        }
-
-        /// <summary>
-        ///     W2-HGT-02: the voxels below y 256, hashed in the order of the 256-high chunks, equal master's (e67aa08)
-        ///     hash from before H1, so the 512-high build changed nothing in the look. Valid until H2 moves the terrain.
-        /// </summary>
-        [Test]
-        public void VoxelHash_BelowY256_EqualsThe256HighWorld(){
-            const ulong expected = 0x72AF39D7F38C0191UL;
-            ulong actual = VoxelHash(256);
-            Assert.AreEqual(expected, actual, $"voxel hash below y 256: 0x{actual:X16}");
-
-            // Above the shipped graph's generation top (y 255) every voxel is air.
-            foreach (int2 chunk in AllFixtureChunks()){
-                using DensityProbeResult p = DensityProbe.Run(_fixture, _config.WorldGen, chunk * Size);
-                for (int column = 0; column < Size * Size; column++)
-                for (int y = 256; y < Height; y++)
-                    if (p.Voxels[column * Height + y] != 0)
-                        Assert.Fail($"chunk {chunk}: voxel {p.Voxels[column * Height + y]} at y {y} in column {column}");
-            }
         }
 
         /// <summary>
@@ -372,10 +356,12 @@ namespace Engine.Tests.EditMode{
         private static readonly DensityChunkClass[] ClassValues = DensityFixture.Classes;
 
         private static readonly Dictionary<DensityChunkClass, string> ExpectedCounters = new(){
-            [DensityChunkClass.Ocean] = "8 chunks: corner columns 648, corners 4448, blocks by range 29800 / by sign 2345 / mixed 623, interpolated 79744, solid 844817; graph: lattice 4232, columns 0, corners 4448, voxels 0 in 0 cells, noise 2D 97336 / 3D 17792, instructions 18720 (315544 lane ops), interpolated 79744",
-            [DensityChunkClass.Coast] = "8 chunks: corner columns 648, corners 4888, blocks by range 29534 / by sign 2560 / mixed 674, interpolated 86272, solid 1049000; graph: lattice 4232, columns 0, corners 4888, voxels 0 in 0 cells, noise 2D 97336 / 3D 19552, instructions 18720 (320384 lane ops), interpolated 86272",
-            [DensityChunkClass.Lowland] = "8 chunks: corner columns 648, corners 3883, blocks by range 30242 / by sign 1968 / mixed 558, interpolated 71424, solid 1144771; graph: lattice 4232, columns 0, corners 3883, voxels 0 in 0 cells, noise 2D 97336 / 3D 15532, instructions 18720 (309329 lane ops), interpolated 71424",
-            [DensityChunkClass.Massif] = "8 chunks: corner columns 648, corners 8342, blocks by range 26898 / by sign 4869 / mixed 1001, interpolated 128128, solid 1575542; graph: lattice 4232, columns 0, corners 8342, voxels 0 in 0 cells, noise 2D 97336 / 3D 33368, instructions 18720 (358378 lane ops), interpolated 128128"
+            [DensityChunkClass.Ocean] = "8 chunks: corner columns 648, corners 4527, blocks by range 29708 / by sign 2486 / mixed 574, interpolated 73472, solid 921239; graph: lattice 4232, columns 0, corners 4527, voxels 0 in 0 cells, noise 2D 177744 / 3D 18108, instructions 31968 (621117 lane ops), interpolated 73472",
+            [DensityChunkClass.Coast] = "8 chunks: corner columns 648, corners 4063, blocks by range 30284 / by sign 1664 / mixed 820, interpolated 104960, solid 1062404; graph: lattice 4232, columns 0, corners 4063, voxels 0 in 0 cells, noise 2D 177744 / 3D 16252, instructions 31968 (616013 lane ops), interpolated 104960",
+            [DensityChunkClass.Lowland] = "8 chunks: corner columns 648, corners 3886, blocks by range 30256 / by sign 1924 / mixed 588, interpolated 75264, solid 1143209; graph: lattice 4232, columns 0, corners 3886, voxels 0 in 0 cells, noise 2D 177744 / 3D 15544, instructions 31968 (614066 lane ops), interpolated 75264",
+            [DensityChunkClass.Massif] = "8 chunks: corner columns 648, corners 4386, blocks by range 30034 / by sign 1934 / mixed 800, interpolated 102400, solid 1599044; graph: lattice 4232, columns 0, corners 4386, voxels 0 in 0 cells, noise 2D 177744 / 3D 17544, instructions 31968 (619566 lane ops), interpolated 102400",
+            [DensityChunkClass.TallMassif] = "8 chunks: corner columns 648, corners 5352, blocks by range 29697 / by sign 1687 / mixed 1384, interpolated 177152, solid 2080493; graph: lattice 4232, columns 0, corners 5352, voxels 0 in 0 cells, noise 2D 177744 / 3D 21408, instructions 31968 (630192 lane ops), interpolated 177152",
+            [DensityChunkClass.CoastalCliff] = "8 chunks: corner columns 648, corners 5106, blocks by range 29760 / by sign 1824 / mixed 1184, interpolated 151552, solid 1197256; graph: lattice 4232, columns 0, corners 5106, voxels 0 in 0 cells, noise 2D 177744 / 3D 20424, instructions 31968 (627486 lane ops), interpolated 151552"
         };
 
         #endregion

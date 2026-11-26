@@ -35,7 +35,7 @@ MonoBehaviour:
   HeightMin: 50
   HeightMax: 240
   HeightSoftBand: 32
-  WaterLevel: 124
+  WaterLevel: 127
   WaterVoxel: {fileID: 11400000, guid: 7b0b0eaca79300d468e0f7c8c0b8d1f3, type: 2}
   OctaveWavelengths:
   - 512

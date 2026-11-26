@@ -14,9 +14,9 @@ using Unity.Mathematics;
 
 namespace Engine.Tests.EditMode{
     /// <summary>
-    ///     The rivers of WorldGen v2 (§9.2, phase V5) on the shipped graph and rule file: the valleys slice is |W| ≤ 0.04 (DEC-196)
-    ///     (the mirrored lowland relief reaches its −4…0 bed there, DEC-192), the river output lies inside the slice and
-    ///     in the lowland, river water only below 124 and none above, the river's centre line in the plain lowland is wet,
+    ///     The rivers of WorldGen v2 (§9.2, phases V5 and H2) on the shipped graph and rule file: the valleys slice is |W| &lt; 0.05,
+    ///     Minecraft's (DEC-240), the river output lies inside the slice and in the lowland, river water only below the sea and
+    ///     none above, the river's centre line in the plain lowland is wet,
     ///     the beds take gravel, sand, clay or mud (DEC-195) and the gentle banks the V4 shore sand.
     /// </summary>
     public class RiverTests{
@@ -24,10 +24,10 @@ namespace Engine.Tests.EditMode{
         private const int Height = DensityLayout.Height;
 
         /// <summary>Half width of the valleys slice in |W| (§9.2).</summary>
-        private const float Slice = 0.04f; // DEC-196 (was 0.05)
+        private const float Slice = 0.05f; // DEC-240 (V5: 0.04, DEC-196)
 
-        /// <summary>The lowland_pv value at the slice's edge: the lowland rows' bed (−4 … 0) lies at −1 … −0.85.</summary>
-        private const float SliceEdgePv = -0.85f;
+        /// <summary>E below which the river fades out in the massif (C ≥ 0.12): Minecraft's peak zone, E −0.4 … −0.375.</summary>
+        private const float MassifE = -0.4f;
 
         /// <summary>C where the river weight is 1 (the plain lowland, DEC-192): −0.11 … 0.03.</summary>
         private const float LowlandCMin = -0.11f, LowlandCMax = 0.03f;
@@ -62,7 +62,8 @@ namespace Engine.Tests.EditMode{
             _chunks = new List<DensityProbeResult>();
             _river = new List<float[]>();
             _c = new List<float[]>();
-            foreach (int2 chunk in RiverChunks(6)){
+            // Six chunks on a centre line and, since the rivers widened in H2 (DEC-240), six at the slice's edge, where the banks lie.
+            foreach (int2 chunk in RiverChunks(6, 0.9f, 1.01f).Concat(RiverChunks(6, 0.05f, 0.3f))){
                 DensityProbeResult probe = DensityProbe.Run(_graph, _config.WorldGen, chunk * Size);
                 _chunks.Add(probe);
                 float[] values = Columns(probe.Origin, out int n);
@@ -94,8 +95,11 @@ namespace Engine.Tests.EditMode{
             return GraphEvaluator.SampleLattice(_graph, _config.WorldGen.Seed, points, out _);
         }
 
-        /// <summary>Up to <paramref name="count" /> chunks, nearest to the origin first, whose centre has river ≥ 0.9 in the plain lowland.</summary>
-        private IEnumerable<int2> RiverChunks(int count){
+        /// <summary>
+        ///     <paramref name="count" /> chunks, nearest to the origin first, whose centre has a river output in
+        ///     [<paramref name="min" />, <paramref name="max" />) in the plain lowland.
+        /// </summary>
+        private IEnumerable<int2> RiverChunks(int count, float min, float max){
             const int radius = 200, step = 3;
             List<int2> chunks = new();
             for (int z = -radius; z <= radius; z += step)
@@ -108,7 +112,8 @@ namespace Engine.Tests.EditMode{
             int found = 0;
             for (int i = 0; i < chunks.Count && found < count; i++){
                 float c = values[cSlot * points.Length + i];
-                if (values[river * points.Length + i] < 0.9f || c < LowlandCMin + 0.01f || c > LowlandCMax - 0.01f) continue;
+                float rv = values[river * points.Length + i];
+                if (rv < min || rv >= max || c < LowlandCMin + 0.01f || c > LowlandCMax - 0.01f) continue;
                 found++;
                 yield return chunks[i];
             }
@@ -129,39 +134,39 @@ namespace Engine.Tests.EditMode{
         #region The valleys slice
 
         /// <summary>
-        ///     The valleys slice is |W| ≤ 0.04 (§9.2, DEC-196): the mirrored lowland relief the lowland rows read (lowland_pv, DEC-192)
-        ///     is at most −0.85, the rows' −4…0 bed, exactly where |W| ≤ 0.04.
+        ///     The valleys slice is |W| &lt; 0.05 (§9.2, DEC-240): the raw river value (river_raw = 1 − 20 |W|, clamped) is above 0
+        ///     exactly there.
         /// </summary>
         [Test]
-        public void ValleysSlice_IsAbsWAtMost0_04(){
+        public void ValleysSlice_IsAbsWBelow0_05(){
             NoiseGraph g = NoiseGraphJson.Parse(ShippedNoiseGraph.LoadJson());
-            g.Outputs["lowland_pv_probe"] = "lowland_pv";
+            g.Outputs["river_raw_probe"] = "river_raw";
             GraphCompileResult r = GraphCompiler.Compile(g, "probe");
             Assert.IsTrue(r.Succeeded, string.Join("\n", r.Messages));
             using CompiledNoiseGraph graph = r.Graph;
             float2[] points = Grid();
             float[] values = GraphEvaluator.SampleLattice(graph, _config.WorldGen.Seed, points, out _);
-            int pvSlot = graph.Outputs.First(o => o.Name == "lowland_pv_probe").LatticeValue, wSlot = graph.Outputs.First(o => o.Name == "weirdness").LatticeValue;
+            int rawSlot = graph.Outputs.First(o => o.Name == "river_raw_probe").LatticeValue, wSlot = graph.Outputs.First(o => o.Name == "weirdness").LatticeValue;
             int inside = 0, mismatches = 0;
             string first = null;
             for (int p = 0; p < points.Length; p++){
-                float w = math.abs(values[wSlot * points.Length + p]), pv = values[pvSlot * points.Length + p];
+                float w = math.abs(values[wSlot * points.Length + p]), raw = values[rawSlot * points.Length + p];
                 if (math.abs(w - Slice) < 1e-4f) continue; // on the edge itself, float rounding decides
-                bool inSlice = w <= Slice;
+                bool inSlice = w < Slice;
                 if (inSlice) inside++;
-                if (inSlice == pv <= SliceEdgePv) continue;
+                if (inSlice == raw > 0f) continue;
                 mismatches++;
-                first ??= $"{points[p]}: |W| {w:0.00000}, lowland_pv {pv:0.00000}";
+                first ??= $"{points[p]}: |W| {w:0.00000}, river_raw {raw:0.00000}";
             }
 
             TestContext.WriteLine($"{inside} of {points.Length} points in the slice");
-            Assert.Greater(inside, points.Length / 100, "the slice holds about 5 % of the points");
-            Assert.AreEqual(0, mismatches, $"lowland_pv ≤ {SliceEdgePv} must equal |W| ≤ {Slice}; first: {first}");
+            Assert.Greater(inside, points.Length / 100, "the slice holds about 8 % of the points");
+            Assert.AreEqual(0, mismatches, $"river_raw > 0 must equal |W| < {Slice}; first: {first}");
         }
 
         /// <summary>
-        ///     The river output lies inside the valleys slice and is 1 − |W|/0.04 there; it is 1 at that value in the plain lowland
-        ///     (C −0.11 … 0.03) and 0 out at sea and in the massif (C &lt; −0.19, or C ≥ 0.12 with E ≤ −0.05).
+        ///     The river output lies inside the valleys slice and is 1 − |W|/0.05 there in the plain lowland (C −0.11 … 0.03); it is
+        ///     0 out at sea and in Minecraft's peak zone of the massif (C &lt; −0.19, or C ≥ 0.12 with E ≤ −0.4).
         /// </summary>
         [Test]
         public void RiverOutput_LiesInTheSliceAndTheLowland(){
@@ -179,7 +184,7 @@ namespace Engine.Tests.EditMode{
                     sea++;
                 }
 
-                if (cv >= 0.12f && ev <= -0.05f){
+                if (cv >= 0.12f && ev <= MassifE){
                     Assert.AreEqual(0f, rv, where + ": river in the massif");
                     massif++;
                 }
@@ -200,9 +205,9 @@ namespace Engine.Tests.EditMode{
 
         #region Built river chunks
 
-        /// <summary>River water only below 124 (at y 123 and under), and no water anywhere above it.</summary>
+        /// <summary>River water only below the sea (at y 126 and under since H2), and no water anywhere above it.</summary>
         [Test]
-        public void RiverWater_OnlyBelow124_AndNoneAbove(){
+        public void RiverWater_OnlyBelowTheSea_AndNoneAbove(){
             ushort water = _config.WorldGen.WaterVoxel;
             Assert.AreNotEqual(0, water);
             int riverWater = 0;
@@ -270,16 +275,16 @@ namespace Engine.Tests.EditMode{
                     }
 
                     // A gentle dry bank next to a river column.
-                    if (h < WetY || h > WetY + 2 || r.Rise[c] >= 3 || h >= r.SnowLine[c] || def.beachBlock == 0) continue;
                     bool besideRiver = false;
                     for (int d = 0; d < 4 && !besideRiver; d++){
                         int nx = x + (d == 0 ? 1 : d == 1 ? -1 : 0), nz = z + (d == 2 ? 1 : d == 3 ? -1 : 0);
                         if (nx < 0 || nz < 0 || nx >= Size || nz >= Size) continue;
                         int nc = nx * Size + nz;
-                        besideRiver = r.Heightmap[nc] < WetY && _river[i][nc] > 0f;
+                        // Since H2 the valley water is wider than the slice (DEC-240, DEC-242): a bank borders inland water, river output or not.
+                        besideRiver = r.Heightmap[nc] < WetY && _c[i][nc] >= LowlandCMin;
                     }
 
-                    if (!besideRiver) continue;
+                    if (!besideRiver || h < WetY || h > WetY + 2 || r.Rise[c] >= 3 || h >= r.SnowLine[c] || def.beachBlock == 0) continue;
                     Assert.AreEqual(def.beachBlock, top, $"{where}: a gentle river bank wants {_ids.Name(def.beachBlock)}, found {_ids.Name(top)}");
                     banks++;
                 }

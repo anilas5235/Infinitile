@@ -39,8 +39,8 @@ namespace Engine.Tests.EditMode{
 
         private void Use(GenArchitecture architecture, BlendMethod method, params Biome[] biomes){
             WorldGenSettings s = _fixture.Settings(architecture, method, biomes);
-            Assert.AreEqual(WaterLevel, s.WaterLevel);
             _cfg = _fixture.ToConfig(s);
+            Assert.AreEqual(WaterLevel, _cfg.WaterLevel);
         }
 
         private RegionSample Region(int2 origin, int2 size){

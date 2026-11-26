@@ -146,6 +146,16 @@ namespace Engine.Scripts.WorldGen.Surface{
         }
     }
 
+    /// <summary>
+    ///     frozen_river: the column lies in a frozen river's band (§8.3, DEC-229): the river output is at least
+    ///     riverIceMin and the water surface is cold enough for river ice. False without river ice.
+    /// </summary>
+    public sealed class FrozenRiverCondition : RuleCondition{
+        public override RuleCondition Clone(){
+            return new FrozenRiverCondition();
+        }
+    }
+
     /// <summary>sky_open: no terrain lies above the voxel's run (it is the column's top run).</summary>
     public sealed class SkyOpenCondition : RuleCondition{
         public override RuleCondition Clone(){
@@ -251,7 +261,7 @@ namespace Engine.Scripts.WorldGen.Surface{
         /// <summary>L: temperature lost per block above <see cref="LapseFrom" />.</summary>
         public float Lapse = 0.0055f;
 
-        public float LapseFrom = 124f;
+        public float LapseFrom = WorldGenSettings.DefaultWaterLevel;
         public float SnowTemperature = -0.638f;
         public string SnowWobble;
         public float IceTemperature = -0.6f;
@@ -741,6 +751,7 @@ namespace Engine.Scripts.WorldGen.Surface{
                 "dry" => new WaterDepthCondition{ Min = 0, Max = 0 },
                 "sky_open" => new SkyOpenCondition(),
                 "near_water" => new NearWaterCondition(),
+                "frozen_river" => new FrozenRiverCondition(),
                 "below_tree_line" => new TreeLineCondition(),
                 "never_snows" => new NeverSnowsCondition(),
                 "steep" => new SteepCondition{ Rise = 4 },

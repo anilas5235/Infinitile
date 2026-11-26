@@ -252,6 +252,12 @@ namespace Engine.Scripts.WorldGen.Surface{
                         return Leaf(RuleNodeKind.Flag, Flag(new ColumnFlagDef{ Kind = ColumnFlagKind.NearWater, A = _set.Climate.NearWaterDistance }), 0, t, f, rule);
                     case SkyOpenCondition:
                         return Leaf(RuleNodeKind.SkyOpen, 0, 0, t, f, rule);
+                    case FrozenRiverCondition:
+                        // Without river ice (riverIceTemperature unset) no column is in a frozen river.
+                        if (float.IsNaN(_set.Climate.RiverIceTemperature)) return f;
+                        _needsTemperature = true;
+                        Output(GraphOutputs.River);
+                        return Leaf(RuleNodeKind.Flag, Flag(new ColumnFlagDef{ Kind = ColumnFlagKind.FrozenRiver }), 0, t, f, rule);
                     case NoiseCondition n: {
                         int density = Array.IndexOf(DensityNames, n.Name);
                         ColumnFlagDef def = density >= 0
@@ -616,6 +622,7 @@ namespace Engine.Scripts.WorldGen.Surface{
                 r.RiverIce = riverIce ? Output(GraphOutputs.River) : -1;
                 r.RiverIceMin = _set.Climate.RiverIceMin;
                 r.RiverIceTemperature = riverIce ? _set.Climate.RiverIceTemperature : 0f;
+                r.RiverIceReach = _set.Climate.NearWaterDistance;
                 r.SnowWobble = Output(_set.Climate.SnowWobble);
                 r.TreeLineWobble = Output(_set.Climate.TreeLineWobble);
                 r.Ice = 1;
