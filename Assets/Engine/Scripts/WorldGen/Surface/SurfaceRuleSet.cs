@@ -146,6 +146,17 @@ namespace Engine.Scripts.WorldGen.Surface{
         }
     }
 
+    /// <summary>
+    ///     frozen_river: the column lies in a frozen river's band (§8.3, DEC-229): the river output at the column or at a
+    ///     wet probe within nearWaterDistance is at least riverIceMin (AD-48), and the water surface is cold enough for
+    ///     river ice. False without river ice.
+    /// </summary>
+    public sealed class FrozenRiverCondition : RuleCondition{
+        public override RuleCondition Clone(){
+            return new FrozenRiverCondition();
+        }
+    }
+
     /// <summary>sky_open: no terrain lies above the voxel's run (it is the column's top run).</summary>
     public sealed class SkyOpenCondition : RuleCondition{
         public override RuleCondition Clone(){
@@ -249,17 +260,26 @@ namespace Engine.Scripts.WorldGen.Surface{
     /// <summary>The climate of snow, ice and the tree line (§8), and the beach shape and water probes of the beach rules.</summary>
     public sealed class SurfaceClimate{
         /// <summary>L: temperature lost per block above <see cref="LapseFrom" />.</summary>
-        public float Lapse = 0.0055f;
+        public float Lapse = 0.00369f;
 
-        public float LapseFrom = 124f;
-        public float SnowTemperature = -0.638f;
+        public float LapseFrom = WorldGenSettings.DefaultWaterLevel;
+        public float SnowTemperature = -0.6228f;
         public string SnowWobble;
-        public float IceTemperature = -0.6f;
+        public float IceTemperature = -0.58f;
         public string IceWobble;
 
         /// <summary>
-        ///     Frozen rivers (§8.3, DEC-207): water where the graph's <c>river</c> output is at least
-        ///     <see cref="RiverIceMin" /> freezes where T &lt; this, without the wobble (Minecraft's temperature level 0),
+        ///     Snow on the sea ice (§8.2): a half snow layer (the "snow_half" block) lies on ice where the column is
+        ///     colder than <see cref="IceTemperature" /> by at least this margin (with the ice and the snow wobble), a
+        ///     full layer ("snow_layer") from <see cref="IceSnowFull" /> on. NaN (the default): no snow on the ice.
+        /// </summary>
+        public float IceSnowHalf = float.NaN;
+
+        public float IceSnowFull = float.NaN;
+
+        /// <summary>
+        ///     Frozen rivers (§8.3, DEC-207): water where the graph's <c>river</c> output, at the column or at a wet probe
+        ///     within <see cref="NearWaterDistance" /> (AD-48), is at least <see cref="RiverIceMin" /> freezes where T &lt; this, without the wobble (Minecraft's temperature level 0),
         ///     so a cold river is one ice sheet. NaN (the default): rivers freeze like the sea.
         /// </summary>
         public float RiverIceTemperature = float.NaN;
@@ -267,9 +287,9 @@ namespace Engine.Scripts.WorldGen.Surface{
         public float RiverIceMin = 0.3f;
 
         /// <summary>T_tree = T_snow + this · L: the tree line lies this many blocks below the snow line.</summary>
-        public float TreeLineBelowSnow = 15f;
+        public float TreeLineBelowSnow = 22f;
 
-        public float TreeLineFloor = 170f;
+        public float TreeLineFloor = 196f;
         public string TreeLineWobble;
         public int NearWaterDistance = 16;
         public string BeachShape;
@@ -571,6 +591,8 @@ namespace Engine.Scripts.WorldGen.Surface{
                     case "snowWobble": Climate.SnowWobble = Text(p, source, file); break;
                     case "iceTemperature": Climate.IceTemperature = Number(p, source, file); break;
                     case "iceWobble": Climate.IceWobble = Text(p, source, file); break;
+                    case "iceSnowHalf": Climate.IceSnowHalf = Number(p, source, file); break;
+                    case "iceSnowFull": Climate.IceSnowFull = Number(p, source, file); break;
                     case "riverIceTemperature": Climate.RiverIceTemperature = Number(p, source, file); break;
                     case "riverIceMin": Climate.RiverIceMin = Number(p, source, file); break;
                     case "treeLineBelowSnow": Climate.TreeLineBelowSnow = Number(p, source, file); break;
@@ -741,6 +763,7 @@ namespace Engine.Scripts.WorldGen.Surface{
                 "dry" => new WaterDepthCondition{ Min = 0, Max = 0 },
                 "sky_open" => new SkyOpenCondition(),
                 "near_water" => new NearWaterCondition(),
+                "frozen_river" => new FrozenRiverCondition(),
                 "below_tree_line" => new TreeLineCondition(),
                 "never_snows" => new NeverSnowsCondition(),
                 "steep" => new SteepCondition{ Rise = 4 },

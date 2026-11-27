@@ -110,7 +110,7 @@ namespace Engine.Tests.EditMode{
 
         /// <summary>
         ///     Up to four chunks per kind, nearest to the origin first, from T and the preliminary surface at the centres
-        ///     of a grid of chunks: snow (surface 8 above the centre's snow line), alpine (between its tree line + 4 and snow line − 6), ice (T &lt; −0.68, surface &lt; 112), coast (surface within 2 of
+        ///     of a grid of chunks: snow (surface 8 above the centre's snow line), alpine (between its tree line + 4 and snow line − 6), ice (T &lt; −0.68, surface &lt; 112), frozen river (river output ≥ 0.3 under the water, cold enough for river ice), coast (surface within 2 of
         ///     the water), lowland (surface 135 … 165) and hot (T &gt; 0.45, dry).
         /// </summary>
         private IEnumerable<(string Kind, int2 Chunk)> SampleChunks(){
@@ -123,18 +123,20 @@ namespace Engine.Tests.EditMode{
             float2[] points = chunks.Select(c => new float2(c.x * Size + Size / 2, c.y * Size + Size / 2)).ToArray();
             float[] values = GraphEvaluator.SampleLattice(_graph, _config.WorldGen.Seed, points, out _);
             int tSlot = Rules.TemperatureSlot, sSlot = Rules.PreliminarySurfaceSlot;
+            int riverSlot = _graph.Outputs.First(o => o.Name == SurfaceRuleSet.RiverOutput).LatticeValue;
             Assert.GreaterOrEqual(tSlot, 0);
             Assert.GreaterOrEqual(sSlot, 0);
             Dictionary<string, int> found = new();
             _coldestWater = float.PositiveInfinity;
             for (int i = 0; i < chunks.Count; i++){
-                float t = values[tSlot * points.Length + i], s = values[sSlot * points.Length + i];
+                float t = values[tSlot * points.Length + i], s = values[sSlot * points.Length + i], river = values[riverSlot * points.Length + i];
                 if (s < 112f) _coldestWater = math.min(_coldestWater, t);
                 // Snow and alpine from the chunk centre's own lines, so a climate refit keeps the samples.
                 int snowLine = Rules.ColdThreshold(t, 0f, Rules.SnowTemperature), treeLine = Rules.TreeLine(t, 0f);
                 string kind = s >= snowLine + 8f && s >= 160f ? "snow"
                     : s >= treeLine + 4f && s < snowLine - 6f ? "alpine"
                     : t < -0.68f && s < 112f ? "ice"
+                    : river >= 0.3f && s < _waterLevel && Rules.ColdAt(WetY, t, 0f, Rules.RiverIceTemperature) ? "frozen river"
                     : math.abs(s - _waterLevel) < 2f ? "coast"
                     : s >= 135f && s <= 165f && t <= 0.45f ? "lowland"
                     : t > 0.45f && s > _waterLevel + 4 ? "hot"
@@ -186,6 +188,59 @@ namespace Engine.Tests.EditMode{
             if (rise >= 4 && def.rockBlock != 0) return 0;
             if (rise >= 2 && def.rockBlock != 0) return SnowLayer;
             return foot ? SnowHalf : SnowLayer;
+        }
+
+        /// <summary>
+        ///     A frozen bank (DEC-229, AD-48): a dry floor with rise under 4 outside the never-snow biomes, its under, beach or
+        ///     rock block (the bank keeps the shore's sand and cliff rock) topped with a snow layer, in a frozen river's band
+        ///     (the probe's <c>frozen_river</c> flag: cold enough for river ice and the river output at the column or a wet
+        ///     probe nearby, AD-48) and with a wet probe within the near-water distance, as the rule's <c>near_water</c>.
+        ///     <see cref="FrozenRiverBanks_CarryASnowLayer" /> checks that banks get them.
+        /// </summary>
+        private bool IsFrozenBank(DensityProbeResult r, int x, int z, int h){
+            int c = x * Size + z;
+            Biome.BiomeDef def = _defs[r.Surface[c]];
+            if (h < 0 || h + 1 < _waterLevel || h + 1 >= Height || def.neverSnows != 0 || r.Rise[c] >= 4) return false;
+            ushort top = VoxelAt(r, x, h, z);
+            if (VoxelAt(r, x, h + 1, z) != SnowLayer || !(Writes(def, Under(def), top) || top == def.beachBlock || top == def.rockBlock)) return false;
+            if (r.FrozenRiver[c] == 0) return false;
+            // The probes of near_water: every fourth column of the padded biome map, 16 blocks around the chunk.
+            const int pad = DensityLayout.BiomePadding;
+            int reach = Rules.RiverIceReach;
+            for (int qx = (x + pad - reach + 3) & ~3; qx <= x + pad + reach; qx += 4)
+            for (int qz = (z + pad - reach + 3) & ~3; qz <= z + pad + reach; qz += 4){
+                int dx = qx - pad - x, dz = qz - pad - z;
+                if (qx < 0 || qz < 0 || qx >= DensityLayout.BiomeSpan || qz >= DensityLayout.BiomeSpan || dx * dx + dz * dz > reach * reach) continue;
+                if (r.PaddedWetAt(qx - pad, qz - pad)) return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>A glacier top (DEC-215, DEC-228): std:Ice on a dry Mountain floor.</summary>
+        private bool IsGlacier(DensityProbeResult r, int x, int z, int h){
+            return h >= 0 && h + 1 >= _waterLevel && VoxelAt(r, x, h, z) == _config.WorldGen.IceVoxel && _names[r.Surface[x * Size + z]] == "Mountain";
+        }
+
+        /// <summary>
+        ///     A glacier lies above the snow line (its temperature is colder than the snow's, with the same wobble), its ice
+        ///     fills at most the top three voxels of the run, and it stays bare (AD-46).
+        /// </summary>
+        private void AssertGlacier(DensityProbeResult r, int x, int z, int h, string where){
+            int c = x * Size + z;
+            Assert.GreaterOrEqual(h, r.SnowLine[c], $"{where}: a glacier below the snow line");
+            // The ice runs down from the top, at most three voxels; at a glacier's edge the lower voxels may be too warm
+            // (the temperature rises downwards with the lapse rate).
+            bool ice = true;
+            for (int d = 1; d <= 3 && r.IsSolid(x, h - d, z); d++){
+                bool here = VoxelAt(r, x, h - d, z) == _config.WorldGen.IceVoxel;
+                Assert.IsFalse(here && (!ice || d == 3), $"{where}, depth {d}: glacier ice not in one run of at most three voxels from the top");
+                ice &= here;
+            }
+            if (h + 1 < Height){
+                ushort above = VoxelAt(r, x, h + 1, z);
+                Assert.IsTrue(above != SnowLayer && above != SnowHalf, $"{where}: snow on a glacier (AD-46)");
+            }
         }
 
         /// <summary>Whether a direct neighbour column inside the chunk lies higher (the rule's step_foot, DEC-205).</summary>
@@ -261,6 +316,18 @@ namespace Engine.Tests.EditMode{
             using (SurfaceRuleCompileResult r = Compile(WithDefault(
                        "{ 'name': 'a', 'if': { 'noise_threshold': { 'name': 'no_such_output', 'min': 0 } }, 'then': { 'block': '@top' } }")))
                 AssertError(r, "output");
+        }
+
+        /// <summary>River ice reads the wet probes within nearWaterDistance (AD-48); they lie every 4 blocks, so less than 4 is an error.</summary>
+        [Test]
+        public void Validator_ReportsRiverIceWithoutAWetProbeInReach(){
+            string climate = Climate.Replace("'nearWaterDistance': 16", "'nearWaterDistance': 3, 'riverIceTemperature': -0.45");
+            using (SurfaceRuleCompileResult r = Compile(Parse("{ 'formatVersion': 1, " + climate + ", 'default': [{ 'name': 'a', 'then': { 'block': '@top' } }] }")))
+                AssertError(r, "climate");
+            // Without river ice the same distance is fine.
+            string plain = Climate.Replace("'nearWaterDistance': 16", "'nearWaterDistance': 3");
+            using (SurfaceRuleCompileResult r = Compile(Parse("{ 'formatVersion': 1, " + plain + ", 'default': [{ 'name': 'a', 'then': { 'block': '@top' } }] }")))
+                Assert.IsFalse(r.Messages.Any(m => m.Severity == LayoutSeverity.Error && m.Kind == "climate"), Errors(r));
         }
 
         /// <summary>river(min) (§7.2, §9.2) is noise_threshold on the graph's river output, and a non-number is an error.</summary>
@@ -412,13 +479,13 @@ namespace Engine.Tests.EditMode{
                     }
                 }
 
-            // DEC-175: the snow line lies at y 210 at T_snow + 86 L (the median Mountain T of the calibration).
-            int median = rules.ColdThreshold(rules.SnowTemperature + 86f * rules.Lapse, 0f, rules.SnowTemperature);
-            Assert.That(median, Is.InRange(210, 211));
+            // DEC-244: the snow line lies at y 255 at T_snow + 128 L (the pooled median Mountain T of the H2 calibration, −0.150).
+            int median = rules.ColdThreshold(rules.SnowTemperature + 128f * rules.Lapse, 0f, rules.SnowTemperature);
+            Assert.That(median, Is.InRange(255, 256));
         }
 
         [Test]
-        public void TreeLine_NeverLiesBelowItsFloor_AndFifteenBlocksBelowTheSnowLine(){
+        public void TreeLine_NeverLiesBelowItsFloor_AndTheGapBelowTheSnowLine(){
             SurfaceRules rules = Rules;
             for (float t = -1.2f; t <= 1.2f; t += 0.0137f){
                 int tree = rules.TreeLine(t, 0f);
@@ -426,9 +493,10 @@ namespace Engine.Tests.EditMode{
                 // The floor holds with the wobble too (W2-CLM-04).
                 Assert.GreaterOrEqual(rules.TreeLine(t, -8f), (int)rules.TreeLineFloor, $"T {t}, wobble -8");
                 float free = rules.LapseFrom + (t - rules.TreeTemperature) / rules.Lapse;
-                if (free <= rules.TreeLineFloor + 1f || free >= 240f) continue;
+                if (free <= rules.TreeLineFloor + 1f || free >= 360f) continue;
                 int snow = rules.ColdThreshold(t, 0f, rules.SnowTemperature);
-                Assert.That(snow - tree, Is.InRange(14, 16), $"T {t}");
+                // DEC-244: 22 blocks below the snow line (V4: 15).
+                Assert.That(snow - tree, Is.InRange(21, 23), $"T {t}");
             }
         }
 
@@ -458,12 +526,18 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void Snow_CoversDryTopsFromTheSnowLine_OutsideNeverSnowBiomes(){
-            int snow = 0, aboveLine = 0, halves = 0;
+            int snow = 0, aboveLine = 0, halves = 0, glaciers = 0, banks = 0;
             foreach (DensityProbeResult r in _chunks)
                 for (int x = 0; x < Size; x++)
                 for (int z = 0; z < Size; z++){
                     int c = x * Size + z, h = r.Heightmap[c];
                     if (h < 0 || h >= Height - 1) continue;
+                    if (IsGlacier(r, x, z, h)){
+                        AssertGlacier(r, x, z, h, $"chunk {r.Origin} column ({x}, {z}) y {h}");
+                        glaciers++;
+                        continue;
+                    }
+
                     Biome.BiomeDef def = _defs[r.Surface[c]];
                     ushort block = SnowBlock(def), top = VoxelAt(r, x, h, z), above = VoxelAt(r, x, h + 1, z);
                     bool dry = h + 1 >= _waterLevel;
@@ -482,14 +556,17 @@ namespace Engine.Tests.EditMode{
 
                         snow++;
                     }
+                    else if (IsFrozenBank(r, x, z, h))
+                        banks++;
                     else{
                         if (!IsOwnBlock(def, block)) Assert.AreNotEqual(block, top, $"{where}: snow below the snow line or in a never-snow biome");
                         Assert.IsTrue(above != SnowLayer && above != SnowHalf, $"{where}: a snow layer below the snow line or in a never-snow biome");
                     }
                 }
 
-            TestContext.WriteLine($"{snow} snow tops ({halves} step feet under a half layer), {aboveLine} dry tops above the snow line");
+            TestContext.WriteLine($"{snow} snow tops ({halves} step feet under a half layer), {aboveLine} dry tops above the snow line, {glaciers} glacier tops, {banks} frozen banks below it");
             Assert.Greater(snow, 0, "no snow in the sample chunks");
+            Assert.Greater(glaciers, 0, "no glacier in the sample chunks (DEC-215)");
             Assert.Greater(halves, 0, "no step foot took the half snow layer (DEC-205)");
             Assert.IsTrue(Kind("snow").Any(r => Enumerable.Range(0, Size * Size).Any(c => r.Heightmap[c] >= r.SnowLine[c])), "no snow chunk reaches its snow line");
         }
@@ -518,27 +595,69 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void Ice_FormsOnlyAtY123_OverOpenColdWater_OutsideNeverSnowBiomes(){
-            int ice = 0;
+        public void Ice_FormsOnlyAtTheWaterLayer_OverOpenColdWater_OrAsGlaciers(){
+            int ice = 0, half = 0, full = 0;
             ushort iceId = _config.WorldGen.IceVoxel;
             Assert.AreNotEqual(0, iceId);
             foreach (DensityProbeResult r in _chunks)
                 for (int x = 0; x < Size; x++)
                 for (int z = 0; z < Size; z++){
                     int c = x * Size + z, h = r.Heightmap[c];
+                    // A glacier's ice (DEC-215) fills the top three voxels of a dry Mountain floor; other ice only at the water layer.
+                    bool glacier = IsGlacier(r, x, z, h);
                     for (int y = 0; y < Height; y++)
-                        if (y != WetY && VoxelAt(r, x, y, z) == iceId)
+                        if (y != WetY && VoxelAt(r, x, y, z) == iceId && !(glacier && y >= h - 2 && y <= h))
                             Assert.Fail($"chunk {r.Origin} column ({x}, {z}): ice at y {y}");
+                    if (glacier) continue;
                     Biome.BiomeDef def = _defs[r.Surface[c]];
                     bool expected = h < WetY && r.IceCold[c] != 0 && def.neverSnows == 0;
                     bool found = VoxelAt(r, x, WetY, z) == iceId;
                     Assert.AreEqual(expected, found, $"chunk {r.Origin} column ({x}, {z}) {_names[r.Surface[c]]}, top {h}, T {r.ColumnTemperature[c]}");
-                    if (found) ice++;
+                    if (!found) continue;
+                    ice++;
+                    // H2: the snow on the sea ice, half a layer and then a full one the colder the column (ColumnClimate's level).
+                    ushort snow = VoxelAt(r, x, WetY + 1, z);
+                    ushort want = r.IceCold[c] switch{ 3 => SnowLayer, 2 => SnowHalf, _ => (ushort)0 };
+                    Assert.AreEqual(want, snow, $"chunk {r.Origin} column ({x}, {z}): snow on the ice, level {r.IceCold[c] - 1}");
+                    if (snow == SnowHalf) half++;
+                    if (snow == SnowLayer) full++;
                 }
 
-            TestContext.WriteLine($"{ice} ice voxels");
+            TestContext.WriteLine($"{ice} ice voxels, {half} with half a snow layer, {full} with a full one");
+            Assert.Greater(half + full, 0, "no snow on the sea ice in the sample chunks");
             Kind("ice");
             Assert.Greater(ice, 0, "no ice in the sample chunks");
+        }
+
+        /// <summary>
+        ///     DEC-229: the dry banks of frozen rivers carry a snow layer below the snow line. A bank is a dry column next to
+        ///     river ice, with rise under 4 (steeper faces stay bare, as above the snow line) outside the never-snow biomes.
+        ///     Since H2 the valley water is wider than the valleys slice, so the rule reads the river band at the wet probes
+        ///     nearby (AD-48); a few banks miss it where the nearest wet probe lies outside the band.
+        /// </summary>
+        [Test]
+        public void FrozenRiverBanks_CarryASnowLayer(){
+            int banks = 0, snowy = 0;
+            ushort iceId = _config.WorldGen.IceVoxel;
+            foreach (DensityProbeResult r in Kind("frozen river"))
+                for (int x = 0; x < Size; x++)
+                for (int z = 0; z < Size; z++){
+                    int c = x * Size + z, h = r.Heightmap[c];
+                    if (h < 0 || h + 1 < _waterLevel || h >= r.SnowLine[c] || r.Rise[c] >= 4 || _defs[r.Surface[c]].neverSnows != 0) continue;
+                    bool besideIce = false;
+                    for (int k = 0; k < 4; k++){
+                        int nx = x + (k == 0 ? 1 : k == 1 ? -1 : 0), nz = z + (k == 2 ? 1 : k == 3 ? -1 : 0);
+                        if (nx >= 0 && nz >= 0 && nx < Size && nz < Size && VoxelAt(r, nx, WetY, nz) == iceId) besideIce = true;
+                    }
+
+                    if (!besideIce) continue;
+                    banks++;
+                    if (IsFrozenBank(r, x, z, h)) snowy++;
+                }
+
+            TestContext.WriteLine($"{snowy} of {banks} banks beside river ice carry a snow layer");
+            Assert.Greater(banks, 0, "no bank beside river ice in the frozen-river chunks");
+            Assert.GreaterOrEqual(snowy, 0.85f * banks, "too few frozen-river banks carry snow (DEC-229)");
         }
 
         [Test]
@@ -639,7 +758,19 @@ namespace Engine.Tests.EditMode{
                     bool dry = depth == 0;
                     bool steep = r.Rise[c] >= 4, alpine = h >= r.TreeLine[c];
                     ushort top = VoxelAt(r, x, h, z);
+                    // DEC-257: the Mountain's alpine grass ends at y 200 plus the tree-line wobble (±8); inside the wobble
+                    // band either block is right.
+                    bool mountain = _names[id] == "Mountain";
+                    bool aboveAlpineGrass = mountain && (h >= MountainGrassTop + TreeLineWobble ||
+                                                         h >= MountainGrassTop - TreeLineWobble && top != def.meadowBlock);
                     string where = $"chunk {r.Origin} column ({x}, {z}) y {h} {_names[id]} (water {depth}, rise {r.Rise[c]}, tree line {r.TreeLine[c]}, snow line {r.SnowLine[c]})";
+
+                    // A glacier (DEC-215) comes first in global-before and stays bare (AD-46).
+                    if (IsGlacier(r, x, z, h)){
+                        AssertGlacier(r, x, z, h, where);
+                        Count("glacier");
+                        continue;
+                    }
 
                     // The beach rule could fire here (its band noise is not visible to the test).
                     bool beachPossible = dry && def.beachBlock != 0 && h - WetY < math.max(1, (int)def.beachHeight) && WetWithin(r, x, z, 20);
@@ -654,6 +785,11 @@ namespace Engine.Tests.EditMode{
                         expected = SnowGround(def, h, r.TreeLine[c], r.Rise[c], foot);
                         ushort cover = SnowCover(def, r.Rise[c], foot);
                         if (cover != 0) Assert.AreEqual(cover, VoxelAt(r, x, h + 1, z), $"{where}: no {Name(cover)} over the snow ground");
+                    }
+                    // A frozen river's bank (DEC-229): the under block with a snow layer, last in global-before.
+                    else if (IsFrozenBank(r, x, z, h)){
+                        rule = "frozen_bank";
+                        expected = top;
                     }
                     // The river bed (DEC-195): mud in a swamp, else sand, clay or gravel by ground_mix. The rule reads the
                     // river output bilinearly from the lattice; the test samples it at the column, so it accepts a bed block
@@ -693,7 +829,7 @@ namespace Engine.Tests.EditMode{
                         rule = "forest_floor";
                         expected = def.forestFloorBlock;
                     }
-                    else if (!alpine && def.meadowGround != 0 && def.meadowBlock != 0){
+                    else if (!alpine && def.meadowGround != 0 && def.meadowBlock != 0 && !aboveAlpineGrass){
                         rule = "meadow";
                         expected = def.meadowBlock;
                     }
@@ -723,7 +859,9 @@ namespace Engine.Tests.EditMode{
                             underRule = "snow rock";
                             under = def.rockBlock;
                         }
-                        else if (rule == "shore_cliff" && d <= 4){
+                        // Under a frozen bank the default rules go on: a shore cliff's rock where its rule holds there.
+                        else if ((rule == "shore_cliff" || rule == "frozen_bank" && r.Rise[c] >= 3 && h - WetY < 4 && def.rockBlock != 0 &&
+                                     WetWithin(r, x, z, 20) && VoxelAt(r, x, y, z) == def.rockBlock) && d <= 4){
                             underRule = "shore_cliff";
                             under = def.rockBlock;
                         }
@@ -731,7 +869,8 @@ namespace Engine.Tests.EditMode{
                             underRule = "beach";
                             under = def.beachBlock;
                         }
-                        else if (rule == "snow" && beachPossible && d <= 2 && VoxelAt(r, x, y, z) == def.beachBlock){
+                        else if ((rule == "snow" && beachPossible || rule == "frozen_bank" && (beachPossible || h - WetY <= 2 && WetWithin(r, x, z, 20))) &&
+                                 d <= 2 && VoxelAt(r, x, y, z) == def.beachBlock){
                             underRule = "beach under snow";
                             under = def.beachBlock;
                         }
@@ -757,7 +896,7 @@ namespace Engine.Tests.EditMode{
             }
 
             TestContext.WriteLine(string.Join(", ", seen.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key} {kv.Value}")));
-            // No shipped biome sets a MeadowBlock since DEC-204 (Mountain is bare stone); the meadow rule stays for mods.
+            // Only the Mountain sets a MeadowBlock (alpine grass below y 200, DEC-257), so the sample chunks need not reach it.
             foreach (string rule in new[]{ "snow", "shallow_floor", "underwater_top", "beach", "steep (under)", "alpine", "top", "ground" })
                 Assert.IsTrue(seen.ContainsKey(rule), $"no column took the {rule} rule in the sample chunks");
             Kind("coast");
@@ -766,5 +905,11 @@ namespace Engine.Tests.EditMode{
         }
 
         #endregion
+
+        /// <summary>The <c>y_above</c> limit of the shipped meadow rule on the Mountain (DEC-257).</summary>
+        private const int MountainGrassTop = 200;
+
+        /// <summary>The amplitude of the shipped <c>tree_line_wobble</c> output, which wobbles that limit.</summary>
+        private const int TreeLineWobble = 8;
     }
 }

@@ -228,7 +228,7 @@ namespace Engine.Tests.EditMode{
 
             WorldGenSettings s = _fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes);
             s.FreezeTemperature = .5f;
-            s.SnowLineHeight = s.WaterLevel + 12f;
+            s.SnowLineHeight = WorldGenSettings.LegacyWaterLevel + 12f;
             s.StrataPeriod = 3;
             s.StrataThickness = 1;
             _config = _fixture.GeneratorConfig(s);
@@ -408,7 +408,7 @@ namespace Engine.Tests.EditMode{
             _biomes[0].MeadowBlock = _fixture.GrassSo;
             WorldGenSettings s = _fixture.Settings(architecture, BlendMethod.DistanceBlend, _biomes);
             // The Terrain-first test area lies lower than the Biome-first one.
-            s.TreeLineHeight = s.WaterLevel + (architecture == GenArchitecture.TerrainFirst ? 5f : 12f);
+            s.TreeLineHeight = WorldGenSettings.LegacyWaterLevel + (architecture == GenArchitecture.TerrainFirst ? 5f : 12f);
             s.TreeLineNoiseAmplitude = 4f;
             s.TreeLineNoiseWavelength = 24f;
             _config = _fixture.GeneratorConfig(s);

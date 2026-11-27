@@ -98,6 +98,9 @@ namespace Engine.Scripts.WorldGen.Surface{
 
         /// <summary>A direct neighbour column inside the chunk lies at least A higher (the foot of a step).</summary>
         public const byte StepFoot = 4;
+
+        /// <summary>The column lies in a frozen river's band: river output ≥ the river ice minimum at the column or at a wet probe within the river ice reach (AD-48), and cold enough for river ice (DEC-229).</summary>
+        public const byte FrozenRiver = 5;
     }
 
     public struct ColumnFlagDef{
@@ -189,6 +192,14 @@ namespace Engine.Scripts.WorldGen.Surface{
         public int RiverIce;
 
         public float RiverIceMin, RiverIceTemperature;
+
+        /// <summary>River ice needs a dry probe within this many blocks, so a river's ice stops at the coast instead of running out over the sea (AD-47).</summary>
+        public int RiverIceReach;
+
+        /// <summary>Snow on the sea ice: the cold margins below <see cref="IceTemperature" /> of the half and the full layer, and their voxels (0: none).</summary>
+        public float IceSnowHalf, IceSnowFull;
+
+        public ushort IceSnowHalfBlock, IceSnowFullBlock;
 
         /// <summary>1: ice forms where it is cold enough (some biome may snow).</summary>
         public byte Ice;

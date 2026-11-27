@@ -42,14 +42,38 @@ MonoBehaviour:
   Boxes:
   - TemperatureRange: {x: 0.28, y: 1}
     HumidityRange: {x: -1, y: -0.087}
-    ContinentalnessRange: {x: -0.19, y: 0.09}
-    ErosionRange: {x: -1, y: 1}
-    WeirdnessRange: {x: -1, y: 1}
+    ContinentalnessRange: {x: -0.19, y: -0.11}
+    ErosionRange: {x: -1, y: -0.375}
+    WeirdnessRange: {x: -1, y: -0.2667}
     DepthRange: {x: 0, y: 0}
   - TemperatureRange: {x: 0.28, y: 1}
     HumidityRange: {x: -1, y: -0.087}
-    ContinentalnessRange: {x: 0.09, y: 1}
-    ErosionRange: {x: -0.05, y: 1}
+    ContinentalnessRange: {x: -0.19, y: -0.11}
+    ErosionRange: {x: -1, y: -0.375}
+    WeirdnessRange: {x: 0.2667, y: 1}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: 0.28, y: 1}
+    HumidityRange: {x: -1, y: -0.087}
+    ContinentalnessRange: {x: -0.19, y: 0.03}
+    ErosionRange: {x: -1, y: -0.2}
+    WeirdnessRange: {x: -0.2667, y: 0.2667}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: 0.28, y: 1}
+    HumidityRange: {x: -1, y: -0.087}
+    ContinentalnessRange: {x: -0.19, y: 0.03}
+    ErosionRange: {x: -0.375, y: -0.2}
+    WeirdnessRange: {x: -1, y: -0.2667}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: 0.28, y: 1}
+    HumidityRange: {x: -1, y: -0.087}
+    ContinentalnessRange: {x: -0.19, y: 0.03}
+    ErosionRange: {x: -0.375, y: -0.2}
+    WeirdnessRange: {x: 0.2667, y: 1}
+    DepthRange: {x: 0, y: 0}
+  - TemperatureRange: {x: 0.28, y: 1}
+    HumidityRange: {x: -1, y: -0.087}
+    ContinentalnessRange: {x: -0.19, y: 1}
+    ErosionRange: {x: -0.2, y: 1}
     WeirdnessRange: {x: -1, y: 1}
     DepthRange: {x: 0, y: 0}
   FloraRules:

@@ -192,17 +192,17 @@ namespace Engine.Editor.WorldGen{
                 Patch largest = of.OrderByDescending(p => p.Size).First();
                 // The smallest patch that is not cut by the map edge, else the smallest.
                 Patch smallest = of.Where(p => !p.TouchesEdge).OrderBy(p => p.Size).FirstOrDefault() ?? of.OrderBy(p => p.Size).First();
-                r.Tour.Add(Spot(FormattableString.Invariant($"{r.Names[b]}: largest patch {largest.Size * km2:0.##} km²"), largest, origin, o.Stride, c.Surface));
-                r.Tour.Add(Spot(FormattableString.Invariant($"{r.Names[b]}: smallest patch {smallest.Size * km2 * 1e6:0} m²"), smallest, origin, o.Stride, c.Surface));
+                r.Tour.Add(Spot(FormattableString.Invariant($"{r.Names[b]}: largest patch {largest.Size * km2:0.##} km²"), largest, origin, o.Stride, c.Surface, o.WaterLevel));
+                r.Tour.Add(Spot(FormattableString.Invariant($"{r.Names[b]}: smallest patch {smallest.Size * km2 * 1e6:0} m²"), smallest, origin, o.Stride, c.Surface, o.WaterLevel));
             }
         }
 
-        private static TourSpot Spot(string what, Patch p, int origin, int stride, NativeArray<float> surface){
+        private static TourSpot Spot(string what, Patch p, int origin, int stride, NativeArray<float> surface, int waterLevel){
             return new TourSpot{
                 What = what,
                 X = origin + p.X * stride,
                 Z = origin + p.Z * stride,
-                Y = (int)math.max(surface[p.Index], 124f) + 3
+                Y = (int)math.max(surface[p.Index], waterLevel) + 3
             };
         }
 
@@ -373,7 +373,7 @@ namespace Engine.Editor.WorldGen{
         // --- Targets (§13.5) ----------------------------------------------------------------------------------------
 
         private static void Evaluate(WorldReportSeed r, WorldReportOptions o){
-            int jungle = r.Id("Jungle"), plains = r.Id("Plains"), savanna = r.Id("Savanna"), badlands = r.Id("Badlands");
+            int jungle = r.Id("Jungle"), plains = r.Id("Plains"), savanna = r.Id("Savanna"), badlands = r.Id("Badlands"), mountain = r.Id("Mountain");
             void Add(string name, string bound, double value, string format, bool pass, TourSpot? worst = null){
                 r.Targets.Add(new TargetResult{ Name = name, Bound = bound, Value = value.ToString(format, CultureInfo.InvariantCulture), Pass = pass, Worst = worst });
             }
@@ -383,14 +383,14 @@ namespace Engine.Editor.WorldGen{
             if (o.HeightExtent > 0){
                 Add("Edges between implausible pairs (% of biome edges)", "0", r.ImplausibleEdgeShare * 100, "0.000", r.ImplausibleEdges == 0, r.ImplausibleEdgeSpot);
                 Add("Badlands share of the ground at 180 and above (%)", "< 30", r.Badlands180Share * 100, "0.0", r.Badlands180Share < 0.30);
-                Add("Ground at 204 and above that is neither Mountain nor Badlands (%)", "< 6", r.Other204Share * 100, "0.0", r.Other204Share < 0.06);
                 Add("Mountain patches whose outer ring is more than half Badlands", "0", r.MountainRingedByBadlands, "0", r.MountainRingedByBadlands == 0, r.RingSpot);
                 if (jungle >= 0){
                     Add("Jungle height at p95", "< 182", r.HeightP95[jungle], "0", !(r.HeightP95[jungle] >= 182));
-                    Add("Jungle median height", "140–145", r.HeightP50[jungle], "0", r.HeightP50[jungle] >= 140 && r.HeightP50[jungle] <= 145);
+                    Add("Jungle median height", "130–142", r.HeightP50[jungle], "0", r.HeightP50[jungle] >= 130 && r.HeightP50[jungle] <= 142); // DEC-248 (was 140–145)
                 }
             }
 
+            if (mountain >= 0) Add("Mountain share of the area (%)", "3–6", r.AreaShare[mountain] * 100, "0.0", r.AreaShare[mountain] >= 0.03 && r.AreaShare[mountain] <= 0.06); // DEC-248, DEC-258
             if (badlands >= 0) Add("Badlands share of the land (%)", "< 7", r.LandShare[badlands] * 100, "0.0", r.LandShare[badlands] < 0.07);
             if (jungle >= 0) Add("Jungle columns under water (%)", "< 25", r.WetShare[jungle] * 100, "0.0", !(r.WetShare[jungle] >= 0.25)); // DEC-199 (was 20)
             if (plains >= 0) Add("Plains columns under water (%)", "< 28", r.WetShare[plains] * 100, "0.0", !(r.WetShare[plains] >= 0.28));

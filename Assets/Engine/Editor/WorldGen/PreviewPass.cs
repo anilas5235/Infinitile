@@ -208,7 +208,7 @@ namespace Engine.Editor.WorldGen{
                 BiomeColors = _biomeColors,
                 HeightMin = _config.HeightMin,
                 HeightMax = _config.HeightMax,
-                WaterLevel = asset.WaterLevel,
+                WaterLevel = _config.WaterLevel,
                 ShowTemperature = options.ShowTemperature ? (byte)1 : (byte)0,
                 ShowContinental = options.ShowContinental ? (byte)1 : (byte)0,
                 ShowHumidity = options.ShowHumidity ? (byte)1 : (byte)0,
@@ -241,7 +241,7 @@ namespace Engine.Editor.WorldGen{
 
         /// <summary>After the scheduled handle completed: uploads the textures and computes the statistics.</summary>
         public void Finish(WorldGenSettings asset){
-            FillTerrainParamViews(asset.WaterLevel);
+            FillTerrainParamViews(_config.WaterLevel);
             FillCaveVolumeView();
             for (int v = 0; v < ViewCount; v++){
                 EnsureTexture(ref _textures[v], Size);

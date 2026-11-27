@@ -360,10 +360,10 @@ namespace Engine.Tests.EditMode{
         }
 
         [Test]
-        public void ShippedWorldGenSettings_MountainIsBareStone(){
-            // DEC-204 (2026-11-25): no grass on mountains. The Mountain has no meadow block, so its ground below the tree
-            // line is stone like above it; no spruces or grass tufts grow on its own ground (a 4096² area at stride 8),
-            // only its rocks and boulders.
+        public void ShippedWorldGenSettings_MountainIsStoneWithLowAlpineGrass(){
+            // DEC-204 (2026-11-25): the Mountain's ground is stone. DEC-257 (2026-11-26): its meadow block is Grass, which
+            // the meadow rule lays only on gentle ground below y 200 (SurfaceRules.json); still no spruces or grass tufts
+            // grow on its own ground (a 4096² area at stride 8), only its rocks and boulders.
             LoadPackages();
             WorldGenConfig cfg = ShippedConfig(out WorldGenSettings settings);
             const int n = 512;
@@ -377,9 +377,10 @@ namespace Engine.Tests.EditMode{
                 int mountain = biomes.FindIndex(b => b.name == "Mountain");
                 Assert.GreaterOrEqual(mountain, 0);
                 Assert.AreEqual(biomes[mountain].StoneBlock, biomes[mountain].TopBlock, "the Mountain's own ground is stone");
-                Assert.IsNull(biomes[mountain].MeadowBlock, "no meadow on the Mountain");
+                Assert.IsNotNull(biomes[mountain].MeadowBlock, "alpine grass on the Mountain (DEC-257)");
+                Assert.AreEqual("Grass", biomes[mountain].MeadowBlock.name);
                 Assert.AreEqual(0, cfg.Biomes[mountain].soilGround);
-                Assert.AreEqual(0, cfg.Biomes[mountain].meadowGround);
+                Assert.AreEqual(1, cfg.Biomes[mountain].meadowGround);
                 int spruce = System.Array.IndexOf(settings.FloraSpeciesNames(), "Spruce");
                 Assert.Greater(spruce, 0, "Spruce species id");
                 foreach (FloraRule rule in biomes[mountain].FloraRules){
@@ -389,7 +390,7 @@ namespace Engine.Tests.EditMode{
 
                 WorldGenRequest request = new(){ Config = cfg, Origin = new int2(-2048, -2048), Size = new int2(n, n), Stride = 8 };
                 WorldGenApi.SampleRegion(request, ref buffers).Complete();
-                int ground = 0, planted = 0;
+                int ground = 0, planted = 0, onGrass = 0;
                 for (int i = 0; i < n * n; i++){
                     if (buffers.SurfaceSource[i] != mountain) continue;
                     ground++;
@@ -397,11 +398,17 @@ namespace Engine.Tests.EditMode{
                     if (species == 0) continue;
                     planted++;
                     int x = request.Origin.x + i % n * request.Stride, z = request.Origin.y + i / n * request.Stride;
-                    // A neighbour's plants without a soil check may still reach Mountain columns at the border; trees need soil
-                    Assert.AreNotEqual(spruce, species, $"({x},{z}): spruce on Mountain ground");
+                    // A neighbour's plants without a soil check may still reach Mountain columns at the border; trees need soil,
+                    // which the alpine grass is (DEC-257): a neighbour's spruce may stand on it, below y 200 plus the wobble.
+                    if (species == spruce && buffers.ColumnHeight[i] + 1 < 200 + 8){
+                        onGrass++;
+                        continue;
+                    }
+
+                    Assert.AreNotEqual(spruce, species, $"({x},{z}) y {buffers.ColumnHeight[i]}: spruce on Mountain stone");
                 }
 
-                TestContext.WriteLine($"Mountain ground {ground} sampled columns, planted {planted}");
+                TestContext.WriteLine($"Mountain ground {ground} sampled columns, planted {planted}, neighbour spruces on alpine grass {onGrass}");
                 Assert.Greater(ground, 0, "Mountain in the sampled area");
             }
             finally{

@@ -19,7 +19,7 @@ MonoBehaviour:
   SnowTopBlock: {fileID: 11400000, guid: 718e517cfa2f0b945a8f3566abd28090, type: 2}
   FreezesWater: 1
   StrataBlock: {fileID: 11400000, guid: 2a1844411e45fba40a1da565a805687e, type: 2}
-  MeadowBlock: {fileID: 0}
+  MeadowBlock: {fileID: 11400000, guid: 2e8eca1efe0447d4b845f277ce2ada8f, type: 2}
   BeachBlock: {fileID: 0}
   BeachHeight: 3
   RockBlock: {fileID: 11400000, guid: 4208763aab69ac240aee81f153582696, type: 2}
@@ -42,28 +42,28 @@ MonoBehaviour:
   Jaggedness: 35
   Boxes:
   - TemperatureRange: {x: -1, y: 0.28}
-    HumidityRange: {x: -1, y: 1}
-    ContinentalnessRange: {x: 0.09, y: 1}
-    ErosionRange: {x: -1, y: -0.05}
-    WeirdnessRange: {x: -0.85, y: -0.45}
+    HumidityRange: {x: -1, y: -0.087}
+    ContinentalnessRange: {x: -0.11, y: 1}
+    ErosionRange: {x: -1, y: -0.375}
+    WeirdnessRange: {x: -1, y: -0.2667}
     DepthRange: {x: 0, y: 0}
   - TemperatureRange: {x: -1, y: 0.28}
-    HumidityRange: {x: -1, y: 1}
-    ContinentalnessRange: {x: 0.09, y: 1}
-    ErosionRange: {x: -1, y: -0.05}
-    WeirdnessRange: {x: 0.45, y: 0.85}
+    HumidityRange: {x: -1, y: -0.087}
+    ContinentalnessRange: {x: -0.11, y: 1}
+    ErosionRange: {x: -1, y: -0.375}
+    WeirdnessRange: {x: 0.2667, y: 1}
     DepthRange: {x: 0, y: 0}
-  - TemperatureRange: {x: 0.28, y: 1}
+  - TemperatureRange: {x: -1, y: 1}
     HumidityRange: {x: -0.087, y: 1}
-    ContinentalnessRange: {x: 0.09, y: 1}
-    ErosionRange: {x: -1, y: -0.05}
-    WeirdnessRange: {x: -0.85, y: -0.45}
+    ContinentalnessRange: {x: -0.11, y: 1}
+    ErosionRange: {x: -1, y: -0.375}
+    WeirdnessRange: {x: -1, y: -0.2667}
     DepthRange: {x: 0, y: 0}
-  - TemperatureRange: {x: 0.28, y: 1}
+  - TemperatureRange: {x: -1, y: 1}
     HumidityRange: {x: -0.087, y: 1}
-    ContinentalnessRange: {x: 0.09, y: 1}
-    ErosionRange: {x: -1, y: -0.05}
-    WeirdnessRange: {x: 0.45, y: 0.85}
+    ContinentalnessRange: {x: -0.11, y: 1}
+    ErosionRange: {x: -1, y: -0.375}
+    WeirdnessRange: {x: 0.2667, y: 1}
     DepthRange: {x: 0, y: 0}
   FloraRules:
   - SpeciesVoxel: {fileID: 11400000, guid: 10218f21e1d9ac948ac6846e1469b188, type: 2}

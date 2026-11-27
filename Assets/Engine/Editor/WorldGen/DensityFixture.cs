@@ -19,7 +19,9 @@ namespace Engine.Editor.WorldGen{
         Ocean,
         Coast,
         Lowland,
-        Massif
+        Massif,
+        TallMassif,
+        CoastalCliff
     }
 
     /// <summary>
@@ -38,10 +40,19 @@ namespace Engine.Editor.WorldGen{
         public const float BlendWidth = 32f;
 
         /// <summary>
+        ///     Gives <paramref name="cfg" /> the shipped sea level: the test configs are built from v1 settings, which keep
+        ///     the legacy water level (AD-39).
+        /// </summary>
+        public static void UseShippedSea(ref WorldGenConfig cfg){
+            cfg.WaterLevel = WorldGenSettings.DefaultWaterLevel;
+        }
+
+        /// <summary>
         ///     Gives <paramref name="cfg" /> the shipped biome layout and the DistanceBlend material kernel, so the biome
         ///     and blend passes (P2, P3) run as in the game; disposes what it replaces.
         /// </summary>
         public static void UseShippedBiomes(ref WorldGenConfig cfg, Allocator allocator = Allocator.Persistent){
+            UseShippedSea(ref cfg);
             if (cfg.Layout.IsCreated) cfg.Layout.Dispose();
             cfg.Layout = BiomeLayoutData.Create(BiomeLayout.FromBiomeSet(AssetDatabase.LoadAssetAtPath<BiomeSet>(BiomeSetPath)), null, allocator);
             if (cfg.MaterialTaps.IsCreated) cfg.MaterialTaps.Dispose();
@@ -73,11 +84,13 @@ namespace Engine.Editor.WorldGen{
         public static readonly DensityChunkClass[] Classes = (DensityChunkClass[])Enum.GetValues(typeof(DensityChunkClass));
 
         // Chunk coordinates (in chunks), eight per class, from the finder on the fixture graph with Seed (radius 512, step 8,
-        // water level 124), made 2026-11-22.
-        private static readonly int2[] Ocean ={ new int2(0, -16), new int2(-16, 0), new int2(-8, -16), new int2(8, -16), new int2(-16, -16), new int2(0, -24), new int2(-24, 0), new int2(-8, -24) };
-        private static readonly int2[] Coast ={ new int2(0, 0), new int2(0, 8), new int2(16, 0), new int2(24, -8), new int2(8, 24), new int2(32, 8), new int2(8, 32), new int2(24, 40) };
-        private static readonly int2[] Lowland ={ new int2(0, -8), new int2(-8, 0), new int2(-8, -8), new int2(0, 16), new int2(16, 8), new int2(-8, 16), new int2(16, -16), new int2(-16, 16) };
-        private static readonly int2[] Massif ={ new int2(-16, 32), new int2(-24, 32), new int2(-16, 40), new int2(-24, 40), new int2(56, 48), new int2(48, 56), new int2(-32, -80), new int2(-40, -80) };
+        // water level 127), made 2026-11-26 on the H2 graph (DEC-227).
+        private static readonly int2[] Ocean ={ new int2(0, -16), new int2(-16, 0), new int2(-8, -16), new int2(8, -16), new int2(-16, -8), new int2(-16, -16), new int2(0, -24), new int2(-24, 0) };
+        private static readonly int2[] Coast ={ new int2(0, 0), new int2(-8, 0), new int2(8, 0), new int2(8, 8), new int2(0, 16), new int2(16, 8), new int2(16, 16), new int2(24, 0) };
+        private static readonly int2[] Lowland ={ new int2(0, -8), new int2(-8, 16), new int2(8, 16), new int2(16, -16), new int2(-16, 16), new int2(24, -16), new int2(-24, 16), new int2(24, 16) };
+        private static readonly int2[] Massif ={ new int2(-16, 32), new int2(-16, 48), new int2(-40, 48), new int2(56, 56), new int2(72, -48), new int2(72, 56), new int2(80, -48), new int2(80, 48) };
+        private static readonly int2[] TallMassif ={ new int2(-120, -40), new int2(200, 144), new int2(48, 248), new int2(208, 144), new int2(216, 296), new int2(-352, 216), new int2(168, 400), new int2(-56, -432) };
+        private static readonly int2[] CoastalCliff ={ new int2(-24, 48), new int2(-16, -104), new int2(-112, 0), new int2(-112, 24), new int2(-96, -80), new int2(-40, 120), new int2(48, 120), new int2(24, -128) };
 
         /// <summary>The chunks of <paramref name="c" />, in chunk coordinates.</summary>
         public static IReadOnlyList<int2> Chunks(DensityChunkClass c){
@@ -86,6 +99,8 @@ namespace Engine.Editor.WorldGen{
                 DensityChunkClass.Coast => Coast,
                 DensityChunkClass.Lowland => Lowland,
                 DensityChunkClass.Massif => Massif,
+                DensityChunkClass.TallMassif => TallMassif,
+                DensityChunkClass.CoastalCliff => CoastalCliff,
                 _ => throw new ArgumentOutOfRangeException(nameof(c))
             };
         }
@@ -104,16 +119,24 @@ namespace Engine.Editor.WorldGen{
 
         /// <summary>
         ///     The class of a chunk from the preliminary surface at its corner columns (lowest, highest), or null when it
-        ///     fits none: ocean lies wholly 12 blocks or more under the water, a coast crosses the water level, a lowland
-        ///     stays between 2 and 26 blocks above it, a massif reaches y 190.
+        ///     fits none: ocean lies wholly 12 blocks or more under the water; a coast crosses the water level, and is a
+        ///     coastal cliff when it also rises <see cref="CliffRise" /> blocks above it; a lowland stays between 2 and 26
+        ///     blocks above it; a massif reaches y 190, a tall massif <see cref="TallMassifTop" /> (DEC-227).
         /// </summary>
         public static DensityChunkClass? Classify(float lowest, float highest, int waterLevel){
             if (highest < waterLevel - 12) return DensityChunkClass.Ocean;
-            if (lowest < waterLevel - 2 && highest > waterLevel + 2) return DensityChunkClass.Coast;
+            if (lowest < waterLevel - 2 && highest > waterLevel + 2) return highest >= waterLevel + CliffRise ? DensityChunkClass.CoastalCliff : DensityChunkClass.Coast;
             if (lowest >= waterLevel + 2 && highest < waterLevel + 26) return DensityChunkClass.Lowland;
+            if (highest >= TallMassifTop) return DensityChunkClass.TallMassif;
             if (highest >= 190f) return DensityChunkClass.Massif;
             return null;
         }
+
+        /// <summary>The height above the water at which a coast chunk counts as a coastal cliff (DEC-227).</summary>
+        public const int CliffRise = 40;
+
+        /// <summary>The preliminary surface a tall-massif chunk reaches (DEC-227).</summary>
+        public const float TallMassifTop = 270f;
 
         /// <summary>
         ///     Finds <paramref name="perClass" /> chunks of each class on <paramref name="graph" />: chunks on a grid of

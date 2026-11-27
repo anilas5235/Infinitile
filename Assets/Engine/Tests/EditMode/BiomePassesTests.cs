@@ -36,6 +36,7 @@ namespace Engine.Tests.EditMode{
             _config = TestFixtures.CreateGeneratorConfig(Allocator.Persistent);
             _config.WorldGen.Seed = DensityFixture.Seed;
             _config.WorldGen.DensityStoneVoxel = TestFixtures.Stone;
+            DensityFixture.UseShippedSea(ref _config.WorldGen);
             _layout = BiomeLayoutTests.Shipped();
             UseLayout(_layout);
             UseBlend(BlendMethod.DistanceBlend, 32f);
@@ -252,7 +253,9 @@ namespace Engine.Tests.EditMode{
                 using DensityProbeResult probe = DensityProbe.Run(_fixture, _config.WorldGen, chunk * Size, DensityChunk.PassBlend, true);
                 for (int x = 0; x < Size; x++)
                 for (int z = 0; z < Size; z++){
-                    ReferenceBlend(probe, _config.WorldGen, x, z, out int4 ids, out float4 w, out byte surface);
+                    // The fixture graph has the per-column border since H2 (DEC-227 froze the shipped graph); NaN where it did not run.
+                    float border = probe.Border[z * Size + x];
+                    ReferenceBlend(probe, _config.WorldGen, x, z, out int4 ids, out float4 w, out byte surface, float.IsNaN(border) ? 0.5f : border);
                     int c = x * Size + z;
                     Assert.AreEqual(ids, probe.BlendBiomes[c], $"chunk {chunk} column ({x}, {z})");
                     for (int k = 0; k < 4; k++) Assert.AreEqual(w[k], probe.BlendWeights[c][k], 1e-6f, $"weight {k}, chunk {chunk} column ({x}, {z})");

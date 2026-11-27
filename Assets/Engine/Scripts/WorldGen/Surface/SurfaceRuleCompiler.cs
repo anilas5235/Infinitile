@@ -112,6 +112,7 @@ namespace Engine.Scripts.WorldGen.Surface{
             private int _reach;
             private bool _interior;
             private bool _needsTemperature;
+            private ushort _iceSnowHalfBlock, _iceSnowFullBlock;
 
             public Compiler(SurfaceRuleSet set, CompiledNoiseGraph graph, Func<string, int> blockByName, List<LayoutMessage> messages){
                 _set = set;
@@ -156,6 +157,10 @@ namespace Engine.Scripts.WorldGen.Surface{
                 if (_outputs.Count > SurfaceRules.MaxOutputs) Error(null, $"The rules read {_outputs.Count} graph outputs; at most {SurfaceRules.MaxOutputs} are allowed.", "limit");
                 if (climate.NearWaterDistance < 0 || climate.NearWaterDistance > 16)
                     Error(null, $"nearWaterDistance {climate.NearWaterDistance} is outside 0 … 16 (the biome padding).", "climate");
+                // River ice reads the river band at the wet probes within nearWaterDistance, which lie on a 4-block grid
+                // (AD-48): below 4 most columns have no probe in reach, and frozen rivers and their banks would vanish.
+                if (!float.IsNaN(climate.RiverIceTemperature) && climate.NearWaterDistance < 4)
+                    Error(null, $"nearWaterDistance {climate.NearWaterDistance} is below 4: river ice needs a wet probe in reach (the probes lie every 4 blocks).", "climate");
                 if (!(climate.Lapse > 0f)) Error(null, "The lapse rate must be positive.", "climate");
                 if (_set.Strata.Period <= 0 || _set.Strata.Thickness <= 0 || _set.Strata.Thickness > _set.Strata.Period)
                     Error(null, "Strata need 0 < thickness ≤ period.", "climate");
@@ -164,6 +169,11 @@ namespace Engine.Scripts.WorldGen.Surface{
                 _needsTemperature = true;
                 Output(climate.IceWobble);
                 if (!float.IsNaN(climate.RiverIceTemperature)) Output(GraphOutputs.River);
+                _iceSnowHalfBlock = IceSnowBlock(climate.IceSnowHalf, "snow_half", "iceSnowHalf");
+                _iceSnowFullBlock = IceSnowBlock(climate.IceSnowFull, "snow_layer", "iceSnowFull");
+                if (_iceSnowHalfBlock != 0 || _iceSnowFullBlock != 0) Output(climate.SnowWobble);
+                if (_iceSnowHalfBlock != 0 && _iceSnowFullBlock != 0 && climate.IceSnowFull < climate.IceSnowHalf)
+                    Error(null, "iceSnowFull must not be smaller than iceSnowHalf: the full layer lies inside the half one.", "climate");
                 float iceWobble = WobbleBound(climate.IceWobble), snowWobble = WobbleBound(climate.SnowWobble);
                 if (climate.IceTemperature + iceWobble > climate.SnowTemperature - snowWobble)
                     // A warning since V4 (DEC-176): the snow refit (DEC-175) would otherwise push the ice into rarity.
@@ -252,6 +262,12 @@ namespace Engine.Scripts.WorldGen.Surface{
                         return Leaf(RuleNodeKind.Flag, Flag(new ColumnFlagDef{ Kind = ColumnFlagKind.NearWater, A = _set.Climate.NearWaterDistance }), 0, t, f, rule);
                     case SkyOpenCondition:
                         return Leaf(RuleNodeKind.SkyOpen, 0, 0, t, f, rule);
+                    case FrozenRiverCondition:
+                        // Without river ice (riverIceTemperature unset) no column is in a frozen river.
+                        if (float.IsNaN(_set.Climate.RiverIceTemperature)) return f;
+                        _needsTemperature = true;
+                        Output(GraphOutputs.River);
+                        return Leaf(RuleNodeKind.Flag, Flag(new ColumnFlagDef{ Kind = ColumnFlagKind.FrozenRiver }), 0, t, f, rule);
                     case NoiseCondition n: {
                         int density = Array.IndexOf(DensityNames, n.Name);
                         ColumnFlagDef def = density >= 0
@@ -573,6 +589,15 @@ namespace Engine.Scripts.WorldGen.Surface{
                 }
             }
 
+            /// <summary>The voxel of a snow layer on the sea ice: the rule file's block <paramref name="block" />, 0 when the margin is unset.</summary>
+            private ushort IceSnowBlock(float margin, string block, string field){
+                if (float.IsNaN(margin)) return 0;
+                if (!(margin >= 0f)) Error(null, $"{field} must be a margin of at least 0 below iceTemperature.", "climate");
+                if (_set.Blocks.TryGetValue(block, out string name)) return Named(name, field);
+                Error(null, $"{field} needs the block \"{block}\" in \"blocks\".", "climate");
+                return 0;
+            }
+
             private SurfaceRules Climate(){
                 SurfaceClimate c = _set.Climate;
                 return new SurfaceRules{
@@ -616,6 +641,11 @@ namespace Engine.Scripts.WorldGen.Surface{
                 r.RiverIce = riverIce ? Output(GraphOutputs.River) : -1;
                 r.RiverIceMin = _set.Climate.RiverIceMin;
                 r.RiverIceTemperature = riverIce ? _set.Climate.RiverIceTemperature : 0f;
+                r.RiverIceReach = _set.Climate.NearWaterDistance;
+                r.IceSnowHalf = _iceSnowHalfBlock != 0 ? _set.Climate.IceSnowHalf : 0f;
+                r.IceSnowFull = _iceSnowFullBlock != 0 ? _set.Climate.IceSnowFull : 0f;
+                r.IceSnowHalfBlock = _iceSnowHalfBlock;
+                r.IceSnowFullBlock = _iceSnowFullBlock;
                 r.SnowWobble = Output(_set.Climate.SnowWobble);
                 r.TreeLineWobble = Output(_set.Climate.TreeLineWobble);
                 r.Ice = 1;

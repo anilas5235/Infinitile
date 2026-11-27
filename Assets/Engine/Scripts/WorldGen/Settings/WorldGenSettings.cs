@@ -97,7 +97,13 @@ namespace Engine.Scripts.WorldGen.Settings{
         public float HeightSoftBand;
 
         /// <summary>The shipped water level; also the default of the column samplers' wetness test (AD-40).</summary>
-        public const int DefaultWaterLevel = 124;
+        public const int DefaultWaterLevel = 127;
+
+        /// <summary>
+        ///     The water level of the v1 height-field generator, whatever <see cref="WaterLevel" /> says: v1 keeps its
+        ///     sea until it is deleted, so its tests and hashes do not move (AD-39).
+        /// </summary>
+        public const int LegacyWaterLevel = 124;
 
         [Tooltip("Water surface level in world Y. Water fills every column up to this level.")]
         public int WaterLevel = DefaultWaterLevel;

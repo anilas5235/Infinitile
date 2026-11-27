@@ -142,26 +142,78 @@ namespace Engine.Scripts.WorldGen.Density{
                 int surface = waterLevel - 1;
                 if (rules.Ice != 0 && ice != 0 && surface >= 0 && b.Heightmap[c] < surface && worldGen.Layout.Defs[biome].neverSnows == 0){
                     float wobble = rules.IceWobble >= 0 ? Output(rules, ref col, ref b, rules.IceWobble) : 0f;
-                    if (rules.ColdAt(surface, col.Temperature, wobble, rules.IceTemperature) || RiverIceCold(rules, ref col, ref b, surface)){
+                    if (rules.ColdAt(surface, col.Temperature, wobble, rules.IceTemperature) ||
+                        RiverIceCold(rules, ref col, ref b, surface) && NearDry(ref b, x, z, rules.RiverIceReach)){
                         column[surface] = ice;
                         counters.IceVoxels++;
+                        // Snow on the ice, thicker the colder the column: half a layer, then a full one (H2).
+                        ushort snow = IceSnow(rules, ref col, ref b, surface, wobble);
+                        if (snow != 0 && waterLevel < H) column[waterLevel] = snow;
                     }
                 }
             }
         }
 
         /// <summary>
-        ///     The first layer of column <paramref name="c" /> from which on the fill writes only air: above the top
-        ///     solid voxel (<see cref="DensityChunkBuffers.Heightmap" />), the snow layer on it and the water (DEC-232).
+        ///     The snow layer on the sea ice of a column: the full layer where it is colder than the ice limit by
+        ///     <see cref="SurfaceRules.IceSnowFull" />, else the half layer from <see cref="SurfaceRules.IceSnowHalf" /> on, else
+        ///     none. The snow wobble moves both, so the snow does not follow the floe edges in rings.
         /// </summary>
-        internal static int AirFrom(in DensityChunkBuffers b, int c, int waterLevel){
-            return math.min(H, math.max(b.Heightmap[c] + 2, waterLevel));
+        private static ushort IceSnow(in SurfaceRules rules, ref Column col, ref DensityChunkBuffers b, int surface, float iceWobble){
+            if (rules.IceSnowHalfBlock == 0 && rules.IceSnowFullBlock == 0) return 0;
+            float snowWobble = rules.SnowWobble >= 0 ? Output(rules, ref col, ref b, rules.SnowWobble) : 0f;
+            return IceSnowLevel(rules, surface, col.Temperature, iceWobble + snowWobble) switch{
+                2 => rules.IceSnowFullBlock,
+                1 => rules.IceSnowHalfBlock,
+                _ => (ushort)0
+            };
         }
 
-        /// <summary>Frozen rivers (§8.3, DEC-207): a river column freezes where T is below the river limit, without wobble.</summary>
+        /// <summary>The snow on the sea ice: 0 none, 1 the half layer, 2 the full layer (<paramref name="wobble" />: the ice plus the snow wobble).</summary>
+        private static int IceSnowLevel(in SurfaceRules rules, int surface, float temperature, float wobble){
+            if (rules.IceSnowFullBlock != 0 && rules.ColdAt(surface, temperature, wobble, rules.IceTemperature - rules.IceSnowFull)) return 2;
+            if (rules.IceSnowHalfBlock != 0 && rules.ColdAt(surface, temperature, wobble, rules.IceTemperature - rules.IceSnowHalf)) return 1;
+            return 0;
+        }
+
+        /// <summary>
+        ///     The first layer of column <paramref name="c" /> from which on the fill writes only air: above the top
+        ///     solid voxel (<see cref="DensityChunkBuffers.Heightmap" />), the snow layer on it, the water and the snow on its ice (DEC-232).
+        /// </summary>
+        internal static int AirFrom(in DensityChunkBuffers b, int c, int waterLevel){
+            return math.min(H, math.max(b.Heightmap[c] + 2, waterLevel + 1));
+        }
+
+        /// <summary>
+        ///     Frozen rivers (§8.3, DEC-207): a column in a river's band freezes where T is below the river limit, without
+        ///     wobble. The band is the river output at the column or at a wet probe within the river ice reach (AD-48): the
+        ///     valley water is wider than the valleys slice since H2, so its edges and its banks lie outside the slice.
+        /// </summary>
         private static bool RiverIceCold(in SurfaceRules rules, ref Column col, ref DensityChunkBuffers b, int surface){
-            return rules.RiverIce >= 0 && Output(rules, ref col, ref b, rules.RiverIce) >= rules.RiverIceMin &&
-                   rules.ColdAt(surface, col.Temperature, 0f, rules.RiverIceTemperature);
+            return rules.RiverIce >= 0 && rules.ColdAt(surface, col.Temperature, 0f, rules.RiverIceTemperature) &&
+                   (Output(rules, ref col, ref b, rules.RiverIce) >= rules.RiverIceMin || RiverNear(rules, ref b, col.X, col.Z, rules.RiverIceReach));
+        }
+
+        /// <summary>
+        ///     A wet probe within <paramref name="r" /> blocks (the probes of <see cref="NearWater" />) whose river output,
+        ///     read on the lattice, reaches the river ice minimum (AD-48).
+        /// </summary>
+        internal static bool RiverNear(in SurfaceRules rules, ref DensityChunkBuffers b, int x, int z, int r){
+            int slot = rules.RiverIce >= 0 ? rules.Outputs[rules.RiverIce].Lattice : -1;
+            if (slot < 0) return false;
+            const int span = DensityLayout.BiomeSpan, pad = DensityLayout.BiomePadding, size = DensityLayout.LatticeSize;
+            const int offset = DensityLayout.BiomeLatticeOffset;
+            float* l = b.Lattice + slot * size * size;
+            int px = x + pad, pz = z + pad;
+            int x0 = math.max(0, px - r), x1 = math.min(span - 1, px + r), z0 = math.max(0, pz - r), z1 = math.min(span - 1, pz + r);
+            for (int qz = (z0 + 3) & ~3; qz <= z1; qz += 4)
+            for (int qx = (x0 + 3) & ~3; qx <= x1; qx += 4){
+                int dx = qx - px, dz = qz - pz;
+                if (dx * dx + dz * dz > r * r || b.Wet[qz * span + qx] == 0) continue;
+                if (l[((qz >> 2) + offset) * size + (qx >> 2) + offset] >= rules.RiverIceMin) return true;
+            }
+
+            return false;
         }
 
         /// <summary>The voxels of one solid run: full graph near its top and bottom, the interior plan between.</summary>
@@ -308,6 +360,9 @@ namespace Engine.Scripts.WorldGen.Density{
                 case ColumnFlagKind.StepFoot:
                     value = StepUp(ref b, col.X, col.Z) >= d.A;
                     break;
+                case ColumnFlagKind.FrozenRiver:
+                    value = RiverIceCold(rules, ref col, ref b, DensityLayout.WetnessY(worldGen.WaterLevel));
+                    break;
                 case ColumnFlagKind.Noise: {
                     float o = d.Output >= 0 ? Output(rules, ref col, ref b, d.Output) : 0f;
                     value = o >= d.A && o < d.B;
@@ -375,10 +430,10 @@ namespace Engine.Scripts.WorldGen.Density{
         ///     The climate of chunk column (x, z) as the rules see it, for tests and reports: T, the snow line (the lowest
         ///     y where the snow test holds, the chunk height for none), the tree line (y at and above it is above the tree
         ///     line), the heightmap's rise and whether the water surface (y <paramref name="waterLevel" /> − 1) is cold
-        ///     enough to freeze.
+        ///     enough to freeze, and the snow on that ice (<paramref name="iceSnow" />: 0 none, 1 half, 2 full layer).
         /// </summary>
         internal static void ColumnClimate(in SurfaceRules rules, ref DensityChunkBuffers b, int x, int z, int waterLevel, out float temperature,
-            out int snowLine, out int treeLine, out int rise, out bool iceCold){
+            out int snowLine, out int treeLine, out int rise, out bool iceCold, out int iceSnow){
             int surface = DensityLayout.WetnessY(waterLevel);
             temperature = rules.TemperatureSlot >= 0 ? Lattice(b.Lattice, rules.TemperatureSlot, x, z) : 0f;
             float snow = WobbleAt(rules, ref b, rules.SnowWobble, x, z);
@@ -388,8 +443,21 @@ namespace Engine.Scripts.WorldGen.Density{
             treeLine = rules.TreeLine(temperature, tree);
             rise = Rise(ref b, x, z);
             iceCold = rules.ColdAt(surface, temperature, ice, rules.IceTemperature) ||
-                      rules.RiverIce >= 0 && WobbleAt(rules, ref b, rules.RiverIce, x, z) >= rules.RiverIceMin &&
-                      rules.ColdAt(surface, temperature, 0f, rules.RiverIceTemperature);
+                      rules.RiverIce >= 0 && rules.ColdAt(surface, temperature, 0f, rules.RiverIceTemperature) &&
+                      (WobbleAt(rules, ref b, rules.RiverIce, x, z) >= rules.RiverIceMin || RiverNear(rules, ref b, x, z, rules.RiverIceReach)) &&
+                      NearDry(ref b, x, z, rules.RiverIceReach);
+            iceSnow = iceCold ? IceSnowLevel(rules, surface, temperature, ice + snow) : 0;
+        }
+
+        /// <summary>
+        ///     The <c>frozen_river</c> flag of chunk column (x, z) as the bank rule sees it, for tests and reports: cold
+        ///     enough for river ice at the wetness layer and in a frozen river's band (AD-48).
+        /// </summary>
+        internal static bool FrozenRiverAt(in SurfaceRules rules, ref DensityChunkBuffers b, int x, int z, int waterLevel){
+            if (rules.RiverIce < 0) return false;
+            float temperature = rules.TemperatureSlot >= 0 ? Lattice(b.Lattice, rules.TemperatureSlot, x, z) : 0f;
+            return rules.ColdAt(DensityLayout.WetnessY(waterLevel), temperature, 0f, rules.RiverIceTemperature) &&
+                   (WobbleAt(rules, ref b, rules.RiverIce, x, z) >= rules.RiverIceMin || RiverNear(rules, ref b, x, z, rules.RiverIceReach));
         }
 
         private static float WobbleAt(in SurfaceRules rules, ref DensityChunkBuffers b, int output, int x, int z){
@@ -463,6 +531,24 @@ namespace Engine.Scripts.WorldGen.Density{
                 int dx = qx - px, dz = qz - pz;
                 if (dx * dx + dz * dz > r * r) continue;
                 if (b.Wet[qz * span + qx] != 0) return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        ///     A dry probe within <paramref name="r" /> blocks (the probes of <see cref="NearWater" />): land nearby. River
+        ///     ice needs it, so a frozen river's ice ends near the coast instead of running out over the open sea (AD-47).
+        /// </summary>
+        internal static bool NearDry(ref DensityChunkBuffers b, int x, int z, int r){
+            const int span = DensityLayout.BiomeSpan, pad = DensityLayout.BiomePadding;
+            int px = x + pad, pz = z + pad;
+            int x0 = math.max(0, px - r), x1 = math.min(span - 1, px + r), z0 = math.max(0, pz - r), z1 = math.min(span - 1, pz + r);
+            for (int qz = (z0 + 3) & ~3; qz <= z1; qz += 4)
+            for (int qx = (x0 + 3) & ~3; qx <= x1; qx += 4){
+                int dx = qx - px, dz = qz - pz;
+                if (dx * dx + dz * dz > r * r) continue;
+                if (b.Wet[qz * span + qx] == 0) return true;
             }
 
             return false;

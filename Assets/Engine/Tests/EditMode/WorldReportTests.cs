@@ -90,7 +90,7 @@ namespace Engine.Tests.EditMode{
             float median = SnowReport.Median(mountainT);
             float calibrated = SnowReport.CalibratedSnowTemperature(median, rules.Rules);
             all.AppendLine(System.FormattableString.Invariant(
-                $"calibration (DEC-175): median Mountain T over the five seeds {median:0.0000} ({mountainT.Count} samples) → T_snow = T_med − 86 L = {calibrated:0.0000} (rule file: {rules.Rules.SnowTemperature:0.0000}); ") +
+                $"calibration (DEC-175): median Mountain T over the five seeds {median:0.0000} ({mountainT.Count} samples) → T_snow = T_med − {SnowReport.CalibrationSnowLine - rules.Rules.LapseFrom} L = {calibrated:0.0000} (rule file: {rules.Rules.SnowTemperature:0.0000}); ") +
                 System.FormattableString.Invariant($"snow line at that median with the file's T_snow: y {rules.Rules.ColdThreshold(median, 0f, rules.Rules.SnowTemperature)}"));
             all.AppendLine(System.FormattableString.Invariant($"({watch.Elapsed.TotalSeconds:0.0} s)"));
             Debug.Log(all.ToString());
@@ -284,6 +284,7 @@ namespace Engine.Tests.EditMode{
                 Config = TestFixtures.CreateGeneratorConfig(Allocator.Persistent);
                 Config.WorldGen.Seed = DensityFixture.Seed;
                 Config.WorldGen.DensityStoneVoxel = TestFixtures.Stone;
+                DensityFixture.UseShippedSea(ref Config.WorldGen);
                 Config.WorldGen.Layout.Dispose();
                 Config.WorldGen.Layout = BiomeLayoutData.Create(layout, null, Allocator.Persistent);
             }

@@ -93,7 +93,7 @@ namespace Engine.Scripts.WorldGen.Settings{
                 HeightMax = settings.HeightMax,
                 HeightSoftBand = settings.HeightSoftBand,
                 PeakWavelength = settings.PeakWavelength,
-                WaterLevel = settings.WaterLevel,
+                WaterLevel = settings.Generator == WorldGenerator.Density ? settings.WaterLevel : WorldGenSettings.LegacyWaterLevel,
                 WaterVoxel = Id(settings.WaterVoxel, voxelId),
                 IceVoxel = Id(settings.IceVoxel, voxelId),
                 EnableClimateOverrides = settings.EnableClimateOverrides,
