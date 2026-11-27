@@ -158,7 +158,9 @@ namespace Engine.Editor.WorldGen{
                     int j = nz * side + nx;
                     if (!dry[j]) continue;
                     any = true;
-                    // The snow line or the bank rule (DEC-229): a dry bank cold enough for river ice; its steep test is not applied here.
+                    // The snow line or the bank rule's temperature test (DEC-229). The neighbour has nearly the river sample's T, so
+                    // this share mostly counts the banks outside the never-snow biomes; the rule's band, near_water and steep tests
+                    // are not applied here. The game's banks are checked by SurfaceRuleTests.FrozenRiverBanks_CarryASnowLayer.
                     bankSnow |= snow[j] || !never[j] && rules.RiverIce >= 0 && rules.ColdAt(surfaceY, Value(tSlot, j), 0f, rules.RiverIceTemperature);
                 }
 
@@ -253,7 +255,7 @@ namespace Engine.Editor.WorldGen{
             sb.AppendLine($"median Mountain T {F(r.MedianMountainT)} → snow line y {r.SnowLineAtMedian} (the calibration pools the five seeds: y {CalibrationSnowLine} at their joint median, DEC-244) · " +
                           $"T_snow {F(rules.SnowTemperature)}, L {F(rules.Lapse, "0.0000")} · sea ice {BiomeWorldReport.P(r.IceShare, "0.00")} of the open water");
             sb.AppendLine($"river water {r.RiverWater} samples: frozen {BiomeWorldReport.P(r.RiverIceShare, "0.00")} (the sea rule alone {BiomeWorldReport.P(r.RiverSeaRuleShare, "0.00")}); " +
-                          $"frozen river samples with a dry neighbour that has snow (the snow line or the bank rule, without its steep test): {BiomeWorldReport.P(r.FrozenRiverSnowyBank, "0.0")}");
+                          $"frozen river samples with a dry neighbour that has snow or passes the bank rule's temperature test (an upper bound: no band, near-water or steep test): {BiomeWorldReport.P(r.FrozenRiverSnowyBank, "0.0")}");
             sb.AppendLine("Mountain ground at y 200 and above, snow share per T band (equal counts):");
             foreach ((float from, float to, int samples, double share) in r.MountainBands)
                 sb.AppendLine($"  T {F(from),6} … {F(to),6}: {BiomeWorldReport.P(share),6} of {samples}");

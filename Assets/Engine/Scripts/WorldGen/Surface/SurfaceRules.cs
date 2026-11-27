@@ -99,7 +99,7 @@ namespace Engine.Scripts.WorldGen.Surface{
         /// <summary>A direct neighbour column inside the chunk lies at least A higher (the foot of a step).</summary>
         public const byte StepFoot = 4;
 
-        /// <summary>The column lies in a frozen river's band: river output ≥ the river ice minimum and cold enough for river ice (DEC-229).</summary>
+        /// <summary>The column lies in a frozen river's band: river output ≥ the river ice minimum at the column or at a wet probe within the river ice reach (AD-48), and cold enough for river ice (DEC-229).</summary>
         public const byte FrozenRiver = 5;
     }
 

@@ -45,11 +45,11 @@ namespace Engine.Scripts.WorldGen.Density{
         /// <summary>[z · 32 + x]: the blend's border threshold (from <see cref="DensityChunk.PassBlend" />); NaN where the border did not run.</summary>
         public NativeArray<float> Border;
 
-        /// <summary>[x · 32 + z], with surface rules (from <see cref="DensityChunk.PassFill" />): T, snow line, tree line, rise, ice flag (0 no ice, else 1 + the snow on it: 0, half, full layer).</summary>
+        /// <summary>[x · 32 + z], with surface rules (from <see cref="DensityChunk.PassFill" />): T, snow line, tree line, rise, ice flag (0 no ice, else 1 + the snow on it: 0, half, full layer), the bank rule's frozen_river flag (0 / 1).</summary>
         public NativeArray<float> ColumnTemperature;
 
         public NativeArray<short> SnowLine, TreeLine;
-        public NativeArray<byte> Rise, IceCold;
+        public NativeArray<byte> Rise, IceCold, FrozenRiver;
 
         public DensityWorkCounters Counters;
 
@@ -83,6 +83,7 @@ namespace Engine.Scripts.WorldGen.Density{
             if (TreeLine.IsCreated) TreeLine.Dispose();
             if (Rise.IsCreated) Rise.Dispose();
             if (IceCold.IsCreated) IceCold.Dispose();
+            if (FrozenRiver.IsCreated) FrozenRiver.Dispose();
         }
     }
 
@@ -150,7 +151,8 @@ namespace Engine.Scripts.WorldGen.Density{
                 SnowLine = new NativeArray<short>(DensityLayout.Columns, Allocator.TempJob),
                 TreeLine = new NativeArray<short>(DensityLayout.Columns, Allocator.TempJob),
                 Rise = new NativeArray<byte>(DensityLayout.Columns, Allocator.TempJob),
-                IceCold = new NativeArray<byte>(DensityLayout.Columns, Allocator.TempJob)
+                IceCold = new NativeArray<byte>(DensityLayout.Columns, Allocator.TempJob),
+                FrozenRiver = new NativeArray<byte>(DensityLayout.Columns, Allocator.TempJob)
             };
             return new DensityProbeJob<TPrograms>{
                 Terrain = terrain,
@@ -174,6 +176,7 @@ namespace Engine.Scripts.WorldGen.Density{
                 TreeLine = result.TreeLine,
                 Rise = result.Rise,
                 IceCold = result.IceCold,
+                FrozenRiver = result.FrozenRiver,
                 Counters = new NativeArray<DensityWorkCounters>(1, Allocator.TempJob)
             };
         }

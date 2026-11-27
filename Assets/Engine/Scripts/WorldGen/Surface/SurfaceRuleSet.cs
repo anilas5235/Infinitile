@@ -147,8 +147,9 @@ namespace Engine.Scripts.WorldGen.Surface{
     }
 
     /// <summary>
-    ///     frozen_river: the column lies in a frozen river's band (§8.3, DEC-229): the river output is at least
-    ///     riverIceMin and the water surface is cold enough for river ice. False without river ice.
+    ///     frozen_river: the column lies in a frozen river's band (§8.3, DEC-229): the river output at the column or at a
+    ///     wet probe within nearWaterDistance is at least riverIceMin (AD-48), and the water surface is cold enough for
+    ///     river ice. False without river ice.
     /// </summary>
     public sealed class FrozenRiverCondition : RuleCondition{
         public override RuleCondition Clone(){
@@ -259,12 +260,12 @@ namespace Engine.Scripts.WorldGen.Surface{
     /// <summary>The climate of snow, ice and the tree line (§8), and the beach shape and water probes of the beach rules.</summary>
     public sealed class SurfaceClimate{
         /// <summary>L: temperature lost per block above <see cref="LapseFrom" />.</summary>
-        public float Lapse = 0.0055f;
+        public float Lapse = 0.00369f;
 
         public float LapseFrom = WorldGenSettings.DefaultWaterLevel;
-        public float SnowTemperature = -0.638f;
+        public float SnowTemperature = -0.6228f;
         public string SnowWobble;
-        public float IceTemperature = -0.6f;
+        public float IceTemperature = -0.58f;
         public string IceWobble;
 
         /// <summary>
@@ -277,8 +278,8 @@ namespace Engine.Scripts.WorldGen.Surface{
         public float IceSnowFull = float.NaN;
 
         /// <summary>
-        ///     Frozen rivers (§8.3, DEC-207): water where the graph's <c>river</c> output is at least
-        ///     <see cref="RiverIceMin" /> freezes where T &lt; this, without the wobble (Minecraft's temperature level 0),
+        ///     Frozen rivers (§8.3, DEC-207): water where the graph's <c>river</c> output, at the column or at a wet probe
+        ///     within <see cref="NearWaterDistance" /> (AD-48), is at least <see cref="RiverIceMin" /> freezes where T &lt; this, without the wobble (Minecraft's temperature level 0),
         ///     so a cold river is one ice sheet. NaN (the default): rivers freeze like the sea.
         /// </summary>
         public float RiverIceTemperature = float.NaN;
@@ -286,9 +287,9 @@ namespace Engine.Scripts.WorldGen.Surface{
         public float RiverIceMin = 0.3f;
 
         /// <summary>T_tree = T_snow + this · L: the tree line lies this many blocks below the snow line.</summary>
-        public float TreeLineBelowSnow = 15f;
+        public float TreeLineBelowSnow = 22f;
 
-        public float TreeLineFloor = 170f;
+        public float TreeLineFloor = 196f;
         public string TreeLineWobble;
         public int NearWaterDistance = 16;
         public string BeachShape;

@@ -157,6 +157,10 @@ namespace Engine.Scripts.WorldGen.Surface{
                 if (_outputs.Count > SurfaceRules.MaxOutputs) Error(null, $"The rules read {_outputs.Count} graph outputs; at most {SurfaceRules.MaxOutputs} are allowed.", "limit");
                 if (climate.NearWaterDistance < 0 || climate.NearWaterDistance > 16)
                     Error(null, $"nearWaterDistance {climate.NearWaterDistance} is outside 0 … 16 (the biome padding).", "climate");
+                // River ice reads the river band at the wet probes within nearWaterDistance, which lie on a 4-block grid
+                // (AD-48): below 4 most columns have no probe in reach, and frozen rivers and their banks would vanish.
+                if (!float.IsNaN(climate.RiverIceTemperature) && climate.NearWaterDistance < 4)
+                    Error(null, $"nearWaterDistance {climate.NearWaterDistance} is below 4: river ice needs a wet probe in reach (the probes lie every 4 blocks).", "climate");
                 if (!(climate.Lapse > 0f)) Error(null, "The lapse rate must be positive.", "climate");
                 if (_set.Strata.Period <= 0 || _set.Strata.Thickness <= 0 || _set.Strata.Thickness > _set.Strata.Period)
                     Error(null, "Strata need 0 < thickness ≤ period.", "climate");

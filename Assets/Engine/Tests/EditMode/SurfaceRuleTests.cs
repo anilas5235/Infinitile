@@ -192,9 +192,10 @@ namespace Engine.Tests.EditMode{
 
         /// <summary>
         ///     A frozen bank (DEC-229, AD-48): a dry floor with rise under 4 outside the never-snow biomes, its under, beach or
-        ///     rock block (the bank keeps the shore's sand and cliff rock) topped with a snow layer, cold enough for river ice and with a wet probe within the near-water distance. The
-        ///     test sees no river band, so it recognises the bank by its blocks; <see cref="FrozenRiverBanks_CarryASnowLayer" />
-        ///     checks that banks get them.
+        ///     rock block (the bank keeps the shore's sand and cliff rock) topped with a snow layer, in a frozen river's band
+        ///     (the probe's <c>frozen_river</c> flag: cold enough for river ice and the river output at the column or a wet
+        ///     probe nearby, AD-48) and with a wet probe within the near-water distance, as the rule's <c>near_water</c>.
+        ///     <see cref="FrozenRiverBanks_CarryASnowLayer" /> checks that banks get them.
         /// </summary>
         private bool IsFrozenBank(DensityProbeResult r, int x, int z, int h){
             int c = x * Size + z;
@@ -202,7 +203,7 @@ namespace Engine.Tests.EditMode{
             if (h < 0 || h + 1 < _waterLevel || h + 1 >= Height || def.neverSnows != 0 || r.Rise[c] >= 4) return false;
             ushort top = VoxelAt(r, x, h, z);
             if (VoxelAt(r, x, h + 1, z) != SnowLayer || !(Writes(def, Under(def), top) || top == def.beachBlock || top == def.rockBlock)) return false;
-            if (!Rules.ColdAt(WetY, r.ColumnTemperature[c], 0f, Rules.RiverIceTemperature)) return false;
+            if (r.FrozenRiver[c] == 0) return false;
             // The probes of near_water: every fourth column of the padded biome map, 16 blocks around the chunk.
             const int pad = DensityLayout.BiomePadding;
             int reach = Rules.RiverIceReach;
@@ -315,6 +316,18 @@ namespace Engine.Tests.EditMode{
             using (SurfaceRuleCompileResult r = Compile(WithDefault(
                        "{ 'name': 'a', 'if': { 'noise_threshold': { 'name': 'no_such_output', 'min': 0 } }, 'then': { 'block': '@top' } }")))
                 AssertError(r, "output");
+        }
+
+        /// <summary>River ice reads the wet probes within nearWaterDistance (AD-48); they lie every 4 blocks, so less than 4 is an error.</summary>
+        [Test]
+        public void Validator_ReportsRiverIceWithoutAWetProbeInReach(){
+            string climate = Climate.Replace("'nearWaterDistance': 16", "'nearWaterDistance': 3, 'riverIceTemperature': -0.45");
+            using (SurfaceRuleCompileResult r = Compile(Parse("{ 'formatVersion': 1, " + climate + ", 'default': [{ 'name': 'a', 'then': { 'block': '@top' } }] }")))
+                AssertError(r, "climate");
+            // Without river ice the same distance is fine.
+            string plain = Climate.Replace("'nearWaterDistance': 16", "'nearWaterDistance': 3");
+            using (SurfaceRuleCompileResult r = Compile(Parse("{ 'formatVersion': 1, " + plain + ", 'default': [{ 'name': 'a', 'then': { 'block': '@top' } }] }")))
+                Assert.IsFalse(r.Messages.Any(m => m.Severity == LayoutSeverity.Error && m.Kind == "climate"), Errors(r));
         }
 
         /// <summary>river(min) (§7.2, §9.2) is noise_threshold on the graph's river output, and a non-number is an error.</summary>
@@ -466,7 +479,7 @@ namespace Engine.Tests.EditMode{
                     }
                 }
 
-            // DEC-244: the snow line lies at y 255 at T_snow + 128 L (the median Mountain T of the H2 calibration, −0.179).
+            // DEC-244: the snow line lies at y 255 at T_snow + 128 L (the pooled median Mountain T of the H2 calibration, −0.150).
             int median = rules.ColdThreshold(rules.SnowTemperature + 128f * rules.Lapse, 0f, rules.SnowTemperature);
             Assert.That(median, Is.InRange(255, 256));
         }

@@ -192,17 +192,17 @@ namespace Engine.Editor.WorldGen{
                 Patch largest = of.OrderByDescending(p => p.Size).First();
                 // The smallest patch that is not cut by the map edge, else the smallest.
                 Patch smallest = of.Where(p => !p.TouchesEdge).OrderBy(p => p.Size).FirstOrDefault() ?? of.OrderBy(p => p.Size).First();
-                r.Tour.Add(Spot(FormattableString.Invariant($"{r.Names[b]}: largest patch {largest.Size * km2:0.##} km²"), largest, origin, o.Stride, c.Surface));
-                r.Tour.Add(Spot(FormattableString.Invariant($"{r.Names[b]}: smallest patch {smallest.Size * km2 * 1e6:0} m²"), smallest, origin, o.Stride, c.Surface));
+                r.Tour.Add(Spot(FormattableString.Invariant($"{r.Names[b]}: largest patch {largest.Size * km2:0.##} km²"), largest, origin, o.Stride, c.Surface, o.WaterLevel));
+                r.Tour.Add(Spot(FormattableString.Invariant($"{r.Names[b]}: smallest patch {smallest.Size * km2 * 1e6:0} m²"), smallest, origin, o.Stride, c.Surface, o.WaterLevel));
             }
         }
 
-        private static TourSpot Spot(string what, Patch p, int origin, int stride, NativeArray<float> surface){
+        private static TourSpot Spot(string what, Patch p, int origin, int stride, NativeArray<float> surface, int waterLevel){
             return new TourSpot{
                 What = what,
                 X = origin + p.X * stride,
                 Z = origin + p.Z * stride,
-                Y = (int)math.max(surface[p.Index], 124f) + 3
+                Y = (int)math.max(surface[p.Index], waterLevel) + 3
             };
         }
 

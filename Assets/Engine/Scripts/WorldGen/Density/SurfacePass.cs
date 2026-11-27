@@ -449,6 +449,17 @@ namespace Engine.Scripts.WorldGen.Density{
             iceSnow = iceCold ? IceSnowLevel(rules, surface, temperature, ice + snow) : 0;
         }
 
+        /// <summary>
+        ///     The <c>frozen_river</c> flag of chunk column (x, z) as the bank rule sees it, for tests and reports: cold
+        ///     enough for river ice at the wetness layer and in a frozen river's band (AD-48).
+        /// </summary>
+        internal static bool FrozenRiverAt(in SurfaceRules rules, ref DensityChunkBuffers b, int x, int z, int waterLevel){
+            if (rules.RiverIce < 0) return false;
+            float temperature = rules.TemperatureSlot >= 0 ? Lattice(b.Lattice, rules.TemperatureSlot, x, z) : 0f;
+            return rules.ColdAt(DensityLayout.WetnessY(waterLevel), temperature, 0f, rules.RiverIceTemperature) &&
+                   (WobbleAt(rules, ref b, rules.RiverIce, x, z) >= rules.RiverIceMin || RiverNear(rules, ref b, x, z, rules.RiverIceReach));
+        }
+
         private static float WobbleAt(in SurfaceRules rules, ref DensityChunkBuffers b, int output, int x, int z){
             if (output < 0) return 0f;
             RuleOutput o = rules.Outputs[output];

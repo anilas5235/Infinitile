@@ -104,12 +104,13 @@ namespace Engine.Scripts.Jobs.Chunk{
 
         /// <summary>
         ///     [x · 32 + z], with surface rules and <see cref="DensityChunk.PassFill" />: the column's T, snow line, tree
-        ///     line, heightmap rise and ice flag (0 no ice, else 1 + the snow on it: 0, half, full layer) as the rules see them (<see cref="SurfacePass.ColumnClimate" />).
+        ///     line, heightmap rise and ice flag (0 no ice, else 1 + the snow on it: 0, half, full layer) as the rules see them (<see cref="SurfacePass.ColumnClimate" />),
+        ///     and the bank rule's <c>frozen_river</c> flag (<see cref="SurfacePass.FrozenRiverAt" />).
         /// </summary>
         public NativeArray<float> ColumnTemperature;
 
         public NativeArray<short> SnowLine, TreeLine;
-        public NativeArray<byte> Rise, IceCold;
+        public NativeArray<byte> Rise, IceCold, FrozenRiver;
 
         public NativeArray<DensityWorkCounters> Counters;
 
@@ -157,6 +158,7 @@ namespace Engine.Scripts.Jobs.Chunk{
                     TreeLine[c] = (short)tree;
                     Rise[c] = (byte)math.min(255, rise);
                     IceCold[c] = ice ? (byte)(1 + iceSnow) : (byte)0;
+                    FrozenRiver[c] = SurfacePass.FrozenRiverAt(WorldGen.SurfaceRules, ref b, x, z, WorldGen.WaterLevel) ? (byte)1 : (byte)0;
                 }
 
             b.Dispose();
