@@ -72,24 +72,24 @@
       "op": "spline",
       "points": [
         {
-          "location": -0.78,
+          "location": -0.64,
           "value": -1
         },
         {
-          "location": -0.68,
-          "value": -0.84
+          "location": -0.54,
+          "value": -0.8
         },
         {
-          "location": -0.575,
-          "value": -0.665
+          "location": -0.45,
+          "value": -0.62
         },
         {
-          "location": -0.47,
-          "value": -0.515
+          "location": -0.36,
+          "value": -0.47
         },
         {
-          "location": -0.35,
-          "value": -0.365
+          "location": -0.27,
+          "value": -0.34
         },
         {
           "location": 0,
@@ -128,7 +128,7 @@
           "from": 0,
           "in": "abs_weirdness",
           "op": "smoothstep",
-          "to": 0.12
+          "to": 0.25
         },
         "op": "mul"
       },
@@ -139,6 +139,1185 @@
         "to": 0.03
       },
       "op": "mul"
+    },
+    "offset_rows": {
+      "coordinate": "continentalness_curve",
+      "interpolation": "monotone",
+      "op": "spline",
+      "points": [
+        {
+          "location": -1,
+          "value": -55
+        },
+        {
+          "location": -0.5,
+          "value": -48
+        },
+        {
+          "location": -0.44,
+          "value": -36
+        },
+        {
+          "location": -0.3,
+          "value": -25
+        },
+        {
+          "location": -0.2,
+          "value": -14.9
+        },
+        {
+          "location": -0.16,
+          "value": {
+            "coordinate": "erosion_value",
+            "interpolation": "monotone",
+            "op": "spline",
+            "points": [
+              {
+                "location": -1,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -10.87
+                    },
+                    {
+                      "location": 1,
+                      "value": 88.82
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.6,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -17.85
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -12.48
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 5.65
+                    },
+                    {
+                      "location": 0.45,
+                      "value": 41.48
+                    },
+                    {
+                      "location": 1,
+                      "value": 64.5
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.42,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -27.77
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -27.68
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 0.59
+                    },
+                    {
+                      "location": 0.6,
+                      "value": 1.26
+                    },
+                    {
+                      "location": 1,
+                      "value": 14.18
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.33,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -37.55
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 6.78
+                    },
+                    {
+                      "location": 1,
+                      "value": 8.18
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.15,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -20.7
+                    },
+                    {
+                      "location": -0.7,
+                      "value": -4.97
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.17
+                    },
+                    {
+                      "location": 0,
+                      "value": 1.17
+                    },
+                    {
+                      "location": 0.35,
+                      "value": 6.21
+                    },
+                    {
+                      "location": 1,
+                      "value": 8.18
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.2,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -18.7
+                    },
+                    {
+                      "location": -0.7,
+                      "value": -4.3
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 0.5
+                    },
+                    {
+                      "location": 1,
+                      "value": 0.5
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 1,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -2.06
+                    },
+                    {
+                      "location": 0,
+                      "value": -3.34
+                    },
+                    {
+                      "location": 0.6,
+                      "value": 1.18
+                    },
+                    {
+                      "location": 1,
+                      "value": 0.5
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "location": 0.03,
+          "value": {
+            "coordinate": "erosion_value",
+            "interpolation": "monotone",
+            "op": "spline",
+            "points": [
+              {
+                "location": -1,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 0.74
+                    },
+                    {
+                      "location": -0.85,
+                      "value": 6.74
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 43.92
+                    },
+                    {
+                      "location": 1,
+                      "value": 110.34
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.6,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -4.16
+                    },
+                    {
+                      "location": 0.45,
+                      "value": 52.67
+                    },
+                    {
+                      "location": 1,
+                      "value": 77.79
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.42,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -10.99
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -10.96
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 8.66
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 9.19
+                    },
+                    {
+                      "location": 0.45,
+                      "value": 20.38
+                    },
+                    {
+                      "location": 1,
+                      "value": 37.91
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.33,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -31.15
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 18.53
+                    },
+                    {
+                      "location": 0.45,
+                      "value": 18.95
+                    },
+                    {
+                      "location": 1,
+                      "value": 22.53
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.15,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -14.3
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 1.6
+                    },
+                    {
+                      "location": 0,
+                      "value": 3.4
+                    },
+                    {
+                      "location": 0.35,
+                      "value": 17.03
+                    },
+                    {
+                      "location": 1,
+                      "value": 22.53
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.2,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -12.3
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -4.7
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 1,
+                      "value": 13.3
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 1,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -2.06
+                    },
+                    {
+                      "location": 0,
+                      "value": -3.34
+                    },
+                    {
+                      "location": 0.35,
+                      "value": 3.42
+                    },
+                    {
+                      "location": 1,
+                      "value": 13.3
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "location": 0.3,
+          "value": {
+            "coordinate": "erosion_value",
+            "interpolation": "monotone",
+            "op": "spline",
+            "points": [
+              {
+                "location": -1,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 26.64
+                    },
+                    {
+                      "location": -0.85,
+                      "value": 29.38
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 47.31
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 77.23
+                    },
+                    {
+                      "location": 1,
+                      "value": 158.38
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.85,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 26.64
+                    },
+                    {
+                      "location": -0.85,
+                      "value": 29.38
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 47.31
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 77.23
+                    },
+                    {
+                      "location": 1,
+                      "value": 158.38
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.7,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 26.1
+                    },
+                    {
+                      "location": -0.7,
+                      "value": 29.46
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 47.44
+                    },
+                    {
+                      "location": 1,
+                      "value": 113.34
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.42,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 26.1
+                    },
+                    {
+                      "location": -0.7,
+                      "value": 26.05
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 32.62
+                    },
+                    {
+                      "location": 1,
+                      "value": 90.88
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.33,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -31.07
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -13.83
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 34.68
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 44.74
+                    },
+                    {
+                      "location": 0.45,
+                      "value": 45.76
+                    },
+                    {
+                      "location": 1,
+                      "value": 54.55
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.15,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -14.22
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -5.88
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 6.8
+                    },
+                    {
+                      "location": 0,
+                      "value": 7.61
+                    },
+                    {
+                      "location": 0.35,
+                      "value": 41.05
+                    },
+                    {
+                      "location": 0.7,
+                      "value": 55.27
+                    },
+                    {
+                      "location": 1,
+                      "value": 54.55
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.05,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -12.22
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -4.92
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 2.26
+                    },
+                    {
+                      "location": 0,
+                      "value": 3.1
+                    },
+                    {
+                      "location": 0.35,
+                      "value": 37.83
+                    },
+                    {
+                      "location": 0.7,
+                      "value": 52.43
+                    },
+                    {
+                      "location": 1,
+                      "value": 51.5
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.2,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -12.22
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -4.63
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 1,
+                      "value": 13.3
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.42,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -12.22
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 0.64
+                    },
+                    {
+                      "location": 1,
+                      "value": 16.45
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.53,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -12.22
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -11.03
+                    },
+                    {
+                      "location": -0.55,
+                      "value": -0.73
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0,
+                      "value": 22.26
+                    },
+                    {
+                      "location": 1,
+                      "value": 22.26
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.58,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -12.22
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -4.63
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 1,
+                      "value": 13.3
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 1,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -2.06
+                    },
+                    {
+                      "location": 0,
+                      "value": -3.27
+                    },
+                    {
+                      "location": 0.35,
+                      "value": 3.43
+                    },
+                    {
+                      "location": 1,
+                      "value": 13.3
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "location": 1,
+          "value": {
+            "coordinate": "erosion_value",
+            "interpolation": "monotone",
+            "op": "spline",
+            "points": [
+              {
+                "location": -1,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 45.03
+                    },
+                    {
+                      "location": -0.85,
+                      "value": 48.1
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 68.18
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 101.66
+                    },
+                    {
+                      "location": 1,
+                      "value": 192.5
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.85,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 45.03
+                    },
+                    {
+                      "location": -0.85,
+                      "value": 48.1
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 68.18
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 101.66
+                    },
+                    {
+                      "location": 1,
+                      "value": 192.5
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.7,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 26.1
+                    },
+                    {
+                      "location": -0.7,
+                      "value": 31.76
+                    },
+                    {
+                      "location": 0,
+                      "value": 69.51
+                    },
+                    {
+                      "location": 1,
+                      "value": 128.5
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.42,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 26.1
+                    },
+                    {
+                      "location": -0.7,
+                      "value": 31.76
+                    },
+                    {
+                      "location": 0,
+                      "value": 69.51
+                    },
+                    {
+                      "location": 1,
+                      "value": 128.5
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.33,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -24.75
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -5.59
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 51.37
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 63.36
+                    },
+                    {
+                      "location": 0.45,
+                      "value": 64.81
+                    },
+                    {
+                      "location": 1,
+                      "value": 77.3
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.15,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -7.9
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -0.29
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 9.45
+                    },
+                    {
+                      "location": 0,
+                      "value": 10.6
+                    },
+                    {
+                      "location": 0.35,
+                      "value": 58.12
+                    },
+                    {
+                      "location": 0.7,
+                      "value": 78.31
+                    },
+                    {
+                      "location": 1,
+                      "value": 77.3
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.05,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -5.9
+                    },
+                    {
+                      "location": -0.85,
+                      "value": 0.37
+                    },
+                    {
+                      "location": 0,
+                      "value": 4.15
+                    },
+                    {
+                      "location": 0.2,
+                      "value": 27.1
+                    },
+                    {
+                      "location": 0.35,
+                      "value": 53.43
+                    },
+                    {
+                      "location": 0.7,
+                      "value": 74.03
+                    },
+                    {
+                      "location": 1,
+                      "value": 72.56
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.2,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -5.9
+                    },
+                    {
+                      "location": -0.7,
+                      "value": 2.74
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0.45,
+                      "value": 4.71
+                    },
+                    {
+                      "location": 1,
+                      "value": 13.3
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.42,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -5.9
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -1.26
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0.2,
+                      "value": 9.65
+                    },
+                    {
+                      "location": 1,
+                      "value": 16.45
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.53,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -5.9
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 1.09
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0,
+                      "value": 22.26
+                    },
+                    {
+                      "location": 1,
+                      "value": 22.26
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.58,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -5.9
+                    },
+                    {
+                      "location": -0.7,
+                      "value": 2.74
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0.45,
+                      "value": 4.71
+                    },
+                    {
+                      "location": 1,
+                      "value": 13.3
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 1,
+                "value": {
+                  "coordinate": "peaks_valleys",
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -2.06
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 1,
+                      "value": 13.3
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
     },
     "peaks": {
       "in": {
@@ -153,7 +1332,7 @@
         "in": {
           "a": {
             "a": 3,
-            "b": "abs_weirdness",
+            "b": "valley_weirdness",
             "op": "mul"
           },
           "b": 2,
@@ -201,6 +1380,1213 @@
           "value": 350
         }
       ]
+    },
+    "ridge_offset": {
+      "coordinate": "continentalness_curve",
+      "interpolation": "monotone",
+      "op": "spline",
+      "points": [
+        {
+          "location": -1,
+          "value": -55
+        },
+        {
+          "location": -0.5,
+          "value": -48
+        },
+        {
+          "location": -0.44,
+          "value": -36
+        },
+        {
+          "location": -0.3,
+          "value": -25
+        },
+        {
+          "location": -0.2,
+          "value": -14.9
+        },
+        {
+          "location": -0.16,
+          "value": {
+            "coordinate": "erosion_value",
+            "interpolation": "monotone",
+            "op": "spline",
+            "points": [
+              {
+                "location": -1,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -10.87
+                    },
+                    {
+                      "location": 1,
+                      "value": 88.82
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.6,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -17.85
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -12.48
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 5.65
+                    },
+                    {
+                      "location": 0.45,
+                      "value": 41.48
+                    },
+                    {
+                      "location": 1,
+                      "value": 64.5
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.42,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -27.77
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -27.68
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 0.59
+                    },
+                    {
+                      "location": 0.6,
+                      "value": 1.26
+                    },
+                    {
+                      "location": 1,
+                      "value": 14.18
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.33,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -37.55
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 6.78
+                    },
+                    {
+                      "location": 1,
+                      "value": 8.18
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.15,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -20.7
+                    },
+                    {
+                      "location": -0.7,
+                      "value": -4.97
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.17
+                    },
+                    {
+                      "location": 0,
+                      "value": 1.17
+                    },
+                    {
+                      "location": 0.35,
+                      "value": 6.21
+                    },
+                    {
+                      "location": 1,
+                      "value": 8.18
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.2,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -18.7
+                    },
+                    {
+                      "location": -0.7,
+                      "value": -4.3
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 0.5
+                    },
+                    {
+                      "location": 1,
+                      "value": 0.5
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 1,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -2.06
+                    },
+                    {
+                      "location": 0,
+                      "value": -3.34
+                    },
+                    {
+                      "location": 0.6,
+                      "value": 1.18
+                    },
+                    {
+                      "location": 1,
+                      "value": 0.5
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "location": 0.03,
+          "value": {
+            "coordinate": "erosion_value",
+            "interpolation": "monotone",
+            "op": "spline",
+            "points": [
+              {
+                "location": -1,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 0.74
+                    },
+                    {
+                      "location": -0.85,
+                      "value": 6.74
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 43.92
+                    },
+                    {
+                      "location": 1,
+                      "value": 110.34
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.6,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -4.16
+                    },
+                    {
+                      "location": 0.45,
+                      "value": 52.67
+                    },
+                    {
+                      "location": 1,
+                      "value": 77.79
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.42,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -10.99
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -10.96
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 8.66
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 9.19
+                    },
+                    {
+                      "location": 0.45,
+                      "value": 20.38
+                    },
+                    {
+                      "location": 1,
+                      "value": 37.91
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.33,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -31.15
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 18.53
+                    },
+                    {
+                      "location": 0.45,
+                      "value": 18.95
+                    },
+                    {
+                      "location": 1,
+                      "value": 22.53
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.15,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -14.3
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 1.6
+                    },
+                    {
+                      "location": 0,
+                      "value": 3.4
+                    },
+                    {
+                      "location": 0.35,
+                      "value": 17.03
+                    },
+                    {
+                      "location": 1,
+                      "value": 22.53
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.2,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -12.3
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -4.7
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 1,
+                      "value": 13.3
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 1,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -2.06
+                    },
+                    {
+                      "location": 0,
+                      "value": -3.34
+                    },
+                    {
+                      "location": 0.35,
+                      "value": 3.42
+                    },
+                    {
+                      "location": 1,
+                      "value": 13.3
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "location": 0.3,
+          "value": {
+            "coordinate": "erosion_value",
+            "interpolation": "monotone",
+            "op": "spline",
+            "points": [
+              {
+                "location": -1,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 26.64
+                    },
+                    {
+                      "location": -0.85,
+                      "value": 29.38
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 47.31
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 77.23
+                    },
+                    {
+                      "location": 1,
+                      "value": 158.38
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.85,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 26.64
+                    },
+                    {
+                      "location": -0.85,
+                      "value": 29.38
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 47.31
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 77.23
+                    },
+                    {
+                      "location": 1,
+                      "value": 158.38
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.7,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 26.1
+                    },
+                    {
+                      "location": -0.7,
+                      "value": 29.46
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 47.44
+                    },
+                    {
+                      "location": 1,
+                      "value": 113.34
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.42,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 26.1
+                    },
+                    {
+                      "location": -0.7,
+                      "value": 26.05
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 32.62
+                    },
+                    {
+                      "location": 1,
+                      "value": 90.88
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.33,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -31.07
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -13.83
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 34.68
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 44.74
+                    },
+                    {
+                      "location": 0.45,
+                      "value": 45.76
+                    },
+                    {
+                      "location": 1,
+                      "value": 54.55
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.15,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -14.22
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -5.88
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 6.8
+                    },
+                    {
+                      "location": 0,
+                      "value": 7.61
+                    },
+                    {
+                      "location": 0.35,
+                      "value": 41.05
+                    },
+                    {
+                      "location": 0.7,
+                      "value": 55.27
+                    },
+                    {
+                      "location": 1,
+                      "value": 54.55
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.05,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -12.22
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -4.92
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 2.26
+                    },
+                    {
+                      "location": 0,
+                      "value": 3.1
+                    },
+                    {
+                      "location": 0.35,
+                      "value": 37.83
+                    },
+                    {
+                      "location": 0.7,
+                      "value": 52.43
+                    },
+                    {
+                      "location": 1,
+                      "value": 51.5
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.2,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -12.22
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -4.63
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 1,
+                      "value": 13.3
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.42,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -12.22
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 0.64
+                    },
+                    {
+                      "location": 1,
+                      "value": 16.45
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.53,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -12.22
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -11.03
+                    },
+                    {
+                      "location": -0.55,
+                      "value": -0.73
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0,
+                      "value": 22.26
+                    },
+                    {
+                      "location": 1,
+                      "value": 22.26
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.58,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -12.22
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -4.63
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 1,
+                      "value": 13.3
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 1,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -2.06
+                    },
+                    {
+                      "location": 0,
+                      "value": -3.27
+                    },
+                    {
+                      "location": 0.35,
+                      "value": 3.43
+                    },
+                    {
+                      "location": 1,
+                      "value": 13.3
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "location": 1,
+          "value": {
+            "coordinate": "erosion_value",
+            "interpolation": "monotone",
+            "op": "spline",
+            "points": [
+              {
+                "location": -1,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 45.03
+                    },
+                    {
+                      "location": -0.85,
+                      "value": 48.1
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 68.18
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 101.66
+                    },
+                    {
+                      "location": 1,
+                      "value": 192.5
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.85,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 45.03
+                    },
+                    {
+                      "location": -0.85,
+                      "value": 48.1
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 68.18
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 101.66
+                    },
+                    {
+                      "location": 1,
+                      "value": 192.5
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.7,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 26.1
+                    },
+                    {
+                      "location": -0.7,
+                      "value": 31.76
+                    },
+                    {
+                      "location": 0,
+                      "value": 69.51
+                    },
+                    {
+                      "location": 1,
+                      "value": 128.5
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.42,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": 26.1
+                    },
+                    {
+                      "location": -0.7,
+                      "value": 31.76
+                    },
+                    {
+                      "location": 0,
+                      "value": 69.51
+                    },
+                    {
+                      "location": 1,
+                      "value": 128.5
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.33,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -24.75
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -5.59
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 51.37
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 63.36
+                    },
+                    {
+                      "location": 0.45,
+                      "value": 64.81
+                    },
+                    {
+                      "location": 1,
+                      "value": 77.3
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.15,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -7.9
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -0.29
+                    },
+                    {
+                      "location": -0.2,
+                      "value": 9.45
+                    },
+                    {
+                      "location": 0,
+                      "value": 10.6
+                    },
+                    {
+                      "location": 0.35,
+                      "value": 58.12
+                    },
+                    {
+                      "location": 0.7,
+                      "value": 78.31
+                    },
+                    {
+                      "location": 1,
+                      "value": 77.3
+                    }
+                  ]
+                }
+              },
+              {
+                "location": -0.05,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -5.9
+                    },
+                    {
+                      "location": -0.85,
+                      "value": 0.37
+                    },
+                    {
+                      "location": 0,
+                      "value": 4.15
+                    },
+                    {
+                      "location": 0.2,
+                      "value": 27.1
+                    },
+                    {
+                      "location": 0.35,
+                      "value": 53.43
+                    },
+                    {
+                      "location": 0.7,
+                      "value": 74.03
+                    },
+                    {
+                      "location": 1,
+                      "value": 72.56
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.2,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -5.9
+                    },
+                    {
+                      "location": -0.7,
+                      "value": 2.74
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0.45,
+                      "value": 4.71
+                    },
+                    {
+                      "location": 1,
+                      "value": 13.3
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.42,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -5.9
+                    },
+                    {
+                      "location": -0.85,
+                      "value": -1.26
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0.2,
+                      "value": 9.65
+                    },
+                    {
+                      "location": 1,
+                      "value": 16.45
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.53,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -5.9
+                    },
+                    {
+                      "location": -0.55,
+                      "value": 1.09
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0,
+                      "value": 22.26
+                    },
+                    {
+                      "location": 1,
+                      "value": 22.26
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 0.58,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -5.9
+                    },
+                    {
+                      "location": -0.7,
+                      "value": 2.74
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0.45,
+                      "value": 4.71
+                    },
+                    {
+                      "location": 1,
+                      "value": 13.3
+                    }
+                  ]
+                }
+              },
+              {
+                "location": 1,
+                "value": {
+                  "coordinate": 0,
+                  "interpolation": "monotone",
+                  "op": "spline",
+                  "points": [
+                    {
+                      "location": -1,
+                      "value": -2.06
+                    },
+                    {
+                      "location": -0.4,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 0,
+                      "value": 1.78
+                    },
+                    {
+                      "location": 1,
+                      "value": 13.3
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "river_bed_gate": {
+      "a": {
+        "a": "river_weight",
+        "b": {
+          "from": -0.5,
+          "in": "erosion_value",
+          "op": "smoothstep",
+          "to": -0.375
+        },
+        "op": "mul"
+      },
+      "b": {
+        "a": 1,
+        "b": {
+          "from": 0.06,
+          "in": "abs_weirdness",
+          "op": "smoothstep",
+          "to": 0.12
+        },
+        "op": "sub"
+      },
+      "op": "mul"
+    },
+    "river_bed_input": {
+      "a": "valley_floor_offset",
+      "b": "lowland_lift",
+      "op": "add"
     },
     "river_raw": {
       "in": {
@@ -1218,1183 +3604,31 @@
       "to": -16
     },
     "terrain_offset": {
-      "a": {
-        "coordinate": "continentalness_curve",
-        "interpolation": "monotone",
-        "op": "spline",
-        "points": [
-          {
-            "location": -1,
-            "value": -27.9
+      "a": "river_bed_input",
+      "b": {
+        "a": {
+          "a": "river_bed_input",
+          "b": {
+            "a": 0.4,
+            "b": {
+              "a": 1,
+              "b": {
+                "from": 0,
+                "in": "river_bed_input",
+                "op": "smoothstep",
+                "to": 4
+              },
+              "op": "sub"
+            },
+            "op": "mul"
           },
-          {
-            "location": -0.5,
-            "value": -27.2
-          },
-          {
-            "location": -0.44,
-            "value": -14.9
-          },
-          {
-            "location": -0.2,
-            "value": -14.9
-          },
-          {
-            "location": -0.16,
-            "value": {
-              "coordinate": "erosion_value",
-              "interpolation": "monotone",
-              "op": "spline",
-              "points": [
-                {
-                  "location": -1,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -10.87
-                      },
-                      {
-                        "location": 1,
-                        "value": 88.82
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.6,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -17.85
-                      },
-                      {
-                        "location": -0.85,
-                        "value": -12.48
-                      },
-                      {
-                        "location": -0.55,
-                        "value": 5.65
-                      },
-                      {
-                        "location": 0.45,
-                        "value": 41.48
-                      },
-                      {
-                        "location": 1,
-                        "value": 64.5
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.42,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -27.77
-                      },
-                      {
-                        "location": -0.85,
-                        "value": -27.68
-                      },
-                      {
-                        "location": -0.55,
-                        "value": 0.59
-                      },
-                      {
-                        "location": 0.6,
-                        "value": 1.26
-                      },
-                      {
-                        "location": 1,
-                        "value": 14.18
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.33,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -37.55
-                      },
-                      {
-                        "location": -0.4,
-                        "value": 6.78
-                      },
-                      {
-                        "location": 1,
-                        "value": 8.18
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.15,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -20.7
-                      },
-                      {
-                        "location": -0.7,
-                        "value": -4.97
-                      },
-                      {
-                        "location": -0.4,
-                        "value": 1.17
-                      },
-                      {
-                        "location": 0,
-                        "value": 1.17
-                      },
-                      {
-                        "location": 0.35,
-                        "value": 6.21
-                      },
-                      {
-                        "location": 1,
-                        "value": 8.18
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": 0.2,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -18.7
-                      },
-                      {
-                        "location": -0.7,
-                        "value": -4.3
-                      },
-                      {
-                        "location": -0.4,
-                        "value": 0.5
-                      },
-                      {
-                        "location": 1,
-                        "value": 0.5
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": 1,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -2.06
-                      },
-                      {
-                        "location": 0,
-                        "value": -3.34
-                      },
-                      {
-                        "location": 0.6,
-                        "value": 1.18
-                      },
-                      {
-                        "location": 1,
-                        "value": 0.5
-                      }
-                    ]
-                  }
-                }
-              ]
-            }
-          },
-          {
-            "location": 0.03,
-            "value": {
-              "coordinate": "erosion_value",
-              "interpolation": "monotone",
-              "op": "spline",
-              "points": [
-                {
-                  "location": -1,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": 0.74
-                      },
-                      {
-                        "location": -0.85,
-                        "value": 6.74
-                      },
-                      {
-                        "location": -0.2,
-                        "value": 43.92
-                      },
-                      {
-                        "location": 1,
-                        "value": 110.34
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.6,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -4.16
-                      },
-                      {
-                        "location": 0.45,
-                        "value": 52.67
-                      },
-                      {
-                        "location": 1,
-                        "value": 77.79
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.42,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -10.99
-                      },
-                      {
-                        "location": -0.85,
-                        "value": -10.96
-                      },
-                      {
-                        "location": -0.55,
-                        "value": 8.66
-                      },
-                      {
-                        "location": -0.4,
-                        "value": 9.19
-                      },
-                      {
-                        "location": 0.45,
-                        "value": 20.38
-                      },
-                      {
-                        "location": 1,
-                        "value": 37.91
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.33,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -31.15
-                      },
-                      {
-                        "location": -0.4,
-                        "value": 18.53
-                      },
-                      {
-                        "location": 0.45,
-                        "value": 18.95
-                      },
-                      {
-                        "location": 1,
-                        "value": 22.53
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.15,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -14.3
-                      },
-                      {
-                        "location": -0.55,
-                        "value": 1.6
-                      },
-                      {
-                        "location": 0,
-                        "value": 3.4
-                      },
-                      {
-                        "location": 0.35,
-                        "value": 17.03
-                      },
-                      {
-                        "location": 1,
-                        "value": 22.53
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": 0.2,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -12.3
-                      },
-                      {
-                        "location": -0.85,
-                        "value": -4.7
-                      },
-                      {
-                        "location": -0.4,
-                        "value": 1.78
-                      },
-                      {
-                        "location": 0,
-                        "value": 1.78
-                      },
-                      {
-                        "location": 1,
-                        "value": 13.3
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": 1,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -2.06
-                      },
-                      {
-                        "location": 0,
-                        "value": -3.34
-                      },
-                      {
-                        "location": 0.35,
-                        "value": 3.42
-                      },
-                      {
-                        "location": 1,
-                        "value": 13.3
-                      }
-                    ]
-                  }
-                }
-              ]
-            }
-          },
-          {
-            "location": 0.3,
-            "value": {
-              "coordinate": "erosion_value",
-              "interpolation": "monotone",
-              "op": "spline",
-              "points": [
-                {
-                  "location": -1,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": 26.64
-                      },
-                      {
-                        "location": -0.85,
-                        "value": 29.38
-                      },
-                      {
-                        "location": -0.55,
-                        "value": 47.31
-                      },
-                      {
-                        "location": -0.2,
-                        "value": 77.23
-                      },
-                      {
-                        "location": 1,
-                        "value": 158.38
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.85,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": 26.64
-                      },
-                      {
-                        "location": -0.85,
-                        "value": 29.38
-                      },
-                      {
-                        "location": -0.55,
-                        "value": 47.31
-                      },
-                      {
-                        "location": -0.2,
-                        "value": 77.23
-                      },
-                      {
-                        "location": 1,
-                        "value": 158.38
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.7,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": 26.1
-                      },
-                      {
-                        "location": -0.7,
-                        "value": 29.46
-                      },
-                      {
-                        "location": -0.2,
-                        "value": 47.44
-                      },
-                      {
-                        "location": 1,
-                        "value": 113.34
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.42,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": 26.1
-                      },
-                      {
-                        "location": -0.7,
-                        "value": 26.05
-                      },
-                      {
-                        "location": -0.2,
-                        "value": 32.62
-                      },
-                      {
-                        "location": 1,
-                        "value": 90.88
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.33,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -31.07
-                      },
-                      {
-                        "location": -0.85,
-                        "value": -13.83
-                      },
-                      {
-                        "location": -0.55,
-                        "value": 34.68
-                      },
-                      {
-                        "location": -0.4,
-                        "value": 44.74
-                      },
-                      {
-                        "location": 0.45,
-                        "value": 45.76
-                      },
-                      {
-                        "location": 1,
-                        "value": 54.55
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.15,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -14.22
-                      },
-                      {
-                        "location": -0.85,
-                        "value": -5.88
-                      },
-                      {
-                        "location": -0.2,
-                        "value": 6.8
-                      },
-                      {
-                        "location": 0,
-                        "value": 7.61
-                      },
-                      {
-                        "location": 0.35,
-                        "value": 41.05
-                      },
-                      {
-                        "location": 0.7,
-                        "value": 55.27
-                      },
-                      {
-                        "location": 1,
-                        "value": 54.55
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.05,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -12.22
-                      },
-                      {
-                        "location": -0.85,
-                        "value": -4.92
-                      },
-                      {
-                        "location": -0.2,
-                        "value": 2.26
-                      },
-                      {
-                        "location": 0,
-                        "value": 3.1
-                      },
-                      {
-                        "location": 0.35,
-                        "value": 37.83
-                      },
-                      {
-                        "location": 0.7,
-                        "value": 52.43
-                      },
-                      {
-                        "location": 1,
-                        "value": 51.5
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": 0.2,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -12.22
-                      },
-                      {
-                        "location": -0.85,
-                        "value": -4.63
-                      },
-                      {
-                        "location": -0.4,
-                        "value": 1.78
-                      },
-                      {
-                        "location": 0,
-                        "value": 1.78
-                      },
-                      {
-                        "location": 1,
-                        "value": 13.3
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": 0.42,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -12.22
-                      },
-                      {
-                        "location": -0.55,
-                        "value": 0.64
-                      },
-                      {
-                        "location": 1,
-                        "value": 16.45
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": 0.53,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -12.22
-                      },
-                      {
-                        "location": -0.85,
-                        "value": -11.03
-                      },
-                      {
-                        "location": -0.55,
-                        "value": -0.73
-                      },
-                      {
-                        "location": -0.4,
-                        "value": 1.78
-                      },
-                      {
-                        "location": 0,
-                        "value": 22.26
-                      },
-                      {
-                        "location": 1,
-                        "value": 22.26
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": 0.58,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -12.22
-                      },
-                      {
-                        "location": -0.85,
-                        "value": -4.63
-                      },
-                      {
-                        "location": -0.4,
-                        "value": 1.78
-                      },
-                      {
-                        "location": 0,
-                        "value": 1.78
-                      },
-                      {
-                        "location": 1,
-                        "value": 13.3
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": 1,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -2.06
-                      },
-                      {
-                        "location": 0,
-                        "value": -3.27
-                      },
-                      {
-                        "location": 0.35,
-                        "value": 3.43
-                      },
-                      {
-                        "location": 1,
-                        "value": 13.3
-                      }
-                    ]
-                  }
-                }
-              ]
-            }
-          },
-          {
-            "location": 1,
-            "value": {
-              "coordinate": "erosion_value",
-              "interpolation": "monotone",
-              "op": "spline",
-              "points": [
-                {
-                  "location": -1,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": 45.03
-                      },
-                      {
-                        "location": -0.85,
-                        "value": 48.1
-                      },
-                      {
-                        "location": -0.55,
-                        "value": 68.18
-                      },
-                      {
-                        "location": -0.2,
-                        "value": 101.66
-                      },
-                      {
-                        "location": 1,
-                        "value": 192.5
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.85,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": 45.03
-                      },
-                      {
-                        "location": -0.85,
-                        "value": 48.1
-                      },
-                      {
-                        "location": -0.55,
-                        "value": 68.18
-                      },
-                      {
-                        "location": -0.2,
-                        "value": 101.66
-                      },
-                      {
-                        "location": 1,
-                        "value": 192.5
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.7,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": 26.1
-                      },
-                      {
-                        "location": -0.7,
-                        "value": 31.76
-                      },
-                      {
-                        "location": 0,
-                        "value": 69.51
-                      },
-                      {
-                        "location": 1,
-                        "value": 128.5
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.42,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": 26.1
-                      },
-                      {
-                        "location": -0.7,
-                        "value": 31.76
-                      },
-                      {
-                        "location": 0,
-                        "value": 69.51
-                      },
-                      {
-                        "location": 1,
-                        "value": 128.5
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.33,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -24.75
-                      },
-                      {
-                        "location": -0.85,
-                        "value": -5.59
-                      },
-                      {
-                        "location": -0.55,
-                        "value": 51.37
-                      },
-                      {
-                        "location": -0.4,
-                        "value": 63.36
-                      },
-                      {
-                        "location": 0.45,
-                        "value": 64.81
-                      },
-                      {
-                        "location": 1,
-                        "value": 77.3
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.15,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -7.9
-                      },
-                      {
-                        "location": -0.85,
-                        "value": -0.29
-                      },
-                      {
-                        "location": -0.2,
-                        "value": 9.45
-                      },
-                      {
-                        "location": 0,
-                        "value": 10.6
-                      },
-                      {
-                        "location": 0.35,
-                        "value": 58.12
-                      },
-                      {
-                        "location": 0.7,
-                        "value": 78.31
-                      },
-                      {
-                        "location": 1,
-                        "value": 77.3
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": -0.05,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -5.9
-                      },
-                      {
-                        "location": -0.85,
-                        "value": 0.37
-                      },
-                      {
-                        "location": 0,
-                        "value": 4.15
-                      },
-                      {
-                        "location": 0.2,
-                        "value": 27.1
-                      },
-                      {
-                        "location": 0.35,
-                        "value": 53.43
-                      },
-                      {
-                        "location": 0.7,
-                        "value": 74.03
-                      },
-                      {
-                        "location": 1,
-                        "value": 72.56
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": 0.2,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -5.9
-                      },
-                      {
-                        "location": -0.7,
-                        "value": 2.74
-                      },
-                      {
-                        "location": -0.4,
-                        "value": 1.78
-                      },
-                      {
-                        "location": 0.45,
-                        "value": 4.71
-                      },
-                      {
-                        "location": 1,
-                        "value": 13.3
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": 0.42,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -5.9
-                      },
-                      {
-                        "location": -0.85,
-                        "value": -1.26
-                      },
-                      {
-                        "location": -0.4,
-                        "value": 1.78
-                      },
-                      {
-                        "location": 0.2,
-                        "value": 9.65
-                      },
-                      {
-                        "location": 1,
-                        "value": 16.45
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": 0.53,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -5.9
-                      },
-                      {
-                        "location": -0.55,
-                        "value": 1.09
-                      },
-                      {
-                        "location": -0.4,
-                        "value": 1.78
-                      },
-                      {
-                        "location": 0,
-                        "value": 22.26
-                      },
-                      {
-                        "location": 1,
-                        "value": 22.26
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": 0.58,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -5.9
-                      },
-                      {
-                        "location": -0.7,
-                        "value": 2.74
-                      },
-                      {
-                        "location": -0.4,
-                        "value": 1.78
-                      },
-                      {
-                        "location": 0.45,
-                        "value": 4.71
-                      },
-                      {
-                        "location": 1,
-                        "value": 13.3
-                      }
-                    ]
-                  }
-                },
-                {
-                  "location": 1,
-                  "value": {
-                    "coordinate": "peaks_valleys",
-                    "interpolation": "monotone",
-                    "op": "spline",
-                    "points": [
-                      {
-                        "location": -1,
-                        "value": -2.06
-                      },
-                      {
-                        "location": -0.4,
-                        "value": 1.78
-                      },
-                      {
-                        "location": 0,
-                        "value": 1.78
-                      },
-                      {
-                        "location": 1,
-                        "value": 13.3
-                      }
-                    ]
-                  }
-                }
-              ]
-            }
-          }
-        ]
+          "op": "sub"
+        },
+        "b": -6,
+        "op": "max"
       },
-      "b": "lowland_lift",
-      "op": "add"
+      "op": "lerp",
+      "t": "river_bed_gate"
     },
     "terrain_raw_density": {
       "a": "terrain_shape",
@@ -2428,6 +3662,52 @@
         "op": "smoothstep",
         "to": 383
       }
+    },
+    "valley_floor_offset": {
+      "a": "offset_rows",
+      "b": {
+        "a": "offset_rows",
+        "b": {
+          "a": 0.75,
+          "b": {
+            "a": "ridge_offset",
+            "b": 8,
+            "op": "sub"
+          },
+          "op": "mul"
+        },
+        "op": "max"
+      },
+      "op": "lerp",
+      "t": {
+        "from": 0.03,
+        "in": "continentalness_curve",
+        "op": "smoothstep",
+        "to": 0.12
+      }
+    },
+    "valley_weirdness": {
+      "coordinate": "abs_weirdness",
+      "interpolation": "monotone",
+      "op": "spline",
+      "points": [
+        {
+          "location": 0,
+          "value": 0
+        },
+        {
+          "location": 0.035,
+          "value": 0.1
+        },
+        {
+          "location": 0.33333333333333331,
+          "value": 0.33333333333333331
+        },
+        {
+          "location": 1,
+          "value": 1
+        }
+      ]
     },
     "weirdness_value": {
       "in": {
@@ -2555,12 +3835,12 @@
       "wavelength": 5271
     },
     "ice_wobble": {
-      "amplitude": 0.08,
-      "gain": 0.5,
+      "amplitude": 0.1,
+      "gain": 0.7,
       "kind": "simplex2",
-      "lacunarity": 2,
-      "octaves": 1,
-      "wavelength": 24
+      "lacunarity": 4,
+      "octaves": 2,
+      "wavelength": 96
     },
     "patch_mix": {
       "amplitude": 1,
@@ -2657,7 +3937,7 @@
       "kind": "simplex2",
       "lacunarity": 2,
       "octaves": 3,
-      "wavelength": 600
+      "wavelength": 1000
     }
   },
   "outputs": {

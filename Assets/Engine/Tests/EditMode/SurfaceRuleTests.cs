@@ -583,7 +583,7 @@ namespace Engine.Tests.EditMode{
 
         [Test]
         public void Ice_FormsOnlyAtTheWaterLayer_OverOpenColdWater_OrAsGlaciers(){
-            int ice = 0;
+            int ice = 0, half = 0, full = 0;
             ushort iceId = _config.WorldGen.IceVoxel;
             Assert.AreNotEqual(0, iceId);
             foreach (DensityProbeResult r in _chunks)
@@ -600,10 +600,18 @@ namespace Engine.Tests.EditMode{
                     bool expected = h < WetY && r.IceCold[c] != 0 && def.neverSnows == 0;
                     bool found = VoxelAt(r, x, WetY, z) == iceId;
                     Assert.AreEqual(expected, found, $"chunk {r.Origin} column ({x}, {z}) {_names[r.Surface[c]]}, top {h}, T {r.ColumnTemperature[c]}");
-                    if (found) ice++;
+                    if (!found) continue;
+                    ice++;
+                    // H2: the snow on the sea ice, half a layer and then a full one the colder the column (ColumnClimate's level).
+                    ushort snow = VoxelAt(r, x, WetY + 1, z);
+                    ushort want = r.IceCold[c] switch{ 3 => SnowLayer, 2 => SnowHalf, _ => (ushort)0 };
+                    Assert.AreEqual(want, snow, $"chunk {r.Origin} column ({x}, {z}): snow on the ice, level {r.IceCold[c] - 1}");
+                    if (snow == SnowHalf) half++;
+                    if (snow == SnowLayer) full++;
                 }
 
-            TestContext.WriteLine($"{ice} ice voxels");
+            TestContext.WriteLine($"{ice} ice voxels, {half} with half a snow layer, {full} with a full one");
+            Assert.Greater(half + full, 0, "no snow on the sea ice in the sample chunks");
             Kind("ice");
             Assert.Greater(ice, 0, "no ice in the sample chunks");
         }
@@ -737,6 +745,11 @@ namespace Engine.Tests.EditMode{
                     bool dry = depth == 0;
                     bool steep = r.Rise[c] >= 4, alpine = h >= r.TreeLine[c];
                     ushort top = VoxelAt(r, x, h, z);
+                    // DEC-257: the Mountain's alpine grass ends at y 200 plus the tree-line wobble (±8); inside the wobble
+                    // band either block is right.
+                    bool mountain = _names[id] == "Mountain";
+                    bool aboveAlpineGrass = mountain && (h >= MountainGrassTop + TreeLineWobble ||
+                                                         h >= MountainGrassTop - TreeLineWobble && top != def.meadowBlock);
                     string where = $"chunk {r.Origin} column ({x}, {z}) y {h} {_names[id]} (water {depth}, rise {r.Rise[c]}, tree line {r.TreeLine[c]}, snow line {r.SnowLine[c]})";
 
                     // A glacier (DEC-215) comes first in global-before and stays bare (AD-46).
@@ -803,7 +816,7 @@ namespace Engine.Tests.EditMode{
                         rule = "forest_floor";
                         expected = def.forestFloorBlock;
                     }
-                    else if (!alpine && def.meadowGround != 0 && def.meadowBlock != 0){
+                    else if (!alpine && def.meadowGround != 0 && def.meadowBlock != 0 && !aboveAlpineGrass){
                         rule = "meadow";
                         expected = def.meadowBlock;
                     }
@@ -870,7 +883,7 @@ namespace Engine.Tests.EditMode{
             }
 
             TestContext.WriteLine(string.Join(", ", seen.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key} {kv.Value}")));
-            // No shipped biome sets a MeadowBlock since DEC-204 (Mountain is bare stone); the meadow rule stays for mods.
+            // Only the Mountain sets a MeadowBlock (alpine grass below y 200, DEC-257), so the sample chunks need not reach it.
             foreach (string rule in new[]{ "snow", "shallow_floor", "underwater_top", "beach", "steep (under)", "alpine", "top", "ground" })
                 Assert.IsTrue(seen.ContainsKey(rule), $"no column took the {rule} rule in the sample chunks");
             Kind("coast");
@@ -879,5 +892,11 @@ namespace Engine.Tests.EditMode{
         }
 
         #endregion
+
+        /// <summary>The <c>y_above</c> limit of the shipped meadow rule on the Mountain (DEC-257).</summary>
+        private const int MountainGrassTop = 200;
+
+        /// <summary>The amplitude of the shipped <c>tree_line_wobble</c> output, which wobbles that limit.</summary>
+        private const int TreeLineWobble = 8;
     }
 }

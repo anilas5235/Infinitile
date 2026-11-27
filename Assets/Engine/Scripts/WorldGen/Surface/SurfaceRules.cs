@@ -196,6 +196,11 @@ namespace Engine.Scripts.WorldGen.Surface{
         /// <summary>River ice needs a dry probe within this many blocks, so a river's ice stops at the coast instead of running out over the sea (AD-47).</summary>
         public int RiverIceReach;
 
+        /// <summary>Snow on the sea ice: the cold margins below <see cref="IceTemperature" /> of the half and the full layer, and their voxels (0: none).</summary>
+        public float IceSnowHalf, IceSnowFull;
+
+        public ushort IceSnowHalfBlock, IceSnowFullBlock;
+
         /// <summary>1: ice forms where it is cold enough (some biome may snow).</summary>
         public byte Ice;
 

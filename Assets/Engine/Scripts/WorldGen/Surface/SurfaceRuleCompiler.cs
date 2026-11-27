@@ -112,6 +112,7 @@ namespace Engine.Scripts.WorldGen.Surface{
             private int _reach;
             private bool _interior;
             private bool _needsTemperature;
+            private ushort _iceSnowHalfBlock, _iceSnowFullBlock;
 
             public Compiler(SurfaceRuleSet set, CompiledNoiseGraph graph, Func<string, int> blockByName, List<LayoutMessage> messages){
                 _set = set;
@@ -164,6 +165,11 @@ namespace Engine.Scripts.WorldGen.Surface{
                 _needsTemperature = true;
                 Output(climate.IceWobble);
                 if (!float.IsNaN(climate.RiverIceTemperature)) Output(GraphOutputs.River);
+                _iceSnowHalfBlock = IceSnowBlock(climate.IceSnowHalf, "snow_half", "iceSnowHalf");
+                _iceSnowFullBlock = IceSnowBlock(climate.IceSnowFull, "snow_layer", "iceSnowFull");
+                if (_iceSnowHalfBlock != 0 || _iceSnowFullBlock != 0) Output(climate.SnowWobble);
+                if (_iceSnowHalfBlock != 0 && _iceSnowFullBlock != 0 && climate.IceSnowFull < climate.IceSnowHalf)
+                    Error(null, "iceSnowFull must not be smaller than iceSnowHalf: the full layer lies inside the half one.", "climate");
                 float iceWobble = WobbleBound(climate.IceWobble), snowWobble = WobbleBound(climate.SnowWobble);
                 if (climate.IceTemperature + iceWobble > climate.SnowTemperature - snowWobble)
                     // A warning since V4 (DEC-176): the snow refit (DEC-175) would otherwise push the ice into rarity.
@@ -579,6 +585,15 @@ namespace Engine.Scripts.WorldGen.Surface{
                 }
             }
 
+            /// <summary>The voxel of a snow layer on the sea ice: the rule file's block <paramref name="block" />, 0 when the margin is unset.</summary>
+            private ushort IceSnowBlock(float margin, string block, string field){
+                if (float.IsNaN(margin)) return 0;
+                if (!(margin >= 0f)) Error(null, $"{field} must be a margin of at least 0 below iceTemperature.", "climate");
+                if (_set.Blocks.TryGetValue(block, out string name)) return Named(name, field);
+                Error(null, $"{field} needs the block \"{block}\" in \"blocks\".", "climate");
+                return 0;
+            }
+
             private SurfaceRules Climate(){
                 SurfaceClimate c = _set.Climate;
                 return new SurfaceRules{
@@ -623,6 +638,10 @@ namespace Engine.Scripts.WorldGen.Surface{
                 r.RiverIceMin = _set.Climate.RiverIceMin;
                 r.RiverIceTemperature = riverIce ? _set.Climate.RiverIceTemperature : 0f;
                 r.RiverIceReach = _set.Climate.NearWaterDistance;
+                r.IceSnowHalf = _iceSnowHalfBlock != 0 ? _set.Climate.IceSnowHalf : 0f;
+                r.IceSnowFull = _iceSnowFullBlock != 0 ? _set.Climate.IceSnowFull : 0f;
+                r.IceSnowHalfBlock = _iceSnowHalfBlock;
+                r.IceSnowFullBlock = _iceSnowFullBlock;
                 r.SnowWobble = Output(_set.Climate.SnowWobble);
                 r.TreeLineWobble = Output(_set.Climate.TreeLineWobble);
                 r.Ice = 1;

@@ -268,6 +268,15 @@ namespace Engine.Scripts.WorldGen.Surface{
         public string IceWobble;
 
         /// <summary>
+        ///     Snow on the sea ice (§8.2): a half snow layer (the "snow_half" block) lies on ice where the column is
+        ///     colder than <see cref="IceTemperature" /> by at least this margin (with the ice and the snow wobble), a
+        ///     full layer ("snow_layer") from <see cref="IceSnowFull" /> on. NaN (the default): no snow on the ice.
+        /// </summary>
+        public float IceSnowHalf = float.NaN;
+
+        public float IceSnowFull = float.NaN;
+
+        /// <summary>
         ///     Frozen rivers (§8.3, DEC-207): water where the graph's <c>river</c> output is at least
         ///     <see cref="RiverIceMin" /> freezes where T &lt; this, without the wobble (Minecraft's temperature level 0),
         ///     so a cold river is one ice sheet. NaN (the default): rivers freeze like the sea.
@@ -581,6 +590,8 @@ namespace Engine.Scripts.WorldGen.Surface{
                     case "snowWobble": Climate.SnowWobble = Text(p, source, file); break;
                     case "iceTemperature": Climate.IceTemperature = Number(p, source, file); break;
                     case "iceWobble": Climate.IceWobble = Text(p, source, file); break;
+                    case "iceSnowHalf": Climate.IceSnowHalf = Number(p, source, file); break;
+                    case "iceSnowFull": Climate.IceSnowFull = Number(p, source, file); break;
                     case "riverIceTemperature": Climate.RiverIceTemperature = Number(p, source, file); break;
                     case "riverIceMin": Climate.RiverIceMin = Number(p, source, file); break;
                     case "treeLineBelowSnow": Climate.TreeLineBelowSnow = Number(p, source, file); break;

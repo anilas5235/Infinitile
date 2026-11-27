@@ -45,7 +45,7 @@ namespace Engine.Scripts.WorldGen.Density{
         /// <summary>[z · 32 + x]: the blend's border threshold (from <see cref="DensityChunk.PassBlend" />); NaN where the border did not run.</summary>
         public NativeArray<float> Border;
 
-        /// <summary>[x · 32 + z], with surface rules (from <see cref="DensityChunk.PassFill" />): T, snow line, tree line, rise, ice flag.</summary>
+        /// <summary>[x · 32 + z], with surface rules (from <see cref="DensityChunk.PassFill" />): T, snow line, tree line, rise, ice flag (0 no ice, else 1 + the snow on it: 0, half, full layer).</summary>
         public NativeArray<float> ColumnTemperature;
 
         public NativeArray<short> SnowLine, TreeLine;

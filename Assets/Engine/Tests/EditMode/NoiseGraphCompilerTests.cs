@@ -311,7 +311,7 @@ namespace Engine.Tests.EditMode{
         /// </summary>
         [Test]
         public void ShippedGraph_OutputsOnFixedColumnsMatchTheGoldenHash(){
-            const uint expected = 0xDED96E74u; // H2: Minecraft rows, W follows Minecraft at wavelength 600, lowland lift, carves removed (DEC-238…243); V5 review: patch_mix output, warped (DEC-206); V5 tour: Minecraft PV fold, slice |W| ≤ 0.04, dry highland gorges (DEC-196…198); V5: rivers on the W zero line in the lowland, mirrored lowland relief, river output (DEC-192, DEC-193); V4 tour 6: rock_kind output (DEC-190); V4 tour 5: ground_mix output (DEC-187); V4 tour 4: rock_mix wavelength 12 (DEC-184); V4 tour 3: rock_mix output (DEC-182); V4 tour: beach noise 64, beach_shape ramp 0.20…0.35 (DEC-179); V4 rule outputs (beach_shape and the snow, ice, tree line and strata wobbles); V3 calmer border (DEC-171); V3 deeper valleys: massif rows d2 (DEC-168); V3 re-tune: ranges on the W zero line, Badlands K (DEC-163…165); V3: blend_border, T/F wavelengths ×1.4 (DEC-161) (V2: the terrain outputs, the massif re-tune and the soft knee)
+            const uint expected = 0xC612E2EDu; // H2 tour 3: deeper ocean, the ocean rows fall from −14.9 at C −0.2 to −55 (DEC-262); shallower, wider river beds (river_bed_gate, bed at −6, DEC-261), two-scale ice_wobble for the sea-ice floes (DEC-260); H2 tour 2: narrower river valleys, valley_weirdness remap of |W| for PV (DEC-251); H2 tour 1: wider Mountain ground (E curve, DEC-245), rivers only in low ground, W wavelength 1000, wider lift (DEC-249); H2: Minecraft rows, W follows Minecraft at wavelength 600, lowland lift, carves removed (DEC-238…243); V5 review: patch_mix output, warped (DEC-206); V5 tour: Minecraft PV fold, slice |W| ≤ 0.04, dry highland gorges (DEC-196…198); V5: rivers on the W zero line in the lowland, mirrored lowland relief, river output (DEC-192, DEC-193); V4 tour 6: rock_kind output (DEC-190); V4 tour 5: ground_mix output (DEC-187); V4 tour 4: rock_mix wavelength 12 (DEC-184); V4 tour 3: rock_mix output (DEC-182); V4 tour: beach noise 64, beach_shape ramp 0.20…0.35 (DEC-179); V4 rule outputs (beach_shape and the snow, ice, tree line and strata wobbles); V3 calmer border (DEC-171); V3 deeper valleys: massif rows d2 (DEC-168); V3 re-tune: ranges on the W zero line, Badlands K (DEC-163…165); V3: blend_border, T/F wavelengths ×1.4 (DEC-161) (V2: the terrain outputs, the massif re-tune and the soft knee)
             using CompiledNoiseGraph graph = ShippedNoiseGraph.Compile().Graph;
             float2[] columns = GoldenColumns();
             float[] lattice = GraphEvaluator.SampleLattice(graph, Seed, columns, out _);
@@ -331,16 +331,16 @@ namespace Engine.Tests.EditMode{
             float2[] points = GoldenColumns();
             GraphEvaluator.SampleLattice(graph, Seed, points, out GraphWorkCounters counters);
             // Octaves: continentalness 5 + warp 2 × 2 + erosion 4 + humidity 3 + temperature 3 + weirdness 3 + peak 3 (re-tune 2026-11-22) + blend border 1 (the detail noise went with DEC-171)
-            // + the V4 rule outputs beach_shape, ice_wobble, snow_wobble, strata_shift and tree_line_wobble 1 each, rock_mix 2 (DEC-182), ground_mix 2 (DEC-187), rock_kind 2 (DEC-190), patch_mix 1 + its warp 2 × 2 (DEC-206).
-            const int samplesPerPoint = 42;
+            // + the V4 rule outputs beach_shape, snow_wobble, strata_shift and tree_line_wobble 1 each, ice_wobble 2 (DEC-260), rock_mix 2 (DEC-182), ground_mix 2 (DEC-187), rock_kind 2 (DEC-190), patch_mix 1 + its warp 2 × 2 (DEC-206).
+            const int samplesPerPoint = 43;
             Assert.AreEqual(points.Length, counters.LatticePoints);
             Assert.AreEqual((long)samplesPerPoint * points.Length, counters.NoiseSamples2D);
             Assert.AreEqual(0, counters.NoiseSamples3D);
 
             using GraphRegionResult region = GraphEvaluator.EvaluateRegion(graph, Seed, new int2(-64, 32), new int2(32, 32), true);
             Assert.AreEqual(9 * 9, region.Counters.LatticePoints, "a chunk's lattice is 9 × 9 points");
-            // The per-column outputs (blend_border and the five V4 rule outputs, rock_mix, ground_mix and rock_kind with two octaves each, patch_mix with its two warp noises) add their noise samples on each of the chunk's 32 × 32 columns.
-            const int columnSamples = 17;
+            // The per-column outputs (blend_border and the five V4 rule outputs, ice_wobble, rock_mix, ground_mix and rock_kind with two octaves each, patch_mix with its two warp noises) add their noise samples on each of the chunk's 32 × 32 columns.
+            const int columnSamples = 18;
             Assert.AreEqual(samplesPerPoint * 81 + columnSamples * 32 * 32, region.Counters.NoiseSamples2D);
             Assert.Greater(region.Counters.NoiseSamples3D, 0, "the terrain density is 3D (N3)");
         }

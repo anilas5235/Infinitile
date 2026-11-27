@@ -307,7 +307,7 @@ namespace Engine.Tests.EditMode{
             foreach (int2 chunk in AllFixtureChunks()){
                 using DensityProbeResult p = DensityProbe.Run(_fixture, _config.WorldGen, chunk * Size);
                 int airFrom = 0;
-                for (int column = 0; column < Size * Size; column++) airFrom = math.max(airFrom, math.min(Height, math.max(p.Heightmap[column] + 2, water)));
+                for (int column = 0; column < Size * Size; column++) airFrom = math.max(airFrom, math.min(Height, math.max(p.Heightmap[column] + 2, water + 1)));
                 Assert.Less(airFrom, Height, $"chunk {chunk}: the air layer is in effect");
                 for (int column = 0; column < Size * Size; column++)
                 for (int y = airFrom; y < Height; y++)
